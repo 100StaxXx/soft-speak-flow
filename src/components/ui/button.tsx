@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-royal-gold text-obsidian hover:bg-royal-gold/80 shadow-soft",
+        default: "bg-royal-purple text-pure-white hover:bg-royal-purple/80 shadow-soft",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-2 border-royal-gold bg-obsidian text-pure-white hover:bg-royal-gold hover:text-obsidian",
+        outline: "border-2 border-royal-purple bg-obsidian text-pure-white hover:bg-royal-purple hover:text-pure-white",
         secondary: "bg-graphite text-pure-white hover:bg-graphite/80 border-2 border-steel/20",
-        ghost: "hover:bg-graphite hover:text-royal-gold",
-        link: "text-royal-gold underline-offset-4 hover:underline",
+        ghost: "hover:bg-graphite hover:text-royal-purple",
+        link: "text-royal-purple underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
