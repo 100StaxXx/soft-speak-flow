@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { useProfile } from "@/hooks/useProfile";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
@@ -34,6 +36,34 @@ function ScrollToTop() {
   return null;
 }
 
+const AppContent = () => {
+  const { profile } = useProfile();
+  
+  return (
+    <ThemeProvider mentorId={profile?.selected_mentor_id}>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/videos" element={<Videos />} />
+        <Route path="/video/:id" element={<VideoDetail />} />
+        <Route path="/quotes" element={<Quotes />} />
+        <Route path="/playlists" element={<Playlists />} />
+        <Route path="/playlist/:id" element={<PlaylistDetail />} />
+        <Route path="/saved" element={<Saved />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/premium" element={<Premium />} />
+        <Route path="/pep-talk/:id" element={<PepTalkDetail />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/mentor-selection" element={<MentorSelection />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </ThemeProvider>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -41,25 +71,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/videos" element={<Videos />} />
-          <Route path="/video/:id" element={<VideoDetail />} />
-          <Route path="/quotes" element={<Quotes />} />
-          <Route path="/playlists" element={<Playlists />} />
-          <Route path="/playlist/:id" element={<PlaylistDetail />} />
-          <Route path="/saved" element={<Saved />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/premium" element={<Premium />} />
-          <Route path="/pep-talk/:id" element={<PepTalkDetail />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/mentor-selection" element={<MentorSelection />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -102,11 +102,26 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Bebas Neue', 'Oswald', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     letter-spacing: 0.02em;
+  }
+  
+  /* Theme transition effect */
+  .theme-transition * {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+  }
+  
+  /* Sharp borders variant */
+  .sharp-borders * {
+    border-radius: 0.25rem !important;
+  }
+  
+  .sharp-borders .rounded-lg {
+    border-radius: 0.25rem !important;
   }
 
   .scrollbar-hide {
