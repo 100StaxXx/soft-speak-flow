@@ -168,7 +168,7 @@ const Index = () => {
           <h1 className="font-heading text-5xl font-bold text-foreground mb-2">
             A Lil Push
           </h1>
-          {mentor && (
+          {mentor && user ? (
             <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mt-3">
               <User className="h-4 w-4" />
               <span>Guided by <span className="font-medium text-foreground">{mentor.name}</span></span>
@@ -176,8 +176,7 @@ const Index = () => {
                 Change
               </Button>
             </div>
-          )}
-          {!user && (
+          ) : (
             <p className="text-muted-foreground text-sm mt-2">
               <Button variant="link" onClick={() => navigate("/auth")} className="text-primary p-0">
                 Sign in
@@ -187,7 +186,7 @@ const Index = () => {
           )}
         </div>
 
-        {mentor && (
+        {mentor && user && (
           <Card className="mb-6 p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-heading flex-shrink-0">
