@@ -178,7 +178,7 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
           className="flex-1 resize-none bg-secondary/50"
         />
         <Button
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={!input.trim() || isLoading}
           size="icon"
           className="h-11 w-11 flex-shrink-0 rounded-lg"
