@@ -18,6 +18,7 @@ import About from "./pages/About";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import MentorSelection from "./pages/MentorSelection";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/mentor-selection" element={<MentorSelection />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
