@@ -1,19 +1,19 @@
-import { Home, Library, Info } from "lucide-react";
+import { Home, Video, MessageCircleHeart, Heart, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-medium z-50">
-      <div className="max-w-lg mx-auto flex items-center justify-around px-4 py-3">
+      <div className="max-w-lg mx-auto flex items-center justify-around px-2 py-3">
         <NavLink
           to="/"
           end
-          className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all"
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
           activeClassName="bg-gradient-to-br from-blush-rose/20 to-petal-pink/20"
         >
           {({ isActive }) => (
             <>
-              <Home className={`h-6 w-6 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
+              <Home className={`h-5 w-5 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
               <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                 Home
               </span>
@@ -22,13 +22,13 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/library"
-          className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all"
+          to="/videos"
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
           activeClassName="bg-gradient-to-br from-blush-rose/20 to-petal-pink/20"
         >
           {({ isActive }) => (
             <>
-              <Library className={`h-6 w-6 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
+              <Video className={`h-5 w-5 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
               <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                 Library
               </span>
@@ -37,15 +37,45 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/about"
-          className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all"
+          to="/quotes"
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
           activeClassName="bg-gradient-to-br from-blush-rose/20 to-petal-pink/20"
         >
           {({ isActive }) => (
             <>
-              <Info className={`h-6 w-6 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
+              <MessageCircleHeart className={`h-5 w-5 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
               <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
-                About
+                Quotes
+              </span>
+            </>
+          )}
+        </NavLink>
+
+        <NavLink
+          to="/saved"
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+          activeClassName="bg-gradient-to-br from-blush-rose/20 to-petal-pink/20"
+        >
+          {({ isActive }) => (
+            <>
+              <Heart className={`h-5 w-5 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
+              <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                Saved
+              </span>
+            </>
+          )}
+        </NavLink>
+
+        <NavLink
+          to="/profile"
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all"
+          activeClassName="bg-gradient-to-br from-blush-rose/20 to-petal-pink/20"
+        >
+          {({ isActive }) => (
+            <>
+              <User className={`h-5 w-5 ${isActive ? 'text-blush-rose' : 'text-muted-foreground'}`} />
+              <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                Profile
               </span>
             </>
           )}
