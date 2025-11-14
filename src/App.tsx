@@ -23,6 +23,13 @@ import Admin from "./pages/Admin";
 import MentorSelection from "./pages/MentorSelection";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import Habits from "./pages/Habits";
+import Challenges from "./pages/Challenges";
+import AudioLibrary from "./pages/AudioLibrary";
+import Lessons from "./pages/Lessons";
+import FocusMode from "./pages/FocusMode";
+import WeeklyReview from "./pages/WeeklyReview";
+import MentorChat from "./pages/MentorChat";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +65,13 @@ const AppContent = () => {
         <Route path="/mentor-selection" element={<MentorSelection />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/habits" element={<Habits />} />
+        <Route path="/challenges" element={<Challenges />} />
+        <Route path="/audio" element={<AudioLibrary />} />
+        <Route path="/lessons" element={<Lessons />} />
+        <Route path="/focus" element={<FocusMode />} />
+        <Route path="/review" element={<WeeklyReview />} />
+        <Route path="/mentor-chat" element={<MentorChat />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </ThemeProvider>

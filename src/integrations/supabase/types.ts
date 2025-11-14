@@ -14,6 +14,197 @@ export type Database = {
   }
   public: {
     Tables: {
+      audio_clips: {
+        Row: {
+          audio_url: string
+          category: string
+          created_at: string | null
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          is_premium: boolean | null
+          mentor_id: string | null
+          title: string
+        }
+        Insert: {
+          audio_url: string
+          category: string
+          created_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_premium?: boolean | null
+          mentor_id?: string | null
+          title: string
+        }
+        Update: {
+          audio_url?: string
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_premium?: boolean | null
+          mentor_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_clips_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_progress: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          date: string
+          id: string
+          notes: string | null
+          user_challenge_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          user_challenge_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          user_challenge_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_progress_user_challenge_id_fkey"
+            columns: ["user_challenge_id"]
+            isOneToOne: false
+            referencedRelation: "user_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string
+          duration_days: number
+          id: string
+          mentor_id: string | null
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description: string
+          duration_days: number
+          id?: string
+          mentor_id?: string | null
+          title: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string
+          duration_days?: number
+          id?: string
+          mentor_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenges_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      check_ins: {
+        Row: {
+          created_at: string | null
+          date: string
+          focus_goal: string | null
+          id: string
+          mood: number | null
+          reflection: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          focus_goal?: string | null
+          id?: string
+          mood?: number | null
+          reflection?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          focus_goal?: string | null
+          id?: string
+          mood?: number | null
+          reflection?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_messages: {
+        Row: {
+          audio_url: string | null
+          category: string | null
+          created_at: string | null
+          date: string
+          id: string
+          mentor_id: string | null
+          message_text: string
+        }
+        Insert: {
+          audio_url?: string | null
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          mentor_id?: string | null
+          message_text: string
+        }
+        Update: {
+          audio_url?: string | null
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          mentor_id?: string | null
+          message_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_messages_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       downloads: {
         Row: {
           content_id: string
@@ -62,6 +253,74 @@ export type Database = {
         }
         Relationships: []
       }
+      habit_completions: {
+        Row: {
+          completed_at: string | null
+          date: string
+          habit_id: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          date?: string
+          habit_id?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          date?: string
+          habit_id?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_completions_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          created_at: string | null
+          current_streak: number | null
+          custom_days: number[] | null
+          frequency: string
+          id: string
+          is_active: boolean | null
+          longest_streak: number | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_streak?: number | null
+          custom_days?: number[] | null
+          frequency: string
+          id?: string
+          is_active?: boolean | null
+          longest_streak?: number | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_streak?: number | null
+          custom_days?: number[] | null
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          longest_streak?: number | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hero_slides: {
         Row: {
           created_at: string | null
@@ -96,6 +355,126 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "hero_slides_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_progress: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          lesson_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lessons: {
+        Row: {
+          audio_url: string | null
+          category: string | null
+          content: string
+          created_at: string | null
+          description: string
+          id: string
+          is_premium: boolean | null
+          lesson_number: number | null
+          mentor_id: string | null
+          title: string
+          total_lessons: number | null
+        }
+        Insert: {
+          audio_url?: string | null
+          category?: string | null
+          content: string
+          created_at?: string | null
+          description: string
+          id?: string
+          is_premium?: boolean | null
+          lesson_number?: number | null
+          mentor_id?: string | null
+          title: string
+          total_lessons?: number | null
+        }
+        Update: {
+          audio_url?: string | null
+          category?: string | null
+          content?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          is_premium?: boolean | null
+          lesson_number?: number | null
+          mentor_id?: string | null
+          title?: string
+          total_lessons?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentor_chats: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          mentor_id: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_chats_mentor_id_fkey"
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
@@ -423,6 +802,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_challenges: {
+        Row: {
+          challenge_id: string | null
+          completed: boolean | null
+          created_at: string | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          start_date?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_challenges_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

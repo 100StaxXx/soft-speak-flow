@@ -17,7 +17,7 @@ import { DailyLesson } from "@/components/DailyLesson";
 import { MentorMessage } from "@/components/MentorMessage";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen } from "lucide-react";
+import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen, Flame, Music, Zap, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -218,6 +218,110 @@ const Index = () => {
             </p>
           </div>
         )}
+
+        {/* Quick Feature Navigation */}
+        {user && (
+          <div className="mb-16">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/mentor-chat")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <MessageCircle className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Ask Mentor</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/habits")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Flame className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Habits</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/challenges")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Target className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Challenges</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/focus")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Zap className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Focus</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/audio")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Music className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Audio</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/review")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <TrendingUp className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Review</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/lessons")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <BookOpen className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Lessons</span>
+                </div>
+              </Card>
+              
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/profile")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <Compass className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Profile</span>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
 
         {featuredPepTalk && (
           <div className="mb-16">
