@@ -172,11 +172,13 @@ const Index = () => {
     <>
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
-      <div className="min-h-screen bg-obsidian">
+      <div className="min-h-screen bg-obsidian snap-y snap-mandatory overflow-y-scroll h-screen">
         <PowerModeToggle onToggle={setPowerMode} />
-        <HeroSlider />
+        <div className="snap-start">
+          <HeroSlider />
+        </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-16">
+      <div className="max-w-6xl mx-auto px-6 py-16 snap-start">
         {mentor && user && (
           <div className="mb-12 flex items-center gap-4 justify-center mentor-aura">
             <div className={`w-12 h-12 rounded-lg bg-royal-gold text-obsidian flex items-center justify-center text-xl font-black flex-shrink-0 ${powerMode ? 'shadow-glow' : ''}`}>
