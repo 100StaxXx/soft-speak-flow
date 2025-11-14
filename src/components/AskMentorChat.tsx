@@ -85,8 +85,8 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
   };
 
   return (
-    <Card className="bg-graphite border-steel/20 p-6 h-[600px] flex flex-col">
-      <h3 className="text-2xl font-heading font-black text-pure-white mb-4">
+    <Card className="bg-graphite border-steel/20 p-6 h-[400px] flex flex-col">
+      <h3 className="text-xl font-heading font-black text-pure-white mb-4">
         Ask {mentorName} Anything
       </h3>
 
