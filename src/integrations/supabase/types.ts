@@ -68,33 +68,48 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          identity_description: string | null
           mentor_type: string
           name: string
+          style: string | null
           tags: string[]
+          target_user_type: string | null
+          themes: string[] | null
           tone_description: string
           voice_style: string
+          welcome_message: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           description: string
           id?: string
+          identity_description?: string | null
           mentor_type: string
           name: string
+          style?: string | null
           tags?: string[]
+          target_user_type?: string | null
+          themes?: string[] | null
           tone_description: string
           voice_style: string
+          welcome_message?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           description?: string
           id?: string
+          identity_description?: string | null
           mentor_type?: string
           name?: string
+          style?: string | null
           tags?: string[]
+          target_user_type?: string | null
+          themes?: string[] | null
           tone_description?: string
           voice_style?: string
+          welcome_message?: string | null
         }
         Relationships: []
       }
@@ -258,6 +273,41 @@ export type Database = {
             columns: ["selected_mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questionnaire_responses: {
+        Row: {
+          answer_tags: string[]
+          created_at: string | null
+          id: string
+          question_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          answer_tags: string[]
+          created_at?: string | null
+          id?: string
+          question_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          answer_tags?: string[]
+          created_at?: string | null
+          id?: string
+          question_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaire_responses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

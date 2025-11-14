@@ -12,9 +12,11 @@ import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { VideoCard } from "@/components/VideoCard";
 import { PlaylistCard } from "@/components/PlaylistCard";
+import { AskMentorChat } from "@/components/AskMentorChat";
+import { DailyLesson } from "@/components/DailyLesson";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Compass, User, Heart } from "lucide-react";
+import { Sparkles, Compass, User, Heart, MessageCircle, Trophy, Target, Repeat, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -31,9 +33,9 @@ const Index = () => {
   const [powerMode, setPowerMode] = useState(false);
 
   useEffect(() => {
-    // Check if user needs to select a mentor
+    // Check if user needs onboarding
     if (user && !profileLoading && profile && !profile.selected_mentor_id) {
-      navigate("/mentor-selection");
+      navigate("/onboarding");
     }
   }, [user, profileLoading, profile, navigate]);
 
@@ -219,6 +221,22 @@ const Index = () => {
           </div>
         )}
 
+        {/* Daily Lesson Section */}
+        {mentor && user && (
+          <div className="mb-16">
+            <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
+              <BookOpen className="h-5 w-5" />
+              Daily Lesson
+            </div>
+            <DailyLesson
+              title="The Power of Consistency"
+              content="Success isn't about massive action. It's about small, consistent steps taken every single day. Don't wait for motivation—create discipline. Show up even when you don't feel like it. That's what separates the dreamers from the doers."
+              category="Discipline"
+            />
+          </div>
+        )}
+
+
         {recommendedVideos.length > 0 && (
           <div className="mb-16">
             <div className="flex items-center justify-between mb-6">
@@ -276,6 +294,85 @@ const Index = () => {
             </div>
           </div>
         )}
+
+        {/* Ask Your Mentor Chat Section */}
+        {mentor && user && (
+          <div className="mb-16">
+            <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
+              <MessageCircle className="h-5 w-5" />
+              Ask Your Mentor Anything
+            </div>
+            <AskMentorChat 
+              mentorName={mentor.name} 
+              mentorTone={mentor.tone_description || "supportive and motivational"} 
+            />
+          </div>
+        )}
+
+        {/* Browse Other Mentors */}
+        {user && (
+          <div className="mb-16">
+            <Card className="bg-graphite border-steel/20 p-8 text-center">
+              <User className="h-12 w-12 text-royal-gold mx-auto mb-4" />
+              <h3 className="text-xl font-heading font-black text-pure-white mb-2">
+                Explore Other Mentors
+              </h3>
+              <p className="text-steel mb-6">
+                Not satisfied with your match? Browse and discover other mentors.
+              </p>
+              <Button 
+                onClick={() => navigate("/mentor-selection")} 
+                variant="outline"
+                className="border-royal-gold text-royal-gold hover:bg-royal-gold hover:text-obsidian"
+              >
+                Browse Mentors
+              </Button>
+            </Card>
+          </div>
+        )}
+
+        {/* Retake Quiz */}
+        {user && profile?.selected_mentor_id && (
+          <div className="mb-16">
+            <Card className="bg-obsidian border-royal-gold/30 p-8 text-center">
+              <Repeat className="h-12 w-12 text-royal-gold mx-auto mb-4" />
+              <h3 className="text-xl font-heading font-black text-pure-white mb-2">
+                Retake the Quiz
+              </h3>
+              <p className="text-steel mb-6">
+                Your goals change. Retake the questionnaire to find a better match.
+              </p>
+              <Button 
+                onClick={() => navigate("/onboarding")} 
+                variant="outline"
+                className="border-royal-gold text-royal-gold hover:bg-royal-gold hover:text-obsidian"
+              >
+                Start Over
+              </Button>
+            </Card>
+          </div>
+        )}
+
+        {/* Explore Categories */}
+        <div className="mb-16">
+          <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
+            <Target className="h-5 w-5" />
+            Explore Categories
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {["Discipline", "Confidence", "Gym", "Focus", "Mindset", "Business"].map((category) => (
+              <Card 
+                key={category}
+                className="bg-graphite border-steel/20 p-6 cursor-pointer hover:border-royal-gold/50 transition-all hover:scale-105"
+                onClick={() => navigate(`/library?category=${category.toLowerCase()}`)}
+              >
+                <h4 className="text-pure-white font-heading font-bold text-center">
+                  {category}
+                </h4>
+              </Card>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-12">
           <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-lg py-6 border-2 border-royal-gold bg-obsidian text-pure-white hover:bg-royal-gold hover:text-obsidian font-bold uppercase tracking-wide">
