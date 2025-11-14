@@ -62,6 +62,47 @@ export type Database = {
         }
         Relationships: []
       }
+      hero_slides: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          media_type: string | null
+          media_url: string | null
+          mentor_id: string | null
+          position: number | null
+          text: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          media_type?: string | null
+          media_url?: string | null
+          mentor_id?: string | null
+          position?: number | null
+          text: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          media_type?: string | null
+          media_url?: string | null
+          mentor_id?: string | null
+          position?: number | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hero_slides_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mentors: {
         Row: {
           avatar_url: string | null
