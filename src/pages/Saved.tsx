@@ -144,11 +144,7 @@ const Saved = () => {
                   {favorites.videos.map((video) => (
                     <VideoCard
                       key={video.id}
-                      id={video.id}
-                      title={video.title}
-                      category={video.category}
-                      thumbnailUrl={video.thumbnail_url}
-                      isPremium={video.is_premium}
+                      video={video}
                     />
                   ))}
                 </div>
@@ -164,10 +160,7 @@ const Saved = () => {
                 favorites.quotes.map((quote) => (
                   <QuoteCard
                     key={quote.id}
-                    id={quote.id}
-                    text={quote.text}
-                    author={quote.author}
-                    isPremium={quote.is_premium}
+                    quote={quote}
                     isFavorited={true}
                     onFavoriteChange={() => refetch()}
                   />
@@ -184,10 +177,7 @@ const Saved = () => {
                 favorites.playlists.map((playlist) => (
                   <PlaylistCard
                     key={playlist.id}
-                    id={playlist.id}
-                    title={playlist.title}
-                    description={playlist.description}
-                    isPremium={playlist.is_premium}
+                    playlist={playlist}
                   />
                 ))
               ) : (

@@ -59,11 +59,7 @@ const Videos = () => {
                 {videos.map((video) => (
                   <VideoCard
                     key={video.id}
-                    id={video.id}
-                    title={video.title}
-                    category={video.category}
-                    thumbnailUrl={video.thumbnail_url}
-                    isPremium={video.is_premium}
+                    video={video}
                   />
                 ))}
               </div>
