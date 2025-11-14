@@ -53,11 +53,7 @@ const Playlists = () => {
             {playlists.map((playlist) => (
               <PlaylistCard
                 key={playlist.id}
-                id={playlist.id}
-                title={playlist.title}
-                description={playlist.description}
-                itemCount={playlist.itemCount}
-                isPremium={playlist.is_premium}
+                playlist={playlist}
               />
             ))}
           </div>

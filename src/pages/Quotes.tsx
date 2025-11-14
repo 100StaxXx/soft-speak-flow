@@ -134,10 +134,7 @@ const Quotes = () => {
             {quotes.map((quote) => (
               <QuoteCard
                 key={quote.id}
-                id={quote.id}
-                text={quote.text}
-                author={quote.author}
-                isPremium={quote.is_premium}
+                quote={quote}
                 isFavorited={favorites?.includes(quote.id)}
                 onFavoriteChange={() => refetch()}
               />

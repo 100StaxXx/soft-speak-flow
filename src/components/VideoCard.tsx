@@ -23,9 +23,9 @@ export const VideoCard = ({ video }: VideoCardProps) => {
       className="group cursor-pointer"
     >
       <div className="relative rounded-3xl overflow-hidden shadow-soft mb-3">
-        {thumbnailUrl ? (
+        {thumbnail_url ? (
           <img
-            src={thumbnailUrl}
+            src={thumbnail_url}
             alt={title}
             className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300"
           />
