@@ -162,11 +162,11 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-gradient-to-br from-background via-muted/20 to-secondary/30">
+    <div className="min-h-screen pb-24 bg-obsidian">
       <div className="max-w-lg mx-auto px-6 py-8">
         <div className="text-center mb-8">
-          <h1 className="font-heading text-5xl font-bold text-foreground mb-2">
-            A Lil Push
+          <h1 className="font-heading text-4xl font-black text-pure-white mb-2 tracking-tight uppercase">
+            Your Push Today
           </h1>
           {mentor && user ? (
             <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mt-3">
@@ -187,14 +187,14 @@ const Index = () => {
         </div>
 
         {mentor && user && (
-          <Card className="mb-6 p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+          <Card className="mb-6 p-6 bg-graphite border-2 border-royal-gold">
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-heading flex-shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-royal-gold text-obsidian flex items-center justify-center text-xl font-black flex-shrink-0">
                 {mentor.name.charAt(0)}
               </div>
               <div>
-                <h3 className="font-medium text-foreground mb-1">{mentor.name} says:</h3>
-                <p className="text-sm text-muted-foreground italic">"{mentor.description}"</p>
+                <h3 className="font-semibold text-pure-white mb-1 uppercase tracking-wide">{mentor.name}</h3>
+                <p className="text-sm text-steel">"{mentor.description}"</p>
               </div>
             </div>
           </Card>
@@ -202,9 +202,9 @@ const Index = () => {
 
         {featuredPepTalk && (
           <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Today's Lil Push
+            <div className="flex items-center gap-2 text-sm font-bold text-royal-gold uppercase tracking-wider">
+              <Sparkles className="h-4 w-4 text-royal-gold" />
+              Featured Push
             </div>
             <PepTalkCard
               id={featuredPepTalk.id}
@@ -219,8 +219,8 @@ const Index = () => {
         {recommendedVideos.length > 0 && (
           <div className="space-y-4 mb-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-heading text-foreground">Recommended for You</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/videos")}>
+              <h2 className="text-xl font-black text-pure-white uppercase tracking-tight">Recommended</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/videos")} className="text-royal-gold hover:bg-graphite">
                 See All
               </Button>
             </div>
@@ -235,8 +235,8 @@ const Index = () => {
         {dailyQuotes.length > 0 && (
           <div className="space-y-4 mb-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-heading text-foreground">Daily Wisdom</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/quotes")}>
+              <h2 className="text-xl font-black text-pure-white uppercase tracking-tight">Daily Wisdom</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/quotes")} className="text-royal-gold hover:bg-graphite">
                 More Quotes
               </Button>
             </div>
@@ -251,8 +251,8 @@ const Index = () => {
         {playlists.length > 0 && (
           <div className="space-y-4 mb-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-heading text-foreground">Curated Playlists</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")}>
+              <h2 className="text-xl font-black text-pure-white uppercase tracking-tight">Playlists</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")} className="text-royal-gold hover:bg-graphite">
                 Browse All
               </Button>
             </div>
@@ -265,9 +265,9 @@ const Index = () => {
         )}
 
         <div className="mt-8">
-          <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-full py-6 border-2">
+          <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-lg py-6 border-2 border-royal-gold bg-obsidian text-pure-white hover:bg-royal-gold hover:text-obsidian font-bold uppercase tracking-wide">
             <Compass className="mr-2 h-5 w-5" />
-            Explore All Content
+            Explore Library
           </Button>
         </div>
       </div>
