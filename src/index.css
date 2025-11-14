@@ -8,89 +8,89 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* A Lil Push - Gender Neutral & Grounded Wellness Brand */
+    /* A Lil Push - Sacramento Kings Inspired (Black & Purple) */
     
     /* Core Brand Colors */
-    --slate-grey: 0 0% 18%;
-    --warm-taupe: 24 16% 58%;
-    --soft-sand: 36 36% 87%;
-    --pale-stone: 30 20% 95%;
-    --midnight-blue: 215 25% 17%;
-    --desert-rose: 15 19% 73%;
+    --obsidian: 0 0% 7%;
+    --steel: 240 5% 65%;
+    --pure-white: 0 0% 100%;
+    --graphite: 240 6% 15%;
+    --royal-purple: 270 60% 50%;
+    --deep-purple: 270 50% 35%;
     
     /* Semantic Tokens */
-    --background: 30 20% 95%;
-    --foreground: 0 0% 18%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 18%;
+    --card: 240 6% 15%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 18%;
+    --popover: 240 6% 15%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 24 16% 58%;
+    --primary: 270 60% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 36 36% 87%;
-    --secondary-foreground: 0 0% 18%;
+    --secondary: 240 6% 20%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 36 36% 87%;
-    --muted-foreground: 0 0% 35%;
+    --muted: 240 6% 25%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 15 19% 73%;
-    --accent-foreground: 0 0% 18%;
+    --accent: 270 50% 35%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 24 16% 78%;
-    --input: 24 16% 78%;
-    --ring: 24 16% 58%;
+    --border: 240 6% 25%;
+    --input: 240 6% 25%;
+    --ring: 270 60% 50%;
 
     --radius: 1.25rem;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--warm-taupe)), hsl(var(--soft-sand)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--pale-stone)), hsl(var(--soft-sand)));
-    --gradient-depth: linear-gradient(135deg, hsl(var(--midnight-blue)), hsl(var(--slate-grey)));
+    --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--deep-purple)));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--graphite)), hsl(var(--obsidian)));
+    --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--obsidian)));
     
-    /* Shadows - Soft & Grounded */
-    --shadow-soft: 0 2px 8px hsl(var(--slate-grey) / 0.08);
-    --shadow-medium: 0 4px 16px hsl(var(--slate-grey) / 0.12);
-    --shadow-glow: 0 0 24px hsl(var(--warm-taupe) / 0.3);
+    /* Shadows - Bold & Strong */
+    --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 24px hsl(var(--royal-purple) / 0.5);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .dark {
-    --background: 215 25% 17%;
-    --foreground: 30 20% 95%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
     
-    --card: 215 25% 22%;
-    --card-foreground: 30 20% 95%;
+    --card: 240 6% 15%;
+    --card-foreground: 0 0% 100%;
     
-    --popover: 215 25% 22%;
-    --popover-foreground: 30 20% 95%;
+    --popover: 240 6% 15%;
+    --popover-foreground: 0 0% 100%;
     
-    --primary: 24 16% 58%;
+    --primary: 270 60% 50%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 215 25% 30%;
-    --secondary-foreground: 30 20% 95%;
+    --secondary: 240 6% 20%;
+    --secondary-foreground: 0 0% 100%;
     
-    --muted: 215 25% 25%;
-    --muted-foreground: 30 20% 70%;
+    --muted: 240 6% 25%;
+    --muted-foreground: 240 5% 65%;
     
-    --accent: 15 19% 73%;
-    --accent-foreground: 215 25% 17%;
+    --accent: 270 50% 35%;
+    --accent-foreground: 0 0% 100%;
     
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 215 25% 25%;
-    --input: 215 25% 25%;
-    --ring: 24 16% 58%;
+    --border: 240 6% 25%;
+    --input: 240 6% 25%;
+    --ring: 270 60% 50%;
   }
 }
 
@@ -101,11 +101,12 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Bebas Neue', 'Oswald', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
   }
 
   .scrollbar-hide {

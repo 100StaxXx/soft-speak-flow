@@ -102,7 +102,7 @@ export const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
         <div className="mb-8">
           <div className="h-1 bg-steel/20 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-royal-gold transition-all duration-500"
+              className="h-full bg-royal-purple transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -123,7 +123,7 @@ export const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
                 key={index}
                 onClick={() => handleAnswer(option)}
                 variant="outline"
-                className="w-full h-auto py-6 px-6 text-lg font-semibold bg-obsidian hover:bg-royal-gold/10 border-steel/30 hover:border-royal-gold text-pure-white rounded-lg transition-all duration-300 hover:scale-[1.02]"
+                className="w-full h-auto py-6 px-6 text-base sm:text-lg font-semibold bg-obsidian hover:bg-royal-purple/10 border-steel/30 hover:border-royal-purple text-pure-white rounded-lg transition-all duration-300 hover:scale-[1.02] whitespace-normal text-left leading-relaxed"
               >
                 {option.label}
               </Button>
