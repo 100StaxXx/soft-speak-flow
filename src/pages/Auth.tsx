@@ -33,7 +33,7 @@ const Auth = () => {
           .single();
 
         if (!profileData?.selected_mentor_id) {
-          navigate("/mentor-selection");
+          navigate("/onboarding");
         } else {
           navigate("/");
         }
@@ -73,9 +73,9 @@ const Auth = () => {
 
         toast({
           title: "Welcome to A Lil Push!",
-          description: "Choose your mentor to continue.",
+          description: "Let's find your perfect mentor.",
         });
-        navigate("/mentor-selection");
+        navigate("/onboarding");
       }
     } catch (error: any) {
       toast({
