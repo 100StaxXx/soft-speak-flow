@@ -175,7 +175,7 @@ const Index = () => {
       <div className="min-h-screen bg-obsidian snap-y snap-mandatory overflow-y-scroll h-screen">
         <PowerModeToggle onToggle={setPowerMode} />
         <div className="snap-start">
-          <HeroSlider />
+          <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
         </div>
 
       <div className="max-w-6xl mx-auto px-6 py-16 snap-start">
