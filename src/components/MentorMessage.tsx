@@ -85,14 +85,16 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
   if (!mentorId || !message) return null;
 
   return (
-    <Card className={`p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-2 border-primary/30 shadow-glow animate-velocity-fade-in ${className}`}>
-      <div className="flex items-start gap-4">
-        <div className="p-3 rounded-lg bg-primary/20 border border-primary/40">
-          <Sparkles className="h-6 w-6 text-primary" />
+    <Card className={`p-5 md:p-6 bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/30 shadow-glow animate-velocity-fade-in relative overflow-hidden ${className}`}>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-2xl" />
+      
+      <div className="flex items-start gap-3 md:gap-4 relative z-10">
+        <div className="p-2.5 md:p-3 rounded-lg bg-primary/20 border border-primary/40 flex-shrink-0">
+          <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-primary" />
         </div>
-        <div className="flex-1">
-          <h3 className="font-heading text-xl text-primary mb-2">{mentorName}</h3>
-          <p className="text-foreground/90 text-lg font-medium">{message}</p>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-heading text-lg md:text-xl font-black text-primary mb-2">{mentorName}</h3>
+          <p className="text-foreground/90 text-base md:text-lg font-medium leading-relaxed">{message}</p>
         </div>
       </div>
     </Card>
