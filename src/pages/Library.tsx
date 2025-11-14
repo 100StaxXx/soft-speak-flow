@@ -73,6 +73,7 @@ const Library = () => {
             {pepTalks.map((pepTalk) => (
               <PepTalkCard
                 key={pepTalk.id}
+                id={pepTalk.id}
                 title={pepTalk.title}
                 category={pepTalk.category}
                 description={pepTalk.description}
