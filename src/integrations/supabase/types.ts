@@ -62,6 +62,42 @@ export type Database = {
         }
         Relationships: []
       }
+      mentors: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          description: string
+          id: string
+          mentor_type: string
+          name: string
+          tags: string[]
+          tone_description: string
+          voice_style: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          mentor_type: string
+          name: string
+          tags?: string[]
+          tone_description: string
+          voice_style: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          mentor_type?: string
+          name?: string
+          tags?: string[]
+          tone_description?: string
+          voice_style?: string
+        }
+        Relationships: []
+      }
       pep_talks: {
         Row: {
           audio_url: string
@@ -71,7 +107,9 @@ export type Database = {
           id: string
           is_featured: boolean
           is_premium: boolean | null
+          mentor_id: string | null
           quote: string
+          tags: string[] | null
           title: string
         }
         Insert: {
@@ -82,7 +120,9 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_premium?: boolean | null
+          mentor_id?: string | null
           quote: string
+          tags?: string[] | null
           title: string
         }
         Update: {
@@ -93,10 +133,20 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_premium?: boolean | null
+          mentor_id?: string | null
           quote?: string
+          tags?: string[] | null
           title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pep_talks_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       playlist_items: {
         Row: {
@@ -140,6 +190,8 @@ export type Database = {
           description: string | null
           id: string
           is_premium: boolean | null
+          mentor_id: string | null
+          tags: string[] | null
           title: string
         }
         Insert: {
@@ -148,6 +200,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           title: string
         }
         Update: {
@@ -156,9 +210,19 @@ export type Database = {
           description?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "playlists_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -167,6 +231,7 @@ export type Database = {
           id: string
           is_premium: boolean | null
           preferences: Json | null
+          selected_mentor_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -175,6 +240,7 @@ export type Database = {
           id: string
           is_premium?: boolean | null
           preferences?: Json | null
+          selected_mentor_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -183,9 +249,18 @@ export type Database = {
           id?: string
           is_premium?: boolean | null
           preferences?: Json | null
+          selected_mentor_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_selected_mentor_id_fkey"
+            columns: ["selected_mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotes: {
         Row: {
@@ -194,6 +269,8 @@ export type Database = {
           created_at: string | null
           id: string
           is_premium: boolean | null
+          mentor_id: string | null
+          tags: string[] | null
           text: string
         }
         Insert: {
@@ -202,6 +279,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           text: string
         }
         Update: {
@@ -210,9 +289,19 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           text?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quotes_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reminders: {
         Row: {
@@ -269,6 +358,8 @@ export type Database = {
           description: string | null
           id: string
           is_premium: boolean | null
+          mentor_id: string | null
+          tags: string[] | null
           thumbnail_url: string | null
           title: string
           video_url: string
@@ -279,6 +370,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           thumbnail_url?: string | null
           title: string
           video_url: string
@@ -289,11 +382,21 @@ export type Database = {
           description?: string | null
           id?: string
           is_premium?: boolean | null
+          mentor_id?: string | null
+          tags?: string[] | null
           thumbnail_url?: string | null
           title?: string
           video_url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "videos_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
