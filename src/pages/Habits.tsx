@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus, ArrowLeft, Flame } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
@@ -98,13 +98,16 @@ export default function Habits() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="container max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+    <div className="min-h-screen bg-background pb-24">
+      <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+        <div className="flex items-center gap-3 md:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="flex-shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-4xl font-heading text-foreground">Habit Tracker</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl md:text-4xl font-heading font-black text-foreground">Habit Tracker</h1>
+            <p className="text-sm text-muted-foreground mt-1">Build discipline, one day at a time</p>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -121,27 +124,36 @@ export default function Habits() {
           ))}
         </div>
 
+        {habits.length === 0 && !showAddForm && (
+          <Card className="p-8 md:p-12 text-center bg-secondary/30 border-dashed">
+            <Flame className="w-16 h-16 mx-auto text-primary mb-4 opacity-50" />
+            <h3 className="text-xl font-heading font-black text-foreground mb-2">No Habits Yet</h3>
+            <p className="text-muted-foreground mb-6">Track up to 2 key habits and build your discipline.</p>
+          </Card>
+        )}
+
         {habits.length < 2 && !showAddForm && (
           <Button
             onClick={() => setShowAddForm(true)}
-            className="w-full"
+            className="w-full h-12 text-sm md:text-base font-bold"
             size="lg"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Add Habit
+            Add Habit ({habits.length}/2)
           </Button>
         )}
 
         {showAddForm && (
-          <Card className="p-6 space-y-4">
-            <h3 className="text-xl font-heading">New Habit</h3>
+          <Card className="p-5 md:p-6 space-y-4 bg-card border-primary/20">
+            <h3 className="text-lg md:text-xl font-heading font-black text-foreground">New Habit</h3>
             <Input
-              placeholder="e.g., Morning workout"
+              placeholder="e.g., Morning workout, Read 30 min"
               value={newHabitTitle}
               onChange={(e) => setNewHabitTitle(e.target.value)}
+              className="text-base"
             />
             <Select value={newHabitFrequency} onValueChange={setNewHabitFrequency}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -150,13 +162,13 @@ export default function Habits() {
                 <SelectItem value="3x_week">3x per week</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2">
               <Button
                 onClick={() => addHabitMutation.mutate()}
                 disabled={!newHabitTitle.trim()}
-                className="flex-1"
+                className="flex-1 h-11 font-bold"
               >
-                Add
+                Add Habit
               </Button>
               <Button
                 onClick={() => {
@@ -164,6 +176,7 @@ export default function Habits() {
                   setNewHabitTitle("");
                 }}
                 variant="outline"
+                className="h-11 font-bold"
               >
                 Cancel
               </Button>

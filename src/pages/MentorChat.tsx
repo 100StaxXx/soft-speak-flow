@@ -30,21 +30,24 @@ export default function MentorChat() {
   if (!user || !mentor) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <p className="text-foreground">Loading...</p>
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">Loading your mentor...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="container max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+    <div className="min-h-screen bg-background pb-24">
+      <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+        <div className="flex items-center gap-3 md:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="flex-shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="text-4xl font-heading text-foreground">Ask {mentor.name}</h1>
-            <p className="text-muted-foreground">Get guidance from your mentor</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl md:text-4xl font-heading font-black text-foreground truncate">Ask {mentor.name}</h1>
+            <p className="text-sm text-muted-foreground">Get guidance from your mentor</p>
           </div>
         </div>
 
