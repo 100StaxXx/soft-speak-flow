@@ -75,7 +75,7 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
           variant={selected ? "default" : "outline"}
           className="w-full rounded-full font-bold uppercase text-xs md:text-sm"
         >
-          {selected ? "✓ Selected" : "Choose Mentor"}
+          {selected ? "✓ Selected" : "Choose Motivator"}
         </Button>
       </div>
     </Card>

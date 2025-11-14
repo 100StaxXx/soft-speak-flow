@@ -32,7 +32,7 @@ export default function MentorChat() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Loading your mentor...</p>
+          <p className="text-muted-foreground text-sm">Loading your motivator...</p>
         </div>
       </div>
     );
@@ -47,7 +47,7 @@ export default function MentorChat() {
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl md:text-4xl font-heading font-black text-foreground truncate">Ask {mentor.name}</h1>
-            <p className="text-sm text-muted-foreground">Get guidance from your mentor</p>
+            <p className="text-sm text-muted-foreground">Get guidance from your motivator</p>
           </div>
         </div>
 

@@ -11,7 +11,7 @@ interface MentorMessageProps {
 
 export const MentorMessage = ({ mentorId, type = "motivation", className = "" }: MentorMessageProps) => {
   const [message, setMessage] = useState("");
-  const [mentorName, setMentorName] = useState("Your Mentor");
+  const [mentorName, setMentorName] = useState("Your Motivator");
 
   useEffect(() => {
     const fetchMessage = async () => {

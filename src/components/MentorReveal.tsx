@@ -49,7 +49,7 @@ export const MentorReveal = ({ mentor, onEnter }: MentorRevealProps) => {
         {stage >= 2 && (
           <div className="mb-8 animate-velocity-fade-in">
             <p className="text-steel text-lg tracking-wider uppercase mb-4">
-              Your Mentor Has Been Chosen
+              Your Motivator Has Been Chosen
             </p>
           </div>
         )}

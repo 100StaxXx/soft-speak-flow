@@ -95,7 +95,7 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center">
             <p className="text-muted-foreground text-center py-8 text-sm italic max-w-xs">
-              Your mentor is ready to guide you. Ask anything...
+              Your motivator is ready to guide you. Ask anything...
             </p>
           </div>
         )}

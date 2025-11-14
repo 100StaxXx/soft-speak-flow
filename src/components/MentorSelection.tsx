@@ -105,7 +105,7 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8 animate-fade-in">
-          <h1 className="text-4xl font-black text-pure-white mb-2">Choose Your Mentor</h1>
+          <h1 className="text-4xl font-black text-pure-white mb-2">Choose Your Motivator</h1>
           <p className="text-steel text-lg">
             We recommend <span className="text-royal-gold font-bold">{recommendedMentor.name}</span> based on your answers
           </p>
