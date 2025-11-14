@@ -47,17 +47,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        'cream-glow': 'hsl(var(--cream-glow))',
-        'blush-rose': 'hsl(var(--blush-rose))',
-        'petal-pink': 'hsl(var(--petal-pink))',
-        'lavender-mist': 'hsl(var(--lavender-mist))',
-        'soft-mauve': 'hsl(var(--soft-mauve))',
-        'warm-charcoal': 'hsl(var(--warm-charcoal))',
-        'gold-accent': 'hsl(var(--gold-accent))',
+        'slate-grey': 'hsl(var(--slate-grey))',
+        'warm-taupe': 'hsl(var(--warm-taupe))',
+        'soft-sand': 'hsl(var(--soft-sand))',
+        'pale-stone': 'hsl(var(--pale-stone))',
+        'midnight-blue': 'hsl(var(--midnight-blue))',
+        'desert-rose': 'hsl(var(--desert-rose))',
       },
       fontFamily: {
-        'heading': ['Cormorant Garamond', 'serif'],
-        'body': ['Inter', 'sans-serif'],
+        'heading': ['Playfair Display', 'serif'],
+        'body': ['Inter', 'Work Sans', 'sans-serif'],
       },
       boxShadow: {
         'soft': 'var(--shadow-soft)',
@@ -65,9 +64,9 @@ export default {
         'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: '1.5rem',
+        md: '1.25rem',
+        sm: '1rem',
       },
       keyframes: {
         "accordion-down": {

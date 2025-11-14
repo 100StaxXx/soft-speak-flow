@@ -1,138 +1,276 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
+import { PepTalkCard } from "@/components/PepTalkCard";
+import { QuoteCard } from "@/components/QuoteCard";
+import { VideoCard } from "@/components/VideoCard";
+import { PlaylistCard } from "@/components/PlaylistCard";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Sparkles, Compass, User } from "lucide-react";
 import { toast } from "sonner";
 
-interface PepTalk {
-  id: string;
-  title: string;
-  category: string;
-  quote: string;
-  description: string;
-  audio_url: string;
-  is_featured: boolean;
-  created_at: string;
-}
-
 const Index = () => {
-  const [featuredPepTalk, setFeaturedPepTalk] = useState<PepTalk | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
+  const [mentor, setMentor] = useState<any>(null);
+  const [featuredPepTalk, setFeaturedPepTalk] = useState<any>(null);
+  const [recommendedVideos, setRecommendedVideos] = useState<any[]>([]);
+  const [dailyQuotes, setDailyQuotes] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFeaturedPepTalk();
-  }, []);
+    // Check if user needs to select a mentor
+    if (user && !profileLoading && profile && !profile.selected_mentor_id) {
+      navigate("/mentor-selection");
+    }
+  }, [user, profileLoading, profile, navigate]);
 
-  const fetchFeaturedPepTalk = async () => {
+  useEffect(() => {
+    if (!user || profileLoading) {
+      fetchGeneralContent();
+      return;
+    }
+    if (profile?.selected_mentor_id) {
+      fetchPersonalizedContent();
+    } else {
+      fetchGeneralContent();
+    }
+  }, [user, profile, profileLoading]);
+
+  const fetchPersonalizedContent = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+
+      // Fetch user's selected mentor
+      const { data: mentorData } = await supabase
+        .from("mentors")
+        .select("*")
+        .eq("id", profile?.selected_mentor_id)
+        .single();
+
+      setMentor(mentorData);
+
+      // Fetch pep talk from user's mentor
+      const { data: pepTalkData } = await supabase
+        .from("pep_talks")
+        .select("*")
+        .eq("mentor_id", profile?.selected_mentor_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!pepTalkData) {
+        const { data: fallbackPepTalk } = await supabase
+          .from("pep_talks")
+          .select("*")
+          .eq("is_featured", true)
+          .limit(1)
+          .maybeSingle();
+        setFeaturedPepTalk(fallbackPepTalk);
+      } else {
+        setFeaturedPepTalk(pepTalkData);
+      }
+
+      const { data: videoData } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("mentor_id", profile?.selected_mentor_id)
+        .order("created_at", { ascending: false })
+        .limit(2);
+      setRecommendedVideos(videoData || []);
+
+      const { data: quoteData } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("mentor_id", profile?.selected_mentor_id)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      setDailyQuotes(quoteData || []);
+
+      const { data: playlistData } = await supabase
+        .from("playlists")
+        .select("*")
+        .eq("mentor_id", profile?.selected_mentor_id)
+        .order("created_at", { ascending: false })
+        .limit(2);
+      setPlaylists(playlistData || []);
+    } catch (error) {
+      console.error("Error fetching personalized content:", error);
+      toast.error("Failed to load personalized content");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGeneralContent = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: pepTalkData } = await supabase
         .from("pep_talks")
         .select("*")
         .eq("is_featured", true)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      setFeaturedPepTalk(pepTalkData);
 
-      if (error) throw error;
-      setFeaturedPepTalk(data);
+      const { data: videoData } = await supabase
+        .from("videos")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2);
+      setRecommendedVideos(videoData || []);
+
+      const { data: quoteData } = await supabase
+        .from("quotes")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      setDailyQuotes(quoteData || []);
+
+      const { data: playlistData } = await supabase
+        .from("playlists")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2);
+      setPlaylists(playlistData || []);
     } catch (error) {
-      console.error("Error fetching featured pep talk:", error);
-      toast.error("Failed to load today's pep talk");
+      console.error("Error fetching content:", error);
+      toast.error("Failed to load content");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-secondary/30">
         <div className="animate-pulse text-center">
-          <Sparkles className="h-12 w-12 text-blush-rose mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your daily dose of motivation...</p>
+          <Sparkles className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading your personalized feed...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-gradient-to-b from-cream-glow to-petal-pink/30">
+    <div className="min-h-screen pb-24 bg-gradient-to-br from-background via-muted/20 to-secondary/30">
       <div className="max-w-lg mx-auto px-6 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="font-heading text-4xl font-bold text-foreground mb-2">
+          <h1 className="font-heading text-5xl font-bold text-foreground mb-2">
             A Lil Push
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Your pocket-sized dose of comfort
-          </p>
+          {mentor && (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mt-3">
+              <User className="h-4 w-4" />
+              <span>Guided by <span className="font-medium text-foreground">{mentor.name}</span></span>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="text-xs">
+                Change
+              </Button>
+            </div>
+          )}
+          {!user && (
+            <p className="text-muted-foreground text-sm mt-2">
+              <Button variant="link" onClick={() => navigate("/auth")} className="text-primary p-0">
+                Sign in
+              </Button>
+              {" "}to unlock personalized mentorship
+            </p>
+          )}
         </div>
 
-        {featuredPepTalk ? (
-          <div className="space-y-6">
-            {/* Featured Badge */}
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles className="h-4 w-4 text-gold-accent" />
-              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Today's Lil Push
-              </span>
-              <Sparkles className="h-4 w-4 text-gold-accent" />
+        {mentor && (
+          <Card className="mb-6 p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-heading flex-shrink-0">
+                {mentor.name.charAt(0)}
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground mb-1">{mentor.name} says:</h3>
+                <p className="text-sm text-muted-foreground italic">"{mentor.description}"</p>
+              </div>
             </div>
+          </Card>
+        )}
 
-            {/* Category */}
-            <div className="text-center">
-              <span className="inline-block px-4 py-1.5 rounded-full bg-lavender-mist/30 text-sm font-medium text-foreground">
-                {featuredPepTalk.category}
-              </span>
+        {featuredPepTalk && (
+          <div className="space-y-4 mb-8">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Today's Lil Push
             </div>
-
-            {/* Title */}
-            <h2 className="font-heading text-3xl font-bold text-center text-foreground leading-tight">
-              {featuredPepTalk.title}
-            </h2>
-
-            {/* Quote */}
-            <div className="bg-card rounded-3xl p-6 shadow-soft">
-              <div className="text-5xl text-blush-rose mb-2">"</div>
-              <p className="font-heading text-xl text-foreground italic leading-relaxed">
-                {featuredPepTalk.quote}
-              </p>
-              <div className="text-5xl text-blush-rose text-right">"</div>
-            </div>
-
-            {/* Audio Player */}
-            <AudioPlayer audioUrl={featuredPepTalk.audio_url} title={featuredPepTalk.title} />
-
-            {/* CTA */}
-            <Button
-              onClick={() => navigate("/library")}
-              className="w-full rounded-full py-6 text-base font-medium bg-gradient-to-r from-blush-rose to-lavender-mist hover:shadow-glow transition-all"
-            >
-              See All Pep Talks
-            </Button>
+            <PepTalkCard
+              id={featuredPepTalk.id}
+              title={featuredPepTalk.title}
+              category={featuredPepTalk.category}
+              quote={featuredPepTalk.quote}
+              isPremium={featuredPepTalk.is_premium}
+            />
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="bg-card rounded-3xl p-8 shadow-soft">
-              <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="font-heading text-2xl font-semibold text-foreground mb-2">
-                No Featured Pep Talk Yet
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Check back soon for your daily dose of motivation!
-              </p>
-              <Button
-                onClick={() => navigate("/library")}
-                className="rounded-full px-8 py-3 bg-gradient-to-r from-blush-rose to-lavender-mist hover:shadow-glow transition-all"
-              >
-                Browse All Pep Talks
+        )}
+
+        {recommendedVideos.length > 0 && (
+          <div className="space-y-4 mb-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-heading text-foreground">Recommended for You</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/videos")}>
+                See All
               </Button>
+            </div>
+            <div className="space-y-3">
+              {recommendedVideos.map((video) => (
+                <VideoCard key={video.id} video={video} />
+              ))}
             </div>
           </div>
         )}
+
+        {dailyQuotes.length > 0 && (
+          <div className="space-y-4 mb-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-heading text-foreground">Daily Wisdom</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/quotes")}>
+                More Quotes
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {dailyQuotes.map((quote) => (
+                <QuoteCard key={quote.id} quote={quote} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {playlists.length > 0 && (
+          <div className="space-y-4 mb-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-heading text-foreground">Curated Playlists</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")}>
+                Browse All
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {playlists.map((playlist) => (
+                <PlaylistCard key={playlist.id} playlist={playlist} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8">
+          <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-full py-6 border-2">
+            <Compass className="mr-2 h-5 w-5" />
+            Explore All Content
+          </Button>
+        </div>
       </div>
 
       <BottomNav />

@@ -3,16 +3,21 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface QuoteCardProps {
+interface Quote {
   id: string;
   text: string;
   author?: string;
-  isPremium?: boolean;
+  is_premium?: boolean;
+}
+
+interface QuoteCardProps {
+  quote: Quote;
   isFavorited?: boolean;
   onFavoriteChange?: () => void;
 }
 
-export const QuoteCard = ({ id, text, author, isPremium, isFavorited: initialFavorited, onFavoriteChange }: QuoteCardProps) => {
+export const QuoteCard = ({ quote, isFavorited: initialFavorited, onFavoriteChange }: QuoteCardProps) => {
+  const { id, text, author, is_premium } = quote;
   const [isFavorited, setIsFavorited] = useState(initialFavorited || false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -68,7 +73,7 @@ export const QuoteCard = ({ id, text, author, isPremium, isFavorited: initialFav
 
   return (
     <div className="relative bg-gradient-to-br from-petal-pink/30 to-lavender-mist/20 rounded-3xl p-6 shadow-soft border border-petal-pink/20">
-      {isPremium && (
+      {is_premium && (
         <div className="absolute top-4 right-4">
           <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
             Premium

@@ -8,60 +8,89 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* A Lil Push - Soft Feminine Design System */
+    /* A Lil Push - Gender Neutral & Grounded Wellness Brand */
     
-    /* Core Colors */
-    --cream-glow: 30 100% 98%;
-    --blush-rose: 349 82% 84%;
-    --petal-pink: 349 88% 95%;
-    --lavender-mist: 256 68% 84%;
-    --soft-mauve: 298 20% 56%;
-    --warm-charcoal: 300 13% 17%;
-    --gold-accent: 42 84% 79%;
+    /* Core Brand Colors */
+    --slate-grey: 0 0% 18%;
+    --warm-taupe: 24 16% 58%;
+    --soft-sand: 36 36% 87%;
+    --pale-stone: 30 20% 95%;
+    --midnight-blue: 215 25% 17%;
+    --desert-rose: 15 19% 73%;
     
     /* Semantic Tokens */
-    --background: var(--cream-glow);
-    --foreground: var(--warm-charcoal);
+    --background: 30 20% 95%;
+    --foreground: 0 0% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: var(--warm-charcoal);
+    --card-foreground: 0 0% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: var(--warm-charcoal);
+    --popover-foreground: 0 0% 18%;
 
-    --primary: var(--blush-rose);
-    --primary-foreground: var(--warm-charcoal);
+    --primary: 24 16% 58%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: var(--petal-pink);
-    --secondary-foreground: var(--warm-charcoal);
+    --secondary: 36 36% 87%;
+    --secondary-foreground: 0 0% 18%;
 
-    --muted: var(--petal-pink);
-    --muted-foreground: var(--soft-mauve);
+    --muted: 36 36% 87%;
+    --muted-foreground: 0 0% 35%;
 
-    --accent: var(--lavender-mist);
-    --accent-foreground: var(--warm-charcoal);
+    --accent: 15 19% 73%;
+    --accent-foreground: 0 0% 18%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 349 60% 92%;
-    --input: 349 60% 92%;
-    --ring: var(--blush-rose);
+    --border: 24 16% 78%;
+    --input: 24 16% 78%;
+    --ring: 24 16% 58%;
 
-    --radius: 1.5rem;
+    --radius: 1.25rem;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--blush-rose)), hsl(var(--petal-pink)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--lavender-mist)), hsl(var(--petal-pink)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--cream-glow)), hsl(var(--petal-pink) / 0.3));
+    --gradient-primary: linear-gradient(135deg, hsl(var(--warm-taupe)), hsl(var(--soft-sand)));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--pale-stone)), hsl(var(--soft-sand)));
+    --gradient-depth: linear-gradient(135deg, hsl(var(--midnight-blue)), hsl(var(--slate-grey)));
     
-    /* Shadows */
-    --shadow-soft: 0 4px 20px hsl(var(--blush-rose) / 0.15);
-    --shadow-medium: 0 8px 30px hsl(var(--blush-rose) / 0.2);
-    --shadow-glow: 0 0 30px hsl(var(--lavender-mist) / 0.3);
+    /* Shadows - Soft & Grounded */
+    --shadow-soft: 0 2px 8px hsl(var(--slate-grey) / 0.08);
+    --shadow-medium: 0 4px 16px hsl(var(--slate-grey) / 0.12);
+    --shadow-glow: 0 0 24px hsl(var(--warm-taupe) / 0.3);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .dark {
+    --background: 215 25% 17%;
+    --foreground: 30 20% 95%;
+    
+    --card: 215 25% 22%;
+    --card-foreground: 30 20% 95%;
+    
+    --popover: 215 25% 22%;
+    --popover-foreground: 30 20% 95%;
+    
+    --primary: 24 16% 58%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 215 25% 30%;
+    --secondary-foreground: 30 20% 95%;
+    
+    --muted: 215 25% 25%;
+    --muted-foreground: 30 20% 70%;
+    
+    --accent: 15 19% 73%;
+    --accent-foreground: 215 25% 17%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 215 25% 25%;
+    --input: 215 25% 25%;
+    --ring: 24 16% 58%;
   }
 }
 
@@ -72,11 +101,11 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', 'Work Sans', sans-serif;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair Display', serif;
     font-weight: 600;
   }
 }
