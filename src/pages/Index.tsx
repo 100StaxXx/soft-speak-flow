@@ -172,16 +172,19 @@ const Index = () => {
   }
 
   return (
-    <>
+    <div className="snap-y snap-mandatory overflow-y-scroll h-screen">
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
-      <div className="relative">
+      <div className="fixed top-6 right-6 z-50">
         <PowerModeToggle onToggle={setPowerMode} />
-        <div className="snap-start h-screen">
-          <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
-        </div>
+      </div>
 
-      <div className={`max-w-6xl mx-auto px-6 py-16 snap-start transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background min-h-screen`}>
+      <section className="snap-start snap-always h-screen">
+        <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
+      </section>
+
+      <section className={`snap-start snap-always min-h-screen transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background`}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
         {mentor && user && (
           <div className="mb-12">
             <MentorMessage 
@@ -211,7 +214,7 @@ const Index = () => {
         {!user && (
           <div className="text-center mb-12">
             <p className="text-steel text-sm">
-              <Button variant="link" onClick={() => navigate("/auth")} className="text-royal-gold p-0 font-bold">
+              <Button variant="link" onClick={() => navigate("/auth")} className="text-royal-purple p-0 font-bold">
                 Sign in
               </Button>
               {" "}to unlock personalized motivation
@@ -450,16 +453,19 @@ const Index = () => {
         </div>
 
         <div className="mt-12">
-          <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-lg py-6 border-2 border-royal-gold bg-obsidian text-pure-white hover:bg-royal-gold hover:text-obsidian font-bold uppercase tracking-wide">
+          <Button onClick={() => navigate("/library")} variant="outline" className="w-full rounded-lg py-6 border-2 border-royal-purple bg-obsidian text-pure-white hover:bg-royal-purple hover:text-obsidian font-bold uppercase tracking-wide">
             <Compass className="mr-2 h-5 w-5" />
             Explore Library
           </Button>
         </div>
-      </div>
+        </div>
+      </section>
 
-        <BottomNav />
-      </div>
-    </>
+      {mentor && user && (
+        <AskMentorChat mentorName={mentor.name} mentorTone={mentor.tone_description} />
+      )}
+      <BottomNav />
+    </div>
   );
 };
 

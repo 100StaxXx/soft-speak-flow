@@ -119,9 +119,9 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
                 </h1>
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-royal-gold/20">
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-royal-purple/20">
                 <div 
-                  className="h-full bg-royal-gold transition-all duration-300"
+                  className="h-full bg-royal-purple transition-all duration-300"
                   style={{ width: selectedIndex === index ? "100%" : "0%" }}
                 />
               </div>
@@ -131,7 +131,7 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
       </div>
 
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 animate-bounce cursor-pointer" onClick={scrollToContent}>
-        <ChevronDown className="h-8 w-8 text-royal-gold" strokeWidth={3} />
+        <ChevronDown className="h-8 w-8 text-royal-purple" strokeWidth={3} />
       </div>
 
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2">
@@ -140,7 +140,7 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
             key={slide.id}
             onClick={() => emblaApi?.scrollTo(index)}
             className={`h-1.5 rounded-full transition-all duration-300 ${
-              selectedIndex === index ? "w-8 bg-royal-gold" : "w-1.5 bg-steel/40"
+              selectedIndex === index ? "w-8 bg-royal-purple" : "w-1.5 bg-pure-white/40"
             }`}
           />
         ))}
