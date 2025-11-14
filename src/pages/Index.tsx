@@ -175,13 +175,13 @@ const Index = () => {
     <>
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
-      <div className="min-h-screen bg-background snap-y snap-mandatory overflow-y-scroll h-screen">
+      <div className="relative">
         <PowerModeToggle onToggle={setPowerMode} />
-        <div className="snap-start">
+        <div className="snap-start h-screen">
           <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
         </div>
 
-      <div className={`max-w-6xl mx-auto px-6 py-16 snap-start transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
+      <div className={`max-w-6xl mx-auto px-6 py-16 snap-start transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background min-h-screen`}>
         {mentor && user && (
           <div className="mb-12">
             <MentorMessage 

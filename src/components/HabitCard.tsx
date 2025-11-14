@@ -26,15 +26,23 @@ export const HabitCard = ({
       <div className="space-y-4 relative z-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-3 break-words">{title}</h3>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 text-primary">
-                <Flame className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-bold whitespace-nowrap">{currentStreak} day{currentStreak !== 1 ? 's' : ''}</span>
+            <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-4 break-words">{title}</h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/30">
+                  <Flame className="w-6 h-6 text-primary flex-shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-2xl font-heading font-black text-primary leading-none">{currentStreak}</span>
+                    <span className="text-xs text-muted-foreground">day streak</span>
+                  </div>
+                </div>
+                {longestStreak > 0 && (
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-foreground">{longestStreak}</span>
+                    <span className="text-xs text-muted-foreground">best</span>
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Best: {longestStreak}
-              </span>
             </div>
           </div>
           <Button
