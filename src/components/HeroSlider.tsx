@@ -63,8 +63,7 @@ export const HeroSlider = () => {
       </div>
 
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 animate-bounce cursor-pointer" onClick={scrollToContent}>
-        <span className="text-pure-white text-sm font-bold uppercase tracking-wider">Scroll to begin</span>
-        <ChevronDown className="h-6 w-6 text-royal-gold" strokeWidth={3} />
+        <ChevronDown className="h-8 w-8 text-royal-gold" strokeWidth={3} />
       </div>
 
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2">

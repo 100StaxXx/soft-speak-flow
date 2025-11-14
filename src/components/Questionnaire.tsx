@@ -18,7 +18,7 @@ const questions: Question[] = [
     options: [
       { label: "Discipline & Consistency", tags: ["discipline", "consistency", "firm"] },
       { label: "Confidence & Self-Worth", tags: ["confidence", "self-worth", "affirmations"] },
-      { label: "Gym & Physical Strength", tags: ["gym", "fitness", "athlete", "physical"] },
+      { label: "Physique & Physical Strength", tags: ["physique", "fitness", "athlete", "physical"] },
       { label: "Heartbreak Recovery", tags: ["heartbreak", "emotional", "calm"] },
       { label: "Business & Success Focus", tags: ["business", "success", "logical"] },
       { label: "Spiritual Calm & Peace", tags: ["spiritual", "calm", "mindfulness"] },
@@ -54,7 +54,7 @@ const questions: Question[] = [
       { label: "Overthinking & Anxiety", tags: ["anxiety", "calm", "mindfulness"] },
       { label: "Procrastination", tags: ["discipline", "firm", "consistency"] },
       { label: "Self-Doubt", tags: ["confidence", "affirmations", "self-worth"] },
-      { label: "Physical Weakness", tags: ["gym", "physical", "athlete"] },
+      { label: "Physical Weakness", tags: ["physique", "physical", "athlete"] },
     ],
   },
   {
