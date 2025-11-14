@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { HeroSlider } from "@/components/HeroSlider";
+import { IntroScreen } from "@/components/IntroScreen";
+import { PowerModeToggle } from "@/components/PowerModeToggle";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
 import { PepTalkCard } from "@/components/PepTalkCard";
@@ -25,6 +27,8 @@ const Index = () => {
   const [dailyQuotes, setDailyQuotes] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showIntro, setShowIntro] = useState(true);
+  const [powerMode, setPowerMode] = useState(false);
 
   useEffect(() => {
     // Check if user needs to select a mentor
@@ -163,17 +167,23 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian">
-      <HeroSlider />
+    <>
+      {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
+      
+      <div className="min-h-screen bg-obsidian">
+        <PowerModeToggle onToggle={setPowerMode} />
+        <HeroSlider />
 
       <div className="max-w-6xl mx-auto px-6 py-16">
         {mentor && user && (
-          <div className="mb-12 flex items-center gap-4 justify-center">
-            <div className="w-12 h-12 rounded-lg bg-royal-gold text-obsidian flex items-center justify-center text-xl font-black flex-shrink-0">
+          <div className="mb-12 flex items-center gap-4 justify-center mentor-aura">
+            <div className={`w-12 h-12 rounded-lg bg-royal-gold text-obsidian flex items-center justify-center text-xl font-black flex-shrink-0 ${powerMode ? 'shadow-glow' : ''}`}>
               {mentor.name.charAt(0)}
             </div>
             <div>
-              <p className="text-xs text-royal-gold font-bold uppercase tracking-widest">From {mentor.name}</p>
+              <p className="text-xs text-royal-gold font-bold uppercase tracking-widest">
+                {powerMode ? "YOUR MENTOR" : `From ${mentor.name}`}
+              </p>
               <p className="text-sm text-steel">"{mentor.description}"</p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="text-xs ml-auto">
@@ -197,7 +207,7 @@ const Index = () => {
           <div className="mb-16">
             <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
               <Heart className="h-5 w-5" fill="currentColor" />
-              Your Push Today
+              {powerMode ? "YOUR MISSION TODAY" : "Your Push Today"}
             </div>
             <PepTalkCard
               id={featuredPepTalk.id}
@@ -212,7 +222,9 @@ const Index = () => {
         {recommendedVideos.length > 0 && (
           <div className="mb-16">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">Recommended</h2>
+              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
+                {powerMode ? "Recommended for You" : "Recommended"}
+              </h2>
               <Button variant="ghost" size="sm" onClick={() => navigate("/videos")} className="text-royal-gold hover:bg-graphite">
                 See All
               </Button>
@@ -228,7 +240,9 @@ const Index = () => {
         {dailyQuotes.length > 0 && (
           <div className="mb-16">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">Daily Wisdom</h2>
+              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
+                {powerMode ? "Quotes to Carry" : "Daily Wisdom"}
+              </h2>
               <Button variant="ghost" size="sm" onClick={() => navigate("/quotes")} className="text-royal-gold hover:bg-graphite">
                 More
               </Button>
@@ -246,7 +260,9 @@ const Index = () => {
         {playlists.length > 0 && (
           <div className="mb-16">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">Playlists</h2>
+              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
+                {powerMode ? "Power Playlists" : "Playlists"}
+              </h2>
               <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")} className="text-royal-gold hover:bg-graphite">
                 Browse All
               </Button>
@@ -269,8 +285,9 @@ const Index = () => {
         </div>
       </div>
 
-      <BottomNav />
-    </div>
+        <BottomNav />
+      </div>
+    </>
   );
 };
 
