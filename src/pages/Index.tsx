@@ -14,14 +14,17 @@ import { VideoCard } from "@/components/VideoCard";
 import { PlaylistCard } from "@/components/PlaylistCard";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { DailyLesson } from "@/components/DailyLesson";
+import { MentorMessage } from "@/components/MentorMessage";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Index = () => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const [mentor, setMentor] = useState<any>(null);
   const [featuredPepTalk, setFeaturedPepTalk] = useState<any>(null);
@@ -172,23 +175,32 @@ const Index = () => {
     <>
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
-      <div className="min-h-screen bg-obsidian snap-y snap-mandatory overflow-y-scroll h-screen">
+      <div className="min-h-screen bg-background snap-y snap-mandatory overflow-y-scroll h-screen">
         <PowerModeToggle onToggle={setPowerMode} />
         <div className="snap-start">
           <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
         </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-16 snap-start">
+      <div className={`max-w-6xl mx-auto px-6 py-16 snap-start transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
         {mentor && user && (
-          <div className="mb-12 flex items-center gap-4 justify-center mentor-aura">
-            <div className={`w-12 h-12 rounded-lg bg-royal-gold text-obsidian flex items-center justify-center text-xl font-black flex-shrink-0 ${powerMode ? 'shadow-glow' : ''}`}>
+          <div className="mb-12">
+            <MentorMessage 
+              mentorId={profile?.selected_mentor_id || undefined} 
+              type="welcome" 
+            />
+          </div>
+        )}
+        
+        {mentor && user && (
+          <div className="mb-8 flex items-center gap-4 justify-center">
+            <div className={`w-12 h-12 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xl font-black flex-shrink-0 ${powerMode ? 'shadow-glow' : ''}`}>
               {mentor.name.charAt(0)}
             </div>
             <div>
-              <p className="text-xs text-royal-gold font-bold uppercase tracking-widest">
+              <p className="text-xs text-primary font-bold uppercase tracking-widest">
                 {powerMode ? "YOUR MENTOR" : `From ${mentor.name}`}
               </p>
-              <p className="text-sm text-steel">"{mentor.description}"</p>
+              <p className="text-sm text-muted-foreground">"{mentor.description}"</p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="text-xs ml-auto">
               Change

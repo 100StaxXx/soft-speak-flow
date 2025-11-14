@@ -115,6 +115,7 @@ export type Database = {
           style: string | null
           tags: string[]
           target_user_type: string | null
+          theme_config: Json | null
           themes: string[] | null
           tone_description: string
           voice_style: string
@@ -131,6 +132,7 @@ export type Database = {
           style?: string | null
           tags?: string[]
           target_user_type?: string | null
+          theme_config?: Json | null
           themes?: string[] | null
           tone_description: string
           voice_style: string
@@ -147,6 +149,7 @@ export type Database = {
           style?: string | null
           tags?: string[]
           target_user_type?: string | null
+          theme_config?: Json | null
           themes?: string[] | null
           tone_description?: string
           voice_style?: string
