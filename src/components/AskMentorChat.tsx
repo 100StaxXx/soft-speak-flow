@@ -16,10 +16,19 @@ interface AskMentorChatProps {
   mentorTone: string;
 }
 
+const SUGGESTED_PROMPTS = [
+  "I'm struggling to stay consistent",
+  "How do I stop procrastinating?",
+  "Give me a confidence boost",
+  "Help me get back on track",
+  "I'm feeling overwhelmed",
+];
+
 export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -31,12 +40,14 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (messageText?: string) => {
+    const textToSend = messageText || input.trim();
+    if (!textToSend || isLoading) return;
 
-    const userMessage: Message = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content: textToSend };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setShowSuggestions(false);
     setIsLoading(true);
 
     try {
@@ -84,6 +95,10 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
     }
   };
 
+  const handleLilPush = async () => {
+    await handleSend("Give me a lil push to stay motivated today");
+  };
+
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border p-5 md:p-6 h-[400px] md:h-[500px] flex flex-col shadow-medium">
       <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-4">
@@ -92,7 +107,31 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 scrollbar-hide">
-        {messages.length === 0 && (
+        {messages.length === 0 && showSuggestions && (
+          <div className="space-y-4 p-4">
+            <p className="text-sm text-muted-foreground text-center">What do you need a lil push on?</p>
+            <div className="grid grid-cols-1 gap-2">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <Button
+                  key={prompt}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSend(prompt)}
+                  className="text-left justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary/50 whitespace-normal"
+                >
+                  <span className="text-xs">{prompt}</span>
+                </Button>
+              ))}
+            </div>
+            <Button
+              onClick={handleLilPush}
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 font-bold"
+            >
+              Lil Push of the Day
+            </Button>
+          </div>
+        )}
+        {messages.length === 0 && !showSuggestions && (
           <div className="h-full flex items-center justify-center">
             <p className="text-muted-foreground text-center py-8 text-sm italic max-w-xs">
               Your motivator is ready to guide you. Ask anything...

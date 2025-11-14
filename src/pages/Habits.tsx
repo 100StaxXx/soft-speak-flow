@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { HabitCard } from "@/components/HabitCard";
+import { HabitTemplates } from "@/components/HabitTemplates";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { BrandTagline } from "@/components/BrandTagline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Plus, ArrowLeft, Flame } from "lucide-react";
+import { Plus, ArrowLeft, Flame, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
@@ -18,8 +20,9 @@ export default function Habits() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
-  const [newHabitFrequency, setNewHabitFrequency] = useState("daily");
+  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
@@ -57,7 +60,8 @@ export default function Habits() {
       const { error } = await supabase.from('habits').insert({
         user_id: user!.id,
         title: newHabitTitle,
-        frequency: newHabitFrequency,
+        frequency: selectedDays.length === 7 ? 'daily' : 'custom',
+        custom_days: selectedDays.length === 7 ? null : selectedDays,
       });
       
       if (error) throw error;
@@ -65,10 +69,21 @@ export default function Habits() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       setNewHabitTitle("");
+      setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
+      setShowTemplates(true);
       toast({ title: "Habit added", description: "Lock in and stay consistent." });
     },
   });
+
+  const handleTemplateSelect = (title: string, frequency: string) => {
+    setNewHabitTitle(title);
+    setShowTemplates(false);
+  };
+
+  const handleCustomHabit = () => {
+    setShowTemplates(false);
+  };
 
   const completeHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
@@ -110,6 +125,8 @@ export default function Habits() {
           </div>
         </div>
 
+        <BrandTagline />
+
         <div className="space-y-4">
           {habits.map((habit) => (
             <HabitCard
@@ -144,43 +161,75 @@ export default function Habits() {
         )}
 
         {showAddForm && (
-          <Card className="p-5 md:p-6 space-y-4 bg-card border-primary/20">
-            <h3 className="text-lg md:text-xl font-heading font-black text-foreground">New Habit</h3>
-            <Input
-              placeholder="e.g., Morning workout, Read 30 min"
-              value={newHabitTitle}
-              onChange={(e) => setNewHabitTitle(e.target.value)}
-              className="text-base"
-            />
-            <Select value={newHabitFrequency} onValueChange={setNewHabitFrequency}>
-              <SelectTrigger className="h-11">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="5x_week">5x per week</SelectItem>
-                <SelectItem value="3x_week">3x per week</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => addHabitMutation.mutate()}
-                disabled={!newHabitTitle.trim()}
-                className="flex-1 h-11 font-bold"
-              >
-                Add Habit
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowAddForm(false);
-                  setNewHabitTitle("");
-                }}
-                variant="outline"
-                className="h-11 font-bold"
-              >
-                Cancel
-              </Button>
-            </div>
+          <Card className="p-4 md:p-6 bg-card/80 backdrop-blur border-primary/20 space-y-5">
+            {showTemplates ? (
+              <>
+                <HabitTemplates 
+                  onSelect={handleTemplateSelect}
+                  onCustom={handleCustomHabit}
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setShowTemplates(true);
+                  }}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-heading font-bold text-foreground">
+                    {newHabitTitle || "Custom Habit"}
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setShowTemplates(true);
+                      setNewHabitTitle("");
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                {!newHabitTitle && (
+                  <Input
+                    placeholder="Enter habit name"
+                    value={newHabitTitle}
+                    onChange={(e) => setNewHabitTitle(e.target.value)}
+                    className="bg-background/50"
+                    autoFocus
+                  />
+                )}
+                <FrequencyPicker 
+                  selectedDays={selectedDays}
+                  onDaysChange={setSelectedDays}
+                />
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    onClick={() => addHabitMutation.mutate()} 
+                    disabled={!newHabitTitle.trim() || selectedDays.length === 0}
+                    className="flex-1"
+                  >
+                    Add Habit
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setShowTemplates(true);
+                      setNewHabitTitle("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            )}
           </Card>
         )}
       </div>
