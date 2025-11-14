@@ -116,4 +116,110 @@ All colors MUST be HSL.
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Masculine Animation System */
+  @keyframes pulse-gold {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes breathe {
+    0%, 100% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    20%, 80% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes velocity-fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    70% {
+      transform: translateY(-5px) scale(1);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes sweep-line {
+    0% {
+      width: 0;
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      width: 100%;
+      opacity: 0;
+    }
+  }
+
+  @keyframes pulse-once {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes dim-to-focus {
+    from {
+      filter: brightness(0.6);
+    }
+    to {
+      filter: brightness(1);
+    }
+  }
+
+  .animate-pulse-gold {
+    animation: pulse-gold 2s ease-in-out infinite;
+  }
+
+  .animate-breathe {
+    animation: breathe 2.5s ease-in-out;
+  }
+
+  .animate-velocity-fade-in {
+    animation: velocity-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-sweep-line {
+    animation: sweep-line 1.2s ease-out forwards;
+  }
+
+  .animate-pulse-once {
+    animation: pulse-once 0.8s ease-out;
+  }
+
+  .animate-dim-to-focus {
+    animation: dim-to-focus 0.3s ease-out forwards;
+  }
+
+  .mentor-aura {
+    position: relative;
+  }
+
+  .mentor-aura::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle, hsl(var(--royal-gold) / 0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
 }

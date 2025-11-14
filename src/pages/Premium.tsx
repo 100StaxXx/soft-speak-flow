@@ -1,9 +1,9 @@
-import { Crown, Infinity, Zap, BookHeart, Sparkles } from "lucide-react";
+import { Crown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Premium = () => {
   const navigate = useNavigate();
@@ -42,124 +42,102 @@ const Premium = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-12">
+    <div className="min-h-screen bg-obsidian px-6 py-16">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-3xl w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-soft">
-            <Crown className="h-10 w-10 text-primary-foreground" />
-          </div>
-          <h1 className="font-display text-5xl md:text-6xl text-foreground mb-4">
-            Unlock your full growth experience
+        <div className="text-center mb-16 space-y-6">
+          <div className="h-1 w-24 bg-royal-gold mx-auto mb-8" />
+          <h1 className="text-6xl font-black text-pure-white uppercase tracking-tight animate-velocity-fade-in">
+            Unlock Your Potential
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Access unlimited content, all mentors, and personalized guidance for your journey
+          <p className="text-xl text-steel max-w-2xl mx-auto">
+            Get unlimited access to all mentors, exclusive content, and personalized experiences.
           </p>
         </div>
 
-        <Card className="max-w-md mx-auto bg-card border-2 border-border shadow-medium mb-12 overflow-hidden">
-          <div className="bg-gradient-to-br from-primary to-accent p-6 text-center">
-            <h2 className="font-display text-3xl text-primary-foreground mb-2">Premium</h2>
-            <div className="flex items-baseline justify-center gap-2">
-              <span className="text-5xl font-bold text-primary-foreground">$9.99</span>
-              <span className="text-primary-foreground/80">/month</span>
+        <Card className="mb-8 bg-graphite border-2 border-royal-gold/30 shadow-glow">
+          <CardHeader className="text-center">
+            <div className="inline-flex items-center gap-2 bg-royal-gold/10 text-royal-gold px-4 py-2 rounded-lg mx-auto mb-4">
+              <Crown className="h-5 w-5" fill="currentColor" />
+              <span className="font-black uppercase tracking-wide">Premium</span>
             </div>
-            <p className="text-primary-foreground/90 mt-2">7-day free trial</p>
-          </div>
-          
-          <div className="p-8 space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
-                <Infinity className="h-6 w-6 text-foreground" />
+            <CardTitle className="text-4xl font-black text-pure-white uppercase">
+              Premium Access
+            </CardTitle>
+            <CardDescription className="text-steel text-xl mt-4">
+              $9.99/month • 7-day free trial
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+                </div>
+                <div>
+                  <p className="font-bold text-pure-white text-lg">Unlimited Content</p>
+                  <p className="text-steel">Access all pep talks, videos, and quotes</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Unlimited Pep Talks & Videos
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Access our entire library of motivational audio and video content
-                </p>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+                </div>
+                <div>
+                  <p className="font-bold text-pure-white text-lg">All Mentors</p>
+                  <p className="text-steel">Switch between any mentor anytime</p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
-                <Crown className="h-6 w-6 text-foreground" />
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+                </div>
+                <div>
+                  <p className="font-bold text-pure-white text-lg">Curated Playlists</p>
+                  <p className="text-steel">Premium collections for every mood</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  All Mentors Available
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Switch between all 5 mentors and find your perfect guide
-                </p>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+                </div>
+                <div>
+                  <p className="font-bold text-pure-white text-lg">Daily Reminders</p>
+                  <p className="text-steel">Custom push notifications for your schedule</p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
-                <BookHeart className="h-6 w-6 text-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Curated Playlists
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Access themed playlists for every mood and moment
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
-                <Zap className="h-6 w-6 text-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Daily Reminders
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Get personalized push notifications to stay motivated
-                </p>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+                </div>
+                <div>
+                  <p className="font-bold text-pure-white text-lg">Offline Access</p>
+                  <p className="text-steel">Download content for on-the-go motivation</p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
-                <Sparkles className="h-6 w-6 text-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Offline Access
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Download content for motivation anywhere, anytime
-                </p>
-              </div>
-            </div>
-          </div>
+            <Button 
+              onClick={handleSubscribe}
+              className="w-full py-7 text-lg font-black uppercase tracking-wider mt-8"
+              size="lg"
+            >
+              Start 7-Day Free Trial
+            </Button>
+            
+            <p className="text-xs text-steel text-center">
+              Cancel anytime. No commitments.
+            </p>
+          </CardContent>
         </Card>
 
-        <div className="max-w-md mx-auto space-y-4">
-          <Button
-            onClick={handleSubscribe}
-            size="lg"
-            className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-semibold py-6 rounded-3xl shadow-medium text-lg"
-          >
-            <Crown className="mr-2 h-5 w-5" />
-            Start 7-Day Free Trial
-          </Button>
-
-          <Button
-            variant="ghost"
+        <div className="text-center">
+          <Button 
+            variant="ghost" 
             onClick={() => navigate(-1)}
-            className="w-full text-muted-foreground hover:text-foreground"
+            className="text-steel hover:text-pure-white uppercase tracking-wide font-semibold"
           >
             Maybe later
           </Button>
-          
-          <p className="text-xs text-muted-foreground text-center pt-4">
-            Cancel anytime. No commitment required.
-          </p>
         </div>
       </div>
     </div>

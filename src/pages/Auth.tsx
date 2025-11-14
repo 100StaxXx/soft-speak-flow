@@ -89,20 +89,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-2 border-petal-pink/30 shadow-elegant">
-        <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-4xl font-display text-warm-charcoal">
+    <div className="min-h-screen bg-obsidian flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-graphite border-2 border-royal-gold/20 shadow-glow">
+        <CardHeader className="text-center space-y-4">
+          <div className="h-1 w-16 bg-royal-gold mx-auto mb-4" />
+          <CardTitle className="text-5xl font-black text-pure-white uppercase tracking-tight">
             A Lil Push
           </CardTitle>
-          <CardDescription className="text-base text-warm-charcoal/70">
-            {isLogin ? "Welcome back" : "Start your journey"}
+          <CardDescription className="text-lg text-steel">
+            {isLogin ? "Welcome Back" : "Build Discipline."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-pure-white font-semibold">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -110,11 +111,11 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="border-petal-pink/30 focus:border-blush-rose"
+                className="bg-obsidian border-steel/20 text-pure-white focus:border-royal-gold"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-pure-white font-semibold">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -123,23 +124,23 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="border-petal-pink/30 focus:border-blush-rose"
+                className="bg-obsidian border-steel/20 text-pure-white focus:border-royal-gold"
               />
             </div>
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blush-rose to-soft-mauve hover:opacity-90 text-white font-medium py-6 rounded-3xl shadow-soft transition-all"
+              className="w-full py-7 text-lg font-black uppercase tracking-wider"
             >
-              {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
+              {loading ? "Loading..." : isLogin ? "Sign In" : "Begin"}
             </Button>
           </form>
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-warm-charcoal/70 hover:text-blush-rose transition-colors"
+              className="text-sm text-royal-gold hover:text-pure-white transition-colors font-semibold uppercase tracking-wide"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {isLogin ? "Create Account" : "Sign In Instead"}
             </button>
           </div>
         </CardContent>

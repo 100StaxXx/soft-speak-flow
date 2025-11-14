@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MentorCard } from "@/components/MentorCard";
+import { MentorArrival } from "@/components/MentorArrival";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles } from "lucide-react";
@@ -25,6 +26,8 @@ const MentorSelection = () => {
   const [selectedMentorId, setSelectedMentorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showArrival, setShowArrival] = useState(false);
+  const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
 
   useEffect(() => {
     fetchMentors();
@@ -59,11 +62,25 @@ const MentorSelection = () => {
       return;
     }
 
-    setSaving(true);
+    const mentor = mentors.find(m => m.id === selectedMentorId);
+    if (!mentor) return;
+
+    setSelectedMentor(mentor);
+    setShowArrival(true);
+  };
+
+  const handleArrivalComplete = async () => {
+    if (!selectedMentorId || !user) return;
+
     try {
+      setSaving(true);
+      
       const { error } = await supabase
         .from("profiles")
-        .update({ selected_mentor_id: selectedMentorId })
+        .update({ 
+          selected_mentor_id: selectedMentorId,
+          updated_at: new Date().toISOString()
+        })
         .eq("id", user.id);
 
       if (error) throw error;
@@ -72,7 +89,7 @@ const MentorSelection = () => {
         title: "Mentor selected!",
         description: "Your personalized experience is ready.",
       });
-
+      
       navigate("/");
     } catch (error: any) {
       toast({
@@ -94,53 +111,61 @@ const MentorSelection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-secondary/30 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12 space-y-4">
-          <div className="flex justify-center mb-4">
-            <Sparkles className="h-12 w-12 text-primary" />
+    <>
+      {showArrival && selectedMentor && (
+        <MentorArrival
+          mentorName={selectedMentor.name}
+          mentorDescription={selectedMentor.description}
+          onComplete={handleArrivalComplete}
+        />
+      )}
+      
+      <div className="min-h-screen bg-obsidian py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-16 space-y-6">
+            <div className="h-1 w-24 bg-royal-gold mx-auto mb-8 animate-sweep-line" />
+            <h1 className="text-6xl font-black text-pure-white uppercase tracking-tight animate-velocity-fade-in">
+              Choose Your Mentor
+            </h1>
+            <p className="text-xl text-steel max-w-2xl mx-auto animate-velocity-fade-in">
+              Select the guide that resonates with you. Your mentor will personalize your journey.
+            </p>
           </div>
-          <h1 className="font-heading text-5xl text-foreground">
-            Choose Your Mentor
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Select the guide that resonates with you. Your mentor will personalize your content, tone, and daily pushes.
-          </p>
-        </div>
 
-        {/* Mentor Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {mentors.map((mentor) => (
-            <MentorCard
-              key={mentor.id}
-              mentor={mentor}
-              selected={selectedMentorId === mentor.id}
-              onSelect={setSelectedMentorId}
-            />
-          ))}
-        </div>
+          {/* Mentor Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {mentors.map((mentor) => (
+              <MentorCard
+                key={mentor.id}
+                mentor={mentor}
+                selected={selectedMentorId === mentor.id}
+                onSelect={setSelectedMentorId}
+              />
+            ))}
+          </div>
 
-        {/* Confirm Button */}
-        <div className="flex justify-center">
-          <Button
-            onClick={handleConfirm}
-            disabled={!selectedMentorId || saving}
-            size="lg"
-            className="rounded-full px-12 py-6 text-lg shadow-glow"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Starting Your Journey...
-              </>
-            ) : (
-              "Begin Your Journey"
-            )}
-          </Button>
+          {/* Confirm Button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={handleConfirm}
+              disabled={!selectedMentorId || saving}
+              size="lg"
+              className="px-16 py-7 text-lg font-black uppercase tracking-wider"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Starting Your Journey...
+                </>
+              ) : (
+                "Begin Your Journey"
+              )}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
