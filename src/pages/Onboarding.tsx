@@ -1,21 +1,35 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Questionnaire } from "@/components/Questionnaire";
-import { MentorReveal } from "@/components/MentorReveal";
+import { MentorSelection } from "@/components/MentorSelection";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { findBestMentor } from "@/utils/mentorMatching";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<"questionnaire" | "reveal">("questionnaire");
-  const [matchedMentor, setMatchedMentor] = useState<any>(null);
+  const [stage, setStage] = useState<"questionnaire" | "selection">("questionnaire");
+  const [recommendedMentor, setRecommendedMentor] = useState<any>(null);
+  const [userTags, setUserTags] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleQuestionnaireComplete = async (userTags: string[]) => {
+  const handleQuestionnaireComplete = async (collectedTags: string[]) => {
     try {
+      // Save questionnaire responses
+      if (user) {
+        const { error: responseError } = await supabase
+          .from("questionnaire_responses")
+          .insert({
+            user_id: user.id,
+            question_id: "onboarding_flow",
+            answer_tags: collectedTags,
+          });
+
+        if (responseError) throw responseError;
+      }
+
       // Fetch all mentors
       const { data: mentors, error: mentorsError } = await supabase
         .from("mentors")
@@ -24,7 +38,7 @@ export default function Onboarding() {
       if (mentorsError) throw mentorsError;
 
       // Find best match
-      const bestMentor = findBestMentor(userTags, mentors || []);
+      const bestMentor = findBestMentor(collectedTags, mentors || []);
 
       if (!bestMentor) {
         toast({
@@ -35,30 +49,44 @@ export default function Onboarding() {
         return;
       }
 
-      // Save selected mentor to profile
-      if (user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ selected_mentor_id: bestMentor.id })
-          .eq("id", user.id);
-
-        if (profileError) throw profileError;
-      }
-
-      setMatchedMentor(bestMentor);
-      setStage("reveal");
+      setRecommendedMentor(bestMentor);
+      setUserTags(collectedTags);
+      setStage("selection");
     } catch (error) {
-      console.error("Error matching mentor:", error);
+      console.error("Error processing questionnaire:", error);
       toast({
         title: "Error",
-        description: "Failed to match mentor. Please try again.",
+        description: "Failed to process questionnaire. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const handleEnterTraining = () => {
-    navigate("/");
+  const handleMentorSelected = async (mentorId: string) => {
+    try {
+      if (user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ selected_mentor_id: mentorId })
+          .eq("id", user.id);
+
+        if (profileError) throw profileError;
+
+        toast({
+          title: "Mentor Selected!",
+          description: "Your training journey begins now.",
+        });
+
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("Error selecting mentor:", error);
+      toast({
+        title: "Error",
+        description: "Failed to select mentor. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -66,8 +94,11 @@ export default function Onboarding() {
       {stage === "questionnaire" && (
         <Questionnaire onComplete={handleQuestionnaireComplete} />
       )}
-      {stage === "reveal" && matchedMentor && (
-        <MentorReveal mentor={matchedMentor} onEnter={handleEnterTraining} />
+      {stage === "selection" && recommendedMentor && (
+        <MentorSelection 
+          recommendedMentor={recommendedMentor} 
+          onMentorSelected={handleMentorSelected}
+        />
       )}
     </>
   );
