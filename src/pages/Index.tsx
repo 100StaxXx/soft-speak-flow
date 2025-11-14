@@ -16,7 +16,7 @@ import { AskMentorChat } from "@/components/AskMentorChat";
 import { DailyLesson } from "@/components/DailyLesson";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Compass, User, Heart, MessageCircle, Trophy, Target, Repeat, BookOpen } from "lucide-react";
+import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -309,49 +309,6 @@ const Index = () => {
           </div>
         )}
 
-        {/* Browse Other Mentors */}
-        {user && (
-          <div className="mb-16">
-            <Card className="bg-graphite border-steel/20 p-8 text-center">
-              <User className="h-12 w-12 text-royal-gold mx-auto mb-4" />
-              <h3 className="text-xl font-heading font-black text-pure-white mb-2">
-                Explore Other Mentors
-              </h3>
-              <p className="text-steel mb-6">
-                Not satisfied with your match? Browse and discover other mentors.
-              </p>
-              <Button 
-                onClick={() => navigate("/mentor-selection")} 
-                variant="outline"
-                className="border-royal-gold text-royal-gold hover:bg-royal-gold hover:text-obsidian"
-              >
-                Browse Mentors
-              </Button>
-            </Card>
-          </div>
-        )}
-
-        {/* Retake Quiz */}
-        {user && profile?.selected_mentor_id && (
-          <div className="mb-16">
-            <Card className="bg-obsidian border-royal-gold/30 p-8 text-center">
-              <Repeat className="h-12 w-12 text-royal-gold mx-auto mb-4" />
-              <h3 className="text-xl font-heading font-black text-pure-white mb-2">
-                Retake the Quiz
-              </h3>
-              <p className="text-steel mb-6">
-                Your goals change. Retake the questionnaire to find a better match.
-              </p>
-              <Button 
-                onClick={() => navigate("/onboarding")} 
-                variant="outline"
-                className="border-royal-gold text-royal-gold hover:bg-royal-gold hover:text-obsidian"
-              >
-                Start Over
-              </Button>
-            </Card>
-          </div>
-        )}
 
         {/* Explore Categories */}
         <div className="mb-16">

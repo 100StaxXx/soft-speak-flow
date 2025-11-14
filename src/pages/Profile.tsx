@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, Plus, Trash2, LogOut, Loader2, User, Bell } from "lucide-react";
+import { Crown, Plus, Trash2, LogOut, Loader2, User, Bell, Repeat } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -140,7 +140,30 @@ const Profile = () => {
               <SelectTrigger className="w-full"><SelectValue placeholder="Select a mentor" /></SelectTrigger>
               <SelectContent>{mentors?.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
             </Select>
-          </Card>
+        </Card>
+
+        {/* Mentor Options */}
+        <Card className="p-6 mb-6 bg-card border-border shadow-soft">
+          <h2 className="font-display text-2xl text-foreground mb-6">Mentor Options</h2>
+          <div className="space-y-4">
+            <Button 
+              onClick={() => navigate("/mentor-selection")} 
+              variant="outline"
+              className="w-full"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Browse All Mentors
+            </Button>
+            <Button 
+              onClick={() => navigate("/onboarding")} 
+              variant="outline"
+              className="w-full"
+            >
+              <Repeat className="h-4 w-4 mr-2" />
+              Retake Quiz
+            </Button>
+          </div>
+        </Card>
         </div>
 
         <Card className="p-6 mb-6 bg-card border-border shadow-soft">
