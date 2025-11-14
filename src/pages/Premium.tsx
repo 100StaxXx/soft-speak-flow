@@ -1,8 +1,9 @@
-import { Crown, Check, Sparkles } from "lucide-react";
+import { Crown, Infinity, Zap, BookHeart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
+import { Card } from "@/components/ui/card";
 
 const Premium = () => {
   const navigate = useNavigate();
@@ -10,29 +11,28 @@ const Premium = () => {
   const { toast } = useToast();
 
   const handleSubscribe = () => {
-    // Placeholder for Stripe integration
     toast({
       title: "Coming Soon",
-      description: "Payment integration will be added here",
+      description: "Payment integration will be available soon. Contact support for early access.",
     });
   };
 
   if (profile?.is_premium) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <div className="bg-gradient-to-r from-gold-accent to-soft-mauve p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <Crown className="h-12 w-12 text-white" />
+          <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-soft">
+            <Crown className="h-12 w-12 text-primary-foreground" />
           </div>
-          <h1 className="font-display text-4xl text-warm-charcoal mb-4">
+          <h1 className="font-display text-4xl text-foreground mb-4">
             You're Premium!
           </h1>
-          <p className="text-warm-charcoal/70 mb-8">
+          <p className="text-muted-foreground mb-8">
             Enjoy unlimited access to all content
           </p>
           <Button
             onClick={() => navigate("/")}
-            className="bg-gradient-to-r from-blush-rose to-soft-mauve hover:opacity-90 text-white font-medium px-8 py-6 rounded-3xl shadow-soft"
+            className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-medium px-8 py-6 rounded-3xl shadow-soft"
           >
             Back to Home
           </Button>
@@ -42,136 +42,124 @@ const Premium = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 px-4 py-12">
-      <div className="max-w-lg mx-auto">
-        <div className="text-center mb-8">
-          <div className="bg-gradient-to-r from-gold-accent to-soft-mauve p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <Crown className="h-12 w-12 text-white" />
+    <div className="min-h-screen bg-background px-4 py-12">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-12">
+          <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-3xl w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-soft">
+            <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
-          <h1 className="font-display text-5xl text-warm-charcoal mb-4">
-            Unlock Your Full Lil Push Experience
+          <h1 className="font-display text-5xl md:text-6xl text-foreground mb-4">
+            Unlock your full growth experience
           </h1>
-          <p className="text-warm-charcoal/70 text-lg">
-            Get unlimited access to everything that lifts you up
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            Access unlimited content, all mentors, and personalized guidance for your journey
           </p>
         </div>
 
-        <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-8 shadow-elegant border border-petal-pink/30 mb-8">
-          <div className="space-y-6">
+        <Card className="max-w-md mx-auto bg-card border-2 border-border shadow-medium mb-12 overflow-hidden">
+          <div className="bg-gradient-to-br from-primary to-accent p-6 text-center">
+            <h2 className="font-display text-3xl text-primary-foreground mb-2">Premium</h2>
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-5xl font-bold text-primary-foreground">$9.99</span>
+              <span className="text-primary-foreground/80">/month</span>
+            </div>
+            <p className="text-primary-foreground/90 mt-2">7-day free trial</p>
+          </div>
+          
+          <div className="p-8 space-y-6">
             <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Check className="h-6 w-6 text-blush-rose" />
+              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
+                <Infinity className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
+                <h3 className="font-semibold text-foreground mb-1">
                   Unlimited Pep Talks & Videos
                 </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Access our entire library of motivational content
+                <p className="text-muted-foreground text-sm">
+                  Access our entire library of motivational audio and video content
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Check className="h-6 w-6 text-blush-rose" />
+              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
+                <Crown className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
-                  Full Quotes & Affirmations Library
+                <h3 className="font-semibold text-foreground mb-1">
+                  All Mentors Available
                 </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Thousands of quotes to inspire and uplift
+                <p className="text-muted-foreground text-sm">
+                  Switch between all 5 mentors and find your perfect guide
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Check className="h-6 w-6 text-blush-rose" />
+              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
+                <BookHeart className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
-                  Playlists for Every Mood
+                <h3 className="font-semibold text-foreground mb-1">
+                  Curated Playlists
                 </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Curated collections for heartbreak, confidence, healing & more
+                <p className="text-muted-foreground text-sm">
+                  Access themed playlists for every mood and moment
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Check className="h-6 w-6 text-blush-rose" />
+              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
+                <Zap className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
-                  Daily Reminders & Alarms
+                <h3 className="font-semibold text-foreground mb-1">
+                  Daily Reminders
                 </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Get gentle pushes when you need them most
+                <p className="text-muted-foreground text-sm">
+                  Get personalized push notifications to stay motivated
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Check className="h-6 w-6 text-blush-rose" />
+              <div className="bg-accent/20 p-3 rounded-2xl flex-shrink-0">
+                <Sparkles className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
-                  Offline Downloads
+                <h3 className="font-semibold text-foreground mb-1">
+                  Offline Access
                 </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Save content for when you're away from wifi
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-blush-rose/20 to-lavender-mist/20 p-3 rounded-2xl flex-shrink-0">
-                <Sparkles className="h-6 w-6 text-blush-rose" />
-              </div>
-              <div>
-                <h3 className="font-medium text-warm-charcoal mb-1">
-                  Ad-Free Experience
-                </h3>
-                <p className="text-warm-charcoal/60 text-sm">
-                  Enjoy uninterrupted motivation
+                <p className="text-muted-foreground text-sm">
+                  Download content for motivation anywhere, anytime
                 </p>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="text-center">
-          <div className="mb-6">
-            <p className="text-warm-charcoal/60 text-sm mb-2">Starting at</p>
-            <p className="font-display text-5xl text-warm-charcoal">
-              $4.99<span className="text-2xl">/month</span>
-            </p>
-          </div>
-
+        <div className="max-w-md mx-auto space-y-4">
           <Button
             onClick={handleSubscribe}
-            className="w-full bg-gradient-to-r from-blush-rose to-soft-mauve hover:opacity-90 text-white font-medium text-lg px-8 py-8 rounded-3xl shadow-elegant mb-4"
+            size="lg"
+            className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-semibold py-6 rounded-3xl shadow-medium text-lg"
           >
-            <Crown className="h-5 w-5 mr-2" />
-            Start Free Trial
+            <Crown className="mr-2 h-5 w-5" />
+            Start 7-Day Free Trial
           </Button>
 
-          <p className="text-warm-charcoal/50 text-xs">
-            Cancel anytime. No commitments.
-          </p>
-        </div>
-
-        <div className="text-center mt-8">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => navigate(-1)}
-            className="text-warm-charcoal/60 hover:text-blush-rose transition-colors text-sm"
+            className="w-full text-muted-foreground hover:text-foreground"
           >
             Maybe later
-          </button>
+          </Button>
+          
+          <p className="text-xs text-muted-foreground text-center pt-4">
+            Cancel anytime. No commitment required.
+          </p>
         </div>
       </div>
     </div>
