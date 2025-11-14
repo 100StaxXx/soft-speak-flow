@@ -21,28 +21,30 @@ interface MentorCardProps {
 export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
   return (
     <Card 
-      className={`p-6 transition-all duration-300 cursor-pointer hover:shadow-medium ${
+      className={`p-5 md:p-6 transition-all duration-300 cursor-pointer hover:shadow-glow overflow-hidden relative group ${
         selected 
-          ? 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary shadow-glow' 
-          : 'bg-card hover:bg-muted/30'
+          ? 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary border-2 shadow-glow' 
+          : 'bg-card hover:bg-secondary/50 border-border'
       }`}
       onClick={() => onSelect(mentor.id)}
     >
-      <div className="flex flex-col items-center text-center space-y-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      
+      <div className="flex flex-col items-center text-center space-y-4 relative z-10">
         {/* Avatar */}
-        <div className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl font-heading ${
-          selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+        <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-3xl md:text-4xl font-heading transition-all ${
+          selected ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-muted text-muted-foreground group-hover:bg-primary/10'
         }`}>
           {mentor.name.charAt(0)}
         </div>
 
         {/* Name */}
-        <h3 className="font-heading text-2xl text-foreground">
+        <h3 className="font-heading text-xl md:text-2xl font-black text-foreground leading-tight">
           {mentor.name}
         </h3>
 
         {/* Description */}
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed line-clamp-3">
           {mentor.description}
         </p>
 
@@ -52,7 +54,7 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
             <Badge 
               key={tag} 
               variant="secondary"
-              className="text-xs rounded-full"
+              className="text-[10px] md:text-xs rounded-full px-2 py-0.5 font-bold uppercase"
             >
               {tag}
             </Badge>
@@ -60,8 +62,8 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
         </div>
 
         {/* Voice Style */}
-        <p className="text-xs text-muted-foreground italic">
-          Voice: {mentor.voice_style}
+        <p className="text-[10px] md:text-xs text-muted-foreground font-medium">
+          Voice: <span className="text-primary">{mentor.voice_style}</span>
         </p>
 
         {/* Select Button */}
@@ -71,9 +73,9 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
             onSelect(mentor.id);
           }}
           variant={selected ? "default" : "outline"}
-          className="w-full rounded-full"
+          className="w-full rounded-full font-bold uppercase text-xs md:text-sm"
         >
-          {selected ? "Selected" : "Choose Mentor"}
+          {selected ? "✓ Selected" : "Choose Mentor"}
         </Button>
       </div>
     </Card>

@@ -85,40 +85,42 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
   };
 
   return (
-    <Card className="bg-graphite border-steel/20 p-6 h-[300px] flex flex-col">
-      <h3 className="text-lg font-heading font-black text-pure-white mb-3">
+    <Card className="bg-card/50 backdrop-blur-sm border-border p-5 md:p-6 h-[400px] md:h-[500px] flex flex-col shadow-medium">
+      <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-4">
         Ask {mentorName} Anything
       </h3>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 scrollbar-hide">
         {messages.length === 0 && (
-          <p className="text-steel text-center py-12 italic">
-            Your mentor is ready to guide you. Ask anything...
-          </p>
+          <div className="h-full flex items-center justify-center">
+            <p className="text-muted-foreground text-center py-8 text-sm italic max-w-xs">
+              Your mentor is ready to guide you. Ask anything...
+            </p>
+          </div>
         )}
         
         {messages.map((message, index) => (
           <div
             key={index}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-velocity-fade-in`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-4 ${
+              className={`max-w-[85%] md:max-w-[80%] rounded-xl p-3 md:p-4 ${
                 message.role === "user"
-                  ? "bg-royal-gold/10 border border-royal-gold/30 text-pure-white"
-                  : "bg-obsidian border border-steel/20 text-steel"
+                  ? "bg-primary/15 border border-primary/30 text-foreground"
+                  : "bg-secondary/80 border border-border text-foreground"
               }`}
             >
-              <p className="leading-relaxed">{message.content}</p>
+              <p className="leading-relaxed text-sm md:text-base break-words">{message.content}</p>
             </div>
           </div>
         ))}
         
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-obsidian border border-steel/20 rounded-lg p-4">
-              <Loader2 className="w-5 h-5 animate-spin text-royal-gold" />
+          <div className="flex justify-start animate-velocity-fade-in">
+            <div className="bg-secondary/80 border border-border rounded-xl p-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
             </div>
           </div>
         )}
@@ -127,21 +129,26 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
       </div>
 
       {/* Input */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-end">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask your mentor..."
+          onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+          placeholder="Type your question..."
           disabled={isLoading}
-          className="bg-obsidian border-steel/30 text-pure-white placeholder:text-steel/50 focus:border-royal-gold"
+          className="flex-1 resize-none bg-secondary/50"
         />
         <Button
           onClick={handleSend}
           disabled={!input.trim() || isLoading}
-          className="bg-royal-gold hover:bg-royal-gold/90 text-obsidian"
+          size="icon"
+          className="h-11 w-11 flex-shrink-0 rounded-lg"
         >
-          <Send className="w-5 h-5" />
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Send className="w-5 h-5" />
+          )}
         </Button>
       </div>
     </Card>
