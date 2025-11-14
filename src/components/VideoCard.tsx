@@ -1,16 +1,21 @@
 import { Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-interface VideoCardProps {
+interface Video {
   id: string;
   title: string;
   category?: string;
-  thumbnailUrl?: string;
-  isPremium?: boolean;
+  thumbnail_url?: string;
+  is_premium?: boolean;
 }
 
-export const VideoCard = ({ id, title, category, thumbnailUrl, isPremium }: VideoCardProps) => {
+interface VideoCardProps {
+  video: Video;
+}
+
+export const VideoCard = ({ video }: VideoCardProps) => {
   const navigate = useNavigate();
+  const { id, title, category, thumbnail_url, is_premium } = video;
 
   return (
     <div
@@ -34,7 +39,7 @@ export const VideoCard = ({ id, title, category, thumbnailUrl, isPremium }: Vide
             <Play className="h-6 w-6 text-blush-rose opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" />
           </div>
         </div>
-        {isPremium && (
+        {is_premium && (
           <div className="absolute top-3 right-3">
             <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
               Premium

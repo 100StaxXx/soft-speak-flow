@@ -1,23 +1,27 @@
 import { Music, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-interface PlaylistCardProps {
+interface Playlist {
   id: string;
   title: string;
   description?: string;
-  itemCount?: number;
-  isPremium?: boolean;
+  is_premium?: boolean;
 }
 
-export const PlaylistCard = ({ id, title, description, itemCount, isPremium }: PlaylistCardProps) => {
+interface PlaylistCardProps {
+  playlist: Playlist;
+}
+
+export const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
   const navigate = useNavigate();
+  const { id, title, description, is_premium } = playlist;
 
   return (
     <div
       onClick={() => navigate(`/playlist/${id}`)}
       className="bg-gradient-to-br from-cream-glow to-petal-pink/20 rounded-3xl p-6 shadow-soft border border-petal-pink/20 cursor-pointer hover:shadow-medium transition-all hover:scale-105"
     >
-      {isPremium && (
+      {is_premium && (
         <div className="mb-3">
           <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
             Premium
@@ -32,11 +36,6 @@ export const PlaylistCard = ({ id, title, description, itemCount, isPremium }: P
       <h3 className="font-display text-xl text-warm-charcoal mb-2">{title}</h3>
       {description && (
         <p className="text-warm-charcoal/70 text-sm mb-3 line-clamp-2">{description}</p>
-      )}
-      {itemCount !== undefined && (
-        <p className="text-warm-charcoal/50 text-xs">
-          {itemCount} {itemCount === 1 ? "item" : "items"}
-        </p>
       )}
     </div>
   );

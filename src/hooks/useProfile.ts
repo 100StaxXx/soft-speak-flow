@@ -7,6 +7,7 @@ interface Profile {
   email: string | null;
   is_premium: boolean;
   preferences: any;
+  selected_mentor_id: string | null;
   created_at: string;
   updated_at: string;
 }

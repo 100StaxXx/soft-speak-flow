@@ -6,12 +6,13 @@ interface PepTalkCardProps {
   id: string;
   title: string;
   category: string;
-  description: string;
+  description?: string;
+  quote?: string;
   isPremium?: boolean;
   onClick?: () => void;
 }
 
-export const PepTalkCard = ({ id, title, category, description, isPremium, onClick }: PepTalkCardProps) => {
+export const PepTalkCard = ({ id, title, category, description, quote, isPremium, onClick }: PepTalkCardProps) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -49,7 +50,7 @@ export const PepTalkCard = ({ id, title, category, description, isPremium, onCli
             {title}
           </h3>
           <p className="text-sm text-muted-foreground line-clamp-2">
-            {description}
+            {description || quote || ""}
           </p>
         </div>
       </div>

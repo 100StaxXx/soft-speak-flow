@@ -17,6 +17,7 @@ import PepTalkDetail from "./pages/PepTalkDetail";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import MentorSelection from "./pages/MentorSelection";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/pep-talk/:id" element={<PepTalkDetail />} />
           <Route path="/about" element={<About />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/mentor-selection" element={<MentorSelection />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
