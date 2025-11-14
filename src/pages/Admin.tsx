@@ -27,6 +27,7 @@ const Admin = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   
+  const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     category: "",
@@ -34,11 +35,28 @@ const Admin = () => {
     description: "",
     audio_url: "",
     is_featured: false,
+    mentor_id: "",
+    tags: [] as string[],
+    is_premium: false,
   });
 
   useEffect(() => {
     fetchPepTalks();
+    fetchMentors();
   }, []);
+
+  const fetchMentors = async () => {
+    const { data, error } = await supabase
+      .from("mentors")
+      .select("*")
+      .order("name");
+
+    if (error) {
+      toast.error("Failed to load mentors");
+      return;
+    }
+    setMentors(data || []);
+  };
 
   const fetchPepTalks = async () => {
     const { data, error } = await supabase
@@ -130,7 +148,7 @@ const Admin = () => {
     fetchPepTalks();
   };
 
-  const handleEdit = (pepTalk: PepTalk) => {
+  const handleEdit = (pepTalk: any) => {
     setFormData({
       title: pepTalk.title,
       category: pepTalk.category,
@@ -138,6 +156,9 @@ const Admin = () => {
       description: pepTalk.description,
       audio_url: pepTalk.audio_url,
       is_featured: pepTalk.is_featured,
+      mentor_id: pepTalk.mentor_id || "",
+      tags: pepTalk.tags || [],
+      is_premium: pepTalk.is_premium || false,
     });
     setEditingId(pepTalk.id);
     setIsEditing(true);
@@ -165,6 +186,9 @@ const Admin = () => {
       description: "",
       audio_url: "",
       is_featured: false,
+      mentor_id: "",
+      tags: [],
+      is_premium: false,
     });
     setEditingId(null);
     setIsEditing(false);
@@ -212,18 +236,39 @@ const Admin = () => {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  placeholder="e.g., daily, heartbreak, discipline, glow-up"
-                  required
-                  className="rounded-2xl"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    placeholder="e.g., daily, heartbreak, discipline, glow-up"
+                    required
+                    className="rounded-2xl"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="mentor">Mentor</Label>
+                  <select
+                    id="mentor"
+                    value={formData.mentor_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, mentor_id: e.target.value })
+                    }
+                    className="w-full h-10 px-3 rounded-2xl border border-input bg-background"
+                  >
+                    <option value="">No specific mentor</option>
+                    {mentors.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -275,15 +320,41 @@ const Admin = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="featured"
-                  checked={formData.is_featured}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, is_featured: checked })
+              <div>
+                <Label htmlFor="tags">Tags (comma separated)</Label>
+                <Input
+                  id="tags"
+                  value={formData.tags.join(", ")}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tags: e.target.value.split(",").map(t => t.trim()).filter(Boolean) })
                   }
+                  placeholder="discipline, focus, motivation"
+                  className="rounded-2xl"
                 />
-                <Label htmlFor="featured">Featured Pep Talk</Label>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="featured"
+                    checked={formData.is_featured}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_featured: checked })
+                    }
+                  />
+                  <Label htmlFor="featured">Featured</Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="premium"
+                    checked={formData.is_premium}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_premium: checked })
+                    }
+                  />
+                  <Label htmlFor="premium">Premium</Label>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">

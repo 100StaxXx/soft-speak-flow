@@ -23,9 +23,20 @@ const Auth = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        navigate("/");
+        // Check if user has selected a mentor
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("selected_mentor_id")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!profileData?.selected_mentor_id) {
+          navigate("/mentor-selection");
+        } else {
+          navigate("/");
+        }
       }
     });
 
@@ -62,8 +73,9 @@ const Auth = () => {
 
         toast({
           title: "Welcome to A Lil Push!",
-          description: "Your account has been created.",
+          description: "Choose your mentor to continue.",
         });
+        navigate("/mentor-selection");
       }
     } catch (error: any) {
       toast({
