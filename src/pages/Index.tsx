@@ -198,7 +198,7 @@ const Index = () => {
             </div>
             <div>
               <p className="text-xs text-primary font-bold uppercase tracking-widest">
-                {powerMode ? "YOUR MENTOR" : `From ${mentor.name}`}
+                {powerMode ? "YOUR MOTIVATOR" : `From ${mentor.name}`}
               </p>
               <p className="text-sm text-muted-foreground">"{mentor.description}"</p>
             </div>
@@ -214,7 +214,7 @@ const Index = () => {
               <Button variant="link" onClick={() => navigate("/auth")} className="text-royal-gold p-0 font-bold">
                 Sign in
               </Button>
-              {" "}to unlock personalized mentorship
+              {" "}to unlock personalized motivation
             </p>
           </div>
         )}
@@ -231,7 +231,7 @@ const Index = () => {
                   <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                     <MessageCircle className="w-6 h-6 text-primary" />
                   </div>
-                  <span className="font-heading text-foreground">Ask Mentor</span>
+                  <span className="font-heading text-foreground">Ask Motivator</span>
                 </div>
               </Card>
               
@@ -418,7 +418,7 @@ const Index = () => {
           <div className="mb-16">
             <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
               <MessageCircle className="h-5 w-5" />
-              Ask Your Mentor Anything
+              Ask Your Motivator Anything
             </div>
             <AskMentorChat 
               mentorName={mentor.name} 

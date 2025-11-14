@@ -75,7 +75,7 @@ export default function WeeklyReview() {
         </Card>
 
         <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
-          <h3 className="text-xl font-heading text-foreground mb-2">Mentor's Feedback</h3>
+          <h3 className="text-xl font-heading text-foreground mb-2">Motivator's Feedback</h3>
           <p className="text-foreground/80">
             Strong work this week. Your consistency is building momentum. Keep showing up, stay locked in, and the results will follow.
           </p>
