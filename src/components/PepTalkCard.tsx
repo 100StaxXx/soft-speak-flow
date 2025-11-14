@@ -25,31 +25,31 @@ export const PepTalkCard = ({ id, title, category, description, quote, isPremium
   return (
     <Card
       onClick={handleClick}
-      className="p-5 cursor-pointer hover:shadow-medium transition-all duration-300 bg-card border-border rounded-3xl relative"
+      className="p-5 cursor-pointer hover:shadow-glow transition-all duration-300 bg-graphite border-2 border-steel/20 hover:border-royal-gold rounded-lg relative"
     >
       {isPremium && (
         <div className="absolute top-4 right-4">
-          <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full inline-flex items-center gap-1">
+          <span className="bg-royal-gold text-obsidian text-xs font-black px-3 py-1 rounded inline-flex items-center gap-1 uppercase tracking-wide">
             <Crown className="h-3 w-3" />
-            Premium
+            Pro
           </span>
         </div>
       )}
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blush-rose to-petal-pink flex items-center justify-center">
-          <Heart className="h-5 w-5 text-warm-charcoal" fill="currentColor" />
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-royal-gold flex items-center justify-center">
+          <Heart className="h-5 w-5 text-obsidian" fill="currentColor" />
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-xs font-bold text-royal-gold uppercase tracking-wider">
               {category}
             </span>
           </div>
-          <h3 className="font-heading text-lg font-semibold text-foreground mb-2 line-clamp-1">
+          <h3 className="font-heading text-lg font-black text-pure-white mb-2 line-clamp-1 uppercase tracking-tight">
             {title}
           </h3>
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-sm text-steel line-clamp-2">
             {description || quote || ""}
           </p>
         </div>
