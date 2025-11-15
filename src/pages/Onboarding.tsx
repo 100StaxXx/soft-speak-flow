@@ -173,7 +173,7 @@ export default function Onboarding() {
         <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
           <div className="max-w-7xl mx-auto space-y-16">
             <div className="text-center space-y-6 animate-fade-in">
-              <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
+              <div className="h-1 w-24 bg-royal-purple mx-auto animate-scale-in" />
               <h1 className="text-5xl md:text-7xl font-black text-pure-white uppercase tracking-tight">
                 Choose Your Mentor
               </h1>
