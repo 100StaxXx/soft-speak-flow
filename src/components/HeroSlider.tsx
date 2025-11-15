@@ -134,17 +134,6 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
         <ChevronDown className="h-8 w-8 text-royal-purple" strokeWidth={3} />
       </div>
 
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2">
-        {slides.map((slide, index) => (
-          <button
-            key={slide.id}
-            onClick={() => emblaApi?.scrollTo(index)}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              selectedIndex === index ? "w-8 bg-royal-purple" : "w-1.5 bg-pure-white/40"
-            }`}
-          />
-        ))}
-      </div>
     </div>
   );
 };
