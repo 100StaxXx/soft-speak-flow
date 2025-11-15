@@ -3,18 +3,18 @@ import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border shadow-medium z-50">
-      <div className="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50">
+      <div className="max-w-lg mx-auto flex items-center justify-around px-1 py-3">
         <NavLink
           to="/"
           end
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
-          activeClassName="bg-primary/10"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Home className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <Home className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Home
               </span>
             </>
@@ -23,13 +23,13 @@ export const BottomNav = () => {
 
         <NavLink
           to="/videos"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
-          activeClassName="bg-primary/10"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Video className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <Video className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Library
               </span>
             </>
@@ -38,13 +38,13 @@ export const BottomNav = () => {
 
         <NavLink
           to="/quotes"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
-          activeClassName="bg-primary/10"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <MessageCircleHeart className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <MessageCircleHeart className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Quotes
               </span>
             </>
@@ -53,13 +53,13 @@ export const BottomNav = () => {
 
         <NavLink
           to="/saved"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
-          activeClassName="bg-primary/10"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Heart className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <Heart className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Saved
               </span>
             </>
@@ -68,13 +68,13 @@ export const BottomNav = () => {
 
         <NavLink
           to="/profile"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
-          activeClassName="bg-primary/10"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <User className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Profile
               </span>
             </>
