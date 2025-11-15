@@ -9,10 +9,14 @@ import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useLessonNotifications } from "@/hooks/useLessonNotifications";
 
 export default function Lessons() {
   const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Enable lesson notifications
+  useLessonNotifications();
 
   // Auto-generate today's lesson on page load
   useEffect(() => {
