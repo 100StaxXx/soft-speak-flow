@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       adaptive_push_queue: {
         Row: {
+          category: string | null
           created_at: string | null
           delivered: boolean | null
           id: string
@@ -25,6 +26,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           delivered?: boolean | null
           id?: string
@@ -34,6 +36,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           delivered?: boolean | null
           id?: string
@@ -46,12 +49,14 @@ export type Database = {
       }
       adaptive_push_settings: {
         Row: {
+          categories: string[] | null
           created_at: string | null
           emotional_triggers: string[] | null
           enabled: boolean | null
           frequency: string | null
           id: string
           intensity: string | null
+          last_category_index: number | null
           mentor_id: string | null
           primary_category: string | null
           time_window: string | null
@@ -59,12 +64,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          categories?: string[] | null
           created_at?: string | null
           emotional_triggers?: string[] | null
           enabled?: boolean | null
           frequency?: string | null
           id?: string
           intensity?: string | null
+          last_category_index?: number | null
           mentor_id?: string | null
           primary_category?: string | null
           time_window?: string | null
@@ -72,12 +79,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          categories?: string[] | null
           created_at?: string | null
           emotional_triggers?: string[] | null
           enabled?: boolean | null
           frequency?: string | null
           id?: string
           intensity?: string | null
+          last_category_index?: number | null
           mentor_id?: string | null
           primary_category?: string | null
           time_window?: string | null

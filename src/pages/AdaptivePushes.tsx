@@ -34,7 +34,7 @@ export default function AdaptivePushes() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [frequency, setFrequency] = useState<Frequency>('daily');
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('morning');
   const [intensity, setIntensity] = useState<Intensity>('balanced');
@@ -58,12 +58,21 @@ export default function AdaptivePushes() {
 
     if (data) {
       setExistingSettings(data);
-      setSelectedCategory(data.primary_category as Category);
+      const cats = data.categories || (data.primary_category ? [data.primary_category] : []);
+      setSelectedCategories(cats as Category[]);
       setFrequency(data.frequency as Frequency);
       setTimeWindow(data.time_window as TimeWindow);
       setIntensity(data.intensity as Intensity);
       setSelectedTriggers(data.emotional_triggers || []);
     }
+  };
+
+  const toggleCategory = (categoryId: Category) => {
+    setSelectedCategories(prev =>
+      prev.includes(categoryId)
+        ? prev.filter(c => c !== categoryId)
+        : [...prev, categoryId]
+    );
   };
 
   const toggleTrigger = (trigger: string) => {
@@ -75,10 +84,10 @@ export default function AdaptivePushes() {
   };
 
   const handleSave = async () => {
-    if (!user || !selectedCategory) {
+    if (!user || selectedCategories.length === 0) {
       toast({
         title: "Missing information",
-        description: "Please select a category",
+        description: "Please select at least one category",
         variant: "destructive"
       });
       return;
@@ -93,7 +102,8 @@ export default function AdaptivePushes() {
         .upsert({
           id: existingSettings?.id,
           user_id: user.id,
-          primary_category: selectedCategory,
+          primary_category: selectedCategories[0],
+          categories: selectedCategories,
           frequency,
           time_window: timeWindow,
           intensity,
@@ -141,19 +151,20 @@ export default function AdaptivePushes() {
           </p>
         </div>
 
-        {/* Category Selection */}
+        {/* Category Selection - Multi-select */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-pure-white flex items-center gap-2">
             <Settings className="h-5 w-5 text-royal-gold" />
-            What type of guidance do you want?
+            What type(s) of guidance do you want?
           </h2>
+          <p className="text-steel text-sm">You can choose more than one. We recommend 1–3.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {categories.map(({ id, label, icon: Icon, color }) => (
               <Card
                 key={id}
-                onClick={() => setSelectedCategory(id)}
+                onClick={() => toggleCategory(id)}
                 className={`p-4 cursor-pointer transition-all ${
-                  selectedCategory === id
+                  selectedCategories.includes(id)
                     ? 'border-royal-gold bg-charcoal/80'
                     : 'border-steel/20 bg-charcoal/40 hover:bg-charcoal/60'
                 }`}
@@ -161,6 +172,11 @@ export default function AdaptivePushes() {
                 <div className="flex items-center gap-3">
                   <Icon className="h-6 w-6" style={{ color }} />
                   <span className="text-pure-white font-bold">{label}</span>
+                  {selectedCategories.includes(id) && (
+                    <div className="ml-auto h-5 w-5 rounded-full bg-royal-gold flex items-center justify-center">
+                      <span className="text-obsidian text-xs">✓</span>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}
@@ -263,7 +279,7 @@ export default function AdaptivePushes() {
         {/* Save Button */}
         <Button
           onClick={handleSave}
-          disabled={!selectedCategory || isLoading}
+          disabled={selectedCategories.length === 0 || isLoading}
           className="w-full h-14 text-lg font-black bg-royal-gold hover:bg-royal-gold/90 text-obsidian"
         >
           {isLoading ? 'Activating...' : 'Activate Adaptive Pushes'}
