@@ -145,7 +145,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecti
                 <Button
                   onClick={() => onSelectMentor(activeMentor.id)}
                   disabled={isSelecting}
-                  className="h-16 px-12 text-lg font-black uppercase tracking-wider bg-royal-gold hover:bg-royal-gold/90 text-obsidian"
+                  className="h-16 px-12 font-black uppercase tracking-wider bg-royal-purple hover:bg-royal-purple/90 text-pure-white shadow-[0_0_30px_rgba(137,81,204,0.5)] hover:shadow-[0_0_40px_rgba(137,81,204,0.7)] transition-all duration-300"
                 >
                   {isSelecting ? (
                     <>Selecting...</>
