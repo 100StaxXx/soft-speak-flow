@@ -434,7 +434,7 @@ const Admin = () => {
                 description: pepTalkData.description,
                 category: pepTalkData.category,
                 audio_url: pepTalkData.audio_url,
-                mentor_id: mentors.find(m => m.slug === pepTalkData.category)?.id || formData.mentor_id,
+                mentor_id: pepTalkData.mentor_id,
               });
               setIsEditing(true);
               toast.success("Pep talk generated! Review and save when ready.");
