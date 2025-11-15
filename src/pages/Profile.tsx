@@ -35,7 +35,11 @@ const Profile = () => {
   const { data: mentors } = useQuery({
     queryKey: ["mentors"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("mentors").select("*").order("name");
+      const { data, error } = await supabase
+        .from("mentors")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -137,8 +141,16 @@ const Profile = () => {
               </div>
             )}
             <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select a mentor" /></SelectTrigger>
-              <SelectContent>{mentors?.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-full bg-background">
+                <SelectValue placeholder="Select a mentor" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border z-50">
+                {mentors?.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="cursor-pointer">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
         </Card>
 
