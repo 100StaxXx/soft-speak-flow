@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Sparkles, BookOpen, Quote, Music, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AudioGenerator } from "@/components/AudioGenerator";
+import { AudioPlayer } from "@/components/AudioPlayer";
+import { TimedCaptions } from "@/components/TimedCaptions";
 import { toast } from "sonner";
 
 interface Mentor {
@@ -28,6 +30,7 @@ const ContentGenerator = () => {
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
   const [formData, setFormData] = useState({
     title: "",
     quote: "",
@@ -39,6 +42,7 @@ const ContentGenerator = () => {
     category: "",
     is_featured: false,
     is_premium: false,
+    transcript: [] as Array<{ word: string; start: number; end: number }>,
   });
   const { toast: toastHook } = useToast();
   const navigate = useNavigate();
@@ -185,12 +189,14 @@ const ContentGenerator = () => {
         category: formData.category || formData.topic_category[0] || "mindset",
         is_featured: formData.is_featured,
         is_premium: formData.is_premium,
+        transcript: formData.transcript,
       });
 
       if (error) throw error;
 
       toast.success("Pep talk saved successfully to library!");
       setShowEditor(false);
+      setCurrentTime(0);
       setFormData({
         title: "",
         quote: "",
@@ -202,6 +208,7 @@ const ContentGenerator = () => {
         category: "",
         is_featured: false,
         is_premium: false,
+        transcript: [],
       });
     } catch (error: any) {
       console.error("Error saving pep talk:", error);
@@ -213,6 +220,7 @@ const ContentGenerator = () => {
 
   const handleCancelEdit = () => {
     setShowEditor(false);
+    setCurrentTime(0);
     setFormData({
       title: "",
       quote: "",
@@ -224,6 +232,7 @@ const ContentGenerator = () => {
       category: "",
       is_featured: false,
       is_premium: false,
+      transcript: [],
     });
   };
 
@@ -312,8 +321,10 @@ const ContentGenerator = () => {
               category: pepTalkData.topic_category[0] || "mindset",
               is_featured: false,
               is_premium: false,
+              transcript: [],
             });
             setShowEditor(true);
+            setCurrentTime(0);
             toast.success("Pep talk generated! Review and edit before saving.");
           }}
         />
@@ -395,9 +406,20 @@ const ContentGenerator = () => {
             </div>
 
             {formData.audio_url && (
-              <div className="space-y-2">
-                <Label>Audio Preview</Label>
-                <audio controls src={formData.audio_url} className="w-full" />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Audio Preview</Label>
+                  <AudioPlayer 
+                    audioUrl={formData.audio_url} 
+                    title={formData.title || "Pep Talk Preview"}
+                    onTimeUpdate={setCurrentTime}
+                  />
+                </div>
+                
+                <TimedCaptions 
+                  transcript={formData.transcript || []} 
+                  currentTime={currentTime}
+                />
               </div>
             )}
 
