@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { transcribePepTalk } from "@/utils/transcribeHelper";
 
 interface CaptionWord {
   word: string;
@@ -31,6 +32,7 @@ const PepTalkDetail = () => {
   const [pepTalk, setPepTalk] = useState<PepTalk | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -66,6 +68,25 @@ const PepTalkDetail = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTranscribe = async () => {
+    if (!pepTalk || !id) return;
+    
+    setIsTranscribing(true);
+    toast.info("Transcribing audio... This may take a minute.");
+    
+    const result = await transcribePepTalk(id, pepTalk.audio_url);
+    
+    if (result.success) {
+      toast.success("Transcript generated successfully!");
+      // Refresh the pep talk to get the new transcript
+      fetchPepTalk(id);
+    } else {
+      toast.error("Failed to generate transcript");
+    }
+    
+    setIsTranscribing(false);
   };
 
   if (loading) {
@@ -124,11 +145,45 @@ const PepTalkDetail = () => {
             onTimeUpdate={setCurrentTime}
           />
 
+          {/* Transcription Status */}
+          {(!pepTalk.transcript || pepTalk.transcript.length === 0) && (
+            <div className="bg-card rounded-3xl p-6 shadow-soft border border-primary/20">
+              <div className="text-center space-y-4">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
+                <div>
+                  <h3 className="font-semibold mb-2">No Transcript Available</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Generate a word-by-word transcript with timestamps for this pep talk
+                  </p>
+                  <Button 
+                    onClick={handleTranscribe}
+                    disabled={isTranscribing}
+                    className="w-full"
+                  >
+                    {isTranscribing ? (
+                      <>
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                        Transcribing...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate Transcript
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Timed Captions */}
-          <TimedCaptions 
-            transcript={pepTalk.transcript || []} 
-            currentTime={currentTime}
-          />
+          {pepTalk.transcript && pepTalk.transcript.length > 0 && (
+            <TimedCaptions 
+              transcript={pepTalk.transcript} 
+              currentTime={currentTime}
+            />
+          )}
         </div>
       </div>
     </div>
