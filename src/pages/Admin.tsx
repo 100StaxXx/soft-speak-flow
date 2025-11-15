@@ -428,27 +428,6 @@ const Admin = () => {
           </div>
         </Card>
 
-        {/* Full AI Generator */}
-        <div className="mb-8">
-          <AudioGenerator
-            mentors={mentors}
-            onFullPepTalkGenerated={(pepTalkData) => {
-              setFormData({
-                ...formData,
-                title: pepTalkData.title,
-                quote: pepTalkData.quote,
-                description: pepTalkData.description,
-                topic_category: pepTalkData.topic_category,
-                emotional_triggers: pepTalkData.emotional_triggers,
-                audio_url: pepTalkData.audio_url,
-                mentor_id: pepTalkData.mentor_id,
-              });
-              setIsEditing(true);
-              toast.success("Pep talk generated! Review and save when ready.");
-            }}
-          />
-        </div>
-
         {/* Quick Actions */}
         <div className="mb-8">
           <Button
