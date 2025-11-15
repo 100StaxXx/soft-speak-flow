@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AudioGenerator } from "@/components/AudioGenerator";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { TimedCaptions } from "@/components/TimedCaptions";
+import { TranscriptEditor } from "@/components/TranscriptEditor";
 import { toast } from "sonner";
 
 interface Mentor {
@@ -419,6 +420,12 @@ const ContentGenerator = () => {
                 <TimedCaptions 
                   transcript={formData.transcript || []} 
                   currentTime={currentTime}
+                />
+
+                <TranscriptEditor
+                  transcript={formData.transcript || []}
+                  onChange={(newTranscript) => setFormData({ ...formData, transcript: newTranscript })}
+                  audioUrl={formData.audio_url}
                 />
               </div>
             )}
