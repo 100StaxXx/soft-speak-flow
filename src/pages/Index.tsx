@@ -35,6 +35,8 @@ const Index = () => {
   const [showIntro, setShowIntro] = useState(true);
   const [powerMode, setPowerMode] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasActiveHabits, setHasActiveHabits] = useState(false);
+  const [hasActiveChallenges, setHasActiveChallenges] = useState(false);
 
   // Reset scroll to top when component mounts and prevent flash
   useEffect(() => {
@@ -67,6 +69,28 @@ const Index = () => {
     } else {
       fetchGeneralContent();
     }
+    
+    // Load user activity data for dynamic prompts
+    const loadUserActivity = async () => {
+      const { data: habits } = await supabase
+        .from("habits")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1);
+      
+      const { data: challenges } = await supabase
+        .from("user_challenges")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1);
+      
+      setHasActiveHabits((habits?.length || 0) > 0);
+      setHasActiveChallenges((challenges?.length || 0) > 0);
+    };
+    
+    loadUserActivity();
   }, [user, profile, profileLoading]);
 
   const fetchPersonalizedContent = async () => {
@@ -451,7 +475,9 @@ const Index = () => {
             </div>
             <AskMentorChat 
               mentorName={mentor.name} 
-              mentorTone={mentor.tone_description || "supportive and motivational"} 
+              mentorTone={mentor.tone_description || "supportive and motivational"}
+              hasActiveHabits={hasActiveHabits}
+              hasActiveChallenges={hasActiveChallenges}
             />
           </div>
         )}

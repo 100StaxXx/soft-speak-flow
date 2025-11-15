@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,6 +14,8 @@ interface Message {
 interface AskMentorChatProps {
   mentorName: string;
   mentorTone: string;
+  hasActiveHabits?: boolean;
+  hasActiveChallenges?: boolean;
 }
 
 const getMentorSpecificPrompts = (mentorName: string, mentorTone: string) => {
@@ -96,8 +97,12 @@ const getActivityBasedPrompts = (hasActiveHabits: boolean, hasActiveChallenges: 
   return prompts;
 };
 
-export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) => {
-  const { user } = useAuth();
+export const AskMentorChat = ({ 
+  mentorName, 
+  mentorTone,
+  hasActiveHabits = false,
+  hasActiveChallenges = false
+}: AskMentorChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -107,31 +112,10 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadDynamicPrompts = async () => {
+    const loadDynamicPrompts = () => {
       const mentorPrompts = getMentorSpecificPrompts(mentorName, mentorTone);
       const timePrompts = getTimeBasedPrompts();
-      
-      let activityPrompts: string[] = [];
-      if (user) {
-        const { data: habits } = await supabase
-          .from("habits")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1);
-        
-        const { data: challenges } = await supabase
-          .from("user_challenges")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1);
-        
-        activityPrompts = getActivityBasedPrompts(
-          (habits?.length || 0) > 0,
-          (challenges?.length || 0) > 0
-        );
-      }
+      const activityPrompts = getActivityBasedPrompts(hasActiveHabits, hasActiveChallenges);
       
       // Combine and shuffle prompts, take 3
       const allPrompts = [...mentorPrompts.slice(0, 2), ...timePrompts.slice(0, 2), ...activityPrompts.slice(0, 1)];
@@ -140,7 +124,7 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
     };
     
     loadDynamicPrompts();
-  }, [mentorName, mentorTone, user]);
+  }, [mentorName, mentorTone, hasActiveHabits, hasActiveChallenges]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
