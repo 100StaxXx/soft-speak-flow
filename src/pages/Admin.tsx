@@ -706,16 +706,6 @@ const Admin = () => {
           </Card>
         )}
 
-        {!isEditing && (
-          <Button
-            onClick={() => setIsEditing(true)}
-            className="mb-8 rounded-full bg-gradient-to-r from-blush-rose to-lavender-mist hover:shadow-glow transition-all"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create New Pep Talk
-          </Button>
-        )}
-
         {/* List */}
         <div className="space-y-4">
           <h2 className="font-heading text-2xl font-semibold text-foreground">
