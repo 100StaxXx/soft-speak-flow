@@ -35,6 +35,11 @@ const Index = () => {
   const [showIntro, setShowIntro] = useState(true);
   const [powerMode, setPowerMode] = useState(false);
 
+  // Reset scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     // Check if user needs onboarding
     if (user && !profileLoading && profile && !profile.selected_mentor_id) {
