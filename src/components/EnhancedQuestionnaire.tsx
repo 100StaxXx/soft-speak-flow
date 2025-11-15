@@ -59,7 +59,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
           <Button
             onClick={handleStart}
             size="lg"
-            className="px-16 py-8 text-xl font-black uppercase tracking-wider bg-royal-gold hover:bg-royal-gold/90 text-obsidian"
+            className="px-16 py-8 text-xl font-black uppercase tracking-wider bg-royal-gold hover:bg-royal-gold/90 text-obsidian shadow-[0_0_30px_rgba(255,215,0,0.5)] hover:shadow-[0_0_40px_rgba(255,215,0,0.7)] transition-all duration-300"
           >
             Start
           </Button>
