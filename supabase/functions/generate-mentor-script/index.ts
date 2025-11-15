@@ -12,7 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
+    const { 
+      mentorSlug, 
+      topic_category, 
+      intensity, 
+      emotionalTriggers,
+      time_of_day,
+      habit_context 
+    } = await req.json();
     
     // topic_category can now be a string or an array
     const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
@@ -43,13 +50,10 @@ serve(async (req) => {
 
     console.log(`Generating script for mentor ${mentor.name}`);
 
-    // Build context for emotional triggers
-    const triggerContext = emotionalTriggers?.length
-      ? `The user is experiencing: ${emotionalTriggers.join(", ")}.`
-      : "";
+    // WEIGHTING MODEL: Categories 60%, Emotional Triggers 25-30%, Intensity 10-15%
 
-    // Topic category context
-    const topicCategoryMap: Record<string, string> = {
+    // 1. CATEGORIES (60% - THE MAIN THEME)
+    const categoryRules: Record<string, string> = {
       discipline: "habits, consistency, self-respect, taking action",
       confidence: "self-worth, believing in yourself, celebrating past wins",
       physique: "training, body goals, self-image, health and fitness",
@@ -58,15 +62,24 @@ serve(async (req) => {
       business: "money, career, taking risks, the long game, responsibility",
     };
 
-    let topicContext = "";
+    let categoryGuidance = "";
     if (categories.length > 0) {
-      const categoryDescriptions = categories
-        .map(cat => topicCategoryMap[cat] || cat)
-        .join("; ");
-      topicContext = `This message is about ${categoryDescriptions}.`;
+      const primaryCategory = categories[0];
+      const secondaryCategories = categories.slice(1);
+      
+      categoryGuidance = `
+PRIMARY CATEGORY (60% of script focus): ${categoryRules[primaryCategory] || primaryCategory}
+- This is the MAIN THEME of the message
+- Build the core message around this`;
+
+      if (secondaryCategories.length > 0) {
+        const secondaryThemes = secondaryCategories.map(cat => categoryRules[cat] || cat).join(", ");
+        categoryGuidance += `
+SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryThemes}`;
+      }
     }
 
-    // Emotional trigger guidance
+    // 2. EMOTIONAL TRIGGERS (25-30% - THE EMOTIONAL ANGLE)
     const emotionalGuidanceMap: Record<string, string> = {
       "Exhausted": "acknowledge low energy, encourage pacing and recharge",
       "Avoiding Action": "address procrastination, emphasize small first steps",
@@ -82,39 +95,96 @@ serve(async (req) => {
       "Motivated & Ready": "amplify momentum, don't let it fade, double down",
     };
 
-    const emotionalGuidance = emotionalTriggers?.length
-      ? `Emotional approach: ${emotionalTriggers.map((t: string) => emotionalGuidanceMap[t] || t).join("; ")}`
-      : "";
+    let triggerGuidance = "";
+    if (emotionalTriggers?.length > 0) {
+      const primaryTriggers = emotionalTriggers.slice(0, 2);
+      const backgroundTriggers = emotionalTriggers.slice(2);
+      
+      triggerGuidance = `
+PRIMARY EMOTIONAL TRIGGERS (25-30% of script, shape opening tone):
+${primaryTriggers.map((t: string) => `- ${t}: ${emotionalGuidanceMap[t] || t}`).join('\n')}
+- Open with this emotional state
+- Acknowledge it directly`;
 
+      if (backgroundTriggers.length > 0) {
+        triggerGuidance += `
+BACKGROUND TRIGGERS (subtle, don't force):
+${backgroundTriggers.map((t: string) => `- ${t}`).join(', ')}`;
+      }
+    }
+
+    // 3. INTENSITY (10-15% - DELIVERY STYLE)
     const intensityMap: Record<string, string> = {
-      gentle: "gentle and compassionate",
-      medium: "balanced and motivating",
-      high: "intense and direct",
+      gentle: "soft, calm, reassuring delivery - like a supportive friend",
+      medium: "motivating, direct, confident - balanced energy",
+      high: "hype, urgent, energetic - peak state energy, strong but never abusive",
     };
 
-    const intensityStyle = intensityMap[intensity || "medium"] || "balanced and motivating";
+    const intensityGuidance = `
+INTENSITY LEVEL (10-15% - affects delivery style, not message):
+${intensityMap[intensity || "medium"] || intensityMap.medium}`;
 
-    const systemPrompt = `You are writing a spoken motivational message for the app "A Lil Push" in the voice of ${mentor.name}.
+    // 4. OPTIONAL CONTEXT
+    let contextGuidance = "";
+    
+    if (time_of_day) {
+      const timeMap: Record<string, string> = {
+        morning: "Set the tone for the day ahead - fresh start energy",
+        afternoon: "Reset and refocus - mid-day realignment",
+        night: "Reflect and prep for tomorrow - wind down but stay ready",
+      };
+      contextGuidance += `
+TIME OF DAY CONTEXT: ${timeMap[time_of_day] || time_of_day}`;
+    }
 
-Mentor Profile:
+    if (habit_context) {
+      const habitMap: Record<string, string> = {
+        starting: "Identity shift + small steps - you're becoming this person",
+        restarting: "Compassion + rebuilding trust with yourself",
+        maintaining: "Momentum + identity reinforcement - you ARE this now",
+      };
+      contextGuidance += `
+HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
+    }
+
+    const systemPrompt = `You are writing a spoken motivational message for "A Lil Push" in the voice of ${mentor.name}.
+
+MENTOR PROFILE:
 - Name: ${mentor.name}
 - Tone: ${mentor.tone_description}
 - Voice Style: ${mentor.voice_style}
 - Description: ${mentor.description}
 ${mentor.themes ? `- Themes: ${mentor.themes.join(", ")}` : ""}
 
-Your Task:
+⸻
+
+WEIGHTING MODEL (CRITICAL):
+${categoryGuidance}
+${triggerGuidance}
+${intensityGuidance}
+${contextGuidance}
+
+⸻
+
+SIMPLE RULE:
+• Categories = what the message is ABOUT (60%)
+• Triggers = the EMOTIONAL ANGLE (25-30%)
+• Intensity = how it's DELIVERED (10-15%)
+• Mentor = the FLAVOR
+
+⸻
+
+YOUR TASK:
 Write a 15-40 second spoken message that:
-- Matches ${mentor.name}'s tone, style, and themes
-- Is ${intensityStyle} in approach
-${topicContext ? `- ${topicContext}` : ""}
-${triggerContext ? `- Responds to: ${triggerContext}` : ""}
-${emotionalGuidance ? `- ${emotionalGuidance}` : ""}
+- Is built primarily around the PRIMARY CATEGORY theme
+- Opens with the PRIMARY EMOTIONAL TRIGGER(s)
+- Uses the intensity level to shape delivery (tone, pace, energy)
+- Sounds like ${mentor.name} speaking directly to someone
 - Contains 3-6 sentences
-- Feels natural and human when spoken aloud
+- Feels PERSONAL, SPECIFIC, and MOTIVATING
 - Uses NO emojis or special formatting
-- Sounds conversational, not written
-- Does NOT explicitly mention "category" or "trigger" words
+- Sounds conversational and human when spoken aloud
+- Does NOT explicitly say "category" or "trigger"
 
 Write ONLY the script text, nothing else.`;
 
