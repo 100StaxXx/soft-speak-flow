@@ -12,7 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
+    const { 
+      mentorSlug, 
+      topic_category, 
+      intensity, 
+      emotionalTriggers,
+      time_of_day,
+      habit_context 
+    } = await req.json();
     
     // topic_category can now be a string or an array
     const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
@@ -44,17 +51,10 @@ serve(async (req) => {
 
     console.log("Generating complete pep talk for mentor:", mentor.name);
 
-    // Generate complete pep talk content using AI
-    const emotionalContext = emotionalTriggers && emotionalTriggers.length > 0 
-      ? `The listener is currently feeling: ${emotionalTriggers.join(", ")}. Address these emotional states directly and provide relevant support.`
-      : "";
+    // WEIGHTING MODEL: Categories 60%, Emotional Triggers 25-30%, Intensity 10-15%
 
-    const intensityGuidance = intensity 
-      ? `Intensity Level: ${intensity} - Adjust your tone and energy to match this intensity level.`
-      : "";
-
-    // Build topic context from categories
-    const topicCategoryMap: Record<string, string> = {
+    // 1. CATEGORIES (60% - THE MAIN THEME)
+    const categoryRules: Record<string, string> = {
       discipline: "habits, consistency, self-respect, taking action",
       confidence: "self-worth, believing in yourself, celebrating past wins",
       physique: "training, body goals, self-image, health and fitness",
@@ -63,11 +63,89 @@ serve(async (req) => {
       business: "money, career, taking risks, the long game, responsibility",
     };
 
-    let categoryContext = "motivation";
+    let categoryGuidance = "";
+    let mainTheme = "motivation";
     if (categories.length > 0) {
-      categoryContext = categories
-        .map(cat => topicCategoryMap[cat] || cat)
-        .join(", ");
+      const primaryCategory = categories[0];
+      mainTheme = categoryRules[primaryCategory] || primaryCategory;
+      const secondaryCategories = categories.slice(1);
+      
+      categoryGuidance = `
+PRIMARY CATEGORY (60% of content focus): ${categoryRules[primaryCategory] || primaryCategory}
+- Build the TITLE, QUOTE, DESCRIPTION, and SCRIPT around this theme
+- This is what the pep talk is ABOUT`;
+
+      if (secondaryCategories.length > 0) {
+        const secondaryThemes = secondaryCategories.map(cat => categoryRules[cat] || cat).join(", ");
+        categoryGuidance += `
+SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryThemes}`;
+      }
+    }
+
+    // 2. EMOTIONAL TRIGGERS (25-30% - THE EMOTIONAL ANGLE)
+    const emotionalGuidanceMap: Record<string, string> = {
+      "Exhausted": "acknowledge low energy, encourage pacing and recharge",
+      "Avoiding Action": "address procrastination, emphasize small first steps",
+      "Anxious & Overthinking": "provide calming perspective, grounding thoughts",
+      "Self-Doubt": "affirm worth and ability, point to proof and belief",
+      "Feeling Stuck": "offer new angles, encourage small moves and one decision",
+      "Frustrated": "channel emotion productively, reframe without quitting",
+      "Heavy or Low": "gentle validation, spark hope, celebrate small wins",
+      "Emotionally Hurt": "acknowledge heartbreak or betrayal, guide toward healing",
+      "Unmotivated": "ignite spark, build momentum, get them moving",
+      "In Transition": "normalize change and uncertainty, guide through identity shifts",
+      "Needing Discipline": "emphasize structure and accountability, 'do it anyway' energy",
+      "Motivated & Ready": "amplify momentum, don't let it fade, double down",
+    };
+
+    let emotionalContext = "";
+    if (emotionalTriggers?.length > 0) {
+      const primaryTriggers = emotionalTriggers.slice(0, 2);
+      const backgroundTriggers = emotionalTriggers.slice(2);
+      
+      emotionalContext = `
+PRIMARY EMOTIONAL TRIGGERS (25-30% of content, shape opening):
+${primaryTriggers.map((t: string) => `- ${t}: ${emotionalGuidanceMap[t] || t}`).join('\n')}
+- Start the script acknowledging this emotional state`;
+
+      if (backgroundTriggers.length > 0) {
+        emotionalContext += `
+BACKGROUND TRIGGERS (subtle mentions only): ${backgroundTriggers.join(', ')}`;
+      }
+    }
+
+    // 3. INTENSITY (10-15% - DELIVERY STYLE)
+    const intensityMap: Record<string, string> = {
+      gentle: "soft, calm, reassuring - like a supportive friend",
+      medium: "motivating, direct, confident - balanced energy",
+      high: "hype, urgent, energetic - peak state, strong but never abusive",
+    };
+
+    const intensityGuidance = `
+INTENSITY LEVEL (10-15% - affects delivery, not message):
+${intensityMap[intensity || "medium"] || intensityMap.medium}`;
+
+    // 4. OPTIONAL CONTEXT
+    let contextGuidance = "";
+    
+    if (time_of_day) {
+      const timeMap: Record<string, string> = {
+        morning: "Set tone for the day - fresh start energy",
+        afternoon: "Reset and refocus - mid-day realignment",
+        night: "Reflect and prep for tomorrow - wind down but stay ready",
+      };
+      contextGuidance += `
+TIME OF DAY: ${timeMap[time_of_day] || time_of_day}`;
+    }
+
+    if (habit_context) {
+      const habitMap: Record<string, string> = {
+        starting: "Identity shift + small steps",
+        restarting: "Compassion + rebuilding trust",
+        maintaining: "Momentum + identity reinforcement",
+      };
+      contextGuidance += `
+HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
     }
 
     const systemPrompt = `You are ${mentor.name}, ${mentor.description}.
@@ -77,17 +155,37 @@ Tone: ${mentor.tone_description}
 ${mentor.identity_description ? `Identity: ${mentor.identity_description}` : ""}
 ${mentor.style_description ? `Style: ${mentor.style_description}` : ""}
 
-Generate a complete pep talk that includes:
-1. A catchy, motivational title (max 60 characters)
-2. A powerful quote (1-2 sentences, max 150 characters)
-3. A compelling description (2-3 sentences explaining what the pep talk covers)
-4. A full motivational script (2-3 paragraphs, conversational tone, direct address to listener)
+⸻
 
-Category: ${categoryContext}
-${intensityGuidance}
+WEIGHTING MODEL (CRITICAL):
+${categoryGuidance}
 ${emotionalContext}
+${intensityGuidance}
+${contextGuidance}
 
-Return ONLY a valid JSON object with these exact keys:
+⸻
+
+SIMPLE RULE:
+• Categories = what it's ABOUT (60%)
+• Triggers = the EMOTIONAL ANGLE (25-30%)
+• Intensity = how it's DELIVERED (10-15%)
+• Mentor = the FLAVOR
+
+⸻
+
+Generate a complete pep talk with:
+1. TITLE (max 60 chars) - reflects the PRIMARY CATEGORY theme
+2. QUOTE (1-2 sentences, max 150 chars) - captures the core message + emotional angle
+3. DESCRIPTION (2-3 sentences) - explains what this pep talk covers, tied to PRIMARY CATEGORY
+4. SCRIPT (2-3 paragraphs, conversational) - 
+   - Opens with PRIMARY EMOTIONAL TRIGGER(s)
+   - 60% built around PRIMARY CATEGORY
+   - Light references to secondary categories if any
+   - Direct address to listener
+   - Sounds like you speaking to someone face-to-face
+   - Personal, specific, motivating
+
+Return ONLY a valid JSON object:
 {
   "title": "...",
   "quote": "...",
