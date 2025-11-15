@@ -43,8 +43,9 @@ const Index = () => {
     if (container) {
       container.scrollTop = 0;
     }
-    // Small delay to ensure DOM is ready
-    setTimeout(() => setIsInitializing(false), 50);
+    // Delay to ensure DOM is ready and scroll is positioned
+    const timer = setTimeout(() => setIsInitializing(false), 100);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -192,7 +193,10 @@ const Index = () => {
   };
 
   return (
-    <div className="snap-y snap-mandatory overflow-y-scroll h-screen" id="main-scroll-container">
+    <div 
+      className={`snap-y snap-mandatory overflow-y-scroll h-screen transition-opacity duration-300 ${isInitializing ? 'opacity-0' : 'opacity-100'}`}
+      id="main-scroll-container"
+    >
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
       <div className="fixed top-6 right-6 z-50">
