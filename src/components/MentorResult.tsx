@@ -116,7 +116,7 @@ export const MentorResult = ({
             <Button
               onClick={onConfirm}
               disabled={isConfirming}
-              className="flex-1 h-16 font-black uppercase tracking-wider bg-gradient-to-r from-royal-purple to-accent-purple hover:from-royal-purple/90 hover:to-accent-purple/90 text-pure-white border border-royal-purple/30 shadow-lg hover:shadow-[0_0_20px_rgba(137,81,204,0.3)] transition-all duration-300"
+              className="flex-1 h-16 font-black uppercase tracking-wider bg-transparent border-2 border-royal-purple text-pure-white hover:bg-royal-purple/10 shadow-[0_0_20px_rgba(137,81,204,0.5)] hover:shadow-[0_0_30px_rgba(137,81,204,0.7)] transition-all duration-300"
             >
               {isConfirming ? (
                 <>Confirming...</>
