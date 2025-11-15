@@ -42,7 +42,7 @@ const Admin = () => {
   const [formData, setFormData] = useState({
     title: "",
     category: "",
-    topic_category: "",
+    topic_category: [] as string[],
     emotional_triggers: [] as string[],
     quote: "",
     description: "",
@@ -254,7 +254,7 @@ const Admin = () => {
     setFormData({
       title: "",
       category: "",
-      topic_category: "",
+      topic_category: [],
       emotional_triggers: [],
       quote: "",
       description: "",
@@ -528,23 +528,42 @@ const Admin = () => {
               </div>
 
               <div>
-                <Label htmlFor="topic-category">Topic Category</Label>
-                <select
-                  id="topic-category"
-                  value={formData.topic_category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, topic_category: e.target.value })
-                  }
-                  className="w-full h-10 px-3 rounded-2xl border border-input bg-background"
-                >
-                  <option value="">Select a topic category...</option>
-                  <option value="discipline">Discipline</option>
-                  <option value="confidence">Confidence</option>
-                  <option value="physique">Physique</option>
-                  <option value="focus">Focus</option>
-                  <option value="mindset">Mindset</option>
-                  <option value="business">Business</option>
-                </select>
+                <Label htmlFor="topic-category">Topic Categories (up to 4)</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {["discipline", "confidence", "physique", "focus", "mindset", "business"].map((cat) => {
+                    const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+                    return (
+                      <Button
+                        key={cat}
+                        type="button"
+                        variant={formData.topic_category.includes(cat) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          const selected = formData.topic_category;
+                          if (selected.includes(cat)) {
+                            setFormData({
+                              ...formData,
+                              topic_category: selected.filter(c => c !== cat)
+                            });
+                          } else if (selected.length < 4) {
+                            setFormData({
+                              ...formData,
+                              topic_category: [...selected, cat]
+                            });
+                          } else {
+                            toast.error("Maximum 4 categories allowed");
+                          }
+                        }}
+                        className="rounded-full text-xs"
+                      >
+                        {label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected: {formData.topic_category.length}/4
+                </p>
               </div>
 
               <div>

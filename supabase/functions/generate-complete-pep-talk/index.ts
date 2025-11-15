@@ -13,6 +13,9 @@ serve(async (req) => {
 
   try {
     const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
+    
+    // topic_category can now be a string or an array
+    const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -50,6 +53,23 @@ serve(async (req) => {
       ? `Intensity Level: ${intensity} - Adjust your tone and energy to match this intensity level.`
       : "";
 
+    // Build topic context from categories
+    const topicCategoryMap: Record<string, string> = {
+      discipline: "habits, consistency, self-respect, taking action",
+      confidence: "self-worth, believing in yourself, celebrating past wins",
+      physique: "training, body goals, self-image, health and fitness",
+      focus: "clarity, priorities, reducing distractions",
+      mindset: "perspective, resilience, thinking patterns",
+      business: "money, career, taking risks, the long game, responsibility",
+    };
+
+    let categoryContext = "motivation";
+    if (categories.length > 0) {
+      categoryContext = categories
+        .map(cat => topicCategoryMap[cat] || cat)
+        .join(", ");
+    }
+
     const systemPrompt = `You are ${mentor.name}, ${mentor.description}.
     
 Voice Style: ${mentor.voice_style}
@@ -63,7 +83,7 @@ Generate a complete pep talk that includes:
 3. A compelling description (2-3 sentences explaining what the pep talk covers)
 4. A full motivational script (2-3 paragraphs, conversational tone, direct address to listener)
 
-Category: ${topic_category || "motivation"}
+Category: ${categoryContext}
 ${intensityGuidance}
 ${emotionalContext}
 
