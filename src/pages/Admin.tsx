@@ -36,6 +36,7 @@ const Admin = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -264,6 +265,52 @@ const Admin = () => {
     setAudioFile(null);
   };
 
+  const mentorPreviewTexts: Record<string, string> = {
+    atlas: "Let's take a breath, get clear, and move with purpose.",
+    darius: "You know what needs to be done. Let's get to it.",
+    eli: "Hey, you're doing better than you think. Keep going.",
+    nova: "Small steps today create big shifts over time.",
+    sienna: "You're safe, you're growing, and you're allowed to take your time.",
+    lumi: "You've got this. Your light reaches further than you realize.",
+    kai: "Slow your mind. Focus your breath. Move with intention.",
+    stryker: "Stand tall. Lock in. This is your moment to push.",
+    solace: "Let your mind settle. Peace starts from within.",
+  };
+
+  const handleVoicePreview = async (mentorSlug: string) => {
+    const previewText = mentorPreviewTexts[mentorSlug];
+    if (!previewText) {
+      toast.error("No preview text for this mentor");
+      return;
+    }
+
+    setPreviewingVoice(mentorSlug);
+    try {
+      toast.info("Generating voice preview...");
+      const { data, error } = await supabase.functions.invoke("generate-mentor-audio", {
+        body: {
+          mentorSlug,
+          script: previewText,
+        },
+      });
+
+      if (error) throw error;
+
+      // Play the audio
+      const audio = new Audio(data.audioUrl);
+      audio.play();
+      toast.success("Playing voice preview");
+
+      audio.onended = () => {
+        setPreviewingVoice(null);
+      };
+    } catch (error: any) {
+      console.error("Error previewing voice:", error);
+      toast.error(error.message || "Failed to preview voice");
+      setPreviewingVoice(null);
+    }
+  };
+
   const handleFullAIGenerate = async () => {
     if (!formData.mentor_id) {
       toast.error("Please select a mentor first");
@@ -347,6 +394,35 @@ const Admin = () => {
           </h1>
           <p className="text-muted-foreground">Manage your pep talks</p>
         </div>
+
+        {/* Voice Preview Section */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">Voice Preview</h2>
+          <p className="text-muted-foreground mb-6">Test each mentor's voice before generating content</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mentors.map((mentor) => (
+              <div key={mentor.id} className="flex items-center justify-between p-4 border rounded-2xl bg-card">
+                <div>
+                  <p className="font-medium">{mentor.name}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{mentor.slug}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleVoicePreview(mentor.slug)}
+                  disabled={previewingVoice === mentor.slug}
+                  className="rounded-full"
+                >
+                  {previewingVoice === mentor.slug ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Music className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
 
         {/* Full AI Generator */}
         <div className="mb-8">
