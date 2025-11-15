@@ -291,6 +291,18 @@ const Index = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card
                 className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
+                onClick={() => navigate("/dashboard")}
+              >
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <TrendingUp className="w-6 h-6 text-primary" />
+                  </div>
+                  <span className="font-heading text-foreground">Dashboard</span>
+                </div>
+              </Card>
+
+              <Card
+                className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
                 onClick={() => navigate("/mentor-chat")}
               >
                 <div className="flex flex-col items-center text-center space-y-2">

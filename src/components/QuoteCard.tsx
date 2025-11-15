@@ -2,6 +2,7 @@ import { Heart } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ShareButton } from "@/components/ShareButton";
 
 interface Quote {
   id: string;
@@ -89,6 +90,12 @@ export const QuoteCard = ({ quote, isFavorited: initialFavorited, onFavoriteChan
           className={`h-5 w-5 ${isFavorited ? "fill-blush-rose text-blush-rose" : "text-warm-charcoal/40"}`}
         />
       </button>
+      <div className="absolute top-4 right-4">
+        <ShareButton
+          title="Motivational Quote"
+          text={`"${text}"${author ? ` - ${author}` : ''}`}
+        />
+      </div>
       <div className="mt-8 mb-4">
         <p className="text-warm-charcoal text-base md:text-lg font-medium leading-relaxed italic break-words">
           "{text}"
