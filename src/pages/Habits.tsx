@@ -181,9 +181,9 @@ export default function Habits() {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-heading font-bold text-foreground">
-                    {newHabitTitle || "Custom Habit"}
+                    Custom Habit
                   </h3>
                   <Button
                     variant="ghost"
@@ -196,7 +196,6 @@ export default function Habits() {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                {!newHabitTitle && (
                 <Input
                   placeholder="Enter habit name"
                   value={newHabitTitle}
@@ -205,7 +204,6 @@ export default function Habits() {
                   maxLength={100}
                   autoFocus
                 />
-                )}
                 <FrequencyPicker 
                   selectedDays={selectedDays}
                   onDaysChange={setSelectedDays}
