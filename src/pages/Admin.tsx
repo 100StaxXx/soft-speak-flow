@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +23,10 @@ interface PepTalk {
 }
 
 const Admin = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,9 +47,36 @@ const Admin = () => {
   });
 
   useEffect(() => {
-    fetchPepTalks();
-    fetchMentors();
-  }, []);
+    const checkAdmin = async () => {
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: "admin",
+      });
+
+      if (error || !data) {
+        toast.error("Access Denied: You don't have permission to access this page.");
+        navigate("/");
+        return;
+      }
+
+      setIsAdmin(true);
+      setAuthLoading(false);
+    };
+
+    checkAdmin();
+  }, [user, navigate, toast]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPepTalks();
+      fetchMentors();
+    }
+  }, [isAdmin]);
 
   const fetchMentors = async () => {
     const { data, error } = await supabase
@@ -194,6 +227,18 @@ const Admin = () => {
     setIsEditing(false);
     setAudioFile(null);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 flex items-center justify-center">
+        <div className="text-foreground text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 py-8 px-4">
