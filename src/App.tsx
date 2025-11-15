@@ -65,6 +65,8 @@ const AppContent = () => {
       <Routes>
         {/* Public routes */}
         <Route path="/auth" element={<Auth />} />
+        
+        {/* Protected routes - require authentication */}
         <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
         
         {/* Protected routes - require authentication and mentor selection */}
