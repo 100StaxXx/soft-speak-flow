@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Message {
   role: "user" | "assistant";
@@ -16,21 +17,130 @@ interface AskMentorChatProps {
   mentorTone: string;
 }
 
-const SUGGESTED_PROMPTS = [
-  "I'm struggling to stay consistent",
-  "How do I stop procrastinating?",
-  "Give me a confidence boost",
-  "Help me get back on track",
-  "I'm feeling overwhelmed",
-];
+const getMentorSpecificPrompts = (mentorName: string, mentorTone: string) => {
+  const isTough = mentorTone.toLowerCase().includes("tough") || mentorTone.toLowerCase().includes("direct");
+  const isEmpathetic = mentorTone.toLowerCase().includes("empathetic") || mentorTone.toLowerCase().includes("supportive");
+  
+  if (isTough) {
+    return [
+      "I need a reality check",
+      "Call me out on my excuses",
+      "Give me the hard truth",
+      "Push me to do better",
+      "What am I doing wrong?",
+    ];
+  } else if (isEmpathetic) {
+    return [
+      "I'm struggling today",
+      "I need some encouragement",
+      "Help me be kinder to myself",
+      "I'm feeling lost",
+      "Remind me why I started",
+    ];
+  }
+  
+  return [
+    "I need motivation",
+    "Help me stay focused",
+    "What should I work on?",
+    "Give me a pep talk",
+    "I'm feeling stuck",
+  ];
+};
+
+const getTimeBasedPrompts = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 12) {
+    return [
+      "Help me start my day strong",
+      "What should I focus on today?",
+      "Give me morning motivation",
+      "How can I make today count?",
+    ];
+  } else if (hour >= 12 && hour < 17) {
+    return [
+      "I need an afternoon boost",
+      "Help me power through the day",
+      "I'm losing momentum",
+      "Keep me on track",
+    ];
+  } else {
+    return [
+      "Help me reflect on today",
+      "How can I finish strong?",
+      "What did I learn today?",
+      "Prepare me for tomorrow",
+    ];
+  }
+};
+
+const getActivityBasedPrompts = (hasActiveHabits: boolean, hasActiveChallenges: boolean) => {
+  const prompts: string[] = [];
+  
+  if (hasActiveHabits) {
+    prompts.push("Help me stay consistent with my habits");
+    prompts.push("I'm breaking my streak");
+  }
+  
+  if (hasActiveChallenges) {
+    prompts.push("Keep me motivated for my challenge");
+    prompts.push("The challenge is getting hard");
+  }
+  
+  if (!hasActiveHabits && !hasActiveChallenges) {
+    prompts.push("Help me build better habits");
+    prompts.push("What challenge should I start?");
+  }
+  
+  return prompts;
+};
 
 export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const loadDynamicPrompts = async () => {
+      const mentorPrompts = getMentorSpecificPrompts(mentorName, mentorTone);
+      const timePrompts = getTimeBasedPrompts();
+      
+      let activityPrompts: string[] = [];
+      if (user) {
+        const { data: habits } = await supabase
+          .from("habits")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1);
+        
+        const { data: challenges } = await supabase
+          .from("user_challenges")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1);
+        
+        activityPrompts = getActivityBasedPrompts(
+          (habits?.length || 0) > 0,
+          (challenges?.length || 0) > 0
+        );
+      }
+      
+      // Combine and shuffle prompts, take 5
+      const allPrompts = [...mentorPrompts.slice(0, 2), ...timePrompts.slice(0, 2), ...activityPrompts.slice(0, 1)];
+      const shuffled = allPrompts.sort(() => Math.random() - 0.5);
+      setSuggestedPrompts(shuffled.slice(0, 5));
+    };
+    
+    loadDynamicPrompts();
+  }, [mentorName, mentorTone, user]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,7 +221,7 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
           <div className="space-y-4 p-4">
             <p className="text-sm text-muted-foreground text-center">What do you need a lil push on?</p>
             <div className="grid grid-cols-1 gap-2">
-              {SUGGESTED_PROMPTS.map((prompt) => (
+              {suggestedPrompts.map((prompt) => (
                 <Button
                   key={prompt}
                   variant="outline"
