@@ -15,6 +15,7 @@ interface AudioGeneratorProps {
     description: string;
     category: string;
     audio_url: string;
+    mentor_id: string;
   }) => void;
   mentors: any[];
 }
@@ -99,7 +100,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
       toast.success("Complete pep talk generated successfully!");
 
-      // Pass all data to parent component
+      // Pass all data to parent component including mentor_id
       if (onFullPepTalkGenerated) {
         onFullPepTalkGenerated({
           title: contentData.title,
@@ -107,6 +108,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           description: contentData.description,
           category: contentData.category,
           audio_url: audioData.audioUrl,
+          mentor_id: mentor.id,
         });
       }
     } catch (error: any) {
@@ -141,12 +143,15 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
             <SelectTrigger id="mentor">
               <SelectValue placeholder="Choose a mentor..." />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background z-50">
               {mentors.map((mentor) => {
                 const config = getMentorVoiceConfig(mentor.slug);
                 return (
-                  <SelectItem key={mentor.slug} value={mentor.slug}>
-                    {mentor.name} ({config?.voiceName || "Unknown"})
+                  <SelectItem key={mentor.slug} value={mentor.slug} className="cursor-pointer">
+                    <div className="flex flex-col items-start py-1">
+                      <div className="font-medium">{mentor.name} ({config?.voiceName || "Unknown"})</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">{mentor.short_title || mentor.description}</div>
+                    </div>
                   </SelectItem>
                 );
               })}
