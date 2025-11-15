@@ -34,14 +34,17 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
   const [powerMode, setPowerMode] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Reset scroll to top when component mounts and when intro completes
+  // Reset scroll to top when component mounts and prevent flash
   useEffect(() => {
     window.scrollTo(0, 0);
     const container = document.getElementById('main-scroll-container');
     if (container) {
       container.scrollTop = 0;
     }
+    // Small delay to ensure DOM is ready
+    setTimeout(() => setIsInitializing(false), 50);
   }, []);
 
   useEffect(() => {
@@ -171,12 +174,11 @@ const Index = () => {
     }
   };
 
-  if (loading || profileLoading) {
+  if (loading || profileLoading || isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-secondary/30">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-center">
           <Sparkles className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-          <p className="text-muted-foreground">Loading your personalized feed...</p>
         </div>
       </div>
     );
