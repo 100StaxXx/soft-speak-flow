@@ -46,10 +46,10 @@ export const PepTalkCard = ({ id, title, category, description, quote, isPremium
               {category}
             </span>
           </div>
-          <h3 className="font-heading text-lg font-black text-pure-white mb-2 line-clamp-1 uppercase tracking-tight">
+          <h3 className="font-heading text-base md:text-lg font-black text-pure-white mb-2 line-clamp-2 uppercase tracking-tight break-words">
             {title}
           </h3>
-          <p className="text-sm text-steel line-clamp-2">
+          <p className="text-sm text-steel line-clamp-2 break-words">
             {description || quote || ""}
           </p>
         </div>

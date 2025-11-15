@@ -33,9 +33,9 @@ export const PlaylistCard = ({ playlist }: PlaylistCardProps) => {
           <Music className="h-6 w-6 text-royal-gold" />
         </div>
       </div>
-      <h3 className="font-heading text-xl text-pure-white mb-2 font-black uppercase tracking-tight">{title}</h3>
+      <h3 className="font-heading text-lg md:text-xl text-pure-white mb-2 font-black uppercase tracking-tight break-words">{title}</h3>
       {description && (
-        <p className="text-steel text-sm mb-3 line-clamp-2">{description}</p>
+        <p className="text-steel text-sm mb-3 line-clamp-2 break-words">{description}</p>
       )}
     </div>
   );
