@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const Profile = () => {
+const Settings = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
@@ -102,7 +102,7 @@ const Profile = () => {
     return (
       <div className="min-h-screen bg-background pb-24">
         <div className="max-w-lg mx-auto px-4 py-8 text-center py-12">
-          <h2 className="font-display text-3xl text-foreground mb-4">Sign in to view your profile</h2>
+          <h2 className="font-display text-3xl text-foreground mb-4">Sign in to view settings</h2>
           <Button onClick={() => navigate("/auth")} className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-6 rounded-3xl">Sign In</Button>
         </div>
         <BottomNav />
@@ -113,7 +113,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="font-display text-4xl text-foreground mb-8">Profile</h1>
+        <h1 className="font-display text-4xl text-foreground mb-8">Settings</h1>
         
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <Card className="p-6 bg-card border-border shadow-soft">
@@ -236,4 +236,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Settings;
