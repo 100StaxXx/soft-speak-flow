@@ -17,6 +17,9 @@ const Quotes = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const [quoteData, setQuoteData] = useState<any>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   const { data: quote, isLoading } = useQuery({
     queryKey: ["single-quote", selectedBubble, bubbleType],
     enabled: !!selectedBubble && !!bubbleType,
@@ -26,21 +29,31 @@ const Quotes = () => {
       });
 
       if (error) throw error;
-      return data?.quote;
+      
+      // Show quote immediately
+      const quoteResult = data?.quote;
+      if (quoteResult) {
+        setQuoteData(quoteResult);
+        setImageLoaded(false);
+      }
+      
+      return quoteResult;
     },
   });
 
   const handleBubbleClick = async (value: string, type: "trigger" | "category") => {
     setSelectedBubble(value);
     setBubbleType(type);
+    setQuoteData(null);
     setShowQuote(false);
     setShowAuthor(false);
     setShowBack(false);
+    setImageLoaded(false);
     
-    // Trigger animations in sequence (slower)
-    setTimeout(() => setShowQuote(true), 500);
-    setTimeout(() => setShowAuthor(true), 2500);
-    setTimeout(() => setShowBack(true), 3500);
+    // Show quote and author immediately after data loads
+    setTimeout(() => setShowQuote(true), 300);
+    setTimeout(() => setShowAuthor(true), 800);
+    setTimeout(() => setShowBack(true), 1200);
   };
 
   const handleBack = () => {
@@ -114,49 +127,63 @@ const Quotes = () => {
             />
           </>
         ) : (
-          <div className="min-h-[80vh] flex items-center justify-center relative">
-            {isLoading ? (
+          <div className="fixed inset-0 flex items-center justify-center z-20">
+            {isLoading && !quoteData ? (
               <div className="text-center">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blush-rose border-r-transparent"></div>
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
               </div>
-            ) : quote ? (
-              <div className="max-w-5xl mx-auto text-center space-y-10 px-8 py-12">
-                {quote.imageUrl && (
-                  <div className="relative">
+            ) : quoteData ? (
+              <>
+                {/* Full-screen image background */}
+                {quoteData.imageUrl && (
+                  <div className={`absolute inset-0 transition-opacity duration-1000 ${
+                    imageLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}>
                     <img 
-                      src={quote.imageUrl} 
+                      src={quoteData.imageUrl} 
                       alt="Quote visualization"
-                      className={`w-full max-w-3xl mx-auto rounded-3xl shadow-2xl transition-all duration-1500 ${
-                        showQuote ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                      }`}
+                      className="w-full h-full object-cover"
+                      onLoad={() => setImageLoaded(true)}
                     />
-                    {/* Cinematic overlay gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-3xl pointer-events-none" />
+                    <div className="absolute inset-0 bg-black/20" />
                   </div>
                 )}
-                <p 
-                  className={`font-${quote.fontFamily || 'quote'} text-5xl md:text-6xl lg:text-7xl text-warm-charcoal leading-tight tracking-wide transition-all duration-1500 drop-shadow-2xl ${
-                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
-                  }`}
-                  style={{ 
-                    textShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    letterSpacing: '0.02em'
-                  }}
-                >
-                  "{quote.text}"
-                </p>
-                <p 
-                  className={`text-3xl md:text-4xl text-blush-rose font-semibold transition-all duration-1500 tracking-wider ${
+                
+                {/* Quote text overlay */}
+                <div className="relative z-30 max-w-6xl mx-auto text-center space-y-10 px-8">
+                  <div className={`transition-all duration-1000 ${
+                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                  }`}>
+                    <blockquote 
+                      className="text-5xl md:text-7xl lg:text-8xl font-bold leading-tight mb-8 tracking-tight"
+                      style={{ 
+                        fontFamily: quoteData.font || 'Cinzel, serif',
+                        color: '#ffffff',
+                        textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 2px 10px rgba(0,0,0,0.9)'
+                      }}
+                    >
+                      "{quoteData.text}"
+                    </blockquote>
+                  </div>
+
+                  <div className={`transition-all duration-1000 delay-300 ${
                     showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                  }`}
-                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
-                >
-                  — {quote.author}
-                </p>
-              </div>
+                  }`}>
+                    <p 
+                      className="text-3xl md:text-4xl font-light italic"
+                      style={{ 
+                        color: '#ffffff',
+                        textShadow: '0 2px 10px rgba(0,0,0,0.7)'
+                      }}
+                    >
+                      — {quoteData.author}
+                    </p>
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="text-center">
-                <p className="text-warm-charcoal/60 text-lg">No quote found</p>
+                <p className="text-white/60 text-lg">No quote found</p>
               </div>
             )}
           </div>
