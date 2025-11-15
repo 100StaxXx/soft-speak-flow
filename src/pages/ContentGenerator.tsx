@@ -186,21 +186,6 @@ const ContentGenerator = () => {
     toast.success(`Transcription complete! Success: ${successCount}, Failed: ${failCount}`);
     fetchPepTalksWithoutTranscripts();
   };
-    const { data, error } = await supabase
-      .from("mentors")
-      .select("*")
-      .order("name");
-
-    if (error) {
-      toastHook({
-        title: "Error",
-        description: "Failed to load mentors",
-        variant: "destructive",
-      });
-    } else {
-      setMentors(data || []);
-    }
-  };
 
   const handleVoicePreview = async (mentorSlug: string) => {
     setPreviewingVoice(mentorSlug);
