@@ -91,33 +91,28 @@ const Quotes = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24 relative overflow-hidden">
-      {/* Cinematic background effects */}
-      {selectedBubble && quote?.bgEffect === 'dark' && (
-        <div className="fixed inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent pointer-events-none z-0" />
-      )}
-      
+    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-20 relative overflow-hidden">
       {/* Back Button */}
       {selectedBubble && (
         <button
           onClick={handleBack}
-          className={`fixed top-8 left-8 z-50 p-3 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
+          className={`fixed top-4 left-4 z-50 p-2 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
             showBack ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
           }`}
         >
-          <ArrowLeft className="h-5 w-5 text-warm-charcoal" />
+          <ArrowLeft className="h-4 w-4 text-warm-charcoal" />
         </button>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
+      <div className="max-w-md mx-auto px-4 py-6 relative z-10">
         {!selectedBubble ? (
           <>
             <div className="mb-2">
-              <h1 className="font-display text-4xl text-warm-charcoal text-center">
+              <h1 className="font-display text-2xl text-warm-charcoal text-center">
                 Quotes & Affirmations
               </h1>
             </div>
-            <p className="text-warm-charcoal/70 text-center mb-8">
+            <p className="text-warm-charcoal/70 text-center mb-6 text-sm">
               Daily wisdom for your journey
             </p>
 
@@ -127,25 +122,25 @@ const Quotes = () => {
             />
           </>
         ) : (
-          <div className="fixed inset-0 flex items-center justify-center z-20">
+          <div className="fixed inset-0 flex items-center justify-center">
             {isLoading && !quoteData ? (
               <div className="text-center">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
               </div>
             ) : quoteData?.imageUrl ? (
-              <div className={`absolute inset-0 transition-opacity duration-1000 ${
+              <div className={`absolute inset-0 transition-opacity duration-700 ${
                 imageLoaded ? 'opacity-100' : 'opacity-0'
               }`}>
                 <img 
                   src={quoteData.imageUrl} 
                   alt="Quote"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   onLoad={() => setImageLoaded(true)}
                 />
               </div>
             ) : (
-              <div className="text-center">
-                <p className="text-white/60 text-lg">No quote found</p>
+              <div className="text-center px-4">
+                <p className="text-white/60 text-sm">No quote found</p>
               </div>
             )}
           </div>
