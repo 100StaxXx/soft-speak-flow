@@ -184,6 +184,13 @@ const Index = () => {
     );
   }
 
+  const scrollToContent = () => {
+    const firstSection = document.querySelector('#content-start');
+    if (firstSection) {
+      firstSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="snap-y snap-mandatory overflow-y-scroll h-screen" id="main-scroll-container">
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
@@ -193,12 +200,15 @@ const Index = () => {
       </div>
 
       {!showIntro && (
-        <section className="snap-start snap-always h-screen">
+        <section 
+          onClick={scrollToContent}
+          className="snap-start snap-always h-screen cursor-pointer"
+        >
           <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
         </section>
       )}
 
-      <section className={`snap-start snap-always min-h-screen transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background`}>
+      <section id="content-start" className={`snap-start snap-always min-h-screen transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background`}>
         <div className="max-w-6xl mx-auto px-6 py-16 pb-32">
         {mentor && user && (
           <div className="mb-12">
