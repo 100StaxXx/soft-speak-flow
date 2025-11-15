@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.generate-full-mentor-audio]
 verify_jwt = false
+
+[functions.generate-complete-pep-talk]
+verify_jwt = false
