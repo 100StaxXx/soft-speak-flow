@@ -33,7 +33,7 @@ const Profile = () => {
   });
 
   const { data: mentors } = useQuery({
-    queryKey: ["mentors"],
+    queryKey: ["mentors", "active"] ,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("mentors")
@@ -41,13 +41,13 @@ const Profile = () => {
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      // Deduplicate by slug (fallback to name)
+      // Deduplicate by normalized slug or name
       const map = new Map<string, any>();
       for (const m of data || []) {
-        const key = m.slug || m.name;
+        const key = ((m.slug || m.name || "").trim().toLowerCase());
         if (!map.has(key)) map.set(key, m);
       }
-      return Array.from(map.values());
+      return Array.from(map.values()).sort((a,b) => a.name.localeCompare(b.name));
     },
   });
 
