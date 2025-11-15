@@ -129,7 +129,8 @@ const Index = () => {
       });
 
       if (error) throw error;
-      setDailyLesson(data);
+      // Extract the lesson from the response
+      setDailyLesson(data?.lesson || data);
     } catch (error) {
       console.error('Error generating daily lesson:', error);
       toast.error('Failed to load daily lesson');
@@ -418,9 +419,8 @@ const Index = () => {
             </div>
             <DailyLesson
               title={dailyLesson.title}
-              content={dailyLesson.lesson}
-              category={dailyLesson.category}
-              actionStep={dailyLesson.action_step}
+              content={dailyLesson.content}
+              category={dailyLesson.category || 'Daily Wisdom'}
             />
           </div>
         )}
