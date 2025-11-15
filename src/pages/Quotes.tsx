@@ -6,7 +6,8 @@ import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw, Download } from "lucide-react";
+import { toast } from "sonner";
 
 const Quotes = () => {
   const [selectedBubble, setSelectedBubble] = useState<string | null>(null);
@@ -50,10 +51,54 @@ const Quotes = () => {
     setShowBack(false);
     setImageLoaded(false);
     
-    // Show quote and author immediately after data loads
-    setTimeout(() => setShowQuote(true), 300);
-    setTimeout(() => setShowAuthor(true), 800);
-    setTimeout(() => setShowBack(true), 1200);
+    // Show UI elements quickly
+    setTimeout(() => setShowQuote(true), 100);
+    setTimeout(() => setShowAuthor(true), 200);
+    setTimeout(() => setShowBack(true), 300);
+  };
+
+  const handleNextQuote = () => {
+    setQuoteData(null);
+    setImageLoaded(false);
+    setShowQuote(false);
+    setShowAuthor(false);
+    
+    // Refetch the quote
+    setTimeout(() => {
+      setShowQuote(true);
+      setShowAuthor(true);
+    }, 100);
+  };
+
+  const handleDownload = async () => {
+    if (!quoteData?.imageUrl) return;
+    
+    try {
+      // Convert base64 to blob
+      const base64Data = quoteData.imageUrl.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `quote-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Quote saved!");
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to save quote");
+    }
   };
 
   const handleBack = () => {
@@ -126,18 +171,43 @@ const Quotes = () => {
             {isLoading && !quoteData ? (
               <div className="text-center">
                 <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
+                <p className="text-white/80 text-xs mt-2">Creating your quote...</p>
               </div>
             ) : quoteData?.imageUrl ? (
-              <div className={`absolute inset-0 transition-opacity duration-700 ${
-                imageLoaded ? 'opacity-100' : 'opacity-0'
-              }`}>
-                <img 
-                  src={quoteData.imageUrl} 
-                  alt="Quote"
-                  className="w-full h-full object-contain"
-                  onLoad={() => setImageLoaded(true)}
-                />
-              </div>
+              <>
+                <div className={`absolute inset-0 transition-opacity duration-700 ${
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}>
+                  <img 
+                    src={quoteData.imageUrl} 
+                    alt="Quote"
+                    className="w-full h-full object-contain"
+                    onLoad={() => setImageLoaded(true)}
+                  />
+                </div>
+                
+                {/* Floating Action Buttons */}
+                {imageLoaded && (
+                  <div className="fixed bottom-24 left-0 right-0 flex items-center justify-center gap-3 px-4 z-50">
+                    <Button
+                      onClick={handleDownload}
+                      size="lg"
+                      className="bg-white/90 hover:bg-white text-warm-charcoal backdrop-blur-sm border border-petal-pink/20 shadow-lg rounded-full px-6"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Save
+                    </Button>
+                    <Button
+                      onClick={handleNextQuote}
+                      size="lg"
+                      className="bg-blush-rose hover:bg-blush-rose/90 text-white backdrop-blur-sm shadow-lg rounded-full px-6"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Next Quote
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center px-4">
                 <p className="text-white/60 text-sm">No quote found</p>
