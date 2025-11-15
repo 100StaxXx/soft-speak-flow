@@ -53,7 +53,7 @@ export default {
         'graphite': 'hsl(var(--graphite))',
         'royal-purple': 'hsl(var(--royal-purple))',
         'deep-purple': 'hsl(var(--deep-purple))',
-        'royal-gold': 'hsl(var(--royal-gold))',
+        'accent-purple': 'hsl(var(--accent-purple))',
       },
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
