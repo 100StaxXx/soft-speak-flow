@@ -197,13 +197,14 @@ export default function Habits() {
                   </Button>
                 </div>
                 {!newHabitTitle && (
-                  <Input
-                    placeholder="Enter habit name"
-                    value={newHabitTitle}
-                    onChange={(e) => setNewHabitTitle(e.target.value)}
-                    className="bg-background/50"
-                    autoFocus
-                  />
+                <Input
+                  placeholder="Enter habit name"
+                  value={newHabitTitle}
+                  onChange={(e) => setNewHabitTitle(e.target.value)}
+                  className="bg-background/50"
+                  maxLength={100}
+                  autoFocus
+                />
                 )}
                 <FrequencyPicker 
                   selectedDays={selectedDays}

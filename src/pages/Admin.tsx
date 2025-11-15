@@ -276,6 +276,7 @@ const Admin = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
+                  maxLength={200}
                   required
                   className="rounded-2xl"
                 />
@@ -291,6 +292,7 @@ const Admin = () => {
                       setFormData({ ...formData, category: e.target.value })
                     }
                     placeholder="e.g., daily, heartbreak, discipline, glow-up"
+                    maxLength={50}
                     required
                     className="rounded-2xl"
                   />
@@ -324,6 +326,7 @@ const Admin = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, quote: e.target.value })
                   }
+                  maxLength={500}
                   required
                   className="rounded-2xl min-h-24"
                 />
@@ -337,6 +340,7 @@ const Admin = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
+                  maxLength={1000}
                   required
                   className="rounded-2xl min-h-24"
                 />
