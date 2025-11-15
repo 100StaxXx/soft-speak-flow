@@ -122,7 +122,7 @@ const Quotes = () => {
             ) : quote ? (
               <div className="max-w-5xl mx-auto text-center space-y-10 px-8 py-12">
                 {quote.imageUrl && (
-                  <div className="relative">\
+                  <div className="relative">
                     <img 
                       src={quote.imageUrl} 
                       alt="Quote visualization"
