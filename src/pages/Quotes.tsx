@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteCard } from "@/components/QuoteCard";
+import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
 
 const Quotes = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -130,14 +132,21 @@ const Quotes = () => {
             <Loader2 className="h-8 w-8 animate-spin text-blush-rose" />
           </div>
         ) : quotes && quotes.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {quotes.map((quote) => (
-              <QuoteCard
-                key={quote.id}
-                quote={quote}
-                isFavorited={favorites?.includes(quote.id)}
-                onFavoriteChange={() => refetch()}
-              />
+              <Card key={quote.id} className="p-6 space-y-4">
+                <QuoteCard
+                  quote={quote}
+                  isFavorited={favorites?.includes(quote.id)}
+                  onFavoriteChange={() => refetch()}
+                />
+                <QuoteImageGenerator
+                  quoteText={quote.text}
+                  author={quote.author}
+                  category={quote.category || selectedCategory || "motivation"}
+                  intensity={quote.intensity || "moderate"}
+                />
+              </Card>
             ))}
           </div>
         ) : (
