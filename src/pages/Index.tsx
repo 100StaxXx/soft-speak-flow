@@ -35,10 +35,23 @@ const Index = () => {
   const [showIntro, setShowIntro] = useState(true);
   const [powerMode, setPowerMode] = useState(false);
 
-  // Reset scroll to top when component mounts
+  // Reset scroll to top when component mounts and when intro completes
   useEffect(() => {
     window.scrollTo(0, 0);
+    const container = document.getElementById('main-scroll-container');
+    if (container) {
+      container.scrollTop = 0;
+    }
   }, []);
+
+  useEffect(() => {
+    if (!showIntro) {
+      const container = document.getElementById('main-scroll-container');
+      if (container) {
+        container.scrollTop = 0;
+      }
+    }
+  }, [showIntro]);
 
   useEffect(() => {
     // Check if user needs onboarding
@@ -177,16 +190,18 @@ const Index = () => {
   }
 
   return (
-    <div className="snap-y snap-mandatory overflow-y-scroll h-screen">
+    <div className="snap-y snap-mandatory overflow-y-scroll h-screen" id="main-scroll-container">
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
       
       <div className="fixed top-6 right-6 z-50">
         <PowerModeToggle onToggle={setPowerMode} />
       </div>
 
-      <section className="snap-start snap-always h-screen">
-        <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
-      </section>
+      {!showIntro && (
+        <section className="snap-start snap-always h-screen">
+          <HeroSlider mentorId={profile?.selected_mentor_id || undefined} />
+        </section>
+      )}
 
       <section className={`snap-start snap-always min-h-screen transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background`}>
         <div className="max-w-6xl mx-auto px-6 py-16">
