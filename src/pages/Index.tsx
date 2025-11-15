@@ -234,9 +234,6 @@ const Index = () => {
               </p>
               <p className="text-sm text-muted-foreground">"{mentor.description}"</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="text-xs ml-auto">
-              Change
-            </Button>
           </div>
         )}
 
