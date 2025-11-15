@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, Plus, Trash2, LogOut, Loader2, User, Bell, Repeat } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -19,14 +19,16 @@ const Profile = () => {
   const { profile } = useProfile();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [newReminderTime, setNewReminderTime] = useState("");
-  const [newReminderLabel, setNewReminderLabel] = useState("");
 
-  const { data: reminders, isLoading: remindersLoading, refetch } = useQuery({
-    queryKey: ["reminders", user?.id],
+  const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
+    queryKey: ["adaptive-push-settings", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("reminders").select("*").eq("user_id", user!.id).order("time_of_day");
+      const { data, error } = await supabase
+        .from("adaptive_push_settings")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -61,27 +63,24 @@ const Profile = () => {
     },
   });
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
-  };
-
-  const handleAddReminder = async () => {
-    if (!user || !newReminderTime) {
-      toast({ title: "Error", description: "Please set a time", variant: "destructive" });
-      return;
-    }
-    if (!profile?.is_premium) {
-      navigate("/premium");
-      return;
-    }
+  const handleToggleAdaptivePush = async () => {
+    if (!user) return;
+    
     try {
-      const { error } = await supabase.from("reminders").insert({ user_id: user.id, time_of_day: newReminderTime, label: newReminderLabel || "Daily lil push", is_active: true });
-      if (error) throw error;
-      toast({ title: "Reminder added" });
-      setNewReminderTime("");
-      setNewReminderLabel("");
-      refetch();
+      const newState = !adaptivePushSettings?.enabled;
+      
+      if (adaptivePushSettings) {
+        const { error } = await supabase
+          .from("adaptive_push_settings")
+          .update({ enabled: newState })
+          .eq("user_id", user.id);
+        if (error) throw error;
+      }
+      
+      toast({ 
+        title: newState ? "Adaptive Pushes enabled" : "Adaptive Pushes disabled" 
+      });
+      refetchSettings();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -187,28 +186,50 @@ const Profile = () => {
         <Card className="p-6 mb-6 bg-card border-border shadow-soft">
           <div className="flex items-center gap-3 mb-4">
             <div className="bg-accent/20 p-2 rounded-xl"><Bell className="h-5 w-5 text-foreground" /></div>
-            <h2 className="font-display text-2xl text-foreground">Daily Reminders</h2>
+            <h2 className="font-display text-2xl text-foreground">Adaptive Pushes™</h2>
           </div>
-          <p className="text-muted-foreground text-sm mb-6">Set times to receive a lil push{!profile?.is_premium && " (Premium)"}</p>
-          <div className="space-y-4 mb-6">
-            <div><Label htmlFor="time" className="text-foreground">Time</Label><Input id="time" type="time" value={newReminderTime} onChange={(e) => setNewReminderTime(e.target.value)} /></div>
-            <div><Label htmlFor="label">Label</Label><Input id="label" placeholder="Morning motivation" value={newReminderLabel} onChange={(e) => setNewReminderLabel(e.target.value)} maxLength={50} /></div>
-            <Button onClick={handleAddReminder} disabled={!newReminderTime} className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground"><Plus className="mr-2 h-4 w-4" />Add Reminder</Button>
-          </div>
-          {remindersLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : reminders?.length ? (
-            <div className="space-y-3">{reminders.map((r) => (
-              <div key={r.id} className="flex items-center justify-between p-4 bg-accent/10 rounded-2xl border border-border">
-                <div className="flex-1"><p className="font-medium text-foreground">{r.time_of_day}</p>{r.label && <p className="text-sm text-muted-foreground">{r.label}</p>}</div>
-                <div className="flex items-center gap-3">
-                  <Switch checked={r.is_active} onCheckedChange={async () => { await supabase.from("reminders").update({ is_active: !r.is_active }).eq("id", r.id); refetch(); }} />
-                  <Button variant="ghost" size="icon" onClick={async () => { await supabase.from("reminders").delete().eq("id", r.id); refetch(); }}><Trash2 className="h-4 w-4" /></Button>
+          <p className="text-muted-foreground text-sm mb-6">
+            Smart reminders in the voice you need, exactly when you need them.
+          </p>
+          
+          {adaptivePushSettings ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-accent/10 rounded-2xl border border-border">
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">Adaptive Pushes Status</p>
+                  <p className="text-sm text-muted-foreground">
+                    {adaptivePushSettings.frequency && `${adaptivePushSettings.frequency.replace('_', ' ')} • `}
+                    {adaptivePushSettings.primary_category || 'Not configured'}
+                  </p>
                 </div>
+                <Switch 
+                  checked={adaptivePushSettings.enabled} 
+                  onCheckedChange={handleToggleAdaptivePush} 
+                />
               </div>
-            ))}</div>
-          ) : <p className="text-center text-muted-foreground py-8">No reminders</p>}
+              
+              <Button 
+                onClick={() => navigate("/adaptive-pushes")} 
+                variant="outline"
+                className="w-full"
+              >
+                Configure Settings
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground mb-4">Not set up yet</p>
+              <Button 
+                onClick={() => navigate("/adaptive-pushes")} 
+                className="bg-transparent border-2 border-royal-purple text-pure-white hover:bg-royal-purple/10"
+              >
+                Set Up Adaptive Pushes
+              </Button>
+            </div>
+          )}
         </Card>
 
-        <Button onClick={handleSignOut} variant="outline" className="w-full"><LogOut className="mr-2 h-4 w-4" />Sign Out</Button>
+        <Button onClick={async () => { await signOut(); navigate("/auth"); }} variant="outline" className="w-full"><LogOut className="mr-2 h-4 w-4" />Sign Out</Button>
       </div>
       <BottomNav />
     </div>
