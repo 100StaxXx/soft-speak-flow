@@ -12,242 +12,130 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      mentorId,
-      category,
-      lessonNumber = 1,
-      totalLessons = 7,
-      userProgress = []
-    } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+    // Get today's date
+    const today = new Date().toISOString().split('T')[0];
 
-    // Fetch mentor details
-    const { data: mentor, error: mentorError } = await supabase
-      .from('mentors')
+    // Check if we already have a lesson for today
+    const { data: existingLesson } = await supabase
+      .from('lessons')
       .select('*')
-      .eq('id', mentorId)
-      .single();
+      .gte('created_at', `${today}T00:00:00`)
+      .lte('created_at', `${today}T23:59:59`)
+      .maybeSingle();
 
-    if (mentorError || !mentor) {
-      throw new Error('Mentor not found');
+    if (existingLesson) {
+      return new Response(
+        JSON.stringify({ lesson: existingLesson, created: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // 18 Daily Lesson Categories
-    const categoryThemes: Record<string, string[]> = {
-      'discipline-reset': [
-        'Showing up when motivation fades',
-        'The power of micro-commitments',
-        'Building unshakeable routines',
-        'Discipline as self-respect'
-      ],
-      'mental-strength': [
-        'Emotional control under pressure',
-        'Choosing your response',
-        'Building mental resilience',
-        'Staying calm in chaos'
-      ],
-      'perspective-shift': [
-        'Reframing setbacks as setup',
-        'The bigger picture matters',
-        'Zooming out to move forward',
-        'Finding meaning in struggle'
-      ],
-      'motivation-spark': [
-        'Igniting your inner fire',
-        'Remember why you started',
-        'The energy to begin again',
-        'Momentum starts with one step'
-      ],
-      'self-worth': [
-        'You are enough right now',
-        'Standards are self-love',
-        'Respecting yourself first',
-        'Your value is inherent'
-      ],
-      'healing': [
-        'Permission to feel everything',
-        'Healing is not linear',
-        'Closure comes from within',
-        'Letting go to grow'
-      ],
-      'emotional-intelligence': [
-        'Understanding your triggers',
-        'Naming what you feel',
-        'Processing without reacting',
-        'Emotional awareness as power'
-      ],
-      'boundaries': [
-        'What you tolerate, you teach',
-        'Saying no with confidence',
-        'Boundaries are love',
-        'Protecting your peace'
-      ],
-      'identity-purpose': [
-        'Who you are becoming',
-        'Living with intention',
-        'Your unique path',
-        'Purpose over perfection'
-      ],
-      'productivity': [
-        'One thing at a time',
-        'Progress over perfection',
-        'Small wins compound',
-        'Momentum over motivation'
-      ],
-      'career-ambition': [
-        'Playing the long game',
-        'Betting on yourself',
-        'Strategic patience',
-        'Building your empire'
-      ],
-      'money-mindset': [
-        'Abundance starts in your mind',
-        'Financial self-respect',
-        'Money follows value',
-        'Wealth is a practice'
-      ],
-      'fitness-selfcare': [
-        'Your body keeps the score',
-        'Strength as self-love',
-        'Honoring your vessel',
-        'Energy management'
-      ],
-      'social-confidence': [
-        'Owning your presence',
-        'Authentic charisma',
-        'Speaking your truth',
-        'Magnetic energy'
-      ],
-      'glowup': [
-        'Main character energy',
-        'Romanticize your life',
-        'The art of reinvention',
-        'Becoming that version'
-      ],
-      'lifestyle-mindfulness': [
-        'Being present wins',
-        'Slow down to speed up',
-        'Intentional living',
-        'Quality over quantity'
-      ],
-      'love-relationships': [
-        'Love starts with self',
-        'Healthy love elevates',
-        'Connection over attachment',
-        'Standards in relationships'
-      ],
-      'longterm-growth': [
-        'The compound effect',
-        'Building legacy',
-        'Future self gratitude',
-        'Playing infinite games'
-      ]
-    };
+    // Get total lessons count to determine lesson number
+    const { count } = await supabase
+      .from('lessons')
+      .select('*', { count: 'exact', head: true });
 
-    const themes = categoryThemes[category] || categoryThemes['discipline-reset'];
-    const lessonTheme = themes[Math.min(lessonNumber - 1, themes.length - 1)];
+    const lessonNumber = (count || 0) + 1;
 
-    const prompt = `You are ${mentor.name}, writing a daily lesson for "A Lil Push".
+    // 18 Daily Lesson Categories (cycling through)
+    const categories = [
+      'discipline-reset', 'mental-strength', 'perspective-shift', 'motivation-spark',
+      'self-worth', 'healing', 'emotional-intelligence', 'boundaries',
+      'identity-purpose', 'productivity', 'career-ambition', 'money-mindset',
+      'fitness-selfcare', 'social-confidence', 'glowup', 'lifestyle-mindfulness',
+      'relationships', 'creativity-flow'
+    ];
 
-CRITICAL FORMATTING RULES: 
-- ABSOLUTELY NO DASHES of any kind: no hyphens, no em dashes, no en dashes
-- Use colons, semicolons, commas, or periods instead
-- If you need a pause, use commas or colons
-- NEVER use dashes for emphasis or to connect thoughts
+    const categoryIndex = (lessonNumber - 1) % categories.length;
+    const currentCategory = categories[categoryIndex];
 
-YOUR MENTOR VOICE:
-- Name: ${mentor.name}
-- Tone: ${mentor.tone_description}
-- Style: ${mentor.style_description || 'Direct and actionable'}
+    // Get a random active mentor
+    const { data: mentors } = await supabase
+      .from('mentors')
+      .select('*')
+      .eq('is_active', true);
 
-LESSON REQUIREMENTS:
-- Category: ${category}
-- Theme: ${lessonTheme}
-- Length: 2 to 5 sentences ONLY (this is "a lil push" not a lecture)
-- Include ONE tiny doable action step
+    if (!mentors || mentors.length === 0) {
+      throw new Error('No active mentors found');
+    }
 
-This is NOT deep self-help. This is a SHORT, IMPACTFUL nudge.
+    const randomMentor = mentors[Math.floor(Math.random() * mentors.length)];
 
-Guidelines:
-- Write entirely in ${mentor.name}'s voice and tone
-- Be specific, not generic
-- Use "you" to speak directly
-- Keep it bite-sized and scroll-stopping
-- NEVER overwhelm the user
-- Make it feel like the exact push they needed today
-- NEVER use dashes anywhere
-- Sound like ${mentor.name}, not a generic coach
-
-Format your response as JSON:
-{
-  "title": "Short catchy hook (4 to 6 words max)",
-  "lesson": "2 to 5 sentence lesson in mentor's voice. Keep it SHORT and impactful.",
-  "category": "${category}",
-  "mentor_tone": "Brief description of tone used",
-  "action_step": "One tiny doable action (max 10 words)"
-}`;
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    // Generate lesson content using Lovable AI
+    if (!lovableApiKey) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const prompt = `Create a powerful daily life lesson for day ${lessonNumber} on the topic of "${currentCategory}". 
+
+The lesson should be:
+- Actionable and practical (not just theory)
+- Under 300 words
+- Written in a ${randomMentor.tone_description} tone
+- Focused on ${randomMentor.description}
+- Include 1-2 specific action steps
+
+Format:
+Title: [compelling 5-7 word title]
+Description: [1 sentence preview]
+Content: [the full lesson with action steps]`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a daily lesson creator for "A Lil Push" app. Write SHORT (2 to 5 sentences), IMPACTFUL lessons in the mentor\'s unique voice. ABSOLUTELY NO DASHES anywhere. Use colons, commas, or periods instead. Keep it bite-sized and scroll-stopping. Return only valid JSON.'
-          },
-          { role: 'user', content: prompt }
-        ],
+        messages: [{ role: 'user', content: prompt }],
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI gateway error:', aiResponse.status, errorText);
-      throw new Error('Failed to generate lesson');
-    }
+    const aiData = await response.json();
+    const lessonText = aiData.choices?.[0]?.message?.content || '';
 
-    const aiData = await aiResponse.json();
-    let generatedContent = aiData.choices[0].message.content;
+    // Parse the AI response
+    const titleMatch = lessonText.match(/Title:\s*(.+)/i);
+    const descMatch = lessonText.match(/Description:\s*(.+)/i);
+    const contentMatch = lessonText.match(/Content:\s*([\s\S]+)/i);
 
-    // Remove markdown code blocks if present
-    generatedContent = generatedContent.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    const title = titleMatch?.[1]?.trim() || `Day ${lessonNumber}: ${currentCategory}`;
+    const description = descMatch?.[1]?.trim() || `Daily lesson on ${currentCategory}`;
+    const content = contentMatch?.[1]?.trim() || lessonText;
 
-    // Parse the JSON response
-    const lessonData = JSON.parse(generatedContent);
+    // Save to database
+    const { data: newLesson, error: insertError } = await supabase
+      .from('lessons')
+      .insert({
+        title,
+        description,
+        content,
+        category: currentCategory,
+        mentor_id: randomMentor.id,
+        lesson_number: lessonNumber,
+        is_premium: false,
+      })
+      .select()
+      .single();
 
-    // Remove ALL types of dashes from all fields
-    const cleanData = {
-      title: lessonData.title?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
-      lesson: lessonData.lesson?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
-      category: lessonData.category,
-      mentor_tone: lessonData.mentor_tone?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
-      action_step: lessonData.action_step?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim()
-    };
+    if (insertError) throw insertError;
 
     return new Response(
-      JSON.stringify(cleanData),
+      JSON.stringify({ lesson: newLesson, created: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in generate-lesson:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error generating lesson:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
