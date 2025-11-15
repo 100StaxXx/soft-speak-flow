@@ -102,7 +102,8 @@ export default function Onboarding() {
         description: `${recommendedMentor.name} will guide your journey.`,
       });
 
-      navigate("/");
+      // Force reload to refresh profile state
+      window.location.href = "/";
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
@@ -140,7 +141,8 @@ export default function Onboarding() {
         description: `${selectedMentor?.name} will guide your journey.`,
       });
 
-      navigate("/");
+      // Force reload to refresh profile state
+      window.location.href = "/";
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
