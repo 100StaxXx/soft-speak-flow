@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useProfile } from "@/hooks/useProfile";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
@@ -49,29 +50,33 @@ const AppContent = () => {
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
       <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/library" element={<Library />} />
-        <Route path="/videos" element={<Videos />} />
-        <Route path="/video/:id" element={<VideoDetail />} />
-        <Route path="/quotes" element={<Quotes />} />
-        <Route path="/playlists" element={<Playlists />} />
-        <Route path="/playlist/:id" element={<PlaylistDetail />} />
-        <Route path="/saved" element={<Saved />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/premium" element={<Premium />} />
-        <Route path="/pep-talk/:id" element={<PepTalkDetail />} />
-        <Route path="/about" element={<About />} />
+        {/* Public routes */}
         <Route path="/auth" element={<Auth />} />
-        <Route path="/mentor-selection" element={<MentorSelection />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/habits" element={<Habits />} />
-        <Route path="/challenges" element={<Challenges />} />
-        <Route path="/audio" element={<AudioLibrary />} />
-        <Route path="/lessons" element={<Lessons />} />
-        <Route path="/focus" element={<FocusMode />} />
-        <Route path="/review" element={<WeeklyReview />} />
-        <Route path="/mentor-chat" element={<MentorChat />} />
+        <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+        
+        {/* Protected routes - require authentication and mentor selection */}
+        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+        <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
+        <Route path="/video/:id" element={<ProtectedRoute><VideoDetail /></ProtectedRoute>} />
+        <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+        <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
+        <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetail /></ProtectedRoute>} />
+        <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+        <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+        <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
+        <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+        <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
+        <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+        <Route path="/audio" element={<ProtectedRoute><AudioLibrary /></ProtectedRoute>} />
+        <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
+        <Route path="/focus" element={<ProtectedRoute><FocusMode /></ProtectedRoute>} />
+        <Route path="/review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
+        <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
     </ThemeProvider>
