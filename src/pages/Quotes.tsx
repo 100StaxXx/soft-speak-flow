@@ -5,44 +5,43 @@ import { BottomNav } from "@/components/BottomNav";
 import { QuoteCard } from "@/components/QuoteCard";
 import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
 import { SeedQuotesButton } from "@/components/SeedQuotesButton";
+import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Sparkles, Filter } from "lucide-react";
+import { Search, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { EMOTIONAL_TRIGGERS } from "@/config/categories";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const Quotes = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
-  const [selectedIntensity, setSelectedIntensity] = useState<string | null>(null);
+  const [selectedBubble, setSelectedBubble] = useState<string | null>(null);
+  const [bubbleType, setBubbleType] = useState<"trigger" | "category" | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const handleBubbleClick = (value: string, type: "trigger" | "category") => {
+    if (selectedBubble === value) {
+      // Deselect if clicking the same bubble
+      setSelectedBubble(null);
+      setBubbleType(null);
+    } else {
+      setSelectedBubble(value);
+      setBubbleType(type);
+    }
+  };
+
   const { data: quotes, isLoading, refetch } = useQuery({
-    queryKey: ["quotes", selectedCategory, selectedTrigger, selectedIntensity, searchTerm],
+    queryKey: ["quotes", selectedBubble, bubbleType, searchTerm],
     queryFn: async () => {
       let query = supabase.from("quotes").select("*").order("created_at", { ascending: false });
 
-      if (selectedCategory) {
-        query = query.eq("category", selectedCategory);
+      if (selectedBubble && bubbleType === "category") {
+        query = query.eq("category", selectedBubble);
       }
 
-      if (selectedIntensity) {
-        query = query.eq("intensity", selectedIntensity);
-      }
-
-      if (selectedTrigger) {
-        query = query.contains("emotional_triggers", [selectedTrigger]);
+      if (selectedBubble && bubbleType === "trigger") {
+        query = query.contains("emotional_triggers", [selectedBubble]);
       }
 
       if (searchTerm) {
@@ -70,17 +69,11 @@ const Quotes = () => {
     },
   });
 
-  const categories = ["discipline", "confidence", "physique", "focus", "mindset", "business"];
-  const intensityLevels = ["gentle", "moderate", "intense"];
-
-  const handleClearFilters = () => {
-    setSelectedCategory(null);
-    setSelectedTrigger(null);
-    setSelectedIntensity(null);
+  const handleClearSelection = () => {
+    setSelectedBubble(null);
+    setBubbleType(null);
     setSearchTerm("");
   };
-
-  const hasActiveFilters = selectedCategory || selectedTrigger || selectedIntensity || searchTerm;
 
   if (!user) {
     return (
@@ -111,125 +104,56 @@ const Quotes = () => {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="font-display text-4xl text-warm-charcoal mb-1">
-              Quote Search
-            </h1>
-            <p className="text-warm-charcoal/70 text-sm">
-              Find the perfect quote for your moment
-            </p>
-          </div>
+          <h1 className="font-display text-4xl text-warm-charcoal text-center flex-1">
+            Quotes & Affirmations
+          </h1>
           <SeedQuotesButton />
         </div>
+        <p className="text-warm-charcoal/70 text-center mb-8">
+          Daily wisdom for your journey
+        </p>
+
+        {/* Floating Bubbles */}
+        <FloatingBubbles 
+          onBubbleClick={handleBubbleClick}
+          selectedValue={selectedBubble}
+        />
 
         {/* Search Bar */}
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-warm-charcoal/40" />
           <Input
             type="text"
-            placeholder="Search by text or author..."
+            placeholder="Search quotes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-12 border-petal-pink/30 focus:border-blush-rose rounded-3xl py-6"
           />
         </div>
 
-        {/* Filters Section */}
-        <Card className="p-6 mb-6 bg-white/60 backdrop-blur-sm border-petal-pink/20">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-5 w-5 text-blush-rose" />
-            <h3 className="font-semibold text-warm-charcoal">Filter Quotes</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Emotional Trigger Filter */}
-            <div>
-              <label className="text-xs text-warm-charcoal/70 mb-2 block font-medium">
-                Emotional State
-              </label>
-              <Select
-                value={selectedTrigger || "all"}
-                onValueChange={(value) => setSelectedTrigger(value === "all" ? null : value)}
-              >
-                <SelectTrigger className="rounded-2xl border-petal-pink/30">
-                  <SelectValue placeholder="Any emotion" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All emotions</SelectItem>
-                  {EMOTIONAL_TRIGGERS.map((trigger) => (
-                    <SelectItem key={trigger} value={trigger}>
-                      {trigger}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="text-xs text-warm-charcoal/70 mb-2 block font-medium">
-                Category
-              </label>
-              <Select
-                value={selectedCategory || "all"}
-                onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}
-              >
-                <SelectTrigger className="rounded-2xl border-petal-pink/30">
-                  <SelectValue placeholder="Any category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Intensity Filter */}
-            <div>
-              <label className="text-xs text-warm-charcoal/70 mb-2 block font-medium">
-                Intensity
-              </label>
-              <Select
-                value={selectedIntensity || "all"}
-                onValueChange={(value) => setSelectedIntensity(value === "all" ? null : value)}
-              >
-                <SelectTrigger className="rounded-2xl border-petal-pink/30">
-                  <SelectValue placeholder="Any intensity" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All intensities</SelectItem>
-                  {intensityLevels.map((intensity) => (
-                    <SelectItem key={intensity} value={intensity}>
-                      {intensity.charAt(0).toUpperCase() + intensity.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {hasActiveFilters && (
-            <Button
-              onClick={handleClearFilters}
-              variant="ghost"
-              size="sm"
-              className="mt-4 text-blush-rose hover:bg-blush-rose/10"
-            >
-              Clear all filters
-            </Button>
-          )}
-        </Card>
-
-        {/* Results Count */}
+        {/* Active Selection & Results Count */}
         {!isLoading && quotes && (
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-warm-charcoal/70">
-              {quotes.length} {quotes.length === 1 ? "quote" : "quotes"} found
-            </p>
+            <div>
+              {selectedBubble && (
+                <p className="text-sm text-blush-rose font-medium mb-1">
+                  Showing: {selectedBubble}
+                </p>
+              )}
+              <p className="text-sm text-warm-charcoal/70">
+                {quotes.length} {quotes.length === 1 ? "quote" : "quotes"} found
+              </p>
+            </div>
+            {(selectedBubble || searchTerm) && (
+              <Button
+                onClick={handleClearSelection}
+                variant="ghost"
+                size="sm"
+                className="text-blush-rose hover:bg-blush-rose/10"
+              >
+                Clear selection
+              </Button>
+            )}
           </div>
         )}
 
@@ -250,10 +174,10 @@ const Quotes = () => {
                 <QuoteImageGenerator
                   quoteText={quote.text}
                   author={quote.author}
-                  category={quote.category || selectedCategory || "motivation"}
-                  intensity={quote.intensity || selectedIntensity || "moderate"}
+                  category={quote.category || (bubbleType === "category" ? selectedBubble : null) || "motivation"}
+                  intensity={quote.intensity || "moderate"}
                   emotionalTrigger={
-                    quote.emotional_triggers?.[0] || selectedTrigger || undefined
+                    quote.emotional_triggers?.[0] || (bubbleType === "trigger" ? selectedBubble : undefined) || undefined
                   }
                 />
               </Card>
@@ -264,15 +188,15 @@ const Quotes = () => {
             <Sparkles className="h-16 w-16 text-blush-rose/40 mx-auto mb-4" />
             <p className="text-warm-charcoal/60 mb-2 font-medium">No quotes found</p>
             <p className="text-sm text-warm-charcoal/50 mb-4">
-              Try adjusting your filters or search term
+              Try selecting a different bubble or adjusting your search
             </p>
-            {hasActiveFilters && (
+            {(selectedBubble || searchTerm) && (
               <Button
-                onClick={handleClearFilters}
+                onClick={handleClearSelection}
                 variant="outline"
                 className="border-blush-rose/30 hover:bg-blush-rose/10"
               >
-                Clear filters
+                Clear selection
               </Button>
             )}
           </div>
