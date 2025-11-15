@@ -2,9 +2,16 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+
+interface CaptionWord {
+  word: string;
+  start: number;
+  end: number;
+}
 
 interface PepTalk {
   id: string;
@@ -15,6 +22,7 @@ interface PepTalk {
   audio_url: string;
   is_featured: boolean;
   created_at: string;
+  transcript: CaptionWord[];
 }
 
 const PepTalkDetail = () => {
@@ -22,6 +30,7 @@ const PepTalkDetail = () => {
   const navigate = useNavigate();
   const [pepTalk, setPepTalk] = useState<PepTalk | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -38,7 +47,18 @@ const PepTalkDetail = () => {
         .single();
 
       if (error) throw error;
-      setPepTalk(data);
+      
+      // Parse transcript from JSON to proper type
+      const transcript = Array.isArray(data.transcript) 
+        ? (data.transcript as unknown as CaptionWord[]) 
+        : [];
+      
+      const parsedData = {
+        ...data,
+        transcript
+      };
+      
+      setPepTalk(parsedData as PepTalk);
     } catch (error) {
       console.error("Error fetching pep talk:", error);
       toast.error("Failed to load pep talk");
@@ -98,17 +118,17 @@ const PepTalkDetail = () => {
           </div>
 
           {/* Audio Player */}
-          <AudioPlayer audioUrl={pepTalk.audio_url} title={pepTalk.title} />
+          <AudioPlayer 
+            audioUrl={pepTalk.audio_url} 
+            title={pepTalk.title}
+            onTimeUpdate={setCurrentTime}
+          />
 
-          {/* Description */}
-          <div className="bg-card rounded-3xl p-6 shadow-soft">
-            <h3 className="font-heading text-lg font-semibold text-foreground mb-3">
-              About This Pep Talk
-            </h3>
-            <p className="text-muted-foreground leading-relaxed">
-              {pepTalk.description}
-            </p>
-          </div>
+          {/* Timed Captions */}
+          <TimedCaptions 
+            transcript={pepTalk.transcript || []} 
+            currentTime={currentTime}
+          />
         </div>
       </div>
     </div>

@@ -6,9 +6,10 @@ import { Slider } from "@/components/ui/slider";
 interface AudioPlayerProps {
   audioUrl: string;
   title: string;
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
-export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
+export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -18,7 +19,11 @@ export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+      onTimeUpdate?.(time);
+    };
     const updateDuration = () => setDuration(audio.duration);
 
     audio.addEventListener("timeupdate", updateTime);
@@ -30,7 +35,7 @@ export const AudioPlayer = ({ audioUrl, title }: AudioPlayerProps) => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", () => setIsPlaying(false));
     };
-  }, [audioUrl]);
+  }, [audioUrl, onTimeUpdate]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
