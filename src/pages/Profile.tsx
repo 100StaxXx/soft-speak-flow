@@ -174,7 +174,7 @@ const Profile = () => {
           <p className="text-muted-foreground text-sm mb-6">Set times to receive a lil push{!profile?.is_premium && " (Premium)"}</p>
           <div className="space-y-4 mb-6">
             <div><Label htmlFor="time" className="text-foreground">Time</Label><Input id="time" type="time" value={newReminderTime} onChange={(e) => setNewReminderTime(e.target.value)} /></div>
-            <div><Label htmlFor="label">Label</Label><Input id="label" placeholder="Morning motivation" value={newReminderLabel} onChange={(e) => setNewReminderLabel(e.target.value)} /></div>
+            <div><Label htmlFor="label">Label</Label><Input id="label" placeholder="Morning motivation" value={newReminderLabel} onChange={(e) => setNewReminderLabel(e.target.value)} maxLength={50} /></div>
             <Button onClick={handleAddReminder} disabled={!newReminderTime} className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground"><Plus className="mr-2 h-4 w-4" />Add Reminder</Button>
           </div>
           {remindersLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : reminders?.length ? (
