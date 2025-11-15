@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -6,8 +6,7 @@ import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
 
 const Quotes = () => {
   const [selectedBubble, setSelectedBubble] = useState<string | null>(null);
@@ -15,8 +14,6 @@ const Quotes = () => {
   const [showQuote, setShowQuote] = useState(false);
   const [showAuthor, setShowAuthor] = useState(false);
   const [showBack, setShowBack] = useState(false);
-  const [showDownload, setShowDownload] = useState(false);
-  const quoteContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -39,48 +36,17 @@ const Quotes = () => {
     setShowQuote(false);
     setShowAuthor(false);
     setShowBack(false);
-    setShowDownload(false);
     
     // Trigger animations in sequence (slower)
     setTimeout(() => setShowQuote(true), 500);
     setTimeout(() => setShowAuthor(true), 2500);
     setTimeout(() => setShowBack(true), 3500);
-    setTimeout(() => setShowDownload(true), 3500);
-  };
-
-  const handleDownload = async () => {
-    if (!quote || !quoteContainerRef.current) return;
-    
-    try {
-      // Use html2canvas to capture the quote container
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(quoteContainerRef.current, {
-        backgroundColor: null,
-        scale: 2,
-      });
-      
-      // Convert to blob and download
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `quote-${Date.now()}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Quote downloaded!");
-      });
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Failed to download quote");
-    }
   };
 
   const handleBack = () => {
     setShowQuote(false);
     setShowAuthor(false);
     setShowBack(false);
-    setShowDownload(false);
     setTimeout(() => {
       setSelectedBubble(null);
       setBubbleType(null);
@@ -130,18 +96,6 @@ const Quotes = () => {
         </button>
       )}
 
-      {/* Download Button */}
-      {selectedBubble && quote && (
-        <button
-          onClick={handleDownload}
-          className={`fixed top-8 right-8 z-50 p-3 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
-            showDownload ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
-          }`}
-        >
-          <Download className="h-5 w-5 text-warm-charcoal" />
-        </button>
-      )}
-
       <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
         {!selectedBubble ? (
           <>
@@ -166,12 +120,9 @@ const Quotes = () => {
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blush-rose border-r-transparent"></div>
               </div>
             ) : quote ? (
-              <div 
-                ref={quoteContainerRef}
-                className="max-w-5xl mx-auto text-center space-y-10 px-8 py-12"
-              >
+              <div className="max-w-5xl mx-auto text-center space-y-10 px-8 py-12">
                 {quote.imageUrl && (
-                  <div className="relative">
+                  <div className="relative">\
                     <img 
                       src={quote.imageUrl} 
                       alt="Quote visualization"
