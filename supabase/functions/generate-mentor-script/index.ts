@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, category, intensity, emotionalTriggers } = await req.json();
+    const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -40,9 +40,43 @@ serve(async (req) => {
 
     console.log(`Generating script for mentor ${mentor.name}`);
 
-    // Build context for triggers
+    // Build context for emotional triggers
     const triggerContext = emotionalTriggers?.length
       ? `The user is experiencing: ${emotionalTriggers.join(", ")}.`
+      : "";
+
+    // Topic category context
+    const topicCategoryMap: Record<string, string> = {
+      discipline: "habits, consistency, self-respect, taking action",
+      confidence: "self-worth, believing in yourself, celebrating past wins",
+      physique: "training, body goals, self-image, health and fitness",
+      focus: "clarity, priorities, reducing distractions",
+      mindset: "perspective, resilience, thinking patterns",
+      business: "money, career, taking risks, the long game, responsibility",
+    };
+
+    const topicContext = topic_category
+      ? `This message is about ${topicCategoryMap[topic_category] || topic_category}.`
+      : "";
+
+    // Emotional trigger guidance
+    const emotionalGuidanceMap: Record<string, string> = {
+      "Exhausted": "acknowledge low energy, encourage pacing and recharge",
+      "Avoiding Action": "address procrastination, emphasize small first steps",
+      "Anxious & Overthinking": "provide calming perspective, grounding thoughts",
+      "Self-Doubt": "affirm worth and ability, point to proof and belief",
+      "Feeling Stuck": "offer new angles, encourage small moves and one decision",
+      "Frustrated": "channel emotion productively, reframe without quitting",
+      "Heavy or Low": "gentle validation, spark hope, celebrate small wins",
+      "Emotionally Hurt": "acknowledge heartbreak or betrayal, guide toward healing",
+      "Unmotivated": "ignite spark, build momentum, get them moving",
+      "In Transition": "normalize change and uncertainty, guide through identity shifts",
+      "Needing Discipline": "emphasize structure and accountability, 'do it anyway' energy",
+      "Motivated & Ready": "amplify momentum, don't let it fade, double down",
+    };
+
+    const emotionalGuidance = emotionalTriggers?.length
+      ? `Emotional approach: ${emotionalTriggers.map((t: string) => emotionalGuidanceMap[t] || t).join("; ")}`
       : "";
 
     const intensityMap: Record<string, string> = {
@@ -66,12 +100,14 @@ Your Task:
 Write a 15-40 second spoken message that:
 - Matches ${mentor.name}'s tone, style, and themes
 - Is ${intensityStyle} in approach
-${category ? `- Addresses the "${category}" category naturally (without mentioning it explicitly)` : ""}
+${topicContext ? `- ${topicContext}` : ""}
 ${triggerContext ? `- Responds to: ${triggerContext}` : ""}
+${emotionalGuidance ? `- ${emotionalGuidance}` : ""}
 - Contains 3-6 sentences
 - Feels natural and human when spoken aloud
 - Uses NO emojis or special formatting
 - Sounds conversational, not written
+- Does NOT explicitly mention "category" or "trigger" words
 
 Write ONLY the script text, nothing else.`;
 

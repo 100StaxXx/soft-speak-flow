@@ -13,7 +13,8 @@ interface AudioGeneratorProps {
     title: string;
     quote: string;
     description: string;
-    category: string;
+    topic_category: string;
+    emotional_triggers: string[];
     audio_url: string;
     mentor_id: string;
   }) => void;
@@ -22,20 +23,18 @@ interface AudioGeneratorProps {
 
 export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGeneratorProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string>("");
-  const [category, setCategory] = useState<string>("motivation");
+  const [topicCategory, setTopicCategory] = useState<string>("discipline");
   const [intensity, setIntensity] = useState<string>("medium");
   const [emotionalTriggers, setEmotionalTriggers] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const categories = [
-    "motivation",
-    "discipline",
-    "growth",
-    "confidence",
-    "focus",
-    "resilience",
-    "mindfulness",
-    "action",
+  const topicCategories = [
+    { label: "Discipline", value: "discipline" },
+    { label: "Confidence", value: "confidence" },
+    { label: "Physique", value: "physique" },
+    { label: "Focus", value: "focus" },
+    { label: "Mindset", value: "mindset" },
+    { label: "Business", value: "business" },
   ];
 
   const triggers = [
@@ -73,12 +72,12 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       const { data: contentData, error: contentError } = await supabase.functions.invoke(
         "generate-complete-pep-talk",
         {
-          body: {
-            mentorSlug: selectedMentor,
-            category,
-            intensity,
-            emotionalTriggers,
-          },
+        body: {
+          mentorSlug: selectedMentor,
+          topic_category: topicCategory,
+          intensity,
+          emotionalTriggers,
+        },
         }
       );
 
@@ -106,7 +105,8 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           title: contentData.title,
           quote: contentData.quote,
           description: contentData.description,
-          category: contentData.category,
+          topic_category: topicCategory,
+          emotional_triggers: emotionalTriggers,
           audio_url: audioData.audioUrl,
           mentor_id: mentor.id,
         });
@@ -162,15 +162,15 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="category">
+          <Label htmlFor="topic-category">Topic Category</Label>
+          <Select value={topicCategory} onValueChange={setTopicCategory}>
+            <SelectTrigger id="topic-category">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            <SelectContent className="bg-background">
+              {topicCategories.map((cat) => (
+                <SelectItem key={cat.value} value={cat.value}>
+                  {cat.label}
                 </SelectItem>
               ))}
             </SelectContent>

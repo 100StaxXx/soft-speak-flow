@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, category, intensity, emotionalTriggers } = await req.json();
+    const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -63,7 +63,7 @@ Generate a complete pep talk that includes:
 3. A compelling description (2-3 sentences explaining what the pep talk covers)
 4. A full motivational script (2-3 paragraphs, conversational tone, direct address to listener)
 
-Category: ${category || "motivation"}
+Category: ${topic_category || "motivation"}
 ${intensityGuidance}
 ${emotionalContext}
 
@@ -135,7 +135,7 @@ Return ONLY a valid JSON object with these exact keys:
         quote: pepTalkData.quote,
         description: pepTalkData.description,
         script: pepTalkData.script,
-        category: category || "motivation",
+        category: topic_category || "motivation",
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

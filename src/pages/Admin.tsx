@@ -42,6 +42,8 @@ const Admin = () => {
   const [formData, setFormData] = useState({
     title: "",
     category: "",
+    topic_category: "",
+    emotional_triggers: [] as string[],
     quote: "",
     description: "",
     audio_url: "",
@@ -175,7 +177,7 @@ const Admin = () => {
       return;
     }
 
-    const pepTalkData = {
+    const pepTalkData: any = {
       ...formData,
       audio_url: audioUrl || formData.audio_url,
     };
@@ -220,6 +222,8 @@ const Admin = () => {
     setFormData({
       title: pepTalk.title,
       category: pepTalk.category,
+      topic_category: pepTalk.topic_category || "",
+      emotional_triggers: pepTalk.emotional_triggers || [],
       quote: pepTalk.quote,
       description: pepTalk.description,
       audio_url: pepTalk.audio_url,
@@ -250,6 +254,8 @@ const Admin = () => {
     setFormData({
       title: "",
       category: "",
+      topic_category: "",
+      emotional_triggers: [],
       quote: "",
       description: "",
       audio_url: "",
@@ -432,7 +438,8 @@ const Admin = () => {
                 title: pepTalkData.title,
                 quote: pepTalkData.quote,
                 description: pepTalkData.description,
-                category: pepTalkData.category,
+                topic_category: pepTalkData.topic_category,
+                emotional_triggers: pepTalkData.emotional_triggers,
                 audio_url: pepTalkData.audio_url,
                 mentor_id: pepTalkData.mentor_id,
               });
@@ -487,16 +494,15 @@ const Admin = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="category">Category (Legacy)</Label>
                   <Input
                     id="category"
                     value={formData.category}
                     onChange={(e) =>
                       setFormData({ ...formData, category: e.target.value })
                     }
-                    placeholder="e.g., daily, heartbreak, discipline, glow-up"
+                    placeholder="e.g., daily, heartbreak"
                     maxLength={50}
-                    required
                     className="rounded-2xl"
                   />
                 </div>
@@ -518,6 +524,51 @@ const Admin = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="topic-category">Topic Category</Label>
+                <select
+                  id="topic-category"
+                  value={formData.topic_category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, topic_category: e.target.value })
+                  }
+                  className="w-full h-10 px-3 rounded-2xl border border-input bg-background"
+                >
+                  <option value="">Select a topic category...</option>
+                  <option value="discipline">Discipline</option>
+                  <option value="confidence">Confidence</option>
+                  <option value="physique">Physique</option>
+                  <option value="focus">Focus</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="business">Business</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Emotional Triggers (Optional)</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {["Exhausted", "Avoiding Action", "Anxious & Overthinking", "Self-Doubt", 
+                    "Feeling Stuck", "Frustrated", "Heavy or Low", "Emotionally Hurt", 
+                    "Unmotivated", "In Transition", "Needing Discipline", "Motivated & Ready"].map((trigger) => (
+                    <Button
+                      key={trigger}
+                      type="button"
+                      variant={formData.emotional_triggers.includes(trigger) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        const triggers = formData.emotional_triggers.includes(trigger)
+                          ? formData.emotional_triggers.filter(t => t !== trigger)
+                          : [...formData.emotional_triggers, trigger];
+                        setFormData({ ...formData, emotional_triggers: triggers });
+                      }}
+                      className="rounded-full text-xs"
+                    >
+                      {trigger}
+                    </Button>
+                  ))}
                 </div>
               </div>
 
