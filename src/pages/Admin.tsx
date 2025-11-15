@@ -24,7 +24,7 @@ interface PepTalk {
 }
 
 const Admin = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoadingFromHook } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -49,8 +49,12 @@ const Admin = () => {
 
   useEffect(() => {
     const checkAdmin = async () => {
+      if (authLoadingFromHook) return; // wait for auth to resolve
+
       if (!user) {
-        navigate("/auth");
+        console.debug('Admin: no user after auth resolved');
+        setIsAdmin(false);
+        setAuthLoading(false);
         return;
       }
 
@@ -72,7 +76,7 @@ const Admin = () => {
     };
 
     checkAdmin();
-  }, [user, navigate, toast]);
+  }, [user, authLoadingFromHook, toast]);
 
   useEffect(() => {
     if (isAdmin) {
