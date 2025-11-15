@@ -33,13 +33,21 @@ const Index = () => {
   const [dailyQuotes, setDailyQuotes] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => {
+    // Only show intro on first visit, not when navigating back
+    return !sessionStorage.getItem('hasVisitedHome');
+  });
   const [powerMode, setPowerMode] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [hasActiveChallenges, setHasActiveChallenges] = useState(false);
   const [dailyLesson, setDailyLesson] = useState<any>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
+
+  // Mark that home has been visited
+  useEffect(() => {
+    sessionStorage.setItem('hasVisitedHome', 'true');
+  }, []);
 
   // Reset scroll to top when component mounts and prevent flash
   useEffect(() => {
