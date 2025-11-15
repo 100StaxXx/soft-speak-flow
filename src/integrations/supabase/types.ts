@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      adaptive_push_queue: {
+        Row: {
+          created_at: string | null
+          delivered: boolean | null
+          id: string
+          mentor_id: string | null
+          message: string | null
+          scheduled_for: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          delivered?: boolean | null
+          id?: string
+          mentor_id?: string | null
+          message?: string | null
+          scheduled_for?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          delivered?: boolean | null
+          id?: string
+          mentor_id?: string | null
+          message?: string | null
+          scheduled_for?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      adaptive_push_settings: {
+        Row: {
+          created_at: string | null
+          emotional_triggers: string[] | null
+          enabled: boolean | null
+          frequency: string | null
+          id: string
+          intensity: string | null
+          mentor_id: string | null
+          primary_category: string | null
+          time_window: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emotional_triggers?: string[] | null
+          enabled?: boolean | null
+          frequency?: string | null
+          id?: string
+          intensity?: string | null
+          mentor_id?: string | null
+          primary_category?: string | null
+          time_window?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emotional_triggers?: string[] | null
+          enabled?: boolean | null
+          frequency?: string | null
+          id?: string
+          intensity?: string | null
+          mentor_id?: string | null
+          primary_category?: string | null
+          time_window?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_push_settings_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audio_clips: {
         Row: {
           audio_url: string
