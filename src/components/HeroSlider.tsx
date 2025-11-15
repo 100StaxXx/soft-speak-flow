@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-import useEmblaCarousel from "embla-carousel-react";
-import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 
 interface HeroSlide {
@@ -30,11 +28,7 @@ const defaultSlides: HeroSlide[] = [
   },
 ];
 
-
 export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
-    Autoplay({ delay: 5000, stopOnInteraction: false }),
-  ]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [slides, setSlides] = useState<HeroSlide[]>(defaultSlides);
 
@@ -74,12 +68,12 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
   }, [mentorId]);
 
   useEffect(() => {
-    if (!emblaApi) return;
+    const timer = setInterval(() => {
+      setSelectedIndex((current) => (current + 1) % slides.length);
+    }, 5000);
 
-    emblaApi.on("select", () => {
-      setSelectedIndex(emblaApi.selectedScrollSnap());
-    });
-  }, [emblaApi]);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   const scrollToContent = () => {
     window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
@@ -87,48 +81,42 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      <div ref={emblaRef} className="h-full">
-        <div className="flex h-full">
-          {slides.map((slide, index) => (
-            <div key={slide.id} className="flex-[0_0_100%] min-w-0 relative h-full">
-              {slide.media_url && slide.media_type === 'image' && (
-                <img 
-                  src={slide.media_url} 
-                  alt={slide.text}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              )}
-              {slide.media_url && slide.media_type === 'video' && (
-                <video 
-                  src={slide.media_url} 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                />
-              )}
-              {!slide.media_url && (
-                <div className="absolute inset-0 bg-gradient-to-b from-graphite via-obsidian to-obsidian" />
-              )}
-              <div className={`absolute inset-0 bg-gradient-to-b ${slide.gradient}`} />
-              
-              <div className="absolute inset-0 flex items-center justify-center px-4">
-                <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-pure-white tracking-tighter text-center uppercase drop-shadow-2xl break-words max-w-[90vw]">
-                  {slide.text}
-                </h1>
-              </div>
-
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-royal-purple/20">
-                <div 
-                  className="h-full bg-royal-purple transition-all duration-300"
-                  style={{ width: selectedIndex === index ? "100%" : "0%" }}
-                />
-              </div>
-            </div>
-          ))}
+      {slides.map((slide, index) => (
+        <div 
+          key={slide.id} 
+          className={`absolute inset-0 transition-opacity duration-1000 ${
+            selectedIndex === index ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {slide.media_url && slide.media_type === 'image' && (
+            <img 
+              src={slide.media_url} 
+              alt={slide.text}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+          {slide.media_url && slide.media_type === 'video' && (
+            <video 
+              src={slide.media_url} 
+              className="absolute inset-0 w-full h-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          )}
+          {!slide.media_url && (
+            <div className="absolute inset-0 bg-gradient-to-b from-graphite via-obsidian to-obsidian" />
+          )}
+          <div className={`absolute inset-0 bg-gradient-to-b ${slide.gradient}`} />
+          
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-pure-white tracking-tighter text-center uppercase drop-shadow-2xl break-words max-w-[90vw]">
+              {slide.text}
+            </h1>
+          </div>
         </div>
-      </div>
+      ))}
 
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 animate-bounce cursor-pointer" onClick={scrollToContent}>
         <ChevronDown className="h-8 w-8 text-royal-purple" strokeWidth={3} />
