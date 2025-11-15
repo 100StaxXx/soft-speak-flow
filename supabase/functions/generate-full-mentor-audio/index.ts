@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, category, intensity, emotionalTriggers } = await req.json();
+    const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -37,7 +37,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           mentorSlug,
-          category,
+          topic_category,
           intensity,
           emotionalTriggers,
         }),

@@ -733,6 +733,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          emotional_triggers: string[] | null
           id: string
           is_featured: boolean
           is_premium: boolean | null
@@ -740,12 +741,14 @@ export type Database = {
           quote: string
           tags: string[] | null
           title: string
+          topic_category: string | null
         }
         Insert: {
           audio_url: string
           category: string
           created_at?: string
           description: string
+          emotional_triggers?: string[] | null
           id?: string
           is_featured?: boolean
           is_premium?: boolean | null
@@ -753,12 +756,14 @@ export type Database = {
           quote: string
           tags?: string[] | null
           title: string
+          topic_category?: string | null
         }
         Update: {
           audio_url?: string
           category?: string
           created_at?: string
           description?: string
+          emotional_triggers?: string[] | null
           id?: string
           is_featured?: boolean
           is_premium?: boolean | null
@@ -766,6 +771,7 @@ export type Database = {
           quote?: string
           tags?: string[] | null
           title?: string
+          topic_category?: string | null
         }
         Relationships: [
           {
