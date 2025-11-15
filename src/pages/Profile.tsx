@@ -37,11 +37,17 @@ const Profile = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("mentors")
-        .select("*")
+        .select("id, name, slug, avatar_url, is_active")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      return data;
+      // Deduplicate by slug (fallback to name)
+      const map = new Map<string, any>();
+      for (const m of data || []) {
+        const key = m.slug || m.name;
+        if (!map.has(key)) map.set(key, m);
+      }
+      return Array.from(map.values());
     },
   });
 
