@@ -937,7 +937,9 @@ export type Database = {
           author: string | null
           category: string | null
           created_at: string | null
+          emotional_triggers: string[] | null
           id: string
+          intensity: string | null
           is_premium: boolean | null
           mentor_id: string | null
           tags: string[] | null
@@ -947,7 +949,9 @@ export type Database = {
           author?: string | null
           category?: string | null
           created_at?: string | null
+          emotional_triggers?: string[] | null
           id?: string
+          intensity?: string | null
           is_premium?: boolean | null
           mentor_id?: string | null
           tags?: string[] | null
@@ -957,7 +961,9 @@ export type Database = {
           author?: string | null
           category?: string | null
           created_at?: string | null
+          emotional_triggers?: string[] | null
           id?: string
+          intensity?: string | null
           is_premium?: boolean | null
           mentor_id?: string | null
           tags?: string[] | null
