@@ -47,7 +47,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
           <div className="space-y-6">
             <div className="h-1 w-32 bg-royal-purple mx-auto animate-scale-in" />
             <h1 className="text-6xl md:text-7xl font-black text-pure-white uppercase tracking-tight">
-              Welcome to
+              Sometimes all we need is
               <br />
               A Lil Push
             </h1>
