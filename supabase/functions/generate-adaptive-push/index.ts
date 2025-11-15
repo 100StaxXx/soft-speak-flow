@@ -16,7 +16,8 @@ serve(async (req) => {
       mentorId, 
       category, 
       intensity, 
-      emotionalTriggers = [] 
+      emotionalTriggers = [],
+      eventContext = ''
     } = await req.json();
 
     const supabase = createClient(
@@ -45,19 +46,44 @@ serve(async (req) => {
       intensity === 'strong' ? 'Be direct and powerful.' :
       'Be balanced and supportive.';
 
-    const prompt = `Write a short 1-2 sentence motivational message in the voice of ${mentor.name}.
+    const categoryRules = `
+Category rules:
+- If category = 'discipline': focus on action, structure, accountability, and self-respect.
+- If category = 'confidence': focus on self-worth, proof of past wins, and believing in themselves again.
+- If category = 'healing': focus on emotional safety, letting go, and gentle recovery.
+- If category = 'calm': focus on breath, slowing down, and reducing overthinking.
+- If category = 'focus': focus on priorities, clarity, and eliminating distractions.
+- If category = 'love': focus on self-worth in relationships, clarity, and healthy standards.
+- If category = 'spiritual': focus on intuition, alignment, and inner guidance.`;
 
-Mentor Profile:
+    const intensityRules = `
+Intensity rules:
+- soft: gentle, nurturing, slower language.
+- balanced: firm but kind.
+- strong: direct, commanding, and highly motivating (but not abusive).`;
+
+    const eventContextText = eventContext ? `\n\nEvent context:\n${eventContext}` : '';
+
+    const prompt = `Write a short 1-2 sentence motivational notification for the app 'A Lil Push'. Write in the voice of the given mentor, exactly matching their tone and style. The message must be concise, emotionally impactful, and suitable as a mobile push notification. Do not use emojis. Do not mention the word 'category' or 'trigger'. Do not repeat the mentor's signature line directly, but stay in character.
+
+Mentor:
+- Name: ${mentor.name}
+- Archetype: ${mentor.archetype || 'N/A'}
 - Tone: ${mentor.tone_description}
 - Style: ${mentor.style_description || 'N/A'}
 - Themes: ${mentor.themes?.join(', ') || 'motivation'}
-- Target User: ${mentor.target_user || 'N/A'}
 
-Category Focus: ${category}
-${emotionalContext}
-${intensityNote}
+User context:
+- Selected category for this push: ${category}
+- Intensity preference: ${intensity}
+- Emotional triggers (if any): ${emotionalTriggers.length > 0 ? emotionalTriggers.join(', ') : 'none'}
 
-Do not use the signature line directly. Stay authentic to the mentor's voice. Make it feel personal and timely.`;
+${categoryRules}
+
+${intensityRules}
+${eventContextText}
+
+Write one short push notification message now, in the mentor's voice.`;
 
     // Call Lovable AI
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
