@@ -12,7 +12,34 @@ interface Quote {
   text: string;
   author: string;
   imageUrl?: string;
+  fontFamily?: string;
+  bgEffect?: string;
 }
+
+// Font mapping based on emotional tone
+const fontByTrigger: Record<string, string> = {
+  "Exhausted": "cormorant",
+  "Avoiding Action": "righteous",
+  "Anxious & Overthinking": "cormorant",
+  "Self-Doubt": "cinzel",
+  "Feeling Stuck": "abril",
+  "Frustrated": "righteous",
+  "Heavy or Low": "cormorant",
+  "Emotionally Hurt": "cormorant",
+  "Unmotivated": "fredoka",
+  "In Transition": "cinzel",
+  "Needing Discipline": "righteous",
+  "Motivated & Ready": "monoton",
+};
+
+const fontByCategory: Record<string, string> = {
+  "discipline": "cinzel",
+  "confidence": "righteous",
+  "physique": "abril",
+  "focus": "monoton",
+  "mindset": "cormorant",
+  "business": "cinzel",
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -217,7 +244,11 @@ Deno.serve(async (req) => {
 
     const quoteWithImage: Quote = {
       ...randomQuote,
-      imageUrl
+      imageUrl,
+      fontFamily: type === 'category' 
+        ? fontByCategory[value.toLowerCase()] || 'quote'
+        : fontByTrigger[value] || 'quote',
+      bgEffect: type === 'trigger' ? 'dark' : 'light'
     };
 
     return new Response(
