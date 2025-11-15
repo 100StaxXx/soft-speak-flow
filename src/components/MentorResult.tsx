@@ -39,7 +39,7 @@ export const MentorResult = ({
       <div className="max-w-3xl w-full space-y-12 animate-fade-in">
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
+          <div className="h-1 w-24 bg-royal-purple mx-auto animate-scale-in" />
           <h1 className="text-4xl md:text-5xl font-black text-pure-white uppercase tracking-tight">
             We've Found Your Mentor
           </h1>
@@ -78,7 +78,7 @@ export const MentorResult = ({
             <h2 className="text-4xl md:text-5xl font-black text-pure-white uppercase">
               {mentor.name}
             </h2>
-            <p className="text-2xl font-bold text-royal-gold">
+            <p className="text-2xl font-bold text-royal-purple">
               {explanation.subtitle}
             </p>
           </div>
@@ -91,7 +91,7 @@ export const MentorResult = ({
 
             {/* Bullets */}
             <div className="space-y-4 pt-4">
-              <h3 className="text-sm font-bold text-royal-gold uppercase tracking-wide text-center">
+              <h3 className="text-sm font-bold text-royal-purple uppercase tracking-wide text-center">
                 How they'll help you
               </h3>
               <div className="space-y-3">
@@ -116,7 +116,7 @@ export const MentorResult = ({
             <Button
               onClick={onConfirm}
               disabled={isConfirming}
-              className="flex-1 h-16 text-lg font-black uppercase tracking-wider bg-royal-gold hover:bg-royal-gold/90 text-obsidian shadow-[0_0_30px_rgba(255,215,0,0.5)] hover:shadow-[0_0_40px_rgba(255,215,0,0.7)] transition-all duration-300"
+              className="flex-1 h-16 text-lg font-black uppercase tracking-wider bg-royal-purple hover:bg-royal-purple/90 text-pure-white shadow-[0_0_30px_rgba(137,81,204,0.5)] hover:shadow-[0_0_40px_rgba(137,81,204,0.7)] transition-all duration-300"
             >
               {isConfirming ? (
                 <>Confirming...</>
