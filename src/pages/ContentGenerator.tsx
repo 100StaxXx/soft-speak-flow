@@ -322,7 +322,7 @@ const ContentGenerator = () => {
               category: pepTalkData.topic_category[0] || "mindset",
               is_featured: false,
               is_premium: false,
-              transcript: [],
+              transcript: pepTalkData.transcript || [],
             });
             setShowEditor(true);
             setCurrentTime(0);
