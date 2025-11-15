@@ -126,17 +126,13 @@ export const AskMentorChat = ({
     loadDynamicPrompts();
   }, [mentorName, mentorTone, hasActiveHabits, hasActiveChallenges]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async (messageText?: string) => {
-    const textToSend = messageText || input.trim();
-    if (!textToSend || isLoading) return;
+    const textToSend = messageText || input;
+    if (!textToSend.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: textToSend };
     setMessages((prev) => [...prev, userMessage]);
@@ -145,38 +141,53 @@ export const AskMentorChat = ({
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("mentor-chat", {
-        body: {
-          messages: [...messages, userMessage],
-          mentorName,
-          mentorTone,
-        },
-      });
-
-      if (error) {
-        if (error.message?.includes("429")) {
-          toast({
-            title: "Rate limit exceeded",
-            description: "Please wait a moment before sending another message.",
-            variant: "destructive",
-          });
-        } else if (error.message?.includes("402")) {
-          toast({
-            title: "Credits required",
-            description: "Please add credits to continue using AI features.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to chat with your mentor.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
         return;
       }
 
+      // Get all previous messages for context
+      const { data: previousMessages } = await supabase
+        .from('mentor_chats')
+        .select('role, content')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(20);
+
+      const conversationHistory = previousMessages || [];
+      
+      const { data, error } = await supabase.functions.invoke("mentor-chat", {
+        body: {
+          message: textToSend,
+          mentorName,
+          conversationHistory: conversationHistory.map(m => ({
+            role: m.role,
+            content: m.content
+          }))
+        },
+      });
+
+      if (error) throw error;
+
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.response,
+        content: data.reply,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save both messages to database
+      await supabase.from('mentor_chats').insert([
+        { user_id: user.id, role: 'user', content: textToSend },
+        { user_id: user.id, role: 'assistant', content: data.reply }
+      ]);
+
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -194,13 +205,13 @@ export const AskMentorChat = ({
   };
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border p-5 md:p-6 h-[400px] md:h-[500px] flex flex-col shadow-medium">
+    <Card className="bg-card/50 backdrop-blur-sm border-border p-5 md:p-6 flex flex-col shadow-medium">
       <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-4">
         Ask {mentorName} Anything
       </h3>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 scrollbar-hide">
+      <div className="space-y-3 mb-4">
         {messages.length === 0 && showSuggestions && (
           <div className="space-y-4 p-4">
             <p className="text-sm text-muted-foreground text-center">What do you need a lil push on?</p>
@@ -226,8 +237,8 @@ export const AskMentorChat = ({
           </div>
         )}
         {messages.length === 0 && !showSuggestions && (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-muted-foreground text-center py-8 text-sm italic max-w-xs">
+          <div className="flex items-center justify-center py-8">
+            <p className="text-muted-foreground text-center text-sm italic max-w-xs">
               Your motivator is ready to guide you. Ask anything...
             </p>
           </div>
@@ -251,36 +262,36 @@ export const AskMentorChat = ({
         ))}
         
         {isLoading && (
-          <div className="flex justify-start animate-velocity-fade-in">
-            <div className="bg-secondary/80 border border-border rounded-xl p-4">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          <div className="flex justify-start">
+            <div className="bg-secondary/80 border border-border rounded-xl p-4 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Thinking...</span>
             </div>
           </div>
         )}
-        
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="flex gap-2 items-end">
+      <div className="flex gap-2 pt-3 border-t border-border">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+          onKeyPress={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type your question..."
           disabled={isLoading}
-          className="flex-1 resize-none bg-secondary/50"
+          className="flex-1 bg-background/50 border-border/50 text-sm"
         />
         <Button
           onClick={() => handleSend()}
-          disabled={!input.trim() || isLoading}
+          disabled={isLoading || !input.trim()}
           size="icon"
-          className="h-11 w-11 flex-shrink-0 rounded-lg"
+          className="shrink-0 bg-primary hover:bg-primary/90"
         >
           {isLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Send className="w-5 h-5" />
+            <Send className="h-4 w-4" />
           )}
         </Button>
       </div>
