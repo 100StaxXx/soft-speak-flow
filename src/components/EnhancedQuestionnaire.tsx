@@ -45,7 +45,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
       <div className="min-h-screen bg-obsidian flex items-center justify-center p-6">
         <div className="max-w-2xl w-full text-center space-y-12 animate-fade-in">
           <div className="space-y-6">
-            <div className="h-1 w-32 bg-royal-gold mx-auto animate-scale-in" />
+            <div className="h-1 w-32 bg-royal-purple mx-auto animate-scale-in" />
             <h1 className="text-6xl md:text-7xl font-black text-pure-white uppercase tracking-tight">
               Welcome to
               <br />
@@ -59,7 +59,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
           <Button
             onClick={handleStart}
             size="lg"
-            className="px-16 py-8 text-xl font-black uppercase tracking-wider bg-royal-gold hover:bg-royal-gold/90 text-obsidian shadow-[0_0_30px_rgba(255,215,0,0.5)] hover:shadow-[0_0_40px_rgba(255,215,0,0.7)] transition-all duration-300"
+            className="px-16 py-8 text-xl font-black uppercase tracking-wider bg-royal-purple hover:bg-royal-purple/90 text-pure-white shadow-[0_0_30px_rgba(137,81,204,0.5)] hover:shadow-[0_0_40px_rgba(137,81,204,0.7)] transition-all duration-300"
           >
             Start
           </Button>
@@ -84,7 +84,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
           <div className="flex justify-between items-center text-sm text-steel">
             <button
               onClick={handleBack}
-              className="flex items-center gap-1 hover:text-royal-gold transition-colors"
+              className="flex items-center gap-1 hover:text-royal-purple transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               Back
@@ -95,7 +95,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
           </div>
           <div className="h-2 bg-charcoal rounded-full overflow-hidden">
             <div
-              className="h-full bg-royal-gold transition-all duration-500"
+              className="h-full bg-royal-purple transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -117,7 +117,7 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
                   p-6 cursor-pointer transition-all duration-300
                   bg-midnight border-2
                   ${answers[question.id] === option.id
-                    ? 'border-royal-gold bg-royal-gold/10 scale-[1.02]'
+                    ? 'border-royal-purple bg-royal-purple/10 scale-[1.02]'
                     : 'border-charcoal hover:border-steel hover:bg-charcoal/50'
                   }
                 `}

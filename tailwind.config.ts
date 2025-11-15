@@ -48,6 +48,8 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         'obsidian': 'hsl(var(--obsidian))',
+        'midnight': 'hsl(var(--midnight))',
+        'charcoal': 'hsl(var(--charcoal))',
         'steel': 'hsl(var(--steel))',
         'pure-white': 'hsl(var(--pure-white))',
         'graphite': 'hsl(var(--graphite))',
