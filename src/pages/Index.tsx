@@ -443,7 +443,7 @@ const Index = () => {
             Explore Categories
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {["Discipline", "Confidence", "Gym", "Focus", "Mindset", "Business"].map((category) => (
+            {["Discipline", "Confidence", "Physique", "Focus", "Mindset", "Business"].map((category) => (
               <Card 
                 key={category}
                 className="bg-graphite border-steel/20 p-6 cursor-pointer hover:border-royal-gold/50 transition-all hover:scale-105"
