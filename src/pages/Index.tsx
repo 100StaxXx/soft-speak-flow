@@ -10,6 +10,7 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
+import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
 import { VideoCard } from "@/components/VideoCard";
 import { PlaylistCard } from "@/components/PlaylistCard";
 import { AskMentorChat } from "@/components/AskMentorChat";
@@ -402,6 +403,11 @@ const Index = () => {
             />
           </div>
         )}
+
+        {/* Quote of the Day Section */}
+        <div className="mb-16">
+          <QuoteOfTheDay />
+        </div>
 
         {/* Daily Lesson Section */}
         {mentor && user && dailyLesson && (
