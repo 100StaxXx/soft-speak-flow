@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Sparkles, BookOpen, Quote, Music, Save, X } from "lucide-react";
+import { Loader2, Sparkles, BookOpen, Quote, Music, Save, X, FileText, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AudioGenerator } from "@/components/AudioGenerator";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -32,6 +32,8 @@ const ContentGenerator = () => {
   const [saving, setSaving] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [pepTalksWithoutTranscripts, setPepTalksWithoutTranscripts] = useState<any[]>([]);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     quote: "",
@@ -50,7 +52,37 @@ const ContentGenerator = () => {
 
   useEffect(() => {
     checkAdminAndFetchMentors();
+    restoreDraft();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPepTalksWithoutTranscripts();
+    }
+  }, [isAdmin]);
+
+  const restoreDraft = () => {
+    const savedDraft = localStorage.getItem('pep-talk-draft');
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setFormData(draft);
+        setShowEditor(true);
+        toast.info("Draft restored from previous session");
+      } catch (error) {
+        console.error("Error restoring draft:", error);
+        localStorage.removeItem('pep-talk-draft');
+      }
+    }
+  };
+
+  const saveDraft = (data: typeof formData) => {
+    localStorage.setItem('pep-talk-draft', JSON.stringify(data));
+  };
+
+  const clearDraft = () => {
+    localStorage.removeItem('pep-talk-draft');
+  };
 
   const checkAdminAndFetchMentors = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -80,6 +112,80 @@ const ContentGenerator = () => {
   };
 
   const fetchMentors = async () => {
+    const { data, error } = await supabase
+      .from("mentors")
+      .select("*")
+      .order("name");
+
+    if (error) {
+      toastHook({
+        title: "Error",
+        description: "Failed to load mentors",
+        variant: "destructive",
+      });
+    } else {
+      setMentors(data || []);
+    }
+  };
+
+  const fetchPepTalksWithoutTranscripts = async () => {
+    const { data, error } = await supabase
+      .from("pep_talks")
+      .select("id, title, audio_url, created_at")
+      .or('transcript.is.null,transcript.eq.[]')
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Error fetching pep talks without transcripts:", error);
+    } else {
+      setPepTalksWithoutTranscripts(data || []);
+    }
+  };
+
+  const bulkTranscribe = async () => {
+    if (pepTalksWithoutTranscripts.length === 0) {
+      toast.info("No pep talks to transcribe");
+      return;
+    }
+
+    setIsTranscribing(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    toast.info(`Starting transcription of ${pepTalksWithoutTranscripts.length} pep talks...`);
+
+    for (const pepTalk of pepTalksWithoutTranscripts) {
+      try {
+        const { data: transcriptData, error: transcriptError } = await supabase.functions.invoke(
+          "transcribe-audio",
+          {
+            body: { audioUrl: pepTalk.audio_url },
+          }
+        );
+
+        if (transcriptError) throw transcriptError;
+
+        if (transcriptData?.transcript) {
+          const { error: updateError } = await supabase
+            .from("pep_talks")
+            .update({ transcript: transcriptData.transcript })
+            .eq("id", pepTalk.id);
+
+          if (updateError) throw updateError;
+          successCount++;
+          toast.success(`Transcribed: ${pepTalk.title}`);
+        }
+      } catch (error) {
+        console.error(`Failed to transcribe ${pepTalk.title}:`, error);
+        failCount++;
+      }
+    }
+
+    setIsTranscribing(false);
+    toast.success(`Transcription complete! Success: ${successCount}, Failed: ${failCount}`);
+    fetchPepTalksWithoutTranscripts();
+  };
     const { data, error } = await supabase
       .from("mentors")
       .select("*")
@@ -196,6 +302,7 @@ const ContentGenerator = () => {
       if (error) throw error;
 
       toast.success("Pep talk saved successfully to library!");
+      clearDraft();
       setShowEditor(false);
       setCurrentTime(0);
       setFormData({
@@ -220,21 +327,24 @@ const ContentGenerator = () => {
   };
 
   const handleCancelEdit = () => {
-    setShowEditor(false);
-    setCurrentTime(0);
-    setFormData({
-      title: "",
-      quote: "",
-      description: "",
-      topic_category: [],
-      emotional_triggers: [],
-      audio_url: "",
-      mentor_id: "",
-      category: "",
-      is_featured: false,
-      is_premium: false,
-      transcript: [],
-    });
+    if (confirm("Are you sure you want to discard this draft?")) {
+      clearDraft();
+      setShowEditor(false);
+      setCurrentTime(0);
+      setFormData({
+        title: "",
+        quote: "",
+        description: "",
+        topic_category: [],
+        emotional_triggers: [],
+        audio_url: "",
+        mentor_id: "",
+        category: "",
+        is_featured: false,
+        is_premium: false,
+        transcript: [],
+      });
+    }
   };
 
   const generateAllQuotes = async () => {
@@ -311,7 +421,7 @@ const ContentGenerator = () => {
         <AudioGenerator
           mentors={mentors}
           onFullPepTalkGenerated={(pepTalkData) => {
-            setFormData({
+            const newFormData = {
               title: pepTalkData.title,
               quote: pepTalkData.quote,
               description: pepTalkData.description,
@@ -323,7 +433,9 @@ const ContentGenerator = () => {
               is_featured: false,
               is_premium: false,
               transcript: pepTalkData.transcript || [],
-            });
+            };
+            setFormData(newFormData);
+            saveDraft(newFormData);
             setShowEditor(true);
             setCurrentTime(0);
             toast.success("Pep talk generated! Review and edit before saving.");
@@ -351,7 +463,11 @@ const ContentGenerator = () => {
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => {
+                  const newData = { ...formData, title: e.target.value };
+                  setFormData(newData);
+                  saveDraft(newData);
+                }}
                 placeholder="Pep talk title"
               />
             </div>
@@ -361,7 +477,11 @@ const ContentGenerator = () => {
               <Textarea
                 id="quote"
                 value={formData.quote}
-                onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                onChange={(e) => {
+                  const newData = { ...formData, quote: e.target.value };
+                  setFormData(newData);
+                  saveDraft(newData);
+                }}
                 placeholder="Inspirational quote"
                 rows={2}
               />
@@ -372,7 +492,11 @@ const ContentGenerator = () => {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  const newData = { ...formData, description: e.target.value };
+                  setFormData(newData);
+                  saveDraft(newData);
+                }}
                 placeholder="Detailed description"
                 rows={4}
               />
@@ -448,6 +572,57 @@ const ContentGenerator = () => {
                 Cancel
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bulk Transcription Section */}
+      {pepTalksWithoutTranscripts.length > 0 && (
+        <Card className="mb-8 border-primary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Pep Talks Without Transcripts
+            </CardTitle>
+            <CardDescription>
+              {pepTalksWithoutTranscripts.length} pep talk(s) need transcription
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {pepTalksWithoutTranscripts.slice(0, 10).map((pepTalk) => (
+                <div key={pepTalk.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{pepTalk.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(pepTalk.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {pepTalksWithoutTranscripts.length > 10 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  ...and {pepTalksWithoutTranscripts.length - 10} more
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={bulkTranscribe}
+              disabled={isTranscribing}
+              className="w-full"
+            >
+              {isTranscribing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Transcribing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Bulk Transcribe All ({pepTalksWithoutTranscripts.length})
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       )}
