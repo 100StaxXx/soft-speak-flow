@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
     
     if (lovableApiKey) {
       try {
-        const imagePrompt = `Create a beautiful 9:16 vertical mobile wallpaper with the quote "${randomQuote.text}" by ${randomQuote.author}. Make it cinematic, inspiring, and elegant with the quote text clearly visible and beautifully formatted on the image. Use dramatic lighting, rich colors, and artistic composition perfect for a phone screen.`;
+        const imagePrompt = `Create a VERTICAL 9:16 portrait mobile wallpaper (taller than it is wide, like a phone screen in portrait mode). Feature the quote "${randomQuote.text}" by ${randomQuote.author}. The image MUST be in portrait/vertical orientation - height should be significantly greater than width. Make it cinematic, inspiring, and elegant with the quote text clearly visible and beautifully formatted. Use dramatic lighting, rich colors, and artistic composition perfect for a tall vertical phone screen. Remember: VERTICAL 9:16 format - height is almost double the width.`;
         
         const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -229,8 +229,7 @@ Deno.serve(async (req) => {
                 content: imagePrompt
               }
             ],
-            modalities: ['image', 'text'],
-            aspect_ratio: '9:16'
+            modalities: ['image', 'text']
           })
         });
 
