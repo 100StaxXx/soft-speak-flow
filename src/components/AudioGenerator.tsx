@@ -17,6 +17,7 @@ interface AudioGeneratorProps {
     emotional_triggers: string[];
     audio_url: string;
     mentor_id: string;
+    transcript: Array<{ word: string; start: number; end: number }>;
   }) => void;
   mentors: any[];
 }
@@ -97,9 +98,33 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
       if (audioError) throw audioError;
 
-      toast.success("Complete pep talk generated successfully!");
+      // Step 3: Transcribe the audio
+      toast.info("Transcribing audio...");
+      let transcript: Array<{ word: string; start: number; end: number }> = [];
+      
+      try {
+        const { data: transcriptData, error: transcriptError } = await supabase.functions.invoke(
+          "transcribe-audio",
+          {
+            body: {
+              audioUrl: audioData.audioUrl,
+            },
+          }
+        );
 
-      // Pass all data to parent component including mentor_id
+        if (transcriptError) {
+          console.error("Transcription error:", transcriptError);
+          toast.warning("Audio generated but transcription failed");
+        } else if (transcriptData?.transcript) {
+          transcript = transcriptData.transcript;
+          toast.success("Complete pep talk with transcript generated!");
+        }
+      } catch (transcriptError) {
+        console.error("Transcription error:", transcriptError);
+        toast.warning("Audio generated but transcription failed");
+      }
+
+      // Pass all data to parent component including transcript
       if (onFullPepTalkGenerated) {
         onFullPepTalkGenerated({
           title: contentData.title,
@@ -109,6 +134,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           emotional_triggers: emotionalTriggers,
           audio_url: audioData.audioUrl,
           mentor_id: mentor.id,
+          transcript,
         });
       }
     } catch (error: any) {
