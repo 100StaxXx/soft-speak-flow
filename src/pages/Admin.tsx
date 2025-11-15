@@ -30,6 +30,8 @@ const Admin = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -152,10 +154,23 @@ const Admin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Show preview instead of saving directly
+    setPreviewData({
+      ...formData,
+      audioFile: audioFile,
+    });
+    setIsPreview(true);
+    setIsEditing(false);
+  };
+
+  const handleApprove = async () => {
+    setUploading(true);
 
     const audioUrl = await uploadAudio();
     if (!audioUrl && !formData.audio_url) {
       toast.error("Please upload an audio file");
+      setUploading(false);
       return;
     }
 
@@ -172,6 +187,7 @@ const Admin = () => {
 
       if (error) {
         toast.error("Failed to update pep talk");
+        setUploading(false);
         return;
       }
       toast.success("Pep talk updated successfully");
@@ -180,13 +196,23 @@ const Admin = () => {
 
       if (error) {
         toast.error("Failed to create pep talk");
+        setUploading(false);
         return;
       }
       toast.success("Pep talk created successfully");
     }
 
+    setIsPreview(false);
+    setPreviewData(null);
     resetForm();
     fetchPepTalks();
+    setUploading(false);
+  };
+
+  const handleReject = () => {
+    setIsPreview(false);
+    setIsEditing(true);
+    toast.info("Returned to editing");
   };
 
   const handleEdit = (pepTalk: any) => {
@@ -233,6 +259,8 @@ const Admin = () => {
     });
     setEditingId(null);
     setIsEditing(false);
+    setIsPreview(false);
+    setPreviewData(null);
     setAudioFile(null);
   };
 
@@ -528,19 +556,9 @@ const Admin = () => {
               <div className="flex gap-3 pt-4">
                 <Button
                   type="submit"
-                  disabled={uploading}
                   className="flex-1 rounded-full bg-gradient-to-r from-blush-rose to-lavender-mist hover:shadow-glow transition-all"
                 >
-                  {uploading ? (
-                    "Uploading..."
-                  ) : editingId ? (
-                    "Update Pep Talk"
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Pep Talk
-                    </>
-                  )}
+                  Preview {editingId ? "Update" : "Creation"}
                 </Button>
                 <Button
                   type="button"
@@ -552,6 +570,139 @@ const Admin = () => {
                 </Button>
               </div>
             </form>
+          </Card>
+        )}
+
+        {/* Preview Mode */}
+        {isPreview && previewData && (
+          <Card className="p-6 mb-8 rounded-3xl shadow-soft border-2 border-royal-purple">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-2xl font-semibold text-royal-purple">
+                Preview: Approve Before Saving
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setIsPreview(false);
+                  setIsEditing(true);
+                }}
+                className="rounded-full"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <Label className="text-muted-foreground">Title</Label>
+                <p className="text-lg font-semibold mt-1">{previewData.title}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Category</Label>
+                  <p className="text-sm mt-1 uppercase font-medium">{previewData.category}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Mentor</Label>
+                  <p className="text-sm mt-1">
+                    {previewData.mentor_id
+                      ? mentors.find(m => m.id === previewData.mentor_id)?.name || "Unknown"
+                      : "No specific mentor"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground">Quote / Script</Label>
+                <p className="text-base mt-1 italic">{previewData.quote}</p>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground">Description</Label>
+                <p className="text-base mt-1">{previewData.description}</p>
+              </div>
+
+              {previewData.tags && previewData.tags.length > 0 && (
+                <div>
+                  <Label className="text-muted-foreground">Tags</Label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {previewData.tags.map((tag: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-royal-purple/10 text-royal-purple rounded-full text-sm"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-muted-foreground">Audio Preview</Label>
+                {previewData.audio_url ? (
+                  <audio
+                    controls
+                    className="w-full mt-2 rounded-2xl"
+                    src={previewData.audio_url}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                ) : previewData.audioFile ? (
+                  <audio
+                    controls
+                    className="w-full mt-2 rounded-2xl"
+                    src={URL.createObjectURL(previewData.audioFile)}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-2">No audio available</p>
+                )}
+              </div>
+
+              <div className="flex gap-4">
+                {previewData.is_featured && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-600 rounded-full text-sm">
+                    <span className="font-medium">⭐ Featured</span>
+                  </div>
+                )}
+                {previewData.is_premium && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 text-purple-600 rounded-full text-sm">
+                    <span className="font-medium">💎 Premium</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t">
+                <Button
+                  onClick={handleApprove}
+                  disabled={uploading}
+                  className="flex-1 rounded-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      ✓ Approve & Save to Catalog
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleReject}
+                  disabled={uploading}
+                  variant="outline"
+                  className="rounded-full border-red-500 text-red-500 hover:bg-red-50"
+                >
+                  ✗ Edit More
+                </Button>
+              </div>
+            </div>
           </Card>
         )}
 
