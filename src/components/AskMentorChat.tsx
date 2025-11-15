@@ -133,10 +133,10 @@ export const AskMentorChat = ({ mentorName, mentorTone }: AskMentorChatProps) =>
         );
       }
       
-      // Combine and shuffle prompts, take 5
+      // Combine and shuffle prompts, take 3
       const allPrompts = [...mentorPrompts.slice(0, 2), ...timePrompts.slice(0, 2), ...activityPrompts.slice(0, 1)];
       const shuffled = allPrompts.sort(() => Math.random() - 0.5);
-      setSuggestedPrompts(shuffled.slice(0, 5));
+      setSuggestedPrompts(shuffled.slice(0, 3));
     };
     
     loadDynamicPrompts();
