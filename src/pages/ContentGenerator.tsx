@@ -3,7 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Sparkles, BookOpen, Quote, Music } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Sparkles, BookOpen, Quote, Music, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AudioGenerator } from "@/components/AudioGenerator";
 import { toast } from "sonner";
@@ -22,6 +26,8 @@ const ContentGenerator = () => {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     quote: "",
@@ -30,8 +36,10 @@ const ContentGenerator = () => {
     emotional_triggers: [] as string[],
     audio_url: "",
     mentor_id: "",
+    category: "",
+    is_featured: false,
+    is_premium: false,
   });
-  const [isEditing, setIsEditing] = useState(false);
   const { toast: toastHook } = useToast();
   const navigate = useNavigate();
 
@@ -158,6 +166,67 @@ const ContentGenerator = () => {
     }
   };
 
+  const handleSavePepTalk = async () => {
+    if (!formData.title || !formData.audio_url || !formData.mentor_id) {
+      toast.error("Please ensure all required fields are filled");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("pep_talks").insert({
+        title: formData.title,
+        quote: formData.quote,
+        description: formData.description,
+        topic_category: formData.topic_category,
+        emotional_triggers: formData.emotional_triggers,
+        audio_url: formData.audio_url,
+        mentor_id: formData.mentor_id,
+        category: formData.category || formData.topic_category[0] || "mindset",
+        is_featured: formData.is_featured,
+        is_premium: formData.is_premium,
+      });
+
+      if (error) throw error;
+
+      toast.success("Pep talk saved successfully to library!");
+      setShowEditor(false);
+      setFormData({
+        title: "",
+        quote: "",
+        description: "",
+        topic_category: [],
+        emotional_triggers: [],
+        audio_url: "",
+        mentor_id: "",
+        category: "",
+        is_featured: false,
+        is_premium: false,
+      });
+    } catch (error: any) {
+      console.error("Error saving pep talk:", error);
+      toast.error(error.message || "Failed to save pep talk");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditor(false);
+    setFormData({
+      title: "",
+      quote: "",
+      description: "",
+      topic_category: [],
+      emotional_triggers: [],
+      audio_url: "",
+      mentor_id: "",
+      category: "",
+      is_featured: false,
+      is_premium: false,
+    });
+  };
+
   const generateAllQuotes = async () => {
     toast.info("Generating quotes for all mentors...");
     for (const mentor of mentors) {
@@ -231,35 +300,128 @@ const ContentGenerator = () => {
       <div className="mb-8">
         <AudioGenerator
           mentors={mentors}
-          onFullPepTalkGenerated={async (pepTalkData) => {
-            try {
-              // Find the mentor to get the category
-              const mentor = mentors.find(m => m.id === pepTalkData.mentor_id);
-              
-              // Save directly to database
-              const { error } = await supabase.from("pep_talks").insert({
-                title: pepTalkData.title,
-                quote: pepTalkData.quote,
-                description: pepTalkData.description,
-                topic_category: pepTalkData.topic_category,
-                emotional_triggers: pepTalkData.emotional_triggers,
-                audio_url: pepTalkData.audio_url,
-                mentor_id: pepTalkData.mentor_id,
-                category: pepTalkData.topic_category[0] || "mindset",
-                is_featured: false,
-                is_premium: false,
-              });
-
-              if (error) throw error;
-
-              toast.success(`Pep talk saved successfully! Audio is now available in your library.`);
-            } catch (error: any) {
-              console.error("Error saving pep talk:", error);
-              toast.error(error.message || "Failed to save pep talk");
-            }
+          onFullPepTalkGenerated={(pepTalkData) => {
+            setFormData({
+              title: pepTalkData.title,
+              quote: pepTalkData.quote,
+              description: pepTalkData.description,
+              topic_category: pepTalkData.topic_category,
+              emotional_triggers: pepTalkData.emotional_triggers,
+              audio_url: pepTalkData.audio_url,
+              mentor_id: pepTalkData.mentor_id,
+              category: pepTalkData.topic_category[0] || "mindset",
+              is_featured: false,
+              is_premium: false,
+            });
+            setShowEditor(true);
+            toast.success("Pep talk generated! Review and edit before saving.");
           }}
         />
       </div>
+
+      {/* Editor Form */}
+      {showEditor && (
+        <Card className="mb-8 border-primary/40">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Review & Edit Pep Talk</CardTitle>
+                <CardDescription>Make any changes before saving to library</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon" onClick={handleCancelEdit}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Pep talk title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quote">Quote</Label>
+              <Textarea
+                id="quote"
+                value={formData.quote}
+                onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                placeholder="Inspirational quote"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Detailed description"
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="Main category"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="featured"
+                checked={formData.is_featured}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_featured: checked })}
+              />
+              <Label htmlFor="featured">Featured</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="premium"
+                checked={formData.is_premium}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_premium: checked })}
+              />
+              <Label htmlFor="premium">Premium</Label>
+            </div>
+
+            {formData.audio_url && (
+              <div className="space-y-2">
+                <Label>Audio Preview</Label>
+                <audio controls src={formData.audio_url} className="w-full" />
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-4">
+              <Button onClick={handleSavePepTalk} disabled={saving} className="flex-1">
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save to Library
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Batch Generation Actions */}
       <div className="grid md:grid-cols-2 gap-4 mb-8">
