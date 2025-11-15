@@ -68,14 +68,14 @@ export default function Lessons() {
             <h1 className="text-4xl font-heading text-foreground">Lessons</h1>
           </div>
           {!showAllLessons && lessons.length > 1 && (
-            <Button variant="outline" onClick={() => setShowAllLessons(true)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowAllLessons(true)}>
               <List className="w-4 h-4 mr-2" />
-              View All Lessons
+              All Lessons
             </Button>
           )}
           {showAllLessons && (
-            <Button variant="outline" onClick={() => setShowAllLessons(false)}>
-              View Today's Lesson
+            <Button variant="ghost" size="sm" onClick={() => setShowAllLessons(false)}>
+              Today Only
             </Button>
           )}
         </div>
