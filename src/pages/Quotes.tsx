@@ -1,113 +1,56 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
-import { QuoteCard } from "@/components/QuoteCard";
-import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
 import { FloatingBubbles } from "@/components/FloatingBubbles";
-import { Input } from "@/components/ui/input";
-import { Search, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
 
 const Quotes = () => {
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedBubble, setSelectedBubble] = useState<string | null>(null);
   const [bubbleType, setBubbleType] = useState<"trigger" | "category" | null>(null);
+  const [showQuote, setShowQuote] = useState(false);
+  const [showAuthor, setShowAuthor] = useState(false);
+  const [showBack, setShowBack] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const handleBubbleClick = async (value: string, type: "trigger" | "category") => {
-    if (selectedBubble === value) {
-      setSelectedBubble(null);
-      setBubbleType(null);
-    } else {
-      setSelectedBubble(value);
-      setBubbleType(type);
-      
-      // Seed real quotes for this selection
-      try {
-        await supabase.functions.invoke('seed-real-quotes-by-selection', {
-          body: { type, value }
-        });
-        // Refetch to show the newly seeded quotes
-        refetch();
-      } catch (error) {
-        console.error('Error seeding quotes:', error);
-      }
-    }
-  };
-
-  const { data: quotes, isLoading, refetch } = useQuery({
-    queryKey: ["quotes", selectedBubble, bubbleType, searchTerm],
+  const { data: quote, isLoading } = useQuery({
+    queryKey: ["single-quote", selectedBubble, bubbleType],
+    enabled: !!selectedBubble && !!bubbleType,
     queryFn: async () => {
-      let query = supabase.from("quotes").select("*").order("created_at", { ascending: false });
-
-      if (selectedBubble && bubbleType === "category") {
-        query = query.eq("category", selectedBubble);
-      }
-
-      if (selectedBubble && bubbleType === "trigger") {
-        query = query.contains("emotional_triggers", [selectedBubble]);
-      }
-
-      if (searchTerm) {
-        query = query.or(`text.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: favorites } = useQuery({
-    queryKey: ["quote-favorites", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("favorites")
-        .select("content_id")
-        .eq("user_id", user!.id)
-        .eq("content_type", "quote");
-
-      return data?.map((f) => f.content_id) || [];
-    },
-  });
-
-  const generateQuotesMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedBubble || !bubbleType) return;
-      
-      const { data, error } = await supabase.functions.invoke('generate-quotes', {
-        body: {
-          type: bubbleType,
-          value: selectedBubble,
-          count: 5
-        }
+      const { data, error } = await supabase.functions.invoke('get-single-quote', {
+        body: { type: bubbleType, value: selectedBubble }
       });
 
       if (error) throw error;
-      return data;
+      return data?.quote;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      toast.success("New quotes generated!");
-    },
-    onError: (error) => {
-      console.error("Error generating quotes:", error);
-      toast.error("Failed to generate quotes");
-    }
   });
 
-  const handleClearSelection = () => {
-    setSelectedBubble(null);
-    setBubbleType(null);
-    setSearchTerm("");
+  const handleBubbleClick = async (value: string, type: "trigger" | "category") => {
+    setSelectedBubble(value);
+    setBubbleType(type);
+    setShowQuote(false);
+    setShowAuthor(false);
+    setShowBack(false);
+    
+    // Trigger animations in sequence
+    setTimeout(() => setShowQuote(true), 300);
+    setTimeout(() => setShowAuthor(true), 1200);
+    setTimeout(() => setShowBack(true), 1800);
+  };
+
+  const handleBack = () => {
+    setShowQuote(false);
+    setShowAuthor(false);
+    setShowBack(false);
+    setTimeout(() => {
+      setSelectedBubble(null);
+      setBubbleType(null);
+    }, 300);
   };
 
   if (!user) {
@@ -135,124 +78,63 @@ const Quotes = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24 relative">
+      {/* Back Button */}
+      {selectedBubble && (
+        <button
+          onClick={handleBack}
+          className={`fixed top-8 left-8 z-50 p-3 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
+            showBack ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+          }`}
+        >
+          <ArrowLeft className="h-5 w-5 text-warm-charcoal" />
+        </button>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-2">
-          <h1 className="font-display text-4xl text-warm-charcoal text-center">
-            Quotes & Affirmations
-          </h1>
-        </div>
-        <p className="text-warm-charcoal/70 text-center mb-8">
-          Daily wisdom for your journey
-        </p>
-
-        <FloatingBubbles 
-          onBubbleClick={handleBubbleClick}
-          selectedValue={selectedBubble}
-        />
-
-        <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-warm-charcoal/40" />
-          <Input
-            type="text"
-            placeholder="Search quotes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-12 border-petal-pink/30 focus:border-blush-rose rounded-3xl py-6"
-          />
-        </div>
-
-        {!isLoading && quotes && (
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              {selectedBubble && (
-                <p className="text-sm text-blush-rose font-medium mb-1">
-                  Showing: {selectedBubble}
-                </p>
-              )}
-              <p className="text-sm text-warm-charcoal/70">
-                {quotes.length} {quotes.length === 1 ? "quote" : "quotes"} found
-              </p>
+        {!selectedBubble ? (
+          <>
+            <div className="mb-2">
+              <h1 className="font-display text-4xl text-warm-charcoal text-center">
+                Quotes & Affirmations
+              </h1>
             </div>
-            <div className="flex gap-2">
-              {selectedBubble && (
-                <Button
-                  onClick={() => generateQuotesMutation.mutate()}
-                  disabled={generateQuotesMutation.isPending}
-                  className="bg-gradient-to-r from-blush-rose to-soft-mauve hover:opacity-90 text-white"
-                  size="sm"
-                >
-                  {generateQuotesMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Generate New Quotes
-                    </>
-                  )}
-                </Button>
-              )}
-              {(selectedBubble || searchTerm) && (
-                <Button
-                  onClick={handleClearSelection}
-                  variant="ghost"
-                  size="sm"
-                  className="text-blush-rose hover:bg-blush-rose/10"
-                >
-                  Clear selection
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blush-rose" />
-          </div>
-        ) : quotes && quotes.length > 0 ? (
-          <div className="space-y-6">
-            {quotes.map((quote, index) => (
-              <Card 
-                key={quote.id} 
-                className="p-6 space-y-4 bg-white/80 backdrop-blur-sm border-petal-pink/20 hover:shadow-lg transition-all duration-300 animate-fade-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <QuoteCard
-                  quote={quote}
-                  isFavorited={favorites?.includes(quote.id)}
-                  onFavoriteChange={() => refetch()}
-                />
-                <QuoteImageGenerator
-                  quoteText={quote.text}
-                  author={quote.author}
-                  category={quote.category || (bubbleType === "category" ? selectedBubble : null) || "motivation"}
-                  intensity={quote.intensity || "moderate"}
-                  emotionalTrigger={
-                    quote.emotional_triggers?.[0] || (bubbleType === "trigger" ? selectedBubble : undefined) || undefined
-                  }
-                />
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Sparkles className="h-16 w-16 text-blush-rose/40 mx-auto mb-4" />
-            <p className="text-warm-charcoal/60 mb-2 font-medium">No quotes found</p>
-            <p className="text-sm text-warm-charcoal/50 mb-4">
-              Try selecting a different bubble or adjusting your search
+            <p className="text-warm-charcoal/70 text-center mb-8">
+              Daily wisdom for your journey
             </p>
-            {(selectedBubble || searchTerm) && (
-              <Button
-                onClick={handleClearSelection}
-                variant="outline"
-                className="border-blush-rose/30 hover:bg-blush-rose/10"
-              >
-                Clear selection
-              </Button>
+
+            <FloatingBubbles 
+              onBubbleClick={handleBubbleClick}
+              selectedValue={selectedBubble}
+            />
+          </>
+        ) : (
+          <div className="min-h-[70vh] flex items-center justify-center">
+            {isLoading ? (
+              <div className="text-center">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blush-rose border-r-transparent"></div>
+              </div>
+            ) : quote ? (
+              <div className="max-w-3xl mx-auto text-center space-y-6">
+                <p 
+                  className={`font-display text-3xl md:text-4xl lg:text-5xl text-warm-charcoal leading-relaxed transition-all duration-700 ${
+                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                  }`}
+                >
+                  "{quote.text}"
+                </p>
+                <p 
+                  className={`text-xl md:text-2xl text-blush-rose font-medium transition-all duration-700 ${
+                    showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  }`}
+                >
+                  — {quote.author}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-warm-charcoal/60 text-lg">No quote found</p>
+              </div>
             )}
           </div>
         )}
