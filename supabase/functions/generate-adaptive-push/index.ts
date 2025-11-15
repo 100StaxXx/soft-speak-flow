@@ -17,7 +17,9 @@ serve(async (req) => {
       category, 
       intensity, 
       emotionalTriggers = [],
-      eventContext = ''
+      eventContext = '',
+      includeAudio = false,
+      mentorSlug = ''
     } = await req.json();
 
     const supabase = createClient(
@@ -115,8 +117,45 @@ Write one short push notification message now, in the mentor's voice.`;
     const aiData = await aiResponse.json();
     const generatedMessage = aiData.choices[0].message.content;
 
+    let audioUrl = null;
+
+    // Generate audio if requested
+    if (includeAudio && mentorSlug) {
+      console.log(`Generating audio for push notification with mentor ${mentorSlug}`);
+      try {
+        const audioResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-mentor-audio`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              mentorSlug,
+              script: generatedMessage,
+            }),
+          }
+        );
+
+        if (audioResponse.ok) {
+          const audioData = await audioResponse.json();
+          audioUrl = audioData.audioUrl;
+          console.log(`Audio generated for push: ${audioUrl}`);
+        } else {
+          console.error('Failed to generate audio for push notification');
+        }
+      } catch (audioError) {
+        console.error('Error generating audio:', audioError);
+        // Continue without audio if generation fails
+      }
+    }
+
     return new Response(
-      JSON.stringify({ message: generatedMessage }),
+      JSON.stringify({ 
+        message: generatedMessage,
+        audioUrl 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

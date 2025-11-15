@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Trash2, Edit, Plus, Upload, X } from "lucide-react";
+import { AudioGenerator } from "@/components/AudioGenerator";
 
 interface PepTalk {
   id: string;
@@ -248,6 +249,21 @@ const Admin = () => {
             Admin Panel
           </h1>
           <p className="text-muted-foreground">Manage your pep talks</p>
+        </div>
+
+        {/* Audio Generator */}
+        <div className="mb-8">
+          <AudioGenerator
+            onAudioGenerated={(script, audioUrl) => {
+              setFormData({
+                ...formData,
+                quote: script,
+                audio_url: audioUrl,
+              });
+              setIsEditing(true);
+              toast.success("Audio generated! Fill in remaining fields to save.");
+            }}
+          />
         </div>
 
         {/* Form */}
