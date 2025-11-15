@@ -5,9 +5,10 @@ interface DailyLessonProps {
   title: string;
   content: string;
   category: string;
+  actionStep?: string;
 }
 
-export const DailyLesson = ({ title, content, category }: DailyLessonProps) => {
+export const DailyLesson = ({ title, content, category, actionStep }: DailyLessonProps) => {
   return (
     <Card className="bg-gradient-to-br from-accent/10 to-card border-primary/20 p-6 md:p-8 overflow-hidden relative">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
@@ -28,9 +29,20 @@ export const DailyLesson = ({ title, content, category }: DailyLessonProps) => {
         {title}
       </h3>
 
-      <p className="text-sm md:text-base text-muted-foreground leading-relaxed relative z-10">
+      <p className="text-sm md:text-base text-muted-foreground leading-relaxed relative z-10 mb-4">
         {content}
       </p>
+
+      {actionStep && (
+        <div className="relative z-10 pt-4 border-t border-primary/10">
+          <p className="text-xs text-primary/80 font-semibold uppercase tracking-wider mb-2">
+            Today's Action
+          </p>
+          <p className="text-sm font-medium text-foreground">
+            {actionStep}
+          </p>
+        </div>
+      )}
     </Card>
   );
 };

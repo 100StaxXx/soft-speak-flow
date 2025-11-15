@@ -36,119 +36,159 @@ serve(async (req) => {
       throw new Error('Mentor not found');
     }
 
-    // Category-specific lesson themes
+    // 18 Daily Lesson Categories
     const categoryThemes: Record<string, string[]> = {
-      discipline: [
-        'Building unshakeable morning routines',
+      'discipline-reset': [
+        'Showing up when motivation fades',
         'The power of micro-commitments',
-        'Accountability without self-punishment',
-        'When discipline becomes freedom',
-        'Breaking the excuse cycle',
-        'Showing up on your worst days',
-        'The identity shift of disciplined people'
+        'Building unshakeable routines',
+        'Discipline as self-respect'
       ],
-      confidence: [
-        'Confidence is evidence-based',
-        'Your past wins matter more than you think',
-        'The gap between who you are and who you show',
-        'Owning your voice without apology',
-        'Confidence in uncertainty',
-        'The compound effect of small bold moves',
-        'You are not your fear'
+      'mental-strength': [
+        'Emotional control under pressure',
+        'Choosing your response',
+        'Building mental resilience',
+        'Staying calm in chaos'
       ],
-      healing: [
+      'perspective-shift': [
+        'Reframing setbacks as setup',
+        'The bigger picture matters',
+        'Zooming out to move forward',
+        'Finding meaning in struggle'
+      ],
+      'motivation-spark': [
+        'Igniting your inner fire',
+        'Remember why you started',
+        'The energy to begin again',
+        'Momentum starts with one step'
+      ],
+      'self-worth': [
+        'You are enough right now',
+        'Standards are self-love',
+        'Respecting yourself first',
+        'Your value is inherent'
+      ],
+      'healing': [
         'Permission to feel everything',
         'Healing is not linear',
-        'What forgiveness really means',
-        'Creating emotional safety for yourself',
-        'The stories you tell yourself about pain',
         'Closure comes from within',
-        'Rebuilding trust in yourself'
+        'Letting go to grow'
       ],
-      calm: [
-        'The breath you forget to take',
-        'Slowing down is not weakness',
-        'The art of the pause',
-        'Overthinking vs. processing',
-        'Creating inner quiet in outer chaos',
-        'The power of doing nothing',
-        'Peace as a practice, not a destination'
+      'emotional-intelligence': [
+        'Understanding your triggers',
+        'Naming what you feel',
+        'Processing without reacting',
+        'Emotional awareness as power'
       ],
-      focus: [
-        'One thing at a time',
-        'Attention is your most valuable asset',
-        'Distractions are not the enemy, drift is',
-        'Deep work in a shallow world',
-        'The myth of multitasking',
-        'Protecting your mental energy',
-        'Clarity comes from subtraction'
-      ],
-      love: [
-        'Love starts with self-respect',
-        'Standards are not walls, they are foundations',
+      'boundaries': [
         'What you tolerate, you teach',
-        'The difference between attachment and connection',
-        'Healthy love does not drain you',
-        'You cannot pour from an empty cup',
-        'Boundaries are love in action'
+        'Saying no with confidence',
+        'Boundaries are love',
+        'Protecting your peace'
       ],
-      spiritual: [
-        'Trusting your inner knowing',
-        'Intuition speaks in whispers',
-        'Alignment over achievement',
-        'The universe responds to energy',
-        'Spiritual strength in practical life',
-        'Signs are everywhere if you listen',
-        'Your path is already unfolding'
+      'identity-purpose': [
+        'Who you are becoming',
+        'Living with intention',
+        'Your unique path',
+        'Purpose over perfection'
+      ],
+      'productivity': [
+        'One thing at a time',
+        'Progress over perfection',
+        'Small wins compound',
+        'Momentum over motivation'
+      ],
+      'career-ambition': [
+        'Playing the long game',
+        'Betting on yourself',
+        'Strategic patience',
+        'Building your empire'
+      ],
+      'money-mindset': [
+        'Abundance starts in your mind',
+        'Financial self-respect',
+        'Money follows value',
+        'Wealth is a practice'
+      ],
+      'fitness-selfcare': [
+        'Your body keeps the score',
+        'Strength as self-love',
+        'Honoring your vessel',
+        'Energy management'
+      ],
+      'social-confidence': [
+        'Owning your presence',
+        'Authentic charisma',
+        'Speaking your truth',
+        'Magnetic energy'
+      ],
+      'glowup': [
+        'Main character energy',
+        'Romanticize your life',
+        'The art of reinvention',
+        'Becoming that version'
+      ],
+      'lifestyle-mindfulness': [
+        'Being present wins',
+        'Slow down to speed up',
+        'Intentional living',
+        'Quality over quantity'
+      ],
+      'love-relationships': [
+        'Love starts with self',
+        'Healthy love elevates',
+        'Connection over attachment',
+        'Standards in relationships'
+      ],
+      'longterm-growth': [
+        'The compound effect',
+        'Building legacy',
+        'Future self gratitude',
+        'Playing infinite games'
       ]
     };
 
-    const themes = categoryThemes[category] || categoryThemes.discipline;
+    const themes = categoryThemes[category] || categoryThemes['discipline-reset'];
     const lessonTheme = themes[Math.min(lessonNumber - 1, themes.length - 1)];
 
-    const prompt = `You are ${mentor.name}, writing a lesson for your app "A Lil Push".
+    const prompt = `You are ${mentor.name}, writing a daily lesson for "A Lil Push".
 
-CRITICAL RULES: 
-- ABSOLUTELY NO DASHES of any kind: no hyphens (-), no em dashes (—), no en dashes (–)
-- Use colons (:), semicolons (;), commas (,), or periods (.) instead
-- If you need a pause or connection between ideas, use commas or colons
+CRITICAL FORMATTING RULES: 
+- ABSOLUTELY NO DASHES of any kind: no hyphens, no em dashes, no en dashes
+- Use colons, semicolons, commas, or periods instead
+- If you need a pause, use commas or colons
 - NEVER use dashes for emphasis or to connect thoughts
 
-Mentor Profile:
+YOUR MENTOR VOICE:
 - Name: ${mentor.name}
-- Archetype: ${mentor.archetype || 'Motivational guide'}
 - Tone: ${mentor.tone_description}
 - Style: ${mentor.style_description || 'Direct and actionable'}
-- Themes: ${mentor.themes?.join(', ') || 'motivation'}
 
-Lesson Details:
+LESSON REQUIREMENTS:
 - Category: ${category}
 - Theme: ${lessonTheme}
-- Lesson ${lessonNumber} of ${totalLessons}
+- Length: 2 to 5 sentences ONLY (this is "a lil push" not a lecture)
+- Include ONE tiny doable action step
 
-Write a complete lesson with these sections:
-
-1. TITLE (5-8 words, powerful and clear)
-2. OPENING (2-3 sentences that hook the reader emotionally)
-3. CORE TEACHING (4-6 paragraphs of actionable wisdom in your voice)
-4. PRACTICAL EXERCISE (One specific thing they can do today)
-5. CLOSING THOUGHT (1-2 sentences, memorable and empowering)
+This is NOT deep self-help. This is a SHORT, IMPACTFUL nudge.
 
 Guidelines:
 - Write entirely in ${mentor.name}'s voice and tone
 - Be specific, not generic
-- Use "you" to speak directly to the reader
-- Include real examples or scenarios
-- Make it feel personal and timely
-- Keep paragraphs short and punchy
-- NEVER use dashes, use colons or commas instead
-- No fluff, every sentence must add value
-- End with something they will remember
+- Use "you" to speak directly
+- Keep it bite-sized and scroll-stopping
+- NEVER overwhelm the user
+- Make it feel like the exact push they needed today
+- NEVER use dashes anywhere
+- Sound like ${mentor.name}, not a generic coach
 
 Format your response as JSON:
 {
-  "title": "Lesson title here",
-  "content": "Full lesson content with all sections, formatted with line breaks between paragraphs"
+  "title": "Short catchy hook (4 to 6 words max)",
+  "lesson": "2 to 5 sentence lesson in mentor's voice. Keep it SHORT and impactful.",
+  "category": "${category}",
+  "mentor_tone": "Brief description of tone used",
+  "action_step": "One tiny doable action (max 10 words)"
 }`;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -167,7 +207,7 @@ Format your response as JSON:
         messages: [
           { 
             role: 'system', 
-            content: 'You are a lesson creator for a motivational app. Write powerful, actionable lessons in the voice of the given mentor. NEVER use dashes in your content. Use colons, semicolons, or commas instead. Return only valid JSON.'
+            content: 'You are a daily lesson creator for "A Lil Push" app. Write SHORT (2 to 5 sentences), IMPACTFUL lessons in the mentor\'s unique voice. ABSOLUTELY NO DASHES anywhere. Use colons, commas, or periods instead. Keep it bite-sized and scroll-stopping. Return only valid JSON.'
           },
           { role: 'user', content: prompt }
         ],
@@ -189,26 +229,17 @@ Format your response as JSON:
     // Parse the JSON response
     const lessonData = JSON.parse(generatedContent);
 
-    // Extra safety: remove ALL types of dashes from the content
-    const cleanContent = lessonData.content
-      .replace(/—/g, ':')  // em dash
-      .replace(/–/g, ',')  // en dash
-      .replace(/\s+-\s+/g, ', ')  // dash with spaces
-      .replace(/-/g, ', ');  // any remaining hyphens
-    const cleanTitle = lessonData.title
-      .replace(/—/g, ':')
-      .replace(/–/g, ',')
-      .replace(/\s+-\s+/g, ', ')
-      .replace(/-/g, ', ');
+    // Remove ALL types of dashes from all fields
+    const cleanData = {
+      title: lessonData.title?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
+      lesson: lessonData.lesson?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
+      category: lessonData.category,
+      mentor_tone: lessonData.mentor_tone?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim(),
+      action_step: lessonData.action_step?.replace(/—/g, ' ').replace(/–/g, ' ').replace(/\s*-\s*/g, ' ').trim()
+    };
 
     return new Response(
-      JSON.stringify({ 
-        title: cleanTitle,
-        content: cleanContent,
-        category,
-        lessonNumber,
-        totalLessons
-      }),
+      JSON.stringify(cleanData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

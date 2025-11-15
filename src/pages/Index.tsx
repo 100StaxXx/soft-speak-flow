@@ -105,8 +105,15 @@ const Index = () => {
     
     setLoadingLesson(true);
     try {
-      // Rotate through categories based on day of year
-      const categories = ['discipline', 'confidence', 'healing', 'calm', 'focus', 'love', 'spiritual'];
+      // 18 categories rotating daily
+      const categories = [
+        'discipline-reset', 'mental-strength', 'perspective-shift', 'motivation-spark',
+        'self-worth', 'healing', 'emotional-intelligence', 'boundaries',
+        'identity-purpose', 'productivity', 'career-ambition', 'money-mindset',
+        'fitness-selfcare', 'social-confidence', 'glowup', 'lifestyle-mindfulness',
+        'love-relationships', 'longterm-growth'
+      ];
+      
       const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
       const categoryIndex = dayOfYear % categories.length;
       const selectedCategory = categories[categoryIndex];
@@ -405,8 +412,9 @@ const Index = () => {
             </div>
             <DailyLesson
               title={dailyLesson.title}
-              content={dailyLesson.content}
+              content={dailyLesson.lesson}
               category={dailyLesson.category}
+              actionStep={dailyLesson.action_step}
             />
           </div>
         )}
