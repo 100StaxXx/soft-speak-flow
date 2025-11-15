@@ -37,6 +37,8 @@ const Index = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [hasActiveChallenges, setHasActiveChallenges] = useState(false);
+  const [dailyLesson, setDailyLesson] = useState<any>(null);
+  const [loadingLesson, setLoadingLesson] = useState(false);
 
   // Reset scroll to top when component mounts and prevent flash
   useEffect(() => {
@@ -91,7 +93,42 @@ const Index = () => {
     };
     
     loadUserActivity();
+    
+    // Generate daily lesson with rotating category
+    if (profile?.selected_mentor_id) {
+      generateDailyLesson();
+    }
   }, [user, profile, profileLoading]);
+
+  const generateDailyLesson = async () => {
+    if (!profile?.selected_mentor_id || loadingLesson) return;
+    
+    setLoadingLesson(true);
+    try {
+      // Rotate through categories based on day of year
+      const categories = ['discipline', 'confidence', 'healing', 'calm', 'focus', 'love', 'spiritual'];
+      const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+      const categoryIndex = dayOfYear % categories.length;
+      const selectedCategory = categories[categoryIndex];
+
+      const { data, error } = await supabase.functions.invoke('generate-lesson', {
+        body: {
+          mentorId: profile.selected_mentor_id,
+          category: selectedCategory,
+          lessonNumber: 1,
+          totalLessons: 7
+        }
+      });
+
+      if (error) throw error;
+      setDailyLesson(data);
+    } catch (error) {
+      console.error('Error generating daily lesson:', error);
+      toast.error('Failed to load daily lesson');
+    } finally {
+      setLoadingLesson(false);
+    }
+  };
 
   const fetchPersonalizedContent = async () => {
     try {
@@ -360,16 +397,16 @@ const Index = () => {
         )}
 
         {/* Daily Lesson Section */}
-        {mentor && user && (
+        {mentor && user && dailyLesson && (
           <div className="mb-16">
             <div className="flex items-center gap-2 text-sm font-black text-royal-gold uppercase tracking-widest mb-6">
               <BookOpen className="h-5 w-5" />
               Daily Lesson
             </div>
             <DailyLesson
-              title="The Power of Consistency"
-              content="Success isn't about massive action. It's about small, consistent steps taken every single day. Don't wait for motivation—create discipline. Show up even when you don't feel like it. That's what separates the dreamers from the doers."
-              category="Discipline"
+              title={dailyLesson.title}
+              content={dailyLesson.content}
+              category={dailyLesson.category}
             />
           </div>
         )}
