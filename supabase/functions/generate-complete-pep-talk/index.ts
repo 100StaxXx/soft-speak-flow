@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, category } = await req.json();
+    const { mentorSlug, category, intensity, emotionalTriggers } = await req.json();
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -42,6 +42,14 @@ serve(async (req) => {
     console.log("Generating complete pep talk for mentor:", mentor.name);
 
     // Generate complete pep talk content using AI
+    const emotionalContext = emotionalTriggers && emotionalTriggers.length > 0 
+      ? `The listener is currently feeling: ${emotionalTriggers.join(", ")}. Address these emotional states directly and provide relevant support.`
+      : "";
+
+    const intensityGuidance = intensity 
+      ? `Intensity Level: ${intensity} - Adjust your tone and energy to match this intensity level.`
+      : "";
+
     const systemPrompt = `You are ${mentor.name}, ${mentor.description}.
     
 Voice Style: ${mentor.voice_style}
@@ -56,6 +64,8 @@ Generate a complete pep talk that includes:
 4. A full motivational script (2-3 paragraphs, conversational tone, direct address to listener)
 
 Category: ${category || "motivation"}
+${intensityGuidance}
+${emotionalContext}
 
 Return ONLY a valid JSON object with these exact keys:
 {
