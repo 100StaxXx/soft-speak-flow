@@ -108,7 +108,11 @@ serve(async (req) => {
 
     const prompt = `You are ${mentor.name}, writing a lesson for your app "A Lil Push".
 
-CRITICAL RULE: Do NOT use dashes anywhere in your response. Use colons, semicolons, commas, or periods instead.
+CRITICAL RULES: 
+- ABSOLUTELY NO DASHES of any kind: no hyphens (-), no em dashes (—), no en dashes (–)
+- Use colons (:), semicolons (;), commas (,), or periods (.) instead
+- If you need a pause or connection between ideas, use commas or colons
+- NEVER use dashes for emphasis or to connect thoughts
 
 Mentor Profile:
 - Name: ${mentor.name}
@@ -185,9 +189,17 @@ Format your response as JSON:
     // Parse the JSON response
     const lessonData = JSON.parse(generatedContent);
 
-    // Extra safety: remove any remaining dashes from the content
-    const cleanContent = lessonData.content.replace(/—/g, ':').replace(/–/g, ',').replace(/\s*-\s*/g, ', ');
-    const cleanTitle = lessonData.title.replace(/—/g, ':').replace(/–/g, ',').replace(/\s*-\s*/g, ', ');
+    // Extra safety: remove ALL types of dashes from the content
+    const cleanContent = lessonData.content
+      .replace(/—/g, ':')  // em dash
+      .replace(/–/g, ',')  // en dash
+      .replace(/\s+-\s+/g, ', ')  // dash with spaces
+      .replace(/-/g, ', ');  // any remaining hyphens
+    const cleanTitle = lessonData.title
+      .replace(/—/g, ':')
+      .replace(/–/g, ',')
+      .replace(/\s+-\s+/g, ', ')
+      .replace(/-/g, ', ');
 
     return new Response(
       JSON.stringify({ 
