@@ -191,10 +191,11 @@ Deno.serve(async (req) => {
       }
     );
 
-  } catch (error) {
-    console.error('Error in seed-real-quotes function:', error);
+  } catch (err) {
+    console.error('Error in seed-real-quotes function:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
