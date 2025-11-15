@@ -9,29 +9,22 @@ import { toast } from "sonner";
 import { getMentorVoiceConfig } from "@/config/mentorVoices";
 
 interface AudioGeneratorProps {
-  onAudioGenerated?: (script: string, audioUrl: string) => void;
+  onFullPepTalkGenerated?: (pepTalkData: {
+    title: string;
+    quote: string;
+    description: string;
+    category: string;
+    audio_url: string;
+  }) => void;
+  mentors: any[];
 }
 
-export const AudioGenerator = ({ onAudioGenerated }: AudioGeneratorProps) => {
+export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGeneratorProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string>("");
   const [category, setCategory] = useState<string>("motivation");
   const [intensity, setIntensity] = useState<string>("medium");
   const [emotionalTriggers, setEmotionalTriggers] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedScript, setGeneratedScript] = useState<string>("");
-  const [audioUrl, setAudioUrl] = useState<string>("");
-
-  const mentors = [
-    { slug: "atlas", name: "Atlas" },
-    { slug: "darius", name: "Darius" },
-    { slug: "eli", name: "Eli" },
-    { slug: "nova", name: "Nova" },
-    { slug: "sienna", name: "Sienna" },
-    { slug: "lumi", name: "Lumi" },
-    { slug: "kai", name: "Kai" },
-    { slug: "stryker", name: "Stryker" },
-    { slug: "solace", name: "Solace" },
-  ];
 
   const categories = [
     "motivation",
@@ -61,36 +54,60 @@ export const AudioGenerator = ({ onAudioGenerated }: AudioGeneratorProps) => {
       return;
     }
 
+    const mentor = mentors.find(m => m.slug === selectedMentor);
+    if (!mentor) {
+      toast.error("Invalid mentor selected");
+      return;
+    }
+
     setIsGenerating(true);
-    setGeneratedScript("");
-    setAudioUrl("");
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-full-mentor-audio", {
-        body: {
-          mentorSlug: selectedMentor,
-          category,
-          intensity,
-          emotionalTriggers,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.script && data?.audioUrl) {
-        setGeneratedScript(data.script);
-        setAudioUrl(data.audioUrl);
-        toast.success("Audio generated successfully!");
-        
-        if (onAudioGenerated) {
-          onAudioGenerated(data.script, data.audioUrl);
+      // Step 1: Generate complete pep talk content
+      toast.info("Generating pep talk content...");
+      const { data: contentData, error: contentError } = await supabase.functions.invoke(
+        "generate-complete-pep-talk",
+        {
+          body: {
+            mentorSlug: selectedMentor,
+            category,
+            intensity,
+            emotionalTriggers,
+          },
         }
-      } else {
-        throw new Error("Invalid response from server");
+      );
+
+      if (contentError) throw contentError;
+
+      // Step 2: Generate audio from the script
+      toast.info("Generating audio...");
+      const { data: audioData, error: audioError } = await supabase.functions.invoke(
+        "generate-mentor-audio",
+        {
+          body: {
+            mentorSlug: selectedMentor,
+            script: contentData.script,
+          },
+        }
+      );
+
+      if (audioError) throw audioError;
+
+      toast.success("Complete pep talk generated successfully!");
+
+      // Pass all data to parent component
+      if (onFullPepTalkGenerated) {
+        onFullPepTalkGenerated({
+          title: contentData.title,
+          quote: contentData.quote,
+          description: contentData.description,
+          category: contentData.category,
+          audio_url: audioData.audioUrl,
+        });
       }
     } catch (error: any) {
-      console.error("Error generating audio:", error);
-      toast.error(error.message || "Failed to generate audio");
+      console.error("Error generating complete pep talk:", error);
+      toast.error(error.message || "Failed to generate pep talk");
     } finally {
       setIsGenerating(false);
     }
@@ -107,10 +124,10 @@ export const AudioGenerator = ({ onAudioGenerated }: AudioGeneratorProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Music className="h-5 w-5" />
-          Generate Audio with AI
+          Fully AI-Generate Pep Talk
         </CardTitle>
         <CardDescription>
-          Generate a custom motivational audio message with ElevenLabs Text-to-Speech
+          Select options below, then generate a complete pep talk with title, description, script, and audio
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -188,30 +205,15 @@ export const AudioGenerator = ({ onAudioGenerated }: AudioGeneratorProps) => {
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
+              Generating Complete Pep Talk...
             </>
           ) : (
-            "Generate Audio"
+            <>
+              <Music className="mr-2 h-4 w-4" />
+              Fully AI-Generate Pep Talk
+            </>
           )}
         </Button>
-
-        {generatedScript && (
-          <div className="space-y-2">
-            <Label>Generated Script</Label>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm">{generatedScript}</p>
-            </div>
-          </div>
-        )}
-
-        {audioUrl && (
-          <div className="space-y-2">
-            <Label>Generated Audio</Label>
-            <audio controls className="w-full" src={audioUrl}>
-              Your browser does not support the audio element.
-            </audio>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

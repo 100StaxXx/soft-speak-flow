@@ -348,79 +348,35 @@ const Admin = () => {
           <p className="text-muted-foreground">Manage your pep talks</p>
         </div>
 
-        {/* Audio Generator */}
+        {/* Full AI Generator */}
         <div className="mb-8">
           <AudioGenerator
-            onAudioGenerated={(script, audioUrl) => {
+            mentors={mentors}
+            onFullPepTalkGenerated={(pepTalkData) => {
               setFormData({
                 ...formData,
-                quote: script,
-                audio_url: audioUrl,
+                title: pepTalkData.title,
+                quote: pepTalkData.quote,
+                description: pepTalkData.description,
+                category: pepTalkData.category,
+                audio_url: pepTalkData.audio_url,
+                mentor_id: mentors.find(m => m.slug === pepTalkData.category)?.id || formData.mentor_id,
               });
               setIsEditing(true);
-              toast.success("Audio generated! Fill in remaining fields to save.");
+              toast.success("Pep talk generated! Review and save when ready.");
             }}
           />
         </div>
 
         {/* Quick Actions */}
         <div className="mb-8">
-          <h3 className="font-heading text-lg font-semibold mb-4">Quick Actions</h3>
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-2 items-center">
-              <div className="flex-1 max-w-xs">
-                <Label htmlFor="quick-mentor" className="mb-2 block">Select Mentor for AI Generation</Label>
-                <select
-                  id="quick-mentor"
-                  value={formData.mentor_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, mentor_id: e.target.value })
-                  }
-                  className="w-full h-10 px-3 rounded-2xl border border-input bg-background"
-                >
-                  <option value="">Choose a mentor...</option>
-                  {mentors.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Create New Pep Talk
-              </Button>
-              <Button
-                onClick={handleFullAIGenerate}
-                disabled={aiGenerating || !formData.mentor_id}
-                variant="secondary"
-                className="flex items-center gap-2"
-              >
-                {aiGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Music className="h-4 w-4" />
-                    Fully AI-Generate Pep Talk
-                  </>
-                )}
-              </Button>
-            </div>
-            {!formData.mentor_id && !aiGenerating && (
-              <p className="text-sm text-muted-foreground">
-                💡 Select a mentor above to enable AI generation
-              </p>
-            )}
-          </div>
+          <Button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create New Pep Talk
+          </Button>
         </div>
 
         {/* Form */}
