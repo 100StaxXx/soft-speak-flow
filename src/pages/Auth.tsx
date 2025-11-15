@@ -168,8 +168,7 @@ const Auth = () => {
     <div className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
       {/* Current Quote Slide Only */}
       <section
-        key={currentSlide}
-        className="snap-start h-screen relative flex items-center justify-center animate-fade-in"
+        className="snap-start h-screen relative flex items-center justify-center"
         style={{
           background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
         }}
@@ -178,10 +177,16 @@ const Auth = () => {
         
         <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
           <blockquote className="space-y-8">
-            <p className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight transition-all duration-700 ease-in-out">
+            <p 
+              key={`quote-${currentSlide}`}
+              className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight animate-fade-in"
+            >
               "{motivationalQuotes[currentSlide].quote}"
             </p>
-            <footer className="text-2xl md:text-3xl text-royal-purple font-semibold transition-all duration-700 ease-in-out">
+            <footer 
+              key={`author-${currentSlide}`}
+              className="text-2xl md:text-3xl text-royal-purple font-semibold animate-fade-in"
+            >
               — {motivationalQuotes[currentSlide].author}
             </footer>
           </blockquote>
