@@ -166,9 +166,10 @@ const Auth = () => {
 
   return (
     <div className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
-      {/* Current Quote Slide Only */}
+      {/* Current Quote Slide Only - Click anywhere to advance */}
       <section
-        className="snap-start h-screen relative flex items-center justify-center"
+        onClick={scrollToForm}
+        className="snap-start h-screen relative flex items-center justify-center cursor-pointer"
         style={{
           background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
         }}
@@ -192,13 +193,9 @@ const Auth = () => {
           </blockquote>
         </div>
 
-        <button
-          onClick={scrollToForm}
-          className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple hover:text-accent-purple transition-colors"
-          aria-label="Scroll to sign in"
-        >
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple">
           <ChevronDown className="w-12 h-12" />
-        </button>
+        </div>
       </section>
 
       {/* Auth Form Section */}
