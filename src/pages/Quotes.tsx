@@ -23,7 +23,6 @@ const Quotes = () => {
 
   const handleBubbleClick = (value: string, type: "trigger" | "category") => {
     if (selectedBubble === value) {
-      // Deselect if clicking the same bubble
       setSelectedBubble(null);
       setBubbleType(null);
     } else {
@@ -55,7 +54,6 @@ const Quotes = () => {
     },
   });
 
-  // Get user's favorites
   const { data: favorites } = useQuery({
     queryKey: ["quote-favorites", user?.id],
     enabled: !!user,
@@ -128,7 +126,6 @@ const Quotes = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-2">
           <h1 className="font-display text-4xl text-warm-charcoal text-center">
             Quotes & Affirmations
@@ -138,13 +135,11 @@ const Quotes = () => {
           Daily wisdom for your journey
         </p>
 
-        {/* Floating Bubbles */}
         <FloatingBubbles 
           onBubbleClick={handleBubbleClick}
           selectedValue={selectedBubble}
         />
 
-        {/* Search Bar */}
         <div className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-warm-charcoal/40" />
           <Input
@@ -156,7 +151,6 @@ const Quotes = () => {
           />
         </div>
 
-        {/* Active Selection & Results Count */}
         {!isLoading && quotes && (
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -191,27 +185,31 @@ const Quotes = () => {
                 </Button>
               )}
               {(selectedBubble || searchTerm) && (
-              <Button
-                onClick={handleClearSelection}
-                variant="ghost"
-                size="sm"
-                className="text-blush-rose hover:bg-blush-rose/10"
-              >
-                Clear selection
-              </Button>
-            )}
+                <Button
+                  onClick={handleClearSelection}
+                  variant="ghost"
+                  size="sm"
+                  className="text-blush-rose hover:bg-blush-rose/10"
+                >
+                  Clear selection
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Quotes Grid */}
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blush-rose" />
           </div>
         ) : quotes && quotes.length > 0 ? (
           <div className="space-y-6">
-            {quotes.map((quote) => (
-              <Card key={quote.id} className="p-6 space-y-4 bg-white/80 backdrop-blur-sm border-petal-pink/20 hover:shadow-lg transition-shadow">
+            {quotes.map((quote, index) => (
+              <Card 
+                key={quote.id} 
+                className="p-6 space-y-4 bg-white/80 backdrop-blur-sm border-petal-pink/20 hover:shadow-lg transition-all duration-300 animate-fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
                 <QuoteCard
                   quote={quote}
                   isFavorited={favorites?.includes(quote.id)}
