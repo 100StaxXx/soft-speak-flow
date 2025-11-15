@@ -21,13 +21,24 @@ const Quotes = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const handleBubbleClick = (value: string, type: "trigger" | "category") => {
+  const handleBubbleClick = async (value: string, type: "trigger" | "category") => {
     if (selectedBubble === value) {
       setSelectedBubble(null);
       setBubbleType(null);
     } else {
       setSelectedBubble(value);
       setBubbleType(type);
+      
+      // Seed real quotes for this selection
+      try {
+        await supabase.functions.invoke('seed-real-quotes-by-selection', {
+          body: { type, value }
+        });
+        // Refetch to show the newly seeded quotes
+        refetch();
+      } catch (error) {
+        console.error('Error seeding quotes:', error);
+      }
     }
   };
 
