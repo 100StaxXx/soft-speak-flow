@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -6,7 +6,8 @@ import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
+import { toast } from "sonner";
 
 const Quotes = () => {
   const [selectedBubble, setSelectedBubble] = useState<string | null>(null);
@@ -14,6 +15,8 @@ const Quotes = () => {
   const [showQuote, setShowQuote] = useState(false);
   const [showAuthor, setShowAuthor] = useState(false);
   const [showBack, setShowBack] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
+  const quoteContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -36,17 +39,48 @@ const Quotes = () => {
     setShowQuote(false);
     setShowAuthor(false);
     setShowBack(false);
+    setShowDownload(false);
     
     // Trigger animations in sequence (slower)
     setTimeout(() => setShowQuote(true), 500);
     setTimeout(() => setShowAuthor(true), 2500);
     setTimeout(() => setShowBack(true), 3500);
+    setTimeout(() => setShowDownload(true), 3500);
+  };
+
+  const handleDownload = async () => {
+    if (!quote || !quoteContainerRef.current) return;
+    
+    try {
+      // Use html2canvas to capture the quote container
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(quoteContainerRef.current, {
+        backgroundColor: null,
+        scale: 2,
+      });
+      
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `quote-${Date.now()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Quote downloaded!");
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download quote");
+    }
   };
 
   const handleBack = () => {
     setShowQuote(false);
     setShowAuthor(false);
     setShowBack(false);
+    setShowDownload(false);
     setTimeout(() => {
       setSelectedBubble(null);
       setBubbleType(null);
@@ -78,7 +112,12 @@ const Quotes = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24 relative">
+    <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24 relative overflow-hidden">
+      {/* Cinematic background effects */}
+      {selectedBubble && quote?.bgEffect === 'dark' && (
+        <div className="fixed inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent pointer-events-none z-0" />
+      )}
+      
       {/* Back Button */}
       {selectedBubble && (
         <button
@@ -91,7 +130,19 @@ const Quotes = () => {
         </button>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Download Button */}
+      {selectedBubble && quote && (
+        <button
+          onClick={handleDownload}
+          className={`fixed top-8 right-8 z-50 p-3 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
+            showDownload ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
+          }`}
+        >
+          <Download className="h-5 w-5 text-warm-charcoal" />
+        </button>
+      )}
+
+      <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
         {!selectedBubble ? (
           <>
             <div className="mb-2">
@@ -109,33 +160,45 @@ const Quotes = () => {
             />
           </>
         ) : (
-          <div className="min-h-[70vh] flex items-center justify-center">
+          <div className="min-h-[80vh] flex items-center justify-center relative">
             {isLoading ? (
               <div className="text-center">
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blush-rose border-r-transparent"></div>
               </div>
             ) : quote ? (
-              <div className="max-w-4xl mx-auto text-center space-y-8">
+              <div 
+                ref={quoteContainerRef}
+                className="max-w-5xl mx-auto text-center space-y-10 px-8 py-12"
+              >
                 {quote.imageUrl && (
-                  <img 
-                    src={quote.imageUrl} 
-                    alt="Quote visualization"
-                    className={`w-full max-w-2xl mx-auto rounded-3xl shadow-2xl transition-all duration-1500 ${
-                      showQuote ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                    }`}
-                  />
+                  <div className="relative">
+                    <img 
+                      src={quote.imageUrl} 
+                      alt="Quote visualization"
+                      className={`w-full max-w-3xl mx-auto rounded-3xl shadow-2xl transition-all duration-1500 ${
+                        showQuote ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                      }`}
+                    />
+                    {/* Cinematic overlay gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-3xl pointer-events-none" />
+                  </div>
                 )}
                 <p 
-                  className={`font-quote text-4xl md:text-5xl lg:text-6xl text-warm-charcoal leading-relaxed transition-all duration-1500 ${
+                  className={`font-${quote.fontFamily || 'quote'} text-5xl md:text-6xl lg:text-7xl text-warm-charcoal leading-tight tracking-wide transition-all duration-1500 drop-shadow-2xl ${
                     showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
                   }`}
+                  style={{ 
+                    textShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    letterSpacing: '0.02em'
+                  }}
                 >
                   "{quote.text}"
                 </p>
                 <p 
-                  className={`text-2xl md:text-3xl text-blush-rose font-medium transition-all duration-1500 ${
+                  className={`text-3xl md:text-4xl text-blush-rose font-semibold transition-all duration-1500 tracking-wider ${
                     showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                   }`}
+                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
                 >
                   — {quote.author}
                 </p>

@@ -61,6 +61,12 @@ export default {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
         'body': ['Barlow', 'sans-serif'],
         'quote': ['Playfair Display', 'serif'],
+        'cinzel': ['Cinzel', 'serif'],
+        'cormorant': ['Cormorant Garamond', 'serif'],
+        'abril': ['Abril Fatface', 'serif'],
+        'righteous': ['Righteous', 'sans-serif'],
+        'monoton': ['Monoton', 'cursive'],
+        'fredoka': ['Fredoka', 'sans-serif'],
       },
       boxShadow: {
         'soft': 'var(--shadow-soft)',
