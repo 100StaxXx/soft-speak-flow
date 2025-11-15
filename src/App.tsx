@@ -32,6 +32,7 @@ import FocusMode from "./pages/FocusMode";
 import WeeklyReview from "./pages/WeeklyReview";
 import MentorChat from "./pages/MentorChat";
 import ContentGenerator from "./pages/ContentGenerator";
+import AdaptivePushes from "./pages/AdaptivePushes";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const AppContent = () => {
         <Route path="/review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
         <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
         <Route path="/content-generator" element={<ProtectedRoute><ContentGenerator /></ProtectedRoute>} />
+        <Route path="/adaptive-pushes" element={<ProtectedRoute><AdaptivePushes /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>
