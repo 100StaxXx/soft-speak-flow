@@ -60,8 +60,10 @@ const Admin = () => {
       });
 
       if (error || !data) {
+        console.debug('Admin check failed', { error, data, userId: user.id });
         toast.error("Access Denied: You don't have permission to access this page.");
-        navigate("/");
+        setIsAdmin(false);
+        setAuthLoading(false);
         return;
       }
 
