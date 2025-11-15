@@ -185,7 +185,7 @@ const Auth = () => {
             </p>
             <footer 
               key={`author-${currentSlide}`}
-              className="text-2xl md:text-3xl text-royal-purple font-semibold animate-fade-in"
+              className="text-2xl md:text-3xl text-royal-purple font-semibold animate-fade-in-delayed"
             >
               — {motivationalQuotes[currentSlide].author}
             </footer>
