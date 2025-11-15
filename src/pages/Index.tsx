@@ -487,9 +487,6 @@ const Index = () => {
         </div>
       </section>
 
-      {mentor && user && (
-        <AskMentorChat mentorName={mentor.name} mentorTone={mentor.tone_description} />
-      )}
       <BottomNav />
     </div>
   );
