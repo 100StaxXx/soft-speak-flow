@@ -1,55 +1,80 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Questionnaire } from "@/components/Questionnaire";
+import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
+import { MentorResult } from "@/components/MentorResult";
 import { MentorGrid } from "@/components/MentorGrid";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { findBestMentor, OnboardingAnswer, getTopMentorMatches } from "@/utils/mentorMatching";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { calculateMentorScores } from "@/utils/mentorScoring";
+import { generateMentorExplanation } from "@/utils/mentorExplanation";
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'questionnaire' | 'selection'>('questionnaire');
+  const [stage, setStage] = useState<'questionnaire' | 'result' | 'browse'>('questionnaire');
   const [mentors, setMentors] = useState<any[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<any>(null);
-  const [compatibleMentors, setCompatibleMentors] = useState<string[]>([]);
+  const [explanation, setExplanation] = useState<any>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleQuestionnaireComplete = async (answers: OnboardingAnswer[]) => {
+  const handleQuestionnaireComplete = async (completedAnswers: Record<string, string>) => {
     try {
+      setAnswers(completedAnswers);
+
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) return;
 
-      // Save questionnaire responses
-      const responses = answers.map(answer => ({
-        user_id: currentUser.id,
-        question_id: answer.questionId,
-        answer_tags: answer.mentorTags
-      }));
-
-      await supabase.from('questionnaire_responses').insert(responses);
-
-      // Fetch mentors and find best matches
+      // Fetch mentors
       const { data: mentorsData } = await supabase
         .from('mentors')
         .select('*')
         .eq('is_active', true)
         .order('created_at');
 
-      if (mentorsData && mentorsData.length > 0) {
-        const bestMatch = findBestMentor(answers, mentorsData);
-        const topMatches = getTopMentorMatches(answers, mentorsData);
-        
-        setMentors(mentorsData);
-        setRecommendedMentor(bestMatch);
-        setCompatibleMentors(topMatches.map(m => m.id));
-        setStage('selection');
+      if (!mentorsData || mentorsData.length === 0) {
+        toast({
+          title: "Error",
+          description: "No mentors available",
+          variant: "destructive",
+        });
+        return;
       }
+
+      setMentors(mentorsData);
+
+      // Calculate best mentor
+      const result = calculateMentorScores(completedAnswers, mentorsData);
+      const bestMentor = mentorsData.find(m => m.slug === result.winnerSlug);
+
+      if (!bestMentor) {
+        toast({
+          title: "Error",
+          description: "Could not determine best mentor",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Generate explanation
+      const mentorExplanation = generateMentorExplanation(bestMentor, completedAnswers);
+
+      setRecommendedMentor(bestMentor);
+      setExplanation(mentorExplanation);
+      setStage('result');
+
+      // Save questionnaire responses
+      const responses = Object.entries(completedAnswers).map(([questionId, optionId]) => ({
+        user_id: currentUser.id,
+        question_id: questionId,
+        answer_tags: [optionId]
+      }));
+
+      await supabase.from('questionnaire_responses').insert(responses);
     } catch (error) {
-      console.error('Error saving questionnaire:', error);
+      console.error('Error processing questionnaire:', error);
       toast({
         title: "Error",
         description: "Failed to process questionnaire",
@@ -58,24 +83,58 @@ export default function Onboarding() {
     }
   };
 
+  const handleConfirmMentor = async () => {
+    if (!user || !recommendedMentor) return;
+
+    try {
+      setSelecting(true);
+
+      await supabase
+        .from('profiles')
+        .update({
+          selected_mentor_id: recommendedMentor.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      toast({
+        title: "Mentor selected!",
+        description: `${recommendedMentor.name} will guide your journey.`,
+      });
+
+      navigate("/");
+    } catch (error) {
+      console.error("Error selecting mentor:", error);
+      toast({
+        title: "Error",
+        description: "Failed to select mentor",
+        variant: "destructive",
+      });
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleSeeAllMentors = () => {
+    setStage('browse');
+  };
+
   const handleMentorSelected = async (mentorId: string) => {
     if (!user) return;
 
     try {
       setSelecting(true);
-      
+
       await supabase
         .from('profiles')
-        .update({ 
+        .update({
           selected_mentor_id: mentorId,
-          preferences: {
-            compatible_mentor_ids: compatibleMentors
-          }
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       const selectedMentor = mentors.find(m => m.id === mentorId);
-      
+
       toast({
         title: "Mentor selected!",
         description: `${selectedMentor?.name} will guide your journey.`,
@@ -97,34 +156,33 @@ export default function Onboarding() {
   return (
     <>
       {stage === "questionnaire" && (
-        <Questionnaire onComplete={handleQuestionnaireComplete} />
+        <EnhancedQuestionnaire onComplete={handleQuestionnaireComplete} />
       )}
-      {stage === "selection" && mentors.length > 0 && (
+
+      {stage === "result" && recommendedMentor && explanation && (
+        <MentorResult
+          mentor={recommendedMentor}
+          explanation={explanation}
+          onConfirm={handleConfirmMentor}
+          onSeeAll={handleSeeAllMentors}
+          isConfirming={selecting}
+        />
+      )}
+
+      {stage === "browse" && mentors.length > 0 && (
         <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
           <div className="max-w-7xl mx-auto space-y-16">
-            {/* Header */}
             <div className="text-center space-y-6 animate-fade-in">
               <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
               <h1 className="text-5xl md:text-7xl font-black text-pure-white uppercase tracking-tight">
-                Your Perfect Match
+                Choose Your Mentor
               </h1>
-              {recommendedMentor && (
-                <div className="space-y-2">
-                  <p className="text-xl text-steel">
-                    Based on your answers, we recommend
-                  </p>
-                  <p className="text-3xl font-bold text-royal-gold">
-                    {recommendedMentor.name}
-                  </p>
-                  <p className="text-lg text-steel italic">
-                    But feel free to explore all mentors below
-                  </p>
-                </div>
-              )}
+              <p className="text-xl text-steel">
+                We recommended {recommendedMentor?.name}, but feel free to explore all options
+              </p>
             </div>
 
-            {/* Mentor Grid */}
-            <MentorGrid 
+            <MentorGrid
               mentors={mentors}
               onSelectMentor={handleMentorSelected}
               currentMentorId={recommendedMentor?.id}
