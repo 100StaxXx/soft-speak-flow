@@ -231,18 +231,32 @@ const ContentGenerator = () => {
       <div className="mb-8">
         <AudioGenerator
           mentors={mentors}
-          onFullPepTalkGenerated={(pepTalkData) => {
-            setFormData({
-              title: pepTalkData.title,
-              quote: pepTalkData.quote,
-              description: pepTalkData.description,
-              topic_category: pepTalkData.topic_category,
-              emotional_triggers: pepTalkData.emotional_triggers,
-              audio_url: pepTalkData.audio_url,
-              mentor_id: pepTalkData.mentor_id,
-            });
-            setIsEditing(true);
-            toast.success("Pep talk generated! You can now save it from the Admin page.");
+          onFullPepTalkGenerated={async (pepTalkData) => {
+            try {
+              // Find the mentor to get the category
+              const mentor = mentors.find(m => m.id === pepTalkData.mentor_id);
+              
+              // Save directly to database
+              const { error } = await supabase.from("pep_talks").insert({
+                title: pepTalkData.title,
+                quote: pepTalkData.quote,
+                description: pepTalkData.description,
+                topic_category: pepTalkData.topic_category,
+                emotional_triggers: pepTalkData.emotional_triggers,
+                audio_url: pepTalkData.audio_url,
+                mentor_id: pepTalkData.mentor_id,
+                category: pepTalkData.topic_category[0] || "mindset",
+                is_featured: false,
+                is_premium: false,
+              });
+
+              if (error) throw error;
+
+              toast.success(`Pep talk saved successfully! Audio is now available in your library.`);
+            } catch (error: any) {
+              console.error("Error saving pep talk:", error);
+              toast.error(error.message || "Failed to save pep talk");
+            }
           }}
         />
       </div>
