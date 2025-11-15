@@ -1,5 +1,3 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -17,101 +15,82 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const { type, value, count = 5 } = await req.json() as QuoteRequest;
 
     console.log('Generating quotes for:', { type, value, count });
 
-    // Create prompt based on type
     const prompt = type === 'trigger'
-      ? `Generate ${count} powerful, authentic quotes and affirmations for someone feeling "${value}". These should be motivational, empowering, and resonate with that emotional state. Each quote should be unique and impactful. Include the author name (can be a famous person or "Anonymous"). Format as JSON array with objects containing "text" and "author" fields.`
-      : `Generate ${count} inspiring quotes and affirmations related to "${value}". Focus on growth, improvement, and motivation in this specific area. Each quote should be unique and actionable. Include the author name (can be a famous person or "Anonymous"). Format as JSON array with objects containing "text" and "author" fields.`;
+      ? `Generate ${count} short, authentic quotes and affirmations for someone feeling "${value}". Each must include an author (famous person or "Anonymous"). Return JSON array of {"text","author"}.`
+      : `Generate ${count} short, inspiring quotes and affirmations related to "${value}". Each must include an author (famous person or "Anonymous"). Return JSON array of {"text","author"}.`;
 
-    // Call Lovable AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
+        Authorization: `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        messages: [{ role: 'user', content: prompt }],
       })
     });
 
-    if (!aiResponse.ok) {
-      throw new Error(`AI API error: ${aiResponse.statusText}`);
+    if (!aiResp.ok) {
+      const txt = await aiResp.text();
+      throw new Error(`AI gateway error: ${aiResp.status} ${txt}`);
     }
 
-    const aiData = await aiResponse.json();
-    const generatedContent = aiData.choices?.[0]?.message?.content;
+    const aiData = await aiResp.json();
+    const content: string = aiData.choices?.[0]?.message?.content ?? '';
 
-    if (!generatedContent) {
-      throw new Error('No content generated from AI');
-    }
-
-    console.log('AI generated content:', generatedContent);
-
-    // Parse the JSON response
-    let quotes;
+    let quotes: Array<{ text: string; author: string }> = [];
     try {
-      // Try to extract JSON from markdown code blocks if present
-      const jsonMatch = generatedContent.match(/```json\s*([\s\S]*?)\s*```/) || 
-                       generatedContent.match(/\[[\s\S]*\]/);
-      const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : generatedContent;
+      const match = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\[[\s\S]*\]/);
+      const jsonStr = match ? (match[1] || match[0]) : content;
       quotes = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
+    } catch (e) {
+      console.error('Parse error:', e, 'raw:', content);
       throw new Error('Failed to parse AI response');
     }
 
-    // Insert quotes into database
-    const quotesToInsert = quotes.map((quote: any) => ({
-      text: quote.text,
-      author: quote.author || 'Anonymous',
+    const rows = quotes.map(q => ({
+      text: q.text,
+      author: q.author || 'Anonymous',
       category: type === 'category' ? value : null,
       emotional_triggers: type === 'trigger' ? [value] : null,
       intensity: 'moderate',
-      is_premium: false
+      is_premium: false,
     }));
 
-    const { error: insertError } = await supabase
-      .from('quotes')
-      .insert(quotesToInsert);
+    const rest = await fetch(`${supabaseUrl}/rest/v1/quotes`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${supabaseKey}`,
+        apikey: supabaseKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify(rows)
+    });
 
-    if (insertError) {
-      console.error('Error inserting quotes:', insertError);
-      throw insertError;
+    if (!rest.ok) {
+      const txt = await rest.text();
+      throw new Error(`Insert failed: ${txt}`);
     }
 
-    console.log('Successfully generated and stored quotes');
-
-    return new Response(
-      JSON.stringify({ success: true, count: quotes.length }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
-
-  } catch (error) {
-    console.error('Error in generate-quotes function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    );
+    return new Response(JSON.stringify({ success: true, count: rows.length }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  } catch (err: any) {
+    console.error('generate-quotes error:', err);
+    return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });
+
