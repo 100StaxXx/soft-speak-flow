@@ -21,12 +21,13 @@ interface MentorGridProps {
   mentors: Mentor[];
   onSelectMentor: (mentorId: string) => void;
   currentMentorId?: string | null;
+  recommendedMentorId?: string | null;
   isSelecting?: boolean;
 }
 
 const MENTOR_ORDER = ['atlas', 'darius', 'kai', 'eli', 'nova', 'sienna', 'lumi', 'stryker', 'solace'];
 
-export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecting = false }: MentorGridProps) => {
+export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommendedMentorId, isSelecting = false }: MentorGridProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
 
   const orderedMentors = MENTOR_ORDER.map(slug => 
@@ -145,7 +146,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecti
                 <Button
                   onClick={() => onSelectMentor(activeMentor.id)}
                   disabled={isSelecting}
-                  className="h-16 px-12 font-black uppercase tracking-wider bg-royal-purple hover:bg-royal-purple/90 text-pure-white shadow-[0_0_30px_rgba(137,81,204,0.5)] hover:shadow-[0_0_40px_rgba(137,81,204,0.7)] transition-all duration-300"
+                  className="h-16 px-12 font-black uppercase tracking-wider bg-gradient-to-r from-royal-purple to-accent-purple hover:from-royal-purple/90 hover:to-accent-purple/90 text-pure-white border border-royal-purple/30 shadow-lg hover:shadow-[0_0_20px_rgba(137,81,204,0.3)] transition-all duration-300"
                 >
                   {isSelecting ? (
                     <>Selecting...</>
@@ -174,21 +175,35 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecti
           {orderedMentors.map((mentor) => (
             <div
               key={mentor.id}
-              className="flex flex-col items-center space-y-3 cursor-pointer group"
+              className={`flex flex-col items-center space-y-3 cursor-pointer group relative ${
+                recommendedMentorId === mentor.id ? 'animate-pulse-slow' : ''
+              }`}
               onClick={() => handleMentorClick(mentor.id)}
             >
+              {/* Recommended Badge */}
+              {recommendedMentorId === mentor.id && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                  <div className="px-3 py-1 bg-gradient-to-r from-royal-purple to-accent-purple rounded-full border border-royal-purple/30 shadow-lg">
+                    <span className="text-xs font-black text-pure-white uppercase tracking-wide">Recommended</span>
+                  </div>
+                </div>
+              )}
               {/* Avatar Circle */}
               <div className="relative">
                 {currentMentorId === mentor.id && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-xs font-bold text-royal-gold whitespace-nowrap z-10">
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-xs font-bold text-royal-purple whitespace-nowrap z-10">
                     Current
                   </div>
                 )}
                 <div
-                  className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden transition-all duration-300 group-hover:scale-110"
+                  className={`relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden transition-all duration-300 group-hover:scale-110 ${
+                    recommendedMentorId === mentor.id ? 'ring-2 ring-royal-purple ring-offset-4 ring-offset-obsidian' : ''
+                  }`}
                   style={{ 
                     border: `2px solid ${mentor.primary_color}`,
-                    boxShadow: `0 0 20px ${mentor.primary_color}40`
+                    boxShadow: recommendedMentorId === mentor.id 
+                      ? `0 0 30px ${mentor.primary_color}60, 0 0 50px rgba(137,81,204,0.3)` 
+                      : `0 0 20px ${mentor.primary_color}40`
                   }}
                 >
                   {mentor.avatar_url ? (
@@ -210,7 +225,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecti
 
               {/* Name */}
               <div className="text-center space-y-1">
-                <h3 className="text-pure-white font-bold text-lg md:text-xl group-hover:text-royal-gold transition-colors">
+                <h3 className="text-pure-white font-bold text-lg md:text-xl group-hover:text-royal-purple transition-colors">
                   {mentor.name}
                 </h3>
                 <p className="text-steel text-xs md:text-sm" style={{ color: mentor.primary_color }}>

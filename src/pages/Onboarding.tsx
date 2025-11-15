@@ -186,6 +186,7 @@ export default function Onboarding() {
               mentors={mentors}
               onSelectMentor={handleMentorSelected}
               currentMentorId={recommendedMentor?.id}
+              recommendedMentorId={recommendedMentor?.id}
               isSelecting={selecting}
             />
           </div>
