@@ -143,15 +143,17 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
             <SelectTrigger id="mentor">
               <SelectValue placeholder="Choose a mentor..." />
             </SelectTrigger>
-            <SelectContent className="bg-background z-50">
+            <SelectContent className="bg-background z-50 max-h-[300px]">
               {mentors.map((mentor) => {
                 const config = getMentorVoiceConfig(mentor.slug);
+                const displayText = `${mentor.name} (${config?.voiceName || "Unknown"}) - ${mentor.short_title || mentor.description}`;
                 return (
-                  <SelectItem key={mentor.slug} value={mentor.slug} className="cursor-pointer">
-                    <div className="flex flex-col items-start py-1">
-                      <div className="font-medium">{mentor.name} ({config?.voiceName || "Unknown"})</div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">{mentor.short_title || mentor.description}</div>
-                    </div>
+                  <SelectItem 
+                    key={mentor.slug} 
+                    value={mentor.slug} 
+                    className="cursor-pointer"
+                  >
+                    {displayText}
                   </SelectItem>
                 );
               })}
