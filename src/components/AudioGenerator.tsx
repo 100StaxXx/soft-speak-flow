@@ -13,7 +13,7 @@ interface AudioGeneratorProps {
     title: string;
     quote: string;
     description: string;
-    topic_category: string;
+    topic_category: string[];
     emotional_triggers: string[];
     audio_url: string;
     mentor_id: string;
@@ -23,12 +23,12 @@ interface AudioGeneratorProps {
 
 export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGeneratorProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string>("");
-  const [topicCategory, setTopicCategory] = useState<string>("discipline");
+  const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<string>("medium");
   const [emotionalTriggers, setEmotionalTriggers] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const topicCategories = [
+  const topicCategoryOptions = [
     { label: "Discipline", value: "discipline" },
     { label: "Confidence", value: "confidence" },
     { label: "Physique", value: "physique" },
@@ -74,7 +74,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
         {
         body: {
           mentorSlug: selectedMentor,
-          topic_category: topicCategory,
+          topic_category: topicCategories,
           intensity,
           emotionalTriggers,
         },
@@ -105,7 +105,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           title: contentData.title,
           quote: contentData.quote,
           description: contentData.description,
-          topic_category: topicCategory,
+          topic_category: topicCategories,
           emotional_triggers: emotionalTriggers,
           audio_url: audioData.audioUrl,
           mentor_id: mentor.id,
@@ -162,19 +162,31 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="topic-category">Topic Category</Label>
-          <Select value={topicCategory} onValueChange={setTopicCategory}>
-            <SelectTrigger id="topic-category">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background">
-              {topicCategories.map((cat) => (
-                <SelectItem key={cat.value} value={cat.value}>
-                  {cat.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="topic-category">Topic Categories (up to 4)</Label>
+          <div className="flex flex-wrap gap-2">
+            {topicCategoryOptions.map((cat) => (
+              <Button
+                key={cat.value}
+                type="button"
+                variant={topicCategories.includes(cat.value) ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (topicCategories.includes(cat.value)) {
+                    setTopicCategories(topicCategories.filter(c => c !== cat.value));
+                  } else if (topicCategories.length < 4) {
+                    setTopicCategories([...topicCategories, cat.value]);
+                  } else {
+                    toast.error("Maximum 4 categories allowed");
+                  }
+                }}
+              >
+                {cat.label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Selected: {topicCategories.length}/4
+          </p>
         </div>
 
         <div className="space-y-2">

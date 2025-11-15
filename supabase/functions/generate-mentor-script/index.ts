@@ -13,6 +13,9 @@ serve(async (req) => {
 
   try {
     const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
+    
+    // topic_category can now be a string or an array
+    const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
 
     if (!mentorSlug) {
       throw new Error("mentorSlug is required");
@@ -55,9 +58,13 @@ serve(async (req) => {
       business: "money, career, taking risks, the long game, responsibility",
     };
 
-    const topicContext = topic_category
-      ? `This message is about ${topicCategoryMap[topic_category] || topic_category}.`
-      : "";
+    let topicContext = "";
+    if (categories.length > 0) {
+      const categoryDescriptions = categories
+        .map(cat => topicCategoryMap[cat] || cat)
+        .join("; ");
+      topicContext = `This message is about ${categoryDescriptions}.`;
+    }
 
     // Emotional trigger guidance
     const emotionalGuidanceMap: Record<string, string> = {

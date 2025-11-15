@@ -741,7 +741,7 @@ export type Database = {
           quote: string
           tags: string[] | null
           title: string
-          topic_category: string | null
+          topic_category: string[] | null
         }
         Insert: {
           audio_url: string
@@ -756,7 +756,7 @@ export type Database = {
           quote: string
           tags?: string[] | null
           title: string
-          topic_category?: string | null
+          topic_category?: string[] | null
         }
         Update: {
           audio_url?: string
@@ -771,7 +771,7 @@ export type Database = {
           quote?: string
           tags?: string[] | null
           title?: string
-          topic_category?: string | null
+          topic_category?: string[] | null
         }
         Relationships: [
           {
