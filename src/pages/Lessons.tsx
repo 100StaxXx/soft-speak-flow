@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BookOpen, Sparkles } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, BookOpen, Sparkles, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ import { useLessonNotifications } from "@/hooks/useLessonNotifications";
 export default function Lessons() {
   const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showAllLessons, setShowAllLessons] = useState(false);
   
   // Enable lesson notifications
   useLessonNotifications();
@@ -53,14 +54,30 @@ export default function Lessons() {
     },
   });
 
+  const todayLesson = lessons[0];
+  const displayLessons = showAllLessons ? lessons : (todayLesson ? [todayLesson] : []);
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-4xl font-heading text-foreground">Lessons</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-4xl font-heading text-foreground">Lessons</h1>
+          </div>
+          {!showAllLessons && lessons.length > 1 && (
+            <Button variant="outline" onClick={() => setShowAllLessons(true)}>
+              <List className="w-4 h-4 mr-2" />
+              View All Lessons
+            </Button>
+          )}
+          {showAllLessons && (
+            <Button variant="outline" onClick={() => setShowAllLessons(false)}>
+              View Today's Lesson
+            </Button>
+          )}
         </div>
 
         <div className="grid gap-4">
@@ -76,18 +93,58 @@ export default function Lessons() {
               <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No lessons available yet.</p>
             </Card>
+          ) : showAllLessons ? (
+            <Accordion type="single" collapsible className="w-full space-y-2">
+              {lessons.map((lesson, index) => (
+                <AccordionItem key={lesson.id} value={lesson.id} className="border rounded-lg px-6">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex flex-col items-start text-left flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {index === 0 && (
+                          <Badge className="bg-gradient-to-r from-blush-rose to-soft-mauve text-xs">
+                            Today
+                          </Badge>
+                        )}
+                        {lesson.lesson_number && (
+                          <Badge variant="secondary" className="text-xs">
+                            Day {lesson.lesson_number}
+                          </Badge>
+                        )}
+                        {lesson.category && (
+                          <Badge variant="outline" className="text-xs">{lesson.category}</Badge>
+                        )}
+                      </div>
+                      <h3 className="text-base font-heading text-foreground">{lesson.title}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(lesson.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-4 space-y-3">
+                      <p className="text-sm text-muted-foreground">{lesson.description}</p>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{lesson.content}</p>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           ) : (
-            lessons.map((lesson, index) => (
+            displayLessons.map((lesson, index) => (
               <Card key={lesson.id} className="p-6 hover:border-primary/40 transition-all">
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        {index === 0 && (
-                          <Badge className="bg-gradient-to-r from-blush-rose to-soft-mauve">
-                            Today's Lesson
-                          </Badge>
-                        )}
+                        <Badge className="bg-gradient-to-r from-blush-rose to-soft-mauve">
+                          Today's Lesson
+                        </Badge>
                         {lesson.lesson_number && (
                           <Badge variant="secondary">
                             Day {lesson.lesson_number}
