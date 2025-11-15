@@ -362,6 +362,42 @@ export type Database = {
           },
         ]
       }
+      lesson_mentors: {
+        Row: {
+          created_at: string | null
+          id: string
+          lesson_id: string | null
+          mentor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          mentor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          mentor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_mentors_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_progress: {
         Row: {
           completed: boolean | null
@@ -484,15 +520,25 @@ export type Database = {
       }
       mentors: {
         Row: {
+          archetype: string | null
           avatar_url: string | null
           created_at: string
           description: string
+          gender_energy: string | null
           id: string
           identity_description: string | null
+          intensity_level: string | null
+          is_active: boolean | null
           mentor_type: string
           name: string
+          primary_color: string | null
+          short_title: string | null
+          signature_line: string | null
+          slug: string | null
           style: string | null
+          style_description: string | null
           tags: string[]
+          target_user: string | null
           target_user_type: string | null
           theme_config: Json | null
           themes: string[] | null
@@ -501,15 +547,25 @@ export type Database = {
           welcome_message: string | null
         }
         Insert: {
+          archetype?: string | null
           avatar_url?: string | null
           created_at?: string
           description: string
+          gender_energy?: string | null
           id?: string
           identity_description?: string | null
+          intensity_level?: string | null
+          is_active?: boolean | null
           mentor_type: string
           name: string
+          primary_color?: string | null
+          short_title?: string | null
+          signature_line?: string | null
+          slug?: string | null
           style?: string | null
+          style_description?: string | null
           tags?: string[]
+          target_user?: string | null
           target_user_type?: string | null
           theme_config?: Json | null
           themes?: string[] | null
@@ -518,15 +574,25 @@ export type Database = {
           welcome_message?: string | null
         }
         Update: {
+          archetype?: string | null
           avatar_url?: string | null
           created_at?: string
           description?: string
+          gender_energy?: string | null
           id?: string
           identity_description?: string | null
+          intensity_level?: string | null
+          is_active?: boolean | null
           mentor_type?: string
           name?: string
+          primary_color?: string | null
+          short_title?: string | null
+          signature_line?: string | null
+          slug?: string | null
           style?: string | null
+          style_description?: string | null
           tags?: string[]
+          target_user?: string | null
           target_user_type?: string | null
           theme_config?: Json | null
           themes?: string[] | null
@@ -535,6 +601,42 @@ export type Database = {
           welcome_message?: string | null
         }
         Relationships: []
+      }
+      pep_talk_mentors: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentor_id: string | null
+          pep_talk_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          pep_talk_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          pep_talk_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pep_talk_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pep_talk_mentors_pep_talk_id_fkey"
+            columns: ["pep_talk_id"]
+            isOneToOne: false
+            referencedRelation: "pep_talks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pep_talks: {
         Row: {
@@ -908,6 +1010,138 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visual_assets: {
+        Row: {
+          asset_url: string
+          created_at: string | null
+          id: string
+          is_premium: boolean | null
+          primary_topic: string | null
+          role: string
+          topics: string[] | null
+        }
+        Insert: {
+          asset_url: string
+          created_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          primary_topic?: string | null
+          role: string
+          topics?: string[] | null
+        }
+        Update: {
+          asset_url?: string
+          created_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          primary_topic?: string | null
+          role?: string
+          topics?: string[] | null
+        }
+        Relationships: []
+      }
+      visual_mentors: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentor_id: string | null
+          visual_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          visual_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          visual_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visual_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visual_mentors_visual_id_fkey"
+            columns: ["visual_id"]
+            isOneToOne: false
+            referencedRelation: "visual_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      written_content: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_premium: boolean | null
+          mode: string
+          primary_topic: string | null
+          text_content: string
+          topics: string[] | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          mode: string
+          primary_topic?: string | null
+          text_content: string
+          topics?: string[] | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          mode?: string
+          primary_topic?: string | null
+          text_content?: string
+          topics?: string[] | null
+        }
+        Relationships: []
+      }
+      written_mentors: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentor_id: string | null
+          written_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          written_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentor_id?: string | null
+          written_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "written_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "written_mentors_written_id_fkey"
+            columns: ["written_id"]
+            isOneToOne: false
+            referencedRelation: "written_content"
             referencedColumns: ["id"]
           },
         ]
