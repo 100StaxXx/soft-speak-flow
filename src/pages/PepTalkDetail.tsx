@@ -88,7 +88,7 @@ const PepTalkDetail = () => {
         {/* Back Button */}
         <Button
           variant="ghost"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/library")}
           className="mb-6 rounded-full hover:bg-secondary"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
