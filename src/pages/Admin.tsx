@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Trash2, Edit, Plus, Upload, X } from "lucide-react";
+import { Trash2, Edit, Plus, Upload, X, Loader2, Music } from "lucide-react";
 import { AudioGenerator } from "@/components/AudioGenerator";
 
 interface PepTalk {
@@ -33,6 +33,7 @@ const Admin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -235,6 +236,68 @@ const Admin = () => {
     setAudioFile(null);
   };
 
+  const handleFullAIGenerate = async () => {
+    if (!formData.mentor_id) {
+      toast.error("Please select a mentor first");
+      return;
+    }
+
+    const mentor = mentors.find(m => m.id === formData.mentor_id);
+    if (!mentor) {
+      toast.error("Invalid mentor selected");
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      // Step 1: Generate complete pep talk content
+      toast.info("Generating pep talk content...");
+      const { data: contentData, error: contentError } = await supabase.functions.invoke(
+        "generate-complete-pep-talk",
+        {
+          body: {
+            mentorSlug: mentor.slug,
+            category: formData.category || "motivation",
+          },
+        }
+      );
+
+      if (contentError) throw contentError;
+
+      // Step 2: Generate audio from the script
+      toast.info("Generating audio...");
+      const { data: audioData, error: audioError } = await supabase.functions.invoke(
+        "generate-mentor-audio",
+        {
+          body: {
+            mentorSlug: mentor.slug,
+            script: contentData.script,
+          },
+        }
+      );
+
+      if (audioError) throw audioError;
+
+      // Update form with all generated data
+      setFormData(prev => ({
+        ...prev,
+        title: contentData.title,
+        quote: contentData.quote,
+        description: contentData.description,
+        category: contentData.category,
+        audio_url: audioData.audioUrl,
+      }));
+
+      setIsEditing(true);
+      toast.success("Complete pep talk generated successfully!");
+    } catch (error: any) {
+      console.error("Error generating complete pep talk:", error);
+      toast.error(error.message || "Failed to generate pep talk");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 flex items-center justify-center">
@@ -270,6 +333,40 @@ const Admin = () => {
               toast.success("Audio generated! Fill in remaining fields to save.");
             }}
           />
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-8 flex gap-2">
+          <Button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create New Pep Talk
+          </Button>
+          <Button
+            onClick={handleFullAIGenerate}
+            disabled={aiGenerating || !formData.mentor_id}
+            variant="secondary"
+            className="flex items-center gap-2"
+          >
+            {aiGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Music className="h-4 w-4" />
+                Fully AI-Generate Pep Talk
+              </>
+            )}
+          </Button>
+          {!formData.mentor_id && !aiGenerating && (
+            <p className="text-sm text-muted-foreground self-center">
+              Select a mentor in the form below to enable AI generation
+            </p>
+          )}
         </div>
 
         {/* Form */}
