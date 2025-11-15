@@ -132,55 +132,17 @@ const Quotes = () => {
               <div className="text-center">
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
               </div>
-            ) : quoteData ? (
-              <>
-                {/* Full-screen image background */}
-                {quoteData.imageUrl && (
-                  <div className={`absolute inset-0 transition-opacity duration-1000 ${
-                    imageLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}>
-                    <img 
-                      src={quoteData.imageUrl} 
-                      alt="Quote visualization"
-                      className="w-full h-full object-cover"
-                      onLoad={() => setImageLoaded(true)}
-                    />
-                    <div className="absolute inset-0 bg-black/20" />
-                  </div>
-                )}
-                
-                {/* Quote text overlay */}
-                <div className="relative z-30 max-w-6xl mx-auto text-center space-y-10 px-8">
-                  <div className={`transition-all duration-1000 ${
-                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                  }`}>
-                    <blockquote 
-                      className="text-5xl md:text-7xl lg:text-8xl font-bold leading-tight mb-8 tracking-tight"
-                      style={{ 
-                        fontFamily: quoteData.font || 'Cinzel, serif',
-                        color: '#ffffff',
-                        textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 2px 10px rgba(0,0,0,0.9)'
-                      }}
-                    >
-                      "{quoteData.text}"
-                    </blockquote>
-                  </div>
-
-                  <div className={`transition-all duration-1000 delay-300 ${
-                    showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                  }`}>
-                    <p 
-                      className="text-3xl md:text-4xl font-light italic"
-                      style={{ 
-                        color: '#ffffff',
-                        textShadow: '0 2px 10px rgba(0,0,0,0.7)'
-                      }}
-                    >
-                      — {quoteData.author}
-                    </p>
-                  </div>
-                </div>
-              </>
+            ) : quoteData?.imageUrl ? (
+              <div className={`absolute inset-0 transition-opacity duration-1000 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}>
+                <img 
+                  src={quoteData.imageUrl} 
+                  alt="Quote"
+                  className="w-full h-full object-cover"
+                  onLoad={() => setImageLoaded(true)}
+                />
+              </div>
             ) : (
               <div className="text-center">
                 <p className="text-white/60 text-lg">No quote found</p>
