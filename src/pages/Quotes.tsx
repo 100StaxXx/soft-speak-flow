@@ -37,10 +37,10 @@ const Quotes = () => {
     setShowAuthor(false);
     setShowBack(false);
     
-    // Trigger animations in sequence
-    setTimeout(() => setShowQuote(true), 300);
-    setTimeout(() => setShowAuthor(true), 1200);
-    setTimeout(() => setShowBack(true), 1800);
+    // Trigger animations in sequence (slower)
+    setTimeout(() => setShowQuote(true), 500);
+    setTimeout(() => setShowAuthor(true), 2500);
+    setTimeout(() => setShowBack(true), 3500);
   };
 
   const handleBack = () => {
@@ -115,17 +115,26 @@ const Quotes = () => {
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blush-rose border-r-transparent"></div>
               </div>
             ) : quote ? (
-              <div className="max-w-3xl mx-auto text-center space-y-6">
+              <div className="max-w-4xl mx-auto text-center space-y-8">
+                {quote.imageUrl && (
+                  <img 
+                    src={quote.imageUrl} 
+                    alt="Quote visualization"
+                    className={`w-full max-w-2xl mx-auto rounded-3xl shadow-2xl transition-all duration-1500 ${
+                      showQuote ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                    }`}
+                  />
+                )}
                 <p 
-                  className={`font-display text-3xl md:text-4xl lg:text-5xl text-warm-charcoal leading-relaxed transition-all duration-700 ${
-                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                  className={`font-quote text-4xl md:text-5xl lg:text-6xl text-warm-charcoal leading-relaxed transition-all duration-1500 ${
+                    showQuote ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
                   }`}
                 >
                   "{quote.text}"
                 </p>
                 <p 
-                  className={`text-xl md:text-2xl text-blush-rose font-medium transition-all duration-700 ${
-                    showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  className={`text-2xl md:text-3xl text-blush-rose font-medium transition-all duration-1500 ${
+                    showAuthor ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                   }`}
                 >
                   — {quote.author}
