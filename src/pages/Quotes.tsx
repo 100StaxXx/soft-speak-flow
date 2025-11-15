@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteCard } from "@/components/QuoteCard";
 import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
 import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Sparkles } from "lucide-react";
+import { Search, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 
 const Quotes = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,6 +19,7 @@ const Quotes = () => {
   const [bubbleType, setBubbleType] = useState<"trigger" | "category" | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleBubbleClick = (value: string, type: "trigger" | "category") => {
     if (selectedBubble === value) {
@@ -66,6 +68,31 @@ const Quotes = () => {
 
       return data?.map((f) => f.content_id) || [];
     },
+  });
+
+  const generateQuotesMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBubble || !bubbleType) return;
+      
+      const { data, error } = await supabase.functions.invoke('generate-quotes', {
+        body: {
+          type: bubbleType,
+          value: selectedBubble,
+          count: 5
+        }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      toast.success("New quotes generated!");
+    },
+    onError: (error) => {
+      console.error("Error generating quotes:", error);
+      toast.error("Failed to generate quotes");
+    }
   });
 
   const handleClearSelection = () => {
@@ -142,7 +169,28 @@ const Quotes = () => {
                 {quotes.length} {quotes.length === 1 ? "quote" : "quotes"} found
               </p>
             </div>
-            {(selectedBubble || searchTerm) && (
+            <div className="flex gap-2">
+              {selectedBubble && (
+                <Button
+                  onClick={() => generateQuotesMutation.mutate()}
+                  disabled={generateQuotesMutation.isPending}
+                  className="bg-gradient-to-r from-blush-rose to-soft-mauve hover:opacity-90 text-white"
+                  size="sm"
+                >
+                  {generateQuotesMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Generate New Quotes
+                    </>
+                  )}
+                </Button>
+              )}
+              {(selectedBubble || searchTerm) && (
               <Button
                 onClick={handleClearSelection}
                 variant="ghost"
