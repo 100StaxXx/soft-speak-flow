@@ -117,7 +117,7 @@ export default function AdaptivePushes() {
         description: "Your mentor will reach out with personalized guidance.",
       });
 
-      navigate('/settings');
+      navigate('/profile');
     } catch (error: any) {
       console.error('Error saving settings:', error);
       toast({

@@ -19,7 +19,7 @@ import Quotes from "./pages/Quotes";
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import Saved from "./pages/Saved";
-import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import Premium from "./pages/Premium";
 import PepTalkDetail from "./pages/PepTalkDetail";
 import About from "./pages/About";
@@ -76,7 +76,7 @@ const AppContent = () => {
         <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
         <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetail /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
         <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
         <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />

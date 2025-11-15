@@ -67,7 +67,7 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/settings"
+          to="/profile"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all"
           activeClassName="bg-primary/10"
         >
@@ -75,7 +75,7 @@ export const BottomNav = () => {
             <>
               <User className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
               <span className={`text-[10px] font-bold uppercase tracking-wide ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                Settings
+                Profile
               </span>
             </>
           )}

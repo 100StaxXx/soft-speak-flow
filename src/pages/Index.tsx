@@ -329,13 +329,13 @@ const Index = () => {
               
               <Card
                 className="p-6 hover:border-primary/40 transition-all cursor-pointer group"
-                onClick={() => navigate("/settings")}
+                onClick={() => navigate("/profile")}
               >
                 <div className="flex flex-col items-center text-center space-y-2">
                   <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                     <Compass className="w-6 h-6 text-primary" />
                   </div>
-                  <span className="font-heading text-foreground">Settings</span>
+                  <span className="font-heading text-foreground">Profile</span>
                 </div>
               </Card>
             </div>
