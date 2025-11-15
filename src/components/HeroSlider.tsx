@@ -113,8 +113,8 @@ export const HeroSlider = ({ mentorId }: { mentorId?: string }) => {
               )}
               <div className={`absolute inset-0 bg-gradient-to-b ${slide.gradient}`} />
               
-              <div className="absolute inset-0 flex items-center justify-center">
-                <h1 className="font-heading text-6xl md:text-8xl font-black text-pure-white tracking-tighter text-center px-6 uppercase drop-shadow-2xl">
+              <div className="absolute inset-0 flex items-center justify-center px-4">
+                <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-pure-white tracking-tighter text-center uppercase drop-shadow-2xl break-words max-w-[90vw]">
                   {slide.text}
                 </h1>
               </div>

@@ -90,12 +90,12 @@ export const QuoteCard = ({ quote, isFavorited: initialFavorited, onFavoriteChan
         />
       </button>
       <div className="mt-8 mb-4">
-        <p className="text-warm-charcoal text-lg font-medium leading-relaxed italic">
+        <p className="text-warm-charcoal text-base md:text-lg font-medium leading-relaxed italic break-words">
           "{text}"
         </p>
       </div>
       {author && (
-        <p className="text-warm-charcoal/60 text-sm">
+        <p className="text-warm-charcoal/60 text-sm break-words">
           — {author}
         </p>
       )}

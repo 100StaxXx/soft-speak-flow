@@ -39,12 +39,12 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
         </div>
 
         {/* Name */}
-        <h3 className="font-heading text-xl md:text-2xl font-black text-foreground leading-tight">
+        <h3 className="font-heading text-lg md:text-xl font-black text-foreground leading-tight break-words">
           {mentor.name}
         </h3>
 
         {/* Description */}
-        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed line-clamp-3">
+        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed line-clamp-3 break-words">
           {mentor.description}
         </p>
 
