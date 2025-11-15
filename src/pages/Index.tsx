@@ -97,25 +97,28 @@ const Index = () => {
     try {
       setLoading(true);
 
-      // Fetch user's selected mentor
-      const { data: mentorData } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("id", profile?.selected_mentor_id)
-        .single();
+      // Batch all queries in parallel for better performance
+      const [
+        { data: mentorData },
+        { data: personalizedPepTalk },
+        { data: personalizedQuotes },
+        { data: videosData },
+        { data: personalizedPlaylists }
+      ] = await Promise.all([
+        supabase.from("mentors").select("*").eq("id", profile?.selected_mentor_id).single(),
+        supabase.from("pep_talks").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("quotes").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(3),
+        supabase.from("videos").select("*").order("created_at", { ascending: false }).limit(2),
+        supabase.from("playlists").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(2)
+      ]);
 
       setMentor(mentorData);
+      setDailyQuotes(personalizedQuotes || []);
+      setRecommendedVideos(videosData || []);
+      setPlaylists(personalizedPlaylists || []);
 
-      // Fetch pep talk from user's mentor
-      const { data: pepTalkData } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .eq("mentor_id", profile?.selected_mentor_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!pepTalkData) {
+      // Use fallback for pep talk if none found for mentor
+      if (!personalizedPepTalk) {
         const { data: fallbackPepTalk } = await supabase
           .from("pep_talks")
           .select("*")
@@ -124,32 +127,8 @@ const Index = () => {
           .maybeSingle();
         setFeaturedPepTalk(fallbackPepTalk);
       } else {
-        setFeaturedPepTalk(pepTalkData);
+        setFeaturedPepTalk(personalizedPepTalk);
       }
-
-      const { data: videoData } = await supabase
-        .from("videos")
-        .select("*")
-        .eq("mentor_id", profile?.selected_mentor_id)
-        .order("created_at", { ascending: false })
-        .limit(2);
-      setRecommendedVideos(videoData || []);
-
-      const { data: quoteData } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("mentor_id", profile?.selected_mentor_id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-      setDailyQuotes(quoteData || []);
-
-      const { data: playlistData } = await supabase
-        .from("playlists")
-        .select("*")
-        .eq("mentor_id", profile?.selected_mentor_id)
-        .order("created_at", { ascending: false })
-        .limit(2);
-      setPlaylists(playlistData || []);
     } catch (error) {
       console.error("Error fetching personalized content:", error);
       toast.error("Failed to load personalized content");
@@ -161,36 +140,24 @@ const Index = () => {
   const fetchGeneralContent = async () => {
     try {
       setLoading(true);
-      
-      const { data: pepTalkData } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .eq("is_featured", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setFeaturedPepTalk(pepTalkData);
 
-      const { data: videoData } = await supabase
-        .from("videos")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2);
-      setRecommendedVideos(videoData || []);
+      // Batch all queries in parallel
+      const [
+        { data: generalPepTalk },
+        { data: generalQuotes },
+        { data: generalVideos },
+        { data: generalPlaylists }
+      ] = await Promise.all([
+        supabase.from("pep_talks").select("*").eq("is_featured", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("quotes").select("*").order("created_at", { ascending: false }).limit(3),
+        supabase.from("videos").select("*").order("created_at", { ascending: false }).limit(2),
+        supabase.from("playlists").select("*").order("created_at", { ascending: false }).limit(2)
+      ]);
 
-      const { data: quoteData } = await supabase
-        .from("quotes")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      setDailyQuotes(quoteData || []);
-
-      const { data: playlistData } = await supabase
-        .from("playlists")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2);
-      setPlaylists(playlistData || []);
+      setFeaturedPepTalk(generalPepTalk);
+      setDailyQuotes(generalQuotes || []);
+      setRecommendedVideos(generalVideos || []);
+      setPlaylists(generalPlaylists || []);
     } catch (error) {
       console.error("Error fetching content:", error);
       toast.error("Failed to load content");

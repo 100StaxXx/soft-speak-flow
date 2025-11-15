@@ -3,38 +3,51 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Library from "./pages/Library";
-import Videos from "./pages/Videos";
-import VideoDetail from "./pages/VideoDetail";
-import Quotes from "./pages/Quotes";
-import Playlists from "./pages/Playlists";
-import PlaylistDetail from "./pages/PlaylistDetail";
-import Saved from "./pages/Saved";
-import Profile from "./pages/Profile";
-import Premium from "./pages/Premium";
-import PepTalkDetail from "./pages/PepTalkDetail";
-import About from "./pages/About";
-import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
-import MentorSelection from "./pages/MentorSelection";
-import Onboarding from "./pages/Onboarding";
-import NotFound from "./pages/NotFound";
-import Habits from "./pages/Habits";
-import Challenges from "./pages/Challenges";
-import AudioLibrary from "./pages/AudioLibrary";
-import Lessons from "./pages/Lessons";
-import FocusMode from "./pages/FocusMode";
-import WeeklyReview from "./pages/WeeklyReview";
-import MentorChat from "./pages/MentorChat";
-import ContentGenerator from "./pages/ContentGenerator";
-import AdaptivePushes from "./pages/AdaptivePushes";
 
-const queryClient = new QueryClient();
+// Eager load critical routes
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
+
+// Lazy load non-critical routes
+const Library = lazy(() => import("./pages/Library"));
+const Videos = lazy(() => import("./pages/Videos"));
+const VideoDetail = lazy(() => import("./pages/VideoDetail"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const Playlists = lazy(() => import("./pages/Playlists"));
+const PlaylistDetail = lazy(() => import("./pages/PlaylistDetail"));
+const Saved = lazy(() => import("./pages/Saved"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Premium = lazy(() => import("./pages/Premium"));
+const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
+const About = lazy(() => import("./pages/About"));
+const Admin = lazy(() => import("./pages/Admin"));
+const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Habits = lazy(() => import("./pages/Habits"));
+const Challenges = lazy(() => import("./pages/Challenges"));
+const AudioLibrary = lazy(() => import("./pages/AudioLibrary"));
+const Lessons = lazy(() => import("./pages/Lessons"));
+const FocusMode = lazy(() => import("./pages/FocusMode"));
+const WeeklyReview = lazy(() => import("./pages/WeeklyReview"));
+const MentorChat = lazy(() => import("./pages/MentorChat"));
+const ContentGenerator = lazy(() => import("./pages/ContentGenerator"));
+const AdaptivePushes = lazy(() => import("./pages/AdaptivePushes"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function ScrollToTop() {
   const { pathname } = useLocation();
