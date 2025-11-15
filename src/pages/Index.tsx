@@ -204,7 +204,7 @@ const Index = () => {
       )}
 
       <section className={`snap-start snap-always min-h-screen transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'} bg-background`}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="max-w-6xl mx-auto px-6 py-16 pb-32">
         {mentor && user && (
           <div className="mb-12">
             <MentorMessage 
