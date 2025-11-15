@@ -54,13 +54,6 @@ const Index = () => {
   }, [showIntro]);
 
   useEffect(() => {
-    // Check if user needs onboarding
-    if (user && !profileLoading && profile && !profile.selected_mentor_id) {
-      navigate("/onboarding");
-    }
-  }, [user, profileLoading, profile, navigate]);
-
-  useEffect(() => {
     if (!user || profileLoading) {
       fetchGeneralContent();
       return;
