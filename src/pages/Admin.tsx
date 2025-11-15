@@ -286,7 +286,6 @@ const Admin = () => {
 
     setPreviewingVoice(mentorSlug);
     try {
-      toast.info("Generating voice preview...");
       const { data, error } = await supabase.functions.invoke("generate-mentor-audio", {
         body: {
           mentorSlug,
@@ -299,7 +298,6 @@ const Admin = () => {
       // Play the audio
       const audio = new Audio(data.audioUrl);
       audio.play();
-      toast.success("Playing voice preview");
 
       audio.onended = () => {
         setPreviewingVoice(null);
