@@ -1,1 +1,4 @@
 project_id = "tffrgsaawvletgiztfry"
+
+[functions.generate-mentor-content]
+verify_jwt = false
