@@ -75,10 +75,10 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, isSelecti
           {/* Back Button */}
           <button
             onClick={handleBack}
-            className="absolute top-8 left-8 z-10 flex items-center gap-2 text-pure-white hover:text-royal-gold transition-colors group"
+            className="absolute top-8 left-8 z-50 flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold transition-colors group cursor-pointer"
+            aria-label="Back to mentor grid"
           >
             <ArrowLeft className="h-6 w-6 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-lg font-bold">Back</span>
           </button>
 
           {/* Current Mentor Indicator */}
