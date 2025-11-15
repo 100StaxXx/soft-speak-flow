@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteCard } from "@/components/QuoteCard";
 import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
-import { SeedQuotesButton } from "@/components/SeedQuotesButton";
 import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, Sparkles } from "lucide-react";
@@ -103,11 +102,10 @@ const Quotes = () => {
     <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="font-display text-4xl text-warm-charcoal text-center flex-1">
+        <div className="mb-2">
+          <h1 className="font-display text-4xl text-warm-charcoal text-center">
             Quotes & Affirmations
           </h1>
-          <SeedQuotesButton />
         </div>
         <p className="text-warm-charcoal/70 text-center mb-8">
           Daily wisdom for your journey
