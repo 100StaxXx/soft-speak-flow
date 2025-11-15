@@ -44,7 +44,7 @@ const mentorVoices: Record<string, any> = {
     style_exaggeration: 0.2,
   },
   kai: {
-    voiceId: "N2lVS1w4EtoT3dr4eOWO",
+    voiceId: "pNInz6obpgDQGcFmaJgB",
     stability: 0.7,
     similarity_boost: 0.85,
     style_exaggeration: 0.8,
