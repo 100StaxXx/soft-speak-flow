@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Import all pages
 import Index from "./pages/Index";
@@ -35,6 +36,7 @@ import WeeklyReview from "./pages/WeeklyReview";
 import MentorChat from "./pages/MentorChat";
 import ContentGenerator from "./pages/ContentGenerator";
 import AdaptivePushes from "./pages/AdaptivePushes";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +95,8 @@ const AppContent = () => {
         <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
         <Route path="/content-generator" element={<ProtectedRoute><ContentGenerator /></ProtectedRoute>} />
         <Route path="/adaptive-pushes" element={<ProtectedRoute><AdaptivePushes /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/weekly-review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -101,16 +105,18 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <ScrollToTop />
-        <AppContent />
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <ScrollToTop />
+          <AppContent />
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
