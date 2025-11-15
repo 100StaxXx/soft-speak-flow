@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
     
     if (lovableApiKey) {
       try {
-        const imagePrompt = `Create an inspiring, artistic visualization for this quote: "${randomQuote.text}" by ${randomQuote.author}. The image should be elegant, motivational, and visually stunning with soft colors and abstract elements.`;
+        const imagePrompt = `Create a beautiful 9:16 vertical mobile wallpaper with the quote "${randomQuote.text}" by ${randomQuote.author}. Make it cinematic, inspiring, and elegant with the quote text clearly visible and beautifully formatted on the image. Use dramatic lighting, rich colors, and artistic composition perfect for a phone screen.`;
         
         const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -229,7 +229,8 @@ Deno.serve(async (req) => {
                 content: imagePrompt
               }
             ],
-            modalities: ['image', 'text']
+            modalities: ['image', 'text'],
+            aspect_ratio: '9:16'
           })
         });
 
