@@ -38,14 +38,18 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
   ];
 
   const triggers = [
-    "overwhelmed",
-    "procrastinating",
-    "anxious",
-    "stuck",
-    "doubtful",
-    "tired",
-    "frustrated",
-    "inspired",
+    "Exhausted",
+    "Avoiding Action",
+    "Anxious & Overthinking",
+    "Self-Doubt",
+    "Feeling Stuck",
+    "Frustrated",
+    "Heavy or Low",
+    "Emotionally Hurt",
+    "Unmotivated",
+    "In Transition",
+    "Needing Discipline",
+    "Motivated & Ready",
   ];
 
   const handleGenerate = async () => {
