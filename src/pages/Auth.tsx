@@ -166,41 +166,34 @@ const Auth = () => {
 
   return (
     <div className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
-      {/* Quote Slides */}
-      {motivationalQuotes.map((item, index) => (
-        <section
-          key={index}
-          className={`snap-start h-screen relative flex items-center justify-center transition-opacity duration-1000 ${
-            index === currentSlide ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={{
-            background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
-          }}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(270_60%_50%/0.1),transparent_50%)]" />
-          
-          <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-            <blockquote className="space-y-8">
-              <p className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight">
-                "{item.quote}"
-              </p>
-              <footer className="text-2xl md:text-3xl text-royal-purple font-semibold">
-                — {item.author}
-              </footer>
-            </blockquote>
-          </div>
+      {/* Current Quote Slide Only */}
+      <section
+        className="snap-start h-screen relative flex items-center justify-center"
+        style={{
+          background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
+        }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(270_60%_50%/0.1),transparent_50%)]" />
+        
+        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
+          <blockquote className="space-y-8 animate-fade-in">
+            <p className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight">
+              "{motivationalQuotes[currentSlide].quote}"
+            </p>
+            <footer className="text-2xl md:text-3xl text-royal-purple font-semibold">
+              — {motivationalQuotes[currentSlide].author}
+            </footer>
+          </blockquote>
+        </div>
 
-          {index === 0 && (
-            <button
-              onClick={scrollToForm}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple hover:text-accent-purple transition-colors"
-              aria-label="Scroll to sign in"
-            >
-              <ChevronDown className="w-12 h-12" />
-            </button>
-          )}
-        </section>
-      ))}
+        <button
+          onClick={scrollToForm}
+          className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple hover:text-accent-purple transition-colors"
+          aria-label="Scroll to sign in"
+        >
+          <ChevronDown className="w-12 h-12" />
+        </button>
+      </section>
 
       {/* Auth Form Section */}
       <section
