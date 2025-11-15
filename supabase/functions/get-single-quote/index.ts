@@ -8,6 +8,12 @@ interface QuoteRequest {
   value: string;
 }
 
+interface Quote {
+  text: string;
+  author: string;
+  imageUrl?: string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -172,8 +178,50 @@ Deno.serve(async (req) => {
 
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
+    // Generate image using Lovable AI
+    console.log('Generating image for quote...');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    
+    let imageUrl = '';
+    
+    if (lovableApiKey) {
+      try {
+        const imagePrompt = `Create an inspiring, artistic visualization for this quote: "${randomQuote.text}" by ${randomQuote.author}. The image should be elegant, motivational, and visually stunning with soft colors and abstract elements.`;
+        
+        const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash-image-preview',
+            messages: [
+              {
+                role: 'user',
+                content: imagePrompt
+              }
+            ],
+            modalities: ['image', 'text']
+          })
+        });
+
+        const imageData = await imageResponse.json();
+        imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url || '';
+        console.log('Image generated successfully');
+      } catch (error) {
+        console.error('Error generating image:', error);
+        // Continue without image if generation fails
+      }
+    }
+
+    const quoteWithImage: Quote = {
+      ...randomQuote,
+      imageUrl
+    };
+
     return new Response(
-      JSON.stringify({ quote: randomQuote }),
+      JSON.stringify({ quote: quoteWithImage }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

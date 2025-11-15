@@ -60,6 +60,7 @@ export default {
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
         'body': ['Barlow', 'sans-serif'],
+        'quote': ['Playfair Display', 'serif'],
       },
       boxShadow: {
         'soft': 'var(--shadow-soft)',
