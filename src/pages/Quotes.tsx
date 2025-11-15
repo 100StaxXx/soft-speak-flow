@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteCard } from "@/components/QuoteCard";
 import { QuoteImageGenerator } from "@/components/QuoteImageGenerator";
+import { SeedQuotesButton } from "@/components/SeedQuotesButton";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -80,9 +81,12 @@ const Quotes = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-24">
       <div className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="font-display text-4xl text-warm-charcoal mb-2 text-center">
-          Quotes & Affirmations
-        </h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="font-display text-4xl text-warm-charcoal">
+            Quotes & Affirmations
+          </h1>
+          <SeedQuotesButton />
+        </div>
         <p className="text-warm-charcoal/70 text-center mb-8">
           Daily wisdom for your journey
         </p>
