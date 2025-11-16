@@ -47,6 +47,12 @@ export const DailyLesson = ({ title, content, category, actionStep }: DailyLesso
             {title}
           </h3>
 
+          {!isOpen && (
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed relative z-10 break-words line-clamp-2 mb-4">
+              {content}
+            </p>
+          )}
+
           <CollapsibleContent className="space-y-4 animate-accordion-down">
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed relative z-10 break-words">
               {content}
