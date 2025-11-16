@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell } from "lucide-react";
+import { Bell, AlertCircle } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  isPushSupported, 
+  subscribeToPush, 
+  unsubscribeFromPush,
+  hasActivePushSubscription 
+} from "@/utils/pushNotifications";
 
 const timeOptions = [
   { value: "06:00", label: "6:00 AM" },
@@ -25,9 +32,56 @@ export const PushNotificationSettings = () => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [isSupported] = useState(isPushSupported());
+
+  useEffect(() => {
+    if (user) {
+      hasActivePushSubscription(user.id).then(setPushEnabled);
+    }
+  }, [user]);
+
+  const handleTogglePushPermission = async (enabled: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (enabled) {
+        // Subscribe to push notifications
+        const subscription = await subscribeToPush(user.id);
+        if (subscription) {
+          setPushEnabled(true);
+          toast({ title: "Push notifications enabled" });
+        } else {
+          toast({ 
+            title: "Permission denied", 
+            description: "You denied notification permissions",
+            variant: "destructive" 
+          });
+        }
+      } else {
+        // Unsubscribe from push notifications
+        await unsubscribeFromPush(user.id);
+        setPushEnabled(false);
+        toast({ title: "Push notifications disabled" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
 
   const handleTogglePepTalk = async (enabled: boolean) => {
     if (!user) return;
+    
+    // If enabling, ensure push is enabled first
+    if (enabled && !pushEnabled) {
+      toast({ 
+        title: "Enable push notifications first", 
+        description: "Please enable browser notifications before activating daily pep talks",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
       const { error } = await supabase
         .from("profiles")
@@ -44,6 +98,17 @@ export const PushNotificationSettings = () => {
 
   const handleToggleQuote = async (enabled: boolean) => {
     if (!user) return;
+    
+    // If enabling, ensure push is enabled first
+    if (enabled && !pushEnabled) {
+      toast({ 
+        title: "Enable push notifications first", 
+        description: "Please enable browser notifications before activating daily quotes",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
       const { error } = await supabase
         .from("profiles")
@@ -86,7 +151,33 @@ export const PushNotificationSettings = () => {
         Get personalized pep talks and quotes delivered daily.
       </p>
 
+      {!isSupported && (
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Push notifications are not supported in your browser. Please use a modern browser like Chrome, Firefox, or Safari.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-6">
+        {/* Browser Push Permission */}
+        {isSupported && (
+          <div className="space-y-3 pb-4 border-b border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-foreground font-medium">Browser Notifications</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Allow this app to send you notifications
+                </p>
+              </div>
+              <Switch
+                checked={pushEnabled}
+                onCheckedChange={handleTogglePushPermission}
+              />
+            </div>
+          </div>
+        )}
         {/* Daily Pep Talk */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -99,6 +190,7 @@ export const PushNotificationSettings = () => {
             <Switch
               checked={profile?.daily_push_enabled ?? false}
               onCheckedChange={handleTogglePepTalk}
+              disabled={!pushEnabled}
             />
           </div>
           
@@ -136,6 +228,7 @@ export const PushNotificationSettings = () => {
             <Switch
               checked={profile?.daily_quote_push_enabled ?? false}
               onCheckedChange={handleToggleQuote}
+              disabled={!pushEnabled}
             />
           </div>
           
