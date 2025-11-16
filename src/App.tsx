@@ -13,20 +13,31 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
+import Library from "./pages/Library";
 import Quotes from "./pages/Quotes";
 import Inspire from "./pages/Inspire";
+import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
 import Premium from "./pages/Premium";
 import PepTalkDetail from "./pages/PepTalkDetail";
+import About from "./pages/About";
 import Admin from "./pages/Admin";
 import MentorSelection from "./pages/MentorSelection";
 import NotFound from "./pages/NotFound";
 import Habits from "./pages/Habits";
+import Challenges from "./pages/Challenges";
+import ChallengeDetail from "./pages/ChallengeDetail";
+import Reflection from "./pages/Reflection";
+import MoodHistory from "./pages/MoodHistory";
+import AudioLibrary from "./pages/AudioLibrary";
+import Lessons from "./pages/Lessons";
+import FocusMode from "./pages/FocusMode";
+import WeeklyReview from "./pages/WeeklyReview";
 import MentorChat from "./pages/MentorChat";
 import ContentGenerator from "./pages/ContentGenerator";
 import AdaptivePushes from "./pages/AdaptivePushes";
+import Dashboard from "./pages/Dashboard";
 import PushSettings from "./pages/PushSettings";
-import Journal from "./pages/Journal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,18 +74,30 @@ const AppContent = () => {
         
         {/* Protected routes - require authentication and mentor selection */}
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
         <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
         <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
+        <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
         <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+        <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
         <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
         <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
-        <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
+        <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+        <Route path="/challenge/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
+        <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+        <Route path="/mood-history" element={<ProtectedRoute><MoodHistory /></ProtectedRoute>} />
+        <Route path="/audio" element={<ProtectedRoute><AudioLibrary /></ProtectedRoute>} />
+        <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
+        <Route path="/focus" element={<ProtectedRoute><FocusMode /></ProtectedRoute>} />
+        <Route path="/review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
         <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-        <Route path="/content-generator" element={<ProtectedRoute requireMentor={false}><ContentGenerator /></ProtectedRoute>} />
+        <Route path="/content-generator" element={<ProtectedRoute><ContentGenerator /></ProtectedRoute>} />
         <Route path="/adaptive-pushes" element={<ProtectedRoute><AdaptivePushes /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/weekly-review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
         <Route path="/push-settings" element={<ProtectedRoute><PushSettings /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />

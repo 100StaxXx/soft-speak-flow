@@ -120,8 +120,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Try to generate pep talk using existing function
-        console.log(`Attempting to generate pep talk for ${mentorSlug}...`);
+        // Generate pep talk using existing function
+        console.log(`Calling generate-full-mentor-audio for ${mentorSlug}...`);
         const { data: generatedData, error: generateError } = await supabase.functions.invoke(
           'generate-full-mentor-audio',
           {
@@ -134,41 +134,13 @@ serve(async (req) => {
           }
         );
 
-        let script, audioUrl, title, summary;
-
-        // If generation fails (e.g., no credits), use fallback from existing pep_talks
         if (generateError || !generatedData) {
-          console.log(`Generation failed for ${mentorSlug}, using fallback from existing pep_talks`);
-          
-          // Find an existing pep talk that matches the theme
-          const { data: existingPepTalk, error: fetchError } = await supabase
-            .from('pep_talks')
-            .select('*')
-            .eq('mentor_id', mentor.id)
-            .contains('topic_category', [theme.topic_category])
-            .limit(10)
-            .order('created_at', { ascending: false });
-
-          if (fetchError || !existingPepTalk || existingPepTalk.length === 0) {
-            console.error(`No fallback pep talk found for ${mentorSlug}`);
-            errors.push({ mentor: mentorSlug, error: 'No fallback available' });
-            continue;
-          }
-
-          // Select a random one from the matches
-          const randomPepTalk = existingPepTalk[Math.floor(Math.random() * existingPepTalk.length)];
-          script = randomPepTalk.quote || randomPepTalk.description;
-          audioUrl = randomPepTalk.audio_url;
-          title = randomPepTalk.title;
-          summary = randomPepTalk.description;
-          
-          console.log(`Using fallback pep talk: ${title}`);
-        } else {
-          script = generatedData.script;
-          audioUrl = generatedData.audioUrl;
-          title = generatedData.title;
-          summary = generatedData.summary;
+          console.error(`Error generating audio for ${mentorSlug}:`, generateError);
+          errors.push({ mentor: mentorSlug, error: generateError?.message || 'Generation failed' });
+          continue;
         }
+
+        const { script, audioUrl } = generatedData;
         
         if (!script || !audioUrl) {
           console.error(`Missing script or audioUrl for ${mentorSlug}`);
@@ -176,13 +148,9 @@ serve(async (req) => {
           continue;
         }
 
-        // Only generate title and summary if not from fallback
-        if (!title) {
-          title = generateTitle(mentorSlug, theme.topic_category);
-        }
-        if (!summary) {
-          summary = generateSummary(theme.topic_category, theme.triggers);
-        }
+        // Generate title and summary
+        const title = generateTitle(mentorSlug, theme.topic_category);
+        const summary = generateSummary(theme.topic_category, theme.triggers);
 
         console.log(`Generated content for ${mentorSlug}: ${title}`);
 
