@@ -107,26 +107,79 @@ export const OnboardingTour = () => {
         options: {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
-          backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.5)',
-          arrowColor: 'hsl(var(--card))',
+          backgroundColor: 'transparent',
+          overlayColor: 'rgba(0, 0, 0, 0.75)',
+          arrowColor: 'rgba(255, 255, 255, 0.1)',
           zIndex: 10000,
         },
+        overlay: {
+          mixBlendMode: 'normal',
+        },
         tooltip: {
-          borderRadius: '16px',
-          padding: '20px',
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '24px',
+          padding: '32px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), 0 0 80px rgba(var(--primary-rgb), 0.3)',
+          animation: 'slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+        tooltipContainer: {
+          textAlign: 'left',
+        },
+        tooltipTitle: {
+          color: 'hsl(var(--foreground))',
+          fontSize: '24px',
+          fontWeight: '700',
+          marginBottom: '12px',
+          fontFamily: 'var(--font-heading)',
+        },
+        tooltipContent: {
+          color: 'rgba(255, 255, 255, 0.9)',
+          fontSize: '16px',
+          lineHeight: '1.6',
+          padding: '0',
         },
         buttonNext: {
-          backgroundColor: 'hsl(var(--primary))',
-          borderRadius: '12px',
-          padding: '10px 20px',
+          backgroundColor: 'rgba(var(--primary-rgb), 0.9)',
+          backdropFilter: 'blur(8px)',
+          borderRadius: '16px',
+          padding: '14px 28px',
+          fontSize: '15px',
+          fontWeight: '600',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 4px 16px rgba(var(--primary-rgb), 0.4)',
+          transition: 'all 0.3s ease',
         },
         buttonBack: {
-          color: 'hsl(var(--muted-foreground))',
-          marginRight: '10px',
+          color: 'rgba(255, 255, 255, 0.7)',
+          marginRight: '12px',
+          fontSize: '15px',
+          fontWeight: '500',
         },
         buttonSkip: {
-          color: 'hsl(var(--muted-foreground))',
+          color: 'rgba(255, 255, 255, 0.5)',
+          fontSize: '14px',
+        },
+        buttonClose: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          width: '32px',
+          height: '32px',
+        },
+        spotlight: {
+          backgroundColor: 'transparent',
+          border: '2px solid rgba(var(--primary-rgb), 0.6)',
+          borderRadius: '16px',
+          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75), 0 0 40px rgba(var(--primary-rgb), 0.5)',
+        },
+      }}
+      floaterProps={{
+        styles: {
+          arrow: {
+            length: 8,
+            spread: 16,
+          },
         },
       }}
       locale={{

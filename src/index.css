@@ -30,6 +30,9 @@ All colors MUST be HSL.
     --deep-purple: 270 50% 35%;
     --accent-purple: 280 70% 60%;
     
+    /* Primary RGB for effects */
+    --primary-rgb: 139, 92, 246;
+    
     /* Semantic Tokens */
     --background: 0 0% 7%;
     --foreground: 0 0% 100%;
@@ -127,6 +130,17 @@ All colors MUST be HSL.
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
   }
   
+  /* Cinematic slide-in animation for onboarding */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
   /* Sharp borders variant */
   .sharp-borders * {
     border-radius: 0.25rem !important;
@@ -288,5 +302,17 @@ All colors MUST be HSL.
     background: radial-gradient(circle, hsl(var(--royal-purple) / 0.05) 0%, transparent 70%);
     pointer-events: none;
     z-index: -1;
+  }
+
+  /* Cinematic slide-in animation for onboarding */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 }
