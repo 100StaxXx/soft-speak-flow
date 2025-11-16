@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Target, CheckCircle2, Circle, Trophy, Sparkles, Plus } from "lucide-react";
+import { ChallengeProgress } from "@/components/ChallengeProgress";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -26,7 +27,8 @@ export default function Challenges() {
     title: '',
     description: '',
     duration_days: 7,
-    category: 'discipline'
+    category: 'discipline',
+    tasks: [] as { day: number; title: string; description: string }[]
   });
 
   const { data: activeChallenge } = useQuery({
@@ -121,7 +123,8 @@ export default function Challenges() {
 
   const createCustomChallengeMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
+      // First create the challenge
+      const { data: challenge, error: challengeError } = await supabase
         .from('challenges')
         .insert({
           title: customChallenge.title,
@@ -130,9 +133,27 @@ export default function Challenges() {
           total_days: customChallenge.duration_days,
           category: customChallenge.category,
           source: 'custom'
-        });
+        })
+        .select()
+        .single();
       
-      if (error) throw error;
+      if (challengeError) throw challengeError;
+
+      // Then create the daily tasks if any
+      if (customChallenge.tasks.length > 0) {
+        const tasksToInsert = customChallenge.tasks.map(task => ({
+          challenge_id: challenge.id,
+          day_number: task.day,
+          task_title: task.title,
+          task_description: task.description
+        }));
+
+        const { error: tasksError } = await supabase
+          .from('challenge_tasks')
+          .insert(tasksToInsert);
+        
+        if (tasksError) throw tasksError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['featuredChallenges'] });
@@ -141,7 +162,8 @@ export default function Challenges() {
         title: '',
         description: '',
         duration_days: 7,
-        category: 'discipline'
+        category: 'discipline',
+        tasks: []
       });
       toast({
         title: "Challenge created!",
@@ -203,6 +225,14 @@ export default function Challenges() {
                   </Button>
                 </div>
               )}
+
+              {/* Progress Tracker */}
+              <ChallengeProgress 
+                userChallengeId={activeChallenge.id}
+                startDate={activeChallenge.start_date}
+                currentDay={activeChallenge.current_day}
+                totalDays={(activeChallenge.challenge as any).total_days}
+              />
             </div>
           </Card>
         ) : activeChallenge && activeChallenge.status === 'completed' ? (
@@ -294,6 +324,60 @@ export default function Challenges() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Daily Tasks (Optional)</Label>
+                    <p className="text-xs text-muted-foreground">Add specific tasks for each day</p>
+                    {customChallenge.tasks.length > 0 && (
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {customChallenge.tasks.map((task, index) => (
+                          <div key={index} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
+                            <span className="font-medium">Day {task.day}:</span>
+                            <span className="flex-1 truncate">{task.title}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setCustomChallenge({
+                                  ...customChallenge,
+                                  tasks: customChallenge.tasks.filter((_, i) => i !== index)
+                                });
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        const nextDay = customChallenge.tasks.length + 1;
+                        if (nextDay <= customChallenge.duration_days) {
+                          const title = prompt(`Task title for Day ${nextDay}:`);
+                          const description = prompt(`Task description for Day ${nextDay}:`);
+                          if (title && description) {
+                            setCustomChallenge({
+                              ...customChallenge,
+                              tasks: [...customChallenge.tasks, { day: nextDay, title, description }]
+                            });
+                          }
+                        } else {
+                          toast({
+                            title: "All days have tasks",
+                            description: "You've added tasks for all days.",
+                          });
+                        }
+                      }}
+                      disabled={customChallenge.tasks.length >= customChallenge.duration_days}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Day {customChallenge.tasks.length + 1} Task
+                    </Button>
                   </div>
 
                   <Button 
