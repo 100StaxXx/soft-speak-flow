@@ -4,14 +4,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
-import { TrendingUp, Calendar, Heart, Target, Sparkles } from "lucide-react";
+import { TrendingUp, Calendar, Heart, Target } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SlideUp } from "./PageTransition";
 
 export const WeeklyInsights = () => {
   const { user } = useAuth();
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const getWeekRange = () => {
     const now = new Date();
@@ -78,39 +77,6 @@ export const WeeklyInsights = () => {
     enabled: !!user,
   });
 
-  const generateInsight = async () => {
-    if (!user || !weeklyData) return;
-    
-    setIsGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-weekly-insights', {
-        body: { 
-          userId: user.id,
-          weeklyData: {
-            habitCount: weeklyData.habitCompletions.length,
-            checkInCount: weeklyData.checkIns.length,
-            moodCount: weeklyData.moodLogs.length,
-            activities: weeklyData.activities.map(a => ({
-              type: a.activity_type,
-              data: a.activity_data
-            }))
-          }
-        }
-      });
-
-      if (error) throw error;
-      
-      if (data?.insight) {
-        await refetch();
-        toast.success("Weekly insights generated!");
-      }
-    } catch (error) {
-      console.error('Error generating insights:', error);
-      toast.error("Failed to generate insights");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   if (!weeklyData) return <SkeletonCard />;
 
@@ -138,20 +104,9 @@ export const WeeklyInsights = () => {
   return (
     <SlideUp>
       <Card className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-bold">This Week's Journey</h2>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={generateInsight}
-            disabled={isGenerating}
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            {isGenerating ? "Generating..." : "AI Insights"}
-          </Button>
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold">This Week's Journey</h2>
         </div>
 
         {/* Stats Grid */}
