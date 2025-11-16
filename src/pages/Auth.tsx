@@ -51,9 +51,27 @@ const Auth = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        // Check profile to decide destination
+        let { data: profileData } = await supabase
+          .from("profiles")
+          .select("selected_mentor_id")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (!profileData) {
+          await supabase.from("profiles").insert({
+            id: session.user.id,
+            email: session.user.email ?? null,
+          });
+        }
+
+        if (!profileData?.selected_mentor_id) {
+          navigate("/onboarding");
+        } else {
+          navigate("/");
+        }
       }
     });
 
