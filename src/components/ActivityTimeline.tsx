@@ -1,4 +1,6 @@
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { SkeletonTimeline } from "@/components/SkeletonCard";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";

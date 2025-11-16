@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { SkeletonQuote } from "@/components/SkeletonCard";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Quote, Sparkles } from "lucide-react";
@@ -57,7 +58,8 @@ export const QuoteOfTheDay = () => {
     fetchTodaysQuote();
   }, [profile?.selected_mentor_id]);
 
-  if (loading || !todaysQuote) return null;
+  if (loading) return <SkeletonQuote />;
+  if (!todaysQuote) return null;
 
   return (
     <Card className="relative overflow-hidden group animate-fade-in">

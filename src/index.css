@@ -145,6 +145,25 @@ All colors MUST be HSL.
     display: none;
   }
 
+  /* Haptic Feedback Utility */
+  .haptic-press {
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .haptic-press:active {
+    transform: scale(0.97);
+  }
+
+  /* Skeleton Pulse */
+  @keyframes skeleton-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
   /* Masculine Animation System */
   @keyframes pulse-gold {
     0%, 100% {

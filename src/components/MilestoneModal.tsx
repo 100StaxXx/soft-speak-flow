@@ -2,6 +2,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Trophy, Flame } from "lucide-react";
 import confetti from "canvas-confetti";
+import { haptics } from "@/utils/haptics";
 import { useEffect, useState } from "react";
 import { ShareableStreakBadge } from "./ShareableStreakBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +26,7 @@ export const MilestoneModal = ({
 
   useEffect(() => {
     if (open) {
+      haptics.success(); // Haptic celebration
       // Trigger confetti
       const duration = 3000;
       const animationEnd = Date.now() + duration;
