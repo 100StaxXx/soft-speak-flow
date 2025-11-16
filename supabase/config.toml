@@ -1,5 +1,14 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.generate-daily-mentor-pep-talks]
+verify_jwt = false
+
+[functions.schedule-daily-mentor-pushes]
+verify_jwt = false
+
+[functions.dispatch-daily-pushes]
+verify_jwt = false
+
 [functions.generate-mentor-content]
 verify_jwt = false
 

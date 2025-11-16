@@ -18,6 +18,9 @@ interface PepTalk {
   audio_url: string;
   is_featured: boolean;
   created_at: string;
+  source?: string;
+  for_date?: string;
+  mentor_slug?: string;
 }
 
 const Library = () => {
@@ -112,14 +115,21 @@ const Library = () => {
         {filteredPepTalks.length > 0 ? (
           <div className="space-y-4">
             {filteredPepTalks.map((pepTalk) => (
-              <PepTalkCard
-                key={pepTalk.id}
-                id={pepTalk.id}
-                title={pepTalk.title}
-                category={pepTalk.category}
-                description={pepTalk.description}
-                onClick={() => navigate(`/pep-talk/${pepTalk.id}`)}
-              />
+              <div key={pepTalk.id} className="relative">
+                {pepTalk.source === 'daily_auto' && (
+                  <div className="absolute -top-2 right-2 z-10 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium">
+                    Daily
+                  </div>
+                )}
+                <PepTalkCard
+                  id={pepTalk.id}
+                  title={pepTalk.title}
+                  category={pepTalk.category}
+                  description={pepTalk.description}
+                  quote={pepTalk.quote}
+                  onClick={() => navigate(`/pep-talk/${pepTalk.id}`)}
+                />
+              </div>
             ))}
           </div>
         ) : (
