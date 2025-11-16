@@ -23,8 +23,8 @@ Deno.serve(async (req) => {
     console.log('Generating quotes for:', { type, value, count });
 
     const prompt = type === 'trigger'
-      ? `Generate ${count} short, authentic quotes and affirmations for someone feeling "${value}". Each must include an author (famous person or "Anonymous"). Return JSON array of {"text","author"}.`
-      : `Generate ${count} short, inspiring quotes and affirmations related to "${value}". Each must include an author (famous person or "Anonymous"). Return JSON array of {"text","author"}.`;
+      ? `Generate ${count} short, authentic quotes and affirmations for someone feeling "${value}". Each must include an author (famous person or "Anonymous"). IMPORTANT: Do NOT include em dashes (—) or attribution dashes in the quote text itself. Return JSON array of {"text","author"} where text is ONLY the quote without any dashes or author attribution.`
+      : `Generate ${count} short, inspiring quotes and affirmations related to "${value}". Each must include an author (famous person or "Anonymous"). IMPORTANT: Do NOT include em dashes (—) or attribution dashes in the quote text itself. Return JSON array of {"text","author"} where text is ONLY the quote without any dashes or author attribution.`;
 
     const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
