@@ -336,6 +336,30 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_quotes: {
+        Row: {
+          created_at: string
+          for_date: string
+          id: string
+          mentor_slug: string
+          quote_id: string
+        }
+        Insert: {
+          created_at?: string
+          for_date: string
+          id?: string
+          mentor_slug: string
+          quote_id: string
+        }
+        Update: {
+          created_at?: string
+          for_date?: string
+          id?: string
+          mentor_slug?: string
+          quote_id?: string
+        }
+        Relationships: []
+      }
       downloads: {
         Row: {
           content_id: string
@@ -922,6 +946,9 @@ export type Database = {
           daily_push_enabled: boolean | null
           daily_push_time: string | null
           daily_push_window: string | null
+          daily_quote_push_enabled: boolean | null
+          daily_quote_push_time: string | null
+          daily_quote_push_window: string | null
           email: string | null
           id: string
           is_premium: boolean | null
@@ -935,6 +962,9 @@ export type Database = {
           daily_push_enabled?: boolean | null
           daily_push_time?: string | null
           daily_push_window?: string | null
+          daily_quote_push_enabled?: boolean | null
+          daily_quote_push_time?: string | null
+          daily_quote_push_window?: string | null
           email?: string | null
           id: string
           is_premium?: boolean | null
@@ -948,6 +978,9 @@ export type Database = {
           daily_push_enabled?: boolean | null
           daily_push_time?: string | null
           daily_push_window?: string | null
+          daily_quote_push_enabled?: boolean | null
+          daily_quote_push_time?: string | null
+          daily_quote_push_window?: string | null
           email?: string | null
           id?: string
           is_premium?: boolean | null
@@ -1147,6 +1180,41 @@ export type Database = {
             columns: ["daily_pep_talk_id"]
             isOneToOne: false
             referencedRelation: "daily_pep_talks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_daily_quote_pushes: {
+        Row: {
+          created_at: string
+          daily_quote_id: string
+          delivered_at: string | null
+          id: string
+          scheduled_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_quote_id: string
+          delivered_at?: string | null
+          id?: string
+          scheduled_at: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_quote_id?: string
+          delivered_at?: string | null
+          id?: string
+          scheduled_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_daily_quote_pushes_daily_quote_id_fkey"
+            columns: ["daily_quote_id"]
+            isOneToOne: false
+            referencedRelation: "daily_quotes"
             referencedColumns: ["id"]
           },
         ]

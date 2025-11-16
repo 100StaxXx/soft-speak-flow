@@ -13,6 +13,9 @@ interface Profile {
   daily_push_enabled: boolean | null;
   daily_push_window: string | null;
   daily_push_time: string | null;
+  daily_quote_push_enabled: boolean | null;
+  daily_quote_push_window: string | null;
+  daily_quote_push_time: string | null;
   timezone: string | null;
 }
 
