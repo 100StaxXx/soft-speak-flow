@@ -23,8 +23,8 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
       return;
     }
 
-    // Redirect to onboarding if mentor required but not selected
-    if (requireMentor && profile && !profile.selected_mentor_id) {
+    // Redirect to onboarding if mentor required and profile missing or not selected
+    if (requireMentor && (!profile || !profile.selected_mentor_id)) {
       navigate("/onboarding");
     }
   }, [user, profile, authLoading, profileLoading, requireMentor, navigate]);
@@ -43,15 +43,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   if (requireMentor && (!profile || !profile.selected_mentor_id)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-foreground">We couldn't find your profile. Please sign in again.</p>
-          <button
-            onClick={async () => { await signOut(); navigate("/auth"); }}
-            className="inline-flex items-center justify-center rounded-md px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 transition"
-          >
-            Sign out
-          </button>
-        </div>
+        <div className="animate-pulse text-foreground">Setting up your profile...</div>
       </div>
     );
   }
