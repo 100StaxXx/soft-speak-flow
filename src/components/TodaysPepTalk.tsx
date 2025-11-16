@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 interface CaptionWord {
   word: string;
@@ -16,6 +17,7 @@ interface CaptionWord {
 
 export const TodaysPepTalk = () => {
   const { profile } = useProfile();
+  const personality = useMentorPersonality();
   const navigate = useNavigate();
   const [pepTalk, setPepTalk] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -273,7 +275,7 @@ export const TodaysPepTalk = () => {
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary animate-pulse" />
           <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Today's Pep Talk
+            {personality?.name ? `${personality.name}'s Message` : "Today's Pep Talk"}
           </h2>
         </div>
 
