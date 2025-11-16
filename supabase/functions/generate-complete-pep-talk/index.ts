@@ -84,18 +84,18 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
 
     // 2. EMOTIONAL TRIGGERS (25-30% - THE EMOTIONAL ANGLE)
     const emotionalGuidanceMap: Record<string, string> = {
-      "Exhausted": "acknowledge low energy, encourage pacing and recharge",
-      "Avoiding Action": "address procrastination, emphasize small first steps",
-      "Anxious & Overthinking": "provide calming perspective, grounding thoughts",
-      "Self-Doubt": "affirm worth and ability, point to proof and belief",
-      "Feeling Stuck": "offer new angles, encourage small moves and one decision",
-      "Frustrated": "channel emotion productively, reframe without quitting",
-      "Heavy or Low": "gentle validation, spark hope, celebrate small wins",
-      "Emotionally Hurt": "acknowledge heartbreak or betrayal, guide toward healing",
-      "Unmotivated": "ignite spark, build momentum, get them moving",
-      "In Transition": "normalize change and uncertainty, guide through identity shifts",
-      "Needing Discipline": "emphasize structure and accountability, 'do it anyway' energy",
-      "Motivated & Ready": "amplify momentum, don't let it fade, double down",
+      "Exhausted": "address low energy states, encourage sustainable pacing",
+      "Avoiding Action": "speak to procrastination, emphasize starting small",
+      "Anxious & Overthinking": "provide calming perspective and grounding",
+      "Self-Doubt": "affirm capability and worth, point to evidence",
+      "Feeling Stuck": "offer fresh perspective, encourage decisive action",
+      "Frustrated": "help channel emotion productively, reframe challenges",
+      "Heavy or Low": "validate difficulty, spark hope through small wins",
+      "Emotionally Hurt": "acknowledge pain, guide toward healing without assumptions",
+      "Unmotivated": "ignite momentum, focus on getting started",
+      "In Transition": "normalize change, guide through uncertainty",
+      "Needing Discipline": "emphasize structure and commitment",
+      "Motivated & Ready": "amplify existing energy, maintain momentum",
     };
 
     let emotionalContext = "";
@@ -106,7 +106,8 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
       emotionalContext = `
 PRIMARY EMOTIONAL TRIGGERS (25-30% of content, shape opening):
 ${primaryTriggers.map((t: string) => `- ${t}: ${emotionalGuidanceMap[t] || t}`).join('\n')}
-- Start the script acknowledging this emotional state`;
+- Address this general state WITHOUT making specific assumptions about the listener's personal feelings
+- Speak to the trigger universally, not as if you know their exact situation`;
 
       if (backgroundTriggers.length > 0) {
         emotionalContext += `
@@ -184,6 +185,9 @@ Generate a complete pep talk with:
    - Direct address to listener
    - Sounds like you speaking to someone face-to-face
    - Personal, specific, motivating
+   - CRITICAL: Do NOT make specific assumptions about the listener's personal feelings (avoid phrases like "I can feel your pain" or "I know you're hurting right now")
+   - Instead, speak to the general state or challenge WITHOUT claiming to know their exact emotional experience
+   - Be empathetic and understanding while maintaining appropriate distance
 
 Return ONLY a valid JSON object:
 {

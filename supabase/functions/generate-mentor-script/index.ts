@@ -81,18 +81,18 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
 
     // 2. EMOTIONAL TRIGGERS (25-30% - THE EMOTIONAL ANGLE)
     const emotionalGuidanceMap: Record<string, string> = {
-      "Exhausted": "acknowledge low energy, encourage pacing and recharge",
-      "Avoiding Action": "address procrastination, emphasize small first steps",
-      "Anxious & Overthinking": "provide calming perspective, grounding thoughts",
-      "Self-Doubt": "affirm worth and ability, point to proof and belief",
-      "Feeling Stuck": "offer new angles, encourage small moves and one decision",
-      "Frustrated": "channel emotion productively, reframe without quitting",
-      "Heavy or Low": "gentle validation, spark hope, celebrate small wins",
-      "Emotionally Hurt": "acknowledge heartbreak or betrayal, guide toward healing",
-      "Unmotivated": "ignite spark, build momentum, get them moving",
-      "In Transition": "normalize change and uncertainty, guide through identity shifts",
-      "Needing Discipline": "emphasize structure and accountability, 'do it anyway' energy",
-      "Motivated & Ready": "amplify momentum, don't let it fade, double down",
+      "Exhausted": "address low energy states, encourage sustainable pacing",
+      "Avoiding Action": "speak to procrastination, emphasize starting small",
+      "Anxious & Overthinking": "provide calming perspective and grounding",
+      "Self-Doubt": "affirm capability and worth, point to evidence",
+      "Feeling Stuck": "offer fresh perspective, encourage decisive action",
+      "Frustrated": "help channel emotion productively, reframe challenges",
+      "Heavy or Low": "validate difficulty, spark hope through small wins",
+      "Emotionally Hurt": "acknowledge pain, guide toward healing without assumptions",
+      "Unmotivated": "ignite momentum, focus on getting started",
+      "In Transition": "normalize change, guide through uncertainty",
+      "Needing Discipline": "emphasize structure and commitment",
+      "Motivated & Ready": "amplify existing energy, maintain momentum",
     };
 
     let triggerGuidance = "";
@@ -103,8 +103,8 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
       triggerGuidance = `
 PRIMARY EMOTIONAL TRIGGERS (25-30% of script, shape opening tone):
 ${primaryTriggers.map((t: string) => `- ${t}: ${emotionalGuidanceMap[t] || t}`).join('\n')}
-- Open with this emotional state
-- Acknowledge it directly`;
+- Open addressing this general state
+- Speak to it universally WITHOUT claiming to know the listener's exact feelings or situation`;
 
       if (backgroundTriggers.length > 0) {
         triggerGuidance += `
@@ -185,6 +185,8 @@ Write a 15-40 second spoken message that:
 - Uses NO emojis or special formatting
 - Sounds conversational and human when spoken aloud
 - Does NOT explicitly say "category" or "trigger"
+- CRITICAL: Do NOT make specific assumptions about the listener's personal feelings (avoid "I can feel your pain", "I know you're hurting", "I sense your struggle")
+- Instead, speak to the challenge or state in general terms while remaining empathetic and supportive
 
 Write ONLY the script text, nothing else.`;
 
