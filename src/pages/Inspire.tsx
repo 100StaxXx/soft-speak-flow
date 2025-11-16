@@ -256,10 +256,10 @@ const Inspire = () => {
             <span className="text-sm font-semibold text-foreground">Inspiration Hub</span>
           </div>
           <h1 className="font-heading text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient">
-            {activeTab === "quotes" ? "Daily Affirmations" : "Audio Library"}
+            {activeTab === "quotes" ? "Daily Affirmations" : "Pep Talks"}
           </h1>
           <p className="text-muted-foreground text-lg">
-            {activeTab === "quotes" ? "Find your perfect quote" : "Listen to motivational pep talks"}
+            {activeTab === "quotes" ? "Find your perfect quote" : "A message for your moment"}
           </p>
         </div>
 
