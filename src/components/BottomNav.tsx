@@ -1,4 +1,4 @@
-import { Home, Target, MessageCircleHeart, BookOpen, User } from "lucide-react";
+import { Home, MessageCircleHeart, Target, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
@@ -22,21 +22,6 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/challenges"
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
-        >
-          {({ isActive }) => (
-            <>
-              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Challenges
-              </span>
-            </>
-          )}
-        </NavLink>
-
-        <NavLink
           to="/inspire"
           className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
@@ -52,15 +37,15 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/reflection"
+          to="/habits"
           className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <BookOpen className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Journal
+                Habits
               </span>
             </>
           )}
