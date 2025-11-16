@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition, SlideUp } from "@/components/PageTransition";
-import { OnboardingTour } from "@/components/OnboardingTour";
+import { EnhancedOnboardingTour } from "@/components/EnhancedOnboardingTour";
 
 const Index = () => {
   const { user } = useAuth();
@@ -69,7 +69,7 @@ const Index = () => {
 
   return (
     <PageTransition>
-      <OnboardingTour />
+      <EnhancedOnboardingTour />
       <div className="min-h-screen bg-background pb-20">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
