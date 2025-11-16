@@ -27,7 +27,7 @@ const Quotes = () => {
     enabled: !!selectedBubble && !!bubbleType,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('get-single-quote', {
-        body: { type: bubbleType, value: selectedBubble }
+        body: { type: bubbleType, value: selectedBubble, includeImage: true }
       });
 
       if (error) throw error;
@@ -35,6 +35,70 @@ const Quotes = () => {
       // Show quote immediately
       const quoteResult = data?.quote;
       if (quoteResult) {
+        // If no image URL, generate a gradient background
+        if (!quoteResult.imageUrl) {
+          const gradients = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+          ];
+          const randomGradient = gradients[Math.floor(Math.random() * gradients.length)];
+          
+          // Create a canvas with gradient and text
+          const canvas = document.createElement('canvas');
+          canvas.width = 1080;
+          canvas.height = 1920;
+          const ctx = canvas.getContext('2d')!;
+          
+          // Create gradient
+          const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+          const colors = randomGradient.match(/#[a-fA-F0-9]{6}/g) || ['#667eea', '#764ba2'];
+          gradient.addColorStop(0, colors[0]);
+          gradient.addColorStop(1, colors[1]);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Add quote text
+          ctx.fillStyle = 'white';
+          ctx.textAlign = 'center';
+          ctx.font = 'bold 72px Arial';
+          
+          // Wrap text
+          const words = quoteResult.text.split(' ');
+          const lines: string[] = [];
+          let currentLine = '';
+          
+          words.forEach(word => {
+            const testLine = currentLine + word + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > 900 && currentLine !== '') {
+              lines.push(currentLine);
+              currentLine = word + ' ';
+            } else {
+              currentLine = testLine;
+            }
+          });
+          lines.push(currentLine);
+          
+          // Draw lines
+          const lineHeight = 90;
+          const startY = (canvas.height - lines.length * lineHeight) / 2;
+          lines.forEach((line, i) => {
+            ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
+          });
+          
+          // Add author
+          if (quoteResult.author) {
+            ctx.font = 'italic 48px Arial';
+            ctx.fillText(`— ${quoteResult.author}`, canvas.width / 2, startY + lines.length * lineHeight + 80);
+          }
+          
+          quoteResult.imageUrl = canvas.toDataURL('image/png');
+        }
+        
         setQuoteData(quoteResult);
         setImageLoaded(false);
       }
@@ -68,30 +132,47 @@ const Quotes = () => {
   };
 
   const handleDownload = async () => {
-    if (!quoteData?.imageUrl) return;
+    if (!quoteData?.imageUrl) {
+      toast.error("No image to download");
+      return;
+    }
     
     try {
-      // Convert base64 to blob
-      const base64Data = quoteData.imageUrl.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      // Check if it's a base64 image
+      if (quoteData.imageUrl.startsWith('data:image')) {
+        // Convert base64 to blob
+        const base64Data = quoteData.imageUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `quote-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast.success("Quote saved!");
+      } else {
+        // Handle regular URL
+        const link = document.createElement('a');
+        link.href = quoteData.imageUrl;
+        link.download = `quote-${Date.now()}.png`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success("Quote saved!");
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/png' });
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `quote-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast.success("Quote saved!");
     } catch (error) {
       console.error('Download error:', error);
       toast.error("Failed to save quote");
