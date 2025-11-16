@@ -137,18 +137,6 @@ const Quotes = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cream-glow via-petal-pink/20 to-lavender-mist/30 pb-20 relative overflow-hidden">
-      {/* Back Button */}
-      {selectedBubble && (
-        <button
-          onClick={handleBack}
-          className={`fixed top-4 left-4 z-50 p-2 rounded-full bg-white/90 backdrop-blur-sm border border-petal-pink/20 hover:bg-white transition-all duration-300 ${
-            showBack ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
-          }`}
-        >
-          <ArrowLeft className="h-4 w-4 text-warm-charcoal" />
-        </button>
-      )}
-
       <div className="max-w-md mx-auto px-4 py-6 relative z-10">
         {!selectedBubble ? (
           <>
@@ -197,21 +185,19 @@ const Quotes = () => {
                 {imageLoaded && (
                   <>
                     {/* Top Bar - Back Button */}
-                    {showBack && (
-                      <div className="fixed top-6 left-0 right-0 flex items-center justify-between px-6 z-50 animate-fade-in">
-                        <Button
-                          onClick={handleBack}
-                          size="sm"
-                          variant="ghost"
-                          className="bg-black/30 hover:bg-black/50 text-white backdrop-blur-md border border-white/10 shadow-lg rounded-full"
-                        >
-                          <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="fixed top-6 left-0 right-0 flex items-center justify-between px-6 z-50 animate-fade-in">
+                      <Button
+                        onClick={handleBack}
+                        size="sm"
+                        variant="ghost"
+                        className="bg-black/30 hover:bg-black/50 text-white backdrop-blur-md border border-white/10 shadow-lg rounded-full"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                    </div>
                     
                     {/* Bottom Action Buttons */}
-                    <div className="fixed bottom-8 left-0 right-0 flex items-center justify-center gap-3 px-6 z-50 animate-fade-in">
+                    <div className="fixed bottom-24 left-0 right-0 flex items-center justify-center gap-3 px-6 z-50 animate-fade-in">
                       <Button
                         onClick={handleDownload}
                         size="lg"
