@@ -3,6 +3,7 @@ import { Check, ArrowRight } from "lucide-react";
 import atlasSage from "@/assets/atlas-sage.png";
 import dariusSage from "@/assets/darius-sage.png";
 import kaiSage from "@/assets/kai-sage.png";
+import eliSage from "@/assets/eli-sage.png";
 
 interface Mentor {
   id: string;
@@ -79,6 +80,13 @@ export const MentorResult = ({
                   alt={mentor.name}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: 'center 25%' }}
+                />
+              ) : mentor.slug === 'eli' ? (
+                <img
+                  src={eliSage}
+                  alt={mentor.name}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: 'center 30%' }}
                 />
               ) : mentor.avatar_url ? (
                 <img
