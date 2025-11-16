@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { MessageCircle } from "lucide-react";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 const ROTATING_QUESTIONS = [
   "What should I focus on today?",
@@ -20,6 +21,7 @@ const ROTATING_QUESTIONS = [
 
 export const MentorQuickChat = () => {
   const navigate = useNavigate();
+  const personality = useMentorPersonality();
   const [currentQuestions, setCurrentQuestions] = useState<string[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,9 @@ export const MentorQuickChat = () => {
     <Card className="p-5 space-y-4">
       <div className="flex items-center gap-2">
         <MessageCircle className="h-5 w-5 text-primary" />
-        <h3 className="font-bold text-foreground">Quick Chat</h3>
+        <h3 className="font-bold text-foreground">
+          {personality?.name ? `Ask ${personality.name}` : "Quick Chat"}
+        </h3>
       </div>
       
       <div className="space-y-2">

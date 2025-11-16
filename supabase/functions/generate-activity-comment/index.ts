@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { activityId } = await req.json()
+    const { activityId, userReply } = await req.json()
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -53,7 +53,23 @@ serve(async (req) => {
 
     const activityDescription = `${activity.activity_type}: ${JSON.stringify(activity.activity_data)}`
     
-    const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+    let prompt: string;
+    
+    if (userReply) {
+      // User is replying to an existing comment - have a conversation
+      prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+
+Earlier, you commented on this user activity:
+${activityDescription}
+Your previous comment: "${activity.mentor_comment}"
+
+The user just replied to you:
+"${userReply}"
+
+Respond to their reply in 1-2 sentences. Be authentic, supportive, and continue the conversation naturally in your distinctive voice.`
+    } else {
+      // Initial comment generation
+      prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
 
 A user just completed this activity:
 ${activityDescription}
@@ -62,6 +78,7 @@ Recent activity context:
 ${contextSummary}
 
 Provide a brief, encouraging comment (1-2 sentences max) acknowledging this action in your distinctive voice. Be specific to what they did. Keep it authentic and personal.`
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -85,10 +102,26 @@ Provide a brief, encouraging comment (1-2 sentences max) acknowledging this acti
     const comment = aiData.choices?.[0]?.message?.content?.trim()
 
     if (comment) {
-      await supabase
-        .from('activity_feed')
-        .update({ mentor_comment: comment })
-        .eq('id', activityId)
+      if (userReply) {
+        // For replies, create a new activity feed item showing the conversation
+        await supabase
+          .from('activity_feed')
+          .insert({
+            user_id: activity.user_id,
+            activity_type: 'chat_message',
+            activity_data: { 
+              user_message: userReply,
+              context: 'reply_to_activity'
+            },
+            mentor_comment: comment
+          })
+      } else {
+        // For initial comments, update the existing activity
+        await supabase
+          .from('activity_feed')
+          .update({ mentor_comment: comment })
+          .eq('id', activityId)
+      }
     }
 
     return new Response(JSON.stringify({ success: true, comment }), {

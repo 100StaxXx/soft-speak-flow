@@ -3,9 +3,11 @@ import { Card } from "@/components/ui/card";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Quote, Sparkles } from "lucide-react";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 export const QuoteOfTheDay = () => {
   const { profile } = useProfile();
+  const personality = useMentorPersonality();
   const [todaysQuote, setTodaysQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,7 +82,9 @@ export const QuoteOfTheDay = () => {
           <div className="flex-1 space-y-3 pt-1">
             <div className="flex items-center gap-2">
               <Sparkles className="h-3 w-3 text-accent animate-pulse" />
-              <h3 className="text-xs font-medium text-accent uppercase tracking-wider">Quote of the Day</h3>
+              <h3 className="text-xs font-medium text-accent uppercase tracking-wider">
+                {personality?.name ? `${personality.name}'s Pick` : "Quote of the Day"}
+              </h3>
             </div>
             
             <blockquote className="relative">

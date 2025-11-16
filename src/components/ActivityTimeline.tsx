@@ -1,10 +1,15 @@
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Card } from "@/components/ui/card";
-import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles } from "lucide-react";
+import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { useWelcomeMessage } from "@/hooks/useWelcomeMessage";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { Textarea } from "./ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
@@ -27,8 +32,13 @@ const activityLabels: Record<string, string> = {
 };
 
 export const ActivityTimeline = () => {
+  const { user } = useAuth();
   const { activities, isLoading, markAsRead } = useActivityFeed();
+  const personality = useMentorPersonality();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Add welcome message for new users
   useWelcomeMessage();
@@ -48,10 +58,38 @@ export const ActivityTimeline = () => {
     );
   }
 
+  const handleReply = async (activityId: string) => {
+    if (!replyText.trim() || !user) return;
+    
+    setIsSubmitting(true);
+    try {
+      // Generate AI response to the user's reply
+      const { data, error } = await supabase.functions.invoke('generate-activity-comment', {
+        body: { 
+          activityId,
+          userReply: replyText.trim()
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Reply sent!");
+      setReplyText("");
+      setReplyingTo(null);
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      toast.error("Failed to send reply");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!activities.length) {
     return (
       <Card className="p-6 text-center">
-        <p className="text-muted-foreground">Your journey starts now. Take your first step.</p>
+        <p className="text-muted-foreground">
+          {personality?.emptyState("Your journey") || "Your journey starts now. Take your first step."}
+        </p>
       </Card>
     );
   }
@@ -106,18 +144,63 @@ export const ActivityTimeline = () => {
                   </div>
                 )}
 
-                {activity.mentor_voice_url && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8"
-                    onClick={() => handlePlayVoice(activity.mentor_voice_url!, activity.id)}
-                  >
-                    <Volume2 className={`h-3 w-3 mr-1 ${playingAudio === activity.id ? 'animate-pulse' : ''}`} />
-                    <span className="text-xs">
-                      {playingAudio === activity.id ? 'Playing...' : 'Listen'}
-                    </span>
-                  </Button>
+                <div className="flex gap-2">
+                  {activity.mentor_voice_url && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => handlePlayVoice(activity.mentor_voice_url!, activity.id)}
+                    >
+                      <Volume2 className={`h-3 w-3 mr-1 ${playingAudio === activity.id ? 'animate-pulse' : ''}`} />
+                      <span className="text-xs">
+                        {playingAudio === activity.id ? 'Playing...' : 'Listen'}
+                      </span>
+                    </Button>
+                  )}
+                  
+                  {activity.mentor_comment && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => setReplyingTo(replyingTo === activity.id ? null : activity.id)}
+                    >
+                      <Reply className="h-3 w-3 mr-1" />
+                      <span className="text-xs">Reply</span>
+                    </Button>
+                  )}
+                </div>
+
+                {/* Reply input */}
+                {replyingTo === activity.id && (
+                  <div className="space-y-2 pt-2">
+                    <Textarea
+                      placeholder="Share your thoughts..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      className="min-h-[80px] text-sm"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setReplyingTo(null);
+                          setReplyText("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleReply(activity.id)}
+                        disabled={!replyText.trim() || isSubmitting}
+                      >
+                        {isSubmitting ? "Sending..." : "Send"}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

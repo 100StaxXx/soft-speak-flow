@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { IntroScreen } from "@/components/IntroScreen";
-import { PowerModeToggle } from "@/components/PowerModeToggle";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
@@ -26,7 +25,6 @@ const Index = () => {
   const [showIntro, setShowIntro] = useState(() => {
     return !sessionStorage.getItem('hasVisitedHome');
   });
-  const [powerMode, setPowerMode] = useState(false);
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
 
   useEffect(() => {
@@ -70,14 +68,11 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Home
-            </h1>
-            <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
-          </div>
-          <PowerModeToggle onToggle={setPowerMode} />
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Home
+          </h1>
+          <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
         </div>
       </div>
 
