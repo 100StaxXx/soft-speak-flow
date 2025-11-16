@@ -67,50 +67,6 @@ const Index = () => {
   };
 
   // Mark that home has been visited
-export default function Index() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { profile } = useProfile();
-  const { toast } = useToast();
-  const [pepTalks, setPepTalks] = useState<any[]>([]);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [videos, setVideos] = useState<any[]>([]);
-  const [audioClips, setAudioClips] = useState<any[]>([]);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [lessons, setLessons] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [todaysPepTalk, setTodaysPepTalk] = useState<any>(null);
-  const [snapEnabled, setSnapEnabled] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Mood selector state
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [moodPush, setMoodPush] = useState<any>(null);
-  const [isLoadingPush, setIsLoadingPush] = useState(false);
-
-  const handleMoodSelect = async (mood: string) => {
-    setSelectedMood(mood);
-    setIsLoadingPush(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-mood-push', {
-        body: { mood }
-      });
-      
-      if (error) throw error;
-      setMoodPush(data);
-    } catch (error: any) {
-      console.error('Error generating mood push:', error);
-      toast({
-        title: "Error",
-        description: "Couldn't generate your push. Try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingPush(false);
-    }
-  };
-
   useEffect(() => {
     sessionStorage.setItem('hasVisitedHome', 'true');
   }, []);
@@ -353,6 +309,25 @@ export default function Index() {
             />
           </div>
         )}
+
+        {/* Night Reflection Card */}
+        <div className="mb-8">
+          <NightReflectionCard />
+        </div>
+
+        {/* Mood Selector */}
+        <div className="mb-8">
+          <MoodSelector onMoodSelect={handleMoodSelect} selectedMood={selectedMood} />
+        </div>
+
+        {/* Mood Push Result */}
+        <div className="mb-12">
+          <MoodPushCard 
+            selectedMood={selectedMood} 
+            pushData={moodPush} 
+            isLoading={isLoadingPush} 
+          />
+        </div>
         
         {mentor && user && (
           <div className="mb-8 flex items-center gap-4 justify-center">
