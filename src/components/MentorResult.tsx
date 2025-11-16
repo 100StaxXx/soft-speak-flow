@@ -6,6 +6,7 @@ import kaiSage from "@/assets/kai-sage.png";
 import eliSage from "@/assets/eli-sage.png";
 import novaSage from "@/assets/nova-sage.png";
 import siennaSage from "@/assets/sienna-sage.png";
+import lumiSage from "@/assets/lumi-sage.png";
 
 interface Mentor {
   id: string;
@@ -103,6 +104,13 @@ export const MentorResult = ({
                   alt={mentor.name}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: 'center 25%' }}
+                />
+              ) : mentor.slug === 'lumi' ? (
+                <img
+                  src={lumiSage}
+                  alt={mentor.name}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: 'center 20%' }}
                 />
               ) : mentor.avatar_url ? (
                 <img

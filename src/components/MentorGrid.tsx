@@ -7,6 +7,7 @@ import kaiSage from "@/assets/kai-sage.png";
 import eliSage from "@/assets/eli-sage.png";
 import novaSage from "@/assets/nova-sage.png";
 import siennaSage from "@/assets/sienna-sage.png";
+import lumiSage from "@/assets/lumi-sage.png";
 
 interface Mentor {
   id: string;
@@ -102,6 +103,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                 alt={activeMentor.name}
                 className="w-full h-full object-cover opacity-60"
                 style={{ objectPosition: 'center 35%' }}
+              />
+            ) : activeMentor.slug === 'lumi' ? (
+              <img 
+                src={lumiSage}
+                alt={activeMentor.name}
+                className="w-full h-full object-cover opacity-60"
+                style={{ objectPosition: 'center 30%' }}
               />
             ) : activeMentor.avatar_url ? (
               <img 
@@ -295,6 +303,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                       alt={mentor.name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                       style={{ objectPosition: 'center 25%' }}
+                    />
+                  ) : mentor.slug === 'lumi' ? (
+                    <img 
+                      src={lumiSage} 
+                      alt={mentor.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      style={{ objectPosition: 'center 20%' }}
                     />
                   ) : mentor.avatar_url ? (
                     <img 
