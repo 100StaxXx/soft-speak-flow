@@ -1,101 +1,84 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
-import { HeroSlider } from "@/components/HeroSlider";
-import { IntroScreen } from "@/components/IntroScreen";
-import { PowerModeToggle } from "@/components/PowerModeToggle";
-import { AudioPlayer } from "@/components/AudioPlayer";
+import { DailyContentWidget } from "@/components/DailyContentWidget";
 import { BottomNav } from "@/components/BottomNav";
-import { PepTalkCard } from "@/components/PepTalkCard";
-import { QuoteCard } from "@/components/QuoteCard";
-import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
-import { VideoCard } from "@/components/VideoCard";
-import { PlaylistCard } from "@/components/PlaylistCard";
-import { AskMentorChat } from "@/components/AskMentorChat";
-import { DailyLesson } from "@/components/DailyLesson";
-import { MentorMessage } from "@/components/MentorMessage";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { HeroSlider } from "@/components/HeroSlider";
+import { MoodSelector } from "@/components/MoodSelector";
+import { YourLilPush } from "@/components/YourLilPush";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen, Flame, Music, Zap, TrendingUp } from "lucide-react";
-import { toast } from "sonner";
-import { useTheme } from "@/contexts/ThemeContext";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Smile, Meh, Frown } from "lucide-react";
 
-const Index = () => {
-  const { user } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
-  const { isTransitioning } = useTheme();
+export default function Index() {
   const navigate = useNavigate();
-  const [mentor, setMentor] = useState<any>(null);
-  const [featuredPepTalk, setFeaturedPepTalk] = useState<any>(null);
-  const [recommendedVideos, setRecommendedVideos] = useState<any[]>([]);
-  const [dailyQuotes, setDailyQuotes] = useState<any[]>([]);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showIntro, setShowIntro] = useState(() => {
-    // Only show intro on first visit, not when navigating back
-    return !sessionStorage.getItem('hasVisitedHome');
-  });
-  const [powerMode, setPowerMode] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [hasActiveHabits, setHasActiveHabits] = useState(false);
-  const [hasActiveChallenges, setHasActiveChallenges] = useState(false);
-  const [dailyLesson, setDailyLesson] = useState<any>(null);
-  const [loadingLesson, setLoadingLesson] = useState(false);
+  const { user } = useAuth();
   const [snapEnabled, setSnapEnabled] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [moodPush, setMoodPush] = useState<any>(null);
+  const [isLoadingPush, setIsLoadingPush] = useState(false);
 
-  // Mark that home has been visited
-  useEffect(() => {
-    sessionStorage.setItem('hasVisitedHome', 'true');
-  }, []);
+  const { data: todaysReflection } = useQuery({
+    queryKey: ['todaysReflection', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('user_reflections')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('reflection_date', today)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
 
-  // Reset scroll to top when component mounts and prevent flash
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    const container = document.getElementById('main-scroll-container');
-    if (container) {
-      container.scrollTop = 0;
-    }
-    // Delay to ensure DOM is ready and scroll is positioned
-    const timer = setTimeout(() => {
-      setIsInitializing(false);
-      // Force scroll position after initialization
-      window.scrollTo(0, 0);
-      if (container) {
-        container.scrollTop = 0;
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
-  // Enable scroll snap after first user interaction to avoid auto-snapping on load
   useEffect(() => {
     const container = document.getElementById('main-scroll-container');
     if (!container) return;
-    const enable = () => setSnapEnabled(true);
-    container.addEventListener('wheel', enable, { once: true, passive: true });
-    container.addEventListener('touchstart', enable, { once: true, passive: true });
+
+    container.scrollTo({ top: 0, behavior: 'instant' });
+
+    const enableSnap = () => {
+      setSnapEnabled(true);
+      container.removeEventListener('wheel', enableSnap);
+      container.removeEventListener('touchstart', enableSnap);
+    };
+
+    container.addEventListener('wheel', enableSnap);
+    container.addEventListener('touchstart', enableSnap);
+
     return () => {
-      container.removeEventListener('wheel', enable);
-      container.removeEventListener('touchstart', enable);
+      container.removeEventListener('wheel', enableSnap);
+      container.removeEventListener('touchstart', enableSnap);
     };
   }, []);
 
-  useEffect(() => {
-    if (!showIntro) {
-      const container = document.getElementById('main-scroll-container');
-      if (container) {
-        container.scrollTop = 0;
-      }
-    }
-  }, [showIntro]);
+  const handleMoodSelect = async (mood: string) => {
+    setSelectedMood(mood);
+    setIsLoadingPush(true);
 
-  useEffect(() => {
-    if (!user || profileLoading) {
-      fetchGeneralContent();
-      return;
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mood-push', {
+        body: { mood }
+      });
+
+      if (error) throw error;
+      setMoodPush(data);
+    } catch (error) {
+      console.error('Error generating mood push:', error);
+      setMoodPush({
+        quote: "You've got this. Keep moving.",
+        mini_pep_talk: "Every challenge is a chance to grow stronger. Take it one step at a time."
+      });
+    } finally {
+      setIsLoadingPush(false);
     }
+  };
     if (profile?.selected_mentor_id) {
       fetchPersonalizedContent();
     } else {

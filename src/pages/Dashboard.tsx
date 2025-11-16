@@ -80,8 +80,8 @@ const Dashboard = () => {
 
       const maxStreak = Math.max(...activeHabits.map(h => h.current_streak || 0), 0);
 
-      const activeChallenges = challenges?.filter(c => c.is_active && !c.completed).length || 0;
-      const completedChallenges = challenges?.filter(c => c.completed).length || 0;
+      const activeChallenges = challenges?.filter(c => c.status === 'active').length || 0;
+      const completedChallenges = challenges?.filter(c => c.status === 'completed').length || 0;
 
       setStats({
         habitStreak: maxStreak,
