@@ -26,23 +26,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
     // Redirect to onboarding if mentor required and profile missing or not selected
     if (requireMentor && (!profile || !profile.selected_mentor_id)) {
-      // Double-check server state to avoid stale client redirect
-      (async () => {
-        try {
-          if (!user) return;
-          const { data } = await supabase
-            .from('profiles')
-            .select('selected_mentor_id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (!data?.selected_mentor_id) {
-            navigate("/onboarding");
-          }
-        } catch {
-          navigate("/onboarding");
-        }
-      })();
+      navigate("/onboarding");
     }
   }, [user, profile, authLoading, profileLoading, requireMentor, navigate]);
 
