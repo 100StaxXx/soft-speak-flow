@@ -12,13 +12,54 @@ serve(async (req) => {
   }
 
   try {
+    // Get authentication token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('Missing authorization header')
+    }
+
     const { reflectionId, mood, note } = await req.json();
+    
+    // Input validation
+    if (!reflectionId || typeof reflectionId !== 'string') {
+      throw new Error('Invalid reflectionId')
+    }
+    if (!mood || typeof mood !== 'string' || !['good', 'neutral', 'tough'].includes(mood)) {
+      throw new Error('Invalid mood value')
+    }
+    if (note && typeof note !== 'string') {
+      throw new Error('Invalid note')
+    }
+    if (note && note.length > 1000) {
+      throw new Error('Note too long (max 1000 characters)')
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify user authentication
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      throw new Error('Unauthorized')
+    }
+
+    // Verify reflection ownership
+    const { data: reflection, error: reflectionError } = await supabase
+      .from('user_reflections')
+      .select('user_id')
+      .eq('id', reflectionId)
+      .single()
+    
+    if (reflectionError) throw reflectionError
+    
+    if (reflection.user_id !== user.id) {
+      throw new Error('Unauthorized: You can only access your own reflections')
+    }
 
     // Create system prompt based on mood
     let systemPrompt = "You are a supportive, warm AI companion for A Lil Push app. Respond in 1-3 sentences.";

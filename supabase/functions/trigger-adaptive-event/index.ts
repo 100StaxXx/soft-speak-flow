@@ -31,12 +31,34 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, eventType } = await req.json();
+    // Get authentication token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('Missing authorization header')
+    }
 
+    const { eventType } = await req.json();
+    
+    // Input validation
+    if (!eventType || typeof eventType !== 'string') {
+      throw new Error('Invalid eventType')
+    }
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
+
+    // Verify user authentication and get userId from token (not request body)
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      throw new Error('Unauthorized')
+    }
+    
+    // Use authenticated user's ID instead of trusting request body
+    const userId = user.id;
 
     // Check rate limits first
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
