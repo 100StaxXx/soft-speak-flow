@@ -18,33 +18,8 @@ const tourSteps: Step[] = [
     placement: 'bottom',
   },
   {
-    target: '[data-tour="search"]',
-    content: '🔍 Search across all your content - quotes, pep talks, and challenges in one place.',
-    placement: 'bottom',
-  },
-  {
-    target: '[data-tour="habits"]',
-    content: '✅ Track your daily habits and build lasting routines. Earn achievements as you progress!',
-    placement: 'top',
-  },
-  {
-    target: '[data-tour="library"]',
-    content: '📚 Access your favorites and downloads anytime in your personal library.',
-    placement: 'top',
-  },
-  {
-    target: '[data-tour="achievements"]',
-    content: '🏆 View your achievements and milestones as you grow on your journey.',
-    placement: 'top',
-  },
-  {
-    target: '[data-tour="profile"]',
-    content: '⚙️ Customize your experience, manage notifications, and switch mentors anytime.',
-    placement: 'top',
-  },
-  {
     target: 'body',
-    content: '✨ You\'re all set! Start building better habits and let your mentor guide you to success.',
+    content: '✨ You\'re all set! Use the bottom navigation to explore: Progress (habits, challenges, achievements), Inspire (motivational content), and Search (find anything).',
     placement: 'center',
   },
 ];

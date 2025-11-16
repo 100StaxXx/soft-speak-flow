@@ -28,6 +28,8 @@ const Reflection = lazy(() => import("./pages/Reflection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const Library = lazy(() => import("./pages/Library"));
 const Challenges = lazy(() => import("./pages/Challenges"));
+const Progress = lazy(() => import("./pages/Progress"));
+const Search = lazy(() => import("./pages/Search"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +86,8 @@ const AppContent = () => {
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+          <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

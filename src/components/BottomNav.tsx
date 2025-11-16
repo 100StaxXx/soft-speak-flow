@@ -1,4 +1,4 @@
-import { Home, Target, MessageCircleHeart, User } from "lucide-react";
+import { Home, TrendingUp, MessageCircleHeart, Search } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
@@ -21,22 +21,20 @@ export const BottomNav = () => {
           )}
         </NavLink>
 
-        <div data-tour="habits">
-          <NavLink
-            to="/habits"
-            className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-            activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
-          >
-            {({ isActive }) => (
-              <>
-                <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                  Habits
-                </span>
-              </>
-            )}
-          </NavLink>
-        </div>
+        <NavLink
+          to="/progress"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+        >
+          {({ isActive }) => (
+            <>
+              <TrendingUp className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+                Progress
+              </span>
+            </>
+          )}
+        </NavLink>
 
         <NavLink
           to="/inspire"
@@ -53,22 +51,20 @@ export const BottomNav = () => {
           )}
         </NavLink>
 
-        <div data-tour="profile">
-          <NavLink
-            to="/profile"
-            className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-            activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
-          >
-            {({ isActive }) => (
-              <>
-                <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                  Profile
-                </span>
-              </>
-            )}
-          </NavLink>
-        </div>
+        <NavLink
+          to="/search"
+          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+        >
+          {({ isActive }) => (
+            <>
+              <Search className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+                Search
+              </span>
+            </>
+          )}
+        </NavLink>
       </div>
     </nav>
   );
