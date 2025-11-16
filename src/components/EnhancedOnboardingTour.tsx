@@ -58,7 +58,7 @@ const tourSteps: Record<string, Step[]> = {
   ],
 };
 
-export const OnboardingTour = () => {
+export const EnhancedOnboardingTour = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const location = useLocation();

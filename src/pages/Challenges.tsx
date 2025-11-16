@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAchievements } from "@/hooks/useAchievements";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { toast } from "sonner";
 export default function Challenges() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { checkAndAwardAchievement } = useAchievements();
   const [activeTab, setActiveTab] = useState<"active" | "available">("active");
 
   // Fetch available challenges
@@ -76,19 +79,25 @@ export default function Challenges() {
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + totalDays);
 
-      const { error } = await supabase.from("user_challenges").insert({
+      const { data, error } = await supabase.from("user_challenges").insert({
         user_id: user.id,
         challenge_id: challengeId,
         start_date: startDate.toISOString().split("T")[0],
         end_date: endDate.toISOString().split("T")[0],
         current_day: 1,
         status: "active",
-      });
+      }).select().single();
 
       if (error) throw error;
 
+      // Award first challenge achievement
+      const totalUserChallenges = (userChallenges?.length || 0) + 1;
+      if (totalUserChallenges === 1) {
+        await checkAndAwardAchievement('first_challenge', { challenge_id: challengeId });
+      }
+
       toast.success("Challenge started!");
-      refetchUserChallenges();
+      await queryClient.invalidateQueries({ queryKey: ["user-challenges"] });
       setActiveTab("active");
     } catch (error: any) {
       toast.error("Failed to start challenge");
