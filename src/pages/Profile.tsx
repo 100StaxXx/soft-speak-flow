@@ -89,6 +89,8 @@ const Profile = () => {
     try {
       const { error } = await supabase.from("profiles").update({ selected_mentor_id: mentorId }).eq("id", user.id);
       if (error) throw error;
+      toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
+      // Reload to refresh mentor theme
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });

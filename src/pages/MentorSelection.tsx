@@ -77,9 +77,14 @@ const MentorSelection = () => {
         .eq("id", user.id);
 
       if (error) throw error;
+
+      toast({
+        title: "Mentor Selected!",
+        description: "Your mentor has been updated successfully",
+      });
       
-      // Full reload to ensure profile state is fresh across the app
-      window.location.href = "/";
+      // Navigate without full reload
+      navigate("/", { replace: true });
     } catch (error: any) {
       toast({
         title: "Error selecting mentor",

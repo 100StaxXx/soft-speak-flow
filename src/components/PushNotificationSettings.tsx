@@ -87,7 +87,9 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      window.location.reload();
+      toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
+      // Reload to sync state
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -113,7 +115,9 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      window.location.reload();
+      toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
+      // Reload to sync state
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -128,7 +132,9 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      window.location.reload();
+      toast({ title: "Time Updated", description: "Your push notification time has been updated" });
+      // Reload to sync state
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
