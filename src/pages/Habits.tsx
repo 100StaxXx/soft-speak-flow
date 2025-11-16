@@ -16,6 +16,7 @@ import { Plus, ArrowLeft, Flame, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
+import { MilestoneModal } from "@/components/MilestoneModal";
 
 export default function Habits() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function Habits() {
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; streak: number; title: string } | null>(null);
 
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
@@ -113,10 +115,26 @@ export default function Habits() {
         });
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      toast({ title: "Habit completed", description: "Keep the streak alive." });
+    onSuccess: async (_, habitId) => {
+      await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
+      await queryClient.invalidateQueries({ queryKey: ['habits'] });
+      
+      // Check for milestone
+      const { data: updatedHabit } = await supabase
+        .from('habits')
+        .select('current_streak, title')
+        .eq('id', habitId)
+        .single();
+      
+      if (updatedHabit && [3, 7, 14, 30, 100].includes(updatedHabit.current_streak)) {
+        setMilestoneModal({
+          open: true,
+          streak: updatedHabit.current_streak,
+          title: updatedHabit.title
+        });
+      } else {
+        toast({ title: "Habit completed", description: "Keep the streak alive." });
+      }
     },
   });
 
@@ -278,6 +296,18 @@ export default function Habits() {
           </Card>
         )}
       </div>
+      
+      {/* Milestone Modal */}
+      {milestoneModal && (
+        <MilestoneModal
+          open={milestoneModal.open}
+          onClose={() => setMilestoneModal(null)}
+          streak={milestoneModal.streak}
+          habitTitle={milestoneModal.title}
+          mentorName={personality?.name}
+        />
+      )}
+      
       <BottomNav />
     </div>
   );

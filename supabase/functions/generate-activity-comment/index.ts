@@ -48,6 +48,29 @@ serve(async (req) => {
       ?.map(a => `${a.activity_type}: ${JSON.stringify(a.activity_data)}`)
       .join('\n') || 'No recent activity'
 
+    // Get today's pep talk for cross-referencing
+    const today = new Date().toISOString().split('T')[0]
+    const { data: todaysPepTalk } = await supabase
+      .from('daily_pep_talks')
+      .select('title, topic_category, emotional_triggers, summary')
+      .eq('for_date', today)
+      .limit(1)
+      .single()
+
+    // Check for milestone achievements
+    let milestoneContext = ''
+    if (activity.activity_type === 'habit_completed' && activity.activity_data?.habit_id) {
+      const { data: habit } = await supabase
+        .from('habits')
+        .select('current_streak, title')
+        .eq('id', activity.activity_data.habit_id)
+        .single()
+      
+      if (habit && [3, 7, 14, 30, 100].includes(habit.current_streak)) {
+        milestoneContext = `\n\nIMPORTANT: This is a ${habit.current_streak}-day streak milestone! Make this celebration feel special and memorable. Use enthusiastic language appropriate to your personality.`
+      }
+    }
+
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
 
@@ -68,14 +91,18 @@ The user just replied to you:
 
 Respond to their reply in 1-2 sentences. Be authentic, supportive, and continue the conversation naturally in your distinctive voice.`
     } else {
-      // Initial comment generation
+      // Initial comment generation with cross-referencing
+      const pepTalkContext = todaysPepTalk 
+        ? `\n\nToday's theme is "${todaysPepTalk.title}" focusing on ${todaysPepTalk.topic_category}. If this activity relates to today's theme, naturally weave that connection into your comment.`
+        : ''
+      
       prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
 
 A user just completed this activity:
 ${activityDescription}
 
 Recent activity context:
-${contextSummary}
+${contextSummary}${pepTalkContext}${milestoneContext}
 
 Provide a brief, encouraging comment (1-2 sentences max) acknowledging this action in your distinctive voice. Be specific to what they did. Keep it authentic and personal.`
     }
