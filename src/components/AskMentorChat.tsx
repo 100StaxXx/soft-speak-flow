@@ -189,12 +189,6 @@ export const AskMentorChat = ({
         { user_id: user.id, role: 'assistant', content: data.response }
       ]);
 
-      // Save both messages to database
-      await supabase.from('mentor_chats').insert([
-        { user_id: user.id, role: 'user', content: textToSend },
-        { user_id: user.id, role: 'assistant', content: data.reply }
-      ]);
-
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
