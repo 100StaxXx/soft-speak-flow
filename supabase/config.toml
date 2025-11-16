@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.generate-complete-pep-talk]
 verify_jwt = false
+
+[functions.generate-weekly-challenges]
+verify_jwt = false
+
+[functions.generate-mood-push]
+verify_jwt = false
+
+[functions.generate-reflection-reply]
+verify_jwt = false
