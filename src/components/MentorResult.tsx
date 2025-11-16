@@ -62,6 +62,7 @@ export const MentorResult = ({
                   src={atlasSage}
                   alt={mentor.name}
                   className="w-full h-full object-cover"
+                  style={{ objectPosition: 'center 20%' }}
                 />
               ) : mentor.avatar_url ? (
                 <img
