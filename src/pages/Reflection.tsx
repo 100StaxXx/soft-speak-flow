@@ -211,35 +211,16 @@ export default function Reflection() {
           <div className="flex items-center gap-3">
             <Moon className="w-8 h-8 text-primary" />
             <div>
-              <h2 className="text-xl font-heading font-black">How was your day?</h2>
+              <h2 className="text-xl font-heading font-black">Daily Reflection</h2>
               <p className="text-sm text-muted-foreground">Take a moment to reflect</p>
             </div>
           </div>
 
           <div className="space-y-6">
-            <div>
-              <p className="text-sm text-muted-foreground mb-4">Choose your mood:</p>
-              <div className="grid grid-cols-3 gap-3">
-                {moodOptions.map((option) => {
-                  const Icon = option.icon;
-                  const isSelected = selectedMood === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => setSelectedMood(option.value)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                        isSelected 
-                          ? `${option.color} scale-105` 
-                          : 'border-border hover:border-primary/40'
-                      }`}
-                    >
-                      <Icon className="w-8 h-8" />
-                      <span className="text-sm font-medium">{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <MoodSelector 
+              selectedMood={currentMoodSelection}
+              onMoodSelect={setCurrentMoodSelection}
+            />
 
             <div>
               <p className="text-sm text-muted-foreground mb-2">
@@ -262,14 +243,6 @@ export default function Reflection() {
               {isSubmitting ? "Saving..." : "Complete Reflection"}
             </Button>
           </div>
-        </Card>
-
-        {/* Mood Selector Section */}
-        <Card className="p-6">
-          <MoodSelector 
-            selectedMood={currentMoodSelection}
-            onMoodSelect={setCurrentMoodSelection}
-          />
         </Card>
       </div>
     </div>
