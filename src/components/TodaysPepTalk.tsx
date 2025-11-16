@@ -71,8 +71,16 @@ export const TodaysPepTalk = () => {
         const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
           body: { id: pepTalk.id }
         });
-        if (!error && data?.script && data.script !== pepTalk.script) {
-          setPepTalk((prev: any) => (prev ? { ...prev, script: data.script } : prev));
+        if (!error && data?.script) {
+          setPepTalk((prev: any) => {
+            if (!prev) return prev;
+            const shouldUpdate = data.script !== prev.script || JSON.stringify(data.transcript) !== JSON.stringify(prev.transcript);
+            return shouldUpdate ? { 
+              ...prev, 
+              script: data.script,
+              transcript: data.transcript || []
+            } : prev;
+          });
         }
       } catch (_) {
         // silent fail; avoid blocking UI if sync fails
@@ -88,14 +96,15 @@ export const TodaysPepTalk = () => {
     if (!audio) return;
 
     const updateTime = () => {
-      setCurrentTime(audio.currentTime);
+      const time = audio.currentTime;
+      setCurrentTime(time);
       
-      // Update active word index based on current time
-      if (pepTalk?.script) {
-        const words = pepTalk.script.split(/\s+/);
-        const averageWordDuration = duration / words.length;
-        const estimatedWordIndex = Math.floor(currentTime / averageWordDuration);
-        setActiveWordIndex(Math.min(estimatedWordIndex, words.length - 1));
+      // Update active word index based on word timestamps
+      if (pepTalk?.transcript && Array.isArray(pepTalk.transcript)) {
+        const wordIndex = pepTalk.transcript.findIndex((w: CaptionWord) => 
+          time >= w.start && time <= w.end
+        );
+        setActiveWordIndex(wordIndex);
       }
     };
     
@@ -114,7 +123,7 @@ export const TodaysPepTalk = () => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk, duration]);
+  }, [pepTalk?.transcript]);
 
   // Auto-scroll to active word
   useEffect(() => {
@@ -186,16 +195,25 @@ export const TodaysPepTalk = () => {
   };
 
   const renderFullTranscript = () => {
-    if (!pepTalk?.script) return null;
-
-    const words = pepTalk.script.split(/\s+/);
+    if (!pepTalk?.transcript || !Array.isArray(pepTalk.transcript)) {
+      // Fallback to plain text if no word timestamps
+      if (!pepTalk?.script) return null;
+      return (
+        <div 
+          ref={transcriptRef}
+          className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
+        >
+          {pepTalk.script}
+        </div>
+      );
+    }
 
     return (
       <div 
         ref={transcriptRef}
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
       >
-        {words.map((word, index) => (
+        {pepTalk.transcript.map((wordData: CaptionWord, index: number) => (
           <span
             key={index}
             ref={index === activeWordIndex ? activeWordRef : null}
@@ -206,7 +224,7 @@ export const TodaysPepTalk = () => {
                 : "text-foreground/80"
             )}
           >
-            {word}{" "}
+            {wordData.word}{" "}
           </span>
         ))}
       </div>
