@@ -122,6 +122,7 @@ export default function Habits() {
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl md:text-4xl font-heading font-black text-foreground">Habit Tracker</h1>
             <p className="text-sm text-muted-foreground mt-1">Build discipline, one day at a time</p>
+            <p className="text-xs text-muted-foreground/80 mt-0.5">Limited to 2 habits for better focus and consistency</p>
           </div>
         </div>
 
