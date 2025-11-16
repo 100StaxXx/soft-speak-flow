@@ -8,6 +8,7 @@ import novaSage from "@/assets/nova-sage.png";
 import siennaSage from "@/assets/sienna-sage.png";
 import lumiSage from "@/assets/lumi-sage.png";
 import strykerSage from "@/assets/stryker-sage.png";
+import solaceSage from "@/assets/solace-sage.png";
 
 interface Mentor {
   id: string;
@@ -116,6 +117,13 @@ export const MentorResult = ({
               ) : mentor.slug === 'stryker' ? (
                 <img
                   src={strykerSage}
+                  alt={mentor.name}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: 'center 25%' }}
+                />
+              ) : mentor.slug === 'solace' ? (
+                <img
+                  src={solaceSage}
                   alt={mentor.name}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: 'center 25%' }}
