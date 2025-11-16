@@ -184,8 +184,8 @@ export default function Reflection() {
           {/* Mood Selector Section */}
           <Card className="p-6">
             <MoodSelector 
-              selectedMood={currentMoodSelection}
-              onMoodSelect={setCurrentMoodSelection}
+              selected={currentMoodSelection}
+              onSelect={setCurrentMoodSelection}
             />
           </Card>
         </div>
@@ -218,8 +218,8 @@ export default function Reflection() {
 
           <div className="space-y-6">
             <MoodSelector 
-              selectedMood={currentMoodSelection}
-              onMoodSelect={setCurrentMoodSelection}
+              selected={currentMoodSelection}
+              onSelect={setCurrentMoodSelection}
             />
 
             <div>
