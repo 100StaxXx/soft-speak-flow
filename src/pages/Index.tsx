@@ -11,8 +11,6 @@ import { BottomNav } from "@/components/BottomNav";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
-import { VideoCard } from "@/components/VideoCard";
-import { PlaylistCard } from "@/components/PlaylistCard";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { DailyLesson } from "@/components/DailyLesson";
 import { MentorMessage } from "@/components/MentorMessage";
@@ -32,9 +30,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [mentor, setMentor] = useState<any>(null);
   const [featuredPepTalk, setFeaturedPepTalk] = useState<any>(null);
-  const [recommendedVideos, setRecommendedVideos] = useState<any[]>([]);
   const [dailyQuotes, setDailyQuotes] = useState<any[]>([]);
-  const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(() => {
     return !sessionStorage.getItem('hasVisitedHome');
@@ -197,21 +193,15 @@ const Index = () => {
       const [
         { data: mentorData },
         { data: personalizedPepTalk },
-        { data: personalizedQuotes },
-        { data: videosData },
-        { data: personalizedPlaylists }
+        { data: personalizedQuotes }
       ] = await Promise.all([
         supabase.from("mentors").select("*").eq("id", profile?.selected_mentor_id).single(),
         supabase.from("pep_talks").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("quotes").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(3),
-        supabase.from("videos").select("*").order("created_at", { ascending: false }).limit(2),
-        supabase.from("playlists").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(2)
+        supabase.from("quotes").select("*").eq("mentor_id", profile?.selected_mentor_id).order("created_at", { ascending: false }).limit(3)
       ]);
 
       setMentor(mentorData);
       setDailyQuotes(personalizedQuotes || []);
-      setRecommendedVideos(videosData || []);
-      setPlaylists(personalizedPlaylists || []);
 
       // Use fallback for pep talk if none found for mentor
       if (!personalizedPepTalk) {
@@ -240,20 +230,14 @@ const Index = () => {
       // Batch all queries in parallel
       const [
         { data: generalPepTalk },
-        { data: generalQuotes },
-        { data: generalVideos },
-        { data: generalPlaylists }
+        { data: generalQuotes }
       ] = await Promise.all([
         supabase.from("pep_talks").select("*").eq("is_featured", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("quotes").select("*").order("created_at", { ascending: false }).limit(3),
-        supabase.from("videos").select("*").order("created_at", { ascending: false }).limit(2),
-        supabase.from("playlists").select("*").order("created_at", { ascending: false }).limit(2)
+        supabase.from("quotes").select("*").order("created_at", { ascending: false }).limit(3)
       ]);
 
       setFeaturedPepTalk(generalPepTalk);
       setDailyQuotes(generalQuotes || []);
-      setRecommendedVideos(generalVideos || []);
-      setPlaylists(generalPlaylists || []);
     } catch (error) {
       console.error("Error fetching content:", error);
       toast.error("Failed to load content");
@@ -491,65 +475,6 @@ const Index = () => {
               content={dailyLesson.content}
               category={dailyLesson.category || 'Daily Wisdom'}
             />
-          </div>
-        )}
-
-
-        {recommendedVideos.length > 0 && (
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
-                {powerMode ? "Recommended for You" : "Recommended"}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/videos")} className="text-royal-gold hover:bg-graphite">
-                See All
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recommendedVideos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {dailyQuotes.length > 0 && (
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
-                {powerMode ? "Quotes to Carry" : "Daily Wisdom"}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/quotes")} className="text-royal-gold hover:bg-graphite">
-                More
-              </Button>
-            </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-              {dailyQuotes.map((quote) => (
-                <div key={quote.id} className="flex-shrink-0 w-80 snap-center">
-                  <QuoteCard quote={quote} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {playlists.length > 0 && (
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-pure-white uppercase tracking-tight">
-                {powerMode ? "Power Playlists" : "Playlists"}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")} className="text-royal-gold hover:bg-graphite">
-                Browse All
-              </Button>
-            </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-              {playlists.map((playlist) => (
-                <div key={playlist.id} className="flex-shrink-0 w-80 snap-center">
-                  <PlaylistCard playlist={playlist} />
-                </div>
-              ))}
-            </div>
           </div>
         )}
 

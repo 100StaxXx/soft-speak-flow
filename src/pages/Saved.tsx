@@ -2,9 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { PepTalkCard } from "@/components/PepTalkCard";
-import { VideoCard } from "@/components/VideoCard";
 import { QuoteCard } from "@/components/QuoteCard";
-import { PlaylistCard } from "@/components/PlaylistCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,9 +28,7 @@ const Saved = () => {
       // Group by content type and fetch full content
       const grouped = {
         pep_talks: [] as any[],
-        videos: [] as any[],
         quotes: [] as any[],
-        playlists: [] as any[],
       };
 
       for (const fav of data || []) {
@@ -43,13 +39,6 @@ const Saved = () => {
             .eq("id", fav.content_id)
             .single();
           if (content) grouped.pep_talks.push(content);
-        } else if (fav.content_type === "video") {
-          const { data: content } = await supabase
-            .from("videos")
-            .select("*")
-            .eq("id", fav.content_id)
-            .single();
-          if (content) grouped.videos.push(content);
         } else if (fav.content_type === "quote") {
           const { data: content } = await supabase
             .from("quotes")
@@ -57,13 +46,6 @@ const Saved = () => {
             .eq("id", fav.content_id)
             .single();
           if (content) grouped.quotes.push(content);
-        } else if (fav.content_type === "playlist") {
-          const { data: content } = await supabase
-            .from("playlists")
-            .select("*")
-            .eq("id", fav.content_id)
-            .single();
-          if (content) grouped.playlists.push(content);
         }
       }
 
@@ -138,23 +120,6 @@ const Saved = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="videos" className="space-y-6">
-              {favorites?.videos && favorites.videos.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6">
-                  {favorites.videos.map((video) => (
-                    <VideoCard
-                      key={video.id}
-                      video={video}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-warm-charcoal/60 py-12">
-                  No saved videos yet
-                </p>
-              )}
-            </TabsContent>
-
             <TabsContent value="quotes" className="space-y-4">
               {favorites?.quotes && favorites.quotes.length > 0 ? (
                 favorites.quotes.map((quote) => (
@@ -168,21 +133,6 @@ const Saved = () => {
               ) : (
                 <p className="text-center text-warm-charcoal/60 py-12">
                   No saved quotes yet
-                </p>
-              )}
-            </TabsContent>
-
-            <TabsContent value="playlists" className="space-y-4">
-              {favorites?.playlists && favorites.playlists.length > 0 ? (
-                favorites.playlists.map((playlist) => (
-                  <PlaylistCard
-                    key={playlist.id}
-                    playlist={playlist}
-                  />
-                ))
-              ) : (
-                <p className="text-center text-warm-charcoal/60 py-12">
-                  No saved playlists yet
                 </p>
               )}
             </TabsContent>
