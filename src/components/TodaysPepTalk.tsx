@@ -82,16 +82,28 @@ export const TodaysPepTalk = () => {
   }, [pepTalk?.id]);
 
 
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const updateTime = () => {
       setCurrentTime(audio.currentTime);
+      
+      // Update active word index based on current time
+      if (pepTalk?.script) {
+        const words = pepTalk.script.split(/\s+/);
+        const averageWordDuration = duration / words.length;
+        const estimatedWordIndex = Math.floor(currentTime / averageWordDuration);
+        setActiveWordIndex(Math.min(estimatedWordIndex, words.length - 1));
+      }
     };
     
     const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setActiveWordIndex(-1);
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -102,7 +114,7 @@ export const TodaysPepTalk = () => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk]);
+  }, [pepTalk, duration]);
 
   // Auto-scroll to active word
   useEffect(() => {
@@ -176,12 +188,27 @@ export const TodaysPepTalk = () => {
   const renderFullTranscript = () => {
     if (!pepTalk?.script) return null;
 
+    const words = pepTalk.script.split(/\s+/);
+
     return (
       <div 
         ref={transcriptRef}
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
       >
-        {pepTalk.script}
+        {words.map((word, index) => (
+          <span
+            key={index}
+            ref={index === activeWordIndex ? activeWordRef : null}
+            className={cn(
+              "transition-colors duration-200",
+              index === activeWordIndex
+                ? "text-primary font-semibold bg-primary/10 px-1 rounded"
+                : "text-foreground/80"
+            )}
+          >
+            {word}{" "}
+          </span>
+        ))}
       </div>
     );
   };
