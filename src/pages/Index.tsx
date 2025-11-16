@@ -8,6 +8,7 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
 import { AskMentorChat } from "@/components/AskMentorChat";
+import { MoodSelector } from "@/components/MoodSelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, MessageCircle, Target, ChevronDown, ChevronUp } from "lucide-react";
@@ -223,6 +224,9 @@ const Index = () => {
         <Card className="p-6 space-y-4 bg-gradient-to-br from-card via-card to-primary/5 border-border/50 shadow-elegant">
           <QuoteOfTheDay />
         </Card>
+
+        {/* Journal & Mood */}
+        <MoodSelector />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
