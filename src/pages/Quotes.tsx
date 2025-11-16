@@ -6,7 +6,7 @@ import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RefreshCw, Download } from "lucide-react";
+import { ArrowLeft, RefreshCw, Download, Home } from "lucide-react";
 import { toast } from "sonner";
 
 const Quotes = () => {
@@ -218,10 +218,19 @@ const Quotes = () => {
       <div className="max-w-md mx-auto px-4 py-6 relative z-10">
         {!selectedBubble ? (
           <>
-            <div className="mb-2">
-              <h1 className="font-display text-2xl text-warm-charcoal text-center">
+            <div className="flex items-center justify-between mb-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/")}
+                className="text-warm-charcoal hover:bg-warm-charcoal/10 rounded-full"
+              >
+                <Home className="h-5 w-5" />
+              </Button>
+              <h1 className="font-display text-2xl text-warm-charcoal flex-1 text-center">
                 Quotes & Affirmations
               </h1>
+              <div className="w-10" /> {/* Spacer for balance */}
             </div>
             <p className="text-warm-charcoal/70 text-center mb-6 text-sm">
               Daily wisdom for your journey
