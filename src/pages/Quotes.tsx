@@ -20,9 +20,10 @@ const Quotes = () => {
 
   const [quoteData, setQuoteData] = useState<any>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [refetchCounter, setRefetchCounter] = useState(0);
 
-  const { data: quote, isLoading } = useQuery({
-    queryKey: ["single-quote", selectedBubble, bubbleType],
+  const { data: quote, isLoading, refetch } = useQuery({
+    queryKey: ["single-quote", selectedBubble, bubbleType, refetchCounter],
     enabled: !!selectedBubble && !!bubbleType,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('get-single-quote', {
@@ -50,6 +51,7 @@ const Quotes = () => {
     setShowAuthor(false);
     setShowBack(false);
     setImageLoaded(false);
+    setRefetchCounter(0);
     
     // Show UI elements quickly
     setTimeout(() => setShowQuote(true), 100);
@@ -60,14 +62,9 @@ const Quotes = () => {
   const handleNextQuote = () => {
     setQuoteData(null);
     setImageLoaded(false);
-    setShowQuote(false);
-    setShowAuthor(false);
     
-    // Refetch the quote
-    setTimeout(() => {
-      setShowQuote(true);
-      setShowAuthor(true);
-    }, 100);
+    // Trigger a new fetch by incrementing the counter
+    setRefetchCounter(prev => prev + 1);
   };
 
   const handleDownload = async () => {
