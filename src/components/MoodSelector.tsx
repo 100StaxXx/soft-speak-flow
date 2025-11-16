@@ -28,11 +28,11 @@ export const MoodSelector = ({ onSelect, selected }: MoodSelectorProps) => {
           <Button
             key={mood.id}
             variant={isSelected ? "default" : "outline"}
-            className={`h-auto py-3 flex-col gap-1.5 ${isSelected ? "" : "hover:border-primary"}`}
+            className={`h-auto py-2.5 flex-col gap-1 ${isSelected ? "" : "hover:border-primary"}`}
             onClick={() => onSelect(mood.id)}
           >
             <Icon className={`h-5 w-5 ${isSelected ? "" : mood.color}`} />
-            <span className="text-[10px] leading-tight">{mood.label}</span>
+            <span className="text-[8px] leading-none text-center">{mood.label}</span>
           </Button>
         );
       })}
