@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Target, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ChallengeProgress } from "@/components/ChallengeProgress";
 import {
   AlertDialog,
   AlertDialogAction,
