@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { TodaysPush } from "@/components/TodaysPush";
+import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
 import { 
   Trophy, 
   Target, 
@@ -161,6 +162,12 @@ const Dashboard = () => {
             <p className="text-2xl font-bold text-foreground">{stats.challengesCompleted}</p>
             <p className="text-xs text-muted-foreground">Completed</p>
           </Card>
+        </div>
+
+        {/* Daily Push Widgets */}
+        <div className="space-y-4 mb-8">
+          <TodaysPush />
+          <QuoteOfTheDay />
         </div>
 
         {/* Progress Details */}
