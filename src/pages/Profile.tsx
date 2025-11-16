@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BarChart3 } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BarChart3, Heart, Trophy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -219,6 +219,33 @@ const Profile = () => {
                 </Button>
               </div>
             </Card>
+
+            {/* Quick Actions */}
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <Card className="p-4 bg-card border-border shadow-soft hover:shadow-glow transition-all cursor-pointer" onClick={() => navigate("/library")}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/20 p-3 rounded-2xl">
+                    <Heart className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">My Library</p>
+                    <p className="text-xs text-muted-foreground">Favorites & Downloads</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-card border-border shadow-soft hover:shadow-glow transition-all cursor-pointer" onClick={() => navigate("/challenges")}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-accent/20 p-3 rounded-2xl">
+                    <Trophy className="h-5 w-5 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Challenges</p>
+                    <p className="text-xs text-muted-foreground">Track your progress</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
 
             <div className="pt-6 border-t border-border">
               <Button onClick={handleSignOut} variant="outline" className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">

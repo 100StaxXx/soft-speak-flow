@@ -26,6 +26,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Habits = lazy(() => import("./pages/Habits"));
 const Reflection = lazy(() => import("./pages/Reflection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
+const Library = lazy(() => import("./pages/Library"));
+const Challenges = lazy(() => import("./pages/Challenges"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +82,8 @@ const AppContent = () => {
           <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+          <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
