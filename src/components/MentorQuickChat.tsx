@@ -21,26 +21,11 @@ const ROTATING_QUESTIONS = [
 export const MentorQuickChat = () => {
   const navigate = useNavigate();
   const [currentQuestions, setCurrentQuestions] = useState<string[]>([]);
-  const [fadeKey, setFadeKey] = useState(0);
 
   useEffect(() => {
-    // Select 3 random questions initially
-    const selectRandomQuestions = () => {
-      const shuffled = [...ROTATING_QUESTIONS].sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, 3);
-    };
-
-    setCurrentQuestions(selectRandomQuestions());
-
-    // Rotate questions every 8 seconds
-    const interval = setInterval(() => {
-      setFadeKey(prev => prev + 1);
-      setTimeout(() => {
-        setCurrentQuestions(selectRandomQuestions());
-      }, 300); // Wait for fade out
-    }, 8000);
-
-    return () => clearInterval(interval);
+    // Select 3 random questions on mount
+    const shuffled = [...ROTATING_QUESTIONS].sort(() => Math.random() - 0.5);
+    setCurrentQuestions(shuffled.slice(0, 3));
   }, []);
 
   const handleQuestionClick = (question: string) => {
@@ -55,13 +40,12 @@ export const MentorQuickChat = () => {
         <h3 className="font-bold text-foreground">Quick Chat</h3>
       </div>
       
-      <div className="space-y-2" key={fadeKey}>
+      <div className="space-y-2">
         {currentQuestions.map((question, index) => (
           <button
-            key={`${fadeKey}-${index}`}
+            key={index}
             onClick={() => handleQuestionClick(question)}
-            className="w-full text-left px-4 py-3 rounded-lg bg-secondary/50 hover:bg-secondary hover:shadow-glow transition-all text-sm text-foreground hover:scale-[1.02] animate-fade-in"
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="w-full text-left px-4 py-3 rounded-lg bg-secondary/50 hover:bg-secondary hover:shadow-glow transition-all text-sm text-foreground hover:scale-[1.02]"
           >
             "{question}"
           </button>
