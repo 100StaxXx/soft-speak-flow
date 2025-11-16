@@ -29,8 +29,6 @@ import MentorSelection from "./pages/MentorSelection";
 import NotFound from "./pages/NotFound";
 import Habits from "./pages/Habits";
 import Challenges from "./pages/Challenges";
-import ChallengeDetail from "./pages/ChallengeDetail";
-import NightReflection from "./pages/NightReflection";
 import AudioLibrary from "./pages/AudioLibrary";
 import Lessons from "./pages/Lessons";
 import FocusMode from "./pages/FocusMode";
@@ -91,8 +89,6 @@ const AppContent = () => {
         <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
         <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
         <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-        <Route path="/challenge/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
-        <Route path="/night-reflection" element={<ProtectedRoute><NightReflection /></ProtectedRoute>} />
         <Route path="/audio" element={<ProtectedRoute><AudioLibrary /></ProtectedRoute>} />
         <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
         <Route path="/focus" element={<ProtectedRoute><FocusMode /></ProtectedRoute>} />
