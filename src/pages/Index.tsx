@@ -43,6 +43,7 @@ const Index = () => {
   const [hasActiveChallenges, setHasActiveChallenges] = useState(false);
   const [dailyLesson, setDailyLesson] = useState<any>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(false);
 
   // Mark that home has been visited
   useEffect(() => {
@@ -66,6 +67,19 @@ const Index = () => {
       }
     }, 100);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Enable scroll snap after first user interaction to avoid auto-snapping on load
+  useEffect(() => {
+    const container = document.getElementById('main-scroll-container');
+    if (!container) return;
+    const enable = () => setSnapEnabled(true);
+    container.addEventListener('wheel', enable, { once: true, passive: true });
+    container.addEventListener('touchstart', enable, { once: true, passive: true });
+    return () => {
+      container.removeEventListener('wheel', enable);
+      container.removeEventListener('touchstart', enable);
+    };
   }, []);
 
   useEffect(() => {
@@ -246,7 +260,7 @@ const Index = () => {
 
   return (
     <div 
-      className={`snap-y overflow-y-scroll h-screen transition-opacity duration-300 ${isInitializing ? 'opacity-0' : 'opacity-100'}`}
+      className={`${snapEnabled ? 'snap-y' : 'snap-none'} overflow-y-scroll h-screen transition-opacity duration-300 ${isInitializing ? 'opacity-0' : 'opacity-100'}`}
       id="main-scroll-container"
     >
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
