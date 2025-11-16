@@ -257,7 +257,7 @@ const Inspire = () => {
               value="audio"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground transition-all duration-300"
             >
-              Audio
+              Pep Talks
             </TabsTrigger>
           </TabsList>
 
