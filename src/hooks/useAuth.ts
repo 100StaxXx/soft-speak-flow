@@ -21,7 +21,7 @@ export const useAuth = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      // Do not set loading here; wait for onAuthStateChange to finalize
     });
 
     return () => subscription.unsubscribe();
