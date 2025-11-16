@@ -1,4 +1,4 @@
-import { Home, Target, MessageCircleHeart, BookOpen, User } from "lucide-react";
+import { Home, Target, MessageCircleHeart, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {

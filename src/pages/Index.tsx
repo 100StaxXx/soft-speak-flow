@@ -14,6 +14,7 @@ import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { MentorNudges } from "@/components/MentorNudges";
 import { WeeklyInsights } from "@/components/WeeklyInsights";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -71,13 +72,18 @@ const Index = () => {
     <PageTransition>
       <OnboardingTour />
       <div className="min-h-screen bg-background pb-20">
-        {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Home
-            </h1>
-            <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
+          {/* Header */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50">
+          <div className="max-w-4xl mx-auto px-4 py-4 space-y-3">
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Home
+              </h1>
+              <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
+            </div>
+            <div data-tour="search">
+              <GlobalSearch />
+            </div>
           </div>
         </div>
 
