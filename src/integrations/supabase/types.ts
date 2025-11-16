@@ -1117,6 +1117,7 @@ export type Database = {
           email: string | null
           id: string
           is_premium: boolean | null
+          onboarding_completed: boolean | null
           preferences: Json | null
           selected_mentor_id: string | null
           timezone: string | null
@@ -1133,6 +1134,7 @@ export type Database = {
           email?: string | null
           id: string
           is_premium?: boolean | null
+          onboarding_completed?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null
@@ -1149,6 +1151,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_premium?: boolean | null
+          onboarding_completed?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null
@@ -1163,6 +1166,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       questionnaire_responses: {
         Row: {

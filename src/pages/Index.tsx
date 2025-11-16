@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition, SlideUp } from "@/components/PageTransition";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 const Index = () => {
   const { user } = useAuth();
@@ -68,6 +69,7 @@ const Index = () => {
 
   return (
     <PageTransition>
+      <OnboardingTour />
       <div className="min-h-screen bg-background pb-20">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
@@ -91,7 +93,9 @@ const Index = () => {
 
           {/* Today's Pep Talk */}
           <SlideUp delay={0.2}>
-            <TodaysPepTalk />
+            <div data-tour="daily-content">
+              <TodaysPepTalk />
+            </div>
           </SlideUp>
 
           {/* Quote of the Day */}
@@ -109,7 +113,7 @@ const Index = () => {
 
           {/* Activity Timeline */}
           <SlideUp delay={0.5}>
-            <div>
+            <div data-tour="activity-feed">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar className="h-5 w-5 text-primary" />
                 <h2 className="font-bold text-lg">Your Journey</h2>
