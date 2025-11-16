@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
-import { useAchievements } from "@/hooks/useAchievements";
 import { HabitCard } from "@/components/HabitCard";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
@@ -26,7 +25,6 @@ export default function Habits() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
-  const { checkAndAwardAchievement } = useAchievements();
   const personality = useMentorPersonality();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
@@ -129,27 +127,13 @@ export default function Habits() {
         .eq('id', habitId)
         .single();
       
-      if (updatedHabit) {
-        const streak = updatedHabit.current_streak;
-        
-        // Award achievements for streaks
-        if (streak === 7) {
-          await checkAndAwardAchievement('streak_7', { habit_id: habitId, streak });
-        } else if (streak === 30) {
-          await checkAndAwardAchievement('streak_30', { habit_id: habitId, streak });
-        } else if (streak === 100) {
-          await checkAndAwardAchievement('streak_100', { habit_id: habitId, streak });
-        }
-        
-        // Show milestone modal
-        if ([3, 7, 14, 30, 100].includes(streak)) {
-          haptics.success();
-          setMilestoneModal({
-            open: true,
-            streak,
-            title: updatedHabit.title
-          });
-        }
+      if (updatedHabit && [3, 7, 14, 30, 100].includes(updatedHabit.current_streak)) {
+        haptics.success(); // Celebration haptic for milestone
+        setMilestoneModal({
+          open: true,
+          streak: updatedHabit.current_streak,
+          title: updatedHabit.title
+        });
       }
     },
     onError: (error) => {

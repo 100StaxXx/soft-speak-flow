@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { useAchievements } from "@/hooks/useAchievements";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const MorningCheckIn = () => {
@@ -16,7 +15,6 @@ export const MorningCheckIn = () => {
   const { toast } = useToast();
   const personality = useMentorPersonality();
   const queryClient = useQueryClient();
-  const { checkAndAwardAchievement } = useAchievements();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,18 +65,6 @@ export const MorningCheckIn = () => {
       supabase.functions.invoke('generate-check-in-response', {
         body: { checkInId: checkIn.id }
       });
-
-      // Check for morning warrior achievement (7 check-ins)
-      const { count } = await supabase
-        .from('daily_check_ins')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('check_in_type', 'morning')
-        .not('completed_at', 'is', null);
-
-      if (count === 7) {
-        await checkAndAwardAchievement('morning_warrior', { check_in_count: count });
-      }
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
     } catch (error) {

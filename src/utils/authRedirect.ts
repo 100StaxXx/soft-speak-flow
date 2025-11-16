@@ -21,8 +21,7 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
     return "/";
   } catch (error) {
     console.error("Error checking profile:", error);
-    // If verification fails (likely unauthenticated), send to auth
-    return "/auth";
+    return "/onboarding";
   }
 };
 

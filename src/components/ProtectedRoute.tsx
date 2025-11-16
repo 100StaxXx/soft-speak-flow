@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRouteProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
@@ -18,7 +18,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
     // Wait for auth to load
     if (authLoading || profileLoading) return;
 
-    // ALWAYS redirect to auth if not logged in - even for requireMentor=false routes
+    // Redirect to auth if not logged in
     if (!user) {
       navigate("/auth");
       return;
@@ -26,7 +26,23 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
     // Redirect to onboarding if mentor required and profile missing or not selected
     if (requireMentor && (!profile || !profile.selected_mentor_id)) {
-      navigate("/onboarding");
+      // Double-check server state to avoid stale client redirect
+      (async () => {
+        try {
+          if (!user) return;
+          const { data } = await supabase
+            .from('profiles')
+            .select('selected_mentor_id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!data?.selected_mentor_id) {
+            navigate("/onboarding");
+          }
+        } catch {
+          navigate("/onboarding");
+        }
+      })();
     }
   }, [user, profile, authLoading, profileLoading, requireMentor, navigate]);
 
