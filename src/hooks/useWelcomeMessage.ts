@@ -6,16 +6,22 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const useWelcomeMessage = () => {
   const { user } = useAuth();
-  const { activities, logActivity } = useActivityFeed();
+  const { activities } = useActivityFeed();
   const personality = useMentorPersonality();
 
   useEffect(() => {
     const addWelcomeMessage = async () => {
-      if (!user || !personality || activities.length > 0) return;
+      if (!user || !personality) return;
 
-      // Check if welcome already added
-      const hasWelcome = activities.some(a => a.activity_type === 'welcome');
-      if (hasWelcome) return;
+      // Check if welcome already exists in database
+      const { data: existingWelcome } = await supabase
+        .from('activity_feed')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('activity_type', 'welcome')
+        .maybeSingle();
+      
+      if (existingWelcome) return;
 
       // Create welcome message
       const welcomeMessages: Record<string, string> = {
