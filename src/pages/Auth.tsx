@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { ChevronDown } from "lucide-react";
+import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 
 const authSchema = z.object({
   email: z.string()
@@ -50,55 +51,22 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Check profile to decide destination
-        let { data: profileData } = await supabase
-          .from("profiles")
-          .select("selected_mentor_id")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (!profileData) {
-          await supabase.from("profiles").insert({
-            id: session.user.id,
-            email: session.user.email ?? null,
-          });
-        }
-
-        if (!profileData?.selected_mentor_id) {
-          navigate("/onboarding");
-        } else {
-          navigate("/");
-        }
+        await ensureProfile(session.user.id, session.user.email);
+        const path = await getAuthRedirectPath(session.user.id);
+        navigate(path);
       }
-    });
+    };
+
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Check if profile exists, create if needed
-        let { data: profileData } = await supabase
-          .from("profiles")
-          .select("selected_mentor_id")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        // Auto-create profile if missing
-        if (!profileData) {
-          await supabase.from("profiles").insert({
-            id: session.user.id,
-            email: session.user.email ?? null,
-          });
-          profileData = { selected_mentor_id: null };
-        }
-
-        // Redirect based on mentor selection
-        if (!profileData?.selected_mentor_id) {
-          navigate("/onboarding");
-        } else {
-          navigate("/");
-        }
+        await ensureProfile(session.user.id, session.user.email);
+        const path = await getAuthRedirectPath(session.user.id);
+        navigate(path);
       }
     });
 
@@ -136,11 +104,6 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully signed in.",
-        });
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -151,12 +114,6 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        toast({
-          title: "Welcome!",
-          description: "Let's find your perfect mentor.",
-        });
-        navigate("/onboarding");
       }
     } catch (error: any) {
       toast({

@@ -50,7 +50,6 @@ export const PushNotificationSettings = () => {
         const subscription = await subscribeToPush(user.id);
         if (subscription) {
           setPushEnabled(true);
-          toast({ title: "Push notifications enabled" });
         } else {
           toast({ 
             title: "Permission denied", 
@@ -62,7 +61,6 @@ export const PushNotificationSettings = () => {
         // Unsubscribe from push notifications
         await unsubscribeFromPush(user.id);
         setPushEnabled(false);
-        toast({ title: "Push notifications disabled" });
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -89,7 +87,6 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      toast({ title: enabled ? "Daily pep talks enabled" : "Daily pep talks disabled" });
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -116,7 +113,6 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      toast({ title: enabled ? "Daily quotes enabled" : "Daily quotes disabled" });
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -132,7 +128,6 @@ export const PushNotificationSettings = () => {
         .eq("id", user.id);
       
       if (error) throw error;
-      toast({ title: "Time updated" });
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });

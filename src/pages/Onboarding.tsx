@@ -97,11 +97,6 @@ export default function Onboarding() {
         })
         .eq('id', user.id);
 
-      toast({
-        title: "Mentor selected!",
-        description: `${recommendedMentor.name} will guide your journey.`,
-      });
-
       // Force reload to refresh profile state
       window.location.href = "/";
     } catch (error) {
@@ -135,11 +130,6 @@ export default function Onboarding() {
         .eq('id', user.id);
 
       const selectedMentor = mentors.find(m => m.id === mentorId);
-
-      toast({
-        title: "Mentor selected!",
-        description: `${selectedMentor?.name} will guide your journey.`,
-      });
 
       // Force reload to refresh profile state
       window.location.href = "/";
