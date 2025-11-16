@@ -53,9 +53,16 @@ export const TodaysPepTalk = () => {
         .single();
 
       if (data) {
+        const transcript = Array.isArray(data.transcript) ? data.transcript : [];
+        console.log('Daily pep talk loaded:', {
+          hasTranscript: transcript.length > 0,
+          transcriptLength: transcript.length,
+          hasScript: !!data.script
+        });
         setPepTalk({ 
           ...data, 
-          mentor_name: mentor.name
+          mentor_name: mentor.name,
+          transcript
         });
       }
       setLoading(false);
@@ -72,6 +79,11 @@ export const TodaysPepTalk = () => {
           body: { id: pepTalk.id }
         });
         if (!error && data?.script) {
+          console.log('Transcript sync response:', {
+            hasTranscript: !!data.transcript,
+            transcriptLength: data.transcript?.length || 0,
+            changed: data.changed
+          });
           setPepTalk((prev: any) => {
             if (!prev) return prev;
             const shouldUpdate = data.script !== prev.script || JSON.stringify(data.transcript) !== JSON.stringify(prev.transcript);
@@ -100,11 +112,13 @@ export const TodaysPepTalk = () => {
       setCurrentTime(time);
       
       // Update active word index based on word timestamps
-      if (pepTalk?.transcript && Array.isArray(pepTalk.transcript)) {
+      if (pepTalk?.transcript && Array.isArray(pepTalk.transcript) && pepTalk.transcript.length > 0) {
         const wordIndex = pepTalk.transcript.findIndex((w: CaptionWord) => 
           time >= w.start && time <= w.end
         );
-        setActiveWordIndex(wordIndex);
+        if (wordIndex !== activeWordIndex && wordIndex >= 0) {
+          setActiveWordIndex(wordIndex);
+        }
       }
     };
     
@@ -123,7 +137,7 @@ export const TodaysPepTalk = () => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk?.transcript]);
+  }, [pepTalk?.transcript, activeWordIndex]);
 
   // Auto-scroll to active word
   useEffect(() => {
