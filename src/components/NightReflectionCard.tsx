@@ -33,7 +33,7 @@ export function NightReflectionCard() {
   };
 
   return (
-    <Card className="p-4 hover:border-primary/40 transition-all cursor-pointer" onClick={() => navigate('/night-reflection')}>
+    <Card className="p-4 hover:border-primary/40 transition-all cursor-pointer" onClick={() => navigate('/reflection')}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Moon className="w-5 h-5 text-primary" />
@@ -47,7 +47,7 @@ export function NightReflectionCard() {
               </>
             ) : (
               <>
-                <div className="text-sm font-medium text-foreground">Tonight: reflect on your day</div>
+                <div className="text-sm font-medium text-foreground">Reflect on your day</div>
                 <div className="text-xs text-muted-foreground">Quick check-in</div>
               </>
             )}

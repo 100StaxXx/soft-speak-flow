@@ -52,7 +52,7 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/night-reflection"
+          to="/reflection"
           className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
