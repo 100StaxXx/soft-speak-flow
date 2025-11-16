@@ -7,6 +7,7 @@ import { Quote, Sparkles } from "lucide-react";
 export const QuoteOfTheDay = () => {
   const { profile } = useProfile();
   const [todaysQuote, setTodaysQuote] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTodaysQuote = async () => {
@@ -21,28 +22,40 @@ export const QuoteOfTheDay = () => {
         .eq("id", profile.selected_mentor_id)
         .single();
 
-      if (!mentor) return;
+      if (!mentor) {
+        setLoading(false);
+        return;
+      }
 
-      // Check if there's a daily quote for today
-      const { data: dailyQuote } = await supabase
-        .from("daily_quotes")
-        .select(`
-          *,
-          quotes:quote_id (*)
-        `)
+      // Get today's pep talk to find related quote
+      const { data: dailyPepTalk } = await supabase
+        .from("daily_pep_talks")
+        .select("emotional_triggers, topic_category")
         .eq("for_date", today)
         .eq("mentor_slug", mentor.slug)
         .single();
 
-      if (dailyQuote) {
-        setTodaysQuote(dailyQuote.quotes);
+      if (dailyPepTalk) {
+        // Fetch a quote that matches the pep talk's themes
+        const { data: quote } = await supabase
+          .from("quotes")
+          .select("*")
+          .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
+          .limit(1)
+          .single();
+
+        if (quote) {
+          setTodaysQuote(quote);
+        }
       }
+      
+      setLoading(false);
     };
 
     fetchTodaysQuote();
   }, [profile?.selected_mentor_id]);
 
-  if (!todaysQuote) return null;
+  if (loading || !todaysQuote) return null;
 
   return (
     <Card className="relative overflow-hidden group animate-fade-in">
