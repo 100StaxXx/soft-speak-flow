@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
+import atlasSage from "@/assets/atlas-sage.png";
 
 interface Mentor {
   id: string;
@@ -55,7 +56,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
         <div className="fixed inset-0 z-50 bg-obsidian animate-fade-in">
           {/* Full Size Mentor Image */}
           <div className="absolute inset-0">
-            {activeMentor.avatar_url ? (
+            {activeMentor.slug === 'atlas' ? (
+              <img 
+                src={atlasSage}
+                alt={activeMentor.name}
+                className="w-full h-full object-cover opacity-60"
+              />
+            ) : activeMentor.avatar_url ? (
               <img 
                 src={activeMentor.avatar_url}
                 alt={activeMentor.name}
@@ -206,7 +213,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                       : `0 0 20px ${mentor.primary_color}40`
                   }}
                 >
-                  {mentor.avatar_url ? (
+                  {mentor.slug === 'atlas' ? (
+                    <img 
+                      src={atlasSage} 
+                      alt={mentor.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                  ) : mentor.avatar_url ? (
                     <img 
                       src={mentor.avatar_url} 
                       alt={mentor.name}
