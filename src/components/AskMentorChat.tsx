@@ -18,83 +18,40 @@ interface AskMentorChatProps {
   hasActiveChallenges?: boolean;
 }
 
-const getMentorSpecificPrompts = (mentorName: string, mentorTone: string) => {
-  const isTough = mentorTone.toLowerCase().includes("tough") || mentorTone.toLowerCase().includes("direct");
-  const isEmpathetic = mentorTone.toLowerCase().includes("empathetic") || mentorTone.toLowerCase().includes("supportive");
-  
-  if (isTough) {
-    return [
-      "I need a reality check",
-      "Call me out on my excuses",
-      "Give me the hard truth",
-      "Push me to do better",
-      "What am I doing wrong?",
-    ];
-  } else if (isEmpathetic) {
-    return [
-      "I'm struggling today",
-      "I need some encouragement",
-      "Help me be kinder to myself",
-      "I'm feeling lost",
-      "Remind me why I started",
-    ];
-  }
-  
-  return [
-    "I need motivation",
-    "Help me stay focused",
-    "What should I work on?",
-    "Give me a pep talk",
-    "I'm feeling stuck",
-  ];
-};
-
-const getTimeBasedPrompts = () => {
+const getSmartPrompts = (
+  mentorTone: string,
+  hasActiveHabits: boolean,
+  hasActiveChallenges: boolean
+): string[] => {
   const hour = new Date().getHours();
+  const isTough = /tough|direct/i.test(mentorTone);
+  const isEmpathetic = /empathetic|supportive/i.test(mentorTone);
+  
+  const prompts = [];
   
   if (hour >= 5 && hour < 12) {
-    return [
-      "Help me start my day strong",
-      "What should I focus on today?",
-      "Give me morning motivation",
-      "How can I make today count?",
-    ];
+    prompts.push("Help me start my day strong", "What should I focus on today?");
   } else if (hour >= 12 && hour < 17) {
-    return [
-      "I need an afternoon boost",
-      "Help me power through the day",
-      "I'm losing momentum",
-      "Keep me on track",
-    ];
+    prompts.push("I need an afternoon boost", "Keep me on track");
   } else {
-    return [
-      "Help me reflect on today",
-      "How can I finish strong?",
-      "What did I learn today?",
-      "Prepare me for tomorrow",
-    ];
-  }
-};
-
-const getActivityBasedPrompts = (hasActiveHabits: boolean, hasActiveChallenges: boolean) => {
-  const prompts: string[] = [];
-  
-  if (hasActiveHabits) {
-    prompts.push("Help me stay consistent with my habits");
-    prompts.push("I'm breaking my streak");
+    prompts.push("Help me reflect on today", "Prepare me for tomorrow");
   }
   
-  if (hasActiveChallenges) {
-    prompts.push("Keep me motivated for my challenge");
-    prompts.push("The challenge is getting hard");
+  if (isTough) {
+    prompts.push("Give me the hard truth");
+  } else if (isEmpathetic) {
+    prompts.push("I need some encouragement");
+  } else {
+    prompts.push("Give me a pep talk");
   }
   
-  if (!hasActiveHabits && !hasActiveChallenges) {
+  if (hasActiveHabits || hasActiveChallenges) {
+    prompts.push(hasActiveHabits ? "Help me stay consistent" : "Keep me motivated");
+  } else {
     prompts.push("Help me build better habits");
-    prompts.push("What challenge should I start?");
   }
   
-  return prompts;
+  return prompts.sort(() => Math.random() - 0.5).slice(0, 3);
 };
 
 export const AskMentorChat = ({ 
@@ -112,190 +69,120 @@ export const AskMentorChat = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadDynamicPrompts = () => {
-      const mentorPrompts = getMentorSpecificPrompts(mentorName, mentorTone);
-      const timePrompts = getTimeBasedPrompts();
-      const activityPrompts = getActivityBasedPrompts(hasActiveHabits, hasActiveChallenges);
-      
-      // Combine and shuffle prompts, take 3
-      const allPrompts = [...mentorPrompts.slice(0, 2), ...timePrompts.slice(0, 2), ...activityPrompts.slice(0, 1)];
-      const shuffled = allPrompts.sort(() => Math.random() - 0.5);
-      setSuggestedPrompts(shuffled.slice(0, 3));
-    };
-    
-    loadDynamicPrompts();
-  }, [mentorName, mentorTone, hasActiveHabits, hasActiveChallenges]);
+    setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
+  }, [mentorTone, hasActiveHabits, hasActiveChallenges]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async (messageText?: string) => {
-    const textToSend = messageText || input;
-    if (!textToSend.trim() || isLoading) return;
-
-    const userMessage: Message = { role: "user", content: textToSend };
-    setMessages((prev) => [...prev, userMessage]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
     setInput("");
+    await sendMessage(text);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
     setShowSuggestions(false);
+    sendMessage(suggestion);
+  };
+
+  const sendMessage = async (text: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
+      return;
+    }
+
+    const userMsg: Message = { role: "user", content: text };
+    setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to chat with your mentor.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Get all previous messages for context
-      const { data: previousMessages } = await supabase
-        .from('mentor_chats')
-        .select('role, content')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(20);
-
-      const conversationHistory = previousMessages || [];
-      
       const { data, error } = await supabase.functions.invoke("mentor-chat", {
         body: {
-          message: textToSend,
+          message: text,
           mentorName,
           mentorTone,
-          conversationHistory: conversationHistory.map(m => ({
-            role: m.role,
-            content: m.content
-          }))
+          conversationHistory: messages.slice(-10)
         },
       });
 
       if (error) throw error;
 
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.response,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      const assistantMsg: Message = { role: "assistant", content: data.response };
+      setMessages((prev) => [...prev, assistantMsg]);
 
-      // Save both messages to database
       await supabase.from('mentor_chats').insert([
-        { user_id: user.id, role: 'user', content: textToSend },
+        { user_id: user.id, role: 'user', content: text },
         { user_id: user.id, role: 'assistant', content: data.response }
       ]);
-
-    } catch (error) {
-      console.error("Error sending message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to get response. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send message", variant: "destructive" });
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLilPush = async () => {
-    await handleSend("Give me a lil push to stay motivated today");
-  };
-
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border p-5 md:p-6 flex flex-col shadow-medium">
-      <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-4">
-        Ask {mentorName} Anything
-      </h3>
-
-      {/* Messages */}
-      <div className="space-y-3 mb-4">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && showSuggestions && (
-          <div className="space-y-4 p-4">
-            <p className="text-sm text-muted-foreground text-center">What do you need a lil push on?</p>
-            <div className="grid grid-cols-1 gap-2">
-              {suggestedPrompts.map((prompt) => (
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-center">
+              Choose a prompt or type your own message
+            </p>
+            <div className="grid gap-2">
+              {suggestedPrompts.map((prompt, idx) => (
                 <Button
-                  key={prompt}
+                  key={idx}
                   variant="outline"
-                  size="sm"
-                  onClick={() => handleSend(prompt)}
-                  className="text-left justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary/50 whitespace-normal"
+                  className="justify-start text-left h-auto py-3 px-4 hover:bg-accent"
+                  onClick={() => handleSuggestionClick(prompt)}
                 >
-                  <span className="text-xs">{prompt}</span>
+                  {prompt}
                 </Button>
               ))}
             </div>
-            <Button
-              onClick={handleLilPush}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 font-bold"
-            >
-              Lil Push of the Day
-            </Button>
           </div>
         )}
-        {messages.length === 0 && !showSuggestions && (
-          <div className="flex items-center justify-center py-8">
-            <p className="text-muted-foreground text-center text-sm italic max-w-xs">
-              Your motivator is ready to guide you. Ask anything...
-            </p>
-          </div>
-        )}
-        
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-velocity-fade-in`}
-          >
-            <div
-              className={`max-w-[85%] md:max-w-[80%] rounded-xl p-3 md:p-4 ${
-                message.role === "user"
-                  ? "bg-primary/15 border border-primary/30 text-foreground"
-                  : "bg-secondary/80 border border-border text-foreground"
-              }`}
-            >
-              <p className="leading-relaxed text-sm md:text-base break-words">{message.content}</p>
+
+        {messages.map((msg, idx) => (
+          <Card key={idx} className={`p-4 ${msg.role === 'user' ? 'ml-8 bg-primary/10' : 'mr-8'}`}>
+            <div className="font-semibold mb-1 text-sm">
+              {msg.role === 'user' ? 'You' : mentorName}
             </div>
-          </div>
+            <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+          </Card>
         ))}
-        
+
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-secondary/80 border border-border rounded-xl p-4 flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Thinking...</span>
-            </div>
-          </div>
+          <Card className="p-4 mr-8">
+            <div className="font-semibold mb-1 text-sm">{mentorName}</div>
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </Card>
         )}
+        
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="flex gap-2 pt-3 border-t border-border">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Type your question..."
-          disabled={isLoading}
-          className="flex-1 bg-background/50 border-border/50 text-sm"
-        />
-        <Button
-          onClick={() => handleSend()}
-          disabled={isLoading || !input.trim()}
-          size="icon"
-          className="shrink-0 bg-primary hover:bg-primary/90"
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-    </Card>
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        <div className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={isLoading || !input.trim()}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
