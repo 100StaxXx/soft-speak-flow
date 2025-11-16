@@ -42,18 +42,79 @@ serve(async (req) => {
     console.log(`Found ${pendingPushes?.length || 0} quote pushes to dispatch`);
 
     let dispatched = 0;
+    let skipped = 0;
     const errors: any[] = [];
 
     for (const push of pendingPushes || []) {
       try {
         console.log(`Dispatching quote push ${push.id} to user ${push.user_id}`);
         
-        // TODO: Integrate with actual push notification service
-        // For now, we'll just log that it was dispatched
-        // In a real implementation, this would call your push notification provider
-        
         const quote = push.daily_quotes?.quotes;
-        console.log(`Quote: "${quote?.text}" - ${quote?.author || 'Unknown'}`);
+        if (!quote) {
+          console.error(`No quote found for push ${push.id}`);
+          continue;
+        }
+
+        // Get user's push subscriptions
+        const { data: subscriptions, error: subError } = await supabase
+          .from('push_subscriptions')
+          .select('endpoint, p256dh, auth')
+          .eq('user_id', push.user_id);
+
+        if (subError) {
+          console.error(`Error fetching subscriptions for user ${push.user_id}:`, subError);
+          errors.push({ push_id: push.id, error: subError.message });
+          continue;
+        }
+
+        if (!subscriptions || subscriptions.length === 0) {
+          console.log(`No push subscriptions for user ${push.user_id}`);
+          // Still mark as delivered even if no subscriptions
+          await supabase
+            .from('user_daily_quote_pushes')
+            .update({ delivered_at: new Date().toISOString() })
+            .eq('id', push.id);
+          skipped++;
+          continue;
+        }
+
+        // Send push notification to each subscription
+        for (const subscription of subscriptions) {
+          try {
+            const pushPayload = {
+              notification: {
+                title: "Your Daily Quote",
+                body: `"${quote.text}" - ${quote.author || 'Unknown'}`,
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                data: {
+                  url: '/inspire?tab=quotes'
+                }
+              }
+            };
+
+            // Send push notification using Web Push
+            const webPushResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `key=${Deno.env.get('FCM_SERVER_KEY') || ''}`
+              },
+              body: JSON.stringify({
+                to: subscription.endpoint,
+                ...pushPayload
+              })
+            });
+
+            if (!webPushResponse.ok) {
+              console.error(`Push notification failed for subscription:`, await webPushResponse.text());
+            } else {
+              console.log(`Push notification sent successfully`);
+            }
+          } catch (subError) {
+            console.error(`Error sending to subscription:`, subError);
+          }
+        }
 
         // Mark as delivered
         const { error: updateError } = await supabase
@@ -81,6 +142,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         dispatched,
+        skipped,
         errors: errors.length > 0 ? errors : undefined,
         total: pendingPushes?.length || 0,
       }),
