@@ -171,7 +171,7 @@ const Quotes = () => {
             {isLoading && !quoteData ? (
               <div className="text-center">
                 <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
-                <p className="text-white/80 text-xs mt-2">Creating your quote...</p>
+                <p className="text-white/80 text-xs mt-2">Finding your quote...</p>
               </div>
             ) : quoteData?.imageUrl ? (
               <>
