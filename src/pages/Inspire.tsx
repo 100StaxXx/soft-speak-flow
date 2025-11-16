@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { FloatingBubbles } from "@/components/FloatingBubbles";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { SearchBar } from "@/components/SearchBar";
-import { FilterBar } from "@/components/FilterBar";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +22,9 @@ interface PepTalk {
   audio_url: string;
   is_featured: boolean;
   created_at: string;
+  emotional_triggers?: string[];
+  topic_category?: string[];
+  intensity?: string;
 }
 
 const Inspire = () => {
@@ -35,7 +38,8 @@ const Inspire = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [refetchCounter, setRefetchCounter] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -75,14 +79,37 @@ const Inspire = () => {
     },
   });
 
-  const categories = Array.from(new Set(pepTalks.map(p => p.category)));
+  // Extract unique categories and triggers
+  const allCategories = Array.from(
+    new Set(
+      pepTalks.flatMap(p => [
+        p.category,
+        ...(p.topic_category || [])
+      ].filter(Boolean))
+    )
+  ).sort();
+
+  const allTriggers = Array.from(
+    new Set(
+      pepTalks.flatMap(p => p.emotional_triggers || [])
+    )
+  ).sort();
 
   const filteredPepTalks = pepTalks.filter(p => {
     const matchesSearch = !searchQuery || 
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !selectedCategory || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.quote.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const pepTalkCategories = [p.category, ...(p.topic_category || [])].filter(Boolean);
+    const matchesCategory = selectedCategories.length === 0 || 
+      selectedCategories.some(cat => pepTalkCategories.includes(cat));
+    
+    const pepTalkTriggers = p.emotional_triggers || [];
+    const matchesTriggers = selectedTriggers.length === 0 || 
+      selectedTriggers.some(trigger => pepTalkTriggers.includes(trigger));
+    
+    return matchesSearch && matchesCategory && matchesTriggers;
   });
 
   const handleBubbleClick = async (value: string, type: "trigger" | "category") => {
@@ -279,11 +306,24 @@ const Inspire = () => {
                 onSearch={setSearchQuery}
                 placeholder="Search pep talks..."
               />
-              <FilterBar
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onCategorySelect={setSelectedCategory}
-              />
+              
+              {allCategories.length > 0 && (
+                <MultiSelectFilter
+                  label="Categories"
+                  options={allCategories}
+                  selectedValues={selectedCategories}
+                  onSelectionChange={setSelectedCategories}
+                />
+              )}
+              
+              {allTriggers.length > 0 && (
+                <MultiSelectFilter
+                  label="Emotional Triggers"
+                  options={allTriggers}
+                  selectedValues={selectedTriggers}
+                  onSelectionChange={setSelectedTriggers}
+                />
+              )}
             </div>
 
             {pepTalksLoading ? (
