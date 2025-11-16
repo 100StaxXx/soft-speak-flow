@@ -37,6 +37,8 @@ const Quotes = () => {
       if (quoteResult) {
         // If no image URL, generate a gradient background
         if (!quoteResult.imageUrl) {
+          console.log('Generating gradient fallback for quote');
+          
           const gradients = [
             'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
@@ -51,52 +53,57 @@ const Quotes = () => {
           const canvas = document.createElement('canvas');
           canvas.width = 1080;
           canvas.height = 1920;
-          const ctx = canvas.getContext('2d')!;
+          const ctx = canvas.getContext('2d');
           
-          // Create gradient
-          const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-          const colors = randomGradient.match(/#[a-fA-F0-9]{6}/g) || ['#667eea', '#764ba2'];
-          gradient.addColorStop(0, colors[0]);
-          gradient.addColorStop(1, colors[1]);
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          // Add quote text
-          ctx.fillStyle = 'white';
-          ctx.textAlign = 'center';
-          ctx.font = 'bold 72px Arial';
-          
-          // Wrap text
-          const words = quoteResult.text.split(' ');
-          const lines: string[] = [];
-          let currentLine = '';
-          
-          words.forEach(word => {
-            const testLine = currentLine + word + ' ';
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > 900 && currentLine !== '') {
-              lines.push(currentLine);
-              currentLine = word + ' ';
-            } else {
-              currentLine = testLine;
+          if (ctx) {
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            const colors = randomGradient.match(/#[a-fA-F0-9]{6}/g) || ['#667eea', '#764ba2'];
+            gradient.addColorStop(0, colors[0]);
+            gradient.addColorStop(1, colors[1]);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add quote text
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 72px Arial';
+            
+            // Wrap text
+            const words = quoteResult.text.split(' ');
+            const lines: string[] = [];
+            let currentLine = '';
+            
+            words.forEach(word => {
+              const testLine = currentLine + word + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > 900 && currentLine !== '') {
+                lines.push(currentLine);
+                currentLine = word + ' ';
+              } else {
+                currentLine = testLine;
+              }
+            });
+            lines.push(currentLine);
+            
+            // Draw lines
+            const lineHeight = 90;
+            const startY = (canvas.height - lines.length * lineHeight) / 2;
+            lines.forEach((line, i) => {
+              ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
+            });
+            
+            // Add author
+            if (quoteResult.author) {
+              ctx.font = 'italic 48px Arial';
+              ctx.fillText(`— ${quoteResult.author}`, canvas.width / 2, startY + lines.length * lineHeight + 80);
             }
-          });
-          lines.push(currentLine);
-          
-          // Draw lines
-          const lineHeight = 90;
-          const startY = (canvas.height - lines.length * lineHeight) / 2;
-          lines.forEach((line, i) => {
-            ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
-          });
-          
-          // Add author
-          if (quoteResult.author) {
-            ctx.font = 'italic 48px Arial';
-            ctx.fillText(`— ${quoteResult.author}`, canvas.width / 2, startY + lines.length * lineHeight + 80);
+            
+            quoteResult.imageUrl = canvas.toDataURL('image/png');
+            console.log('Gradient image generated successfully');
+          } else {
+            console.error('Failed to get canvas context');
           }
-          
-          quoteResult.imageUrl = canvas.toDataURL('image/png');
         }
         
         setQuoteData(quoteResult);
