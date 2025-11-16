@@ -103,7 +103,7 @@ export const MentorResult = ({
                   src={siennaSage}
                   alt={mentor.name}
                   className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 25%' }}
+                  style={{ objectPosition: 'center 30%' }}
                 />
               ) : mentor.slug === 'lumi' ? (
                 <img
