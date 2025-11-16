@@ -13,6 +13,7 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { MentorNudges } from "@/components/MentorNudges";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -82,6 +83,9 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Proactive Nudges */}
+        <MentorNudges />
+
         {/* Morning Check-in */}
         <MorningCheckIn />
 

@@ -30,11 +30,24 @@ serve(async (req) => {
     // Get mentor personality
     const { data: mentor } = await supabase
       .from('mentors')
-      .select('name, tone_description')
+      .select('name, tone_description, slug')
       .eq('id', checkIn.profiles.selected_mentor_id)
       .single()
 
     if (!mentor) throw new Error('Mentor not found')
+
+    // Get today's pep talk theme
+    const today = new Date().toISOString().split('T')[0]
+    const { data: pepTalk } = await supabase
+      .from('daily_pep_talks')
+      .select('title, topic_category')
+      .eq('for_date', today)
+      .eq('mentor_slug', mentor.slug)
+      .maybeSingle()
+
+    const pepTalkContext = pepTalk 
+      ? `Today's pep talk theme: "${pepTalk.title}" (${pepTalk.topic_category}). Reference this theme if relevant to their intention.`
+      : ''
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
@@ -45,10 +58,13 @@ A user just completed their morning check-in:
 - Mood: ${checkIn.mood}
 - Their focus for today: "${checkIn.intention}"
 
+${pepTalkContext}
+
 Respond with a brief, personalized message (2-3 sentences) that:
 1. Acknowledges their current mood
 2. Supports their intention for the day
-3. Matches your distinctive voice
+3. References today's pep talk theme if it connects to their intention
+4. Matches your distinctive voice
 
 Keep it authentic, direct, and energizing.`
 

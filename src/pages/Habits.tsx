@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { ContextualText } from "@/components/ContextualText";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +23,7 @@ export default function Habits() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
+  const personality = useMentorPersonality();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
@@ -161,7 +164,9 @@ export default function Habits() {
           <Card className="p-8 md:p-12 text-center bg-secondary/30 border-dashed">
             <Flame className="w-16 h-16 mx-auto text-primary mb-4 opacity-50" />
             <h3 className="text-xl font-heading font-black text-foreground mb-2">No Habits Yet</h3>
-            <p className="text-muted-foreground mb-6">Track up to 2 key habits and build your discipline.</p>
+            <p className="text-muted-foreground mb-6">
+              <ContextualText type="empty" context="tracking your habits" fallback="Track up to 2 key habits and build your discipline." />
+            </p>
           </Card>
         )}
 
