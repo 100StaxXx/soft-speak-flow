@@ -65,8 +65,31 @@ export const AskMentorChat = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const [dailyMessageCount, setDailyMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const DAILY_MESSAGE_LIMIT = 10;
+
+  useEffect(() => {
+    // Check today's message count
+    const checkDailyLimit = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('mentor_chats')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('role', 'user')
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`);
+      
+      setDailyMessageCount(count || 0);
+    };
+    checkDailyLimit();
+  }, [messages]);
 
   useEffect(() => {
     setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
@@ -96,6 +119,16 @@ export const AskMentorChat = ({
       return;
     }
 
+    // Check daily limit
+    if (dailyMessageCount >= DAILY_MESSAGE_LIMIT) {
+      toast({ 
+        title: "Daily limit reached", 
+        description: `You've reached your daily limit of ${DAILY_MESSAGE_LIMIT} messages. Reset tomorrow!`,
+        variant: "destructive" 
+      });
+      return;
+    }
+
     const userMsg: Message = { role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
@@ -114,6 +147,9 @@ export const AskMentorChat = ({
 
       const assistantMsg: Message = { role: "assistant", content: data.response };
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Increment daily count
+      setDailyMessageCount(prev => prev + 1);
 
       await supabase.from('mentor_chats').insert([
         { user_id: user.id, role: 'user', content: text },
@@ -170,18 +206,27 @@ export const AskMentorChat = ({
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            disabled={isLoading}
+            placeholder={dailyMessageCount >= DAILY_MESSAGE_LIMIT ? "Daily limit reached" : "Type your message..."}
+            disabled={isLoading || dailyMessageCount >= DAILY_MESSAGE_LIMIT}
             className="flex-1"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
+          <Button type="submit" disabled={isLoading || !input.trim() || dailyMessageCount >= DAILY_MESSAGE_LIMIT}>
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        {dailyMessageCount >= DAILY_MESSAGE_LIMIT ? (
+          <p className="text-xs text-destructive mt-2 text-center">
+            Daily limit reached ({DAILY_MESSAGE_LIMIT} messages). Resets tomorrow!
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            {DAILY_MESSAGE_LIMIT - dailyMessageCount} messages remaining today
+          </p>
+        )}
       </form>
     </div>
   );
