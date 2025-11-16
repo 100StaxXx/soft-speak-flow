@@ -17,6 +17,7 @@ import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import VideoDetail from "./pages/VideoDetail";
 import Quotes from "./pages/Quotes";
+import Inspire from "./pages/Inspire";
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import Saved from "./pages/Saved";
@@ -81,6 +82,7 @@ const AppContent = () => {
         <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
         <Route path="/video/:id" element={<ProtectedRoute><VideoDetail /></ProtectedRoute>} />
         <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+        <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
         <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
         <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetail /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
