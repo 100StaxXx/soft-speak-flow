@@ -5,9 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Moon, Smile, Meh, Frown } from "lucide-react";
+import { ArrowLeft, Moon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
+import { BottomNav } from "@/components/BottomNav";
 
 type Mood = 'good' | 'neutral' | 'tough';
 
@@ -102,11 +103,6 @@ export default function Reflection() {
     }
   };
 
-  const moodOptions = [
-    { value: 'good' as Mood, label: 'Good', icon: Smile, color: 'bg-green-500/20 hover:bg-green-500/30 border-green-500' },
-    { value: 'neutral' as Mood, label: 'Neutral', icon: Meh, color: 'bg-muted hover:bg-muted/80 border-border' },
-    { value: 'tough' as Mood, label: 'Tough', icon: Frown, color: 'bg-red-500/20 hover:bg-red-500/30 border-red-500' }
-  ];
 
   if (isLoading) {
     return (
@@ -143,23 +139,8 @@ export default function Reflection() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground mb-2">How was your day?</p>
-                <div className="flex gap-2">
-                  {moodOptions.map((option) => {
-                    const Icon = option.icon;
-                    const isSelected = todayReflection.mood === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        disabled
-                        className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 flex-1 ${
-                          isSelected ? option.color : 'opacity-30'
-                        }`}
-                      >
-                        <Icon className="w-8 h-8" />
-                        <span className="text-sm font-medium">{option.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="p-4 rounded-xl bg-muted/50">
+                  <p className="text-lg font-medium capitalize">{todayReflection.mood.replace('_', ' ')}</p>
                 </div>
               </div>
 
@@ -189,6 +170,7 @@ export default function Reflection() {
             />
           </Card>
         </div>
+        <BottomNav />
       </div>
     );
   }
@@ -245,6 +227,7 @@ export default function Reflection() {
           </div>
         </Card>
       </div>
+      <BottomNav />
     </div>
   );
 }
