@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { HabitCard } from "@/components/HabitCard";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
@@ -19,6 +20,7 @@ export default function Habits() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { logActivity } = useActivityFeed();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
@@ -87,6 +89,8 @@ export default function Habits() {
 
   const completeHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
+      const habit = habits.find(h => h.id === habitId);
+      
       const { error } = await supabase.from('habit_completions').insert({
         habit_id: habitId,
         user_id: user!.id,
@@ -94,6 +98,17 @@ export default function Habits() {
       });
       
       if (error) throw error;
+      
+      // Log to activity feed
+      if (habit) {
+        logActivity({
+          type: 'habit_completed',
+          data: { 
+            habit_id: habitId,
+            habit_title: habit.title 
+          }
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habit-completions'] });

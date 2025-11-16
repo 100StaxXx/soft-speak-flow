@@ -11,8 +11,10 @@ import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
+import { MorningCheckIn } from "@/components/MorningCheckIn";
+import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { Card } from "@/components/ui/card";
-import { MessageCircle, Target } from "lucide-react";
+import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 const Index = () => {
@@ -80,6 +82,9 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Morning Check-in */}
+        <MorningCheckIn />
+
         {/* Today's Pep Talk */}
         <TodaysPepTalk />
 
@@ -88,6 +93,15 @@ const Index = () => {
 
         {/* Mentor Quick Chat */}
         <MentorQuickChat />
+
+        {/* Activity Timeline */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="h-5 w-5 text-primary" />
+            <h2 className="font-bold text-lg">Your Journey</h2>
+          </div>
+          <ActivityTimeline />
+        </div>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
