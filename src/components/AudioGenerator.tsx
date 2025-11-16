@@ -188,7 +188,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="topic-category">Topic Categories (up to 4)</Label>
+          <Label htmlFor="topic-category">Topic Categories (select multiple, up to 4)</Label>
           <div className="flex flex-wrap gap-2">
             {topicCategoryOptions.map((cat) => (
               <Button
@@ -211,7 +211,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Selected: {topicCategories.length}/4
+            Click to select/deselect categories. Selected: {topicCategories.length}/4
           </p>
         </div>
 
