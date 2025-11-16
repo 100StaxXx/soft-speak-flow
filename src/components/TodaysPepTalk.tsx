@@ -65,6 +65,24 @@ export const TodaysPepTalk = () => {
   }, [profile?.selected_mentor_id]);
 
   useEffect(() => {
+    const runSync = async () => {
+      if (!pepTalk?.id || !pepTalk?.audio_url) return;
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
+          body: { id: pepTalk.id }
+        });
+        if (!error && data?.script && data.script !== pepTalk.script) {
+          setPepTalk((prev: any) => (prev ? { ...prev, script: data.script } : prev));
+        }
+      } catch (_) {
+        // silent fail; avoid blocking UI if sync fails
+      }
+    };
+    runSync();
+  }, [pepTalk?.id]);
+
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
