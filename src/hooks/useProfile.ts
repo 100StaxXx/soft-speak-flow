@@ -10,6 +10,10 @@ interface Profile {
   selected_mentor_id: string | null;
   created_at: string;
   updated_at: string;
+  daily_push_enabled: boolean | null;
+  daily_push_window: string | null;
+  daily_push_time: string | null;
+  timezone: string | null;
 }
 
 export const useProfile = () => {
