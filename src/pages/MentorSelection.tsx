@@ -78,7 +78,8 @@ const MentorSelection = () => {
 
       if (error) throw error;
       
-      navigate("/");
+      // Full reload to ensure profile state is fresh across the app
+      window.location.href = "/";
     } catch (error: any) {
       toast({
         title: "Error selecting mentor",

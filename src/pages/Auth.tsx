@@ -62,11 +62,14 @@ const Auth = () => {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        await ensureProfile(session.user.id, session.user.email);
-        const path = await getAuthRedirectPath(session.user.id);
-        navigate(path);
+        // Defer additional Supabase calls to avoid deadlocks in the callback
+        setTimeout(async () => {
+          await ensureProfile(session.user.id, session.user.email);
+          const path = await getAuthRedirectPath(session.user.id);
+          navigate(path);
+        }, 0);
       }
     });
 

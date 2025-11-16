@@ -89,13 +89,15 @@ export default function Onboarding() {
     try {
       setSelecting(true);
 
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({
           selected_mentor_id: recommendedMentor.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
+
+      if (error) throw error;
 
       // Force reload to refresh profile state
       window.location.href = "/";
@@ -121,13 +123,15 @@ export default function Onboarding() {
     try {
       setSelecting(true);
 
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({
           selected_mentor_id: mentorId,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
+
+      if (error) throw error;
 
       const selectedMentor = mentors.find(m => m.id === mentorId);
 
