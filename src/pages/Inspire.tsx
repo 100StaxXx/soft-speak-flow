@@ -150,23 +150,32 @@ const Inspire = () => {
     
     setIsGeneratingImage(true);
     try {
-      const { data, error } = await supabase.functions.invoke('get-single-quote', {
-        body: { type: bubbleType, value: selectedBubble, includeImage: true }
+      // Generate an image for the CURRENTLY DISPLAYED quote text
+      const { data, error } = await supabase.functions.invoke('generate-quote-image', {
+        body: {
+          quoteText: quoteData.text,
+          author: quoteData.author || 'Unknown',
+          // Pass context if available to help styling
+          category: bubbleType === 'category' ? selectedBubble : undefined,
+          emotionalTrigger: bubbleType === 'trigger' ? selectedBubble : undefined,
+          intensity: quoteData.intensity || 'moderate',
+        },
       });
 
       if (error) throw error;
-      
-      const quoteResult = data?.quote;
-      if (quoteResult?.imageUrl) {
-        setQuoteData(quoteResult);
+
+      const imageUrl = data?.imageUrl as string | undefined;
+      if (imageUrl) {
+        // Preserve current quote text/author; only attach the generated image
+        setQuoteData({ ...quoteData, imageUrl });
         setImageLoaded(false);
-        toast.success("AI image generated!");
+        toast.success('Image generated!');
       } else {
-        toast.error("Failed to generate image");
+        toast.error('Failed to generate image');
       }
     } catch (error) {
       console.error('Image generation error:', error);
-      toast.error("Failed to generate image");
+      toast.error('Failed to generate image');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -176,14 +185,24 @@ const Inspire = () => {
     if (!quoteData?.imageUrl) return;
     
     try {
-      const base64Data = quoteData.imageUrl.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const imageUrl = quoteData.imageUrl as string;
+      let blob: Blob;
+
+      if (imageUrl.startsWith('data:image')) {
+        // Handle base64 data URI
+        const base64Data = imageUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        blob = new Blob([byteArray], { type: 'image/png' });
+      } else {
+        // Handle remote URL
+        const res = await fetch(imageUrl);
+        blob = await res.blob();
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/png' });
       
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -194,10 +213,10 @@ const Inspire = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      toast.success("Quote saved!");
+      toast.success('Quote saved!');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error("Failed to save quote");
+      toast.error('Failed to save quote');
     }
   };
 
@@ -333,13 +352,6 @@ const Inspire = () => {
                     )}
 
                     <div className="flex flex-col gap-3">
-                      <Button
-                        onClick={handleNextQuote}
-                        className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Next Quote
-                      </Button>
                       {!quoteData.imageUrl ? (
                         <Button
                           onClick={handleGenerateImage}
@@ -370,6 +382,14 @@ const Inspire = () => {
                           Download Image
                         </Button>
                       )}
+
+                      <Button
+                        onClick={handleNextQuote}
+                        className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Next Quote
+                      </Button>
                     </div>
                   </div>
                 )}
