@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
 
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-    // Generate background image using Lovable AI (no text in image)
+    // Generate complete quote image with embedded text using Lovable AI
     console.log('Generating image for quote...');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
@@ -215,16 +215,31 @@ Deno.serve(async (req) => {
       try {
         const bgTheme = type === 'category' ? value : 'motivation';
         const emotion = type === 'trigger' ? value : '';
-        const imagePrompt = `Create a vertical 9:16 portrait abstract background for an inspirational quote poster.
+        
+        // CRITICAL: Use strong emphasis and repetition to ensure accurate text rendering
+        const imagePrompt = `CRITICAL INSTRUCTION: You MUST spell every word EXACTLY as written below. DO NOT change any letters, words, or spelling.
 
+Create a vertical 9:16 portrait inspirational quote image (1080x1920) with this EXACT TEXT:
+
+QUOTE TEXT (spell EXACTLY as written):
+"${randomQuote.text}"
+
+AUTHOR (spell EXACTLY as written):
+— ${randomQuote.author}
+
+REQUIREMENTS:
+- CRITICAL: Spell every single word EXACTLY as shown above
+- CRITICAL: Double-check spelling matches the quote text PERFECTLY
+- CRITICAL: The text must be CLEARLY READABLE with high contrast
+- Make it cinematic, elegant, and inspiring
 - Theme: ${bgTheme}
 ${emotion ? `- Emotional tone: ${emotion}` : ''}
-- DO NOT include any text or letters in the image
-- High quality, cinematic, professional
-- Ensure good contrast in the center for overlay text readability
-- Modern, inspiring color palette
-- Keep composition clean and not busy
-- Optimized for mobile story/reel format (1080x1920)`;
+- Use dramatic lighting and rich colors
+- Professional typography with excellent readability
+- Vertical portrait format optimized for mobile (9:16 ratio)
+- Modern, high-quality design
+
+REMEMBER: Spell the quote text EXACTLY as provided above. Every word must match PERFECTLY.`;
         
         const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -242,15 +257,21 @@ ${emotion ? `- Emotional tone: ${emotion}` : ''}
         });
 
         if (!imageResponse.ok) {
-          const t = await imageResponse.text();
-          console.error('AI gateway error', imageResponse.status, t);
-          throw new Error('AI image generation failed');
+          const errorText = await imageResponse.text();
+          console.error('AI gateway error:', imageResponse.status, errorText);
+          throw new Error(`AI image generation failed: ${imageResponse.status}`);
         }
 
         const imageData = await imageResponse.json();
-        imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url || '';
-        if (!imageUrl) throw new Error('No image url in AI response');
-        console.log('Image generated successfully');
+        const generatedUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (!generatedUrl) {
+          console.error('No image URL in AI response:', JSON.stringify(imageData));
+          throw new Error('No image URL in AI response');
+        }
+        
+        imageUrl = generatedUrl;
+        console.log('Image generated successfully with embedded text');
       } catch (error) {
         console.error('Error generating image:', error);
         // Continue without image if generation fails
