@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
+import atlasSage from "@/assets/atlas-sage.png";
 
 interface Mentor {
   id: string;
@@ -56,7 +57,13 @@ export const MentorResult = ({
                 boxShadow: `0 0 40px ${mentor.primary_color}60`
               }}
             >
-              {mentor.avatar_url ? (
+              {mentor.slug === 'atlas' ? (
+                <img
+                  src={atlasSage}
+                  alt={mentor.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : mentor.avatar_url ? (
                 <img
                   src={mentor.avatar_url}
                   alt={mentor.name}
