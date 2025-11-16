@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -28,6 +29,8 @@ const Reflection = lazy(() => import("./pages/Reflection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const Library = lazy(() => import("./pages/Library"));
 const Challenges = lazy(() => import("./pages/Challenges"));
+const Achievements = lazy(() => import("./pages/Achievements"));
+const Search = lazy(() => import("./pages/Search"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +87,8 @@ const AppContent = () => {
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+          <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
+          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
@@ -98,6 +103,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <InstallPWA />
+        <OfflineIndicator />
         <BrowserRouter>
           <ScrollToTop />
           <AppContent />

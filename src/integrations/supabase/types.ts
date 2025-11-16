@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          achievement_type: string
+          created_at: string | null
+          description: string
+          earned_at: string
+          icon: string
+          id: string
+          metadata: Json | null
+          tier: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          achievement_type: string
+          created_at?: string | null
+          description: string
+          earned_at?: string
+          icon: string
+          id?: string
+          metadata?: Json | null
+          tier?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          achievement_type?: string
+          created_at?: string | null
+          description?: string
+          earned_at?: string
+          icon?: string
+          id?: string
+          metadata?: Json | null
+          tier?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_feed: {
         Row: {
           activity_data: Json
@@ -1652,7 +1691,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_achievement_stats: {
+        Row: {
+          bronze_count: number | null
+          gold_count: number | null
+          platinum_count: number | null
+          silver_count: number | null
+          total_achievements: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
