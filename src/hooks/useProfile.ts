@@ -42,10 +42,29 @@ export const useProfile = () => {
         if (error) {
           console.error("Error fetching profile:", error);
         }
-        
-        setProfile(data);
+
+        if (!data) {
+          // Auto-create profile on first login if missing
+          const { data: inserted, error: insertError } = await supabase
+            .from("profiles")
+            .insert({
+              id: user.id,
+              email: user.email ?? null,
+            })
+            .select("*")
+            .single();
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+            setProfile(null);
+          } else {
+            setProfile(inserted);
+          }
+        } else {
+          setProfile(data);
+        }
       } catch (error) {
-        console.error("Error fetching profile:", error);
+        console.error("Error fetching/creating profile:", error);
       } finally {
         setLoading(false);
       }
