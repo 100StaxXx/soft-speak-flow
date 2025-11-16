@@ -57,7 +57,14 @@ const Index = () => {
       container.scrollTop = 0;
     }
     // Delay to ensure DOM is ready and scroll is positioned
-    const timer = setTimeout(() => setIsInitializing(false), 100);
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+      // Force scroll position after initialization
+      window.scrollTo(0, 0);
+      if (container) {
+        container.scrollTop = 0;
+      }
+    }, 100);
     return () => clearTimeout(timer);
   }, []);
 
@@ -239,7 +246,7 @@ const Index = () => {
 
   return (
     <div 
-      className={`snap-y snap-mandatory overflow-y-scroll h-screen transition-opacity duration-300 ${isInitializing ? 'opacity-0' : 'opacity-100'}`}
+      className={`snap-y overflow-y-scroll h-screen transition-opacity duration-300 ${isInitializing ? 'opacity-0' : 'opacity-100'}`}
       id="main-scroll-container"
     >
       {showIntro && <IntroScreen onComplete={() => setShowIntro(false)} />}
