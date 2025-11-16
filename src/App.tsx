@@ -14,12 +14,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Library from "./pages/Library";
-import Videos from "./pages/Videos";
-import VideoDetail from "./pages/VideoDetail";
 import Quotes from "./pages/Quotes";
 import Inspire from "./pages/Inspire";
-import Playlists from "./pages/Playlists";
-import PlaylistDetail from "./pages/PlaylistDetail";
 import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
 import Premium from "./pages/Premium";
@@ -79,12 +75,8 @@ const AppContent = () => {
         {/* Protected routes - require authentication and mentor selection */}
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-        <Route path="/videos" element={<ProtectedRoute><Videos /></ProtectedRoute>} />
-        <Route path="/video/:id" element={<ProtectedRoute><VideoDetail /></ProtectedRoute>} />
         <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
         <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
-        <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
-        <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetail /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />

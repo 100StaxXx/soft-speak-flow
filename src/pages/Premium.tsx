@@ -76,7 +76,7 @@ const Premium = () => {
                 </div>
                 <div>
                   <p className="font-bold text-pure-white text-lg">Unlimited Content</p>
-                  <p className="text-steel">Access all pep talks, videos, and quotes</p>
+                  <p className="text-steel">Access all pep talks, lessons, and quotes</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -93,8 +93,8 @@ const Premium = () => {
                   <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
                 </div>
                 <div>
-                  <p className="font-bold text-pure-white text-lg">Curated Playlists</p>
-                  <p className="text-steel">Premium collections for every mood</p>
+                  <p className="font-bold text-pure-white text-lg">AI Mentor Chat</p>
+                  <p className="text-steel">Unlimited conversations with your mentor</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
