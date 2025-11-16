@@ -1,5 +1,7 @@
 import { Card } from "./ui/card";
-import { Sparkles } from "lucide-react";
+import { Button } from "./ui/button";
+import { Sparkles, History } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface MoodPushCardProps {
   selectedMood: string | null;
@@ -13,13 +15,18 @@ interface MoodPushCardProps {
 }
 
 export function MoodPushCard({ selectedMood, pushData, isLoading }: MoodPushCardProps) {
+  const navigate = useNavigate();
   if (!selectedMood && !pushData) {
     return (
       <Card className="p-8 text-center border-dashed">
         <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mb-4">
           Tap how you feel to get a lil push.
         </p>
+        <Button variant="outline" size="sm" onClick={() => navigate('/mood-history')}>
+          <History className="w-4 h-4 mr-2" />
+          View Mood History
+        </Button>
       </Card>
     );
   }

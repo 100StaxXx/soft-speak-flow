@@ -8,12 +8,12 @@ const corsHeaders = {
 const moodMapping: Record<string, { category: string; triggers: string[] }> = {
   'Unmotivated': { category: 'discipline', triggers: ['Unmotivated', 'Procrastinating'] },
   'Overthinking': { category: 'mindset', triggers: ['Anxious & Overthinking', 'Stressed'] },
-  'Confident': { category: 'confidence', triggers: ['Confident', 'Empowered'] },
+  'Stressed': { category: 'mindset', triggers: ['Stressed', 'Overwhelmed'] },
+  'Low Energy': { category: 'self-care', triggers: ['Drained', 'Low Energy'] },
+  'Content': { category: 'gratitude', triggers: ['Content', 'Peaceful'] },
+  'Disciplined': { category: 'discipline', triggers: ['Disciplined', 'Focused'] },
   'Focused': { category: 'focus', triggers: ['Focused', 'Clear-minded'] },
-  'Frustrated': { category: 'mindset', triggers: ['Frustrated', 'Stuck'] },
-  'Inspired': { category: 'growth', triggers: ['Inspired', 'Energized'] },
-  'Heavy / Low': { category: 'self-care', triggers: ['Heavy or Low', 'Drained'] },
-  'In Transition': { category: 'growth', triggers: ['Uncertain', 'In Transition'] }
+  'Inspired': { category: 'growth', triggers: ['Inspired', 'Energized'] }
 };
 
 serve(async (req) => {

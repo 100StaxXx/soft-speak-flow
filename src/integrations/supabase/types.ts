@@ -787,6 +787,27 @@ export type Database = {
         }
         Relationships: []
       }
+      mood_logs: {
+        Row: {
+          created_at: string
+          id: string
+          mood: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mood: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mood?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pep_talk_mentors: {
         Row: {
           created_at: string | null
