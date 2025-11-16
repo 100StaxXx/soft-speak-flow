@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { QUESTIONNAIRE } from "@/config/questionnaire";
@@ -11,6 +11,11 @@ interface EnhancedQuestionnaireProps {
 export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps) => {
   const [currentStep, setCurrentStep] = useState<'welcome' | number>('welcome');
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   const handleStart = () => {
     setCurrentStep(0);

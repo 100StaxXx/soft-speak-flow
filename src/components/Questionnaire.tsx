@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ONBOARDING_QUESTIONS, OnboardingAnswer } from "@/utils/mentorMatching";
@@ -10,6 +10,11 @@ interface QuestionnaireProps {
 export const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
+
+  // Scroll to top whenever question changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentQuestion]);
 
   const handleAnswer = (answerId: string, mentorTags: string[]) => {
     const question = ONBOARDING_QUESTIONS[currentQuestion];
