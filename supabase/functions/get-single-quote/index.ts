@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
 
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-    // Generate image using Lovable AI
+    // Generate background image using Lovable AI (no text in image)
     console.log('Generating image for quote...');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
@@ -213,7 +213,18 @@ Deno.serve(async (req) => {
     
     if (lovableApiKey) {
       try {
-        const imagePrompt = `Create a VERTICAL 9:16 portrait mobile wallpaper (taller than it is wide, like a phone screen in portrait mode). Feature the quote "${randomQuote.text}" by ${randomQuote.author}. The image MUST be in portrait/vertical orientation - height should be significantly greater than width. Make it cinematic, inspiring, and elegant with the quote text clearly visible and beautifully formatted. Use dramatic lighting, rich colors, and artistic composition perfect for a tall vertical phone screen. Remember: VERTICAL 9:16 format - height is almost double the width.`;
+        const bgTheme = type === 'category' ? value : 'motivation';
+        const emotion = type === 'trigger' ? value : '';
+        const imagePrompt = `Create a vertical 9:16 portrait abstract background for an inspirational quote poster.
+
+- Theme: ${bgTheme}
+${emotion ? `- Emotional tone: ${emotion}` : ''}
+- DO NOT include any text or letters in the image
+- High quality, cinematic, professional
+- Ensure good contrast in the center for overlay text readability
+- Modern, inspiring color palette
+- Keep composition clean and not busy
+- Optimized for mobile story/reel format (1080x1920)`;
         
         const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -222,23 +233,28 @@ Deno.serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-image-preview',
+            model: 'google/gemini-2.5-flash-image',
             messages: [
-              {
-                role: 'user',
-                content: imagePrompt
-              }
+              { role: 'user', content: imagePrompt }
             ],
             modalities: ['image', 'text']
           })
         });
 
+        if (!imageResponse.ok) {
+          const t = await imageResponse.text();
+          console.error('AI gateway error', imageResponse.status, t);
+          throw new Error('AI image generation failed');
+        }
+
         const imageData = await imageResponse.json();
         imageUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url || '';
+        if (!imageUrl) throw new Error('No image url in AI response');
         console.log('Image generated successfully');
       } catch (error) {
         console.error('Error generating image:', error);
         // Continue without image if generation fails
+        imageUrl = '';
       }
     }
 
