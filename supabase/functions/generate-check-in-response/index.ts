@@ -12,13 +12,32 @@ serve(async (req) => {
   }
 
   try {
+    // Get authentication token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('Missing authorization header')
+    }
+
     const { checkInId } = await req.json()
+    
+    // Input validation
+    if (!checkInId || typeof checkInId !== 'string') {
+      throw new Error('Invalid checkInId')
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get check-in details
+    // Verify user authentication
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      throw new Error('Unauthorized')
+    }
+
+    // Get check-in details and verify ownership
     const { data: checkIn, error: checkInError } = await supabase
       .from('daily_check_ins')
       .select('*, profiles!inner(selected_mentor_id)')
@@ -26,6 +45,11 @@ serve(async (req) => {
       .single()
 
     if (checkInError) throw checkInError
+    
+    // Verify the check-in belongs to the authenticated user
+    if (checkIn.user_id !== user.id) {
+      throw new Error('Unauthorized: You can only access your own check-ins')
+    }
 
     // Get mentor personality
     const { data: mentor } = await supabase
