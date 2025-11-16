@@ -55,12 +55,13 @@ Visual requirements:
 - Include "— ${author || 'Unknown'}" attribution below the quote
 - Background should complement but not overwrite the text
 - Use typography that matches the ${intensity} intensity level
-- Aspect ratio: 16:9 landscape orientation
+- Aspect ratio: 9:16 portrait orientation (vertical, mobile-friendly format)
 - Color palette should evoke ${category} energy
 - Modern, clean aesthetic
 - Text should be the hero element, centered or artfully positioned
+- Optimized for social media story/reel format
 
-Create an image that feels motivational, professional, and visually striking.`;
+Create an image that feels motivational, professional, and visually striking in a vertical mobile format.`;
 
     console.log("Generating image with prompt:", imagePrompt);
 
