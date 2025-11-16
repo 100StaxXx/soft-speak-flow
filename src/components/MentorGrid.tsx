@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
 import atlasSage from "@/assets/atlas-sage.png";
+import dariusSage from "@/assets/darius-sage.png";
 
 interface Mentor {
   id: string;
@@ -62,6 +63,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                 alt={activeMentor.name}
                 className="w-full h-full object-cover opacity-60"
                 style={{ objectPosition: 'center 30%' }}
+              />
+            ) : activeMentor.slug === 'darius' ? (
+              <img 
+                src={dariusSage}
+                alt={activeMentor.name}
+                className="w-full h-full object-cover opacity-60"
+                style={{ objectPosition: 'center 20%' }}
               />
             ) : activeMentor.avatar_url ? (
               <img 
@@ -217,6 +225,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                   {mentor.slug === 'atlas' ? (
                     <img 
                       src={atlasSage} 
+                      alt={mentor.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      style={{ objectPosition: 'center 20%' }}
+                    />
+                  ) : mentor.slug === 'darius' ? (
+                    <img 
+                      src={dariusSage} 
                       alt={mentor.name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                       style={{ objectPosition: 'center 20%' }}

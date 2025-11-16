@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
 import atlasSage from "@/assets/atlas-sage.png";
+import dariusSage from "@/assets/darius-sage.png";
 
 interface Mentor {
   id: string;
@@ -60,6 +61,13 @@ export const MentorResult = ({
               {mentor.slug === 'atlas' ? (
                 <img
                   src={atlasSage}
+                  alt={mentor.name}
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: 'center 20%' }}
+                />
+              ) : mentor.slug === 'darius' ? (
+                <img
+                  src={dariusSage}
                   alt={mentor.name}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: 'center 20%' }}
