@@ -20,6 +20,19 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const waitForProfileUpdate = async (userId: string, tries = 8) => {
+    for (let i = 0; i < tries; i++) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('selected_mentor_id')
+        .eq('id', userId)
+        .maybeSingle();
+      if (data?.selected_mentor_id) return true;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return false;
+  };
+
   const handleQuestionnaireComplete = async (completedAnswers: Record<string, string>) => {
     try {
       setAnswers(completedAnswers);
@@ -105,11 +118,11 @@ export default function Onboarding() {
         description: `${recommendedMentor.name} is now your guide. Let's begin!`,
       });
 
-      // Small delay to ensure database update completes
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for the profile to reflect the update to avoid redirect loop
+      await waitForProfileUpdate(user.id);
 
-      // Force reload to refresh profile state
-      window.location.href = "/";
+      // Navigate without full reload
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
@@ -150,11 +163,11 @@ export default function Onboarding() {
         description: selectedMentor ? `${selectedMentor.name} is now your guide!` : "Your mentor has been selected!",
       });
 
-      // Small delay to ensure database update completes
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for the profile to reflect the update to avoid redirect loop
+      await waitForProfileUpdate(user.id);
 
-      // Force reload to refresh profile state
-      window.location.href = "/";
+      // Navigate without full reload
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
