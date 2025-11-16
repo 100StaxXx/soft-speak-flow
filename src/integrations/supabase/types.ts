@@ -185,6 +185,41 @@ export type Database = {
           },
         ]
       }
+      challenge_tasks: {
+        Row: {
+          challenge_id: string
+          created_at: string | null
+          day_number: number
+          id: string
+          task_description: string
+          task_title: string
+        }
+        Insert: {
+          challenge_id: string
+          created_at?: string | null
+          day_number: number
+          id?: string
+          task_description: string
+          task_title: string
+        }
+        Update: {
+          challenge_id?: string
+          created_at?: string | null
+          day_number?: number
+          id?: string
+          task_description?: string
+          task_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_tasks_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenges: {
         Row: {
           category: string | null
@@ -192,8 +227,9 @@ export type Database = {
           description: string
           duration_days: number
           id: string
-          mentor_id: string | null
+          source: string | null
           title: string
+          total_days: number
         }
         Insert: {
           category?: string | null
@@ -201,8 +237,9 @@ export type Database = {
           description: string
           duration_days: number
           id?: string
-          mentor_id?: string | null
+          source?: string | null
           title: string
+          total_days: number
         }
         Update: {
           category?: string | null
@@ -210,18 +247,11 @@ export type Database = {
           description?: string
           duration_days?: number
           id?: string
-          mentor_id?: string | null
+          source?: string | null
           title?: string
+          total_days?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "challenges_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "mentors"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       check_ins: {
         Row: {
@@ -1111,32 +1141,32 @@ export type Database = {
       user_challenges: {
         Row: {
           challenge_id: string | null
-          completed: boolean | null
           created_at: string | null
+          current_day: number | null
           end_date: string
           id: string
-          is_active: boolean | null
           start_date: string
+          status: string | null
           user_id: string
         }
         Insert: {
           challenge_id?: string | null
-          completed?: boolean | null
           created_at?: string | null
+          current_day?: number | null
           end_date: string
           id?: string
-          is_active?: boolean | null
           start_date?: string
+          status?: string | null
           user_id: string
         }
         Update: {
           challenge_id?: string | null
-          completed?: boolean | null
           created_at?: string | null
+          current_day?: number | null
           end_date?: string
           id?: string
-          is_active?: boolean | null
           start_date?: string
+          status?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1218,6 +1248,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_reflections: {
+        Row: {
+          ai_reply: string | null
+          created_at: string
+          id: string
+          mood: string
+          note: string | null
+          reflection_date: string
+          user_id: string
+        }
+        Insert: {
+          ai_reply?: string | null
+          created_at?: string
+          id?: string
+          mood: string
+          note?: string | null
+          reflection_date: string
+          user_id: string
+        }
+        Update: {
+          ai_reply?: string | null
+          created_at?: string
+          id?: string
+          mood?: string
+          note?: string | null
+          reflection_date?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
