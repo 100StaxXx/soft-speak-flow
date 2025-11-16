@@ -5,10 +5,15 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Target, CheckCircle2, Circle, Trophy, Sparkles } from "lucide-react";
+import { ArrowLeft, Target, CheckCircle2, Circle, Trophy, Sparkles, Plus } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function Challenges() {
   const { user } = useAuth();
@@ -16,6 +21,13 @@ export default function Challenges() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [customChallenge, setCustomChallenge] = useState({
+    title: '',
+    description: '',
+    duration_days: 7,
+    category: 'discipline'
+  });
 
   const { data: activeChallenge } = useQuery({
     queryKey: ['activeChallenge', user?.id],
@@ -107,6 +119,37 @@ export default function Challenges() {
     },
   });
 
+  const createCustomChallengeMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('challenges')
+        .insert({
+          title: customChallenge.title,
+          description: customChallenge.description,
+          duration_days: customChallenge.duration_days,
+          total_days: customChallenge.duration_days,
+          category: customChallenge.category,
+          source: 'custom'
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['featuredChallenges'] });
+      setIsCreateDialogOpen(false);
+      setCustomChallenge({
+        title: '',
+        description: '',
+        duration_days: 7,
+        category: 'discipline'
+      });
+      toast({
+        title: "Challenge created!",
+        description: "Your custom challenge is ready to start.",
+      });
+    },
+  });
+
   const categories = ['discipline', 'confidence', 'focus', 'mindset', 'self-care', 'physique', 'productivity'];
 
   return (
@@ -177,11 +220,92 @@ export default function Challenges() {
 
         {/* Featured Challenges */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <h2 className="text-2xl font-heading text-foreground">
               <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
               {activeChallenge?.status === 'active' ? 'More Challenges' : 'Featured Challenges'}
             </h2>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Custom
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create Custom Challenge</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Challenge Title</Label>
+                    <Input
+                      id="title"
+                      placeholder="30-Day Reading Challenge"
+                      value={customChallenge.title}
+                      onChange={(e) => setCustomChallenge({ ...customChallenge, title: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Read for 30 minutes every day to build a consistent reading habit..."
+                      value={customChallenge.description}
+                      onChange={(e) => setCustomChallenge({ ...customChallenge, description: e.target.value })}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duration">Duration</Label>
+                      <Select 
+                        value={customChallenge.duration_days.toString()}
+                        onValueChange={(value) => setCustomChallenge({ ...customChallenge, duration_days: parseInt(value) })}
+                      >
+                        <SelectTrigger id="duration">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="7">7 Days</SelectItem>
+                          <SelectItem value="14">14 Days</SelectItem>
+                          <SelectItem value="30">30 Days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select 
+                        value={customChallenge.category}
+                        onValueChange={(value) => setCustomChallenge({ ...customChallenge, category: value })}
+                      >
+                        <SelectTrigger id="category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat} className="capitalize">
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={() => createCustomChallengeMutation.mutate()}
+                    disabled={!customChallenge.title || !customChallenge.description || createCustomChallengeMutation.isPending}
+                    className="w-full"
+                  >
+                    {createCustomChallengeMutation.isPending ? 'Creating...' : 'Create Challenge'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Category Filter */}
