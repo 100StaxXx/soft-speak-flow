@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { TodaysPush } from "@/components/TodaysPush";
 import { 
   Trophy, 
   Target, 

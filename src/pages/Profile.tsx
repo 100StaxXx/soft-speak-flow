@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -215,6 +215,15 @@ const Profile = () => {
               >
                 Configure Settings
               </Button>
+              
+              <Button 
+                onClick={() => navigate("/push-settings")} 
+                variant="outline"
+                className="w-full"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Daily Push Settings
+              </Button>
             </div>
           ) : (
             <div className="text-center py-6">
@@ -229,7 +238,17 @@ const Profile = () => {
           )}
         </Card>
 
-        <Button onClick={async () => { await signOut(); navigate("/auth"); }} variant="outline" className="w-full"><LogOut className="mr-2 h-4 w-4" />Sign Out</Button>
+        <div className="space-y-3">
+          <Button onClick={() => navigate("/push-settings")} variant="outline" className="w-full">
+            <Settings className="mr-2 h-4 w-4" />
+            Push Notification Settings
+          </Button>
+
+          <Button onClick={async () => { await signOut(); navigate("/auth"); }} variant="outline" className="w-full">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
       </div>
       <BottomNav />
     </div>

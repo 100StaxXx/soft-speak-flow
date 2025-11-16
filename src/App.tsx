@@ -37,6 +37,7 @@ import MentorChat from "./pages/MentorChat";
 import ContentGenerator from "./pages/ContentGenerator";
 import AdaptivePushes from "./pages/AdaptivePushes";
 import Dashboard from "./pages/Dashboard";
+import PushSettings from "./pages/PushSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -97,6 +98,7 @@ const AppContent = () => {
         <Route path="/adaptive-pushes" element={<ProtectedRoute><AdaptivePushes /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/weekly-review" element={<ProtectedRoute><WeeklyReview /></ProtectedRoute>} />
+        <Route path="/push-settings" element={<ProtectedRoute><PushSettings /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>
