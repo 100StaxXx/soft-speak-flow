@@ -70,7 +70,7 @@ export const MentorResult = ({
                   src={dariusSage}
                   alt={mentor.name}
                   className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 20%' }}
+                  style={{ objectPosition: 'center 15%' }}
                 />
               ) : mentor.avatar_url ? (
                 <img
