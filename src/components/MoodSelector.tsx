@@ -1,70 +1,36 @@
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-
-const moods = [
-  { label: "Unmotivated", emoji: "😴" },
-  { label: "Overthinking", emoji: "🤯" },
-  { label: "Stressed", emoji: "😰" },
-  { label: "Low Energy", emoji: "🔋" },
-  { label: "Content", emoji: "😌" },
-  { label: "Disciplined", emoji: "💪" },
-  { label: "Focused", emoji: "🎯" },
-  { label: "Inspired", emoji: "✨" }
-];
+import { Smile, Meh, Frown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface MoodSelectorProps {
-  onMoodSelect: (mood: string) => void;
-  selectedMood: string | null;
+  onSelect: (mood: string) => void;
+  selected?: string | null;
 }
 
-export function MoodSelector({ onMoodSelect, selectedMood }: MoodSelectorProps) {
-  const { user } = useAuth();
-
-  const handleMoodClick = async (mood: string) => {
-    // Log the mood selection to database
-    if (user) {
-      await supabase
-        .from('mood_logs')
-        .insert({
-          user_id: user.id,
-          mood: mood
-        });
-    }
-    
-    onMoodSelect(mood);
-  };
+export const MoodSelector = ({ onSelect, selected }: MoodSelectorProps) => {
+  const moods = [
+    { id: "good", label: "Good", icon: Smile, color: "text-green-500" },
+    { id: "neutral", label: "Neutral", icon: Meh, color: "text-yellow-500" },
+    { id: "tough", label: "Tough", icon: Frown, color: "text-red-500" },
+  ];
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-heading text-foreground">
-        How are you feeling right now?
-      </h3>
-      
-      <div className="grid grid-cols-4 gap-3">
-        {moods.map((mood) => {
-          const isSelected = selectedMood === mood.label;
-          return (
-            <button
-              key={mood.label}
-              onClick={() => handleMoodClick(mood.label)}
-              className={`
-                flex flex-col items-center justify-center gap-2
-                p-4 rounded-xl
-                transition-all duration-300 hover:scale-105 active:scale-95
-                ${isSelected 
-                  ? 'bg-primary text-primary-foreground scale-105 shadow-lg' 
-                  : 'bg-card hover:bg-accent border border-border'
-                }
-              `}
-            >
-              <span className="text-2xl">{mood.emoji}</span>
-              <span className="text-xs font-medium text-center leading-tight">
-                {mood.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="grid grid-cols-3 gap-3">
+      {moods.map((mood) => {
+        const Icon = mood.icon;
+        const isSelected = selected === mood.id;
+        
+        return (
+          <Button
+            key={mood.id}
+            variant={isSelected ? "default" : "outline"}
+            className={`h-20 flex-col gap-2 ${isSelected ? "" : "hover:border-primary"}`}
+            onClick={() => onSelect(mood.id)}
+          >
+            <Icon className={`h-6 w-6 ${isSelected ? "" : mood.color}`} />
+            <span className="text-sm">{mood.label}</span>
+          </Button>
+        );
+      })}
     </div>
   );
-}
+};
