@@ -4,6 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { MobilePaymentButton } from "@/components/MobilePaymentButton";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
 const Premium = () => {
   const navigate = useNavigate();
@@ -116,13 +121,38 @@ const Premium = () => {
               </div>
             </div>
 
-            <Button 
-              onClick={handleSubscribe}
-              className="w-full py-7 text-lg font-black uppercase tracking-wider mt-8"
-              size="lg"
-            >
-              Start 7-Day Free Trial
-            </Button>
+            <Elements stripe={stripePromise}>
+              <div className="space-y-4">
+                <MobilePaymentButton
+                  amount={999}
+                  currency="usd"
+                  label="Premium Subscription"
+                  onSuccess={() => {
+                    toast({
+                      title: "Welcome to Premium!",
+                      description: "Your subscription is now active.",
+                    });
+                  }}
+                />
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-graphite px-2 text-steel">Or</span>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSubscribe}
+                  className="w-full py-7 text-lg font-black uppercase tracking-wider"
+                  size="lg"
+                >
+                  Start 7-Day Free Trial
+                </Button>
+              </div>
+            </Elements>
             
             <p className="text-xs text-steel text-center">
               Cancel anytime. No commitments.
