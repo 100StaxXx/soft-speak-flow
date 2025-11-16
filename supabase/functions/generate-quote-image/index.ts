@@ -52,16 +52,19 @@ ${emotionalTrigger ? `Emotional tone: addressing ${emotionalTrigger}` : ""}
 Visual requirements:
 - High quality, professional design
 - The quote text "${quoteText}" should be prominently displayed and easily readable
-- Include "— ${author || 'Unknown'}" attribution below the quote
+- CRITICAL: Ensure generous padding/margins (at least 80-100px) from ALL edges to prevent text cutoff
+- Text should never touch or be close to the borders of the image
+- Include "— ${author || 'Unknown'}" attribution below the quote with proper spacing
 - Background should complement but not overwrite the text
 - Use typography that matches the ${intensity} intensity level
 - Aspect ratio: 9:16 portrait orientation (vertical, mobile-friendly format)
 - Color palette should evoke ${category} energy
 - Modern, clean aesthetic
-- Text should be the hero element, centered or artfully positioned
+- Text should be the hero element, centered or artfully positioned with safe margins
+- Keep all text content well within the safe zone, away from edges
 - Optimized for social media story/reel format
 
-Create an image that feels motivational, professional, and visually striking in a vertical mobile format.`;
+Create an image that feels motivational, professional, and visually striking in a vertical mobile format with proper text spacing from borders.`;
 
     console.log("Generating image with prompt:", imagePrompt);
 
