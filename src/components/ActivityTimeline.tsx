@@ -1,11 +1,13 @@
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Card } from "@/components/ui/card";
-import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2 } from "lucide-react";
+import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "./ui/button";
 import { useState } from "react";
+import { useWelcomeMessage } from "@/hooks/useWelcomeMessage";
 
 const activityIcons: Record<string, any> = {
+  welcome: Sparkles,
   habit_completed: CheckCircle,
   mood_logged: Heart,
   pep_talk_listened: Volume2,
@@ -15,6 +17,7 @@ const activityIcons: Record<string, any> = {
 };
 
 const activityLabels: Record<string, string> = {
+  welcome: "joined the journey",
   habit_completed: "completed a habit",
   mood_logged: "logged your mood",
   pep_talk_listened: "listened to pep talk",
@@ -26,6 +29,9 @@ const activityLabels: Record<string, string> = {
 export const ActivityTimeline = () => {
   const { activities, isLoading, markAsRead } = useActivityFeed();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  
+  // Add welcome message for new users
+  useWelcomeMessage();
 
   if (isLoading) {
     return (
