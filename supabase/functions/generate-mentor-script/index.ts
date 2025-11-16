@@ -188,6 +188,33 @@ Write a 15-40 second spoken message that:
 - CRITICAL: Do NOT make specific assumptions about the listener's personal feelings (avoid "I can feel your pain", "I know you're hurting", "I sense your struggle")
 - Instead, speak to the challenge or state in general terms while remaining empathetic and supportive
 
+CRITICAL VARIATION REQUIREMENT - CREATE MAXIMUM DIVERSITY:
+Every script MUST sound completely different. Vary these aggressively:
+
+OPENINGS (rotate through different approaches):
+• Provocative question / Bold statement / Observation / Challenge / Reframe / Quick story beat
+
+STRUCTURAL FLOW (use different patterns):
+• Problem→solution / Contrast pattern / Build to climax / Circular reasoning / Call-and-response
+
+CONTENT TOOLS (mix it up):
+• Metaphors: Draw from sports / nature / building / combat / creation / journey (use different ones)
+• Examples: Vary between abstract concepts and concrete scenarios
+• Angles: Identity / action / emotion / systems / habits
+
+STYLE VARIATION (change the feel):
+• Sentence rhythm: Punchy short / Flowing long / Mixed cadence
+• Energy shifts: Start strong→settle / Build momentum / Even intensity
+• Language register: Raw & direct / Thoughtful / Grounded & practical
+
+NEVER USE:
+• Repeated opening phrases like "Look", "Here's the thing", "Listen"
+• Same metaphors or analogies
+• Identical sentence patterns
+• Generic motivational clichés
+
+GOAL: Two scripts on the same topic should feel like different conversations entirely
+
 Write ONLY the script text, nothing else.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
