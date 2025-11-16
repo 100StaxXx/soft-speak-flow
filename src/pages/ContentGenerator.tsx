@@ -497,6 +497,48 @@ const ContentGenerator = () => {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="topic_category">Topic Categories (comma-separated)</Label>
+              <Input
+                id="topic_category"
+                value={formData.topic_category.join(", ")}
+                onChange={(e) => {
+                  const categories = e.target.value
+                    .split(",")
+                    .map(cat => cat.trim())
+                    .filter(cat => cat.length > 0);
+                  const newData = { ...formData, topic_category: categories };
+                  setFormData(newData);
+                  saveDraft(newData);
+                }}
+                placeholder="e.g., discipline, confidence, mindset"
+              />
+              <p className="text-xs text-muted-foreground">
+                Separate multiple categories with commas
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="emotional_triggers">Emotional Triggers (comma-separated)</Label>
+              <Input
+                id="emotional_triggers"
+                value={formData.emotional_triggers.join(", ")}
+                onChange={(e) => {
+                  const triggers = e.target.value
+                    .split(",")
+                    .map(trigger => trigger.trim())
+                    .filter(trigger => trigger.length > 0);
+                  const newData = { ...formData, emotional_triggers: triggers };
+                  setFormData(newData);
+                  saveDraft(newData);
+                }}
+                placeholder="e.g., Exhausted, Self-Doubt, Unmotivated"
+              />
+              <p className="text-xs text-muted-foreground">
+                Separate multiple triggers with commas
+              </p>
+            </div>
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="featured"
