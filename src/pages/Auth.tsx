@@ -58,14 +58,24 @@ const Auth = () => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        // Check if user has selected a mentor
-        const { data: profileData } = await supabase
+      if (event === 'SIGNED_IN' && session) {
+        // Check if profile exists, create if needed
+        let { data: profileData } = await supabase
           .from("profiles")
           .select("selected_mentor_id")
           .eq("id", session.user.id)
-          .single();
+          .maybeSingle();
 
+        // Auto-create profile if missing
+        if (!profileData) {
+          await supabase.from("profiles").insert({
+            id: session.user.id,
+            email: session.user.email ?? null,
+          });
+          profileData = { selected_mentor_id: null };
+        }
+
+        // Redirect based on mentor selection
         if (!profileData?.selected_mentor_id) {
           navigate("/onboarding");
         } else {
