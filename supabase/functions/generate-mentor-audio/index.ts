@@ -90,27 +90,43 @@ serve(async (req) => {
 
     console.log(`Generating audio for mentor ${mentorSlug} with voice ${voiceConfig.voiceId}`);
 
-    // Call ElevenLabs TTS API
-    const elevenLabsResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceConfig.voiceId}`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: script,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: voiceConfig.stability,
-            similarity_boost: voiceConfig.similarity_boost,
-            style: voiceConfig.style_exaggeration,
-            use_speaker_boost: true,
+    // Call ElevenLabs TTS API with timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 second timeout
+    
+    let elevenLabsResponse;
+    try {
+      elevenLabsResponse = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceConfig.voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
           },
-        }),
+          body: JSON.stringify({
+            text: script,
+            model_id: "eleven_multilingual_v2",
+            voice_settings: {
+              stability: voiceConfig.stability,
+              similarity_boost: voiceConfig.similarity_boost,
+              style: voiceConfig.style_exaggeration,
+              use_speaker_boost: true,
+            },
+          }),
+          signal: controller.signal,
+        }
+      );
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error?.name === 'AbortError') {
+        console.error("ElevenLabs API timeout after 55 seconds");
+        throw new Error("Audio generation timed out. Please try again.");
       }
-    );
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!elevenLabsResponse.ok) {
       const errorText = await elevenLabsResponse.text();
