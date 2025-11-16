@@ -93,11 +93,20 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           selected_mentor_id: recommendedMentor.id,
+          onboarding_completed: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       if (error) throw error;
+
+      toast({
+        title: "Mentor Selected!",
+        description: `${recommendedMentor.name} is now your guide. Let's begin!`,
+      });
+
+      // Small delay to ensure database update completes
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Force reload to refresh profile state
       window.location.href = "/";
@@ -127,6 +136,7 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           selected_mentor_id: mentorId,
+          onboarding_completed: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -134,6 +144,14 @@ export default function Onboarding() {
       if (error) throw error;
 
       const selectedMentor = mentors.find(m => m.id === mentorId);
+
+      toast({
+        title: "Mentor Selected!",
+        description: selectedMentor ? `${selectedMentor.name} is now your guide!` : "Your mentor has been selected!",
+      });
+
+      // Small delay to ensure database update completes
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Force reload to refresh profile state
       window.location.href = "/";
