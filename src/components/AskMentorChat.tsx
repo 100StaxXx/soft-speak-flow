@@ -167,6 +167,7 @@ export const AskMentorChat = ({
         body: {
           message: textToSend,
           mentorName,
+          mentorTone,
           conversationHistory: conversationHistory.map(m => ({
             role: m.role,
             content: m.content
@@ -178,9 +179,15 @@ export const AskMentorChat = ({
 
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.reply,
+        content: data.response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save both messages to database
+      await supabase.from('mentor_chats').insert([
+        { user_id: user.id, role: 'user', content: textToSend },
+        { user_id: user.id, role: 'assistant', content: data.response }
+      ]);
 
       // Save both messages to database
       await supabase.from('mentor_chats').insert([

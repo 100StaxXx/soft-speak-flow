@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, mentorName, mentorTone } = await req.json();
+    const { message, conversationHistory, mentorName, mentorTone } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -31,6 +31,13 @@ Your role is to:
 
 Remember: You're not just a chatbot - you're a real mentor helping someone become their best self.`;
 
+    // Build messages array: system prompt + conversation history + current message
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...(conversationHistory || []),
+      { role: "user", content: message }
+    ];
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -39,10 +46,7 @@ Remember: You're not just a chatbot - you're a real mentor helping someone becom
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        messages: messages,
       }),
     });
 
