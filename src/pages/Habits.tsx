@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { haptics } from "@/utils/haptics";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { ContextualText } from "@/components/ContextualText";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -94,6 +95,7 @@ export default function Habits() {
 
   const completeHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
+      haptics.medium(); // Haptic feedback on habit completion
       const habit = habits.find(h => h.id === habitId);
       
       const { error } = await supabase.from('habit_completions').insert({
@@ -127,6 +129,7 @@ export default function Habits() {
         .single();
       
       if (updatedHabit && [3, 7, 14, 30, 100].includes(updatedHabit.current_streak)) {
+        haptics.success(); // Celebration haptic for milestone
         setMilestoneModal({
           open: true,
           streak: updatedHabit.current_streak,
@@ -135,6 +138,15 @@ export default function Habits() {
       } else {
         toast({ title: "Habit completed", description: "Keep the streak alive." });
       }
+    },
+    onError: (error) => {
+      haptics.error();
+      toast({ 
+        title: "Error", 
+        description: "Failed to complete habit. Please try again.",
+        variant: "destructive"
+      });
+      console.error('Error completing habit:', error);
     },
   });
 

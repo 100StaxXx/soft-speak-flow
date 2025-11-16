@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { TrendingUp, Calendar, Heart, Target, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -111,7 +112,7 @@ export const WeeklyInsights = () => {
     }
   };
 
-  if (!weeklyData) return null;
+  if (!weeklyData) return <SkeletonCard />;
 
   const stats = [
     {

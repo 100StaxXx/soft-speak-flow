@@ -3,38 +3,47 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-// Import all pages
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
-import Quotes from "./pages/Quotes";
-import Inspire from "./pages/Inspire";
-import Profile from "./pages/Profile";
-import Premium from "./pages/Premium";
-import PepTalkDetail from "./pages/PepTalkDetail";
-import Admin from "./pages/Admin";
-import MentorSelection from "./pages/MentorSelection";
-import NotFound from "./pages/NotFound";
-import Habits from "./pages/Habits";
-import Reflection from "./pages/Reflection";
-import MentorChat from "./pages/MentorChat";
+// Lazy load pages for code splitting
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const Inspire = lazy(() => import("./pages/Inspire"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Premium = lazy(() => import("./pages/Premium"));
+const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
+const Admin = lazy(() => import("./pages/Admin"));
+const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Habits = lazy(() => import("./pages/Habits"));
+const Reflection = lazy(() => import("./pages/Reflection"));
+const MentorChat = lazy(() => import("./pages/MentorChat"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 1,
     },
   },
 });
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center space-y-4">
+      <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -51,27 +60,24 @@ const AppContent = () => {
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/auth" element={<Auth />} />
-        
-        {/* Protected routes - require authentication */}
-        <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-        
-        {/* Protected routes - require authentication and mentor selection */}
-        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-        <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
-        <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-        <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
-        <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-        <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
-        <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-        
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
+          <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+          <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+          <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
+          <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
+          <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+          <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </ThemeProvider>
   );
 };
