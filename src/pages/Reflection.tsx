@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -12,10 +13,12 @@ import { BottomNav } from "@/components/BottomNav";
 
 type Mood = 'good' | 'neutral' | 'tough';
 
+
 export default function Reflection() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { logActivity } = useActivityFeed();
   
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [note, setNote] = useState("");
@@ -82,6 +85,15 @@ export default function Reflection() {
           reflectionId: reflection.id,
           mood: selectedMood,
           note: note
+        }
+      });
+
+      // Log to activity feed
+      logActivity({
+        type: 'reflection_completed',
+        data: {
+          mood: selectedMood,
+          has_note: !!note
         }
       });
 

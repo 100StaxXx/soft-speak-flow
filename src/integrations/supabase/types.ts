@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_feed: {
+        Row: {
+          activity_data: Json
+          activity_type: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          mentor_comment: string | null
+          mentor_voice_url: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_data?: Json
+          activity_type: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          mentor_comment?: string | null
+          mentor_voice_url?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_data?: Json
+          activity_type?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          mentor_comment?: string | null
+          mentor_voice_url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       adaptive_push_queue: {
         Row: {
           category: string | null
@@ -282,6 +315,45 @@ export type Database = {
           mood?: number | null
           reflection?: string | null
           type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_check_ins: {
+        Row: {
+          check_in_date: string
+          check_in_type: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          intention: string | null
+          mentor_response: string | null
+          mood: string | null
+          reflection: string | null
+          user_id: string
+        }
+        Insert: {
+          check_in_date?: string
+          check_in_type: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          intention?: string | null
+          mentor_response?: string | null
+          mood?: string | null
+          reflection?: string | null
+          user_id: string
+        }
+        Update: {
+          check_in_date?: string
+          check_in_type?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          intention?: string | null
+          mentor_response?: string | null
+          mood?: string | null
+          reflection?: string | null
           user_id?: string
         }
         Relationships: []
@@ -705,6 +777,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mentor_nudges: {
+        Row: {
+          context: Json | null
+          created_at: string
+          delivered_at: string | null
+          dismissed_at: string | null
+          id: string
+          message: string
+          nudge_type: string
+          read_at: string | null
+          user_id: string
+          voice_url: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          delivered_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          message: string
+          nudge_type: string
+          read_at?: string | null
+          user_id: string
+          voice_url?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          delivered_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          message?: string
+          nudge_type?: string
+          read_at?: string | null
+          user_id?: string
+          voice_url?: string | null
+        }
+        Relationships: []
       }
       mentors: {
         Row: {
