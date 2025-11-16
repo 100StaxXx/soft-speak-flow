@@ -488,16 +488,6 @@ const ContentGenerator = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Main category"
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="topic_category">Topic Categories (comma-separated)</Label>
               <Input
                 id="topic_category"
