@@ -84,6 +84,7 @@ serve(async (req) => {
 
     const transcribed = await transcribeResp.json();
     const transcribedText: string | undefined = transcribed?.text;
+    const wordTimestamps: any[] = transcribed?.transcript || [];
 
     if (!transcribedText) {
       return new Response(
@@ -92,14 +93,17 @@ serve(async (req) => {
       );
     }
 
-    // If the new text differs significantly, update the row
+    // If the new text differs significantly, update the row with both script and transcript
     const currentText: string = pepTalk.script || "";
     const differs = currentText.trim() !== transcribedText.trim();
 
     if (differs) {
       const { error: updateErr } = await supabase
         .from("daily_pep_talks")
-        .update({ script: transcribedText })
+        .update({ 
+          script: transcribedText,
+          transcript: wordTimestamps
+        })
         .eq("id", pepTalk.id);
 
       if (updateErr) {
@@ -109,10 +113,16 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      console.log(`Updated daily_pep_talks.script and transcript (id=${pepTalk.id})`);
     }
 
     return new Response(
-      JSON.stringify({ id: pepTalk.id, script: transcribedText, changed: differs }),
+      JSON.stringify({ 
+        id: pepTalk.id, 
+        script: transcribedText, 
+        transcript: wordTimestamps,
+        changed: differs 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

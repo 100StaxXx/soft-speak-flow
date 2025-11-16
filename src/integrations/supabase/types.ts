@@ -337,6 +337,7 @@ export type Database = {
           summary: string
           title: string
           topic_category: string
+          transcript: Json | null
         }
         Insert: {
           audio_url: string
@@ -350,6 +351,7 @@ export type Database = {
           summary: string
           title: string
           topic_category: string
+          transcript?: Json | null
         }
         Update: {
           audio_url?: string
@@ -363,6 +365,7 @@ export type Database = {
           summary?: string
           title?: string
           topic_category?: string
+          transcript?: Json | null
         }
         Relationships: []
       }
