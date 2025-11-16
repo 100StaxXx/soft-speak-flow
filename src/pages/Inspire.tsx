@@ -82,10 +82,17 @@ const Inspire = () => {
   // Extract unique categories and triggers
   const allCategories = Array.from(
     new Set(
-      pepTalks.flatMap(p => [
-        p.category,
-        ...(p.topic_category || [])
-      ].filter(Boolean))
+      pepTalks.flatMap(p => {
+        const cats = [
+          p.category,
+          ...(p.topic_category || [])
+        ].filter(Boolean);
+        
+        // Split comma-separated categories
+        return cats.flatMap(cat => 
+          cat.split(',').map(c => c.trim().toLowerCase())
+        );
+      })
     )
   ).sort();
 
@@ -101,7 +108,11 @@ const Inspire = () => {
       p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.quote.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const pepTalkCategories = [p.category, ...(p.topic_category || [])].filter(Boolean);
+    // Split and normalize categories for matching
+    const pepTalkCategories = [p.category, ...(p.topic_category || [])]
+      .filter(Boolean)
+      .flatMap(cat => cat.split(',').map(c => c.trim().toLowerCase()));
+    
     const matchesCategory = selectedCategories.length === 0 || 
       selectedCategories.some(cat => pepTalkCategories.includes(cat));
     
