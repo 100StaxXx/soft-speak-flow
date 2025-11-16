@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Play, Sparkles } from "lucide-react";
+import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export const TodaysPepTalk = () => {
@@ -11,6 +12,11 @@ export const TodaysPepTalk = () => {
   const navigate = useNavigate();
   const [pepTalk, setPepTalk] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
@@ -45,6 +51,57 @@ export const TodaysPepTalk = () => {
     fetchDailyPepTalk();
   }, [profile?.selected_mentor_id]);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [pepTalk]);
+
+  const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleSeek = (value: number[]) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = value[0];
+    setCurrentTime(value[0]);
+  };
+
+  const skipTime = (seconds: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+  };
+
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
   if (loading) {
     return (
       <Card className="p-6 animate-pulse">
@@ -78,35 +135,100 @@ export const TodaysPepTalk = () => {
         </div>
 
         {/* Content */}
-        <div className="space-y-3 p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 hover:border-primary/30 transition-colors">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 space-y-2">
-              <h3 className="font-bold text-foreground line-clamp-2">
-                {pepTalk.title}
-              </h3>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {pepTalk.summary}
-              </p>
+        <div className="space-y-4 p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+          <div className="space-y-2">
+            <h3 className="font-bold text-foreground">
+              {pepTalk.title}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {pepTalk.summary}
+            </p>
+          </div>
+
+          {/* Audio Player */}
+          <audio ref={audioRef} src={pepTalk.audio_url} preload="metadata" />
+          
+          <div className="space-y-3">
+            {/* Playback Controls */}
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTime(-10)}
+                className="h-10 w-10 rounded-full hover:bg-primary/20"
+              >
+                <SkipBack className="h-4 w-4" />
+              </Button>
+
+              <Button
+                size="icon"
+                onClick={togglePlayPause}
+                className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 transition-all"
+              >
+                {isPlaying ? (
+                  <Pause className="h-5 w-5" fill="currentColor" />
+                ) : (
+                  <Play className="h-5 w-5 ml-0.5" fill="currentColor" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTime(10)}
+                className="h-10 w-10 rounded-full hover:bg-primary/20"
+              >
+                <SkipForward className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="shrink-0 h-10 w-10 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30"
-              onClick={() => {
-                // Play audio logic or navigate to detail
-                const audio = new Audio(pepTalk.audio_url);
-                audio.play();
-              }}
-            >
-              <Play className="h-5 w-5 text-primary" />
-            </Button>
+
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <Slider
+                value={[currentTime]}
+                max={duration || 100}
+                step={0.1}
+                onValueChange={handleSeek}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            {/* Transcript Toggle */}
+            {pepTalk.script && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTranscript(!showTranscript)}
+                className="w-full justify-between"
+              >
+                <span className="text-xs">Transcription</span>
+                {showTranscript ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+            {/* Transcript */}
+            {showTranscript && pepTalk.script && (
+              <div className="p-3 rounded-lg bg-background/50 border border-border/50 max-h-48 overflow-y-auto">
+                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                  {pepTalk.script}
+                </p>
+              </div>
+            )}
           </div>
           
           <Button 
             variant="outline" 
             size="sm"
             className="w-full"
-            onClick={() => navigate(`/inspire`)}
+            onClick={() => navigate("/inspire")}
           >
             Browse More Pep Talks
           </Button>
