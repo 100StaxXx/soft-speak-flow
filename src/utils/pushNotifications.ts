@@ -50,7 +50,7 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
     // Request permission first
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      console.log('Notification permission denied');
+      
       return null;
     }
 

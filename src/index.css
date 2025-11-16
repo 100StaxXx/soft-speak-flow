@@ -304,15 +304,4 @@ All colors MUST be HSL.
     z-index: -1;
   }
 
-  /* Cinematic slide-in animation for onboarding */
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px) scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
 }

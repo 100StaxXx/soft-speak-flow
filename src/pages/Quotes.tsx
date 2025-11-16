@@ -37,7 +37,7 @@ const Quotes = () => {
       if (quoteResult) {
         // If no image URL, generate a gradient background
         if (!quoteResult.imageUrl) {
-          console.log('Generating gradient fallback for quote');
+          
           
           const gradients = [
             'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -100,9 +100,6 @@ const Quotes = () => {
             }
             
             quoteResult.imageUrl = canvas.toDataURL('image/png');
-            console.log('Gradient image generated successfully');
-          } else {
-            console.error('Failed to get canvas context');
           }
         }
         
