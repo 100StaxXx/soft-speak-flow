@@ -57,11 +57,6 @@ export const TodaysPepTalk = () => {
 
       if (data) {
         const transcript = Array.isArray(data.transcript) ? data.transcript : [];
-        console.log('Daily pep talk loaded:', {
-          hasTranscript: transcript.length > 0,
-          transcriptLength: transcript.length,
-          hasScript: !!data.script
-        });
         setPepTalk({ 
           ...data, 
           mentor_name: mentor.name,
@@ -82,11 +77,6 @@ export const TodaysPepTalk = () => {
           body: { id: pepTalk.id }
         });
         if (!error && data?.script) {
-          console.log('Transcript sync response:', {
-            hasTranscript: !!data.transcript,
-            transcriptLength: data.transcript?.length || 0,
-            changed: data.changed
-          });
           setPepTalk((prev: any) => {
             if (!prev) return prev;
             const shouldUpdate = data.script !== prev.script || JSON.stringify(data.transcript) !== JSON.stringify(prev.transcript);

@@ -50,7 +50,7 @@ export async function retryWithBackoff<T>(
         opts.maxDelay
       );
       
-      console.log(`Retry attempt ${attempt}/${opts.maxAttempts} after ${delay}ms`);
+      
       
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, delay));
