@@ -335,7 +335,7 @@ export const TodaysPepTalk = () => {
 
             {/* Transcript Section */}
             <div className="space-y-2 p-3 rounded-lg bg-background/50 border border-border/50">
-              {!showFullTranscript ? renderTranscriptPreview() : renderFullTranscript()}
+              {showFullTranscript ? renderFullTranscript() : renderTranscriptPreview()}
               
               {pepTalk?.script && (
                 <Button
