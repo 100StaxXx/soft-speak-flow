@@ -1,4 +1,4 @@
-import { Home, Target, MessageCircleHeart, BookHeart, User } from "lucide-react";
+import { Home, Target, MessageCircleHeart, BookOpen, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 export const BottomNav = () => {
@@ -58,7 +58,7 @@ export const BottomNav = () => {
         >
           {({ isActive }) => (
             <>
-              <BookHeart className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <BookOpen className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Journal
               </span>
