@@ -177,14 +177,21 @@ export default function Challenges() {
         </div>
 
         {/* Ongoing Challenges Section */}
-        {activeChallenges.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-heading text-foreground flex items-center gap-2">
-              <Target className="w-6 h-6 text-primary" />
-              Ongoing Challenges
-            </h2>
-            
-            {activeChallenges.map((activeChallenge: any) => (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-heading text-foreground flex items-center gap-2">
+            <Target className="w-6 h-6 text-primary" />
+            Ongoing Challenges
+          </h2>
+          
+          {activeChallenges.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Circle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No ongoing challenges. Start one below to begin your journey!
+              </p>
+            </Card>
+          ) : (
+            activeChallenges.map((activeChallenge: any) => (
               <Card 
                 key={activeChallenge.id}
                 className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 cursor-pointer hover:shadow-elegant transition-all"
@@ -214,9 +221,9 @@ export default function Challenges() {
                   </div>
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
         {/* Available Challenges Section */}
         <div className="space-y-4">
@@ -398,10 +405,9 @@ export default function Challenges() {
               availableChallenges.map((challenge: any) => (
                 <Card 
                   key={challenge.id} 
-                  className="p-6 hover:border-primary/40 transition-all cursor-pointer"
-                  onClick={() => navigate(`/challenge/${challenge.id}`)}
+                  className="p-6 hover:border-primary/40 transition-all"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-xl font-heading text-foreground">{challenge.title}</h3>
@@ -418,6 +424,13 @@ export default function Challenges() {
                         )}
                       </div>
                     </div>
+                    <Button
+                      onClick={() => startChallengeMutation.mutate(challenge.id)}
+                      disabled={startChallengeMutation.isPending}
+                      size="sm"
+                    >
+                      Start
+                    </Button>
                   </div>
                 </Card>
               ))
