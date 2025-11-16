@@ -40,17 +40,18 @@ const Inspire = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Fetch quote
+  // Fetch quote (without AI image by default)
   const { data: quote, isLoading } = useQuery({
     queryKey: ["single-quote", selectedBubble, bubbleType, refetchCounter],
     enabled: !!selectedBubble && !!bubbleType && activeTab === "quotes",
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('get-single-quote', {
-        body: { type: bubbleType, value: selectedBubble }
+        body: { type: bubbleType, value: selectedBubble, includeImage: false }
       });
 
       if (error) throw error;
@@ -142,6 +143,33 @@ const Inspire = () => {
     setQuoteData(null);
     setImageLoaded(false);
     setRefetchCounter(prev => prev + 1);
+  };
+
+  const handleGenerateImage = async () => {
+    if (!selectedBubble || !bubbleType || !quoteData) return;
+    
+    setIsGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-single-quote', {
+        body: { type: bubbleType, value: selectedBubble, includeImage: true }
+      });
+
+      if (error) throw error;
+      
+      const quoteResult = data?.quote;
+      if (quoteResult?.imageUrl) {
+        setQuoteData(quoteResult);
+        setImageLoaded(false);
+        toast.success("AI image generated!");
+      } else {
+        toast.error("Failed to generate image");
+      }
+    } catch (error) {
+      console.error('Image generation error:', error);
+      toast.error("Failed to generate image");
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   const handleDownload = async () => {
@@ -312,7 +340,16 @@ const Inspire = () => {
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Next Quote
                       </Button>
-                      {quoteData.imageUrl && (
+                      {!quoteData.imageUrl ? (
+                        <Button
+                          onClick={handleGenerateImage}
+                          disabled={isGeneratingImage}
+                          variant="outline"
+                          className="hover:shadow-soft transition-all duration-300"
+                        >
+                          <Sparkles className={`h-4 w-4 ${isGeneratingImage ? 'animate-spin' : ''}`} />
+                        </Button>
+                      ) : (
                         <Button
                           onClick={handleDownload}
                           variant="outline"

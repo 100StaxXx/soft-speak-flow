@@ -6,6 +6,7 @@ const corsHeaders = {
 interface QuoteRequest {
   type: 'trigger' | 'category';
   value: string;
+  includeImage?: boolean;
 }
 
 interface Quote {
@@ -50,9 +51,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const { type, value } = await req.json() as QuoteRequest;
+    const { type, value, includeImage = false } = await req.json() as QuoteRequest;
 
-    console.log('Getting single quote for:', { type, value });
+    console.log('Getting single quote for:', { type, value, includeImage });
 
     // Real quotes database
     const realQuotesByCategory: Record<string, Array<{text: string, author: string}>> = {
@@ -205,13 +206,14 @@ Deno.serve(async (req) => {
 
     const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
-    // Generate complete quote image with embedded text using Lovable AI
-    console.log('Generating image for quote...');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    
+    // Only generate AI image if explicitly requested
     let imageUrl = '';
     
-    if (lovableApiKey) {
+    if (includeImage) {
+      console.log('Generating AI image for quote...');
+      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+      
+      if (lovableApiKey) {
       try {
         const bgTheme = type === 'category' ? value : 'motivation';
         const emotion = type === 'trigger' ? value : '';
@@ -284,6 +286,9 @@ REMEMBER: Spell the quote text EXACTLY as provided above. Every word must match 
         // Use gradient fallback on any error
         imageUrl = '';
       }
+    }
+    } else {
+      console.log('Using gradient fallback (includeImage: false)');
     }
 
     const quoteWithImage: Quote = {
