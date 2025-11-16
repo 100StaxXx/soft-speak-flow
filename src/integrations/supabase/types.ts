@@ -294,6 +294,48 @@ export type Database = {
           },
         ]
       }
+      daily_pep_talks: {
+        Row: {
+          audio_url: string
+          created_at: string
+          emotional_triggers: string[]
+          for_date: string
+          id: string
+          intensity: string
+          mentor_slug: string
+          script: string
+          summary: string
+          title: string
+          topic_category: string
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string
+          emotional_triggers?: string[]
+          for_date: string
+          id?: string
+          intensity: string
+          mentor_slug: string
+          script: string
+          summary: string
+          title: string
+          topic_category: string
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string
+          emotional_triggers?: string[]
+          for_date?: string
+          id?: string
+          intensity?: string
+          mentor_slug?: string
+          script?: string
+          summary?: string
+          title?: string
+          topic_category?: string
+        }
+        Relationships: []
+      }
       downloads: {
         Row: {
           content_id: string
@@ -734,11 +776,15 @@ export type Database = {
           created_at: string
           description: string
           emotional_triggers: string[] | null
+          for_date: string | null
           id: string
+          intensity: string | null
           is_featured: boolean
           is_premium: boolean | null
           mentor_id: string | null
+          mentor_slug: string | null
           quote: string
+          source: string | null
           tags: string[] | null
           title: string
           topic_category: string[] | null
@@ -750,11 +796,15 @@ export type Database = {
           created_at?: string
           description: string
           emotional_triggers?: string[] | null
+          for_date?: string | null
           id?: string
+          intensity?: string | null
           is_featured?: boolean
           is_premium?: boolean | null
           mentor_id?: string | null
+          mentor_slug?: string | null
           quote: string
+          source?: string | null
           tags?: string[] | null
           title: string
           topic_category?: string[] | null
@@ -766,11 +816,15 @@ export type Database = {
           created_at?: string
           description?: string
           emotional_triggers?: string[] | null
+          for_date?: string | null
           id?: string
+          intensity?: string | null
           is_featured?: boolean
           is_premium?: boolean | null
           mentor_id?: string | null
+          mentor_slug?: string | null
           quote?: string
+          source?: string | null
           tags?: string[] | null
           title?: string
           topic_category?: string[] | null
@@ -865,29 +919,41 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          daily_push_enabled: boolean | null
+          daily_push_time: string | null
+          daily_push_window: string | null
           email: string | null
           id: string
           is_premium: boolean | null
           preferences: Json | null
           selected_mentor_id: string | null
+          timezone: string | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
+          daily_push_enabled?: boolean | null
+          daily_push_time?: string | null
+          daily_push_window?: string | null
           email?: string | null
           id: string
           is_premium?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
+          daily_push_enabled?: boolean | null
+          daily_push_time?: string | null
+          daily_push_window?: string | null
           email?: string | null
           id?: string
           is_premium?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1046,6 +1112,41 @@ export type Database = {
             columns: ["challenge_id"]
             isOneToOne: false
             referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_daily_pushes: {
+        Row: {
+          created_at: string
+          daily_pep_talk_id: string
+          delivered_at: string | null
+          id: string
+          scheduled_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_pep_talk_id: string
+          delivered_at?: string | null
+          id?: string
+          scheduled_at: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_pep_talk_id?: string
+          delivered_at?: string | null
+          id?: string
+          scheduled_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_daily_pushes_daily_pep_talk_id_fkey"
+            columns: ["daily_pep_talk_id"]
+            isOneToOne: false
+            referencedRelation: "daily_pep_talks"
             referencedColumns: ["id"]
           },
         ]
