@@ -6,6 +6,13 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+
+interface CaptionWord {
+  word: string;
+  start: number;
+  end: number;
+}
 
 export const TodaysPepTalk = () => {
   const { profile } = useProfile();
@@ -15,8 +22,11 @@ export const TodaysPepTalk = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showFullTranscript, setShowFullTranscript] = useState(false);
+  const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const activeWordRef = useRef<HTMLSpanElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
@@ -43,7 +53,10 @@ export const TodaysPepTalk = () => {
         .single();
 
       if (data) {
-        setPepTalk({ ...data, mentor_name: mentor.name });
+        setPepTalk({ 
+          ...data, 
+          mentor_name: mentor.name
+        });
       }
       setLoading(false);
     };
@@ -55,7 +68,10 @@ export const TodaysPepTalk = () => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
 
@@ -69,6 +85,24 @@ export const TodaysPepTalk = () => {
       audio.removeEventListener("ended", handleEnded);
     };
   }, [pepTalk]);
+
+  // Auto-scroll to active word
+  useEffect(() => {
+    if (activeWordRef.current && transcriptRef.current && showFullTranscript) {
+      const container = transcriptRef.current;
+      const activeWord = activeWordRef.current;
+      
+      const containerRect = container.getBoundingClientRect();
+      const wordRect = activeWord.getBoundingClientRect();
+      
+      if (wordRect.top < containerRect.top || wordRect.bottom > containerRect.bottom) {
+        activeWord.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }
+  }, [activeWordIndex, showFullTranscript]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -100,6 +134,38 @@ export const TodaysPepTalk = () => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  const renderTranscriptPreview = () => {
+    if (!pepTalk?.script) {
+      return (
+        <p className="text-sm text-muted-foreground italic">
+          No transcript available
+        </p>
+      );
+    }
+
+    const words = pepTalk.script.split(' ');
+    const previewWords = words.slice(0, 20);
+
+    return (
+      <div className="text-sm leading-relaxed text-foreground/70">
+        {previewWords.join(' ')}...
+      </div>
+    );
+  };
+
+  const renderFullTranscript = () => {
+    if (!pepTalk?.script) return null;
+
+    return (
+      <div 
+        ref={transcriptRef}
+        className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
+      >
+        {pepTalk.script}
+      </div>
+    );
   };
 
   if (loading) {
@@ -197,31 +263,28 @@ export const TodaysPepTalk = () => {
               </div>
             </div>
 
-            {/* Transcript Toggle */}
-            {pepTalk.script && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTranscript(!showTranscript)}
-                className="w-full justify-between"
-              >
-                <span className="text-xs">Transcription</span>
-                {showTranscript ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-
-            {/* Transcript */}
-            {showTranscript && pepTalk.script && (
-              <div className="p-3 rounded-lg bg-background/50 border border-border/50 max-h-48 overflow-y-auto">
-                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                  {pepTalk.script}
-                </p>
-              </div>
-            )}
+            {/* Transcript Section */}
+            <div className="space-y-2 p-3 rounded-lg bg-background/50 border border-border/50">
+              {!showFullTranscript ? renderTranscriptPreview() : renderFullTranscript()}
+              
+              {pepTalk?.script && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFullTranscript(!showFullTranscript)}
+                  className="w-full justify-between mt-2"
+                >
+                  <span className="text-xs">
+                    {showFullTranscript ? "Show Less" : "Show Full Transcript"}
+                  </span>
+                  {showFullTranscript ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
           
           <Button 
