@@ -9,6 +9,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryRetryConfig } from "@/utils/retry";
+import { InstallPWA } from "@/components/InstallPWA";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -92,6 +93,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <InstallPWA />
         <BrowserRouter>
           <ScrollToTop />
           <AppContent />
