@@ -102,7 +102,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                 src={siennaSage}
                 alt={activeMentor.name}
                 className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 35%' }}
+                style={{ objectPosition: 'center 40%' }}
               />
             ) : activeMentor.slug === 'lumi' ? (
               <img 
@@ -302,7 +302,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                       src={siennaSage} 
                       alt={mentor.name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 25%' }}
+                      style={{ objectPosition: 'center 30%' }}
                     />
                   ) : mentor.slug === 'lumi' ? (
                     <img 
