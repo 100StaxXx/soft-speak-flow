@@ -313,6 +313,7 @@ const Inspire = () => {
                   options={allCategories}
                   selectedValues={selectedCategories}
                   onSelectionChange={setSelectedCategories}
+                  mutuallyExclusiveGroups={[["business", "discipline"]]}
                 />
               )}
               

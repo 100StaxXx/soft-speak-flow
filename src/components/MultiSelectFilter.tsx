@@ -7,6 +7,7 @@ interface MultiSelectFilterProps {
   options: string[];
   selectedValues: string[];
   onSelectionChange: (values: string[]) => void;
+  mutuallyExclusiveGroups?: string[][];
 }
 
 export const MultiSelectFilter = ({
@@ -14,13 +15,28 @@ export const MultiSelectFilter = ({
   options,
   selectedValues,
   onSelectionChange,
+  mutuallyExclusiveGroups = [],
 }: MultiSelectFilterProps) => {
   const toggleOption = (value: string) => {
+    let newValues: string[];
+    
     if (selectedValues.includes(value)) {
-      onSelectionChange(selectedValues.filter(v => v !== value));
+      // Deselect the value
+      newValues = selectedValues.filter(v => v !== value);
     } else {
-      onSelectionChange([...selectedValues, value]);
+      // Check if this value is in any mutually exclusive group
+      const exclusiveGroup = mutuallyExclusiveGroups.find(group => group.includes(value));
+      
+      if (exclusiveGroup) {
+        // Remove any other values from the same exclusive group
+        newValues = selectedValues.filter(v => !exclusiveGroup.includes(v));
+        newValues.push(value);
+      } else {
+        newValues = [...selectedValues, value];
+      }
     }
+    
+    onSelectionChange(newValues);
   };
 
   const clearAll = () => {
