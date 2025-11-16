@@ -26,6 +26,7 @@ import MentorChat from "./pages/MentorChat";
 import ContentGenerator from "./pages/ContentGenerator";
 import AdaptivePushes from "./pages/AdaptivePushes";
 import PushSettings from "./pages/PushSettings";
+import Journal from "./pages/Journal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +71,7 @@ const AppContent = () => {
         <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
         <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
+        <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
         <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
         <Route path="/content-generator" element={<ProtectedRoute requireMentor={false}><ContentGenerator /></ProtectedRoute>} />
         <Route path="/adaptive-pushes" element={<ProtectedRoute><AdaptivePushes /></ProtectedRoute>} />
