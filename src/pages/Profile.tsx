@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
+import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -264,6 +265,9 @@ const Profile = () => {
                 <Button onClick={handleCreateAdaptivePushSettings} className="w-full">Enable Adaptive Pushes</Button>
               )}
             </Card>
+
+            {/* Daily Quote Settings */}
+            <DailyQuoteSettings />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
