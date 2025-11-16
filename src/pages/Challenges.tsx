@@ -185,12 +185,11 @@ export default function Challenges() {
           </div>
 
           {/* Category Filter */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedCategory(null)}
-              className="flex-shrink-0"
             >
               All
             </Button>
@@ -200,7 +199,7 @@ export default function Challenges() {
                 variant={selectedCategory === cat ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedCategory(cat)}
-                className="capitalize flex-shrink-0"
+                className="capitalize"
               >
                 {cat}
               </Button>
