@@ -16,6 +16,9 @@ import { PlaylistCard } from "@/components/PlaylistCard";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { DailyLesson } from "@/components/DailyLesson";
 import { MentorMessage } from "@/components/MentorMessage";
+import { MoodSelector } from "@/components/MoodSelector";
+import { MoodPushCard } from "@/components/MoodPushCard";
+import { NightReflectionCard } from "@/components/NightReflectionCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Compass, Heart, MessageCircle, Trophy, Target, BookOpen, Flame, Music, Zap, TrendingUp } from "lucide-react";
@@ -34,7 +37,6 @@ const Index = () => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(() => {
-    // Only show intro on first visit, not when navigating back
     return !sessionStorage.getItem('hasVisitedHome');
   });
   const [powerMode, setPowerMode] = useState(false);
@@ -44,8 +46,71 @@ const Index = () => {
   const [dailyLesson, setDailyLesson] = useState<any>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(false);
+  
+  // Mood selector
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [moodPush, setMoodPush] = useState<any>(null);
+  const [isLoadingPush, setIsLoadingPush] = useState(false);
+
+  const handleMoodSelect = async (mood: string) => {
+    setSelectedMood(mood);
+    setIsLoadingPush(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mood-push', { body: { mood } });
+      if (error) throw error;
+      setMoodPush(data);
+    } catch (error) {
+      toast.error("Couldn't generate your push");
+    } finally {
+      setIsLoadingPush(false);
+    }
+  };
 
   // Mark that home has been visited
+export default function Index() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const { toast } = useToast();
+  const [pepTalks, setPepTalks] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [audioClips, setAudioClips] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [lessons, setLessons] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [todaysPepTalk, setTodaysPepTalk] = useState<any>(null);
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Mood selector state
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [moodPush, setMoodPush] = useState<any>(null);
+  const [isLoadingPush, setIsLoadingPush] = useState(false);
+
+  const handleMoodSelect = async (mood: string) => {
+    setSelectedMood(mood);
+    setIsLoadingPush(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mood-push', {
+        body: { mood }
+      });
+      
+      if (error) throw error;
+      setMoodPush(data);
+    } catch (error: any) {
+      console.error('Error generating mood push:', error);
+      toast({
+        title: "Error",
+        description: "Couldn't generate your push. Try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingPush(false);
+    }
+  };
+
   useEffect(() => {
     sessionStorage.setItem('hasVisitedHome', 'true');
   }, []);
@@ -115,7 +180,7 @@ const Index = () => {
         .from("user_challenges")
         .select("id")
         .eq("user_id", user.id)
-        .eq("is_active", true)
+        .eq("status", "active")
         .limit(1);
       
       setHasActiveHabits((habits?.length || 0) > 0);
