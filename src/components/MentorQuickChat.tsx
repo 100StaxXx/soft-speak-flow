@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { MessageCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { MessageCircle, Send } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 const ROTATING_QUESTIONS = [
@@ -23,6 +25,7 @@ export const MentorQuickChat = () => {
   const navigate = useNavigate();
   const personality = useMentorPersonality();
   const [currentQuestions, setCurrentQuestions] = useState<string[]>([]);
+  const [customQuestion, setCustomQuestion] = useState("");
 
   useEffect(() => {
     // Select 3 random questions on mount
@@ -31,8 +34,14 @@ export const MentorQuickChat = () => {
   }, []);
 
   const handleQuestionClick = (question: string) => {
-    // Navigate to chat with the question as state
     navigate("/mentor-chat", { state: { initialMessage: question } });
+  };
+
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customQuestion.trim()) {
+      navigate("/mentor-chat", { state: { initialMessage: customQuestion } });
+    }
   };
 
   return (
@@ -55,6 +64,18 @@ export const MentorQuickChat = () => {
           </button>
         ))}
       </div>
+
+      <form onSubmit={handleCustomSubmit} className="flex gap-2">
+        <Input
+          value={customQuestion}
+          onChange={(e) => setCustomQuestion(e.target.value)}
+          placeholder="Or ask your own question..."
+          className="flex-1"
+        />
+        <Button type="submit" size="icon" disabled={!customQuestion.trim()}>
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
     </Card>
   );
 };
