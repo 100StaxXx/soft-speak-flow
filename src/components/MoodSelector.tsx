@@ -1,4 +1,4 @@
-import { Smile, Meh, Frown, Sparkles, Heart, Coffee, Moon, Zap } from "lucide-react";
+import { Frown, Brain, Zap, Battery, Smile, Target, Focus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MoodSelectorProps {
@@ -8,14 +8,14 @@ interface MoodSelectorProps {
 
 export const MoodSelector = ({ onSelect, selected }: MoodSelectorProps) => {
   const moods = [
-    { id: "amazing", label: "Amazing", icon: Sparkles, color: "text-yellow-500" },
-    { id: "happy", label: "Happy", icon: Smile, color: "text-green-500" },
-    { id: "grateful", label: "Grateful", icon: Heart, color: "text-pink-500" },
-    { id: "calm", label: "Calm", icon: Coffee, color: "text-blue-400" },
-    { id: "neutral", label: "Neutral", icon: Meh, color: "text-gray-500" },
-    { id: "tired", label: "Tired", icon: Moon, color: "text-purple-500" },
+    { id: "unmotivated", label: "Unmotivated", icon: Frown, color: "text-red-500" },
+    { id: "overthinking", label: "Overthinking", icon: Brain, color: "text-purple-500" },
     { id: "stressed", label: "Stressed", icon: Zap, color: "text-orange-500" },
-    { id: "tough", label: "Tough", icon: Frown, color: "text-red-500" },
+    { id: "low_energy", label: "Low Energy", icon: Battery, color: "text-gray-500" },
+    { id: "content", label: "Content", icon: Smile, color: "text-blue-400" },
+    { id: "disciplined", label: "Disciplined", icon: Target, color: "text-green-500" },
+    { id: "focused", label: "Focused", icon: Focus, color: "text-teal-500" },
+    { id: "inspired", label: "Inspired", icon: Sparkles, color: "text-yellow-500" },
   ];
 
   return (
