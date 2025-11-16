@@ -332,10 +332,10 @@ const Inspire = () => {
                       </div>
                     )}
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3">
                       <Button
                         onClick={handleNextQuote}
-                        className="flex-1 bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
                       >
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Next Quote
@@ -344,18 +344,30 @@ const Inspire = () => {
                         <Button
                           onClick={handleGenerateImage}
                           disabled={isGeneratingImage}
-                          variant="outline"
-                          className="hover:shadow-soft transition-all duration-300"
+                          size="lg"
+                          className="w-full h-14 bg-gradient-to-r from-royal-purple to-accent-purple hover:from-royal-purple/90 hover:to-accent-purple/90 text-pure-white font-black uppercase tracking-wider shadow-[0_0_30px_rgba(137,81,204,0.5)] hover:shadow-[0_0_50px_rgba(137,81,204,0.8)] transition-all duration-300 hover:scale-105 border-2 border-royal-purple/50"
                         >
-                          <Sparkles className={`h-4 w-4 ${isGeneratingImage ? 'animate-spin' : ''}`} />
+                          {isGeneratingImage ? (
+                            <>
+                              <Sparkles className="mr-2 h-5 w-5 animate-spin" />
+                              Generating Magic...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-5 w-5" />
+                              Generate AI Image
+                            </>
+                          )}
                         </Button>
                       ) : (
                         <Button
                           onClick={handleDownload}
                           variant="outline"
-                          className="hover:shadow-soft transition-all duration-300"
+                          size="lg"
+                          className="w-full hover:shadow-soft transition-all duration-300"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="mr-2 h-5 w-5" />
+                          Download Image
                         </Button>
                       )}
                     </div>
