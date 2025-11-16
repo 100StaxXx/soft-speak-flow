@@ -68,7 +68,6 @@ const AppContent = () => {
         <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
         <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
-        <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
         <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
         
         <Route path="*" element={<NotFound />} />
