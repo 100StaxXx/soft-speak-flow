@@ -66,7 +66,6 @@ export const MorningCheckIn = () => {
         body: { checkInId: checkIn.id }
       });
 
-      toast({ title: "Morning check-in complete!", description: "Let's make today count." });
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
     } catch (error) {
       console.error(error);

@@ -80,7 +80,6 @@ export default function Habits() {
       setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
       setShowTemplates(true);
-      toast({ title: "Habit added", description: "Lock in and stay consistent." });
     },
   });
 
@@ -135,8 +134,6 @@ export default function Habits() {
           streak: updatedHabit.current_streak,
           title: updatedHabit.title
         });
-      } else {
-        toast({ title: "Habit completed", description: "Keep the streak alive." });
       }
     },
     onError: (error) => {

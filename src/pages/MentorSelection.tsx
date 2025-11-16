@@ -77,13 +77,6 @@ const MentorSelection = () => {
         .eq("id", user.id);
 
       if (error) throw error;
-
-      const selectedMentor = mentors.find(m => m.id === mentorId);
-      
-      toast({
-        title: "Mentor selected!",
-        description: `${selectedMentor?.name} will be your guide.`,
-      });
       
       navigate("/");
     } catch (error: any) {

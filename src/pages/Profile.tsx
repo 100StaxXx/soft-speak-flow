@@ -78,9 +78,6 @@ const Profile = () => {
         if (error) throw error;
       }
       
-      toast({ 
-        title: newState ? "Adaptive Pushes enabled" : "Adaptive Pushes disabled" 
-      });
       refetchSettings();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -92,7 +89,6 @@ const Profile = () => {
     try {
       const { error } = await supabase.from("profiles").update({ selected_mentor_id: mentorId }).eq("id", user.id);
       if (error) throw error;
-      toast({ title: "Mentor updated" });
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
