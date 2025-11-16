@@ -31,8 +31,9 @@ export default function Challenges() {
     tasks: [] as { day: number; title: string; description: string }[]
   });
 
-  const { data: activeChallenge } = useQuery({
-    queryKey: ['activeChallenge', user?.id],
+  // Fetch active (ongoing) challenges
+  const { data: activeChallenges = [] } = useQuery({
+    queryKey: ['activeChallenges', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_challenges')
@@ -42,7 +43,7 @@ export default function Challenges() {
         `)
         .eq('user_id', user!.id)
         .eq('status', 'active')
-        .maybeSingle();
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data;
@@ -50,27 +51,19 @@ export default function Challenges() {
     enabled: !!user,
   });
 
-  const { data: currentTask } = useQuery({
-    queryKey: ['currentTask', activeChallenge?.challenge_id, activeChallenge?.current_day],
+  // Fetch available challenges (all challenges not yet started or completed by user)
+  const { data: availableChallenges = [] } = useQuery({
+    queryKey: ['availableChallenges', selectedCategory, user?.id],
     queryFn: async () => {
-      if (!activeChallenge) return null;
-      
-      const { data, error } = await supabase
-        .from('challenge_tasks')
-        .select('*')
-        .eq('challenge_id', activeChallenge.challenge_id)
-        .eq('day_number', activeChallenge.current_day)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeChallenge,
-  });
+      // First get all user's challenge IDs
+      const { data: userChallenges } = await supabase
+        .from('user_challenges')
+        .select('challenge_id')
+        .eq('user_id', user!.id);
 
-  const { data: featuredChallenges = [] } = useQuery({
-    queryKey: ['featuredChallenges', selectedCategory],
-    queryFn: async () => {
+      const userChallengeIds = userChallenges?.map(uc => uc.challenge_id) || [];
+
+      // Get challenges not in user's challenges
       let query = supabase
         .from('challenges')
         .select('*')
@@ -80,44 +73,43 @@ export default function Challenges() {
         query = query.eq('category', selectedCategory);
       }
       
-      const { data, error } = await query.limit(10);
+      if (userChallengeIds.length > 0) {
+        query = query.not('id', 'in', `(${userChallengeIds.join(',')})`);
+      }
+      
+      const { data, error } = await query.limit(20);
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
-  const completeTaskMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeChallenge) return;
-      
-      const totalDays = (activeChallenge.challenge as any).total_days;
-      const nextDay = activeChallenge.current_day + 1;
-      
-      const updateData = nextDay > totalDays
-        ? { status: 'completed' }
-        : { current_day: nextDay };
-      
+  const startChallengeMutation = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const challenge = availableChallenges.find((c: any) => c.id === challengeId);
+      if (!challenge) return;
+
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + challenge.duration_days);
+
       const { error } = await supabase
         .from('user_challenges')
-        .update(updateData)
-        .eq('id', activeChallenge.id);
-      
+        .insert({
+          user_id: user!.id,
+          challenge_id: challengeId,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+        });
+
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeChallenge'] });
-      
-      if (activeChallenge && activeChallenge.current_day >= (activeChallenge.challenge as any).total_days) {
-        toast({
-          title: "🎉 Challenge Complete!",
-          description: "Amazing work completing this challenge!",
-        });
-      } else {
-        toast({
-          title: "Day complete!",
-          description: "Ready for the next one?",
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ['activeChallenges'] });
+      queryClient.invalidateQueries({ queryKey: ['availableChallenges'] });
+      toast({
+        title: "Challenge started!",
+        description: "Let's do this!",
+      });
     },
   });
 
@@ -156,7 +148,7 @@ export default function Challenges() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['featuredChallenges'] });
+      queryClient.invalidateQueries({ queryKey: ['availableChallenges'] });
       setIsCreateDialogOpen(false);
       setCustomChallenge({
         title: '',
@@ -184,76 +176,54 @@ export default function Challenges() {
           <h1 className="text-4xl font-heading text-foreground">Challenges</h1>
         </div>
 
-        {/* Current Challenge Section */}
-        {activeChallenge && activeChallenge.status === 'active' ? (
-          <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/20 border-primary/20">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Trophy className="w-6 h-6 text-primary" />
-                <div>
-                  <div className="text-sm text-muted-foreground">Your Current Challenge</div>
-                  <h2 className="text-2xl font-heading text-foreground">
-                    {(activeChallenge.challenge as any).title}
-                  </h2>
+        {/* Ongoing Challenges Section */}
+        {activeChallenges.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-heading text-foreground flex items-center gap-2">
+              <Target className="w-6 h-6 text-primary" />
+              Ongoing Challenges
+            </h2>
+            
+            {activeChallenges.map((activeChallenge: any) => (
+              <Card 
+                key={activeChallenge.id}
+                className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 cursor-pointer hover:shadow-elegant transition-all"
+                onClick={() => navigate(`/challenge/${activeChallenge.challenge_id}`)}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-xl font-heading text-foreground mb-1">
+                        {activeChallenge.challenge.title}
+                      </h3>
+                      <Badge variant="secondary" className="capitalize">
+                        {activeChallenge.challenge.category}
+                      </Badge>
+                    </div>
+                    <Circle className="w-6 h-6 text-primary" />
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Day {activeChallenge.current_day} of {activeChallenge.challenge.total_days}</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-500"
+                        style={{ width: `${(activeChallenge.current_day / activeChallenge.challenge.total_days) * 100}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Day {activeChallenge.current_day} of {(activeChallenge.challenge as any).total_days}</span>
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${(activeChallenge.current_day / (activeChallenge.challenge as any).total_days) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {currentTask && (
-                <div className="bg-card p-4 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-2">Today's Task</div>
-                  <h3 className="font-heading text-lg text-foreground mb-2">{currentTask.task_title}</h3>
-                  <p className="text-foreground/80 mb-4">{currentTask.task_description}</p>
-                  
-                  <Button 
-                    onClick={() => completeTaskMutation.mutate()}
-                    disabled={completeTaskMutation.isPending}
-                    className="w-full"
-                    size="lg"
-                  >
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    {completeTaskMutation.isPending ? 'Completing...' : 'Complete Today'}
-                  </Button>
-                </div>
-              )}
-
-              {/* Progress Tracker */}
-              <ChallengeProgress 
-                userChallengeId={activeChallenge.id}
-                startDate={activeChallenge.start_date}
-                currentDay={activeChallenge.current_day}
-                totalDays={(activeChallenge.challenge as any).total_days}
-              />
-            </div>
-          </Card>
-        ) : activeChallenge && activeChallenge.status === 'completed' ? (
-          <Card className="p-8 text-center bg-gradient-to-br from-green-500/10 to-accent/20 border-green-500/20">
-            <Trophy className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-heading text-foreground mb-2">Challenge Complete!</h2>
-            <p className="text-muted-foreground mb-4">
-              You finished: {(activeChallenge.challenge as any).title}
-            </p>
-            <Button onClick={() => navigate('/challenges')}>
-              Start Another Challenge
-            </Button>
-          </Card>
-        ) : null}
-
-        {/* Featured Challenges */}
+        {/* Available Challenges Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-2xl font-heading text-foreground">
               <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
-              {activeChallenge?.status === 'active' ? 'More Challenges' : 'Featured Challenges'}
+              {activeChallenges.length > 0 ? 'Available Challenges' : 'Start a Challenge'}
             </h2>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -415,14 +385,17 @@ export default function Challenges() {
           </div>
 
           <div className="grid gap-4">
-            {featuredChallenges.length === 0 ? (
+            {availableChallenges.length === 0 ? (
               <Card className="p-12 text-center">
                 <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No challenges available yet.</p>
-                <p className="text-sm text-muted-foreground mt-2">New challenges are added weekly.</p>
+                <p className="text-muted-foreground">
+                  {selectedCategory 
+                    ? 'No challenges available in this category.' 
+                    : 'All challenges have been started! Check back later for new challenges.'}
+                </p>
               </Card>
             ) : (
-              featuredChallenges.map((challenge) => (
+              availableChallenges.map((challenge: any) => (
                 <Card 
                   key={challenge.id} 
                   className="p-6 hover:border-primary/40 transition-all cursor-pointer"
