@@ -31,6 +31,7 @@ import Habits from "./pages/Habits";
 import Challenges from "./pages/Challenges";
 import ChallengeDetail from "./pages/ChallengeDetail";
 import NightReflection from "./pages/NightReflection";
+import MoodHistory from "./pages/MoodHistory";
 import AudioLibrary from "./pages/AudioLibrary";
 import Lessons from "./pages/Lessons";
 import FocusMode from "./pages/FocusMode";
@@ -93,6 +94,7 @@ const AppContent = () => {
         <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
         <Route path="/challenge/:id" element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
         <Route path="/night-reflection" element={<ProtectedRoute><NightReflection /></ProtectedRoute>} />
+        <Route path="/mood-history" element={<ProtectedRoute><MoodHistory /></ProtectedRoute>} />
         <Route path="/audio" element={<ProtectedRoute><AudioLibrary /></ProtectedRoute>} />
         <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
         <Route path="/focus" element={<ProtectedRoute><FocusMode /></ProtectedRoute>} />
