@@ -167,50 +167,76 @@ const Quotes = () => {
             />
           </>
         ) : (
-          <div className="fixed inset-0 flex items-center justify-center">
+          <div className="fixed inset-0">
             {isLoading && !quoteData ? (
-              <div className="text-center">
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
-                <p className="text-white/80 text-xs mt-2">Finding your quote...</p>
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-warm-charcoal via-blush-rose/20 to-lavender-mist/30">
+                <div className="text-center">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-white border-r-transparent"></div>
+                  <p className="text-white/80 text-sm mt-4 font-medium">Finding your quote...</p>
+                </div>
               </div>
             ) : quoteData?.imageUrl ? (
               <>
-                <div className={`absolute inset-0 transition-opacity duration-700 ${
-                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                {/* Full Screen Quote Image */}
+                <div className={`absolute inset-0 transition-all duration-1000 ${
+                  imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
                 }`}>
                   <img 
                     src={quoteData.imageUrl} 
                     alt="Quote"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                     onLoad={() => setImageLoaded(true)}
                   />
+                  
+                  {/* Cinematic Gradient Overlays */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none" />
                 </div>
                 
-                {/* Floating Action Buttons */}
+                {/* Floating Action Buttons - Transparent Overlay */}
                 {imageLoaded && (
-                  <div className="fixed bottom-24 left-0 right-0 flex items-center justify-center gap-3 px-4 z-50">
-                    <Button
-                      onClick={handleDownload}
-                      size="lg"
-                      className="bg-white/90 hover:bg-white text-warm-charcoal backdrop-blur-sm border border-petal-pink/20 shadow-lg rounded-full px-6"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button
-                      onClick={handleNextQuote}
-                      size="lg"
-                      className="bg-blush-rose hover:bg-blush-rose/90 text-white backdrop-blur-sm shadow-lg rounded-full px-6"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Next Quote
-                    </Button>
-                  </div>
+                  <>
+                    {/* Top Bar - Back Button */}
+                    {showBack && (
+                      <div className="fixed top-6 left-0 right-0 flex items-center justify-between px-6 z-50 animate-fade-in">
+                        <Button
+                          onClick={handleBack}
+                          size="sm"
+                          variant="ghost"
+                          className="bg-black/30 hover:bg-black/50 text-white backdrop-blur-md border border-white/10 shadow-lg rounded-full"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* Bottom Action Buttons */}
+                    <div className="fixed bottom-8 left-0 right-0 flex items-center justify-center gap-3 px-6 z-50 animate-fade-in">
+                      <Button
+                        onClick={handleDownload}
+                        size="lg"
+                        className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/20 shadow-2xl rounded-full px-8 transition-all duration-300 hover:scale-105"
+                      >
+                        <Download className="h-5 w-5 mr-2" />
+                        Save
+                      </Button>
+                      <Button
+                        onClick={handleNextQuote}
+                        size="lg"
+                        className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/20 shadow-2xl rounded-full px-8 transition-all duration-300 hover:scale-105"
+                      >
+                        <RefreshCw className="h-5 w-5 mr-2" />
+                        Next
+                      </Button>
+                    </div>
+                  </>
                 )}
               </>
             ) : (
-              <div className="text-center px-4">
-                <p className="text-white/60 text-sm">No quote found</p>
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-warm-charcoal via-blush-rose/20 to-lavender-mist/30">
+                <div className="text-center px-4">
+                  <p className="text-white/60 text-sm">No quote found</p>
+                </div>
               </div>
             )}
           </div>
