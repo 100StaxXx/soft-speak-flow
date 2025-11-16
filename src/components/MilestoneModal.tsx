@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Trophy, Flame } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useEffect, useState } from "react";
+import { ShareableStreakBadge } from "./ShareableStreakBadge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MilestoneModalProps {
   open: boolean;
@@ -80,53 +82,70 @@ export const MilestoneModal = ({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
-        <div className="text-center space-y-6 py-6">
-          {/* Icon */}
-          <div className="relative mx-auto w-24 h-24">
-            <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse" />
-            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Trophy className="h-12 w-12 text-white" />
-            </div>
-          </div>
+        <Tabs defaultValue="celebrate" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="celebrate">Celebrate</TabsTrigger>
+            <TabsTrigger value="share">Share</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="celebrate" className="space-y-6 py-6">
+            <div className="text-center space-y-6">
+              {/* Icon */}
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse" />
+                <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Trophy className="h-12 w-12 text-white" />
+                </div>
+              </div>
 
-          {/* Message */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent animate-pulse" />
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                {milestoneMessage()}
-              </h2>
-              <Sparkles className="h-5 w-5 text-accent animate-pulse" />
-            </div>
-            
-            <div className="flex items-center justify-center gap-2 text-4xl font-bold">
-              <Flame className="h-8 w-8 text-orange-500" />
-              <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
-                {streak}
-              </span>
-              <span className="text-muted-foreground text-2xl">day streak</span>
-            </div>
-            
-            <p className="text-lg text-foreground font-medium">
-              {habitTitle}
-            </p>
-            
-            {mentorName && (
-              <p className="text-sm text-muted-foreground italic">
-                {mentorName} is proud of you!
-              </p>
-            )}
-          </div>
+              {/* Message */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    {milestoneMessage()}
+                  </h2>
+                  <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+                </div>
+                
+                <div className="flex items-center justify-center gap-2 text-4xl font-bold">
+                  <Flame className="h-8 w-8 text-orange-500" />
+                  <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                    {streak}
+                  </span>
+                  <span className="text-muted-foreground text-2xl">day streak</span>
+                </div>
+                
+                <p className="text-lg text-foreground font-medium">
+                  {habitTitle}
+                </p>
+                
+                {mentorName && (
+                  <p className="text-sm text-muted-foreground italic">
+                    {mentorName} is proud of you!
+                  </p>
+                )}
+              </div>
 
-          {/* Close Button */}
-          <Button
-            onClick={onClose}
-            className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
-            size="lg"
-          >
-            Keep Going! 🚀
-          </Button>
-        </div>
+              {/* Close Button */}
+              <Button
+                onClick={onClose}
+                className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                size="lg"
+              >
+                Keep Going! 🚀
+              </Button>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="share" className="py-6">
+            <ShareableStreakBadge
+              streak={streak}
+              habitTitle={habitTitle}
+              mentorName={mentorName}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

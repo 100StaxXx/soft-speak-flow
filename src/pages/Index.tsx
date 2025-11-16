@@ -13,9 +13,11 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { MentorNudges } from "@/components/MentorNudges";
+import { WeeklyInsights } from "@/components/WeeklyInsights";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { PageTransition, SlideUp } from "@/components/PageTransition";
 
 const Index = () => {
   const { user } = useAuth();
@@ -65,79 +67,96 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Home
-          </h1>
-          <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Proactive Nudges */}
-        <MentorNudges />
-
-        {/* Morning Check-in */}
-        <MorningCheckIn />
-
-        {/* Today's Pep Talk */}
-        <TodaysPepTalk />
-
-        {/* Quote of the Day */}
-        <QuoteOfTheDay />
-
-        {/* Mentor Quick Chat */}
-        <MentorQuickChat />
-
-        {/* Activity Timeline */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-5 w-5 text-primary" />
-            <h2 className="font-bold text-lg">Your Journey</h2>
+    <PageTransition>
+      <div className="min-h-screen bg-background pb-20">
+        {/* Header */}
+        <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Home
+            </h1>
+            <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
           </div>
-          <ActivityTimeline />
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card 
-            className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
-            onClick={() => navigate("/habits")}
-          >
-            <div className="flex flex-col items-center text-center space-y-3">
-              <Target className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-bold">Habits</h3>
-                <p className="text-xs text-muted-foreground">
-                  {hasActiveHabits ? "Track your progress" : "Start building"}
-                </p>
-              </div>
-            </div>
-          </Card>
+        {/* Main Content */}
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          {/* Proactive Nudges */}
+          <MentorNudges />
 
-          <Card 
-            className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
-            onClick={() => navigate("/mentor-chat")}
-          >
-            <div className="flex flex-col items-center text-center space-y-3">
-              <MessageCircle className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-bold">Chat</h3>
-                <p className="text-xs text-muted-foreground">Talk to your mentor</p>
+          {/* Morning Check-in */}
+          <SlideUp delay={0.1}>
+            <MorningCheckIn />
+          </SlideUp>
+
+          {/* Today's Pep Talk */}
+          <SlideUp delay={0.2}>
+            <TodaysPepTalk />
+          </SlideUp>
+
+          {/* Quote of the Day */}
+          <SlideUp delay={0.3}>
+            <QuoteOfTheDay />
+          </SlideUp>
+
+          {/* Weekly Insights */}
+          <WeeklyInsights />
+
+          {/* Mentor Quick Chat */}
+          <SlideUp delay={0.4}>
+            <MentorQuickChat />
+          </SlideUp>
+
+          {/* Activity Timeline */}
+          <SlideUp delay={0.5}>
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Calendar className="h-5 w-5 text-primary" />
+                <h2 className="font-bold text-lg">Your Journey</h2>
               </div>
+              <ActivityTimeline />
             </div>
-          </Card>
+          </SlideUp>
+
+          {/* Quick Actions */}
+          <SlideUp delay={0.6}>
+            <div className="grid grid-cols-2 gap-4">
+              <Card 
+                className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
+                onClick={() => navigate("/habits")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <Target className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-bold">Habits</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {hasActiveHabits ? "Track your progress" : "Start building"}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card 
+                className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
+                onClick={() => navigate("/mentor-chat")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <MessageCircle className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-bold">Chat</h3>
+                    <p className="text-xs text-muted-foreground">Talk to your mentor</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </SlideUp>
+
         </div>
 
+        {/* Bottom Navigation */}
+        <BottomNav />
       </div>
-
-      {/* Bottom Navigation */}
-      <BottomNav />
-    </div>
+    </PageTransition>
   );
 };
 
