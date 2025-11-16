@@ -259,21 +259,39 @@ const Inspire = () => {
 
                 {quoteData && (
                   <div className="space-y-6 animate-fade-in">
-                    {quoteData.imageUrl && (
-                      <div className="relative rounded-3xl overflow-hidden shadow-glow border border-border/20">
-                        <img
-                          src={quoteData.imageUrl}
-                          alt="Quote"
-                          className="w-full h-auto"
-                          onLoad={() => setImageLoaded(true)}
-                        />
-                        {!imageLoaded && (
-                          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse" />
-                        )}
-                      </div>
-                    )}
+                    {/* Show AI image if available, otherwise beautiful gradient */}
+                    <div className="relative rounded-3xl overflow-hidden shadow-glow border border-border/20">
+                      {quoteData.imageUrl ? (
+                        <>
+                          <img
+                            src={quoteData.imageUrl}
+                            alt="Quote"
+                            className="w-full h-auto"
+                            onLoad={() => setImageLoaded(true)}
+                          />
+                          {!imageLoaded && (
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse" />
+                          )}
+                        </>
+                      ) : (
+                        <div className="relative aspect-[9/16] bg-gradient-to-br from-primary via-accent to-primary/50 p-12 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20" />
+                          <div className="relative z-10 text-center space-y-6">
+                            <p className="font-heading text-3xl md:text-4xl text-white leading-relaxed drop-shadow-2xl">
+                              "{quoteData.text}"
+                            </p>
+                            {quoteData.author && (
+                              <p className="text-xl text-white/90 italic drop-shadow-lg">
+                                — {quoteData.author}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                    {showQuote && (
+                    {/* Only show text overlay if AI image was generated */}
+                    {quoteData.imageUrl && showQuote && (
                       <div className="text-center space-y-4 p-8 bg-card/50 backdrop-blur-xl rounded-3xl border border-border/50 shadow-elegant">
                         <p className="font-heading text-2xl md:text-3xl text-foreground leading-relaxed">
                           "{quoteData.text}"

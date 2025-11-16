@@ -259,22 +259,29 @@ REMEMBER: Spell the quote text EXACTLY as provided above. Every word must match 
         if (!imageResponse.ok) {
           const errorText = await imageResponse.text();
           console.error('AI gateway error:', imageResponse.status, errorText);
-          throw new Error(`AI image generation failed: ${imageResponse.status}`);
+          
+          // If it's a 402 (payment required), log it but don't throw - use fallback
+          if (imageResponse.status === 402) {
+            console.log('AI credits exhausted, using gradient fallback');
+            imageUrl = ''; // Will trigger gradient fallback in UI
+          } else {
+            throw new Error(`AI image generation failed: ${imageResponse.status}`);
+          }
+        } else {
+          const imageData = await imageResponse.json();
+          const generatedUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+          
+          if (!generatedUrl) {
+            console.error('No image URL in AI response:', JSON.stringify(imageData));
+            imageUrl = ''; // Use gradient fallback
+          } else {
+            imageUrl = generatedUrl;
+            console.log('Image generated successfully with embedded text');
+          }
         }
-
-        const imageData = await imageResponse.json();
-        const generatedUrl = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        
-        if (!generatedUrl) {
-          console.error('No image URL in AI response:', JSON.stringify(imageData));
-          throw new Error('No image URL in AI response');
-        }
-        
-        imageUrl = generatedUrl;
-        console.log('Image generated successfully with embedded text');
       } catch (error) {
         console.error('Error generating image:', error);
-        // Continue without image if generation fails
+        // Use gradient fallback on any error
         imageUrl = '';
       }
     }
