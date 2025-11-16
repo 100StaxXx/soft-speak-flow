@@ -9,6 +9,7 @@ import novaSage from "@/assets/nova-sage.png";
 import siennaSage from "@/assets/sienna-sage.png";
 import lumiSage from "@/assets/lumi-sage.png";
 import strykerSage from "@/assets/stryker-sage.png";
+import solaceSage from "@/assets/solace-sage.png";
 
 interface Mentor {
   id: string;
@@ -115,6 +116,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
             ) : activeMentor.slug === 'stryker' ? (
               <img 
                 src={strykerSage}
+                alt={activeMentor.name}
+                className="w-full h-full object-cover opacity-60"
+                style={{ objectPosition: 'center 25%' }}
+              />
+            ) : activeMentor.slug === 'solace' ? (
+              <img 
+                src={solaceSage}
                 alt={activeMentor.name}
                 className="w-full h-full object-cover opacity-60"
                 style={{ objectPosition: 'center 25%' }}
@@ -322,6 +330,13 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                   ) : mentor.slug === 'stryker' ? (
                     <img 
                       src={strykerSage} 
+                      alt={mentor.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      style={{ objectPosition: 'center 25%' }}
+                    />
+                  ) : mentor.slug === 'solace' ? (
+                    <img 
+                      src={solaceSage} 
                       alt={mentor.name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                       style={{ objectPosition: 'center 25%' }}
