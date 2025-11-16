@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
-import atlasSage from "@/assets/atlas-sage.png";
-import dariusSage from "@/assets/darius-sage.png";
-import kaiSage from "@/assets/kai-sage.png";
-import eliSage from "@/assets/eli-sage.png";
-import novaSage from "@/assets/nova-sage.png";
-import siennaSage from "@/assets/sienna-sage.png";
-import lumiSage from "@/assets/lumi-sage.png";
-import strykerSage from "@/assets/stryker-sage.png";
-import solaceSage from "@/assets/solace-sage.png";
+import { MentorAvatar } from "@/components/MentorAvatar";
 
 interface Mentor {
   id: string;
@@ -53,10 +45,6 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
 
   const activeMentor = orderedMentors.find(m => m.id === selectedMentor);
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
-
   return (
     <div className="relative w-full max-w-6xl mx-auto">
       {/* Full Screen Mentor View */}
@@ -64,83 +52,15 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
         <div className="fixed inset-0 z-50 bg-obsidian animate-fade-in">
           {/* Full Size Mentor Image */}
           <div className="absolute inset-0">
-            {activeMentor.slug === 'atlas' ? (
-              <img 
-                src={atlasSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 30%' }}
-              />
-            ) : activeMentor.slug === 'darius' ? (
-              <img 
-                src={dariusSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 25%' }}
-              />
-            ) : activeMentor.slug === 'kai' ? (
-              <img 
-                src={kaiSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 35%' }}
-              />
-            ) : activeMentor.slug === 'eli' ? (
-              <img 
-                src={eliSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 40%' }}
-              />
-            ) : activeMentor.slug === 'nova' ? (
-              <img 
-                src={novaSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 30%' }}
-              />
-            ) : activeMentor.slug === 'sienna' ? (
-              <img 
-                src={siennaSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 40%' }}
-              />
-            ) : activeMentor.slug === 'lumi' ? (
-              <img 
-                src={lumiSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 30%' }}
-              />
-            ) : activeMentor.slug === 'stryker' ? (
-              <img 
-                src={strykerSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 25%' }}
-              />
-            ) : activeMentor.slug === 'solace' ? (
-              <img 
-                src={solaceSage}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-                style={{ objectPosition: 'center 25%' }}
-              />
-            ) : activeMentor.avatar_url ? (
-              <img 
-                src={activeMentor.avatar_url}
-                alt={activeMentor.name}
-                className="w-full h-full object-cover opacity-60"
-              />
-            ) : (
-              <div 
-                className="w-full h-full flex items-center justify-center text-9xl font-black text-pure-white/20"
-                style={{ backgroundColor: `${activeMentor.primary_color}40` }}
-              >
-                {getInitials(activeMentor.name)}
-              </div>
-            )}
+            <MentorAvatar
+              mentorSlug={activeMentor.slug}
+              mentorName={activeMentor.name}
+              primaryColor={activeMentor.primary_color}
+              avatarUrl={activeMentor.avatar_url}
+              size="xl"
+              showBorder={false}
+              className="!w-full !h-full !rounded-none opacity-60"
+            />
             {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-obsidian/60 to-transparent" />
           </div>
@@ -267,95 +187,21 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
                     Current
                   </div>
                 )}
-                <div
-                  className={`relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden transition-all duration-300 group-hover:scale-110 ${
+                <MentorAvatar
+                  mentorSlug={mentor.slug}
+                  mentorName={mentor.name}
+                  primaryColor={mentor.primary_color}
+                  avatarUrl={mentor.avatar_url}
+                  size="md"
+                  className={`transition-all duration-300 group-hover:scale-110 ${
                     recommendedMentorId === mentor.id ? 'ring-2 ring-royal-purple ring-offset-4 ring-offset-obsidian' : ''
                   }`}
                   style={{ 
-                    border: `2px solid ${mentor.primary_color}`,
                     boxShadow: recommendedMentorId === mentor.id 
                       ? `0 0 30px ${mentor.primary_color}60, 0 0 50px rgba(137,81,204,0.3)` 
                       : `0 0 20px ${mentor.primary_color}40`
                   }}
-                >
-                  {mentor.slug === 'atlas' ? (
-                    <img 
-                      src={atlasSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 20%' }}
-                    />
-                  ) : mentor.slug === 'darius' ? (
-                    <img 
-                      src={dariusSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 15%' }}
-                    />
-                  ) : mentor.slug === 'kai' ? (
-                    <img 
-                      src={kaiSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 25%' }}
-                    />
-                  ) : mentor.slug === 'eli' ? (
-                    <img 
-                      src={eliSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 30%' }}
-                    />
-                  ) : mentor.slug === 'nova' ? (
-                    <img 
-                      src={novaSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 20%' }}
-                    />
-                  ) : mentor.slug === 'sienna' ? (
-                    <img 
-                      src={siennaSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 30%' }}
-                    />
-                  ) : mentor.slug === 'lumi' ? (
-                    <img 
-                      src={lumiSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 20%' }}
-                    />
-                  ) : mentor.slug === 'stryker' ? (
-                    <img 
-                      src={strykerSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 25%' }}
-                    />
-                  ) : mentor.slug === 'solace' ? (
-                    <img 
-                      src={solaceSage} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      style={{ objectPosition: 'center 25%' }}
-                    />
-                  ) : mentor.avatar_url ? (
-                    <img 
-                      src={mentor.avatar_url} 
-                      alt={mentor.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                  ) : (
-                    <div 
-                      className="w-full h-full flex items-center justify-center text-pure-white text-2xl font-black"
-                      style={{ backgroundColor: mentor.primary_color }}
-                    >
-                      {getInitials(mentor.name)}
-                    </div>
-                  )}
-                </div>
+                />
               </div>
 
               {/* Name */}

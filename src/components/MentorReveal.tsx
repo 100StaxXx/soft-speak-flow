@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
-import atlasSage from "@/assets/atlas-sage.png";
-import dariusSage from "@/assets/darius-sage.png";
-import kaiSage from "@/assets/kai-sage.png";
-import eliSage from "@/assets/eli-sage.png";
-import novaSage from "@/assets/nova-sage.png";
-import siennaSage from "@/assets/sienna-sage.png";
-import lumiSage from "@/assets/lumi-sage.png";
-import strykerSage from "@/assets/stryker-sage.png";
-import solaceSage from "@/assets/solace-sage.png";
+import { MentorAvatar } from "@/components/MentorAvatar";
 
 interface Mentor {
   id: string;
@@ -28,35 +20,8 @@ interface MentorRevealProps {
   onEnter: () => void;
 }
 
-const MENTOR_IMAGES: Record<string, string> = {
-  atlas: atlasSage,
-  darius: dariusSage,
-  kai: kaiSage,
-  eli: eliSage,
-  nova: novaSage,
-  sienna: siennaSage,
-  lumi: lumiSage,
-  stryker: strykerSage,
-  solace: solaceSage,
-};
-
-const POSITION_MAP: Record<string, string> = {
-  atlas: 'center 20%',
-  darius: 'center 15%',
-  kai: 'center 25%',
-  eli: 'center 30%',
-  nova: 'center 20%',
-  sienna: 'center 30%',
-  lumi: 'center 20%',
-  stryker: 'center 25%',
-  solace: 'center 25%',
-};
-
 export const MentorReveal = ({ mentor, onEnter }: MentorRevealProps) => {
   const [stage, setStage] = useState(0);
-  const mentorImage = MENTOR_IMAGES[mentor.slug] || mentor.avatar_url;
-  const imagePosition = POSITION_MAP[mentor.slug] || 'center 25%';
-  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   useEffect(() => {
     const timers = [
@@ -128,29 +93,18 @@ export const MentorReveal = ({ mentor, onEnter }: MentorRevealProps) => {
               />
               
               {/* Avatar Container */}
-              <div
-                className="relative w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden animate-scale-in"
+              <MentorAvatar
+                mentorSlug={mentor.slug}
+                mentorName={mentor.name}
+                primaryColor={mentor.primary_color}
+                avatarUrl={mentor.avatar_url}
+                size="xl"
+                showGlow
+                className="animate-scale-in"
                 style={{
-                  border: `4px solid ${mentor.primary_color}`,
                   boxShadow: `0 0 80px ${mentor.primary_color}90, inset 0 0 40px ${mentor.primary_color}20`
                 }}
-              >
-                {mentorImage ? (
-                  <img
-                    src={mentorImage}
-                    alt={mentor.name}
-                    className="w-full h-full object-cover"
-                    style={{ objectPosition: imagePosition }}
-                  />
-                ) : (
-                  <div
-                    className="w-full h-full flex items-center justify-center text-pure-white text-6xl font-black"
-                    style={{ backgroundColor: mentor.primary_color }}
-                  >
-                    {getInitials(mentor.name)}
-                  </div>
-                )}
-              </div>
+              />
             </div>
           </div>
         )}

@@ -1,14 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
-import atlasSage from "@/assets/atlas-sage.png";
-import dariusSage from "@/assets/darius-sage.png";
-import kaiSage from "@/assets/kai-sage.png";
-import eliSage from "@/assets/eli-sage.png";
-import novaSage from "@/assets/nova-sage.png";
-import siennaSage from "@/assets/sienna-sage.png";
-import lumiSage from "@/assets/lumi-sage.png";
-import strykerSage from "@/assets/stryker-sage.png";
-import solaceSage from "@/assets/solace-sage.png";
+import { MentorAvatar } from "@/components/MentorAvatar";
 
 interface Mentor {
   id: string;
@@ -39,10 +31,6 @@ export const MentorResult = ({
   onSeeAll,
   isConfirming = false
 }: MentorResultProps) => {
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
-
   return (
     <div className="min-h-screen bg-obsidian flex items-center justify-center p-6">
       <div className="max-w-3xl w-full space-y-12 animate-fade-in">
@@ -58,91 +46,15 @@ export const MentorResult = ({
         <div className="bg-midnight border-2 border-charcoal rounded-2xl p-8 md:p-12 space-y-8">
           {/* Avatar */}
           <div className="flex justify-center">
-            <div
-              className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden animate-scale-in"
-              style={{
-                border: `4px solid ${mentor.primary_color}`,
-                boxShadow: `0 0 40px ${mentor.primary_color}60`
-              }}
-            >
-              {mentor.slug === 'atlas' ? (
-                <img
-                  src={atlasSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 20%' }}
-                />
-              ) : mentor.slug === 'darius' ? (
-                <img
-                  src={dariusSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 15%' }}
-                />
-              ) : mentor.slug === 'kai' ? (
-                <img
-                  src={kaiSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 25%' }}
-                />
-              ) : mentor.slug === 'eli' ? (
-                <img
-                  src={eliSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 30%' }}
-                />
-              ) : mentor.slug === 'nova' ? (
-                <img
-                  src={novaSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 20%' }}
-                />
-              ) : mentor.slug === 'sienna' ? (
-                <img
-                  src={siennaSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 30%' }}
-                />
-              ) : mentor.slug === 'lumi' ? (
-                <img
-                  src={lumiSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 20%' }}
-                />
-              ) : mentor.slug === 'stryker' ? (
-                <img
-                  src={strykerSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 25%' }}
-                />
-              ) : mentor.slug === 'solace' ? (
-                <img
-                  src={solaceSage}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: 'center 25%' }}
-                />
-              ) : mentor.avatar_url ? (
-                <img
-                  src={mentor.avatar_url}
-                  alt={mentor.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center text-pure-white text-4xl font-black"
-                  style={{ backgroundColor: mentor.primary_color }}
-                >
-                  {getInitials(mentor.name)}
-                </div>
-              )}
-            </div>
+            <MentorAvatar
+              mentorSlug={mentor.slug}
+              mentorName={mentor.name}
+              primaryColor={mentor.primary_color}
+              avatarUrl={mentor.avatar_url}
+              size="lg"
+              showGlow
+              className="animate-scale-in"
+            />
           </div>
 
           {/* Name & Title */}
