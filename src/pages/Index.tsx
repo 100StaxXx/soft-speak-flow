@@ -9,6 +9,7 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
 import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
 import { AskMentorChat } from "@/components/AskMentorChat";
+import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, Target } from "lucide-react";
@@ -84,6 +85,9 @@ const Index = () => {
 
         {/* Quote of the Day */}
         <QuoteOfTheDay />
+
+        {/* Mentor Quick Chat */}
+        <MentorQuickChat />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">

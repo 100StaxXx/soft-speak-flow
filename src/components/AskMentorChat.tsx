@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -60,6 +61,7 @@ export const AskMentorChat = ({
   hasActiveHabits = false,
   hasActiveChallenges = false
 }: AskMentorChatProps) => {
+  const location = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +70,7 @@ export const AskMentorChat = ({
   const [dailyMessageCount, setDailyMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const hasProcessedInitialMessage = useRef(false);
 
   const DAILY_MESSAGE_LIMIT = 10;
 
@@ -98,6 +101,17 @@ export const AskMentorChat = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Handle initial message from navigation state
+  useEffect(() => {
+    const initialMessage = location.state?.initialMessage;
+    if (initialMessage && !hasProcessedInitialMessage.current) {
+      hasProcessedInitialMessage.current = true;
+      setShowSuggestions(false);
+      sendMessage(initialMessage);
+    }
+  }, [location.state]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
