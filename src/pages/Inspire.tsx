@@ -443,6 +443,8 @@ const Inspire = () => {
                     quote={pepTalk.quote}
                     isPremium={false}
                     onClick={() => navigate(`/pep-talk/${pepTalk.id}`)}
+                    emotionalTriggers={pepTalk.emotional_triggers}
+                    highlightedTriggers={selectedTriggers}
                   />
                 ))}
               </div>
