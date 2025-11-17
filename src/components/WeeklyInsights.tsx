@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
-import { TrendingUp, Calendar, Heart, Target } from "lucide-react";
+import { TrendingUp, Calendar, Heart, Target, Swords } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SlideUp } from "./PageTransition";
@@ -49,9 +49,9 @@ export const WeeklyInsights = () => {
         .gte('created_at', start)
         .lte('created_at', end);
       
-      // Get mood logs this week
-      const { data: moodLogs } = await supabase
-        .from('mood_logs')
+      // Get quests (daily_tasks) this week
+      const { data: quests } = await supabase
+        .from('daily_tasks')
         .select('*')
         .eq('user_id', user.id)
         .gte('created_at', start)
@@ -69,7 +69,7 @@ export const WeeklyInsights = () => {
       return {
         habitCompletions: habitCompletions || [],
         checkIns: checkIns || [],
-        moodLogs: moodLogs || [],
+        quests: quests || [],
         activities: activities || [],
         aiInsight: null as string | null
       };
@@ -94,10 +94,10 @@ export const WeeklyInsights = () => {
       color: "text-accent"
     },
     {
-      icon: Heart,
-      label: "Mood Logs",
-      value: weeklyData.moodLogs.length,
-      color: "text-pink-500"
+      icon: Swords,
+      label: "Quests",
+      value: weeklyData.quests.length,
+      color: "text-amber-500"
     }
   ];
 
