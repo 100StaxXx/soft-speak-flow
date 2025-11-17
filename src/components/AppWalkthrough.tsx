@@ -35,8 +35,8 @@ const WALKTHROUGH_STEPS: Step[] = [
   // TASKS PAGE
   {
     target: '[data-tour="tasks-tab"]',
-    content: "📋 Let's explore the Quests section! Click on this tab to see your daily quests and habits.",
-    placement: "bottom",
+    content: "📋 Now let's build your quests! Tap the Quests tab to get started.",
+    placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
   },
@@ -317,11 +317,11 @@ export const AppWalkthrough = () => {
 
       // Navigate between pages
       if (index === 3 && action === ACTIONS.NEXT) {
-        // After Ask Mentor, show step to click Quests tab (don't auto-navigate)
+        // After Ask Mentor, show step to click Quests tab
         setStepIndex(4);
-      } else if (index === 4 && action === ACTIONS.NEXT && location.pathname !== '/tasks') {
-        // Don't allow progression from tasks-tab step until user clicks the tab and navigates
-        // Route listener will handle progression
+      } else if (index === 4 && action === ACTIONS.NEXT) {
+        // Don't allow "Next" button on tasks-tab step - user must click the tab
+        // Route listener will handle progression when they navigate
         return;
       } else if (index === 12 && action === ACTIONS.NEXT) {
         // After evolution + limits, navigate to Companion and set step

@@ -86,6 +86,7 @@ export const BottomNav = () => {
           to="/tasks"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          data-tour="tasks-tab"
         >
           {({ isActive }) => (
             <>
