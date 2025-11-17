@@ -17,7 +17,12 @@ export const GlobalEvolutionListener = () => {
   const [previousStage, setPreviousStage] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log('GlobalEvolutionListener: No user, skipping subscription');
+      return;
+    }
+
+    console.log('GlobalEvolutionListener: Setting up subscription for user:', user.id);
 
     // Subscribe to companion updates
     const channel = supabase
@@ -34,11 +39,16 @@ export const GlobalEvolutionListener = () => {
           const newData = payload.new as any;
           const oldData = payload.old as any;
 
-          console.log('Companion update received:', { newData, oldData });
+          console.log('GlobalEvolutionListener: Companion update received:', { 
+            newData, 
+            oldData,
+            hasOldData: !!oldData,
+            stageChanged: oldData && newData.current_stage > oldData.current_stage
+          });
 
           // Check if stage changed (evolution happened)
           if (oldData && newData.current_stage > oldData.current_stage) {
-            console.log('Evolution detected!', {
+            console.log('GlobalEvolutionListener: Evolution detected!', {
               oldStage: oldData.current_stage,
               newStage: newData.current_stage,
               imageUrl: newData.current_image_url,
@@ -54,7 +64,11 @@ export const GlobalEvolutionListener = () => {
               .limit(1)
               .single();
 
+            console.log('GlobalEvolutionListener: Evolution record:', evolutionRecord);
+
             const imageUrl = evolutionRecord?.image_url || newData.current_image_url || "";
+
+            console.log('GlobalEvolutionListener: Setting evolution state with imageUrl:', imageUrl);
 
             setPreviousStage(oldData.current_stage);
             setEvolutionData({
@@ -68,9 +82,12 @@ export const GlobalEvolutionListener = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('GlobalEvolutionListener: Subscription status:', status);
+      });
 
     return () => {
+      console.log('GlobalEvolutionListener: Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   }, [user, queryClient]);
