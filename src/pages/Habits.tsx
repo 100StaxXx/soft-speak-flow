@@ -316,10 +316,10 @@ export default function Habits() {
                 <div className="flex gap-2 pt-2">
                   <Button 
                     onClick={() => addHabitMutation.mutate()} 
-                    disabled={!newHabitTitle.trim() || selectedDays.length === 0}
+                    disabled={!newHabitTitle.trim() || selectedDays.length === 0 || addHabitMutation.isPending}
                     className="flex-1"
                   >
-                    Add Habit
+                    {addHabitMutation.isPending ? 'Creating...' : 'Add Habit'}
                   </Button>
                   <Button 
                     variant="outline" 
