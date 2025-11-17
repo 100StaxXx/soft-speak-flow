@@ -1,9 +1,22 @@
-// Edge function for mentor chat
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const ChatSchema = z.object({
+  message: z.string().min(1).max(1000),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().max(2000)
+  })).max(20).optional(),
+  mentorName: z.string().min(1).max(50),
+  mentorTone: z.string().min(1).max(200)
+});
+
+const DAILY_MESSAGE_LIMIT = 10;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,9 +24,66 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory, mentorName, mentorTone } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    // Get authenticated user
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate input
+    const body = await req.json();
+    const validation = ChatSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { message, conversationHistory, mentorName, mentorTone } = validation.data;
+
+    // Server-side rate limit check
+    const today = new Date().toISOString().split('T')[0];
+    const { count } = await supabase
+      .from('mentor_chats')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('role', 'user')
+      .gte('created_at', `${today}T00:00:00`);
+
+    if ((count || 0) >= DAILY_MESSAGE_LIMIT) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Rate limit exceeded",
+          limit: DAILY_MESSAGE_LIMIT,
+          resetAt: `${today}T23:59:59Z`
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
@@ -31,7 +101,6 @@ Your role is to:
 
 Remember: You're not just a chatbot - you're a real mentor helping someone become their best self.`;
 
-    // Build messages array: system prompt + conversation history + current message
     const messages = [
       { role: "system", content: systemPrompt },
       ...(conversationHistory || []),

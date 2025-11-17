@@ -1,10 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const CheckInSchema = z.object({
+  checkInId: z.string().uuid()
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,15 +20,27 @@ serve(async (req) => {
     // Get authentication token
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      throw new Error('Missing authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    const { checkInId } = await req.json()
+    // Validate input
+    const body = await req.json()
+    const validation = CheckInSchema.safeParse(body);
     
-    // Input validation
-    if (!checkInId || typeof checkInId !== 'string') {
-      throw new Error('Invalid checkInId')
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const { checkInId } = validation.data;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
