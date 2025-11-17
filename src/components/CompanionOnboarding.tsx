@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, Target, TrendingUp, Heart, ChevronRight } from "lucide-react";
 import confetti from "canvas-confetti";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OnboardingStep {
   title: string;
@@ -44,12 +45,31 @@ export const CompanionOnboarding = () => {
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
-    // Check if user has seen onboarding
+    // Check if user has seen onboarding AND if main onboarding is completed
     const hasSeenOnboarding = localStorage.getItem("companion-onboarding-complete");
-    if (!hasSeenOnboarding) {
-      // Delay to let page load
-      setTimeout(() => setIsVisible(true), 800);
-    }
+    
+    // Don't show during initial onboarding flow - only after user has completed profile setup
+    const checkOnboardingStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('id', user.id)
+          .single();
+
+        // Only show if user has completed main onboarding and hasn't seen companion tour
+        if (!hasSeenOnboarding && profile?.onboarding_completed) {
+          setTimeout(() => setIsVisible(true), 800);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+      }
+    };
+
+    checkOnboardingStatus();
   }, []);
 
   const handleNext = () => {
