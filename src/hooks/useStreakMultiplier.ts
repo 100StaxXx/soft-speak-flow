@@ -4,7 +4,7 @@ export const useStreakMultiplier = () => {
   const { profile } = useProfile();
   
   const getStreakMultiplier = (): number => {
-    const streak = profile?.current_habit_streak || 0;
+    const streak = profile?.current_habit_streak ?? 0;
     
     if (streak >= 30) return 3; // 3x XP at 30+ days
     if (streak >= 7) return 2;  // 2x XP at 7-29 days
@@ -12,7 +12,7 @@ export const useStreakMultiplier = () => {
   };
 
   const getNextMilestone = () => {
-    const streak = profile?.current_habit_streak || 0;
+    const streak = profile?.current_habit_streak ?? 0;
     
     if (streak < 7) {
       return { days: 7, multiplier: 2, daysRemaining: 7 - streak };
@@ -24,8 +24,8 @@ export const useStreakMultiplier = () => {
   };
 
   return {
-    currentStreak: profile?.current_habit_streak || 0,
-    longestStreak: profile?.longest_habit_streak || 0,
+    currentStreak: profile?.current_habit_streak ?? 0,
+    longestStreak: profile?.longest_habit_streak ?? 0,
     multiplier: getStreakMultiplier(),
     nextMilestone: getNextMilestone(),
   };

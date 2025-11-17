@@ -1,43 +1,73 @@
-import { Home, TrendingUp, MessageCircleHeart, Search, Sparkles } from "lucide-react";
+import { MessageCircleHeart, Search, Sparkles, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useProfile } from "@/hooks/useProfile";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { MentorAvatar } from "@/components/MentorAvatar";
 
 export const BottomNav = () => {
+  const { profile } = useProfile();
+
+  const { data: selectedMentor } = useQuery({
+    queryKey: ["selected-mentor", profile?.selected_mentor_id],
+    enabled: !!profile?.selected_mentor_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("mentors")
+        .select("*")
+        .eq("id", profile!.selected_mentor_id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <nav 
       className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50 transition-transform duration-300"
       role="navigation"
       aria-label="Main navigation"
     >
-      <div className="max-w-lg mx-auto flex items-center justify-around px-1 py-3">
+      <div className="max-w-lg mx-auto flex items-center justify-around px-1 py-2.5">
         <NavLink
           to="/"
           end
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Home 
-                className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`}
-                aria-hidden="true"
-              />
+              {selectedMentor ? (
+                <div className={`transition-all duration-300 ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}>
+                  <MentorAvatar
+                    mentorSlug={selectedMentor.slug || ''}
+                    mentorName={selectedMentor.name}
+                    primaryColor={selectedMentor.primary_color || '#000'}
+                    size="sm"
+                    className="w-7 h-7"
+                    showBorder={false}
+                  />
+                </div>
+              ) : (
+                <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              )}
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Home
+                Mentor
               </span>
             </>
           )}
         </NavLink>
 
         <NavLink
-          to="/progress"
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          to="/companion"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <TrendingUp className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Progress
+                Companion
               </span>
             </>
           )}
@@ -45,7 +75,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/inspire"
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
@@ -60,7 +90,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/search"
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
@@ -74,15 +104,15 @@ export const BottomNav = () => {
         </NavLink>
 
         <NavLink
-          to="/companion"
-          className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          to="/profile"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Companion
+                Profile
               </span>
             </>
           )}
