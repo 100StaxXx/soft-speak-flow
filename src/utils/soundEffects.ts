@@ -56,35 +56,46 @@ class SoundManager {
   playEvolutionStart() {
     if (!this.audioContext || this.isMuted) return;
 
-    // Magical ascending arpeggio
-    const notes = [261.63, 329.63, 392.00, 523.25]; // C, E, G, C
-    notes.forEach((freq, i) => {
+    // Create powerful ascending magical tones with harmonics
+    const frequencies = [220, 277, 330, 440, 554, 659, 880, 1108];
+    frequencies.forEach((freq, i) => {
       setTimeout(() => {
-        this.createOscillator(freq, 0.2, 'sine');
-      }, i * 100);
+        this.createOscillator(freq, 0.2, 'sawtooth');
+        // Add harmonic
+        this.createOscillator(freq * 1.5, 0.1, 'sine');
+      }, i * 80);
     });
   }
 
   playEvolutionSuccess() {
     if (!this.audioContext || this.isMuted) return;
 
-    // Victory fanfare
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C, E, G, C (higher octave)
-    notes.forEach((freq, i) => {
+    // Create an epic triumphant fanfare with bass and harmonics
+    const bassTones = [130.81, 164.81, 196.00]; // C3, E3, G3
+    const chords = [
+      [523.25, 659.25, 783.99], // C5 major
+      [659.25, 830.61, 987.77], // E5 major
+      [783.99, 987.77, 1174.66], // G5 major
+      [1046.50, 1318.51, 1567.98], // C6 major - final high chord
+    ];
+    
+    // Play bass foundation
+    bassTones.forEach((freq, i) => {
       setTimeout(() => {
-        this.createOscillator(freq, 0.3, 'triangle');
+        this.createOscillator(freq, 0.4, 'sawtooth');
       }, i * 150);
     });
-
-    // Add sparkle effect
-    setTimeout(() => {
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-          const freq = 1000 + Math.random() * 1000;
-          this.createOscillator(freq, 0.1, 'sine');
-        }, i * 50);
-      }
-    }, 600);
+    
+    // Play bright chords on top
+    chords.forEach((chord, i) => {
+      setTimeout(() => {
+        chord.forEach(freq => {
+          this.createOscillator(freq, 0.35, 'triangle');
+          // Add sparkle harmonics
+          this.createOscillator(freq * 2, 0.15, 'sine');
+        });
+      }, i * 180);
+    });
   }
 
   playSparkle() {

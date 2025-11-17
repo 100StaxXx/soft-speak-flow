@@ -18,8 +18,7 @@ export const EmptyHabits = ({ onAddHabit }: EmptyHabitsProps) => {
             Build Better Habits
           </h3>
           <p className="text-sm md:text-base text-muted-foreground">
-            Every habit you complete earns XP and helps your companion evolve. 
-            Start small, stay consistent, and watch your progress compound.
+            Choose a habit from the templates below or create your own to get started!
           </p>
         </div>
         
