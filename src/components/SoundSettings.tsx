@@ -169,11 +169,11 @@ export const SoundSettings = () => {
         <div className="pt-6 mt-6 border-t space-y-4">
           <div className="space-y-2">
             <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Music className="w-4 h-4" />
-              Background Music
+              <Music className="w-4 h-4 text-primary" />
+              Ambient Music
             </h4>
             <p className="text-xs text-muted-foreground">
-              Ambient music for a relaxing experience
+              Calming background music creates a relaxing, immersive experience throughout the app
             </p>
           </div>
 
@@ -198,7 +198,12 @@ export const SoundSettings = () => {
           </div>
 
           <div className="flex items-center justify-between py-2">
-            <Label htmlFor="bg-mute">Mute Background Music</Label>
+            <div className="space-y-0.5">
+              <Label htmlFor="bg-mute">Mute Ambient Music</Label>
+              <p className="text-xs text-muted-foreground">
+                Turn off background music while keeping sound effects
+              </p>
+            </div>
             <Switch
               id="bg-mute"
               checked={bgMusicMuted}

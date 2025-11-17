@@ -10,6 +10,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 
@@ -110,6 +111,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <InstallPWA />
+        <AmbientMusicPlayer />
         <BrowserRouter>
           <ScrollToTop />
           <AppContent />
