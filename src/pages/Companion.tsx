@@ -3,6 +3,7 @@ import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { CompanionOnboarding } from "@/components/CompanionOnboarding";
+import { CompanionPageTour } from "@/components/CompanionPageTour";
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
@@ -214,6 +215,7 @@ const Companion = () => {
 
   return (
     <PageTransition>
+      <CompanionPageTour />
       <CompanionErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -225,23 +227,25 @@ const Companion = () => {
         </header>
 
         <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
-          <CompanionDisplay />
+          <div data-tour="companion-display">
+            <CompanionDisplay />
+          </div>
 
           <Tabs defaultValue="habits" className="w-full">
             <TabsList className="grid w-full grid-cols-4 h-auto">
-              <TabsTrigger value="habits" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+              <TabsTrigger value="habits" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="habits-tab">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Habits</span>
               </TabsTrigger>
-              <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+              <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="progress-tab">
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+              <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="achievements-tab">
                 <Trophy className="h-4 w-4" />
                 <span className="hidden sm:inline">Achievements</span>
               </TabsTrigger>
-              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="evolution-tab">
                 <History className="h-4 w-4" />
                 <span className="hidden sm:inline">Evolution</span>
               </TabsTrigger>
