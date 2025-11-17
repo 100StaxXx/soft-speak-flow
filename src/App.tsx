@@ -82,13 +82,12 @@ const AppContent = memo(() => {
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
-          <Route path="/inspire" element={<ProtectedRoute><Inspire /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
           <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
           <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-          <Route path="/habits" element={<ProtectedRoute><Habits /></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
