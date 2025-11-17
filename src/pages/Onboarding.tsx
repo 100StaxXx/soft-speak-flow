@@ -181,6 +181,9 @@ export default function Onboarding() {
 
     try {
       setSelecting(true);
+      
+      const chosenMentor = mentors.find(m => m.id === mentorId);
+      console.log('Selecting mentor:', chosenMentor?.name, 'ID:', mentorId);
 
       const { error } = await supabase
         .from('profiles')
@@ -193,11 +196,9 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      const selectedMentor = mentors.find(m => m.id === mentorId);
-
       toast({
         title: "Mentor Selected!",
-        description: selectedMentor ? `${selectedMentor.name} is now your guide!` : "Your mentor has been selected!",
+        description: chosenMentor ? `${chosenMentor.name} is now your guide!` : "Your mentor has been selected!",
       });
 
       // Wait for the profile to reflect the update
