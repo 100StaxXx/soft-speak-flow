@@ -2,16 +2,18 @@ import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { SkeletonTimeline } from "@/components/SkeletonCard";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
-import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply } from "lucide-react";
+import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "./ui/button";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useWelcomeMessage } from "@/hooks/useWelcomeMessage";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { Textarea } from "./ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
@@ -36,11 +38,14 @@ const activityLabels: Record<string, string> = {
 export const ActivityTimeline = () => {
   const { user } = useAuth();
   const { activities, isLoading, markAsRead } = useActivityFeed();
+  const queryClient = useQueryClient();
   const personality = useMentorPersonality();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [swipedItems, setSwipedItems] = useState<Record<string, number>>({});
+  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
   
   // Add welcome message for new users
   useWelcomeMessage();
@@ -86,6 +91,56 @@ export const ActivityTimeline = () => {
     }
   };
 
+  const handleTouchStart = useCallback((e: React.TouchEvent, activityId: string) => {
+    touchStart.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now()
+    };
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent, activityId: string) => {
+    if (!touchStart.current) return;
+    
+    const deltaX = e.touches[0].clientX - touchStart.current.x;
+    const deltaY = Math.abs(e.touches[0].clientY - touchStart.current.y);
+    
+    // Only swipe horizontally if vertical movement is minimal
+    if (deltaY < 30 && deltaX < 0) {
+      setSwipedItems(prev => ({ ...prev, [activityId]: Math.max(deltaX, -100) }));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(async (activityId: string) => {
+    if (!touchStart.current) return;
+    
+    const swipeDistance = swipedItems[activityId] || 0;
+    
+    // If swiped more than 60px, delete
+    if (swipeDistance < -60) {
+      try {
+        await supabase
+          .from('activity_feed')
+          .delete()
+          .eq('id', activityId);
+        
+        toast.success("Activity removed");
+        queryClient.invalidateQueries({ queryKey: ['activity-feed'] });
+      } catch (error) {
+        console.error('Error deleting activity:', error);
+        toast.error("Failed to delete");
+      }
+    }
+    
+    // Reset swipe
+    setSwipedItems(prev => {
+      const newState = { ...prev };
+      delete newState[activityId];
+      return newState;
+    });
+    touchStart.current = null;
+  }, [swipedItems, queryClient]);
+
   if (!activities.length) {
     return (
       <Card className="p-6 text-center">
@@ -116,10 +171,28 @@ export const ActivityTimeline = () => {
         const label = activityLabels[activity.activity_type] || activity.activity_type;
         
         return (
-          <Card 
+          <div 
             key={activity.id} 
-            className={`p-4 transition-all ${!activity.is_read ? 'border-primary shadow-glow' : ''}`}
+            className="relative overflow-hidden"
+            onTouchStart={(e) => handleTouchStart(e, activity.id)}
+            onTouchMove={(e) => handleTouchMove(e, activity.id)}
+            onTouchEnd={() => handleTouchEnd(activity.id)}
           >
+            {/* Delete background */}
+            <div className="absolute inset-0 bg-destructive flex items-center justify-end pr-6">
+              <Trash2 className="h-5 w-5 text-destructive-foreground" />
+            </div>
+            
+            <Card 
+              className={cn(
+                "p-4 transition-all relative bg-card",
+                !activity.is_read ? 'border-primary shadow-glow' : ''
+              )}
+              style={{
+                transform: `translateX(${swipedItems[activity.id] || 0}px)`,
+                transition: swipedItems[activity.id] ? 'none' : 'transform 0.3s ease'
+              }}
+            >
             <div className="flex gap-3">
               <div className="flex-shrink-0">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -207,6 +280,7 @@ export const ActivityTimeline = () => {
               </div>
             </div>
           </Card>
+        </div>
         );
       })}
     </div>
