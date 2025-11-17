@@ -7,14 +7,21 @@ interface PepTalkCardProps {
   id: string;
   title: string;
   category: string;
+  topicCategories?: string[];
   description?: string;
   quote?: string;
   isPremium?: boolean;
   onClick?: () => void;
 }
 
-export const PepTalkCard = ({ id, title, category, description, quote, isPremium, onClick }: PepTalkCardProps) => {
+export const PepTalkCard = ({ id, title, category, topicCategories, description, quote, isPremium, onClick }: PepTalkCardProps) => {
   const navigate = useNavigate();
+
+  // Combine category and topic_categories, remove duplicates
+  const allCategories = Array.from(new Set([
+    category,
+    ...(topicCategories || [])
+  ].filter(Boolean)));
 
   const handleClick = () => {
     if (onClick) {
@@ -49,10 +56,12 @@ export const PepTalkCard = ({ id, title, category, description, quote, isPremium
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-royal-gold uppercase tracking-wider">
-              {category}
-            </span>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            {allCategories.map((cat, index) => (
+              <span key={index} className="text-xs font-bold text-royal-gold uppercase tracking-wider">
+                {cat}
+              </span>
+            ))}
           </div>
           <h3 className="font-heading text-base md:text-lg font-black text-pure-white mb-2 line-clamp-2 uppercase tracking-tight break-words">
             {title}

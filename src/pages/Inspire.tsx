@@ -438,6 +438,7 @@ const Inspire = () => {
                     id={pepTalk.id}
                     title={pepTalk.title}
                     category={pepTalk.category}
+                    topicCategories={pepTalk.topic_category}
                     description={pepTalk.description}
                     quote={pepTalk.quote}
                     isPremium={false}
