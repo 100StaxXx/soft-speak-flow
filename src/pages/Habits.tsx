@@ -64,6 +64,10 @@ export default function Habits() {
 
   const addHabitMutation = useMutation({
     mutationFn: async () => {
+      if (habits.length >= 5) {
+        throw new Error('Maximum 5 habits allowed');
+      }
+      
       const { error } = await supabase.from('habits').insert({
         user_id: user!.id,
         title: newHabitTitle,
@@ -216,15 +220,30 @@ export default function Habits() {
         )}
 
         {/* Add Habit Button */}
-        {!showAddForm && (
+        {habits.length < 5 && !showAddForm && (
           <Button
             onClick={() => setShowAddForm(true)}
             className="w-full h-12 text-sm md:text-base font-bold"
             size="lg"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Add New Habit
+            Add New Habit ({habits.length}/5)
           </Button>
+        )}
+
+        {/* Max Habits Reached */}
+        {habits.length === 5 && (
+          <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary border-primary/30">
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <Target className="w-6 h-6 text-primary" />
+                <h3 className="font-heading font-bold text-foreground">5 habits tracked</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                You're building momentum. Archive a habit to add a new one.
+              </p>
+            </div>
+          </Card>
         )}
 
         {showAddForm && (
