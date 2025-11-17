@@ -18,13 +18,13 @@ const ELEMENT_EFFECTS = {
 };
 
 const STAGE_DESCRIPTORS = {
-  0: "A mystical glowing egg, small and cute with subtle energy patterns",
-  1: "The egg is cracking with energy leaking out, more intense glow, hints of the creature inside",
-  2: "Small mythical creature emerging, features becoming visible, still young and adorable",
-  3: "Guardian form with protective stance, more powerful, aura forming around it",
-  4: "Ascended form with wings or energy manifestation, majestic and floating",
-  5: "Mythic form, large and powerful, commanding presence, legendary aura",
-  6: "Final titan form, massive and awe-inspiring, ultimate evolution, cinematic and epic",
+  0: "A mystical glowing egg, small and cute with subtle energy patterns, dormant potential",
+  1: "The egg is dramatically cracking with brilliant energy exploding out, creature's features emerging from shell fragments",
+  2: "Young mythical creature, small but fierce, playful pose, features clearly visible, surrounded by magical energy wisps",
+  3: "Adolescent guardian form with protective stance, medium size, more defined muscles and features, swirling elemental aura",
+  4: "Mature ascended form with majestic wings or energy manifestation, large and powerful, hovering with confidence, intense magical glow",
+  5: "Ancient mythic form, massive and commanding, legendary presence, reality-bending elemental powers visibly emanating",
+  6: "Ultimate titan form, colossal and godlike, world-shaking power, cosmic energy radiating, supreme final evolution",
 };
 
 serve(async (req) => {
@@ -120,34 +120,59 @@ Style: High quality digital art, mystical, fantasy, glowing, magical, ${favorite
 Mood: Warm, hopeful, potential, beginning of a journey.
 Background: Simple dark gradient to make the egg glow stand out.`;
     } else {
-      // Evolution generation
-      // Evolution - emphasize the animal form
-      prompt = `Transform and evolve this companion creature to Stage ${stage}.
+      // Evolution generation - create from scratch with very distinct characteristics per stage
+      const sizeDescriptors = {
+        1: "tiny newborn, fits in cupped hands",
+        2: "small juvenile, size of a house cat",
+        3: "medium adolescent, size of a large dog",
+        4: "large adult, size of a horse",
+        5: "massive elder, size of an elephant",
+        6: "colossal titan, larger than a building"
+      };
 
-CRITICAL: This is a ${sanitizedAnimal} companion. It MUST clearly look like a ${sanitizedAnimal} at this stage.
+      const poseDescriptors = {
+        1: "curled up protectively, cautious and vulnerable",
+        2: "curious stance, exploring playfully",
+        3: "alert guardian pose, ready to protect",
+        4: "majestic spread wings, soaring powerfully",
+        5: "commanding presence, radiating authority",
+        6: "divine stance, reality-warping power display"
+      };
 
-MAINTAIN AND ENHANCE THESE CORE TRAITS:
-- Primary color scheme: ${favoriteColor} (keep this as the main color)
-- Core form: ${sanitizedAnimal} (this should be VERY clear - the creature IS a ${sanitizedAnimal})
-- Elemental energy: ${coreElement} effects and aura
+      const powerLevel = {
+        1: "gentle magical glow",
+        2: "crackling elemental sparks",
+        3: "swirling powerful aura",
+        4: "intense energy storms",
+        5: "reality-bending forces",
+        6: "cosmic-scale power manifestation"
+      };
 
-${STAGE_DESCRIPTORS[stage as keyof typeof STAGE_DESCRIPTORS]}
+      prompt = `Create a Stage ${stage} ${sanitizedAnimal} companion creature. This is a COMPLETELY NEW FORM evolution.
 
-Make the ${sanitizedAnimal} form much more recognizable and prominent. 
-The creature should clearly be identifiable as a ${sanitizedAnimal} with ${coreElement} powers.
-Keep the ${favoriteColor} color scheme but emphasize the ${sanitizedAnimal} anatomy and features.
-${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+CRITICAL IDENTITY:
+- This is a ${sanitizedAnimal} - make it INSTANTLY recognizable
+- Size: ${sizeDescriptors[stage as keyof typeof sizeDescriptors]}
+- Pose: ${poseDescriptors[stage as keyof typeof poseDescriptors]}
+- Power level: ${powerLevel[stage as keyof typeof powerLevel]}
+
+VISUAL SPECIFICATIONS:
+- Primary color: ${favoriteColor} (dominant throughout body and aura)
+- Element affinity: ${coreElement} (${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]})
+- Stage evolution: ${STAGE_DESCRIPTORS[stage as keyof typeof STAGE_DESCRIPTORS]}
+
+The ${sanitizedAnimal} features must be anatomically clear: proper ${sanitizedAnimal} head shape, body proportions, characteristic features.
+The creature should look SIGNIFICANTLY more powerful and larger than Stage ${stage - 1}.
 
 IMPORTANT GUIDELINES:
 - Do not make this creature look evil, demonic, grotesque, or horror themed
 - It should feel encouraging, protective, and inspiring
 - Design for a motivation/mental fitness app
 - Keep it friendly, powerful, and majestic
-- The ${sanitizedAnimal} features must be clear and recognizable
+- Each stage should look DISTINCTLY different from the previous one
 
-Style: Epic fantasy art, detailed ${sanitizedAnimal} features, more powerful than before, magical, glowing ${favoriteColor} tones.
-Keep the same ${sanitizedAnimal} identity but amplify the power, size, and majesty.
-Background: Dramatic and atmospheric, complementing the ${coreElement} element.`;
+Style: Epic high-fantasy digital art, cinematic lighting, dramatic ${coreElement} effects, glowing ${favoriteColor} palette.
+Background: Dynamic atmospheric scene that complements the ${coreElement} element and Stage ${stage} power level.`;
     }
 
     console.log("Generated prompt:", prompt);
@@ -158,24 +183,13 @@ Background: Dramatic and atmospheric, complementing the ${coreElement} element.`
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    const messages: any[] = [];
-    
-    if (previousImageUrl && stage > 0) {
-      // For evolution, include the previous image
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: previousImageUrl } }
-        ]
-      });
-    } else {
-      // For initial generation
-      messages.push({
+    // Always generate from scratch for more distinct evolutions
+    const messages: any[] = [
+      {
         role: "user",
         content: prompt
-      });
-    }
+      }
+    ];
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
