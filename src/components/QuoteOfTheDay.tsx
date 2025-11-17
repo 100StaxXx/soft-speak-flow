@@ -52,7 +52,7 @@ export const QuoteOfTheDay = () => {
           .select("*")
           .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (quote) {
           setTodaysQuote(quote);
