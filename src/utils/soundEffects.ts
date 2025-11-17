@@ -141,6 +141,19 @@ class SoundManager {
     }, 150);
   }
 
+  playLessonComplete() {
+    if (!this.audioContext || this.isMuted) return;
+
+    // Gentle, satisfying completion chime
+    this.createOscillator(659.25, 0.2, 'sine');
+    setTimeout(() => {
+      this.createOscillator(783.99, 0.25, 'sine');
+    }, 100);
+    setTimeout(() => {
+      this.createOscillator(1046.50, 0.3, 'sine');
+    }, 200);
+  }
+
   playAchievementUnlock() {
     if (!this.audioContext || this.isMuted) return;
 
@@ -231,6 +244,7 @@ export const playSparkle = () => soundManager.playSparkle();
 export const playHabitComplete = () => soundManager.playHabitComplete();
 export const playXPGain = () => soundManager.playXPGain();
 export const playMissionComplete = () => soundManager.playMissionComplete();
+export const playLessonComplete = () => soundManager.playLessonComplete();
 export const playAchievementUnlock = () => soundManager.playAchievementUnlock();
 export const playButtonClick = () => soundManager.playButtonClick();
 export const playNotification = () => soundManager.playNotification();
