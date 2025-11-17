@@ -1,4 +1,4 @@
-import { ListChecks, Search, Egg, User } from "lucide-react";
+import { ListChecks, Search, Sparkles, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -68,7 +68,7 @@ export const BottomNav = () => {
           {({ isActive }) => (
             <>
               <div className="relative">
-                <Egg className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+                <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
                 {companion && progressToNext > 75 && (
                   <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-primary text-primary-foreground animate-pulse">
                     !
