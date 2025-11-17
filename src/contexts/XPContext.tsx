@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { XPToast } from "@/components/XPToast";
+import { playXPGain } from "@/utils/soundEffects";
 
 interface XPContextType {
   showXPToast: (xp: number, reason: string) => void;
@@ -16,6 +17,7 @@ export const XPProvider = ({ children }: { children: ReactNode }) => {
 
   const showXPToast = (xp: number, reason: string) => {
     setToastData({ xp, reason, show: true });
+    playXPGain();
   };
 
   return (

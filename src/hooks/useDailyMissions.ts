@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
+import { playMissionComplete } from "@/utils/soundEffects";
 
 const MISSION_TEMPLATES = [
   { type: "check_in", text: "Complete your daily check-in", xp: 5 },
@@ -83,6 +84,7 @@ export const useDailyMissions = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
       toast({ title: "Mission Complete!", description: "XP awarded!" });
+      playMissionComplete();
     },
   });
 

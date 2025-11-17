@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { Sparkles, Zap, Volume2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { playEvolutionStart, playEvolutionSuccess, playSparkle } from "@/utils/soundEffects";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -30,6 +31,9 @@ export const CompanionEvolution = ({
   useEffect(() => {
     if (!isEvolving) return;
 
+    // Play evolution start sound
+    playEvolutionStart();
+
     // Generate AI voice line
     const generateVoice = async () => {
       if (!mentorSlug || !userId) {
@@ -49,28 +53,24 @@ export const CompanionEvolution = ({
         }
 
         if (data?.audioContent) {
-          // Create audio from base64
-          const audioBlob = new Blob(
-            [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
-            { type: 'audio/mpeg' }
-          );
-          const audioUrl = URL.createObjectURL(audioBlob);
-          audioRef.current = new Audio(audioUrl);
+          const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
+          audioRef.current = audio;
         }
+
+        setIsLoadingVoice(false);
       } catch (error) {
         console.error('Failed to generate evolution voice:', error);
-      } finally {
         setIsLoadingVoice(false);
       }
     };
 
     generateVoice();
-    haptics.heavy();
 
     const timers = [
       setTimeout(() => {
         setStage(1);
         haptics.medium();
+        playSparkle();
         // First wave of confetti
         confetti({
           particleCount: 80,
@@ -82,6 +82,7 @@ export const CompanionEvolution = ({
       setTimeout(() => {
         setStage(2);
         haptics.heavy();
+        playSparkle();
         // Play voice if available
         if (audioRef.current && !isLoadingVoice) {
           audioRef.current.play().catch(err => console.error('Audio play failed:', err));
@@ -115,6 +116,7 @@ export const CompanionEvolution = ({
       setTimeout(() => {
         setStage(3);
         haptics.success();
+        playEvolutionSuccess();
         // Third massive burst
         confetti({
           particleCount: 250,

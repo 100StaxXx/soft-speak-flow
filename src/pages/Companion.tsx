@@ -27,6 +27,7 @@ import { useState } from "react";
 import confetti from "canvas-confetti";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { playHabitComplete } from "@/utils/soundEffects";
 
 const Companion = () => {
   const navigate = useNavigate();
@@ -100,6 +101,9 @@ const Companion = () => {
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
+      
+      // Play success sound
+      playHabitComplete();
       
       // Check if all habits complete
       const allComplete = habits.every(h => 
