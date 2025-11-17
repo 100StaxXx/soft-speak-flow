@@ -18,25 +18,36 @@ export const AmbientMusicPlayer = () => {
       setState(ambientMusic.getState());
     };
 
-    // Pause audio when app is not visible
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        ambientMusic.pause();
-      } else if (!state.isMuted) {
-        ambientMusic.play();
-      }
-    };
-
     window.addEventListener('bg-music-volume-change', updateState);
     window.addEventListener('bg-music-mute-change', updateState);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [state.isMuted]);
+
+  // Handle visibility changes separately to avoid stale closure issues
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause and stop audio when app goes to background or screen locks
+        ambientMusic.stop();
+      } else {
+        // Resume only if not muted
+        const currentState = ambientMusic.getState();
+        if (!currentState.isMuted) {
+          ambientMusic.play();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const handleToggle = () => {
     ambientMusic.toggleMute();
