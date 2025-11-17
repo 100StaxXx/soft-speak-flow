@@ -3,31 +3,31 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const COLORS = [
-  { name: "Royal Purple", value: "#9333EA", gradient: "from-purple-600 to-violet-600" },
-  { name: "Ocean Blue", value: "#0EA5E9", gradient: "from-blue-500 to-cyan-500" },
-  { name: "Forest Green", value: "#10B981", gradient: "from-emerald-500 to-green-600" },
-  { name: "Sunset Orange", value: "#F97316", gradient: "from-orange-500 to-red-500" },
-  { name: "Rose Pink", value: "#EC4899", gradient: "from-pink-500 to-rose-500" },
-  { name: "Golden Yellow", value: "#EAB308", gradient: "from-yellow-500 to-amber-500" },
-  { name: "Crimson Red", value: "#DC2626", gradient: "from-red-600 to-rose-600" },
-  { name: "Silver Gray", value: "#64748B", gradient: "from-slate-500 to-gray-600" },
-];
 
 const ANIMALS = [
-  { name: "Dragon", emoji: "🐉" },
-  { name: "Phoenix", emoji: "🔥" },
-  { name: "Wolf", emoji: "🐺" },
-  { name: "Tiger", emoji: "🐯" },
-  { name: "Eagle", emoji: "🦅" },
-  { name: "Serpent", emoji: "🐍" },
-  { name: "Bear", emoji: "🐻" },
-  { name: "Fox", emoji: "🦊" },
-  { name: "Lion", emoji: "🦁" },
-  { name: "Owl", emoji: "🦉" },
-  { name: "Raven", emoji: "🐦‍⬛" },
-  { name: "Deer", emoji: "🦌" },
+  "Dragon", "Phoenix", "Griffin", "Unicorn", "Pegasus",
+  "Wolf", "Tiger", "Lion", "Bear", "Eagle",
+  "Fox", "Owl", "Raven", "Hawk", "Falcon",
+  "Serpent", "Cobra", "Python", "Viper", "Basilisk",
+  "Deer", "Stag", "Elk", "Moose", "Reindeer",
+  "Panther", "Jaguar", "Leopard", "Cheetah", "Lynx",
+  "Mammoth", "Elephant", "Rhino", "Bison", "Buffalo",
+  "Kraken", "Leviathan", "Hydra", "Chimera", "Cerberus",
+  "Sphinx", "Minotaur", "Centaur", "Thunderbird", "Roc",
+  "Kitsune", "Tanuki", "Qilin", "Kirin", "Baku",
+  "Fenrir", "Sleipnir", "Jormungandr", "Nidhogg", "Fafnir",
+  "Manticore", "Wyvern", "Drake", "Wyrm", "Lindworm",
+  "Gryphon", "Hippogriff", "Alicorn", "Kelpie", "Selkie",
+  "Thundercat", "Storm Wolf", "Ember Fox", "Frost Bear", "Shadow Panther",
+  "Celestial Whale", "Cosmic Turtle", "Nebula Stag", "Aurora Owl", "Starlight Butterfly",
 ];
 
 const ELEMENTS = [
@@ -51,7 +51,7 @@ interface CompanionPersonalizationProps {
 }
 
 export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPersonalizationProps) => {
-  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>("#9333EA");
   const [selectedAnimal, setSelectedAnimal] = useState<string>("");
   const [selectedElement, setSelectedElement] = useState<string>("");
 
@@ -74,61 +74,52 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
           </div>
         </div>
 
-        {/* Color Selection */}
+        {/* Color Selection with Color Wheel */}
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite color</Label>
-          <div className="grid grid-cols-4 gap-3">
-            {COLORS.map((color) => (
-              <button
-                key={color.value}
-                onClick={() => setSelectedColor(color.name)}
-                className={`
-                  relative h-20 rounded-lg transition-all duration-200
-                  bg-gradient-to-br ${color.gradient}
-                  ${selectedColor === color.name 
-                    ? "ring-4 ring-primary scale-105 shadow-lg" 
-                    : "hover:scale-105 hover:shadow-md opacity-70 hover:opacity-100"
-                  }
-                `}
-              >
-                {selectedColor === color.name && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-white rounded-full p-1">
-                      <div className="text-2xl">✓</div>
-                    </div>
-                  </div>
-                )}
-                <div className="absolute bottom-1 left-0 right-0 text-center">
-                  <span className="text-xs font-semibold text-white drop-shadow-lg">
-                    {color.name}
-                  </span>
-                </div>
-              </button>
-            ))}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <input
+                type="color"
+                value={selectedColor}
+                onChange={(e) => setSelectedColor(e.target.value)}
+                className="w-32 h-32 rounded-full cursor-pointer border-4 border-primary/20 shadow-glow transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: selectedColor,
+                }}
+              />
+              <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-br from-white/20 to-transparent" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="text-sm text-muted-foreground">Selected Color</div>
+              <div 
+                className="h-20 rounded-lg border-2 border-border shadow-soft transition-all"
+                style={{ backgroundColor: selectedColor }}
+              />
+              <div className="text-xs text-muted-foreground font-mono">{selectedColor}</div>
+            </div>
           </div>
         </div>
 
-        {/* Animal Selection */}
+        {/* Animal Selection with Dropdown */}
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
-          <div className="grid grid-cols-4 gap-3">
-            {ANIMALS.map((animal) => (
-              <button
-                key={animal.name}
-                onClick={() => setSelectedAnimal(animal.name)}
-                className={`
-                  p-4 rounded-lg border-2 transition-all duration-200
-                  ${selectedAnimal === animal.name
-                    ? "border-primary bg-primary/10 scale-105 shadow-lg"
-                    : "border-border hover:border-primary/50 hover:scale-105"
-                  }
-                `}
-              >
-                <div className="text-4xl mb-2">{animal.emoji}</div>
-                <div className="text-sm font-medium">{animal.name}</div>
-              </button>
-            ))}
-          </div>
+          <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
+            <SelectTrigger className="w-full h-14 text-base">
+              <SelectValue placeholder="Choose your spirit creature..." />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px] bg-card border-border">
+              {ANIMALS.map((animal) => (
+                <SelectItem 
+                  key={animal} 
+                  value={animal}
+                  className="cursor-pointer hover:bg-accent/50"
+                >
+                  {animal}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Element Selection */}
