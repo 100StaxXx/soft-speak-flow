@@ -2,6 +2,19 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import "./index.css";
 
+// Register service worker for PWA with optimized caching
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(registration => {
+        console.log('SW registered:', registration);
+      })
+      .catch(error => {
+        console.log('SW registration failed:', error);
+      });
+  });
+}
+
 // Lazy load the main app for code splitting
 const App = lazy(() => import("./App.tsx"));
 
