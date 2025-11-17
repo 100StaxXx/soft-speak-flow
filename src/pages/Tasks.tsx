@@ -209,28 +209,31 @@ export default function Tasks() {
                         variant={taskDifficulty === 'easy' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setTaskDifficulty('easy')}
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-1 px-2"
                       >
                         <Zap className="h-4 w-4" />
-                        Easy (5 XP)
+                        <span className="hidden sm:inline">Easy</span>
+                        <span className="sm:hidden">5</span>
                       </Button>
                       <Button
                         variant={taskDifficulty === 'medium' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setTaskDifficulty('medium')}
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-1 px-2"
                       >
                         <Flame className="h-4 w-4" />
-                        Medium (15 XP)
+                        <span className="hidden sm:inline">Medium</span>
+                        <span className="sm:hidden">15</span>
                       </Button>
                       <Button
                         variant={taskDifficulty === 'hard' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setTaskDifficulty('hard')}
-                        className="flex-1 gap-2"
+                        className="flex-1 gap-1 px-2"
                       >
                         <Mountain className="h-4 w-4" />
-                        Hard (25 XP)
+                        <span className="hidden sm:inline">Hard</span>
+                        <span className="sm:hidden">25</span>
                       </Button>
                     </div>
 
