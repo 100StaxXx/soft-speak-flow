@@ -89,7 +89,7 @@ export const MorningCheckIn = () => {
           </div>
           <div className="flex-1 space-y-3">
             <div>
-              <h3 className="font-bold text-lg">Morning Check-in Complete</h3>
+              <h3 className="font-bold text-lg">Check-in Complete</h3>
               <p className="text-sm text-muted-foreground">Focus: {existingCheckIn.intention}</p>
             </div>
             {existingCheckIn.mentor_response && (
@@ -112,9 +112,9 @@ export const MorningCheckIn = () => {
             <Sunrise className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-heading font-black text-lg md:text-xl">Morning Check-in</h3>
+            <h3 className="font-heading font-black text-lg md:text-xl">Check-in</h3>
             <p className="text-xs md:text-sm text-muted-foreground">
-              {personality?.name} wants to know: How are we starting today?
+              {personality?.name} wants to know: How are you feeling?
             </p>
           </div>
         </div>
