@@ -13,21 +13,20 @@ import {
 
 
 const ANIMALS = [
-  "Dragon", "Phoenix", "Griffin", "Unicorn", "Pegasus",
-  "Wolf", "Tiger", "Lion", "Bear", "Eagle",
-  "Fox", "Owl", "Raven", "Hawk", "Falcon",
-  "Serpent", "Cobra", "Python", "Viper", "Basilisk",
-  "Deer", "Stag", "Elk", "Moose", "Reindeer",
-  "Panther", "Jaguar", "Leopard", "Cheetah", "Lynx",
-  "Mammoth", "Elephant", "Rhino", "Bison", "Buffalo",
-  "Kraken", "Leviathan", "Hydra", "Chimera", "Cerberus",
-  "Sphinx", "Minotaur", "Centaur", "Thunderbird", "Roc",
-  "Kitsune", "Tanuki", "Qilin", "Kirin", "Baku",
-  "Fenrir", "Sleipnir", "Jormungandr", "Nidhogg", "Fafnir",
-  "Manticore", "Wyvern", "Drake", "Wyrm", "Lindworm",
-  "Gryphon", "Hippogriff", "Alicorn", "Kelpie", "Selkie",
-  "Thundercat", "Storm Wolf", "Ember Fox", "Frost Bear", "Shadow Panther",
-  "Celestial Whale", "Cosmic Turtle", "Nebula Stag", "Aurora Owl", "Starlight Butterfly",
+  "Dragon", "Unicorn", "Wolf", "Tiger", "Lion",
+  "Phoenix", "Bear", "Shark", "Eagle", "Dolphin",
+  "Fox", "Panther", "Orca", "Cat", "Dog",
+  "Owl", "Pegasus", "Gorilla", "Cheetah", "Snake",
+  "Gryphon", "Jaguar", "Snow Leopard", "Falcon", "Hawk",
+  "Elephant", "Sea Turtle", "Octopus", "Kangaroo", "Penguin",
+  "Sloth", "Parrot", "Raven", "Kitsune", "Kraken",
+  "Hydra", "Chimera", "Basilisk", "Leviathan", "Hippo",
+  "Rhino", "Horse (Stallion)", "Puma / Cougar", "Lynx", "Hyena",
+  "Manta Ray", "Jellyfish", "Reindeer", "Mammoth", "Cerberus",
+  "Sphinx", "Tanuki", "Fenrir", "Wyvern", "Hippogriff",
+  "Blue Whale", "Butterfly", "Mechanical Dragon", "Thunderbird", "Crocodile",
+  "Wolverine", "Arctic Fox", "Fennec Fox", "Hummingbird", "T-Rex",
+  "Velociraptor",
 ];
 
 const ELEMENTS = [
