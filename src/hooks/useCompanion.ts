@@ -12,6 +12,8 @@ export interface Companion {
   current_stage: number;
   current_xp: number;
   current_image_url: string | null;
+  eye_color?: string;
+  fur_color?: string;
   created_at: string;
   updated_at: string;
 }
@@ -65,7 +67,11 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Generate initial companion image
+      // Determine consistent colors for the companion's lifetime
+      const eyeColor = `glowing ${data.favoriteColor}`;
+      const furColor = data.favoriteColor;
+
+      // Generate initial companion image with color specifications
       const { data: imageData, error: imageError } = await supabase.functions.invoke(
         "generate-companion-image",
         {
@@ -74,6 +80,8 @@ export const useCompanion = () => {
             spiritAnimal: data.spiritAnimal,
             coreElement: data.coreElement,
             stage: 0,
+            eyeColor,
+            furColor,
           },
         }
       );
@@ -81,7 +89,7 @@ export const useCompanion = () => {
       if (imageError) throw imageError;
       if (!imageData?.imageUrl) throw new Error("Failed to generate companion image");
 
-      // Create companion record
+      // Create companion record with color specifications
       const { data: companionData, error: createError } = await supabase
         .from("user_companion")
         .insert({
@@ -92,6 +100,8 @@ export const useCompanion = () => {
           current_stage: 0,
           current_xp: 0,
           current_image_url: imageData.imageUrl,
+          eye_color: eyeColor,
+          fur_color: furColor,
         })
         .select()
         .single();
@@ -181,7 +191,7 @@ export const useCompanion = () => {
 
       toast.loading("Your companion is evolving...", { id: "evolution" });
 
-      // Generate evolved image
+      // Generate evolved image with consistent colors
       const { data: imageData, error: imageError } = await supabase.functions.invoke(
         "generate-companion-image",
         {
@@ -191,6 +201,8 @@ export const useCompanion = () => {
             coreElement: companion.core_element,
             stage: newStage,
             previousImageUrl: companion.current_image_url,
+            eyeColor: companion.eye_color || `glowing ${companion.favorite_color}`,
+            furColor: companion.fur_color || companion.favorite_color,
           },
         }
       );

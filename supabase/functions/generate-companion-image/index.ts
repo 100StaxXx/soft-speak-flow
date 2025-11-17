@@ -139,6 +139,8 @@ serve(async (req) => {
       stage = 0,
       previousImageUrl = null,
       mentorName = "Atlas",
+      eyeColor = null,
+      furColor = null,
     } = await req.json();
 
     console.log(`Generating companion for user ${user.id}, stage ${stage}`);
@@ -177,6 +179,10 @@ serve(async (req) => {
     }
     
     const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
+    
+    // Determine consistent colors
+    const consistentEyeColor = eyeColor || `glowing ${favoriteColor}`;
+    const consistentFurColor = furColor || favoriteColor;
     
     if (stage === 0) {
       // Initial egg stage
@@ -220,12 +226,19 @@ EVOLUTION CONTINUITY (CRITICAL - Like Pokemon/Digimon):
 - Evolution should feel like the SAME creature growing more powerful, NOT a different creature
 - Visual signature elements (eyes, ears, tail, wings if applicable) must carry through all stages
 
+MANDATORY COLOR CONSISTENCY (CRITICAL):
+- Eye Color: MUST be exactly "${consistentEyeColor}" in every stage - NEVER change eye color
+- Fur/Skin/Scale Color: MUST be exactly "${consistentFurColor}" as the base body color - NEVER change this
+- These colors were set at birth and MUST remain identical through all evolutions
+- Only elemental effects and markings can add complementary colors - base colors NEVER change
+
 EVOLUTION STAGE: ${stageInfo.name}
 
 SPECIES IDENTITY:
 - Base Species: ${sanitizedAnimal} (anatomy must be accurate and instantly recognizable)
 - Signature Features: Keep distinctive ${sanitizedAnimal} characteristics (face, ears, body shape, limbs)
-- Color Palette: ${favoriteColor} as primary color (same shades and patterns as previous stages)
+- Base Body Color: ${consistentFurColor} (primary fur/skin/scales - NEVER changes)
+- Eye Color: ${consistentEyeColor} (NEVER changes, just glows brighter with power)
 - Elemental Affinity: ${coreElement}
 
 STAGE ${stage} SPECIFICATIONS:
@@ -237,21 +250,23 @@ STAGE ${stage} SPECIFICATIONS:
 EVOLUTION APPROACH (Pokemon/Digimon Style):
 - GRADUAL transformation: Add new features while preserving existing ones
 - Maintain facial expression style and personality from previous stages
-- Keep the same eye color and shape (just make them glow more with power)
+- Keep EXACT SAME eye color: "${consistentEyeColor}" (just make them glow more with power)
+- Keep EXACT SAME fur/skin color: "${consistentFurColor}" (body base color never changes)
 - Retain body proportions philosophy (if quadruped stays quadruped, etc.)
 - Add armor-like elemental formations that enhance rather than replace features
 - New stage = same creature + enhanced power manifestation + size increase
 
 ELEMENTAL EFFECTS FOR STAGE ${stage}:
 ${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
-(Effects should wrap AROUND the creature, not obscure its features)
+(Effects should wrap AROUND the creature, not obscure its features or change base colors)
 
 STAGE ${stage} SPECIFIC DETAILS:
 ${stageInfo.details}
 
 VISUAL CONTINUITY CHECKLIST:
 ✓ Same ${sanitizedAnimal} face shape and expression style
-✓ Same ${favoriteColor} color distribution pattern
+✓ Same ${consistentFurColor} fur/skin/scale base color (70%+ of body)
+✓ Same ${consistentEyeColor} eye color (EXACTLY - never changes)
 ✓ Same body type (wings, legs, tail configuration)
 ✓ Same eye placement and basic eye design
 ✓ Same personality/character visible in pose
@@ -263,13 +278,13 @@ ${stageInfo.atmosphere}
 
 CRITICAL REQUIREMENTS:
 - This must look like THE SAME ${sanitizedAnimal} from Stage 0, just more powerful
-- ${favoriteColor} stays the dominant color (70%+ of body)
+- Base colors NEVER change: ${consistentFurColor} body, ${consistentEyeColor} eyes
 - Someone who saw Stage ${stage - 1} should immediately recognize this as the next form
 - Features evolve but NEVER completely change (like Charmander→Charmeleon→Charizard staying recognizably related)
-- ${coreElement} effects enhance the creature's power without hiding its features
+- ${coreElement} effects enhance the creature's power without hiding its features or changing base colors
 
 DESIGN PHILOSOPHY:
-Think Pokemon/Digimon: each stage is the same character leveling up, gaining power and size, with new armor/effects, but ALWAYS recognizable as the same companion throughout the journey.
+Think Pokemon/Digimon: each stage is the same character leveling up, gaining power and size, with new armor/effects, but ALWAYS recognizable as the same companion with IDENTICAL base coloring throughout the journey.
 
 IMPORTANT TONE:
 - Inspiring, empowering companion for motivation/personal growth
@@ -277,10 +292,10 @@ IMPORTANT TONE:
 - Majestic but never frightening or evil
 - Each stage celebrates growth and achievement
 
-Art Style: Epic fantasy digital art, cinematic lighting, dynamic ${coreElement} elemental effects, ${favoriteColor}-dominant color palette, character design continuity like Pokemon evolutions.
+Art Style: Epic fantasy digital art, cinematic lighting, dynamic ${coreElement} elemental effects, ${consistentFurColor}-dominant color palette with ${consistentEyeColor} eyes, character design continuity like Pokemon evolutions.
 Background: Atmospheric environment reflecting Stage ${stage} power level, complementing ${coreElement} element without overwhelming the creature.
 
-Focus on visual continuity and recognizable evolution progression while showing significant power growth for Stage ${stage}.`;
+Focus on visual continuity, EXACT color matching (${consistentFurColor} body + ${consistentEyeColor} eyes), and recognizable evolution progression while showing significant power growth for Stage ${stage}.`;
     }
 
     console.log("Generated prompt:", prompt);
