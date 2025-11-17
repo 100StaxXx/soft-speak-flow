@@ -20,7 +20,7 @@ const ANIMALS = [
   "Gryphon", "Jaguar", "Snow Leopard", "Falcon", "Hawk",
   "Elephant", "Sea Turtle", "Octopus", "Kangaroo", "Penguin",
   "Sloth", "Parrot", "Raven", "Kitsune", "Kraken",
-  "Hydra", "Chimera", "Basilisk", "Leviathan", "Hippo",
+  "Hydra", "Basilisk", "Leviathan", "Hippo",
   "Rhino", "Horse (Stallion)", "Puma / Cougar", "Lynx", "Hyena",
   "Manta Ray", "Jellyfish", "Reindeer", "Mammoth", "Cerberus",
   "Sphinx", "Tanuki", "Fenrir", "Wyvern", "Hippogriff",
