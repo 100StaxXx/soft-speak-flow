@@ -1505,7 +1505,9 @@ export type Database = {
           current_image_url: string | null
           current_stage: number
           current_xp: number
+          eye_color: string | null
           favorite_color: string
+          fur_color: string | null
           id: string
           spirit_animal: string
           updated_at: string
@@ -1517,7 +1519,9 @@ export type Database = {
           current_image_url?: string | null
           current_stage?: number
           current_xp?: number
+          eye_color?: string | null
           favorite_color: string
+          fur_color?: string | null
           id?: string
           spirit_animal: string
           updated_at?: string
@@ -1529,7 +1533,9 @@ export type Database = {
           current_image_url?: string | null
           current_stage?: number
           current_xp?: number
+          eye_color?: string | null
           favorite_color?: string
+          fur_color?: string | null
           id?: string
           spirit_animal?: string
           updated_at?: string
