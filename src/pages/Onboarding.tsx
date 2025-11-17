@@ -149,28 +149,24 @@ export default function Onboarding() {
     coreElement: string;
   }) => {
     try {
-      await createCompanion.mutateAsync(data);
-      
-      // Ensure profile is marked as onboarding complete
+      // Mark onboarding as complete FIRST for instant navigation
       if (user) {
-        const { error } = await supabase
+        await supabase
           .from('profiles')
           .update({ onboarding_completed: true })
           .eq('id', user.id);
-        
-        if (error) {
-          console.error('Error updating profile:', error);
-        }
       }
       
-      // Wait briefly for companion to save
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Navigate immediately - companion creation happens in background
       navigate("/", { replace: true });
+      
+      // Trigger companion creation without awaiting
+      createCompanion.mutate(data);
     } catch (error) {
-      console.error("Error creating companion:", error);
+      console.error("Error in onboarding:", error);
       toast({
         title: "Error",
-        description: "Failed to create companion. Please try again.",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     }

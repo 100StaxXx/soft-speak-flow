@@ -138,7 +138,7 @@ serve(async (req) => {
       coreElement, 
       stage = 0,
       previousImageUrl = null,
-      mentorName = "Atlas"
+      mentorName = "Atlas",
     } = await req.json();
 
     console.log(`Generating companion for user ${user.id}, stage ${stage}`);
