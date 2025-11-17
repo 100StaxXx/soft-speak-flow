@@ -3,6 +3,7 @@ import Joyride, { CallBackProps, STATUS, Step, ACTIONS, EVENTS } from "react-joy
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { haptics } from "@/utils/haptics";
 
 const WALKTHROUGH_STEPS: Step[] = [
   // HOME PAGE - Check-in
@@ -177,6 +178,7 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     const handleCheckInComplete = () => {
       if (run && stepIndex === 1 && waitingForAction) {
+        haptics.success(); // Celebratory feedback for check-in
         setWaitingForAction(false);
         setStepIndex(2);
       }
@@ -190,6 +192,7 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     const handleTaskComplete = () => {
       if (run && stepIndex === 7 && waitingForAction) {
+        haptics.success(); // Celebratory feedback for quest completion
         setWaitingForAction(false);
         setStepIndex(8);
       }
@@ -203,6 +206,7 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     const handleEvolution = () => {
       if (run && stepIndex === 10 && waitingForAction) {
+        haptics.heavy(); // Strong feedback for evolution milestone
         setWaitingForAction(false);
         // Wait for evolution animation to complete
         setTimeout(() => {
@@ -221,12 +225,15 @@ export const AppWalkthrough = () => {
     
     if (stepIndex === 4 && location.pathname === '/tasks') {
       // User clicked Quests tab, progress to next step
+      haptics.medium(); // Feedback for navigation
       setTimeout(() => setStepIndex(5), 500);
     } else if (stepIndex === 13 && location.pathname === '/companion') {
       // User navigated to companion page
+      haptics.medium(); // Feedback for navigation
       setTimeout(() => setStepIndex(14), 500);
     } else if (stepIndex === 19 && location.pathname === '/inspire') {
       // User navigated to inspire page  
+      haptics.medium(); // Feedback for navigation
       setTimeout(() => setStepIndex(20), 500);
     }
   }, [location.pathname, stepIndex, run]);
@@ -237,6 +244,7 @@ export const AppWalkthrough = () => {
 
     // Only allow finishing when tutorial is complete, prevent skipping
     if (status === STATUS.FINISHED) {
+      haptics.success(); // Celebratory feedback for completing entire tutorial
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
@@ -246,6 +254,11 @@ export const AppWalkthrough = () => {
     // Handle step progression
     if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       const nextStepIndex = index + (action === ACTIONS.PREV ? -1 : 1);
+
+      // Light haptic feedback for regular step progression
+      if (action === ACTIONS.NEXT) {
+        haptics.light();
+      }
 
       // Navigate between pages
       if (index === 3 && action === ACTIONS.NEXT) {
