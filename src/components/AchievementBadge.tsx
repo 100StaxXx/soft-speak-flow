@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Trophy, Award, Medal, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,7 @@ const tierConfig = {
   },
 };
 
-export const AchievementBadge = ({
+export const AchievementBadge = memo(({
   tier,
   title,
   description,
@@ -58,10 +59,12 @@ export const AchievementBadge = ({
   return (
     <div
       className={cn(
-        "relative rounded-xl bg-card border border-border/50 overflow-hidden group hover:scale-105 transition-all duration-300",
+        "relative rounded-xl bg-card border border-border/50 overflow-hidden group hover:scale-105 transition-all duration-300 animate-fade-in",
         config.shadow,
         sizeClasses[size]
       )}
+      role="article"
+      aria-label={`Achievement: ${title}`}
     >
       <div
         className={cn(
@@ -77,7 +80,7 @@ export const AchievementBadge = ({
               config.gradient
             )}
           >
-            <Icon className={cn("text-white", iconSizes[size])} />
+            <Icon className={cn("text-white", iconSizes[size])} aria-hidden="true" />
           </div>
           <div className="flex-1">
             <h4 className="font-semibold text-foreground">{title}</h4>
@@ -92,4 +95,4 @@ export const AchievementBadge = ({
       </div>
     </div>
   );
-};
+});
