@@ -56,6 +56,8 @@ export default {
         'royal-purple': 'hsl(var(--royal-purple))',
         'deep-purple': 'hsl(var(--deep-purple))',
         'accent-purple': 'hsl(var(--accent-purple))',
+        'electric-purple': 'hsl(var(--electric-purple))',
+        'neon-glow': 'hsl(var(--neon-glow))',
       },
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
@@ -74,6 +76,7 @@ export default {
         'hard': 'var(--shadow-hard)',
         'glow': 'var(--shadow-glow)',
         'glow-lg': 'var(--shadow-glow-lg)',
+        'neon': 'var(--shadow-neon)',
       },
       borderRadius: {
         lg: '1.5rem',

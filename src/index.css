@@ -17,69 +17,76 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* A Lil Push - Sacramento Kings Inspired (Black & Purple) */
+    /* A Lil Push - Enhanced Premium Design */
     
-    /* Core Brand Colors */
-    --obsidian: 0 0% 7%;
-    --midnight: 240 6% 12%;
-    --charcoal: 240 6% 20%;
-    --steel: 240 5% 65%;
+    /* Core Brand Colors - More Vibrant */
+    --obsidian: 0 0% 5%;
+    --midnight: 240 10% 10%;
+    --charcoal: 240 8% 18%;
+    --steel: 240 5% 70%;
     --pure-white: 0 0% 100%;
-    --graphite: 240 6% 15%;
-    --royal-purple: 270 60% 50%;
-    --deep-purple: 270 50% 35%;
-    --accent-purple: 280 70% 60%;
+    --graphite: 240 8% 14%;
+    --royal-purple: 270 70% 55%;
+    --deep-purple: 270 60% 40%;
+    --accent-purple: 280 80% 65%;
+    --electric-purple: 280 90% 70%;
+    --neon-glow: 270 100% 75%;
     
     /* Primary RGB for effects */
-    --primary-rgb: 139, 92, 246;
+    --primary-rgb: 167, 108, 255;
     
     /* Semantic Tokens */
-    --background: 0 0% 7%;
-    --foreground: 0 0% 100%;
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
 
-    --card: 240 6% 15%;
-    --card-foreground: 0 0% 100%;
+    --card: 240 8% 14%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 240 6% 15%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 240 8% 14%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 270 60% 50%;
+    --primary: 270 70% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 6% 20%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 240 8% 18%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 6% 25%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 240 6% 22%;
+    --muted-foreground: 240 5% 70%;
 
-    --accent: 270 50% 35%;
+    --accent: 280 80% 65%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 25%;
-    --input: 240 6% 25%;
-    --ring: 270 60% 50%;
+    --border: 240 10% 20%;
+    --input: 240 8% 18%;
+    --ring: 270 70% 55%;
 
     --radius: 1.25rem;
     
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--deep-purple)));
+    /* Enhanced Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--electric-purple)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--accent-purple)));
     --gradient-subtle: linear-gradient(180deg, hsl(var(--graphite)), hsl(var(--obsidian)));
-    --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--obsidian)));
-    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.1), transparent);
+    --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--midnight)));
+    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.2), transparent);
+    --gradient-glow: linear-gradient(135deg, hsl(var(--neon-glow) / 0.3), hsl(var(--royal-purple) / 0.2));
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(var(--secondary)));
     
-    /* Shadows - Bold & Strong */
-    --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4);
-    --shadow-hard: 0 8px 24px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 24px hsl(var(--royal-purple) / 0.5);
-    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.6);
+    /* Enhanced Shadows */
+    --shadow-soft: 0 2px 12px hsl(0 0% 0% / 0.4);
+    --shadow-medium: 0 4px 20px hsl(0 0% 0% / 0.5);
+    --shadow-hard: 0 8px 32px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 30px hsl(var(--royal-purple) / 0.6), 0 0 60px hsl(var(--royal-purple) / 0.3);
+    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.7), 0 0 80px hsl(var(--royal-purple) / 0.4);
+    --shadow-neon: 0 0 20px hsl(var(--neon-glow) / 0.8), 0 0 40px hsl(var(--neon-glow) / 0.5);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     
     /* Spacing Scale */

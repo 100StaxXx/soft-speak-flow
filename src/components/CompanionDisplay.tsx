@@ -55,44 +55,49 @@ export const CompanionDisplay = () => {
         }}
       />
 
-      <Card className="relative overflow-hidden shadow-glow border-primary/30 hover:border-primary/50 transition-all duration-300 hover:shadow-glow-lg animate-scale-in">
-      {/* Background gradient based on element */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-50" />
+      <Card className="relative overflow-hidden shadow-glow-lg border-primary/40 hover:border-primary/70 transition-all duration-500 hover:shadow-neon animate-scale-in bg-gradient-to-br from-card via-card to-secondary/50">
+      {/* Enhanced Background Effects */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 opacity-60" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.15),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--accent)/0.15),transparent_50%)]" />
       
-      <div className="relative p-5 md:p-6 space-y-4">
+      <div className="relative p-6 md:p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg md:text-xl font-heading font-black flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+            <h3 className="text-xl md:text-2xl font-heading font-black flex items-center gap-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <Sparkles className="h-6 w-6 text-primary animate-pulse drop-shadow-[0_0_8px_hsl(var(--primary))]" />
               Your Companion
             </h3>
-            <p className="text-sm text-muted-foreground">{stageName}</p>
+            <p className="text-sm md:text-base text-muted-foreground font-medium mt-1">{stageName}</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl md:text-3xl font-heading font-black text-primary">
+            <div className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-br from-primary via-accent to-primary bg-clip-text text-transparent drop-shadow-lg">
               Stage {companion.current_stage}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs md:text-sm text-muted-foreground font-medium mt-1">
               {companion.spirit_animal}
             </div>
           </div>
         </div>
 
-        {/* Companion Image */}
-        <div className="flex justify-center">
+        {/* Enhanced Companion Image */}
+        <div className="flex justify-center py-4">
           {companion.current_image_url ? (
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-300 animate-pulse" />
+              {/* Multi-layered glow effect */}
+              <div className="absolute -inset-3 bg-gradient-to-r from-primary via-accent to-primary rounded-3xl blur-xl opacity-40 group-hover:opacity-60 transition-all duration-500 animate-pulse" />
+              <div className="absolute -inset-2 bg-gradient-to-r from-accent via-primary to-accent rounded-3xl blur-lg opacity-30 group-hover:opacity-50 transition-all duration-500" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-accent/30 rounded-2xl blur opacity-50 group-hover:opacity-75 transition-all duration-300" />
               <img
                 src={companion.current_image_url}
                 alt={`${stageName} companion`}
-                className="relative max-w-full h-auto max-h-64 rounded-2xl shadow-glow transition-all duration-700 group-hover:scale-105 animate-[breathe_4s_ease-in-out_infinite]"
+                className="relative max-w-full h-auto max-h-80 md:max-h-96 rounded-2xl shadow-glow-lg transition-all duration-700 group-hover:scale-105 group-hover:shadow-neon animate-[breathe_4s_ease-in-out_infinite] border-2 border-primary/20"
                 loading="lazy"
               />
             </div>
           ) : (
-            <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center">
-              <Sparkles className="h-16 w-16 text-primary animate-pulse" />
+            <div className="w-64 h-64 md:w-80 md:h-80 rounded-3xl bg-gradient-to-br from-primary/20 via-accent/20 to-primary/20 animate-pulse flex items-center justify-center shadow-glow-lg">
+              <Sparkles className="h-20 w-20 md:h-24 md:w-24 text-primary animate-pulse drop-shadow-[0_0_12px_hsl(var(--primary))]" />
             </div>
           )}
         </div>

@@ -65,11 +65,12 @@ export const HabitCard = memo(({
 
   return (
     <Card 
-      className="p-5 md:p-6 bg-gradient-to-br from-card to-secondary border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-glow relative overflow-hidden group animate-scale-in"
+      className="p-5 md:p-6 bg-gradient-to-br from-card via-card to-secondary/80 border-primary/30 hover:border-primary/60 transition-all duration-500 hover:shadow-glow-lg relative overflow-hidden group animate-scale-in"
       role="article"
       aria-label={`Habit: ${title}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-accent/5 to-primary/10 opacity-0 group-hover:opacity-100 transition-all duration-500" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.1),transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
       <div className="space-y-4 relative z-10">
         <div className="flex items-start justify-between gap-4">
