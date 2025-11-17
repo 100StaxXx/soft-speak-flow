@@ -55,12 +55,12 @@ const Index = () => {
     checkHabits();
   }, [user]);
 
-  // Optimized redirect check - removed timeout that was causing delays
+  // Only redirect to onboarding if user has no mentor selected
   useEffect(() => {
-    if (user && profile?.selected_mentor_id && !companion && !companionLoading) {
+    if (user && profile && !profile.selected_mentor_id && !companionLoading) {
       navigate("/onboarding");
     }
-  }, [user, profile, companion, companionLoading, navigate]);
+  }, [user, profile, companionLoading, navigate]);
 
   if (showIntro) {
     return <IntroScreen onComplete={() => setShowIntro(false)} />;
