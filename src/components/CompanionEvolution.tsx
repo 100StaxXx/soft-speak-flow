@@ -5,6 +5,7 @@ import { haptics } from "@/utils/haptics";
 import { Sparkles, Zap, Volume2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { playEvolutionStart, playEvolutionSuccess, playSparkle } from "@/utils/soundEffects";
+import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -30,6 +31,9 @@ export const CompanionEvolution = ({
 
   useEffect(() => {
     if (!isEvolving) return;
+
+    // Pause ambient music for evolution
+    pauseAmbientForEvent();
 
     // Play evolution start sound
     playEvolutionStart();
@@ -146,6 +150,8 @@ export const CompanionEvolution = ({
           audioRef.current.pause();
           audioRef.current = null;
         }
+        // Resume ambient music after evolution
+        resumeAmbientAfterEvent();
         onComplete();
       }, 5500),
     ];
@@ -156,6 +162,8 @@ export const CompanionEvolution = ({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      // Make sure to resume ambient if component unmounts
+      resumeAmbientAfterEvent();
     };
   }, [isEvolving, isLoadingVoice, onComplete]);
 
