@@ -99,7 +99,6 @@ const Index = () => {
             </div>
 
             {/* Priority Content */}
-            <CompanionDisplay />
             <MentorNudges />
             <MorningCheckIn />
             <TodaysPepTalk />
