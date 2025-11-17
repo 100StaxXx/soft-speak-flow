@@ -62,26 +62,52 @@ serve(async (req) => {
     // Build the prompt
     let prompt = "";
     
-    // Sanitize spirit animal input
-    const safeAnimals = ['dragon', 'phoenix', 'wolf', 'tiger', 'eagle', 'serpent', 'bear', 'fox', 'lion', 'owl', 'raven', 'deer'];
+    // Sanitize spirit animal input - allow all animals from the companion personalization
+    const validAnimals = [
+      'dragon', 'phoenix', 'griffin', 'unicorn', 'pegasus',
+      'wolf', 'tiger', 'lion', 'bear', 'eagle',
+      'fox', 'owl', 'raven', 'hawk', 'falcon',
+      'serpent', 'cobra', 'python', 'viper', 'basilisk',
+      'deer', 'stag', 'elk', 'moose', 'reindeer',
+      'panther', 'jaguar', 'leopard', 'cheetah', 'lynx',
+      'mammoth', 'elephant', 'rhino', 'bison', 'buffalo',
+      'kraken', 'leviathan', 'hydra', 'chimera', 'cerberus',
+      'sphinx', 'minotaur', 'centaur', 'thunderbird', 'roc',
+      'kitsune', 'tanuki', 'qilin', 'kirin', 'baku',
+      'fenrir', 'sleipnir', 'jormungandr', 'nidhogg', 'fafnir',
+      'manticore', 'wyvern', 'drake', 'wyrm', 'lindworm',
+      'gryphon', 'hippogriff', 'alicorn', 'kelpie', 'selkie',
+      'thundercat', 'storm wolf', 'ember fox', 'frost bear', 'shadow panther',
+      'celestial whale', 'cosmic turtle', 'nebula stag', 'aurora owl', 'starlight butterfly'
+    ];
+    
     let sanitizedAnimal = spiritAnimal.toLowerCase().trim();
-    if (!sanitizedAnimal || sanitizedAnimal.length > 30 || !safeAnimals.some(safe => sanitizedAnimal.includes(safe))) {
+    
+    // Check if the provided animal matches any valid animal (allows partial matches for multi-word animals)
+    const isValid = validAnimals.some(valid => 
+      sanitizedAnimal.includes(valid) || valid.includes(sanitizedAnimal)
+    );
+    
+    if (!isValid || sanitizedAnimal.length > 50) {
       sanitizedAnimal = 'dragon'; // Default to dragon for invalid inputs
     }
     
     if (stage === 0) {
-      // Initial generation
+      // Initial generation - egg stage
       prompt = `Create a mystical glowing egg companion creature in a fantasy art style.
 
+This egg will hatch into a ${sanitizedAnimal} companion.
+
 User's personal choices:
-- Primary color scheme: ${favoriteColor} (use this as the dominant color)
-- Spirit animal essence: ${sanitizedAnimal} (subtle hints of this animal's features)
+- Primary color scheme: ${favoriteColor} (use this as the dominant color throughout)
+- Spirit animal: ${sanitizedAnimal} (subtle hints of this creature visible through the egg)
 - Elemental affinity: ${coreElement} (add ${coreElement} energy patterns)
 
 ${STAGE_DESCRIPTORS[0]}
 
 The egg should be small, cute, and magical. Incorporate ${favoriteColor} as the main color.
-Add subtle ${sanitizedAnimal} patterns or silhouettes visible through the translucent shell.
+Add subtle ${sanitizedAnimal} silhouettes, patterns, or symbols visible through the translucent shell.
+The egg should give hints that a ${sanitizedAnimal} will emerge from it.
 ${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
 
 IMPORTANT GUIDELINES:
@@ -95,16 +121,21 @@ Mood: Warm, hopeful, potential, beginning of a journey.
 Background: Simple dark gradient to make the egg glow stand out.`;
     } else {
       // Evolution generation
+      // Evolution - emphasize the animal form
       prompt = `Transform and evolve this companion creature to Stage ${stage}.
 
-MAINTAIN THESE CORE TRAITS:
-- ${favoriteColor} as the primary color scheme
-- ${sanitizedAnimal} features (make them MORE prominent at this stage)
-- ${coreElement} elemental energy effects
+CRITICAL: This is a ${sanitizedAnimal} companion. It MUST clearly look like a ${sanitizedAnimal} at this stage.
+
+MAINTAIN AND ENHANCE THESE CORE TRAITS:
+- Primary color scheme: ${favoriteColor} (keep this as the main color)
+- Core form: ${sanitizedAnimal} (this should be VERY clear - the creature IS a ${sanitizedAnimal})
+- Elemental energy: ${coreElement} effects and aura
 
 ${STAGE_DESCRIPTORS[stage as keyof typeof STAGE_DESCRIPTORS]}
 
-The ${sanitizedAnimal} characteristics should be clearer and more defined now.
+Make the ${sanitizedAnimal} form much more recognizable and prominent. 
+The creature should clearly be identifiable as a ${sanitizedAnimal} with ${coreElement} powers.
+Keep the ${favoriteColor} color scheme but emphasize the ${sanitizedAnimal} anatomy and features.
 ${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
 
 IMPORTANT GUIDELINES:
@@ -112,9 +143,10 @@ IMPORTANT GUIDELINES:
 - It should feel encouraging, protective, and inspiring
 - Design for a motivation/mental fitness app
 - Keep it friendly, powerful, and majestic
+- The ${sanitizedAnimal} features must be clear and recognizable
 
-Style: Epic fantasy art, more detailed and powerful than before, magical, glowing.
-Keep the same unique identity but amplify the power, size, and majesty.
+Style: Epic fantasy art, detailed ${sanitizedAnimal} features, more powerful than before, magical, glowing ${favoriteColor} tones.
+Keep the same ${sanitizedAnimal} identity but amplify the power, size, and majesty.
 Background: Dramatic and atmospheric, complementing the ${coreElement} element.`;
     }
 
