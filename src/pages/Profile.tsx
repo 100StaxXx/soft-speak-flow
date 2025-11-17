@@ -287,6 +287,8 @@ const Profile = () => {
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-6">
+              <SoundSettings />
+              
               <Card>
                 <CardHeader>
                   <CardTitle>App Preferences</CardTitle>
