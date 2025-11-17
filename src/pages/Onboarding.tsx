@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
 import { MentorResult } from "@/components/MentorResult";
 import { MentorGrid } from "@/components/MentorGrid";
@@ -46,6 +47,7 @@ export default function Onboarding() {
   const { createCompanion } = useCompanion();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Scroll to top when stage changes
   useEffect(() => {
@@ -132,12 +134,14 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           selected_mentor_id: recommendedMentor.id,
-          // DON'T mark onboarding as complete yet - need to create companion first
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Invalidate profile cache
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
 
       toast({
         title: "Mentor Selected!",
@@ -183,8 +187,14 @@ export default function Onboarding() {
         .update({ onboarding_completed: true })
         .eq('id', user!.id);
       
+      // CRITICAL: Invalidate profile cache to force refetch with new data
+      await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });
+      
       // Set flag in localStorage for immediate check
       localStorage.setItem('onboardingComplete', 'true');
+      
+      // Small delay to ensure cache is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Navigate directly to home
       navigate("/", { replace: true });
@@ -209,18 +219,19 @@ export default function Onboarding() {
       setSelecting(true);
       
       const chosenMentor = mentors.find(m => m.id === mentorId);
-      // Selecting mentor
 
       const { error } = await supabase
         .from('profiles')
         .update({
           selected_mentor_id: mentorId,
-          // DON'T mark onboarding as complete yet - need to create companion first
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Invalidate profile cache
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
 
       toast({
         title: "Mentor Selected!",
