@@ -129,8 +129,8 @@ class AmbientMusicManager {
           this.isPlaying = true;
           this.fadeIn();
         })
-        .catch(err => {
-          console.log('Ambient music autoplay prevented:', err);
+        .catch(() => {
+          // Autoplay prevented - this is expected on some browsers
         });
     }
   }

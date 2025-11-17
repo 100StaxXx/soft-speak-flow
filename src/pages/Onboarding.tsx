@@ -176,7 +176,7 @@ export default function Onboarding() {
       setSelecting(true);
       
       const chosenMentor = mentors.find(m => m.id === mentorId);
-      console.log('Selecting mentor:', chosenMentor?.name, 'ID:', mentorId);
+      // Selecting mentor
 
       const { error } = await supabase
         .from('profiles')
