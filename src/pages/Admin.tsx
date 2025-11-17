@@ -13,14 +13,18 @@ import { Trash2, Edit, Plus, Upload, X, Loader2, Music } from "lucide-react";
 import { AudioGenerator } from "@/components/AudioGenerator";
 
 interface PepTalk {
-  id: string;
+  id?: string;
   title: string;
   category: string;
   quote: string;
   description: string;
   audio_url: string;
   is_featured: boolean;
-  created_at: string;
+  created_at?: string;
+  mentor_id?: string;
+  tags?: string[];
+  is_premium?: boolean;
+  audioFile?: File;
 }
 
 const Admin = () => {
@@ -31,7 +35,7 @@ const Admin = () => {
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<PepTalk | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);

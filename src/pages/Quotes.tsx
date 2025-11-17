@@ -18,7 +18,7 @@ const Quotes = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [quoteData, setQuoteData] = useState<any>(null);
+  const [quoteData, setQuoteData] = useState<{ text: string; author: string | null; category: string | null; imageUrl?: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [refetchCounter, setRefetchCounter] = useState(0);
 

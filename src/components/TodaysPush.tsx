@@ -6,10 +6,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Bell, Play, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+interface DailyPepTalk {
+  id: string;
+  title: string;
+  summary: string;
+  for_date: string;
+  mentor_name?: string;
+  topic_category?: string;
+  intensity?: string;
+}
+
 export const TodaysPush = () => {
   const { profile } = useProfile();
   const navigate = useNavigate();
-  const [todaysPepTalk, setTodaysPepTalk] = useState<any>(null);
+  const [todaysPepTalk, setTodaysPepTalk] = useState<DailyPepTalk | null>(null);
 
   useEffect(() => {
     const fetchTodaysPepTalk = async () => {

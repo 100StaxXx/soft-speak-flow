@@ -34,7 +34,7 @@ const Inspire = () => {
   const [showQuote, setShowQuote] = useState(false);
   const [showAuthor, setShowAuthor] = useState(false);
   const [showBack, setShowBack] = useState(false);
-  const [quoteData, setQuoteData] = useState<any>(null);
+  const [quoteData, setQuoteData] = useState<{ text: string; author: string | null; category: string | null; intensity?: string; imageUrl?: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [refetchCounter, setRefetchCounter] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
