@@ -171,11 +171,11 @@ export default function Tasks() {
 
         <Tabs defaultValue="tasks" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="tasks" className="gap-2">
+            <TabsTrigger value="tasks" className="gap-2" data-tour="tasks-tab">
               <Calendar className="h-4 w-4" />
               Daily Tasks
             </TabsTrigger>
-            <TabsTrigger value="habits" className="gap-2">
+            <TabsTrigger value="habits" className="gap-2" data-tour="habits-tab">
               <CheckCircle2 className="h-4 w-4" />
               Habits
             </TabsTrigger>
@@ -197,6 +197,7 @@ export default function Tasks() {
                 <Card className="p-4 space-y-4">
                   <div className="space-y-3">
                     <Input
+                      data-tour="add-task-input"
                       placeholder="Add a task..."
                       value={newTaskText}
                       onChange={(e) => setNewTaskText(e.target.value)}
@@ -204,7 +205,7 @@ export default function Tasks() {
                       disabled={isAdding}
                     />
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" data-tour="task-difficulty">
                       <Button
                         variant={taskDifficulty === 'easy' ? 'default' : 'outline'}
                         size="sm"
@@ -257,9 +258,10 @@ export default function Tasks() {
                     description="Add up to 3 tasks to focus on today"
                   />
                 ) : (
-                  tasks.map((task) => (
+                  tasks.map((task, index) => (
                     <Card 
                       key={task.id}
+                      data-tour={index === 0 ? "first-task" : undefined}
                       className={cn(
                         "p-4 flex items-center gap-3 transition-all cursor-pointer hover:bg-accent/50",
                         task.completed && "opacity-60"
