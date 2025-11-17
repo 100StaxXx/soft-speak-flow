@@ -50,21 +50,6 @@ export const ActivityTimeline = () => {
   // Add welcome message for new users
   useWelcomeMessage();
 
-  if (isLoading) {
-    return (
-      <Card className="p-6">
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="animate-pulse">
-              <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-              <div className="h-3 bg-muted rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-      </Card>
-    );
-  }
-
   const handleReply = async (activityId: string) => {
     if (!replyText.trim() || !user) return;
     
@@ -141,16 +126,6 @@ export const ActivityTimeline = () => {
     touchStart.current = null;
   }, [swipedItems, queryClient]);
 
-  if (!activities.length) {
-    return (
-      <Card className="p-6 text-center">
-        <p className="text-muted-foreground">
-          {personality?.emptyState("Your journey") || "Your journey starts now. Take your first step."}
-        </p>
-      </Card>
-    );
-  }
-
   const handlePlayVoice = (url: string, activityId: string) => {
     if (playingAudio === activityId) {
       setPlayingAudio(null);
@@ -163,6 +138,16 @@ export const ActivityTimeline = () => {
     audio.onended = () => setPlayingAudio(null);
     markAsRead(activityId);
   };
+
+  if (!activities.length) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-muted-foreground">
+          {personality?.emptyState("Your journey") || "Your journey starts now. Take your first step."}
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-3">
