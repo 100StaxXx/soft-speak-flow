@@ -1,11 +1,12 @@
 // Ambient music system with persistence
 class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
-  private volume = 0.3;
+  private volume = 0.15; // Reduced default volume to be subtle
   private isMuted = false;
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
   private currentTrack = 'ambient';
+  private isPausedForEvent = false; // Track if paused for major events
 
   // Ambient music URLs - these would be your actual music files
   private tracks = {
@@ -145,11 +146,39 @@ class AmbientMusicManager {
     });
   }
 
+  // Pause for major events (evolution, etc.)
+  pauseForEvent() {
+    if (!this.audio || !this.isPlaying) return;
+    
+    this.isPausedForEvent = true;
+    this.fadeOut(() => {
+      if (this.audio) {
+        this.audio.pause();
+      }
+    }, 500); // Faster fade for events
+  }
+
+  // Resume after major event
+  resumeAfterEvent() {
+    if (!this.audio || !this.isPausedForEvent) return;
+    
+    this.isPausedForEvent = false;
+    if (!this.isMuted) {
+      this.audio.play()
+        .then(() => {
+          this.isPlaying = true;
+          this.fadeIn(1500); // Gentle fade back in
+        })
+        .catch(err => console.error('Resume failed:', err));
+    }
+  }
+
   stop() {
     if (!this.audio) return;
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
+    this.isPausedForEvent = false;
   }
 
   private fadeIn(duration = 2000) {
@@ -233,6 +262,8 @@ export const ambientMusic = new AmbientMusicManager();
 // Convenience exports
 export const playAmbient = () => ambientMusic.play();
 export const pauseAmbient = () => ambientMusic.pause();
+export const pauseAmbientForEvent = () => ambientMusic.pauseForEvent();
+export const resumeAmbientAfterEvent = () => ambientMusic.resumeAfterEvent();
 export const toggleAmbientMute = () => ambientMusic.toggleMute();
 export const setAmbientVolume = (volume: number) => ambientMusic.setVolume(volume);
 export const changeAmbientTrack = (track: 'ambient' | 'meditation' | 'focus' | 'energy') => 
