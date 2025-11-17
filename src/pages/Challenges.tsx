@@ -141,7 +141,15 @@ export default function Challenges() {
 
           {/* Active Challenges */}
           <TabsContent value="active" className="space-y-6">
-            {userChallenges && userChallenges.length > 0 ? (
+            {!userChallenges || userChallenges.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                title="No active challenges"
+                description="Push yourself to grow with structured challenges. Browse available challenges and start your journey today."
+                actionLabel="Browse Challenges"
+                onAction={() => setActiveTab("available")}
+              />
+            ) : (
               userChallenges.map((userChallenge) => {
                 const challenge = userChallenge.challenges;
                 if (!challenge) return null;
@@ -187,14 +195,6 @@ export default function Challenges() {
                   </Card>
                 );
               })
-            ) : (
-              <EmptyState
-                icon={Dumbbell}
-                title="No Active Challenges"
-                description="Ready to level up? Start a challenge from the Available tab and begin your transformation journey today!"
-                actionLabel="Browse Challenges"
-                onAction={() => setActiveTab("available")}
-              />
             )}
           </TabsContent>
 

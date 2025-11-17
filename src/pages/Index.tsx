@@ -15,7 +15,7 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { MentorNudges } from "@/components/MentorNudges";
 import { WeeklyInsights } from "@/components/WeeklyInsights";
 import { Card } from "@/components/ui/card";
-import { MessageCircle, Target, Calendar } from "lucide-react";
+import { MessageSquare, CheckCircle } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition, SlideUp } from "@/components/PageTransition";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -78,8 +78,7 @@ const Index = () => {
   }
 
   return (
-    <PageTransition>
-      <OnboardingTour />
+    <>
       <OnboardingFlow 
         open={showOnboarding} 
         onComplete={() => {
@@ -87,97 +86,74 @@ const Index = () => {
           localStorage.setItem('onboardingFlowCompleted', 'true');
         }} 
       />
-      <div className="min-h-screen bg-background pb-20">
-          {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Home
-            </h1>
-            <p className="text-sm text-muted-foreground">Your daily motivation hub</p>
-          </div>
-        </div>
+      <PageTransition>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
+          <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+            {/* Header */}
+            <div className="mb-6">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
+                Home
+              </h1>
+              <p className="text-muted-foreground">Your personal growth journey starts here</p>
+            </div>
 
-        {/* Main Content */}
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-          {/* Proactive Nudges */}
-          <MentorNudges />
-
-          {/* Morning Check-in */}
-          <SlideUp delay={0.1}>
+            {/* Priority Content */}
+            <MentorNudges />
             <MorningCheckIn />
-          </SlideUp>
+            <TodaysPepTalk />
 
-          {/* Today's Pep Talk */}
-          <SlideUp delay={0.2}>
-            <div data-tour="daily-content">
-              <TodaysPepTalk />
-            </div>
-          </SlideUp>
-
-          {/* Quote of the Day */}
-          <SlideUp delay={0.3}>
-            <QuoteOfTheDay />
-          </SlideUp>
-
-          {/* Weekly Insights */}
-          <WeeklyInsights />
-
-          {/* Mentor Quick Chat */}
-          <SlideUp delay={0.4}>
-            <MentorQuickChat />
-          </SlideUp>
-
-          {/* Activity Timeline */}
-          <SlideUp delay={0.5}>
-            <div data-tour="activity-feed">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="h-5 w-5 text-primary" />
-                <h2 className="font-bold text-lg">Your Journey</h2>
+            {/* Secondary Content - Collapsible */}
+            <details className="group" open>
+              <summary className="cursor-pointer list-none">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <span className="font-medium text-sm">More insights</span>
+                  <svg className="h-5 w-5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </summary>
+              <div className="mt-4 space-y-6">
+                <QuoteOfTheDay />
+                <WeeklyInsights />
+                <ActivityTimeline />
               </div>
-              <ActivityTimeline />
-            </div>
-          </SlideUp>
+            </details>
 
-          {/* Quick Actions */}
-          <SlideUp delay={0.6}>
+            {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-4">
-              <Card 
-                className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
-                onClick={() => navigate("/habits")}
-              >
-                <div className="flex flex-col items-center text-center space-y-3">
-                  <Target className="h-8 w-8 text-primary" />
+              <Card className="p-6 hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate('/habits')}>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <CheckCircle className="h-6 w-6 text-primary" />
+                  </div>
                   <div>
-                    <h3 className="font-bold">Habits</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {hasActiveHabits ? "Track your progress" : "Start building"}
+                    <h3 className="font-semibold">Habits</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {hasActiveHabits ? 'Track progress' : 'Get started'}
                     </p>
                   </div>
                 </div>
               </Card>
 
-              <Card 
-                className="p-6 cursor-pointer hover:shadow-glow transition-all hover:scale-105"
-                onClick={() => navigate("/mentor-chat")}
-              >
-                <div className="flex flex-col items-center text-center space-y-3">
-                  <MessageCircle className="h-8 w-8 text-primary" />
+              <Card className="p-6 hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate('/mentor-chat')}>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <MessageSquare className="h-6 w-6 text-primary" />
+                  </div>
                   <div>
-                    <h3 className="font-bold">Chat</h3>
-                    <p className="text-xs text-muted-foreground">Talk to your mentor</p>
+                    <h3 className="font-semibold">Chat</h3>
+                    <p className="text-sm text-muted-foreground">Ask anything</p>
                   </div>
                 </div>
               </Card>
+
+              <MentorQuickChat />
             </div>
-          </SlideUp>
-
+          </div>
         </div>
-
-        {/* Bottom Navigation */}
-        <BottomNav />
-      </div>
-    </PageTransition>
+      </PageTransition>
+      <BottomNav />
+    </>
   );
 };
 

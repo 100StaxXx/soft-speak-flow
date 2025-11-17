@@ -1,5 +1,6 @@
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { SkeletonTimeline } from "@/components/SkeletonCard";
+import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply, Trash2 } from "lucide-react";
