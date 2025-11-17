@@ -121,7 +121,7 @@ export const CompanionDisplay = () => {
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                {Math.random() > 0.5 
+                {companion.current_xp % 2 === 0
                   ? "Do your habits to feed your companion."
                   : "Complete a challenge to accelerate evolution."}
               </p>
