@@ -13,181 +13,11 @@ import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, History, Target } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Trophy, History, TrendingUp } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 
 const Companion = () => {
-  const navigate = useNavigate();
   const { companion, nextEvolutionXP, progressToNext } = useCompanion();
-
-  const { data: habits = [] } = useQuery({
-    queryKey: ['habits', user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', user!.id)
-        .eq('is_active', true);
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const { data: completions = [] } = useQuery({
-    queryKey: ['habit-completions', user?.id],
-    queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .eq('user_id', user!.id)
-        .eq('date', today);
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const completeHabitMutation = useMutation({
-    mutationFn: async (habitId: string) => {
-      const habit = habits.find(h => h.id === habitId);
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { error } = await supabase.from('habit_completions').insert({
-        habit_id: habitId,
-        user_id: user!.id,
-        date: today,
-      });
-      
-      if (error) throw error;
-      
-      const difficultyXP = { easy: 5, medium: 10, hard: 20 };
-      const xpAmount = difficultyXP[habit?.difficulty || 'medium'];
-      await awardCustomXP(xpAmount, 'habit_complete');
-      
-      if (habit) {
-        logActivity({
-          type: 'habit_complete',
-          data: { habit: habit.title, xp: xpAmount }
-        });
-      }
-
-      return { habit, xpAmount };
-    },
-    onSuccess: ({ habit, xpAmount }) => {
-      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-      
-      playHabitComplete();
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 }
-      });
-      
-      toast({
-        title: "Habit Completed! 🎉",
-        description: `+${xpAmount} XP earned`,
-      });
-
-      const totalCompleted = completions.length + 1;
-      if (totalCompleted === habits.length) {
-        awardAllHabitsComplete();
-      }
-
-      // Dispatch event for walkthrough
-      window.dispatchEvent(new CustomEvent('habit-completed'));
-    },
-  });
-
-  const uncompleteHabitMutation = useMutation({
-    mutationFn: async (habitId: string) => {
-      const today = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('habit_completions')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('user_id', user!.id)
-        .eq('date', today);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-    },
-  });
-
-  const handleToggleHabit = async (habitId: string) => {
-    const isCompleted = completions.some((c) => c.habit_id === habitId);
-    
-    if (isCompleted) {
-      uncompleteHabitMutation.mutate(habitId);
-    } else {
-      completeHabitMutation.mutate(habitId);
-    }
-  };
-
-  const addHabitMutation = useMutation({
-    mutationFn: async (data: {
-      title: string;
-      difficulty: string;
-      frequency: string;
-      customDays?: number[];
-    }) => {
-      const { error } = await supabase.from('habits').insert({
-        user_id: user!.id,
-        title: data.title,
-        difficulty: data.difficulty,
-        frequency: data.frequency,
-        custom_days: data.customDays,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      setShowAddForm(false);
-      setNewHabitTitle("");
-      toast({
-        title: "Habit Added!",
-        description: "Complete it daily to earn XP",
-      });
-
-      // Dispatch event for walkthrough
-      window.dispatchEvent(new CustomEvent('habit-created'));
-    },
-  });
-
-  const handleTemplateSelect = (title: string) => {
-    setNewHabitTitle(title);
-    setShowAddForm(true);
-  };
-
-  const handleCustomHabit = () => {
-    setShowAddForm(true);
-  };
-
-  const handleAddHabit = () => {
-    if (!newHabitTitle.trim()) return;
-
-    const frequency = selectedDays.length === 7 
-      ? 'daily' 
-      : selectedDays.length === 0 
-      ? 'custom' 
-      : 'custom';
-
-    addHabitMutation.mutate({
-      title: newHabitTitle,
-      difficulty: habitDifficulty,
-      frequency,
-      customDays: frequency === 'custom' ? selectedDays : undefined,
-    });
-  };
-
-  const handleCancel = () => {
-    setShowAddForm(false);
-    setNewHabitTitle("");
-    setHabitDifficulty("medium");
-    setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
-  };
 
   if (!companion) {
     return <CompanionOnboarding />;
@@ -220,14 +50,10 @@ const Companion = () => {
             )}
           </div>
 
-          <Tabs defaultValue="habits" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto">
-              <TabsTrigger value="habits" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="habits-tab">
-                <Target className="h-4 w-4" />
-                <span className="hidden sm:inline">Habits</span>
-              </TabsTrigger>
+          <Tabs defaultValue="progress" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-auto">
               <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="progress-tab">
-                <Sparkles className="h-4 w-4" />
+                <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
               <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="achievements-tab">
@@ -240,108 +66,8 @@ const Companion = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="habits" className="space-y-4 mt-6">
-              {habits.length === 0 && !showAddForm ? (
-                <Card className="p-8 text-center bg-gradient-to-br from-primary/5 to-accent/5 border-dashed border-2">
-                  <Target className="h-16 w-16 mx-auto text-primary/50 mb-4" />
-                  <h3 className="text-xl font-heading font-bold text-foreground mb-2">
-                    Build Better Habits
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                    Every habit you complete earns XP and helps your companion evolve.
-                  </p>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {habits.map((habit) => (
-                    <HabitCard
-                      key={habit.id}
-                      id={habit.id}
-                      title={habit.title}
-                      currentStreak={habit.current_streak || 0}
-                      longestStreak={habit.longest_streak || 0}
-                      completedToday={completions.some((c) => c.habit_id === habit.id)}
-                      difficulty={habit.difficulty || "medium"}
-                      onComplete={() => handleToggleHabit(habit.id)}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {habits.length < 5 && !showAddForm && showTemplates && (
-                <div data-tour="habit-templates">
-                  <HabitTemplates 
-                    onSelect={handleTemplateSelect}
-                    onCustom={handleCustomHabit}
-                    existingHabits={habits}
-                  />
-                </div>
-              )}
-
-              {!showTemplates && habits.length < 5 && !showAddForm && (
-                <Button 
-                  data-tour="create-habit-button"
-                  onClick={() => setShowTemplates(true)}
-                  variant="outline" 
-                  className="w-full border-dashed border-2"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Habit ({habits.length}/5)
-                </Button>
-              )}
-
-              {showAddForm && (
-                <Card data-tour="habit-form" className="p-6 space-y-4 border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-heading font-bold text-foreground">
-                      {newHabitTitle || "New Habit"}
-                    </h3>
-                    <Button variant="ghost" size="icon" onClick={handleCancel}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Habit Name</label>
-                    <Input
-                      value={newHabitTitle}
-                      onChange={(e) => setNewHabitTitle(e.target.value)}
-                      placeholder="e.g., Morning meditation"
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-2" data-tour="habit-difficulty">
-                    <label className="text-sm font-medium text-foreground">Difficulty</label>
-                    <HabitDifficultySelector
-                      value={habitDifficulty}
-                      onChange={setHabitDifficulty}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Frequency</label>
-                    <FrequencyPicker
-                      selectedDays={selectedDays}
-                      onDaysChange={setSelectedDays}
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button onClick={handleAddHabit} className="flex-1">
-                      Add Habit
-                    </Button>
-                    <Button onClick={handleCancel} variant="outline">
-                      Cancel
-                    </Button>
-                  </div>
-                </Card>
-              )}
-
-              <HabitCalendar />
-            </TabsContent>
-
             <TabsContent value="progress" className="space-y-6 mt-6">
+              <HabitCalendar />
               <NextEvolutionPreview 
                 currentStage={companion?.current_stage || 0}
                 currentXP={companion?.current_xp || 0}
