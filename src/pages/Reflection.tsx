@@ -23,7 +23,7 @@ export default function Reflection() {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [todayReflection, setTodayReflection] = useState<any>(null);
+  const [todayReflection, setTodayReflection] = useState<{ mood: string; note: string | null; ai_reply: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMoodSelection, setCurrentMoodSelection] = useState<string | null>(null);
 

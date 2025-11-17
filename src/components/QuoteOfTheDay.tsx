@@ -6,10 +6,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Quote, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
+interface Quote {
+  id: string;
+  text: string;
+  author: string | null;
+  category: string | null;
+}
+
 export const QuoteOfTheDay = () => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
-  const [todaysQuote, setTodaysQuote] = useState<any>(null);
+  const [todaysQuote, setTodaysQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

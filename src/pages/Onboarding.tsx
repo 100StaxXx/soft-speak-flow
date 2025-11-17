@@ -11,11 +11,35 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 
+interface Mentor {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  avatar_url: string | null;
+  short_title: string;
+  primary_color: string;
+  archetype: string;
+  tone_description: string;
+  style_description: string;
+  tags: string[];
+  target_user: string;
+  signature_line: string;
+  themes: string[];
+}
+
+interface MentorExplanation {
+  title: string;
+  subtitle: string;
+  paragraph: string;
+  bullets: string[];
+}
+
 export default function Onboarding() {
   const [stage, setStage] = useState<'questionnaire' | 'result' | 'browse' | 'companion'>('questionnaire');
-  const [mentors, setMentors] = useState<any[]>([]);
-  const [recommendedMentor, setRecommendedMentor] = useState<any>(null);
-  const [explanation, setExplanation] = useState<any>(null);
+  const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
+  const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
   const { user } = useAuth();
