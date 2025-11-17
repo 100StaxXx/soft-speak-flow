@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 
@@ -70,6 +71,7 @@ const AppContent = () => {
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
       <Suspense fallback={<LoadingFallback />}>
+        <GlobalEvolutionListener />
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
