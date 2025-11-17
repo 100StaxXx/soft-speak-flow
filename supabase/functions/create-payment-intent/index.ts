@@ -1,11 +1,27 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Define server-side prices to prevent manipulation
+const PRICES = {
+  'premium_monthly': 999,    // $9.99
+  'premium_yearly': 9999,    // $99.99
+  'credits_10': 1000,        // $10.00
+  'credits_25': 2500,        // $25.00
+  'credits_50': 5000,        // $50.00
+} as const;
+
+type PriceId = keyof typeof PRICES;
+
+const PaymentSchema = z.object({
+  priceId: z.enum(['premium_monthly', 'premium_yearly', 'credits_10', 'credits_25', 'credits_50'])
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -19,16 +35,44 @@ serve(async (req) => {
     );
 
     // Get authenticated user
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
 
     if (!user?.email) {
-      throw new Error("User not authenticated");
+      return new Response(
+        JSON.stringify({ error: "User not authenticated" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const { amount, currency = "usd" } = await req.json();
+    // Validate input
+    const body = await req.json();
+    const validation = PaymentSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid price ID", 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { priceId } = validation.data;
+    
+    // Server determines the actual amount - client cannot manipulate this
+    const amount = PRICES[priceId];
+    const currency = "usd";
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -55,7 +99,7 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Create payment intent
+    // Create payment intent with server-controlled amount
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
@@ -64,10 +108,11 @@ serve(async (req) => {
       metadata: {
         user_id: user.id,
         user_email: user.email,
+        price_id: priceId,
       },
     });
 
-    console.log("Payment intent created:", paymentIntent.id);
+    console.log("Payment intent created:", paymentIntent.id, "for", priceId);
 
     return new Response(
       JSON.stringify({ 
