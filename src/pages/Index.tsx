@@ -86,7 +86,7 @@ const Index = () => {
 
   return (
     <>
-      <Suspense fallback={null}>
+      <Suspense fallback={<ComponentLoader />}>
         <OnboardingFlow 
           open={showOnboarding} 
           onComplete={() => {

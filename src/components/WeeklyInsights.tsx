@@ -49,7 +49,7 @@ export const WeeklyInsights = () => {
         .gte('created_at', start)
         .lte('created_at', end);
       
-      // Get quests (daily_tasks) this week
+      // Get quests (daily_tasks) this week - removed duplicate query
       const { data: quests } = await supabase
         .from('daily_tasks')
         .select('*')
