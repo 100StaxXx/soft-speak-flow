@@ -74,8 +74,12 @@ const Companion = () => {
                 nextEvolutionXP={companion ? nextEvolutionXP : 0}
                 progressPercent={companion ? progressToNext : 0}
               />
-              <XPBreakdown />
-              <DailyMissions />
+              <div data-tour="xp-breakdown">
+                <XPBreakdown />
+              </div>
+              <div data-tour="daily-missions">
+                <DailyMissions />
+              </div>
               <WeeklyInsights />
             </TabsContent>
 
