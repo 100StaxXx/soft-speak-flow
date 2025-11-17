@@ -24,6 +24,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import confetti from "canvas-confetti";
+import { useXPRewards } from "@/hooks/useXPRewards";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
 
 const Companion = () => {
   const navigate = useNavigate();
@@ -31,6 +34,8 @@ const Companion = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
+  const { logActivity } = useActivityFeed();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
@@ -64,6 +69,91 @@ const Companion = () => {
     enabled: !!user,
   });
 
+  const completeHabitMutation = useMutation({
+    mutationFn: async (habitId: string) => {
+      const habit = habits.find(h => h.id === habitId);
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { error } = await supabase.from('habit_completions').insert({
+        habit_id: habitId,
+        user_id: user!.id,
+        date: today,
+      });
+      
+      if (error) throw error;
+      
+      // Award XP based on difficulty
+      const difficultyXP = { easy: 5, medium: 10, hard: 20 };
+      const xpAmount = difficultyXP[habit?.difficulty || 'medium'];
+      await awardCustomXP(xpAmount, 'habit_complete');
+      
+      // Log activity
+      if (habit) {
+        logActivity({
+          type: 'habit_completed',
+          data: { habit_id: habitId, habit_title: habit.title }
+        });
+      }
+      
+      return { habitId, habit };
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
+      await queryClient.invalidateQueries({ queryKey: ['habits'] });
+      
+      // Check if all habits complete
+      const allComplete = habits.every(h => 
+        completions.some(c => c.habit_id === h.id) || h.id === data.habitId
+      );
+      
+      if (allComplete && habits.length > 0) {
+        awardAllHabitsComplete();
+        confetti({
+          particleCount: 200,
+          spread: 120,
+          origin: { y: 0.6 },
+        });
+        toast({
+          title: "🎉 All Habits Complete!",
+          description: "Bonus XP! Your companion grows stronger!",
+        });
+      } else {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+        });
+      }
+    },
+  });
+
+  const uncompleteHabitMutation = useMutation({
+    mutationFn: async (habitId: string) => {
+      const today = new Date().toISOString().split('T')[0];
+      const { error } = await supabase
+        .from('habit_completions')
+        .delete()
+        .eq('habit_id', habitId)
+        .eq('user_id', user!.id)
+        .eq('date', today);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
+  const handleToggleHabit = async (habitId: string) => {
+    const isCompleted = completions.some(c => c.habit_id === habitId);
+    if (isCompleted) {
+      uncompleteHabitMutation.mutate(habitId);
+    } else {
+      completeHabitMutation.mutate(habitId);
+    }
+  };
+
   const addHabitMutation = useMutation({
     mutationFn: async () => {
       if (habits.length >= 5) {
@@ -87,6 +177,10 @@ const Companion = () => {
       setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
       setShowTemplates(true);
+      toast({
+        title: "Habit created!",
+        description: "Start completing it to earn XP and grow your companion.",
+      });
     },
     onError: (error: any) => {
       toast({ title: 'Could not create habit', description: error.message || 'Please try again.', variant: 'destructive' });
@@ -123,35 +217,35 @@ const Companion = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-20">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center px-4">
-            <h1 className="text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <div className="container flex h-14 md:h-16 items-center px-4">
+            <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Companion & Progress
             </h1>
           </div>
         </header>
 
-        <div className="container px-4 py-6 space-y-6 max-w-4xl mx-auto">
+        <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
           <CompanionDisplay />
 
           <Tabs defaultValue="habits" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="habits">
-                <Target className="h-4 w-4 mr-2" />
-                Habits
+            <TabsList className="grid w-full grid-cols-4 h-auto">
+              <TabsTrigger value="habits" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+                <Target className="h-4 w-4" />
+                <span className="hidden sm:inline">Habits</span>
               </TabsTrigger>
-              <TabsTrigger value="progress">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Progress
+              <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="evolution">
-                <History className="h-4 w-4 mr-2" />
-                Evolution
+              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Evolution</span>
               </TabsTrigger>
-              <TabsTrigger value="achievements">
-                <Trophy className="h-4 w-4 mr-2" />
-                Achievements
+              <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+                <Trophy className="h-4 w-4" />
+                <span className="hidden sm:inline">Achievements</span>
               </TabsTrigger>
             </TabsList>
 
@@ -166,20 +260,47 @@ const Companion = () => {
             </TabsContent>
 
             <TabsContent value="habits" className="space-y-4 mt-6">
-              <div className="space-y-4">
-                {habits.map((habit) => (
-                  <HabitCard
-                    key={habit.id}
-                    id={habit.id}
-                    title={habit.title}
-                    currentStreak={habit.current_streak || 0}
-                    longestStreak={habit.longest_streak || 0}
-                    completedToday={completions.some((c) => c.habit_id === habit.id)}
-                    difficulty={habit.difficulty || "medium"}
-                    onComplete={() => queryClient.invalidateQueries({ queryKey: ['habit-completions'] })}
-                  />
-                ))}
-              </div>
+              {habits.length === 0 && !showAddForm ? (
+                <Card className="p-8 text-center bg-gradient-to-br from-primary/5 to-accent/5 border-dashed border-2">
+                  <Target className="h-16 w-16 mx-auto text-primary/50 mb-4" />
+                  <h3 className="text-xl font-heading font-bold text-foreground mb-2">
+                    Build Better Habits
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                    Every habit you complete earns XP and helps your companion evolve. 
+                    Start small, stay consistent, and watch your progress compound.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Earn XP</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
+                      <Target className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Track Progress</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
+                      <Trophy className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Grow Companion</span>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {habits.map((habit) => (
+                    <HabitCard
+                      key={habit.id}
+                      id={habit.id}
+                      title={habit.title}
+                      currentStreak={habit.current_streak || 0}
+                      longestStreak={habit.longest_streak || 0}
+                      completedToday={completions.some((c) => c.habit_id === habit.id)}
+                      difficulty={habit.difficulty || "medium"}
+                      onComplete={() => handleToggleHabit(habit.id)}
+                    />
+                  ))}
+                </div>
+              )}
 
               {habits.length < 5 && !showAddForm && showTemplates && (
                 <HabitTemplates 
@@ -228,14 +349,6 @@ const Companion = () => {
                     </Button>
                   </div>
                 </Card>
-              )}
-
-              {habits.length === 0 && !showAddForm && (
-                <div className="text-center py-12">
-                  <Target className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-heading font-bold text-foreground mb-2">No habits yet</h3>
-                  <p className="text-sm text-muted-foreground mb-6">Start building better habits today</p>
-                </div>
               )}
 
               <HabitCalendar />
