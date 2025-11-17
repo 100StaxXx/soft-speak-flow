@@ -1,27 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
 import { IntroScreen } from "@/components/IntroScreen";
-import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
-import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
-import { AskMentorChat } from "@/components/AskMentorChat";
-import { MentorQuickChat } from "@/components/MentorQuickChat";
-import { TodaysPepTalk } from "@/components/TodaysPepTalk";
-import { MorningCheckIn } from "@/components/MorningCheckIn";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
-import { MentorNudges } from "@/components/MentorNudges";
-import { WeeklyInsights } from "@/components/WeeklyInsights";
-import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { Card } from "@/components/ui/card";
-import { MessageSquare, CheckCircle } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { PageTransition, SlideUp } from "@/components/PageTransition";
-import { OnboardingTour } from "@/components/OnboardingTour";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { PageTransition } from "@/components/PageTransition";
+import { LoadingQuote } from "@/components/LoadingQuote";
+
+// Lazy load heavy components
+const QuoteOfTheDay = lazy(() => import("@/components/QuoteOfTheDay").then(m => ({ default: m.QuoteOfTheDay })));
+const MentorQuickChat = lazy(() => import("@/components/MentorQuickChat").then(m => ({ default: m.MentorQuickChat })));
+const TodaysPepTalk = lazy(() => import("@/components/TodaysPepTalk").then(m => ({ default: m.TodaysPepTalk })));
+const MorningCheckIn = lazy(() => import("@/components/MorningCheckIn").then(m => ({ default: m.MorningCheckIn })));
+const MentorNudges = lazy(() => import("@/components/MentorNudges").then(m => ({ default: m.MentorNudges })));
+const OnboardingTour = lazy(() => import("@/components/OnboardingTour").then(m => ({ default: m.OnboardingTour })));
+const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
 
 const Index = () => {
   const { user } = useAuth();
@@ -57,19 +54,12 @@ const Index = () => {
     checkHabits();
   }, [user]);
 
+  // Optimized redirect check - removed timeout that was causing delays
   useEffect(() => {
-    // Only redirect to onboarding if user has mentor but no companion
-    // Don't check for companionLoading to avoid race conditions
-    if (user && profile?.selected_mentor_id && !companion) {
-      // Wait a bit to see if companion loads
-      const timer = setTimeout(() => {
-        if (!companion) {
-          navigate("/onboarding");
-        }
-      }, 500);
-      return () => clearTimeout(timer);
+    if (user && profile?.selected_mentor_id && !companion && !companionLoading) {
+      navigate("/onboarding");
     }
-  }, [user, profile, companion, navigate]);
+  }, [user, profile, companion, companionLoading, navigate]);
 
   if (showIntro) {
     return <IntroScreen onComplete={() => setShowIntro(false)} />;
@@ -86,14 +76,23 @@ const Index = () => {
     );
   }
 
+  // Loading fallback component
+  const ComponentLoader = () => (
+    <Card className="p-4 animate-pulse">
+      <div className="h-20 bg-muted/50 rounded" />
+    </Card>
+  );
+
   return (
     <>
-      <OnboardingFlow 
-        open={showOnboarding} 
-        onComplete={() => {
-          setShowOnboarding(false);
-        }} 
-      />
+      <Suspense fallback={null}>
+        <OnboardingFlow 
+          open={showOnboarding} 
+          onComplete={() => {
+            setShowOnboarding(false);
+          }} 
+        />
+      </Suspense>
       <PageTransition>
         <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
           <div className="max-w-4xl mx-auto px-4 py-6 md:py-8 space-y-5 md:space-y-6">
@@ -105,17 +104,33 @@ const Index = () => {
               <p className="text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
             </div>
 
-            {/* Priority Content */}
-            <MentorNudges />
-            <MorningCheckIn />
-            <TodaysPepTalk />
+            {/* Priority Content - Load with Suspense for better UX */}
+            <Suspense fallback={<ComponentLoader />}>
+              <MentorNudges />
+            </Suspense>
+            
+            <Suspense fallback={<ComponentLoader />}>
+              <MorningCheckIn />
+            </Suspense>
+            
+            <Suspense fallback={<ComponentLoader />}>
+              <TodaysPepTalk />
+            </Suspense>
 
-            <QuoteOfTheDay />
-            <MentorQuickChat />
+            <Suspense fallback={<ComponentLoader />}>
+              <QuoteOfTheDay />
+            </Suspense>
+            
+            <Suspense fallback={<ComponentLoader />}>
+              <MentorQuickChat />
+            </Suspense>
           </div>
         </div>
       </PageTransition>
       <BottomNav />
+      <Suspense fallback={null}>
+        <OnboardingTour />
+      </Suspense>
     </>
   );
 };
