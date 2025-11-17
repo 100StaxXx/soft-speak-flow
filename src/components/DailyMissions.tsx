@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle, Target } from "lucide-react";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
 import { Progress } from "@/components/ui/progress";
+import { EmptyMissions } from "@/components/EmptyMissions";
+import { haptics } from "@/utils/haptics";
 
 export const DailyMissions = () => {
   const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
 
-  if (missions.length === 0) return null;
+  if (missions.length === 0) return <EmptyMissions />;
 
   const progress = (completedCount / totalCount) * 100;
 
@@ -63,8 +65,12 @@ export const DailyMissions = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => completeMission(mission.id)}
+                  onClick={() => {
+                    haptics.medium();
+                    completeMission(mission.id);
+                  }}
                   disabled={isCompleting}
+                  className="transition-transform hover:scale-105 active:scale-95"
                 >
                   Complete
                 </Button>
