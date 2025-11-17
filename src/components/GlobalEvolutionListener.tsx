@@ -30,7 +30,7 @@ export const GlobalEvolutionListener = () => {
           table: 'user_companion',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const newData = payload.new as any;
           const oldData = payload.old as any;
 
@@ -42,10 +42,22 @@ export const GlobalEvolutionListener = () => {
               imageUrl: newData.current_image_url,
             });
 
+            // Fetch the latest evolution record to ensure we have the correct image
+            const { data: evolutionRecord } = await supabase
+              .from('companion_evolutions')
+              .select('image_url')
+              .eq('companion_id', newData.id)
+              .eq('stage', newData.current_stage)
+              .order('evolved_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            const imageUrl = evolutionRecord?.image_url || newData.current_image_url || "";
+
             setPreviousStage(oldData.current_stage);
             setEvolutionData({
               stage: newData.current_stage,
-              imageUrl: newData.current_image_url || "",
+              imageUrl,
             });
             setIsEvolving(true);
 
