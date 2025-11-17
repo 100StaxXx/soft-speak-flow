@@ -174,6 +174,26 @@ export const AppWalkthrough = () => {
     checkWalkthroughStatus();
   }, [user, location.pathname]);
 
+  // Guard: Stop tutorial if user navigates to auth or unexpected route
+  useEffect(() => {
+    if (!run) return;
+
+    // Define expected routes for each step range
+    const expectedRoute = (() => {
+      if (stepIndex <= 3) return '/';
+      if (stepIndex >= 4 && stepIndex <= 12) return '/tasks';
+      if (stepIndex >= 13 && stepIndex <= 18) return '/companion';
+      if (stepIndex >= 19) return '/inspire';
+      return '/';
+    })();
+
+    // If user is on auth page or wrong route, navigate them back or reset tutorial
+    if (location.pathname === '/auth' || (location.pathname !== expectedRoute && stepIndex <= 3)) {
+      console.log('Tutorial: User on wrong route, navigating to home');
+      navigate('/');
+    }
+  }, [location.pathname, stepIndex, run, navigate]);
+
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
