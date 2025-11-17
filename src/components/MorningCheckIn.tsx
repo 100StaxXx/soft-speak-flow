@@ -105,13 +105,15 @@ export const MorningCheckIn = () => {
   }
 
   return (
-    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+    <Card className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Sunrise className="h-6 w-6 text-primary" />
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Sunrise className="h-5 w-5 text-primary" />
+          </div>
           <div>
-            <h3 className="font-bold text-lg">Morning Check-in</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="font-heading font-black text-lg md:text-xl">Morning Check-in</h3>
+            <p className="text-xs md:text-sm text-muted-foreground">
               {personality?.name} wants to know: How are we starting today?
             </p>
           </div>
@@ -119,12 +121,12 @@ export const MorningCheckIn = () => {
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">How are you feeling?</label>
+            <label className="text-sm font-bold mb-2 block">How are you feeling?</label>
             <MoodSelector selected={mood} onSelect={setMood} />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 flex items-center gap-2">
+            <label className="text-sm font-bold mb-2 flex items-center gap-2">
               <Target className="h-4 w-4" />
               What's your main focus today?
             </label>
@@ -133,17 +135,19 @@ export const MorningCheckIn = () => {
               value={intention}
               onChange={(e) => setIntention(e.target.value)}
               rows={3}
-              className="resize-none"
+              className="resize-none transition-all duration-200 focus:shadow-glow"
             />
           </div>
 
           <Button 
             onClick={submitCheckIn} 
             disabled={isSubmitting || !mood || !intention.trim()}
-            className="w-full"
+            variant="cta"
+            className="w-full h-12"
+            size="lg"
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            {personality?.buttonText("Start My Day") || "Start My Day"}
+            {personality?.buttonText("Start My Day") || "Start My Day"} (+5 XP)
           </Button>
         </div>
       </div>

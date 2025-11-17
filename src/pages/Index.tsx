@@ -89,13 +89,13 @@ const Index = () => {
       />
       <PageTransition>
         <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
-          <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+          <div className="max-w-4xl mx-auto px-4 py-6 md:py-8 space-y-5 md:space-y-6">
             {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
+            <div className="mb-4 md:mb-6">
+              <h1 className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
                 Home
               </h1>
-              <p className="text-muted-foreground">Your personal growth journey starts here</p>
+              <p className="text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
             </div>
 
             {/* Priority Content */}
