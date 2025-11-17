@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
-import { TrendingUp, Sunrise, Target, Swords } from "lucide-react";
+import { TrendingUp, Sunrise, CheckCircle2, Swords } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SlideUp } from "./PageTransition";
@@ -82,10 +82,10 @@ export const WeeklyInsights = () => {
 
   const stats = [
     {
-      icon: Target,
+      icon: CheckCircle2,
       label: "Habits Completed",
       value: weeklyData.habitCompletions.length,
-      color: "text-primary"
+      color: "text-red-500"
     },
     {
       icon: Sunrise,
@@ -97,7 +97,7 @@ export const WeeklyInsights = () => {
       icon: Swords,
       label: "Quests",
       value: weeklyData.quests.length,
-      color: "text-amber-500"
+      color: "text-red-500"
     }
   ];
 
