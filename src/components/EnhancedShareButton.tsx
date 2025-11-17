@@ -78,12 +78,13 @@ export const EnhancedShareButton = ({
           variant={variant}
           size={size}
           className={className}
-          aria-label="Share"
+          aria-label={`Share ${title}`}
+          aria-haspopup="menu"
         >
-          <Share2 className="h-4 w-4" />
+          <Share2 className="h-4 w-4" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-2">
+      <PopoverContent className="w-48 p-2" role="menu" aria-label="Share options">
         <div className="space-y-1">
           <Button
             variant="ghost"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { CheckCircle2, Flame, Trash2, Archive } from "lucide-react";
@@ -28,7 +28,7 @@ interface HabitCardProps {
   onComplete: () => void;
 }
 
-export const HabitCard = ({
+export const HabitCard = memo(({
   id,
   title,
   currentStreak,
@@ -39,7 +39,7 @@ export const HabitCard = ({
   const queryClient = useQueryClient();
   const [showActions, setShowActions] = useState(false);
 
-  const handleArchive = async () => {
+  const handleArchive = useCallback(async () => {
     const { error } = await supabase
       .from('habits')
       .update({ is_active: false })
@@ -49,19 +49,23 @@ export const HabitCard = ({
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       toast.success("Habit archived. Ready for a new one.");
     }
-  };
+  }, [id, queryClient]);
 
-  const getStreakMessage = () => {
+  const getStreakMessage = useCallback(() => {
     if (currentStreak === 0) return "Start your streak today";
     if (currentStreak === 1) return "Day 1. Keep going.";
     if (currentStreak < 7) return "Building momentum...";
     if (currentStreak < 21) return "Habit forming...";
     if (currentStreak < 66) return "Almost automatic...";
     return "Discipline locked in.";
-  };
+  }, [currentStreak]);
 
   return (
-    <Card className="p-5 md:p-6 bg-gradient-to-br from-card to-secondary border-primary/20 hover:border-primary/40 transition-all hover:shadow-glow relative overflow-hidden group">
+    <Card 
+      className="p-5 md:p-6 bg-gradient-to-br from-card to-secondary border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-glow relative overflow-hidden group hover-scale animate-fade-in"
+      role="article"
+      aria-label={`Habit: ${title}`}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
       
       <div className="space-y-4 relative z-10">
@@ -107,11 +111,12 @@ export const HabitCard = ({
               size="icon"
               variant={completedToday ? "secondary" : "default"}
               className={cn(
-                "h-12 w-12 rounded-full flex-shrink-0 transition-all",
+                "h-12 w-12 rounded-full flex-shrink-0 transition-all duration-300 hover-scale",
                 completedToday && "bg-primary/20 text-primary hover:bg-primary/30"
               )}
+              aria-label={completedToday ? `${title} completed for today` : `Mark ${title} as complete`}
             >
-              <CheckCircle2 className="w-6 h-6" />
+              <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
             </Button>
             
             <div className="flex gap-1">
@@ -160,4 +165,4 @@ export const HabitCard = ({
       </div>
     </Card>
   );
-};
+});
