@@ -173,11 +173,19 @@ export default function Onboarding() {
         .maybeSingle();
 
       if (!existingCompanion) {
-        // Create companion only if it doesn't exist
+        // Create companion
         await createCompanion.mutateAsync(data);
       }
       
-      // Don't mark onboarding as complete - let the tour handle it
+      // Mark onboarding as complete
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('id', user!.id);
+      
+      // Set flag in localStorage for immediate check
+      localStorage.setItem('onboardingComplete', 'true');
+      
       // Navigate directly to home
       navigate("/", { replace: true });
     } catch (error) {
