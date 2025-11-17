@@ -472,39 +472,68 @@ export type Database = {
       }
       daily_missions: {
         Row: {
+          auto_complete: boolean | null
+          category: string | null
+          chain_parent_id: string | null
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
+          difficulty: string | null
           id: string
+          is_bonus: boolean | null
           mission_date: string
           mission_text: string
           mission_type: string
+          progress_current: number | null
+          progress_target: number | null
           user_id: string
           xp_reward: number
         }
         Insert: {
+          auto_complete?: boolean | null
+          category?: string | null
+          chain_parent_id?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          difficulty?: string | null
           id?: string
+          is_bonus?: boolean | null
           mission_date?: string
           mission_text: string
           mission_type: string
+          progress_current?: number | null
+          progress_target?: number | null
           user_id: string
           xp_reward?: number
         }
         Update: {
+          auto_complete?: boolean | null
+          category?: string | null
+          chain_parent_id?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          difficulty?: string | null
           id?: string
+          is_bonus?: boolean | null
           mission_date?: string
           mission_text?: string
           mission_type?: string
+          progress_current?: number | null
+          progress_target?: number | null
           user_id?: string
           xp_reward?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "daily_missions_chain_parent_id_fkey"
+            columns: ["chain_parent_id"]
+            isOneToOne: false
+            referencedRelation: "daily_missions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       daily_pep_talks: {
         Row: {
