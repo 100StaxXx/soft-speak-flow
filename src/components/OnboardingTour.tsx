@@ -40,10 +40,10 @@ export const OnboardingTour = () => {
       !onboardingCompleted && 
       location.pathname === '/'
     ) {
-      // Small delay to ensure elements are rendered
+      // Smaller delay for faster start
       const timer = setTimeout(() => {
         setRun(true);
-      }, 1000);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [user, profile, location.pathname]);

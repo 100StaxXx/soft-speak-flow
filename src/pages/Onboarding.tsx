@@ -152,15 +152,8 @@ export default function Onboarding() {
       // Create companion first and wait for it
       await createCompanion.mutateAsync(data);
       
-      // Mark onboarding as complete after companion is created
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ onboarding_completed: true })
-          .eq('id', user.id);
-      }
-      
-      // Navigate to home
+      // Don't mark onboarding as complete - let the tour handle it
+      // Navigate directly to home
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Error in onboarding:", error);
