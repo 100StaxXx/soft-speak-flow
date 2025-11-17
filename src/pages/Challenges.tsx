@@ -104,7 +104,7 @@ export default function Challenges() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 pt-safe">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

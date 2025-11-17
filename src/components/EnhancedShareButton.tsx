@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Share2, Download, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toPng } from "html-to-image";
+import html2canvas from "html-to-image";
 
 interface EnhancedShareButtonProps {
   title: string;
@@ -38,7 +38,7 @@ export const EnhancedShareButton = ({
       if (platform === "download" && imageElementId) {
         const element = document.getElementById(imageElementId);
         if (element) {
-          const dataUrl = await toPng(element);
+          const dataUrl = await html2canvas.toPng(element);
           const link = document.createElement("a");
           link.download = `${title.toLowerCase().replace(/\s+/g, "-")}.png`;
           link.href = dataUrl;
