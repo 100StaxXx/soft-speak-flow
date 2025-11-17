@@ -158,7 +158,7 @@ export const AppWalkthrough = () => {
           .from('user_companion')
           .select('id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (companion && location.pathname === '/') {
           // Small delay to ensure DOM is ready

@@ -22,7 +22,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
           .from("mentors")
           .select("name, welcome_message, tone_description")
           .eq("id", mentorId)
-          .single();
+          .maybeSingle();
 
         if (mentor) {
           setMentorName(mentor.name);
