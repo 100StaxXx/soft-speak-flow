@@ -68,14 +68,27 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--deep-purple)));
     --gradient-subtle: linear-gradient(180deg, hsl(var(--graphite)), hsl(var(--obsidian)));
     --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--obsidian)));
+    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.1), transparent);
     
     /* Shadows - Bold & Strong */
     --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
     --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4);
+    --shadow-hard: 0 8px 24px hsl(0 0% 0% / 0.5);
     --shadow-glow: 0 0 24px hsl(var(--royal-purple) / 0.5);
+    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.6);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Spacing Scale */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
   }
   
   .dark {

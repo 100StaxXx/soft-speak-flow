@@ -62,7 +62,7 @@ export const HabitCard = memo(({
 
   return (
     <Card 
-      className="p-5 md:p-6 bg-gradient-to-br from-card to-secondary border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-glow relative overflow-hidden group hover-scale animate-fade-in"
+      className="p-5 md:p-6 bg-gradient-to-br from-card to-secondary border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-glow relative overflow-hidden group animate-scale-in"
       role="article"
       aria-label={`Habit: ${title}`}
     >

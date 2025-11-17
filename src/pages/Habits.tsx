@@ -181,7 +181,7 @@ export default function Habits() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-5 md:space-y-6">
         <div className="flex items-center gap-3 md:gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="flex-shrink-0">
             <ArrowLeft className="w-5 h-5" />
@@ -189,7 +189,7 @@ export default function Habits() {
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl md:text-4xl font-heading font-black text-foreground">Habit Tracker</h1>
             <p className="text-sm text-muted-foreground mt-1">Build discipline, one day at a time</p>
-            <p className="text-xs text-muted-foreground/80 mt-0.5">Limited to 2 habits for better focus and consistency</p>
+            <p className="text-xs text-muted-foreground/80 mt-0.5">Track up to 5 habits - earn XP daily</p>
           </div>
         </div>
 
@@ -223,7 +223,8 @@ export default function Habits() {
         {habits.length < 5 && !showAddForm && (
           <Button
             onClick={() => setShowAddForm(true)}
-            className="w-full h-12 text-sm md:text-base font-bold"
+            variant="cta"
+            className="w-full h-12 md:h-14 text-sm md:text-base font-bold"
             size="lg"
           >
             <Plus className="w-5 h-5 mr-2" />

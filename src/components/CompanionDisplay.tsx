@@ -49,21 +49,21 @@ export const CompanionDisplay = () => {
         }}
       />
 
-      <Card className="relative overflow-hidden">
+      <Card className="relative overflow-hidden shadow-glow border-primary/30 hover:border-primary/50 transition-all duration-300 hover:shadow-glow-lg animate-scale-in">
       {/* Background gradient based on element */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-50" />
       
-      <div className="relative p-6 space-y-4">
+      <div className="relative p-5 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <h3 className="text-lg md:text-xl font-heading font-black flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
               Your Companion
             </h3>
             <p className="text-sm text-muted-foreground">{stageName}</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-primary">
+            <div className="text-2xl md:text-3xl font-heading font-black text-primary">
               Stage {companion.current_stage}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -75,20 +75,18 @@ export const CompanionDisplay = () => {
         {/* Companion Image */}
         <div className="flex justify-center">
           {companion.current_image_url ? (
-            <div className="relative">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-300" />
               <img
                 src={companion.current_image_url}
                 alt={`${stageName} companion`}
-                className="max-w-full h-auto max-h-64 rounded-lg shadow-glow"
-              />
-              <div 
-                className="absolute inset-0 rounded-lg opacity-30 blur-xl"
-                style={{ backgroundColor: companion.favorite_color }}
+                className="relative max-w-full h-auto max-h-64 rounded-2xl shadow-glow transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
               />
             </div>
           ) : (
-            <div className="w-48 h-48 rounded-lg bg-muted animate-pulse flex items-center justify-center">
-              <Sparkles className="h-12 w-12 text-muted-foreground" />
+            <div className="w-48 h-48 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center">
+              <Sparkles className="h-16 w-16 text-primary animate-pulse" />
             </div>
           )}
         </div>
@@ -100,32 +98,37 @@ export const CompanionDisplay = () => {
               Experience: {companion.current_xp} XP
             </span>
             {nextEvolutionXP && (
-              <span className="font-medium text-primary">
+              <span className="font-bold text-foreground">
                 Next: {nextEvolutionXP} XP
               </span>
             )}
           </div>
           {nextEvolutionXP && (
-            <Progress value={progressToNext} className="h-2" />
+            <div className="relative">
+              <Progress value={progressToNext} className="h-3" />
+              <div className="absolute inset-0 overflow-hidden rounded-full">
+                <div className="h-full w-full bg-gradient-shimmer animate-shimmer" />
+              </div>
+            </div>
           )}
         </div>
 
         {/* Traits */}
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">Color</div>
+            <div className="text-xs text-muted-foreground mb-1">Color</div>
             <div 
-              className="w-8 h-8 rounded-full mx-auto mt-1 border-2 border-border"
+              className="w-10 h-10 rounded-full mx-auto border-2 border-border shadow-soft transition-transform hover:scale-110"
               style={{ backgroundColor: companion.favorite_color }}
             />
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">Animal</div>
-            <div className="font-medium mt-1 text-sm">{companion.spirit_animal}</div>
+            <div className="text-xs text-muted-foreground mb-1">Animal</div>
+            <div className="font-bold text-sm">{companion.spirit_animal}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">Element</div>
-            <div className="font-medium mt-1 text-sm">{companion.core_element}</div>
+            <div className="text-xs text-muted-foreground mb-1">Element</div>
+            <div className="font-bold text-sm">{companion.core_element}</div>
           </div>
         </div>
       </div>
