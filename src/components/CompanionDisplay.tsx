@@ -7,6 +7,56 @@ import { useAuth } from "@/hooks/useAuth";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useState, useEffect } from "react";
 
+// Convert hex color to color name
+const getColorName = (hexColor: string): string => {
+  const colorMap: Record<string, string> = {
+    '#FF0000': 'Red', '#FF4500': 'Orange Red', '#FF6347': 'Tomato',
+    '#FFA500': 'Orange', '#FFD700': 'Gold', '#FFFF00': 'Yellow',
+    '#00FF00': 'Lime', '#00FA9A': 'Spring Green', '#008000': 'Green',
+    '#00FFFF': 'Cyan', '#00CED1': 'Turquoise', '#4169E1': 'Royal Blue',
+    '#0000FF': 'Blue', '#000080': 'Navy', '#4B0082': 'Indigo',
+    '#9370DB': 'Purple', '#8B008B': 'Dark Magenta', '#FF00FF': 'Magenta',
+    '#FF1493': 'Deep Pink', '#FF69B4': 'Hot Pink', '#FFC0CB': 'Pink',
+    '#FFFFFF': 'White', '#C0C0C0': 'Silver', '#808080': 'Gray',
+    '#000000': 'Black', '#A52A2A': 'Brown', '#D2691E': 'Chocolate',
+  };
+
+  // Direct match
+  const upperHex = hexColor.toUpperCase();
+  if (colorMap[upperHex]) return colorMap[upperHex];
+
+  // Convert hex to RGB for color detection
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Determine dominant color channel
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  
+  // Grayscale
+  if (max - min < 30) {
+    if (max > 200) return 'White';
+    if (max > 150) return 'Light Gray';
+    if (max > 100) return 'Gray';
+    if (max > 50) return 'Dark Gray';
+    return 'Black';
+  }
+
+  // Color detection
+  if (r === max) {
+    if (g > b) return g > 150 ? 'Yellow' : 'Orange';
+    return r > 150 ? 'Red' : 'Dark Red';
+  } else if (g === max) {
+    if (r > b) return 'Yellow Green';
+    return g > 150 ? 'Green' : 'Dark Green';
+  } else {
+    if (r > g) return b > 150 ? 'Purple' : 'Dark Purple';
+    return b > 150 ? 'Blue' : 'Dark Blue';
+  }
+};
+
 const STAGE_NAMES = {
   0: "Mysterious Egg",
   1: "Sparkling Egg",
@@ -106,7 +156,7 @@ export const CompanionDisplay = () => {
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Color</p>
-                <p className="font-medium text-sm capitalize">{companion.favorite_color}</p>
+                <p className="font-medium text-sm">{getColorName(companion.favorite_color)}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-accent/5 to-primary/5 border border-accent/10 hover:border-accent/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Spirit</p>
