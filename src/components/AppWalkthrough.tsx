@@ -33,9 +33,10 @@ const WALKTHROUGH_STEPS: Step[] = [
   // TASKS PAGE
   {
     target: '[data-tour="tasks-tab"]',
-    content: "📋 Let's explore the Quests section! Here you can manage your daily quests and habits.",
+    content: "📋 Let's explore the Quests section! Click on this tab to see your daily quests and habits.",
     placement: "bottom",
     disableBeacon: true,
+    spotlightClicks: true,
   },
   {
     target: '[data-tour="add-task-input"]',
@@ -214,6 +215,20 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('companion-evolved', handleEvolution);
   }, [stepIndex, waitingForAction]);
 
+  // Listen for route changes to progress tutorial
+  useEffect(() => {
+    if (stepIndex === 4 && location.pathname === '/tasks') {
+      // User clicked Quests tab, progress to next step
+      setTimeout(() => setStepIndex(5), 500);
+    } else if (stepIndex === 13 && location.pathname === '/companion') {
+      // User navigated to companion page
+      setTimeout(() => setStepIndex(14), 500);
+    } else if (stepIndex === 19 && location.pathname === '/inspire') {
+      // User navigated to inspire page  
+      setTimeout(() => setStepIndex(20), 500);
+    }
+  }, [location.pathname, stepIndex]);
+
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { status, action, index, type, lifecycle } = data;
@@ -229,19 +244,18 @@ export const AppWalkthrough = () => {
     if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       const nextStepIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
-      // Navigate between pages
+      // Navigate between pages - now handled by route listener
       if (index === 3 && action === ACTIONS.NEXT) {
-        // After Ask Mentor, navigate to Quests
-        navigate('/tasks');
-        setTimeout(() => setStepIndex(4), 500);
+        // After Ask Mentor, show step to click Quests tab (don't auto-navigate)
+        setStepIndex(4);
       } else if (index === 12 && action === ACTIONS.NEXT) {
         // After evolution + limits, navigate to Companion
         navigate('/companion');
-        setTimeout(() => setStepIndex(13), 500);
+        // Progress handled by route listener
       } else if (index === 18 && action === ACTIONS.NEXT) {
-        // After evolution tab, navigate to Inspire
+        // After achievements tab, navigate to Inspire
         navigate('/inspire');
-        setTimeout(() => setStepIndex(19), 500);
+        // Progress handled by route listener
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
         setWaitingForAction(true);
