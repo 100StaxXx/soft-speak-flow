@@ -313,6 +313,7 @@ export default function Habits() {
                 <HabitTemplates 
                   onSelect={handleTemplateSelect}
                   onCustom={handleCustomHabit}
+                  existingHabits={habits}
                 />
                 <Button 
                   variant="outline" 

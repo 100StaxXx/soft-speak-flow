@@ -321,6 +321,7 @@ const Companion = () => {
                 <HabitTemplates 
                   onSelect={handleTemplateSelect}
                   onCustom={handleCustomHabit}
+                  existingHabits={habits}
                 />
               )}
 
