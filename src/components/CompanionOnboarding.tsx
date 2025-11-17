@@ -58,7 +58,7 @@ export const CompanionOnboarding = () => {
           .from('profiles')
           .select('onboarding_completed')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         // Only show if user has completed main onboarding and hasn't seen companion tour
         if (!hasSeenOnboarding && profile?.onboarding_completed) {
