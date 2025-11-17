@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { CheckCircle2, Flame, Trash2, Archive } from "lucide-react";
+import { EnhancedShareButton } from "./EnhancedShareButton";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -113,29 +114,39 @@ export const HabitCard = ({
               <CheckCircle2 className="w-6 h-6" />
             </Button>
             
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100"
-                >
-                  <Archive className="w-4 h-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Archive this habit?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will archive "{title}" and free up a slot for a new habit. Your streak data will be preserved.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleArchive}>Archive</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <div className="flex gap-1">
+              <EnhancedShareButton
+                title={`${currentStreak} Day Streak!`}
+                text={`I've maintained a ${currentStreak}-day streak on "${title}"! 🔥 Building better habits every day.`}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100"
+              />
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100"
+                  >
+                    <Archive className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Archive this habit?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will archive "{title}" and free up a slot for a new habit. Your streak data will be preserved.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleArchive}>Archive</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
         

@@ -19,6 +19,7 @@ import { MessageCircle, Target, Calendar } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition, SlideUp } from "@/components/PageTransition";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 
 const Index = () => {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ const Index = () => {
     return !sessionStorage.getItem('hasVisitedHome');
   });
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem('hasVisitedHome', 'true');
@@ -52,6 +54,14 @@ const Index = () => {
     checkHabits();
   }, [user]);
 
+  useEffect(() => {
+    // Show onboarding if user has mentor but hasn't completed the feature tour
+    const hasSeenOnboarding = localStorage.getItem('onboardingFlowCompleted');
+    if (user && profile?.selected_mentor_id && !hasSeenOnboarding) {
+      setTimeout(() => setShowOnboarding(true), 1000);
+    }
+  }, [user, profile]);
+
   if (showIntro) {
     return <IntroScreen onComplete={() => setShowIntro(false)} />;
   }
@@ -70,6 +80,13 @@ const Index = () => {
   return (
     <PageTransition>
       <OnboardingTour />
+      <OnboardingFlow 
+        open={showOnboarding} 
+        onComplete={() => {
+          setShowOnboarding(false);
+          localStorage.setItem('onboardingFlowCompleted', 'true');
+        }} 
+      />
       <div className="min-h-screen bg-background pb-20">
           {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50">
