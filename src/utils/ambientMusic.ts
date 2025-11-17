@@ -1,7 +1,7 @@
 // Ambient music system with persistence
 class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
-  private volume = 0.15; // Reduced default volume to be subtle
+  private volume = 0.05; // Subtle background volume
   private isMuted = false;
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
