@@ -11,6 +11,7 @@ import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { HabitCard } from "@/components/HabitCard";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { BrandTagline } from "@/components/BrandTagline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,10 +29,11 @@ export default function Habits() {
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
   const personality = useMentorPersonality();
-  const { awardHabitCompletion, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
+  const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
+  const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; streak: number; title: string } | null>(null);
 
@@ -73,6 +75,7 @@ export default function Habits() {
         title: newHabitTitle,
         frequency: selectedDays.length === 7 ? 'daily' : 'custom',
         custom_days: selectedDays.length === 7 ? null : selectedDays,
+        difficulty: habitDifficulty,
       });
       
       if (error) throw error;
@@ -80,6 +83,7 @@ export default function Habits() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       setNewHabitTitle("");
+      setHabitDifficulty("medium");
       setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
       setShowTemplates(true);
@@ -108,8 +112,14 @@ export default function Habits() {
       
       if (error) throw error;
       
-      // Award XP for habit completion
-      awardHabitCompletion();
+      // Award XP based on habit difficulty
+      const difficultyXP = {
+        easy: 5,
+        medium: 10,
+        hard: 20,
+      };
+      const xpAmount = difficultyXP[habit?.difficulty || 'medium'];
+      await awardCustomXP(xpAmount, 'habit_complete');
       
       // Log to activity feed
       if (habit) {
@@ -204,6 +214,7 @@ export default function Habits() {
               currentStreak={habit.current_streak}
               longestStreak={habit.longest_streak}
               completedToday={completions.some(c => c.habit_id === habit.id)}
+              difficulty={habit.difficulty}
               onComplete={() => completeHabitMutation.mutate(habit.id)}
             />
           ))}
@@ -294,6 +305,10 @@ export default function Habits() {
                 <FrequencyPicker 
                   selectedDays={selectedDays}
                   onDaysChange={setSelectedDays}
+                />
+                <HabitDifficultySelector
+                  value={habitDifficulty}
+                  onChange={setHabitDifficulty}
                 />
                 <div className="flex gap-2 pt-2">
                   <Button 

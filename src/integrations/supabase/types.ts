@@ -470,6 +470,42 @@ export type Database = {
           },
         ]
       }
+      daily_missions: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          mission_date: string
+          mission_text: string
+          mission_type: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          mission_date?: string
+          mission_text: string
+          mission_type: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          mission_date?: string
+          mission_text?: string
+          mission_type?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       daily_pep_talks: {
         Row: {
           audio_url: string
@@ -624,6 +660,7 @@ export type Database = {
           created_at: string | null
           current_streak: number | null
           custom_days: number[] | null
+          difficulty: string | null
           frequency: string
           id: string
           is_active: boolean | null
@@ -635,6 +672,7 @@ export type Database = {
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
+          difficulty?: string | null
           frequency: string
           id?: string
           is_active?: boolean | null
@@ -646,6 +684,7 @@ export type Database = {
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
+          difficulty?: string | null
           frequency?: string
           id?: string
           is_active?: boolean | null
@@ -1182,6 +1221,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          current_habit_streak: number | null
           daily_push_enabled: boolean | null
           daily_push_time: string | null
           daily_push_window: string | null
@@ -1191,6 +1231,7 @@ export type Database = {
           email: string | null
           id: string
           is_premium: boolean | null
+          longest_habit_streak: number | null
           onboarding_completed: boolean | null
           preferences: Json | null
           selected_mentor_id: string | null
@@ -1199,6 +1240,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
           daily_push_time?: string | null
           daily_push_window?: string | null
@@ -1208,6 +1250,7 @@ export type Database = {
           email?: string | null
           id: string
           is_premium?: boolean | null
+          longest_habit_streak?: number | null
           onboarding_completed?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null
@@ -1216,6 +1259,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
           daily_push_time?: string | null
           daily_push_window?: string | null
@@ -1225,6 +1269,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_premium?: boolean | null
+          longest_habit_streak?: number | null
           onboarding_completed?: boolean | null
           preferences?: Json | null
           selected_mentor_id?: string | null

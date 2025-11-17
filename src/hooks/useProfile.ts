@@ -17,6 +17,8 @@ interface Profile {
   daily_quote_push_window: string | null;
   daily_quote_push_time: string | null;
   timezone: string | null;
+  current_habit_streak: number;
+  longest_habit_streak: number;
 }
 
 export const useProfile = () => {

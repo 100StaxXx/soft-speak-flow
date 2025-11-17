@@ -4,13 +4,14 @@
  * All XP rewards are centralized in useXPRewards hook.
  * Use the hook helpers instead of hard-coding XP values.
  * 
- * XP VALUES:
- * - Habit Completion: 5 XP
+ * XP VALUES (Difficulty-Based System):
+ * - Easy Habit: 5 XP
+ * - Medium Habit: 10 XP
+ * - Hard Habit: 20 XP
  * - All Habits Complete (daily bonus): 10 XP
- * - Morning Check-in: 5 XP
+ * - Check-in: 5 XP
  * - Pep Talk Listened (80%+): 3 XP
- * - Challenge Day Complete: 20 XP
- * - Weekly Challenge Complete: 50 XP
+ * - Daily Missions: 5-20 XP (varies by mission)
  * - Streak Milestone: 15 XP
  * 
  * EVOLUTION THRESHOLDS:

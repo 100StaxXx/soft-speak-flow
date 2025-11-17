@@ -80,6 +80,14 @@ export const useXPRewards = () => {
     });
   };
 
+  const awardCustomXP = async (xpAmount: number, eventType: string) => {
+    if (!companion) return;
+    awardXP.mutate({
+      eventType,
+      xpAmount,
+    });
+  };
+
   return {
     // Primary XP awards matching your spec
     awardHabitCompletion,
@@ -93,6 +101,7 @@ export const useXPRewards = () => {
     awardStreakMilestone,
     awardReflectionComplete,
     awardQuoteShared,
+    awardCustomXP,
     
     // Legacy aliases (for backward compatibility)
     awardCheckIn: awardCheckInComplete,
