@@ -135,23 +135,23 @@ export const CompanionDisplay = () => {
                 Stage {companion.current_stage}
               </p>
             </div>
-            <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`}>
+            <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true">
               <Sparkles className="h-7 w-7 text-primary" />
             </div>
           </div>
 
           {/* Companion Image */}
           <div className="flex justify-center py-8 relative group">
-            <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} />
+            <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div className="relative">
-              <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} />
+              <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} aria-hidden="true" />
               {!imageLoaded && !imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center">
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-label="Loading companion image">
                   <Sparkles className="h-12 w-12 text-primary/50 animate-spin" />
                 </div>
               )}
               {imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30">
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30" role="alert">
                   <div className="text-center p-4">
                     <p className="text-sm text-muted-foreground mb-2">Image unavailable</p>
                     <button 
@@ -159,7 +159,8 @@ export const CompanionDisplay = () => {
                         setImageError(false);
                         setImageLoaded(false);
                       }}
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                      aria-label="Retry loading companion image"
                     >
                       Retry
                     </button>
@@ -168,7 +169,7 @@ export const CompanionDisplay = () => {
               )}
               <img 
                 src={companion.current_image_url || ""} 
-                alt="Your Companion" 
+                alt={`${stageName} companion at stage ${companion.current_stage}`}
                 className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
                 onLoad={() => setImageLoaded(true)}
                 onError={() => {
@@ -181,10 +182,17 @@ export const CompanionDisplay = () => {
 
           <div className="space-y-3">
             <div className="text-center">
-              <p className="text-sm font-medium text-muted-foreground mb-2">
+              <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {companion.current_xp} / {nextEvolutionXP} XP to next evolution
               </p>
-              <Progress value={progressToNext} className="h-3 rounded-full shadow-inner" />
+              <Progress 
+                value={progressToNext} 
+                className="h-3 rounded-full shadow-inner" 
+                aria-labelledby="xp-progress-label"
+                aria-valuenow={companion.current_xp}
+                aria-valuemin={0}
+                aria-valuemax={nextEvolutionXP}
+              />
             </div>
             
             <div className="grid grid-cols-3 gap-3 pt-2">

@@ -63,11 +63,21 @@ export const CompanionOnboarding = () => {
   const handleComplete = () => {
     localStorage.setItem("companion-onboarding-complete", "true");
     setIsVisible(false);
+    
+    // Get primary color from CSS variables for confetti
+    const primaryColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--primary')
+      .trim();
+    
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#A76CFF', '#C084FC', '#E879F9']
+      colors: [
+        `hsl(${primaryColor})`,
+        `hsl(${primaryColor} / 0.8)`,
+        `hsl(${primaryColor} / 0.6)`
+      ]
     });
   };
 
