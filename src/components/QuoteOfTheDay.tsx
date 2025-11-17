@@ -30,7 +30,7 @@ export const QuoteOfTheDay = () => {
         .from("mentors")
         .select("slug")
         .eq("id", profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
 
       if (!mentor) {
         setLoading(false);
@@ -43,7 +43,7 @@ export const QuoteOfTheDay = () => {
         .select("emotional_triggers, topic_category")
         .eq("for_date", today)
         .eq("mentor_slug", mentor.slug)
-        .single();
+        .maybeSingle();
 
       if (dailyPepTalk) {
         // Fetch a quote that matches the pep talk's themes

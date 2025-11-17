@@ -68,10 +68,11 @@ export function preloadCriticalResources() {
 }
 
 /**
- * Measure and log performance metrics
+ * Measure and log performance metrics (dev only)
  */
 export function measurePerformance() {
   if (typeof window === 'undefined' || !window.performance) return;
+  if (!import.meta.env.DEV) return; // Only in development
 
   // Log navigation timing
   window.addEventListener('load', () => {

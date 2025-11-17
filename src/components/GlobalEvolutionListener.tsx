@@ -45,7 +45,7 @@ export const GlobalEvolutionListener = () => {
               .eq('stage', newData.current_stage)
               .order('evolved_at', { ascending: false })
               .limit(1)
-              .single();
+              .maybeSingle();
 
             const imageUrl = evolutionRecord?.image_url || newData.current_image_url || "";
 
@@ -56,7 +56,7 @@ export const GlobalEvolutionListener = () => {
                 .from('mentors')
                 .select('slug')
                 .eq('id', profile.selected_mentor_id)
-                .single();
+                .maybeSingle();
               
               mentorSlug = mentor?.slug;
             }

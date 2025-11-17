@@ -37,10 +37,10 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
         .from("user_achievement_stats")
         .select("*")
         .eq("user_id", user!.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data || { total_achievements: 0, bronze_count: 0, silver_count: 0, gold_count: 0, platinum_count: 0 };
     },
   });
 
