@@ -1,0 +1,109 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/use-toast";
+import { useXPRewards } from "@/hooks/useXPRewards";
+
+export const useDailyTasks = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { awardCustomXP } = useXPRewards();
+
+  const { data: tasks = [], isLoading } = useQuery({
+    queryKey: ['daily-tasks', user?.id],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('daily_tasks')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('task_date', today)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const addTask = useMutation({
+    mutationFn: async (taskText: string) => {
+      if (tasks.length >= 3) {
+        throw new Error('Maximum 3 tasks per day');
+      }
+
+      const { error } = await supabase
+        .from('daily_tasks')
+        .insert({
+          user_id: user!.id,
+          task_text: taskText,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      toast({ title: "Task added successfully!" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add task",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleTask = useMutation({
+    mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({
+          completed,
+          completed_at: completed ? new Date().toISOString() : null,
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      return { taskId, completed };
+    },
+    onSuccess: ({ completed }) => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      if (completed) {
+        awardCustomXP(5, 'task_complete', 'Task Complete!');
+      }
+    },
+  });
+
+  const deleteTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('daily_tasks')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      toast({ title: "Task deleted" });
+    },
+  });
+
+  const completedCount = tasks.filter(t => t.completed).length;
+  const totalCount = tasks.length;
+
+  return {
+    tasks,
+    isLoading,
+    addTask: addTask.mutate,
+    toggleTask: toggleTask.mutate,
+    deleteTask: deleteTask.mutate,
+    isAdding: addTask.isPending,
+    isToggling: toggleTask.isPending,
+    completedCount,
+    totalCount,
+    canAddMore: tasks.length < 3,
+  };
+};

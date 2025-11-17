@@ -1,0 +1,367 @@
+import { useState } from "react";
+import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BrandTagline } from "@/components/BrandTagline";
+import { BottomNav } from "@/components/BottomNav";
+import { HabitCard } from "@/components/HabitCard";
+import { HabitTemplates } from "@/components/HabitTemplates";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
+import { EmptyState } from "@/components/EmptyState";
+import { useDailyTasks } from "@/hooks/useDailyTasks";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/ui/use-toast";
+import { useXPRewards } from "@/hooks/useXPRewards";
+import { useActivityFeed } from "@/hooks/useActivityFeed";
+import confetti from "canvas-confetti";
+import { haptics } from "@/utils/haptics";
+import { cn } from "@/lib/utils";
+
+export default function Tasks() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { logActivity } = useActivityFeed();
+  const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
+  
+  // Tasks state
+  const { 
+    tasks, 
+    addTask, 
+    toggleTask, 
+    deleteTask, 
+    isAdding, 
+    canAddMore 
+  } = useDailyTasks();
+  const [newTaskText, setNewTaskText] = useState("");
+
+  // Habits state
+  const [showAddHabit, setShowAddHabit] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(true);
+  const [newHabitTitle, setNewHabitTitle] = useState("");
+  const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+
+  // Fetch habits
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('is_active', true);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: completions = [] } = useQuery({
+    queryKey: ['habit-completions', user?.id],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('habit_completions')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('date', today);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Add habit mutation
+  const addHabitMutation = useMutation({
+    mutationFn: async () => {
+      if (habits.length >= 5) {
+        throw new Error('Maximum 5 habits allowed');
+      }
+      
+      const { error } = await supabase.from('habits').insert({
+        user_id: user!.id,
+        title: newHabitTitle,
+        frequency: selectedDays.length === 7 ? 'daily' : 'custom',
+        custom_days: selectedDays.length === 7 ? null : selectedDays,
+        difficulty: habitDifficulty,
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      setNewHabitTitle("");
+      setHabitDifficulty("medium");
+      setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+      setShowAddHabit(false);
+      setShowTemplates(true);
+      toast({ title: "Habit created successfully!" });
+      haptics.success();
+    },
+  });
+
+  // Toggle habit completion
+  const toggleHabitMutation = useMutation({
+    mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (isCompleted) {
+        const { error } = await supabase
+          .from('habit_completions')
+          .delete()
+          .eq('habit_id', habitId)
+          .eq('date', today);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('habit_completions')
+          .insert({ habit_id: habitId, user_id: user!.id, date: today });
+        if (error) throw error;
+        
+        const habit = habits.find(h => h.id === habitId);
+        const xpAmount = habitDifficulty === 'easy' ? 5 : habitDifficulty === 'hard' ? 20 : 10;
+        await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+        
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        haptics.success();
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
+  const handleAddTask = () => {
+    if (!newTaskText.trim()) return;
+    addTask(newTaskText);
+    setNewTaskText("");
+  };
+
+  const handleAddHabit = () => {
+    if (!newHabitTitle.trim()) {
+      toast({ title: "Please enter a habit title", variant: "destructive" });
+      return;
+    }
+    addHabitMutation.mutate();
+  };
+
+  const habitProgress = habits.length > 0 
+    ? completions.length / habits.length 
+    : 0;
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <BrandTagline />
+
+        <div className="flex items-center gap-3">
+          <Target className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Tasks & Habits</h1>
+            <p className="text-muted-foreground">Build your daily momentum</p>
+          </div>
+        </div>
+
+        <Tabs defaultValue="tasks" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tasks" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              Daily Tasks
+            </TabsTrigger>
+            <TabsTrigger value="habits" className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Habits
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tasks" className="space-y-4 mt-6">
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Today's Tasks</h3>
+                  <p className="text-sm text-muted-foreground">Max 3 tasks per day</p>
+                </div>
+                <div className="text-sm font-medium text-primary">
+                  {tasks.filter(t => t.completed).length}/{tasks.length}
+                </div>
+              </div>
+
+              {canAddMore && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a task..."
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                    disabled={isAdding}
+                  />
+                  <Button 
+                    onClick={handleAddTask}
+                    disabled={isAdding || !newTaskText.trim()}
+                    size="icon"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {tasks.length === 0 ? (
+                  <EmptyState 
+                    icon={Calendar}
+                    title="No tasks yet"
+                    description="Add up to 3 tasks to focus on today"
+                  />
+                ) : (
+                  tasks.map((task) => (
+                    <Card 
+                      key={task.id}
+                      className={cn(
+                        "p-4 flex items-center gap-3 transition-all cursor-pointer hover:bg-accent/50",
+                        task.completed && "opacity-60"
+                      )}
+                      onClick={() => toggleTask({ taskId: task.id, completed: !task.completed })}
+                    >
+                      {task.completed ? (
+                        <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                      ) : (
+                        <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className={cn(
+                        "flex-1",
+                        task.completed && "line-through text-muted-foreground"
+                      )}>
+                        {task.task_text}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTask(task.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="habits" className="space-y-4 mt-6">
+            {showAddHabit ? (
+              <Card className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Create New Habit</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddHabit(false)}>
+                    Cancel
+                  </Button>
+                </div>
+
+                <Input
+                  placeholder="Habit name..."
+                  value={newHabitTitle}
+                  onChange={(e) => setNewHabitTitle(e.target.value)}
+                />
+
+                <HabitDifficultySelector
+                  value={habitDifficulty}
+                  onChange={setHabitDifficulty}
+                />
+
+                <FrequencyPicker
+                  selectedDays={selectedDays}
+                  onDaysChange={setSelectedDays}
+                />
+
+                <Button 
+                  onClick={handleAddHabit} 
+                  className="w-full"
+                  disabled={addHabitMutation.isPending || !newHabitTitle.trim()}
+                >
+                  Create Habit
+                </Button>
+              </Card>
+            ) : (
+              <>
+                {habits.length === 0 ? (
+                  showTemplates ? (
+                    <HabitTemplates
+                      onSelect={(title, frequency) => {
+                        setNewHabitTitle(title);
+                        setShowTemplates(false);
+                        setShowAddHabit(true);
+                      }}
+                      onCustom={() => setShowAddHabit(true)}
+                      existingHabits={habits}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Target}
+                      title="No habits yet"
+                      description="Create your first habit to start building momentum"
+                      actionLabel="Add Habit"
+                      onAction={() => setShowAddHabit(true)}
+                    />
+                  )
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">Your Habits</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {habits.length}/5 habits
+                        </p>
+                      </div>
+                      {habits.length < 5 && (
+                        <Button onClick={() => setShowAddHabit(true)} size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {habits.map((habit) => {
+                        const isCompleted = completions.some(c => c.habit_id === habit.id);
+                        return (
+                          <HabitCard
+                            key={habit.id}
+                            id={habit.id}
+                            title={habit.title}
+                            currentStreak={habit.current_streak || 0}
+                            longestStreak={habit.longest_streak || 0}
+                            completedToday={isCompleted}
+                            difficulty={habit.difficulty}
+                            onComplete={() => toggleHabitMutation.mutate({ habitId: habit.id, isCompleted })}
+                          />
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {habits.length === 5 && !showAddHabit && (
+              <Card className="p-4 bg-accent/20 border-accent">
+                <p className="text-sm text-center text-muted-foreground">
+                  You've reached the maximum of 5 habits. Focus on consistency!
+                </p>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+}
