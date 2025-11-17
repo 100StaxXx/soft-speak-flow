@@ -128,7 +128,7 @@ export const CompanionEvolution = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center"
+        className="fixed inset-0 z-[9999] bg-gradient-to-br from-background via-primary/20 to-background backdrop-blur-md flex items-center justify-center overflow-hidden"
       >
         {/* Animated background glow */}
         <motion.div
