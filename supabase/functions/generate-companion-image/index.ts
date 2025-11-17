@@ -17,14 +17,98 @@ const ELEMENT_EFFECTS = {
   shadow: "Add dark purple wisps, mysterious smoke, deep contrast, ethereal darkness",
 };
 
-const STAGE_DESCRIPTORS = {
-  0: "A mystical glowing egg, small and cute with subtle energy patterns, dormant potential",
-  1: "The egg is dramatically cracking with brilliant energy exploding out, creature's features emerging from shell fragments",
-  2: "Young mythical creature, small but fierce, playful pose, features clearly visible, surrounded by magical energy wisps",
-  3: "Adolescent guardian form with protective stance, medium size, more defined muscles and features, swirling elemental aura",
-  4: "Mature ascended form with majestic wings or energy manifestation, large and powerful, hovering with confidence, intense magical glow",
-  5: "Ancient mythic form, massive and commanding, legendary presence, reality-bending elemental powers visibly emanating",
-  6: "Ultimate titan form, colossal and godlike, world-shaking power, cosmic energy radiating, supreme final evolution",
+// Universal stage descriptions that work for any animal/element/color combination
+const EVOLUTION_STAGES = {
+  0: {
+    name: "Dormant Egg",
+    size: "small, fits in both hands",
+    pose: "resting in a mystical nest or floating gently",
+    powerLevel: "dormant energy, subtle internal glow",
+    visualFocus: "The egg itself - smooth, magical shell with subtle patterns",
+    atmosphere: "Quiet, anticipation, potential energy building",
+    details: "Translucent shell showing faint silhouette of creature inside, gentle pulsing light, peaceful and protected"
+  },
+  1: {
+    name: "Hatching Stage",
+    size: "tiny newborn, fits in cupped hands (6-8 inches)",
+    pose: "emerging from cracked egg, tentative first movements, vulnerable and curious",
+    powerLevel: "awakening energy, flickering elemental sparks, unstable aura",
+    visualFocus: "Newborn creature breaking free, egg fragments around it, first glimpse of its form",
+    atmosphere: "Birth moment, raw potential, innocent wonder",
+    details: "Large eyes, soft features, tiny elemental wisps around body, clumsy but determined, shell pieces glowing nearby"
+  },
+  2: {
+    name: "Juvenile Form",
+    size: "small creature, size of a large cat (12-18 inches)",
+    pose: "playful exploration stance, discovering its powers, energetic and curious",
+    powerLevel: "growing elemental control, visible energy trails, consistent glow",
+    visualFocus: "Young creature with distinct species features, practicing abilities",
+    atmosphere: "Playfulness, discovery, growing confidence",
+    details: "Clear animal features emerging, elemental energy forming small patterns, bright eyes full of wonder, nimble movements"
+  },
+  3: {
+    name: "Adolescent Guardian",
+    size: "medium guardian, size of a large dog (2-3 feet)",
+    pose: "alert protective stance, ready to defend, showing early mastery",
+    powerLevel: "controlled elemental aura, swirling energy patterns, focused power",
+    visualFocus: "Teenage creature finding its strength, protective instincts awakening",
+    atmosphere: "Determination, loyalty, growing power, protective energy",
+    details: "Well-defined musculature, elemental markings on body, confident posture, energy forming defensive shields or barriers"
+  },
+  4: {
+    name: "Mature Protector",
+    size: "large protector, size of a horse (4-5 feet)",
+    pose: "noble guardian stance, commanding presence, grounded power",
+    powerLevel: "stable powerful aura, elemental mastery visible, area effect",
+    visualFocus: "Adult creature in prime form, fully realized protector",
+    atmosphere: "Strength, wisdom, reliable power, calm authority",
+    details: "Impressive physical form, intricate elemental patterns throughout body, eyes glowing with wisdom, environment responding to presence"
+  },
+  5: {
+    name: "Ascended Form",
+    size: "majestic being, size of an elephant (6-8 feet)",
+    pose: "hovering or floating with energy, transcendent posture, weightless grace",
+    powerLevel: "intense elemental storms, reality-bending effects, massive aura",
+    visualFocus: "Creature ascending beyond physical limitations, energy manifestation",
+    atmosphere: "Transcendence, awe-inspiring, otherworldly majesty",
+    details: "Wings or energy appendages, body partially translucent with power, eyes blazing with cosmic energy, ground cracking from power"
+  },
+  6: {
+    name: "Ancient Elder",
+    size: "massive ancient, larger than a building (10-15 feet)",
+    pose: "seated in wisdom or standing as monument, timeless and eternal",
+    powerLevel: "elemental domain control, weather effects, landscape alteration",
+    visualFocus: "Ancient creature of legend, time-weathered but supremely powerful",
+    atmosphere: "Ancient wisdom, patient power, living legend",
+    details: "Battle scars transformed into power symbols, elements orbiting the creature, eyes containing ages of wisdom, aura affecting entire environment"
+  },
+  7: {
+    name: "Mythic Avatar",
+    size: "colossal mythic, size of multiple buildings (20-30 feet)",
+    pose: "world-shaping stance, unleashing primal forces, reality warper",
+    powerLevel: "elemental apocalypse level, reshaping reality, godlike manifestation",
+    visualFocus: "Living myth, creature of pure elemental fury and creation",
+    atmosphere: "Mythical power, reshaping world, feared and revered",
+    details: "Multiple elemental effects simultaneously, body merged with environment, sky and ground reflecting its power, legendary presence"
+  },
+  8: {
+    name: "Celestial Being",
+    size: "titan form, mountain-sized (40-60 feet)",
+    pose: "cosmic stance bridging earth and sky, universal presence",
+    powerLevel: "stellar energy manipulation, cosmic forces, dimensional tears",
+    visualFocus: "Creature transcending mortal realm, celestial guardian",
+    atmosphere: "Divine majesty, cosmic significance, beyond comprehension",
+    details: "Body contains stars and cosmic energy, elements no longer just around but PART of creature, reality bending around it, celestial phenomena"
+  },
+  9: {
+    name: "Primordial Titan",
+    size: "world-scale entity, incomprehensibly massive (100+ feet)",
+    pose: "existence itself, beyond physical form, ultimate manifestation",
+    powerLevel: "creation and destruction balanced, universe-altering presence",
+    visualFocus: "The absolute final form, primordial force of nature itself",
+    atmosphere: "Ultimate power, beginning and end, alpha and omega",
+    details: "Form barely contained in reality, multiple dimensions visible through body, elements of creation swirling, landscape transformed into elemental paradise, godhood achieved"
+  }
 };
 
 serve(async (req) => {
@@ -92,87 +176,82 @@ serve(async (req) => {
       sanitizedAnimal = 'dragon'; // Default to dragon for invalid inputs
     }
     
+    const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
+    
     if (stage === 0) {
-      // Initial generation - egg stage
-      prompt = `Create a mystical glowing egg companion creature in a fantasy art style.
+      // Initial egg stage
+      prompt = `Create a mystical companion egg in high-quality fantasy art style.
 
-This egg will hatch into a ${sanitizedAnimal} companion.
-
-User's personal choices:
-- Primary color scheme: ${favoriteColor} (use this as the dominant color throughout)
-- Spirit animal: ${sanitizedAnimal} (subtle hints of this creature visible through the egg)
-- Elemental affinity: ${coreElement} (add ${coreElement} energy patterns)
-
-${STAGE_DESCRIPTORS[0]}
-
-The egg should be small, cute, and magical. Incorporate ${favoriteColor} as the main color.
-Add subtle ${sanitizedAnimal} silhouettes, patterns, or symbols visible through the translucent shell.
-The egg should give hints that a ${sanitizedAnimal} will emerge from it.
-${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
-
-IMPORTANT GUIDELINES:
-- Do not make this creature look evil, demonic, grotesque, or horror themed
-- It should feel encouraging, protective, and inspiring
-- Design for a motivation/mental fitness app
-- Keep it friendly, magical, and uplifting
-
-Style: High quality digital art, mystical, fantasy, glowing, magical, ${favoriteColor} color palette.
-Mood: Warm, hopeful, potential, beginning of a journey.
-Background: Simple dark gradient to make the egg glow stand out.`;
-    } else {
-      // Evolution generation - create from scratch with very distinct characteristics per stage
-      const sizeDescriptors = {
-        1: "tiny newborn, fits in cupped hands",
-        2: "small juvenile, size of a house cat",
-        3: "medium adolescent, size of a large dog",
-        4: "large adult, size of a horse",
-        5: "massive elder, size of an elephant",
-        6: "colossal titan, larger than a building"
-      };
-
-      const poseDescriptors = {
-        1: "curled up protectively, cautious and vulnerable",
-        2: "curious stance, exploring playfully",
-        3: "alert guardian pose, ready to protect",
-        4: "majestic spread wings, soaring powerfully",
-        5: "commanding presence, radiating authority",
-        6: "divine stance, reality-warping power display"
-      };
-
-      const powerLevel = {
-        1: "gentle magical glow",
-        2: "crackling elemental sparks",
-        3: "swirling powerful aura",
-        4: "intense energy storms",
-        5: "reality-bending forces",
-        6: "cosmic-scale power manifestation"
-      };
-
-      prompt = `Create a Stage ${stage} ${sanitizedAnimal} companion creature. This is a COMPLETELY NEW FORM evolution.
-
-CRITICAL IDENTITY:
-- This is a ${sanitizedAnimal} - make it INSTANTLY recognizable
-- Size: ${sizeDescriptors[stage as keyof typeof sizeDescriptors]}
-- Pose: ${poseDescriptors[stage as keyof typeof poseDescriptors]}
-- Power level: ${powerLevel[stage as keyof typeof powerLevel]}
+STAGE: ${stageInfo.name}
+This egg will eventually hatch into a ${sanitizedAnimal}.
 
 VISUAL SPECIFICATIONS:
-- Primary color: ${favoriteColor} (dominant throughout body and aura)
-- Element affinity: ${coreElement} (${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]})
-- Stage evolution: ${STAGE_DESCRIPTORS[stage as keyof typeof STAGE_DESCRIPTORS]}
+- Size: ${stageInfo.size}
+- Pose/Position: ${stageInfo.pose}
+- Power Level: ${stageInfo.powerLevel}
+- Primary Color: ${favoriteColor} (dominant color throughout the egg)
+- Element Affinity: ${coreElement} (${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]})
 
-The ${sanitizedAnimal} features must be anatomically clear: proper ${sanitizedAnimal} head shape, body proportions, characteristic features.
-The creature should look SIGNIFICANTLY more powerful and larger than Stage ${stage - 1}.
+KEY DETAILS:
+${stageInfo.details}
+
+ATMOSPHERE & MOOD:
+${stageInfo.atmosphere}
+
+The egg should incorporate ${favoriteColor} as the main color with ${coreElement} energy patterns.
+Subtle ${sanitizedAnimal} silhouettes or symbols should be faintly visible through the shell.
 
 IMPORTANT GUIDELINES:
-- Do not make this creature look evil, demonic, grotesque, or horror themed
-- It should feel encouraging, protective, and inspiring
-- Design for a motivation/mental fitness app
-- Keep it friendly, powerful, and majestic
-- Each stage should look DISTINCTLY different from the previous one
+- Warm, hopeful, magical feeling
+- Designed for a motivation/self-improvement app
+- Not evil, demonic, or horror-themed
+- Encouraging and inspiring visual
 
-Style: Epic high-fantasy digital art, cinematic lighting, dramatic ${coreElement} effects, glowing ${favoriteColor} palette.
-Background: Dynamic atmospheric scene that complements the ${coreElement} element and Stage ${stage} power level.`;
+Art Style: High-quality digital art, mystical fantasy, glowing magical effects, ${favoriteColor} color palette.
+Background: Simple dark gradient to make the egg's glow stand out prominently.`;
+    } else {
+      // Evolution stages 1-9
+      prompt = `Create Stage ${stage} evolution of a ${sanitizedAnimal} companion creature.
+
+EVOLUTION STAGE: ${stageInfo.name}
+
+CRITICAL IDENTITY:
+- Species: ${sanitizedAnimal} (must be INSTANTLY recognizable with proper ${sanitizedAnimal} anatomy)
+- Primary Color: ${favoriteColor} (dominant throughout entire body, aura, and effects)
+- Element Affinity: ${coreElement}
+
+STAGE ${stage} SPECIFICATIONS:
+- Size: ${stageInfo.size}
+- Pose: ${stageInfo.pose}  
+- Power Level: ${stageInfo.powerLevel}
+- Visual Focus: ${stageInfo.visualFocus}
+
+ELEMENTAL EFFECTS:
+${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+
+KEY VISUAL DETAILS FOR STAGE ${stage}:
+${stageInfo.details}
+
+ATMOSPHERE & PRESENCE:
+${stageInfo.atmosphere}
+
+CRITICAL REQUIREMENTS:
+- The ${sanitizedAnimal} features must be anatomically accurate and immediately recognizable
+- Stage ${stage} should look DRAMATICALLY more powerful than Stage ${stage - 1}
+- Size should be noticeably larger than previous stage
+- ${favoriteColor} must be the dominant color scheme throughout
+- ${coreElement} effects should be proportional to this power level
+
+IMPORTANT GUIDELINES:
+- Inspiring and empowering, not dark or evil
+- Designed for motivation/mental fitness app
+- Friendly but powerful and majestic
+- Each evolution stage must be DISTINCTLY different
+
+Art Style: Epic high-fantasy digital art, cinematic dramatic lighting, intense ${coreElement} elemental effects, glowing ${favoriteColor} color palette, photorealistic creature design.
+Background: Dynamic atmospheric environment that reflects Stage ${stage} power level and complements ${coreElement} element.
+
+Focus on making this Stage ${stage} evolution look significantly more evolved, larger, and more powerful than any previous stage.`;
     }
 
     console.log("Generated prompt:", prompt);
