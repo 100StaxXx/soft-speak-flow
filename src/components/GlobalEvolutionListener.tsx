@@ -13,6 +13,7 @@ export const GlobalEvolutionListener = () => {
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
     imageUrl: string;
+    mentorSlug?: string;
   } | null>(null);
   const [previousStage, setPreviousStage] = useState<number | null>(null);
 
@@ -68,12 +69,26 @@ export const GlobalEvolutionListener = () => {
 
             const imageUrl = evolutionRecord?.image_url || newData.current_image_url || "";
 
+            // Fetch mentor slug if we have a selected mentor
+            let mentorSlug: string | undefined;
+            if (profile?.selected_mentor_id) {
+              const { data: mentor } = await supabase
+                .from('mentors')
+                .select('slug')
+                .eq('id', profile.selected_mentor_id)
+                .single();
+              
+              mentorSlug = mentor?.slug;
+              console.log('GlobalEvolutionListener: Fetched mentor slug:', mentorSlug);
+            }
+
             console.log('GlobalEvolutionListener: Setting evolution state with imageUrl:', imageUrl);
 
             setPreviousStage(oldData.current_stage);
             setEvolutionData({
               stage: newData.current_stage,
               imageUrl,
+              mentorSlug,
             });
             setIsEvolving(true);
 
@@ -101,7 +116,7 @@ export const GlobalEvolutionListener = () => {
       isEvolving={isEvolving}
       newStage={evolutionData.stage}
       newImageUrl={evolutionData.imageUrl}
-      mentorSlug={profile?.selected_mentor_id}
+      mentorSlug={evolutionData.mentorSlug}
       userId={user?.id}
       onComplete={() => {
         setIsEvolving(false);
