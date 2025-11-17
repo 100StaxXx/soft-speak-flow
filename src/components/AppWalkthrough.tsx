@@ -30,6 +30,38 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
   },
   
+  // TASKS PAGE
+  {
+    target: '[data-tour="tasks-tab"]',
+    content: "📋 Let's explore the Tasks section! Here you can manage your daily tasks and habits.",
+    placement: "bottom",
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="add-task-input"]',
+    content: "✍️ Add a task you want to complete today. Make it specific and achievable!",
+    placement: "top",
+    spotlightClicks: true,
+  },
+  {
+    target: '[data-tour="task-difficulty"]',
+    content: "⚡ Choose the difficulty. Easy = 5 XP, Medium = 15 XP, Hard = 25 XP. Start with medium!",
+    placement: "top",
+    spotlightClicks: true,
+  },
+  {
+    target: '[data-tour="first-task"]',
+    content: "✅ Great! Now complete your task by clicking the checkbox. You'll earn XP for your companion!",
+    placement: "bottom",
+    spotlightClicks: true,
+  },
+  {
+    target: '[data-tour="habits-tab"]',
+    content: "🔄 The Habits tab shows recurring activities. Let's create your first habit!",
+    placement: "bottom",
+    spotlightClicks: true,
+  },
+  
   // COMPANION PAGE
   {
     target: '[data-tour="companion-display"]',
@@ -63,13 +95,38 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Your companion is evolving! Your check-in (5 XP) + habit completion (5 XP) = 10 XP needed to evolve to Stage 1!",
+    content: "🎉 Your companion is evolving! Check-in (5 XP) + task (15 XP) + habit (5 XP) = 25 XP. You've passed Stage 1!",
     placement: "center",
     disableBeacon: true,
   },
   {
+    target: '[data-tour="progress-tab"]',
+    content: "📊 The Progress tab shows your companion's XP, daily missions, and weekly insights.",
+    placement: "bottom",
+  },
+  {
+    target: '[data-tour="xp-breakdown"]',
+    content: "💎 Here's your XP breakdown showing all the ways you've earned experience today!",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="daily-missions"]',
+    content: "🎯 Daily missions give you personalized goals. Complete them for bonus XP!",
+    placement: "top",
+  },
+  {
+    target: '[data-tour="achievements-tab"]',
+    content: "🏆 Track your achievements and milestones here. Every accomplishment matters!",
+    placement: "bottom",
+  },
+  {
+    target: '[data-tour="evolution-tab"]',
+    content: "📜 View your companion's evolution history - a visual timeline of your growth!",
+    placement: "bottom",
+  },
+  {
     target: '[data-tour="companion-display"]',
-    content: "⚠️ Important: You can only have 5 habits max. Choose carefully and be honest with yourself about what you can maintain!",
+    content: "⚠️ Important limits: Max 5 habits, max 3 tasks per day. Quality over quantity!",
     placement: "bottom",
   },
   
@@ -140,12 +197,25 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, waitingForAction]);
 
-  // Listen for habit creation
+  // Listen for task completion
   useEffect(() => {
-    const handleHabitCreated = () => {
+    const handleTaskComplete = () => {
       if (stepIndex === 7 && waitingForAction) {
         setWaitingForAction(false);
         setStepIndex(8);
+      }
+    };
+
+    window.addEventListener('task-complete', handleTaskComplete);
+    return () => window.removeEventListener('task-complete', handleTaskComplete);
+  }, [stepIndex, waitingForAction]);
+
+  // Listen for habit creation
+  useEffect(() => {
+    const handleHabitCreated = () => {
+      if (stepIndex === 12 && waitingForAction) {
+        setWaitingForAction(false);
+        setStepIndex(13);
       }
     };
 
@@ -156,17 +226,17 @@ export const AppWalkthrough = () => {
   // Listen for companion evolution
   useEffect(() => {
     const handleEvolution = () => {
-      if (stepIndex === 9) {
+      if (stepIndex === 14 && !waitingForAction) {
         // Wait for evolution animation to complete
         setTimeout(() => {
-          setStepIndex(10);
+          setStepIndex(15);
         }, 8000); // Evolution animation duration
       }
     };
 
     window.addEventListener('companion-evolved', handleEvolution);
     return () => window.removeEventListener('companion-evolved', handleEvolution);
-  }, [stepIndex]);
+  }, [stepIndex, waitingForAction]);
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { status, action, index, type, lifecycle } = data;
@@ -184,20 +254,27 @@ export const AppWalkthrough = () => {
 
       // Navigate between pages
       if (index === 3 && action === ACTIONS.NEXT) {
-        // After Ask Mentor, navigate to Companion
-        navigate('/companion');
+        // After Ask Mentor, navigate to Tasks
+        navigate('/tasks');
         setTimeout(() => setStepIndex(4), 500);
-      } else if (index === 10 && action === ACTIONS.NEXT) {
-        // After habit limit warning, navigate to Inspire
+      } else if (index === 8 && action === ACTIONS.NEXT) {
+        // After habits tab intro, navigate to Companion
+        navigate('/companion');
+        setTimeout(() => setStepIndex(9), 500);
+      } else if (index === 20 && action === ACTIONS.NEXT) {
+        // After companion limits warning, navigate to Inspire
         navigate('/inspire');
-        setTimeout(() => setStepIndex(11), 500);
+        setTimeout(() => setStepIndex(21), 500);
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
         setWaitingForAction(true);
       } else if (index === 7 && lifecycle === 'complete') {
+        // Wait for task completion
+        setWaitingForAction(true);
+      } else if (index === 12 && lifecycle === 'complete') {
         // Wait for habit creation
         setWaitingForAction(true);
-      } else if (index === 8 && lifecycle === 'complete') {
+      } else if (index === 13 && lifecycle === 'complete') {
         // Wait for habit completion (evolution will trigger automatically)
         setWaitingForAction(true);
       } else {
