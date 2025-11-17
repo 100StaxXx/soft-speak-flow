@@ -57,23 +57,43 @@ serve(async (req) => {
     // Get check-in details and verify ownership
     const { data: checkIn, error: checkInError } = await supabase
       .from('daily_check_ins')
-      .select('*, profiles!inner(selected_mentor_id)')
+      .select('*')
       .eq('id', checkInId)
       .single()
 
-    if (checkInError) throw checkInError
+    if (checkInError) {
+      console.error('Check-in fetch error:', checkInError);
+      throw checkInError;
+    }
     
     // Verify the check-in belongs to the authenticated user
     if (checkIn.user_id !== user.id) {
       throw new Error('Unauthorized: You can only access your own check-ins')
     }
 
+    // Get user's selected mentor from profiles
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('selected_mentor_id')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile?.selected_mentor_id) {
+      console.error('Profile fetch error:', profileError);
+      throw new Error('User profile or mentor not found')
+    }
+
     // Get mentor personality
-    const { data: mentor } = await supabase
+    const { data: mentor, error: mentorError } = await supabase
       .from('mentors')
       .select('name, tone_description, slug')
-      .eq('id', checkIn.profiles.selected_mentor_id)
+      .eq('id', profile.selected_mentor_id)
       .single()
+
+    if (mentorError || !mentor) {
+      console.error('Mentor fetch error:', mentorError);
+      throw new Error('Mentor not found')
+    }
 
     if (!mentor) throw new Error('Mentor not found')
 
