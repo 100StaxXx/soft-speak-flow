@@ -235,7 +235,8 @@ export const AppWalkthrough = () => {
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { status, action, index, type, lifecycle } = data;
 
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+    // Only allow finishing when tutorial is complete, prevent skipping
+    if (status === STATUS.FINISHED) {
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
@@ -283,16 +284,17 @@ export const AppWalkthrough = () => {
       callback={handleJoyrideCallback}
       continuous
       showProgress
-      showSkipButton
+      showSkipButton={false}
       disableOverlayClose
       disableCloseOnEsc
       hideCloseButton
+      disableScrolling
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.7)',
+          overlayColor: 'rgba(0, 0, 0, 0.9)',
           zIndex: 10000,
         },
         tooltip: {
@@ -317,8 +319,8 @@ export const AppWalkthrough = () => {
           color: 'hsl(var(--muted-foreground))',
           marginRight: '1rem',
         },
-        buttonSkip: {
-          color: 'hsl(var(--muted-foreground))',
+        overlay: {
+          mixBlendMode: 'normal',
         },
       }}
       locale={{
@@ -326,7 +328,6 @@ export const AppWalkthrough = () => {
         close: 'Close',
         last: 'Finish',
         next: 'Next',
-        skip: 'Skip Tutorial',
       }}
     />
   );
