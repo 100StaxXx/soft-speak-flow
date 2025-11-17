@@ -36,13 +36,16 @@ const Companion = lazy(() => import("./pages/Companion"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      ...queryRetryConfig,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+      gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
+      refetchOnWindowFocus: false, // Don't refetch on tab switch
+      refetchOnReconnect: true, // Refetch on reconnect
+      retry: 2, // Retry failed requests twice
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
     },
     mutations: {
-      ...queryRetryConfig,
+      retry: 1,
+      retryDelay: 1000,
     },
   },
 });

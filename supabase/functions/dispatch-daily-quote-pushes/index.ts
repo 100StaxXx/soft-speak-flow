@@ -26,9 +26,11 @@ serve(async (req) => {
       .from('user_daily_quote_pushes')
       .select(`
         *,
-        daily_quotes:daily_quote_id (
-          *,
-          quotes:quote_id (*)
+        daily_quotes!inner (
+          id,
+          quote_id,
+          mentor_slug,
+          for_date
         )
       `)
       .lte('scheduled_at', now)
@@ -49,9 +51,15 @@ serve(async (req) => {
       try {
         console.log(`Dispatching quote push ${push.id} to user ${push.user_id}`);
         
-        const quote = push.daily_quotes?.quotes;
-        if (!quote) {
-          console.error(`No quote found for push ${push.id}`);
+        // Fetch the actual quote using the quote_id from daily_quotes
+        const { data: quote, error: quoteError } = await supabase
+          .from('quotes')
+          .select('*')
+          .eq('id', push.daily_quotes.quote_id)
+          .single();
+
+        if (quoteError || !quote) {
+          console.error(`No quote found for push ${push.id}:`, quoteError);
           continue;
         }
 
