@@ -124,7 +124,6 @@ export const useMissionAutoComplete = () => {
             if (template && MISSION_ACTIVITY_MAP[template]) {
               // Trigger chain bonus missions if configured
               // This would be implemented in a separate function
-              console.log(`Mission ${template} completed - check for chain bonuses`);
             }
 
             // Invalidate queries

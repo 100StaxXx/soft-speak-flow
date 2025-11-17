@@ -6,7 +6,6 @@ import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { transcribePepTalk } from "@/utils/transcribeHelper";
 
 interface CaptionWord {
   word: string;
