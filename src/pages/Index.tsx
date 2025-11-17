@@ -58,18 +58,18 @@ const Index = () => {
   }, [user]);
 
   useEffect(() => {
-    // Check if user needs to create a companion
-    if (user && profile?.selected_mentor_id && !companion && !companionLoading) {
-      // User has a mentor but no companion - redirect to companion creation
-      navigate("/onboarding");
-      return;
+    // Only redirect to onboarding if user has mentor but no companion
+    // Don't check for companionLoading to avoid race conditions
+    if (user && profile?.selected_mentor_id && !companion) {
+      // Wait a bit to see if companion loads
+      const timer = setTimeout(() => {
+        if (!companion) {
+          navigate("/onboarding");
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }
-    
-    // Show onboarding if user has mentor and companion but hasn't completed the feature tour
-    if (user && profile?.selected_mentor_id && companion && !profile?.onboarding_completed) {
-      setTimeout(() => setShowOnboarding(true), 1000);
-    }
-  }, [user, profile, companion, companionLoading, navigate]);
+  }, [user, profile, companion, navigate]);
 
   if (showIntro) {
     return <IntroScreen onComplete={() => setShowIntro(false)} />;
