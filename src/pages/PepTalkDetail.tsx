@@ -76,17 +76,34 @@ const PepTalkDetail = () => {
     setIsTranscribing(true);
     toast.info("Transcribing audio... This may take a minute.");
     
-    const result = await transcribePepTalk(id, pepTalk.audio_url);
-    
-    if (result.success) {
-      toast.success("Transcript generated successfully!");
-      // Refresh the pep talk to get the new transcript
-      fetchPepTalk(id);
-    } else {
+    try {
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { audioUrl: pepTalk.audio_url }
+      });
+
+      if (error) throw error;
+
+      if (data?.transcript && Array.isArray(data.transcript)) {
+        // Update the database with the new transcript
+        const { error: updateError } = await supabase
+          .from('pep_talks')
+          .update({ transcript: data.transcript })
+          .eq('id', id);
+
+        if (updateError) throw updateError;
+
+        toast.success("Transcript generated successfully!");
+        // Refresh the pep talk to show the new transcript
+        await fetchPepTalk(id);
+      } else {
+        throw new Error('No transcript data returned');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
       toast.error("Failed to generate transcript");
+    } finally {
+      setIsTranscribing(false);
     }
-    
-    setIsTranscribing(false);
   };
 
   if (loading) {
@@ -109,7 +126,7 @@ const PepTalkDetail = () => {
         {/* Back Button */}
         <Button
           variant="ghost"
-          onClick={() => navigate("/library")}
+          onClick={() => navigate("/inspire")}
           className="mb-6 rounded-full hover:bg-secondary"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

@@ -12,9 +12,11 @@ interface PepTalkCardProps {
   quote?: string;
   isPremium?: boolean;
   onClick?: () => void;
+  emotionalTriggers?: string[];
+  highlightedTriggers?: string[];
 }
 
-export const PepTalkCard = ({ id, title, category, topicCategories, description, quote, isPremium, onClick }: PepTalkCardProps) => {
+export const PepTalkCard = ({ id, title, category, topicCategories, description, quote, isPremium, onClick, emotionalTriggers, highlightedTriggers }: PepTalkCardProps) => {
   const navigate = useNavigate();
 
   // Combine category and topic_categories, remove duplicates
@@ -22,6 +24,10 @@ export const PepTalkCard = ({ id, title, category, topicCategories, description,
     category,
     ...(topicCategories || [])
   ].filter(Boolean)));
+
+  // Check if this pep talk has any of the highlighted triggers
+  const hasHighlightedTrigger = highlightedTriggers && highlightedTriggers.length > 0 && 
+    emotionalTriggers?.some(trigger => highlightedTriggers.includes(trigger));
 
   const handleClick = () => {
     if (onClick) {
@@ -33,7 +39,9 @@ export const PepTalkCard = ({ id, title, category, topicCategories, description,
   return (
     <Card
       onClick={handleClick}
-      className="p-5 cursor-pointer hover:shadow-glow transition-all duration-300 bg-graphite border-2 border-steel/20 hover:border-royal-gold rounded-lg relative"
+      className={`p-5 cursor-pointer hover:shadow-glow transition-all duration-300 bg-graphite border-2 ${
+        hasHighlightedTrigger ? 'border-royal-gold shadow-glow' : 'border-steel/20'
+      } hover:border-royal-gold rounded-lg relative`}
     >
       {isPremium && (
         <div className="absolute top-4 right-12">
@@ -51,7 +59,9 @@ export const PepTalkCard = ({ id, title, category, topicCategories, description,
         />
       </div>
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-royal-gold flex items-center justify-center">
+        <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+          hasHighlightedTrigger ? 'bg-royal-gold animate-pulse' : 'bg-royal-gold'
+        }`}>
           <Heart className="h-5 w-5 text-obsidian" fill="currentColor" />
         </div>
         
@@ -62,6 +72,11 @@ export const PepTalkCard = ({ id, title, category, topicCategories, description,
                 {cat}
               </span>
             ))}
+            {hasHighlightedTrigger && (
+              <span className="text-xs font-bold text-royal-gold uppercase tracking-wider animate-pulse">
+                ✨ Match
+              </span>
+            )}
           </div>
           <h3 className="font-heading text-base md:text-lg font-black text-pure-white mb-2 line-clamp-2 uppercase tracking-tight break-words">
             {title}
