@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionEvolution } from "@/components/CompanionEvolution";
+import { useState, useEffect } from "react";
 
 const STAGE_NAMES = {
   0: "Mysterious Egg",
@@ -36,7 +38,18 @@ export const CompanionDisplay = () => {
   const stageName = STAGE_NAMES[companion.current_stage as keyof typeof STAGE_NAMES] || "Unknown";
 
   return (
-    <Card className="relative overflow-hidden">
+    <>
+      <CompanionEvolution
+        isEvolving={isEvolving}
+        newStage={evolutionData?.stage || 0}
+        newImageUrl={evolutionData?.imageUrl || ""}
+        onComplete={() => {
+          setIsEvolving(false);
+          setEvolutionData(null);
+        }}
+      />
+
+      <Card className="relative overflow-hidden">
       {/* Background gradient based on element */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-50" />
       
