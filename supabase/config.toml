@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.generate-reflection-reply]
 verify_jwt = false
+
+[functions.generate-evolution-voice]
+verify_jwt = false
