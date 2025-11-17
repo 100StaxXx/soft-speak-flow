@@ -89,7 +89,7 @@ export const MorningCheckIn = () => {
       <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Sunrise className="h-6 w-6 text-primary" />
+            <Sunrise className="h-6 w-6 text-orange-500" />
           </div>
           <div className="flex-1 space-y-3">
             <div>
@@ -130,7 +130,7 @@ export const MorningCheckIn = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sunrise className="h-5 w-5 text-primary" />
+            <Sunrise className="h-5 w-5 text-orange-500" />
           </div>
           <div>
             <h3 className="font-heading font-black text-lg md:text-xl">Check-in</h3>

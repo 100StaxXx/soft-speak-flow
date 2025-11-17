@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
-import { TrendingUp, Calendar, Heart, Target, Swords } from "lucide-react";
+import { TrendingUp, Sunrise, Target, Swords } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SlideUp } from "./PageTransition";
@@ -88,10 +88,10 @@ export const WeeklyInsights = () => {
       color: "text-primary"
     },
     {
-      icon: Calendar,
+      icon: Sunrise,
       label: "Check-Ins",
       value: weeklyData.checkIns.length,
-      color: "text-accent"
+      color: "text-orange-500"
     },
     {
       icon: Swords,
