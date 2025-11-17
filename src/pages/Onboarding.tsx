@@ -52,17 +52,11 @@ export default function Onboarding() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [stage]);
 
-  const waitForProfileUpdate = async (userId: string, tries = 8) => {
-    for (let i = 0; i < tries; i++) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('selected_mentor_id')
-        .eq('id', userId)
-        .maybeSingle();
-      if (data?.selected_mentor_id) return true;
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    return false;
+  // No need to wait - profile updates are immediate
+  const waitForProfileUpdate = async () => {
+    // Small delay to ensure UI state updates
+    await new Promise((r) => setTimeout(r, 100));
+    return true;
   };
 
   const handleQuestionnaireComplete = async (completedAnswers: Record<string, string>) => {
@@ -150,10 +144,8 @@ export default function Onboarding() {
         description: `${recommendedMentor.name} is now your guide.`,
       });
 
-      // Wait for the profile to reflect the update
-      await waitForProfileUpdate(user.id);
-
       // Move to companion creation
+      await waitForProfileUpdate();
       setStage('companion');
     } catch (error) {
       console.error("Error selecting mentor:", error);
@@ -227,13 +219,11 @@ export default function Onboarding() {
         description: chosenMentor ? `${chosenMentor.name} is now your guide!` : "Your mentor has been selected!",
       });
 
-      // Wait for the profile to reflect the update
-      await waitForProfileUpdate(user.id);
-
       // Mark onboarding complete for walkthrough trigger
       localStorage.setItem('onboardingComplete', 'true');
 
-      // Move to companion creation instead of navigating away
+      // Move to companion creation
+      await waitForProfileUpdate();
       setStage('companion');
     } catch (error) {
       console.error("Error selecting mentor:", error);
