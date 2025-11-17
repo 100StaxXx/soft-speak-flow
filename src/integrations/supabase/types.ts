@@ -358,6 +358,41 @@ export type Database = {
         }
         Relationships: []
       }
+      companion_evolutions: {
+        Row: {
+          companion_id: string
+          evolved_at: string
+          id: string
+          image_url: string
+          stage: number
+          xp_at_evolution: number
+        }
+        Insert: {
+          companion_id: string
+          evolved_at?: string
+          id?: string
+          image_url: string
+          stage: number
+          xp_at_evolution: number
+        }
+        Update: {
+          companion_id?: string
+          evolved_at?: string
+          id?: string
+          image_url?: string
+          stage?: number
+          xp_at_evolution?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_evolutions_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_check_ins: {
         Row: {
           check_in_date: string
@@ -1389,6 +1424,53 @@ export type Database = {
           },
         ]
       }
+      user_companion: {
+        Row: {
+          core_element: string
+          created_at: string
+          current_image_url: string | null
+          current_stage: number
+          current_xp: number
+          favorite_color: string
+          id: string
+          spirit_animal: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          core_element: string
+          created_at?: string
+          current_image_url?: string | null
+          current_stage?: number
+          current_xp?: number
+          favorite_color: string
+          id?: string
+          spirit_animal: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          core_element?: string
+          created_at?: string
+          current_image_url?: string | null
+          current_stage?: number
+          current_xp?: number
+          favorite_color?: string
+          id?: string
+          spirit_animal?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_companion_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_daily_pushes: {
         Row: {
           created_at: string
@@ -1685,6 +1767,51 @@ export type Database = {
             columns: ["written_id"]
             isOneToOne: false
             referencedRelation: "written_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xp_events: {
+        Row: {
+          companion_id: string
+          created_at: string
+          event_metadata: Json | null
+          event_type: string
+          id: string
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          companion_id: string
+          created_at?: string
+          event_metadata?: Json | null
+          event_type: string
+          id?: string
+          user_id: string
+          xp_earned: number
+        }
+        Update: {
+          companion_id?: string
+          created_at?: string
+          event_metadata?: Json | null
+          event_type?: string
+          id?: string
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xp_events_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xp_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

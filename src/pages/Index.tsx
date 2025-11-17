@@ -14,6 +14,7 @@ import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { MentorNudges } from "@/components/MentorNudges";
 import { WeeklyInsights } from "@/components/WeeklyInsights";
+import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { Card } from "@/components/ui/card";
 import { MessageSquare, CheckCircle } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -98,6 +99,7 @@ const Index = () => {
             </div>
 
             {/* Priority Content */}
+            <CompanionDisplay />
             <MentorNudges />
             <MorningCheckIn />
             <TodaysPepTalk />
