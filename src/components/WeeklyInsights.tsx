@@ -97,7 +97,7 @@ export const WeeklyInsights = () => {
       icon: Swords,
       label: "Quests",
       value: weeklyData.quests.length,
-      color: "text-red-500"
+      color: "text-amber-500"
     }
   ];
 
