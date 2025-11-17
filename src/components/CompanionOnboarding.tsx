@@ -127,9 +127,9 @@ export const CompanionOnboarding = () => {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <Card className="relative overflow-hidden bg-gradient-to-br from-card via-primary/5 to-accent/10 border-primary/40 shadow-glow-lg">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-card via-primary/5 to-accent/10 border-primary/40 shadow-glow-lg w-full max-w-md">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
               
               <div className="relative p-6 space-y-6">
