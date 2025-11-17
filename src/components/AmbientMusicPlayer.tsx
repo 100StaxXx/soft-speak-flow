@@ -18,14 +18,25 @@ export const AmbientMusicPlayer = () => {
       setState(ambientMusic.getState());
     };
 
+    // Pause audio when app is not visible
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        ambientMusic.pause();
+      } else if (!state.isMuted) {
+        ambientMusic.play();
+      }
+    };
+
     window.addEventListener('bg-music-volume-change', updateState);
     window.addEventListener('bg-music-mute-change', updateState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [state.isMuted]);
 
   const handleToggle = () => {
     ambientMusic.toggleMute();
