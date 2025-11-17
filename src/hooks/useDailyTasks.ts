@@ -77,6 +77,8 @@ export const useDailyTasks = () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed) {
         awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        // Dispatch event for walkthrough
+        window.dispatchEvent(new CustomEvent('task-complete'));
       }
     },
   });
