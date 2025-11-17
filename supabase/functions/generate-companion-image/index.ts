@@ -213,12 +213,20 @@ Background: Simple dark gradient to make the egg's glow stand out prominently.`;
       // Evolution stages 1-9
       prompt = `Create Stage ${stage} evolution of a ${sanitizedAnimal} companion creature.
 
+EVOLUTION CONTINUITY (CRITICAL - Like Pokemon/Digimon):
+- This creature MUST maintain recognizable design elements from its previous stages
+- Core ${sanitizedAnimal} features (face shape, body structure, distinctive markings) MUST remain consistent
+- Color scheme stays anchored to ${favoriteColor} with same pattern placement
+- Evolution should feel like the SAME creature growing more powerful, NOT a different creature
+- Visual signature elements (eyes, ears, tail, wings if applicable) must carry through all stages
+
 EVOLUTION STAGE: ${stageInfo.name}
 
-CRITICAL IDENTITY:
-- Species: ${sanitizedAnimal} (must be INSTANTLY recognizable with proper ${sanitizedAnimal} anatomy)
-- Primary Color: ${favoriteColor} (dominant throughout entire body, aura, and effects)
-- Element Affinity: ${coreElement}
+SPECIES IDENTITY:
+- Base Species: ${sanitizedAnimal} (anatomy must be accurate and instantly recognizable)
+- Signature Features: Keep distinctive ${sanitizedAnimal} characteristics (face, ears, body shape, limbs)
+- Color Palette: ${favoriteColor} as primary color (same shades and patterns as previous stages)
+- Elemental Affinity: ${coreElement}
 
 STAGE ${stage} SPECIFICATIONS:
 - Size: ${stageInfo.size}
@@ -226,32 +234,53 @@ STAGE ${stage} SPECIFICATIONS:
 - Power Level: ${stageInfo.powerLevel}
 - Visual Focus: ${stageInfo.visualFocus}
 
-ELEMENTAL EFFECTS:
-${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+EVOLUTION APPROACH (Pokemon/Digimon Style):
+- GRADUAL transformation: Add new features while preserving existing ones
+- Maintain facial expression style and personality from previous stages
+- Keep the same eye color and shape (just make them glow more with power)
+- Retain body proportions philosophy (if quadruped stays quadruped, etc.)
+- Add armor-like elemental formations that enhance rather than replace features
+- New stage = same creature + enhanced power manifestation + size increase
 
-KEY VISUAL DETAILS FOR STAGE ${stage}:
+ELEMENTAL EFFECTS FOR STAGE ${stage}:
+${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+(Effects should wrap AROUND the creature, not obscure its features)
+
+STAGE ${stage} SPECIFIC DETAILS:
 ${stageInfo.details}
+
+VISUAL CONTINUITY CHECKLIST:
+✓ Same ${sanitizedAnimal} face shape and expression style
+✓ Same ${favoriteColor} color distribution pattern
+✓ Same body type (wings, legs, tail configuration)
+✓ Same eye placement and basic eye design
+✓ Same personality/character visible in pose
+✓ Elemental markings in same locations, just more elaborate
+✓ Previous stage features visible but evolved, not replaced
 
 ATMOSPHERE & PRESENCE:
 ${stageInfo.atmosphere}
 
 CRITICAL REQUIREMENTS:
-- The ${sanitizedAnimal} features must be anatomically accurate and immediately recognizable
-- Stage ${stage} should look DRAMATICALLY more powerful than Stage ${stage - 1}
-- Size should be noticeably larger than previous stage
-- ${favoriteColor} must be the dominant color scheme throughout
-- ${coreElement} effects should be proportional to this power level
+- This must look like THE SAME ${sanitizedAnimal} from Stage 0, just more powerful
+- ${favoriteColor} stays the dominant color (70%+ of body)
+- Someone who saw Stage ${stage - 1} should immediately recognize this as the next form
+- Features evolve but NEVER completely change (like Charmander→Charmeleon→Charizard staying recognizably related)
+- ${coreElement} effects enhance the creature's power without hiding its features
 
-IMPORTANT GUIDELINES:
-- Inspiring and empowering, not dark or evil
-- Designed for motivation/mental fitness app
-- Friendly but powerful and majestic
-- Each evolution stage must be DISTINCTLY different
+DESIGN PHILOSOPHY:
+Think Pokemon/Digimon: each stage is the same character leveling up, gaining power and size, with new armor/effects, but ALWAYS recognizable as the same companion throughout the journey.
 
-Art Style: Epic high-fantasy digital art, cinematic dramatic lighting, intense ${coreElement} elemental effects, glowing ${favoriteColor} color palette, photorealistic creature design.
-Background: Dynamic atmospheric environment that reflects Stage ${stage} power level and complements ${coreElement} element.
+IMPORTANT TONE:
+- Inspiring, empowering companion for motivation/personal growth
+- Friendly and loyal guardian energy
+- Majestic but never frightening or evil
+- Each stage celebrates growth and achievement
 
-Focus on making this Stage ${stage} evolution look significantly more evolved, larger, and more powerful than any previous stage.`;
+Art Style: Epic fantasy digital art, cinematic lighting, dynamic ${coreElement} elemental effects, ${favoriteColor}-dominant color palette, character design continuity like Pokemon evolutions.
+Background: Atmospheric environment reflecting Stage ${stage} power level, complementing ${coreElement} element without overwhelming the creature.
+
+Focus on visual continuity and recognizable evolution progression while showing significant power growth for Stage ${stage}.`;
     }
 
     console.log("Generated prompt:", prompt);
