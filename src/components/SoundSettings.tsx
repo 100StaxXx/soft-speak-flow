@@ -10,13 +10,19 @@ import { soundManager } from "@/utils/soundEffects";
 export const SoundSettings = () => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
+  const [bgMusicMuted, setBgMusicMuted] = useState(false);
 
   useEffect(() => {
     const savedVolume = localStorage.getItem('sound_volume');
     const savedMuted = localStorage.getItem('sound_muted');
+    const savedBgVolume = localStorage.getItem('bg_music_volume');
+    const savedBgMuted = localStorage.getItem('bg_music_muted');
     
     if (savedVolume) setVolume(parseFloat(savedVolume));
     if (savedMuted) setIsMuted(savedMuted === 'true');
+    if (savedBgVolume) setBgMusicVolume(parseFloat(savedBgVolume));
+    if (savedBgMuted) setBgMusicMuted(savedBgMuted === 'true');
   }, []);
 
   const handleVolumeChange = (values: number[]) => {
@@ -28,6 +34,20 @@ export const SoundSettings = () => {
   const handleMuteToggle = () => {
     const muted = soundManager.toggleMute();
     setIsMuted(muted);
+  };
+
+  const handleBgMusicVolumeChange = (values: number[]) => {
+    const newVolume = values[0];
+    setBgMusicVolume(newVolume);
+    localStorage.setItem('bg_music_volume', newVolume.toString());
+    window.dispatchEvent(new CustomEvent('bg-music-volume-change', { detail: newVolume }));
+  };
+
+  const handleBgMusicMuteToggle = () => {
+    const newMuted = !bgMusicMuted;
+    setBgMusicMuted(newMuted);
+    localStorage.setItem('bg_music_muted', newMuted.toString());
+    window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMuted }));
   };
 
   const testSound = (soundFn: () => void) => {
@@ -142,6 +162,48 @@ export const SoundSettings = () => {
               <span className="mr-2">🔥</span>
               Streak
             </Button>
+          </div>
+        </div>
+
+        {/* Background Music Section */}
+        <div className="pt-6 mt-6 border-t space-y-4">
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Music className="w-4 h-4" />
+              Background Music
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Ambient music for a relaxing experience
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                {bgMusicMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                Music Volume
+              </Label>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(bgMusicVolume * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[bgMusicVolume]}
+              onValueChange={handleBgMusicVolumeChange}
+              max={1}
+              step={0.05}
+              disabled={bgMusicMuted}
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <Label htmlFor="bg-mute">Mute Background Music</Label>
+            <Switch
+              id="bg-mute"
+              checked={bgMusicMuted}
+              onCheckedChange={handleBgMusicMuteToggle}
+            />
           </div>
         </div>
       </div>
