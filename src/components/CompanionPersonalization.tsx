@@ -77,7 +77,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         {/* Color Selection with Color Wheel */}
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite color</Label>
-          <div className="flex items-center gap-4">
+          <div className="flex justify-center">
             <div className="relative">
               <input
                 type="color"
@@ -89,14 +89,6 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
                 }}
               />
               <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-br from-white/20 to-transparent" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="text-sm text-muted-foreground">Selected Color</div>
-              <div 
-                className="h-20 rounded-lg border-2 border-border shadow-soft transition-all"
-                style={{ backgroundColor: selectedColor }}
-              />
-              <div className="text-xs text-muted-foreground font-mono">{selectedColor}</div>
             </div>
           </div>
         </div>
