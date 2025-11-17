@@ -148,6 +148,28 @@ export const AppWalkthrough = () => {
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
 
+  // Utility: wait for a selector to exist before advancing
+  const waitForSelector = useCallback((selector: string, timeout = 5000) => {
+    return new Promise<void>((resolve) => {
+      const start = Date.now();
+      const check = () => {
+        if (document.querySelector(selector)) return resolve();
+        if (Date.now() - start > timeout) return resolve();
+        requestAnimationFrame(check);
+      };
+      check();
+    });
+  }, []);
+
+  // Utility: safely set step after ensuring target exists
+  const safeSetStep = useCallback(async (idx: number) => {
+    const target = WALKTHROUGH_STEPS[idx]?.target as string | undefined;
+    if (target && target !== 'body') {
+      await waitForSelector(target, 6000);
+    }
+    setStepIndex(idx);
+  }, [waitForSelector]);
+
   useEffect(() => {
     const checkWalkthroughStatus = async () => {
       if (!user) return;
@@ -164,10 +186,11 @@ export const AppWalkthrough = () => {
           .maybeSingle();
 
         if (companion && location.pathname === '/') {
-          // Small delay to ensure DOM is ready
+          // Wait for initial step target to be present, then start
+          await waitForSelector((WALKTHROUGH_STEPS[0].target as string) || 'body', 8000);
           setTimeout(() => {
             setRun(true);
-          }, 1000);
+          }, 300);
         }
       }
     };
@@ -201,7 +224,7 @@ export const AppWalkthrough = () => {
       if (run && stepIndex === 1 && waitingForAction) {
         haptics.success(); // Celebratory feedback for check-in
         setWaitingForAction(false);
-        setStepIndex(2);
+        safeSetStep(2);
       }
     };
 
@@ -307,7 +330,7 @@ export const AppWalkthrough = () => {
     }
 
     // Handle step progression
-    if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
+    if (type === EVENTS.STEP_AFTER) {
       const nextStepIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
       // Light haptic feedback for regular step progression
