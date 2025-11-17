@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords } from "lucide-react";
+import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { useActivityFeed } from "@/hooks/useActivityFeed";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { cn } from "@/lib/utils";
+import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 
 export default function Tasks() {
   const { user } = useAuth();
@@ -169,9 +170,9 @@ export default function Tasks() {
           </div>
         </div>
 
-        <Tabs defaultValue="tasks" className="w-full">
+        <Tabs defaultValue="quests" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="tasks" className="gap-2" data-tour="tasks-tab">
+            <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
               <Swords className="h-4 w-4" />
               Daily Quests
             </TabsTrigger>
@@ -181,11 +182,67 @@ export default function Tasks() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks" className="space-y-4 mt-6">
+          <TabsContent value="quests" className="space-y-4 mt-4">
+            {/* Week Calendar Navigation */}
+            <Card className="p-4 bg-gradient-to-br from-primary/5 to-accent/5">
+              <div className="flex items-center justify-between mb-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedDate(addDays(selectedDate, -7))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h3 className="font-semibold text-sm">
+                  {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedDate(addDays(selectedDate, 7))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map((day) => {
+                  const isSelected = isSameDay(day, selectedDate);
+                  const isToday = isSameDay(day, new Date());
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      onClick={() => setSelectedDate(day)}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+                        isSelected 
+                          ? "bg-primary text-primary-foreground shadow-glow" 
+                          : "hover:bg-accent",
+                        isToday && !isSelected && "ring-2 ring-primary/30"
+                      )}
+                    >
+                      <span className="text-xs font-medium mb-1">
+                        {format(day, 'EEE')}
+                      </span>
+                      <span className={cn(
+                        "text-lg font-bold",
+                        isSelected && "text-primary-foreground"
+                      )}>
+                        {format(day, 'd')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold">Today's Quests</h3>
+                  <h3 className="font-semibold">
+                    {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
+                  </h3>
                   <p className="text-sm text-muted-foreground">Max 3 quests per day</p>
                 </div>
                 <div className="text-sm font-medium text-primary">

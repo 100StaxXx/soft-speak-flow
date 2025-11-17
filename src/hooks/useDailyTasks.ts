@@ -4,21 +4,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 
-export const useDailyTasks = () => {
+export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
 
+  const taskDate = selectedDate 
+    ? selectedDate.toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['daily-tasks', user?.id],
+    queryKey: ['daily-tasks', user?.id, taskDate],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('daily_tasks')
         .select('*')
         .eq('user_id', user!.id)
-        .eq('task_date', today)
+        .eq('task_date', taskDate)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
@@ -28,7 +31,11 @@ export const useDailyTasks = () => {
   });
 
   const addTask = useMutation({
-    mutationFn: async ({ taskText, difficulty }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard' }) => {
+    mutationFn: async ({ taskText, difficulty, taskDate: customDate }: { 
+      taskText: string; 
+      difficulty: 'easy' | 'medium' | 'hard';
+      taskDate?: string;
+    }) => {
       if (tasks.length >= 3) {
         throw new Error('Maximum 3 tasks per day');
       }
@@ -43,6 +50,7 @@ export const useDailyTasks = () => {
           task_text: taskText,
           difficulty,
           xp_reward: xpReward,
+          task_date: customDate || taskDate,
         });
 
       if (error) throw error;
