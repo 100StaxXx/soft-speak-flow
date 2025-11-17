@@ -38,6 +38,7 @@ export const XPBreakdown = () => {
 
   const typeLabels: Record<string, string> = {
     habit_complete: "Habits",
+    task_complete: "Tasks",
     check_in: "Check-in",
     pep_talk: "Pep Talk",
     all_habits_complete: "All Habits Bonus",
