@@ -6,6 +6,7 @@ interface MentorPersonality {
   name: string;
   tone: string;
   style: string;
+  avatar_url?: string;
   buttonText: (action: string) => string;
   emptyState: (context: string) => string;
   encouragement: () => string;
@@ -54,7 +55,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
       if (!profile?.selected_mentor_id) return null;
       const { data } = await supabase
         .from('mentors')
-        .select('name, tone_description, style')
+        .select('name, tone_description, style, avatar_url')
         .eq('id', profile.selected_mentor_id)
         .single();
       return data;
@@ -82,6 +83,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
     name: mentor.name,
     tone: mentor.tone_description,
     style: mentor.style || '',
+    avatar_url: mentor.avatar_url || undefined,
     buttonText: template.buttonText!,
     emptyState: template.emptyState!,
     encouragement: template.encouragement!,
