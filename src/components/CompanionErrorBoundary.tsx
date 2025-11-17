@@ -41,9 +41,9 @@ const CompanionErrorFallback = ({ error }: { error: Error | null }) => {
   const navigate = useNavigate();
   
   return (
-    <Card className="p-8 text-center bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/30">
+    <Card className="p-8 text-center bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/30" role="alert" aria-live="assertive">
       <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
-        <div className="h-16 w-16 rounded-full bg-destructive/20 flex items-center justify-center">
+        <div className="h-16 w-16 rounded-full bg-destructive/20 flex items-center justify-center" aria-hidden="true">
           <AlertCircle className="h-8 w-8 text-destructive" />
         </div>
         
@@ -60,26 +60,28 @@ const CompanionErrorFallback = ({ error }: { error: Error | null }) => {
           <Button
             onClick={() => window.location.reload()}
             className="gap-2"
+            aria-label="Reload page to retry loading companion"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Retry
           </Button>
           <Button
             variant="outline"
             onClick={() => navigate("/")}
             className="gap-2"
+            aria-label="Return to home page"
           >
-            <Home className="h-4 w-4" />
+            <Home className="h-4 w-4" aria-hidden="true" />
             Go Home
           </Button>
         </div>
 
         {error && (
           <details className="mt-4 text-xs text-muted-foreground max-w-full">
-            <summary className="cursor-pointer hover:text-foreground">
+            <summary className="cursor-pointer hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary rounded">
               Technical Details
             </summary>
-            <pre className="mt-2 p-3 bg-background/50 rounded text-left overflow-auto max-h-32">
+            <pre className="mt-2 p-3 bg-background/50 rounded text-left overflow-auto max-h-32" aria-label="Error details">
               {error.message}
             </pre>
           </details>
