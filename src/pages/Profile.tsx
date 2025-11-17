@@ -18,6 +18,7 @@ import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
+import { SoundSettings } from "@/components/SoundSettings";
 
 const Profile = () => {
   const { user, signOut } = useAuth();

@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { playAchievementUnlock } from "@/utils/soundEffects";
 
 interface AchievementData {
   type: string;
@@ -44,6 +45,7 @@ export const useAchievements = () => {
         toast.success("🏆 Achievement Unlocked!", {
           description: achievement.title,
         });
+        playAchievementUnlock();
       }
     } catch (error) {
       console.error("Error awarding achievement:", error);
