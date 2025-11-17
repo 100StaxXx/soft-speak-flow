@@ -21,6 +21,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { MilestoneModal } from "@/components/MilestoneModal";
+import { StreakMilestoneModal } from "@/components/StreakMilestoneModal";
+import confetti from "canvas-confetti";
 
 export default function Habits() {
   const { user } = useAuth();
@@ -36,6 +38,8 @@ export default function Habits() {
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; streak: number; title: string } | null>(null);
+  const [streakMilestone, setStreakMilestone] = useState<{ open: boolean; streak: number } | null>(null);
+  const [isFirstCompletion, setIsFirstCompletion] = useState(false);
 
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
@@ -107,6 +111,18 @@ export default function Habits() {
       haptics.medium();
       const habit = habits.find(h => h.id === habitId);
       
+      // Check if this is user's first ever habit completion
+      const { data: previousCompletions } = await supabase
+        .from('habit_completions')
+        .select('id')
+        .eq('user_id', user!.id)
+        .limit(1);
+      
+      const isFirst = !previousCompletions || previousCompletions.length === 0;
+      if (isFirst) {
+        setIsFirstCompletion(true);
+      }
+      
       const { error } = await supabase.from('habit_completions').insert({
         habit_id: habitId,
         user_id: user!.id,
@@ -139,6 +155,21 @@ export default function Habits() {
       await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
       
+      // First completion celebration
+      if (isFirstCompletion) {
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#A76CFF', '#FFD700', '#FFA500'],
+        });
+        toast({
+          title: "🎉 Your First Habit Completion!",
+          description: "This is the start of something great. Keep going!",
+        });
+        setIsFirstCompletion(false);
+      }
+      
       // Check if all habits are complete
       const today = new Date().toISOString().split('T')[0];
       const { data: todaysCompletions } = await supabase
@@ -149,20 +180,34 @@ export default function Habits() {
       
       if (todaysCompletions && todaysCompletions.length === habits.length && habits.length > 0) {
         awardAllHabitsComplete();
+        confetti({
+          particleCount: 200,
+          spread: 120,
+          origin: { y: 0.6 },
+          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700'],
+          ticks: 400,
+        });
         toast({
           title: "🎉 All Habits Complete!",
           description: "Bonus XP awarded! Your companion is growing stronger!"
         });
       }
       
-      // Check for milestone
+      // Check for streak milestone
       const { data: updatedHabit } = await supabase
         .from('habits')
         .select('current_streak, title')
         .eq('id', habitId)
         .single();
       
-      if (updatedHabit && [3, 7, 14, 30, 100].includes(updatedHabit.current_streak)) {
+      if (updatedHabit && [7, 30, 100].includes(updatedHabit.current_streak)) {
+        haptics.success();
+        setStreakMilestone({
+          open: true,
+          streak: updatedHabit.current_streak,
+        });
+      } else if (updatedHabit && [3, 14].includes(updatedHabit.current_streak)) {
+        // Smaller milestones
         haptics.success();
         setMilestoneModal({
           open: true,
@@ -346,6 +391,15 @@ export default function Habits() {
           streak={milestoneModal.streak}
           habitTitle={milestoneModal.title}
           mentorName={personality?.name}
+        />
+      )}
+      
+      {/* Streak Milestone Modal (7, 30, 100 days) */}
+      {streakMilestone && (
+        <StreakMilestoneModal
+          open={streakMilestone.open}
+          streak={streakMilestone.streak}
+          onClose={() => setStreakMilestone(null)}
         />
       )}
       
