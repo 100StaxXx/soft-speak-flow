@@ -3,20 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
 import { MentorResult } from "@/components/MentorResult";
 import { MentorGrid } from "@/components/MentorGrid";
+import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useCompanion } from "@/hooks/useCompanion";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'questionnaire' | 'result' | 'browse'>('questionnaire');
+  const [stage, setStage] = useState<'questionnaire' | 'result' | 'browse' | 'companion'>('questionnaire');
   const [mentors, setMentors] = useState<any[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<any>(null);
   const [explanation, setExplanation] = useState<any>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
   const { user } = useAuth();
+  const { createCompanion } = useCompanion();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -115,14 +118,14 @@ export default function Onboarding() {
 
       toast({
         title: "Mentor Selected!",
-        description: `${recommendedMentor.name} is now your guide. Let's begin!`,
+        description: `${recommendedMentor.name} is now your guide.`,
       });
 
-      // Wait for the profile to reflect the update to avoid redirect loop
+      // Wait for the profile to reflect the update
       await waitForProfileUpdate(user.id);
 
-      // Navigate without full reload
-      navigate("/", { replace: true });
+      // Move to companion creation
+      setStage('companion');
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
@@ -132,6 +135,24 @@ export default function Onboarding() {
       });
     } finally {
       setSelecting(false);
+    }
+  };
+
+  const handleCompanionCreated = async (data: {
+    favoriteColor: string;
+    spiritAnimal: string;
+    coreElement: string;
+  }) => {
+    try {
+      await createCompanion.mutateAsync(data);
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Error creating companion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create companion",
+        variant: "destructive",
+      });
     }
   };
 
@@ -218,6 +239,13 @@ export default function Onboarding() {
             />
           </div>
         </div>
+      )}
+
+      {stage === "companion" && (
+        <CompanionPersonalization
+          onComplete={handleCompanionCreated}
+          isLoading={createCompanion.isPending}
+        />
       )}
     </>
   );
