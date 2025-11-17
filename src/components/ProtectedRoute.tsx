@@ -88,7 +88,6 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
             <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
             <p className="text-foreground">Setting up your profile...</p>
           </div>
-          <Progress value={progress} className="w-full" />
         </div>
       </div>
     );
