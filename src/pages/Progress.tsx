@@ -1,24 +1,32 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAchievements } from "@/hooks/useAchievements";
 import { BottomNav } from "@/components/BottomNav";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
+import { HabitCard } from "@/components/HabitCard";
+import { HabitCalendar } from "@/components/HabitCalendar";
+import { WeeklyInsights } from "@/components/WeeklyInsights";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Target, Trophy, CheckCircle2, Calendar, Flame } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Target, Trophy, CheckCircle2, Calendar, TrendingUp } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 const Progress = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { checkStreakAchievements, checkChallengeAchievements } = useAchievements();
   const [showHabitForm, setShowHabitForm] = useState(false);
+  const [newHabitTitle, setNewHabitTitle] = useState("");
 
-  const { data: habits = [], refetch: refetchHabits } = useQuery({
+  const { data: habits = [] } = useQuery({
     queryKey: ["habits", user?.id],
     enabled: !!user,
     queryFn: async () => {
@@ -30,6 +38,21 @@ const Progress = () => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: todayCompletions = [] } = useQuery({
+    queryKey: ["today-completions", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("habit_completions")
+        .select("habit_id")
+        .eq("user_id", user!.id)
+        .eq("date", today);
+      if (error) throw error;
+      return data.map(c => c.habit_id);
     },
   });
 
@@ -62,6 +85,66 @@ const Progress = () => {
     },
   });
 
+  const addHabitMutation = useMutation({
+    mutationFn: async (title: string) => {
+      const { data, error } = await supabase
+        .from("habits")
+        .insert({
+          user_id: user!.id,
+          title,
+          frequency: "daily",
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      setShowHabitForm(false);
+      setNewHabitTitle("");
+      toast.success("Habit created!");
+    },
+  });
+
+  const completeHabitMutation = useMutation({
+    mutationFn: async (habitId: string) => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { error } = await supabase
+        .from("habit_completions")
+        .insert({
+          user_id: user!.id,
+          habit_id: habitId,
+          date: today,
+        });
+      if (error) throw error;
+
+      // Update streak
+      const habit = habits.find(h => h.id === habitId);
+      if (habit) {
+        const newStreak = (habit.current_streak || 0) + 1;
+        const newLongest = Math.max(newStreak, habit.longest_streak || 0);
+        
+        await supabase
+          .from("habits")
+          .update({ 
+            current_streak: newStreak,
+            longest_streak: newLongest,
+          })
+          .eq("id", habitId);
+
+        // Check for achievements
+        await checkStreakAchievements(newStreak);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["today-completions"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-calendar"] });
+      toast.success("Great job! Keep the streak going! 🔥");
+    },
+  });
+
   const startChallenge = async (challengeId: string, duration: number) => {
     if (!user) return;
     try {
@@ -79,7 +162,14 @@ const Progress = () => {
       });
 
       if (error) throw error;
-      toast.success("Challenge started!");
+      
+      queryClient.invalidateQueries({ queryKey: ["user-challenges"] });
+      
+      // Check achievements
+      const activeCount = (userChallenges?.length || 0) + 1;
+      await checkChallengeAchievements(activeCount);
+      
+      toast.success("Challenge started! Let's do this! 💪");
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -115,9 +205,13 @@ const Progress = () => {
             </TabsList>
 
             <TabsContent value="habits" className="space-y-4 mt-6">
+              <WeeklyInsights />
+              
+              <HabitCalendar />
+
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Your Habits</h2>
-                <Button onClick={() => setShowHabitForm(true)}>
+                <h2 className="text-xl font-semibold">Daily Habits</h2>
+                <Button onClick={() => setShowHabitForm(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Habit
                 </Button>
@@ -128,36 +222,23 @@ const Progress = () => {
                   <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
                   <h3 className="font-semibold mb-2">No Habits Yet</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Start building better habits today!
+                    Start building better habits today and watch your progress grow!
                   </p>
                   <Button onClick={() => setShowHabitForm(true)}>Create Your First Habit</Button>
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {habits.map((habit) => {
-                    const today = new Date().toISOString().split("T")[0];
-                    return (
-                      <Card key={habit.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{habit.title}</h3>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Flame className="h-4 w-4 text-orange-500" />
-                                <span>{habit.current_streak} day streak</span>
-                              </div>
-                              <div>
-                                <span>Best: {habit.longest_streak} days</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline">
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                  {habits.map((habit) => (
+                    <HabitCard
+                      key={habit.id}
+                      id={habit.id}
+                      title={habit.title}
+                      currentStreak={habit.current_streak || 0}
+                      longestStreak={habit.longest_streak || 0}
+                      completedToday={todayCompletions.includes(habit.id)}
+                      onComplete={() => completeHabitMutation.mutate(habit.id)}
+                    />
+                  ))}
                 </div>
               )}
             </TabsContent>
@@ -246,6 +327,41 @@ const Progress = () => {
           </Tabs>
         </div>
       </div>
+
+      <Dialog open={showHabitForm} onOpenChange={setShowHabitForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Habit</DialogTitle>
+            <DialogDescription>
+              Add a new daily habit to track. Keep it simple and specific!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="E.g., Morning meditation, Read 10 pages..."
+              value={newHabitTitle}
+              onChange={(e) => setNewHabitTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newHabitTitle.trim()) {
+                  addHabitMutation.mutate(newHabitTitle.trim());
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowHabitForm(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => newHabitTitle.trim() && addHabitMutation.mutate(newHabitTitle.trim())}
+                disabled={!newHabitTitle.trim() || addHabitMutation.isPending}
+              >
+                Create Habit
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <BottomNav />
     </PageTransition>
   );
