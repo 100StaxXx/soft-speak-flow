@@ -99,7 +99,7 @@ const Index = () => {
             {/* Header */}
             <div className="mb-4 md:mb-6">
               <h1 className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
-                Home
+                Mentor
               </h1>
               <p className="text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
             </div>

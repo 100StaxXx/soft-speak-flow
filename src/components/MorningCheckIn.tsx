@@ -93,18 +93,25 @@ export const MorningCheckIn = () => {
               <h3 className="font-bold text-lg">Check-in Complete</h3>
               <p className="text-sm text-muted-foreground">Focus: {existingCheckIn.intention}</p>
             </div>
-            {existingCheckIn.mentor_response && (
-              <div className="bg-secondary/50 rounded-lg p-4 border-l-2 border-primary">
+            
+            {/* Mentor Response Section */}
+            {existingCheckIn.mentor_response && personality && (
+              <div className="bg-gradient-to-br from-secondary/50 to-accent/5 rounded-lg p-4 border border-primary/10">
                 <div className="flex items-start gap-3">
-                  {personality?.avatar_url && (
-                    <Avatar className="h-10 w-10 flex-shrink-0 border-2 border-primary/20">
-                      <AvatarImage src={personality.avatar_url} alt={personality.name} />
-                      <AvatarFallback>{personality.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className="flex-1">
-                    <p className="text-sm italic">{existingCheckIn.mentor_response}</p>
-                    <p className="text-xs text-muted-foreground mt-2">— {personality?.name}</p>
+                  <Avatar className="h-12 w-12 flex-shrink-0 border-2 border-primary/30 shadow-glow-sm">
+                    <AvatarImage src={personality.avatar_url} alt={personality.name} />
+                    <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                      {personality.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{personality.name}</p>
+                      <Sparkles className="h-3 w-3 text-primary" />
+                    </div>
+                    <p className="text-sm italic text-foreground/90 leading-relaxed">
+                      "{existingCheckIn.mentor_response}"
+                    </p>
                   </div>
                 </div>
               </div>
