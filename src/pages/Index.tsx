@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useCompanion } from "@/hooks/useCompanion";
 import { IntroScreen } from "@/components/IntroScreen";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { BottomNav } from "@/components/BottomNav";
@@ -25,6 +26,7 @@ import { OnboardingFlow } from "@/components/OnboardingFlow";
 const Index = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const [showIntro, setShowIntro] = useState(() => {
@@ -56,11 +58,18 @@ const Index = () => {
   }, [user]);
 
   useEffect(() => {
-    // Show onboarding if user has mentor but hasn't completed the feature tour
-    if (user && profile?.selected_mentor_id && !profile?.onboarding_completed) {
+    // Check if user needs to create a companion
+    if (user && profile?.selected_mentor_id && !companion && !companionLoading) {
+      // User has a mentor but no companion - redirect to companion creation
+      navigate("/onboarding");
+      return;
+    }
+    
+    // Show onboarding if user has mentor and companion but hasn't completed the feature tour
+    if (user && profile?.selected_mentor_id && companion && !profile?.onboarding_completed) {
       setTimeout(() => setShowOnboarding(true), 1000);
     }
-  }, [user, profile]);
+  }, [user, profile, companion, companionLoading, navigate]);
 
   if (showIntro) {
     return <IntroScreen onComplete={() => setShowIntro(false)} />;
