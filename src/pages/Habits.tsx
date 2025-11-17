@@ -88,6 +88,9 @@ export default function Habits() {
       setShowAddForm(false);
       setShowTemplates(true);
     },
+    onError: (error: any) => {
+      toast({ title: 'Could not create habit', description: error.message || 'Please try again.', variant: 'destructive' });
+    },
   });
 
   const handleTemplateSelect = (title: string, frequency: string) => {
