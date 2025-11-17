@@ -102,23 +102,7 @@ const Index = () => {
             <MorningCheckIn />
             <TodaysPepTalk />
 
-            {/* Secondary Content - Collapsible */}
-            <details className="group" open>
-              <summary className="cursor-pointer list-none">
-                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <span className="font-medium text-sm">More insights</span>
-                  <svg className="h-5 w-5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </summary>
-              <div className="mt-4 space-y-6">
-                <QuoteOfTheDay />
-                <WeeklyInsights />
-                <ActivityTimeline />
-              </div>
-            </details>
-
+            <MentorQuickChat />
           </div>
         </div>
       </PageTransition>
