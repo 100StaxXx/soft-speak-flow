@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { Textarea } from "@/components/ui/textarea";
 import { MoodSelector } from "./MoodSelector";
 import { Sunrise, Target, Sparkles } from "lucide-react";
@@ -15,6 +16,7 @@ export const MorningCheckIn = () => {
   const { toast } = useToast();
   const personality = useMentorPersonality();
   const queryClient = useQueryClient();
+  const { awardCheckIn } = useXPRewards();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +62,9 @@ export const MorningCheckIn = () => {
         .single();
 
       if (error) throw error;
+
+      // Award XP for check-in
+      awardCheckIn();
 
       // Generate mentor response in background
       supabase.functions.invoke('generate-check-in-response', {

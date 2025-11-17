@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonPepTalk } from "@/components/SkeletonCard";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
@@ -20,6 +21,7 @@ export const TodaysPepTalk = () => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
+  const { awardPepTalkListen } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -27,6 +29,7 @@ export const TodaysPepTalk = () => {
   const [duration, setDuration] = useState(0);
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
+  const [hasAwardedXP, setHasAwardedXP] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -103,6 +106,12 @@ export const TodaysPepTalk = () => {
     const updateTime = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
+      
+      // Award XP when user has listened to 80% of the pep talk
+      if (!hasAwardedXP && duration > 0 && time >= duration * 0.8) {
+        setHasAwardedXP(true);
+        awardPepTalkListen();
+      }
       
       // Update active word index based on word timestamps
       if (pepTalk?.transcript && Array.isArray(pepTalk.transcript) && pepTalk.transcript.length > 0) {

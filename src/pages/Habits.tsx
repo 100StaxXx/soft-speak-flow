@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { haptics } from "@/utils/haptics";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { ContextualText } from "@/components/ContextualText";
 import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ export default function Habits() {
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
   const personality = useMentorPersonality();
+  const { awardHabitCompletion, awardAllHabitsComplete } = useXPRewards();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
@@ -95,7 +97,7 @@ export default function Habits() {
 
   const completeHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
-      haptics.medium(); // Haptic feedback on habit completion
+      haptics.medium();
       const habit = habits.find(h => h.id === habitId);
       
       const { error } = await supabase.from('habit_completions').insert({
@@ -105,6 +107,9 @@ export default function Habits() {
       });
       
       if (error) throw error;
+      
+      // Award XP for habit completion
+      awardHabitCompletion();
       
       // Log to activity feed
       if (habit) {
@@ -121,6 +126,22 @@ export default function Habits() {
       await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
       await queryClient.invalidateQueries({ queryKey: ['habits'] });
       
+      // Check if all habits are complete
+      const today = new Date().toISOString().split('T')[0];
+      const { data: todaysCompletions } = await supabase
+        .from('habit_completions')
+        .select('habit_id')
+        .eq('user_id', user!.id)
+        .eq('date', today);
+      
+      if (todaysCompletions && todaysCompletions.length === habits.length && habits.length > 0) {
+        awardAllHabitsComplete();
+        toast({
+          title: "🎉 All Habits Complete!",
+          description: "Bonus XP awarded! Your companion is growing stronger!"
+        });
+      }
+      
       // Check for milestone
       const { data: updatedHabit } = await supabase
         .from('habits')
@@ -129,7 +150,7 @@ export default function Habits() {
         .single();
       
       if (updatedHabit && [3, 7, 14, 30, 100].includes(updatedHabit.current_streak)) {
-        haptics.success(); // Celebration haptic for milestone
+        haptics.success();
         setMilestoneModal({
           open: true,
           streak: updatedHabit.current_streak,
