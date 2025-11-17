@@ -165,8 +165,6 @@ export const AskMentorChat = ({
     setIsLoading(true);
 
     try {
-      console.log("Sending message to mentor-chat function:", { text, mentorName, mentorTone });
-      
       const { data, error } = await supabase.functions.invoke("mentor-chat", {
         body: {
           message: text,
@@ -176,15 +174,9 @@ export const AskMentorChat = ({
         },
       });
 
-      console.log("Mentor chat response:", { data, error });
-
-      if (error) {
-        console.error("Mentor chat error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data || !data.response) {
-        console.error("Invalid response from mentor-chat:", data);
         throw new Error("Invalid response from mentor");
       }
 
