@@ -604,6 +604,39 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_tasks: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          task_date: string
+          task_text: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          task_date?: string
+          task_text: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          task_date?: string
+          task_text?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       downloads: {
         Row: {
           content_id: string
