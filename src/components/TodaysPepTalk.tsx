@@ -44,7 +44,7 @@ export const TodaysPepTalk = () => {
         .from("mentors")
         .select("slug, name")
         .eq("id", profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
 
       if (!mentor) {
         setLoading(false);
@@ -56,7 +56,7 @@ export const TodaysPepTalk = () => {
         .select("*")
         .eq("for_date", today)
         .eq("mentor_slug", mentor.slug)
-        .single();
+        .maybeSingle();
 
       if (data) {
         const transcript = Array.isArray(data.transcript) ? data.transcript : [];

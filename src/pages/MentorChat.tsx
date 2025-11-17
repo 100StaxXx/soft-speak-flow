@@ -22,7 +22,7 @@ export default function MentorChat() {
         .from('mentors')
         .select('*')
         .eq('id', profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!profile?.selected_mentor_id,

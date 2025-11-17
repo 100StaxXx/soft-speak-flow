@@ -57,7 +57,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
         .from('mentors')
         .select('name, tone_description, style, avatar_url')
         .eq('id', profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!profile?.selected_mentor_id,

@@ -67,7 +67,7 @@ const Profile = () => {
         .from("mentors")
         .select("*")
         .eq("id", profile!.selected_mentor_id!)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
