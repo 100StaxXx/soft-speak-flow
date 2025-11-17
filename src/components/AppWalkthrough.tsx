@@ -57,39 +57,19 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: '[data-tour="habits-tab"]',
-    content: "🔄 The Habits tab shows recurring activities. Let's create your first habit!",
-    placement: "bottom",
-    spotlightClicks: true,
-  },
-  
-  // COMPANION PAGE
-  {
-    target: '[data-tour="companion-display"]',
-    content: "✨ Meet your companion! This little creature grows as you complete habits and build consistency.",
-    placement: "bottom",
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="create-habit-button"]',
-    content: "🎯 Let's create your first habit! Click here to get started.",
+    content: "🔄 Now let's create your first habit - a recurring activity that builds consistency!",
     placement: "bottom",
     spotlightClicks: true,
   },
   {
-    target: '[data-tour="habit-templates"]',
-    content: "💡 Choose something you already did today or a positive habit. This first one should be an easy win!",
-    placement: "top",
-    spotlightClicks: true,
-  },
-  {
-    target: '[data-tour="habit-difficulty"]',
-    content: "⚡ Select 'Easy' difficulty for your first habit - we want to build momentum!",
-    placement: "top",
+    target: 'body',
+    content: "💡 Choose a template or create a custom habit. Pick something you already did today for an easy win!",
+    placement: "center",
     spotlightClicks: true,
   },
   {
     target: '[data-tour="first-habit-checkbox"]',
-    content: "✅ Now complete your habit by tapping this checkbox. Watch what happens!",
+    content: "✅ Now complete your habit by clicking this checkbox. Watch your companion evolve!",
     placement: "bottom",
     spotlightClicks: true,
   },
@@ -97,6 +77,19 @@ const WALKTHROUGH_STEPS: Step[] = [
     target: 'body',
     content: "🎉 Your companion is evolving! Check-in (5 XP) + task (15 XP) + habit (5 XP) = 25 XP. You've passed Stage 1!",
     placement: "center",
+    disableBeacon: true,
+  },
+  {
+    target: 'body',
+    content: "⚠️ Important limits: Max 5 habits, max 3 tasks per day. Quality over quantity!",
+    placement: "center",
+  },
+  
+  // COMPANION PAGE
+  {
+    target: '[data-tour="companion-display"]',
+    content: "✨ Meet your evolved companion! This little creature grows as you build consistency.",
+    placement: "bottom",
     disableBeacon: true,
   },
   {
@@ -122,11 +115,6 @@ const WALKTHROUGH_STEPS: Step[] = [
   {
     target: '[data-tour="evolution-tab"]',
     content: "📜 View your companion's evolution history - a visual timeline of your growth!",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="companion-display"]',
-    content: "⚠️ Important limits: Max 5 habits, max 3 tasks per day. Quality over quantity!",
     placement: "bottom",
   },
   
@@ -210,33 +198,22 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('task-complete', handleTaskComplete);
   }, [stepIndex, waitingForAction]);
 
-  // Listen for habit creation
-  useEffect(() => {
-    const handleHabitCreated = () => {
-      if (stepIndex === 12 && waitingForAction) {
-        setWaitingForAction(false);
-        setStepIndex(13);
-      }
-    };
-
-    window.addEventListener('habit-created', handleHabitCreated);
-    return () => window.removeEventListener('habit-created', handleHabitCreated);
-  }, [stepIndex, waitingForAction]);
-
-  // Listen for companion evolution
+  // Listen for habit completion (which triggers evolution)
   useEffect(() => {
     const handleEvolution = () => {
-      if (stepIndex === 14 && !waitingForAction) {
+      if (stepIndex === 10 && waitingForAction) {
+        setWaitingForAction(false);
         // Wait for evolution animation to complete
         setTimeout(() => {
-          setStepIndex(15);
-        }, 8000); // Evolution animation duration
+          setStepIndex(11);
+        }, 8000);
       }
     };
 
     window.addEventListener('companion-evolved', handleEvolution);
     return () => window.removeEventListener('companion-evolved', handleEvolution);
   }, [stepIndex, waitingForAction]);
+
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { status, action, index, type, lifecycle } = data;
@@ -257,24 +234,21 @@ export const AppWalkthrough = () => {
         // After Ask Mentor, navigate to Tasks
         navigate('/tasks');
         setTimeout(() => setStepIndex(4), 500);
-      } else if (index === 8 && action === ACTIONS.NEXT) {
-        // After habits tab intro, navigate to Companion
+      } else if (index === 12 && action === ACTIONS.NEXT) {
+        // After evolution + limits, navigate to Companion
         navigate('/companion');
-        setTimeout(() => setStepIndex(9), 500);
-      } else if (index === 20 && action === ACTIONS.NEXT) {
-        // After companion limits warning, navigate to Inspire
+        setTimeout(() => setStepIndex(13), 500);
+      } else if (index === 18 && action === ACTIONS.NEXT) {
+        // After evolution tab, navigate to Inspire
         navigate('/inspire');
-        setTimeout(() => setStepIndex(21), 500);
+        setTimeout(() => setStepIndex(19), 500);
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
         setWaitingForAction(true);
       } else if (index === 7 && lifecycle === 'complete') {
         // Wait for task completion
         setWaitingForAction(true);
-      } else if (index === 12 && lifecycle === 'complete') {
-        // Wait for habit creation
-        setWaitingForAction(true);
-      } else if (index === 13 && lifecycle === 'complete') {
+      } else if (index === 10 && lifecycle === 'complete') {
         // Wait for habit completion (evolution will trigger automatically)
         setWaitingForAction(true);
       } else {
