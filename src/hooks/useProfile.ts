@@ -19,6 +19,7 @@ interface Profile {
   timezone: string | null;
   current_habit_streak: number | null;
   longest_habit_streak: number | null;
+  onboarding_completed: boolean | null;
 }
 
 export const useProfile = () => {
