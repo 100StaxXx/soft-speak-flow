@@ -247,18 +247,24 @@ export const AppWalkthrough = () => {
     if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       const nextStepIndex = index + (action === ACTIONS.PREV ? -1 : 1);
 
-      // Navigate between pages - now handled by route listener
+      // Navigate between pages
       if (index === 3 && action === ACTIONS.NEXT) {
         // After Ask Mentor, show step to click Quests tab (don't auto-navigate)
         setStepIndex(4);
+      } else if (index === 4 && action === ACTIONS.NEXT && location.pathname !== '/tasks') {
+        // Don't allow progression from tasks-tab step until user clicks the tab and navigates
+        // Route listener will handle progression
+        return;
       } else if (index === 12 && action === ACTIONS.NEXT) {
-        // After evolution + limits, navigate to Companion
+        // After evolution + limits, navigate to Companion and set step
+        setStepIndex(13);
         navigate('/companion');
-        // Progress handled by route listener
+        // Route listener will then progress to 14
       } else if (index === 18 && action === ACTIONS.NEXT) {
-        // After achievements tab, navigate to Inspire
+        // After evolution tab, navigate to Inspire and set step
+        setStepIndex(19);
         navigate('/inspire');
-        // Progress handled by route listener
+        // Route listener will then progress to 20
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
         setWaitingForAction(true);
@@ -272,7 +278,7 @@ export const AppWalkthrough = () => {
         setStepIndex(nextStepIndex);
       }
     }
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   if (!user) return null;
 
