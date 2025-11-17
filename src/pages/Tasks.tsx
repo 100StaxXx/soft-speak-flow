@@ -30,6 +30,11 @@ export default function Tasks() {
   const { logActivity } = useActivityFeed();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   
+  // Calendar state for quest scheduling
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  
   // Tasks state
   const { 
     tasks, 
@@ -38,7 +43,7 @@ export default function Tasks() {
     deleteTask, 
     isAdding, 
     canAddMore 
-  } = useDailyTasks();
+  } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
