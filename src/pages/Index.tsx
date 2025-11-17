@@ -102,6 +102,7 @@ const Index = () => {
             <MorningCheckIn />
             <TodaysPepTalk />
 
+            <QuoteOfTheDay />
             <MentorQuickChat />
           </div>
         </div>
