@@ -176,7 +176,7 @@ export const AppWalkthrough = () => {
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
-      if (stepIndex === 1 && waitingForAction) {
+      if (run && stepIndex === 1 && waitingForAction) {
         setWaitingForAction(false);
         setStepIndex(2);
       }
@@ -184,12 +184,12 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, waitingForAction]);
+  }, [stepIndex, waitingForAction, run]);
 
   // Listen for quest completion
   useEffect(() => {
     const handleTaskComplete = () => {
-      if (stepIndex === 7 && waitingForAction) {
+      if (run && stepIndex === 7 && waitingForAction) {
         setWaitingForAction(false);
         setStepIndex(8);
       }
@@ -197,12 +197,12 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('task-complete', handleTaskComplete);
     return () => window.removeEventListener('task-complete', handleTaskComplete);
-  }, [stepIndex, waitingForAction]);
+  }, [stepIndex, waitingForAction, run]);
 
   // Listen for habit completion (which triggers evolution)
   useEffect(() => {
     const handleEvolution = () => {
-      if (stepIndex === 10 && waitingForAction) {
+      if (run && stepIndex === 10 && waitingForAction) {
         setWaitingForAction(false);
         // Wait for evolution animation to complete
         setTimeout(() => {
@@ -213,10 +213,12 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('companion-evolved', handleEvolution);
     return () => window.removeEventListener('companion-evolved', handleEvolution);
-  }, [stepIndex, waitingForAction]);
+  }, [stepIndex, waitingForAction, run]);
 
   // Listen for route changes to progress tutorial
   useEffect(() => {
+    if (!run) return; // Only progress if walkthrough is running
+    
     if (stepIndex === 4 && location.pathname === '/tasks') {
       // User clicked Quests tab, progress to next step
       setTimeout(() => setStepIndex(5), 500);
@@ -227,7 +229,7 @@ export const AppWalkthrough = () => {
       // User navigated to inspire page  
       setTimeout(() => setStepIndex(20), 500);
     }
-  }, [location.pathname, stepIndex]);
+  }, [location.pathname, stepIndex, run]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
