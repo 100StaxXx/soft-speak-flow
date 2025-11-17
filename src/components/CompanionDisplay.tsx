@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useState, useEffect } from "react";
 
@@ -16,6 +18,8 @@ const STAGE_NAMES = {
 };
 
 export const CompanionDisplay = () => {
+  const { user } = useAuth();
+  const { profile } = useProfile();
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion } = useCompanion();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
@@ -43,6 +47,8 @@ export const CompanionDisplay = () => {
         isEvolving={isEvolving}
         newStage={evolutionData?.stage || 0}
         newImageUrl={evolutionData?.imageUrl || ""}
+        mentorSlug={profile?.selected_mentor_id}
+        userId={user?.id}
         onComplete={() => {
           setIsEvolving(false);
           setEvolutionData(null);

@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
-import { Sparkles, Zap } from "lucide-react";
+import { Sparkles, Zap, Volume2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
   newStage: number;
   newImageUrl: string;
+  mentorSlug?: string;
+  userId?: string;
   onComplete: () => void;
 }
 
@@ -15,31 +18,75 @@ export const CompanionEvolution = ({
   isEvolving, 
   newStage, 
   newImageUrl,
+  mentorSlug,
+  userId,
   onComplete 
 }: CompanionEvolutionProps) => {
   const [stage, setStage] = useState(0);
+  const [voiceLine, setVoiceLine] = useState<string>("");
+  const [isLoadingVoice, setIsLoadingVoice] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isEvolving) return;
 
+    // Generate AI voice line
+    const generateVoice = async () => {
+      if (!mentorSlug || !userId) {
+        setIsLoadingVoice(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-evolution-voice', {
+          body: { mentorSlug, newStage, userId }
+        });
+
+        if (error) throw error;
+
+        if (data?.voiceLine) {
+          setVoiceLine(data.voiceLine);
+        }
+
+        if (data?.audioContent) {
+          // Create audio from base64
+          const audioBlob = new Blob(
+            [Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0))],
+            { type: 'audio/mpeg' }
+          );
+          const audioUrl = URL.createObjectURL(audioBlob);
+          audioRef.current = new Audio(audioUrl);
+        }
+      } catch (error) {
+        console.error('Failed to generate evolution voice:', error);
+      } finally {
+        setIsLoadingVoice(false);
+      }
+    };
+
+    generateVoice();
     haptics.heavy();
 
     const timers = [
       setTimeout(() => {
         setStage(1);
         haptics.medium();
-      }, 200),
+      }, 500),
       setTimeout(() => {
         setStage(2);
         haptics.heavy();
-        // First confetti burst
+        // Play voice if available
+        if (audioRef.current && !isLoadingVoice) {
+          audioRef.current.play().catch(err => console.error('Audio play failed:', err));
+        }
+        // Confetti burst
         confetti({
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1']
+          colors: ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE']
         });
-      }, 600),
+      }, 1500),
       setTimeout(() => {
         setStage(3);
         haptics.success();
@@ -48,20 +95,30 @@ export const CompanionEvolution = ({
           particleCount: 150,
           spread: 100,
           origin: { y: 0.6 },
-          colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1']
+          colors: ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE']
         });
-      }, 1200),
+      }, 2500),
       setTimeout(() => {
         setStage(4);
-      }, 2000),
+      }, 3500),
       setTimeout(() => {
         setStage(0);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
         onComplete();
-      }, 3500),
+      }, 5000),
     ];
 
-    return () => timers.forEach(clearTimeout);
-  }, [isEvolving, onComplete]);
+    return () => {
+      timers.forEach(clearTimeout);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [isEvolving, isLoadingVoice, onComplete]);
 
   if (!isEvolving) return null;
 
