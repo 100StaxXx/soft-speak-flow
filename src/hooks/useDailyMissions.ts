@@ -5,16 +5,6 @@ import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
 import { playMissionComplete } from "@/utils/soundEffects";
 
-const MISSION_TEMPLATES = [
-  { type: "check_in", text: "Complete your daily check-in", xp: 5 },
-  { type: "pep_talk", text: "Listen to today's pep talk", xp: 3 },
-  { type: "habits_3", text: "Complete 3 habits today", xp: 15 },
-  { type: "all_habits", text: "Complete all your habits", xp: 20 },
-  { type: "reflection", text: "Write a reflection note", xp: 5 },
-  { type: "quote_share", text: "Share a quote", xp: 5 },
-  { type: "mentor_chat", text: "Chat with your mentor", xp: 10 },
-];
-
 export const useDailyMissions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -27,31 +17,20 @@ export const useDailyMissions = () => {
     queryFn: async () => {
       if (!user) return [];
       
+      // Try to get existing missions
       const { data: existing } = await supabase
         .from('daily_missions')
         .select('*')
         .eq('user_id', user.id)
         .eq('mission_date', today);
 
-      // If no missions for today, generate 3 random ones
+      // If no missions exist, generate them server-side
       if (!existing || existing.length === 0) {
-        const shuffled = [...MISSION_TEMPLATES].sort(() => Math.random() - 0.5);
-        const selectedMissions = shuffled.slice(0, 3);
+        const { data: generated } = await supabase.functions.invoke('generate-daily-missions', {
+          body: { userId: user.id }
+        });
         
-        const { data: created } = await supabase
-          .from('daily_missions')
-          .insert(
-            selectedMissions.map(m => ({
-              user_id: user.id,
-              mission_type: m.type,
-              mission_text: m.text,
-              xp_reward: m.xp,
-              mission_date: today,
-            }))
-          )
-          .select();
-        
-        return created || [];
+        return generated?.missions || [];
       }
 
       return existing;

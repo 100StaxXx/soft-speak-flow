@@ -1,14 +1,19 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Target } from "lucide-react";
+import { CheckCircle2, Circle, Target, Zap, TrendingUp } from "lucide-react";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
+import { useMissionAutoComplete } from "@/hooks/useMissionAutoComplete";
 import { Progress } from "@/components/ui/progress";
 import { EmptyMissions } from "@/components/EmptyMissions";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
+import { Badge } from "@/components/ui/badge";
 
 export const DailyMissions = () => {
   const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
+  
+  // Enable auto-completion detection
+  useMissionAutoComplete();
 
   if (missions.length === 0) return <EmptyMissions />;
 
@@ -66,42 +71,79 @@ export const DailyMissions = () => {
         <Progress value={progress} className="h-2" />
 
         <div className="space-y-2">
-          {missions.map((mission) => (
-            <div
-              key={mission.id}
-              className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                mission.completed
-                  ? "bg-accent/5 border-accent/20 opacity-60"
-                  : "bg-background border-border hover:border-accent/40"
-              }`}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                {mission.completed ? (
-                  <CheckCircle2 className="h-5 w-5 text-accent flex-shrink-0" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                )}
-                <div>
-                  <p className={`text-sm font-medium ${mission.completed ? "line-through" : ""}`}>
-                    {mission.mission_text}
-                  </p>
-                  <p className="text-xs text-muted-foreground">+{mission.xp_reward} XP</p>
+          {missions.map((mission) => {
+            const hasProgress = mission.progress_target > 1;
+            const progressPercent = hasProgress 
+              ? (mission.progress_current / mission.progress_target) * 100 
+              : 0;
+            const isAutoComplete = mission.auto_complete;
+            
+            return (
+              <div
+                key={mission.id}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                  mission.completed
+                    ? "bg-accent/5 border-accent/20 opacity-60"
+                    : "bg-background border-border hover:border-accent/40"
+                } ${mission.is_bonus ? "border-yellow-500/30 bg-yellow-500/5" : ""}`}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  {mission.completed ? (
+                    <CheckCircle2 className="h-5 w-5 text-accent flex-shrink-0" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className={`text-sm font-medium ${mission.completed ? "line-through" : ""}`}>
+                        {mission.mission_text}
+                      </p>
+                      {isAutoComplete && !mission.completed && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                          <Zap className="h-2.5 w-2.5 mr-1" />
+                          Auto
+                        </Badge>
+                      )}
+                      {mission.is_bonus && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 border-yellow-500/50 text-yellow-600">
+                          Bonus
+                        </Badge>
+                      )}
+                      {mission.difficulty === 'hard' && !mission.completed && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 border-red-500/50 text-red-600">
+                          <TrendingUp className="h-2.5 w-2.5 mr-1" />
+                          Hard
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">+{mission.xp_reward} XP</p>
+                      {hasProgress && !mission.completed && (
+                        <span className="text-xs text-muted-foreground">
+                          • {mission.progress_current}/{mission.progress_target}
+                        </span>
+                      )}
+                    </div>
+                    {hasProgress && !mission.completed && (
+                      <Progress value={progressPercent} className="h-1 mt-1.5" />
+                    )}
+                  </div>
                 </div>
+                
+                {!mission.completed && !isAutoComplete && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleComplete(mission.id)}
+                    disabled={isCompleting}
+                    className="transition-transform hover:scale-105 active:scale-95 hover:bg-accent/10 hover:border-accent/60"
+                  >
+                    Complete
+                  </Button>
+                )}
               </div>
-              
-              {!mission.completed && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleComplete(mission.id)}
-                  disabled={isCompleting}
-                  className="transition-transform hover:scale-105 active:scale-95 hover:bg-accent/10 hover:border-accent/60"
-                >
-                  Complete
-                </Button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </Card>
