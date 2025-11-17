@@ -37,7 +37,7 @@ const MentorSelection = () => {
           .from("profiles")
           .select("selected_mentor_id")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
         if (profile?.selected_mentor_id) {
           setCurrentMentorId(profile.selected_mentor_id);
