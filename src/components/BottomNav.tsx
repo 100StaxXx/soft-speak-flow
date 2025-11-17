@@ -65,12 +65,12 @@ export const BottomNav = () => {
           {({ isActive }) => (
             <>
               {selectedMentor ? (
-                <button 
+                <div 
                   onClick={(e) => {
-                    e.preventDefault();
+                    e.stopPropagation();
                     setShowMentorDialog(true);
                   }}
-                  className={`transition-all duration-300 ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}
+                  className={`cursor-pointer transition-all duration-300 ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}
                 >
                   <MentorAvatar
                     mentorSlug={selectedMentor.slug || ''}
@@ -80,7 +80,7 @@ export const BottomNav = () => {
                     className="w-7 h-7"
                     showBorder={false}
                   />
-                </button>
+                </div>
               ) : (
                 <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               )}
