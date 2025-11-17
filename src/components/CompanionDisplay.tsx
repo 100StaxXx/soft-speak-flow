@@ -14,7 +14,20 @@ const STAGE_NAMES = {
 };
 
 export const CompanionDisplay = () => {
-  const { companion, nextEvolutionXP, progressToNext } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, evolveCompanion } = useCompanion();
+  const [isEvolving, setIsEvolving] = useState(false);
+  const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
+
+  // Listen for evolution events
+  useEffect(() => {
+    if (!evolveCompanion.isSuccess || !evolveCompanion.data) return;
+    
+    setEvolutionData({
+      stage: evolveCompanion.data.current_stage,
+      imageUrl: evolveCompanion.data.current_image_url || "",
+    });
+    setIsEvolving(true);
+  }, [evolveCompanion.isSuccess, evolveCompanion.data]);
 
   if (!companion) {
     return null;
@@ -104,5 +117,6 @@ export const CompanionDisplay = () => {
         </div>
       </div>
     </Card>
+    </>
   );
 };
