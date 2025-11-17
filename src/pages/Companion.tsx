@@ -86,50 +86,37 @@ const Companion = () => {
       
       if (error) throw error;
       
-      // Award XP based on difficulty
       const difficultyXP = { easy: 5, medium: 10, hard: 20 };
       const xpAmount = difficultyXP[habit?.difficulty || 'medium'];
       await awardCustomXP(xpAmount, 'habit_complete');
       
-      // Log activity
       if (habit) {
         logActivity({
-          type: 'habit_completed',
-          data: { habit_id: habitId, habit_title: habit.title }
+          type: 'habit_complete',
+          data: { habit: habit.title, xp: xpAmount }
         });
       }
-      
-      return { habitId, habit };
+
+      return { habit, xpAmount };
     },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-      await queryClient.invalidateQueries({ queryKey: ['habits'] });
+    onSuccess: ({ habit, xpAmount }) => {
+      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
       
-      // Play success sound
       playHabitComplete();
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.8 }
+      });
       
-      // Check if all habits complete
-      const allComplete = habits.every(h => 
-        completions.some(c => c.habit_id === h.id) || h.id === data.habitId
-      );
-      
-      if (allComplete && habits.length > 0) {
+      toast({
+        title: "Habit Completed! 🎉",
+        description: `+${xpAmount} XP earned`,
+      });
+
+      const totalCompleted = completions.length + 1;
+      if (totalCompleted === habits.length) {
         awardAllHabitsComplete();
-        confetti({
-          particleCount: 200,
-          spread: 120,
-          origin: { y: 0.6 },
-        });
-        toast({
-          title: "🎉 All Habits Complete!",
-          description: "Bonus XP! Your companion grows stronger!",
-        });
-      } else {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.7 },
-        });
       }
     },
   });
@@ -148,12 +135,12 @@ const Companion = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
     },
   });
 
   const handleToggleHabit = async (habitId: string) => {
-    const isCompleted = completions.some(c => c.habit_id === habitId);
+    const isCompleted = completions.some((c) => c.habit_id === habitId);
+    
     if (isCompleted) {
       uncompleteHabitMutation.mutate(habitId);
     } else {
@@ -162,81 +149,83 @@ const Companion = () => {
   };
 
   const addHabitMutation = useMutation({
-    mutationFn: async () => {
-      if (habits.length >= 5) {
-        throw new Error('Maximum 5 habits allowed');
-      }
-      
+    mutationFn: async (data: {
+      title: string;
+      difficulty: string;
+      frequency: string;
+      customDays?: number[];
+    }) => {
       const { error } = await supabase.from('habits').insert({
         user_id: user!.id,
-        title: newHabitTitle,
-        frequency: selectedDays.length === 7 ? 'daily' : 'custom',
-        custom_days: selectedDays.length === 7 ? null : selectedDays,
-        difficulty: habitDifficulty,
+        title: data.title,
+        difficulty: data.difficulty,
+        frequency: data.frequency,
+        custom_days: data.customDays,
       });
-      
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
-      setNewHabitTitle("");
-      setHabitDifficulty("medium");
-      setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
-      setShowTemplates(true);
+      setNewHabitTitle("");
       toast({
-        title: "Habit created!",
-        description: "Start completing it to earn XP and grow your companion.",
+        title: "Habit Added!",
+        description: "Complete it daily to earn XP",
       });
-    },
-    onError: (error: any) => {
-      toast({ title: 'Could not create habit', description: error.message || 'Please try again.', variant: 'destructive' });
     },
   });
 
-  const handleTemplateSelect = (title: string, frequency: string) => {
+  const handleTemplateSelect = (title: string) => {
     setNewHabitTitle(title);
-    setShowTemplates(false);
     setShowAddForm(true);
   };
 
   const handleCustomHabit = () => {
-    setNewHabitTitle("");
-    setShowTemplates(false);
     setShowAddForm(true);
   };
 
   const handleAddHabit = () => {
-    if (!newHabitTitle.trim()) {
-      toast({ title: 'Habit title required', variant: 'destructive' });
-      return;
-    }
-    addHabitMutation.mutate();
+    if (!newHabitTitle.trim()) return;
+
+    const frequency = selectedDays.length === 7 
+      ? 'daily' 
+      : selectedDays.length === 0 
+      ? 'custom' 
+      : 'custom';
+
+    addHabitMutation.mutate({
+      title: newHabitTitle,
+      difficulty: habitDifficulty,
+      frequency,
+      customDays: frequency === 'custom' ? selectedDays : undefined,
+    });
   };
 
   const handleCancel = () => {
     setShowAddForm(false);
-    setShowTemplates(true);
     setNewHabitTitle("");
     setHabitDifficulty("medium");
     setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
   };
 
+  if (!companion) {
+    return <CompanionOnboarding />;
+  }
+
   return (
     <PageTransition>
       <CompanionErrorBoundary>
-        <CompanionOnboarding />
-        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-20">
-          <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex h-14 md:h-16 items-center px-4">
-              <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Companion & Progress
-              </h1>
-            </div>
-          </header>
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-14 md:h-16 items-center px-4">
+            <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Companion & Progress
+            </h1>
+          </div>
+        </header>
 
-          <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
-            <CompanionDisplay />
+        <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
+          <CompanionDisplay />
 
           <Tabs defaultValue="habits" className="w-full">
             <TabsList className="grid w-full grid-cols-4 h-auto">
@@ -248,31 +237,15 @@ const Companion = () => {
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">Progress</span>
               </TabsTrigger>
-              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
-                <History className="h-4 w-4" />
-                <span className="hidden sm:inline">Evolution</span>
-              </TabsTrigger>
               <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
                 <Trophy className="h-4 w-4" />
                 <span className="hidden sm:inline">Achievements</span>
               </TabsTrigger>
+              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Evolution</span>
+              </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="progress" className="space-y-6 mt-6">
-              <NextEvolutionPreview 
-                currentStage={companion?.current_stage || 0}
-                currentXP={companion?.current_xp || 0}
-                nextEvolutionXP={companion ? nextEvolutionXP : 0}
-                progressPercent={companion ? progressToNext : 0}
-              />
-              <XPBreakdown />
-              <DailyMissions />
-              <WeeklyInsights />
-            </TabsContent>
-
-            <TabsContent value="evolution" className="space-y-6 mt-6">
-              {companion && <CompanionEvolutionHistory companionId={companion.id} />}
-            </TabsContent>
 
             <TabsContent value="habits" className="space-y-4 mt-6">
               {habits.length === 0 && !showAddForm ? (
@@ -282,23 +255,8 @@ const Companion = () => {
                     Build Better Habits
                   </h3>
                   <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                    Every habit you complete earns XP and helps your companion evolve. 
-                    Start small, stay consistent, and watch your progress compound.
+                    Every habit you complete earns XP and helps your companion evolve.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Earn XP</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
-                      <Target className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Track Progress</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background/50">
-                      <Trophy className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Grow Companion</span>
-                    </div>
-                  </div>
                 </Card>
               ) : (
                 <div className="space-y-4">
@@ -339,29 +297,35 @@ const Companion = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Habit Name</label>
                     <Input
-                      placeholder="Enter habit name..."
                       value={newHabitTitle}
                       onChange={(e) => setNewHabitTitle(e.target.value)}
+                      placeholder="e.g., Morning meditation"
+                      className="w-full"
                     />
                   </div>
 
-                  <HabitDifficultySelector 
-                    value={habitDifficulty}
-                    onChange={setHabitDifficulty}
-                  />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Difficulty</label>
+                    <HabitDifficultySelector
+                      value={habitDifficulty}
+                      onChange={setHabitDifficulty}
+                    />
+                  </div>
 
-                  <FrequencyPicker
-                    selectedDays={selectedDays}
-                    onDaysChange={setSelectedDays}
-                  />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Frequency</label>
+                    <FrequencyPicker
+                      selectedDays={selectedDays}
+                      onDaysChange={setSelectedDays}
+                    />
+                  </div>
 
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleAddHabit}
-                      disabled={!newHabitTitle.trim() || addHabitMutation.isPending}
-                      className="flex-1"
-                    >
-                      {addHabitMutation.isPending ? "Creating..." : "Create Habit"}
+                  <div className="flex gap-3">
+                    <Button onClick={handleAddHabit} className="flex-1">
+                      Add Habit
+                    </Button>
+                    <Button onClick={handleCancel} variant="outline">
+                      Cancel
                     </Button>
                   </div>
                 </Card>
@@ -370,10 +334,25 @@ const Companion = () => {
               <HabitCalendar />
             </TabsContent>
 
+            <TabsContent value="progress" className="space-y-6 mt-6">
+              <NextEvolutionPreview 
+                currentStage={companion?.current_stage || 0}
+                currentXP={companion?.current_xp || 0}
+                nextEvolutionXP={companion ? nextEvolutionXP : 0}
+                progressPercent={companion ? progressToNext : 0}
+              />
+              <XPBreakdown />
+              <DailyMissions />
+              <WeeklyInsights />
+            </TabsContent>
+
             <TabsContent value="achievements" className="space-y-6 mt-6">
               <AchievementsPanel />
             </TabsContent>
 
+            <TabsContent value="evolution" className="space-y-6 mt-6">
+              {companion && <CompanionEvolutionHistory companionId={companion.id} />}
+            </TabsContent>
           </Tabs>
         </div>
 

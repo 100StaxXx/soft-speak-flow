@@ -221,13 +221,22 @@ export const useCompanion = () => {
 
       if (updateError) throw updateError;
 
-      // Record evolution
-      await supabase.from("companion_evolutions").insert({
-        companion_id: companion.id,
-        stage: newStage,
-        image_url: imageData.imageUrl,
-        xp_at_evolution: currentXP,
-      });
+      // Record evolution (check if it doesn't already exist for this stage)
+      const { data: existingEvolution } = await supabase
+        .from("companion_evolutions")
+        .select("id")
+        .eq("companion_id", companion.id)
+        .eq("stage", newStage)
+        .maybeSingle();
+
+      if (!existingEvolution) {
+        await supabase.from("companion_evolutions").insert({
+          companion_id: companion.id,
+          stage: newStage,
+          image_url: imageData.imageUrl,
+          xp_at_evolution: currentXP,
+        });
+      }
 
       return imageData.imageUrl;
     },

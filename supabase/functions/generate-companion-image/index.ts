@@ -185,7 +185,7 @@ serve(async (req) => {
     const consistentFurColor = furColor || favoriteColor;
     
     if (stage === 0) {
-      // Initial egg stage
+      // Initial egg stage - NO HANDS
       prompt = `Create a mystical companion egg in high-quality fantasy art style.
 
 STAGE: ${stageInfo.name}
@@ -207,11 +207,11 @@ ${stageInfo.atmosphere}
 The egg should incorporate ${favoriteColor} as the main color with ${coreElement} energy patterns.
 Subtle ${sanitizedAnimal} silhouettes or symbols should be faintly visible through the shell.
 
-IMPORTANT GUIDELINES:
+CRITICAL REQUIREMENTS:
+- NO hands, NO people, NO human elements in the image
+- Egg floating or on a pedestal/platform
+- Centered composition
 - Warm, hopeful, magical feeling
-- Designed for a motivation/self-improvement app
-- Not evil, demonic, or horror-themed
-- Encouraging and inspiring visual
 
 Art Style: High-quality digital art, mystical fantasy, glowing magical effects, ${favoriteColor} color palette.
 Background: Simple dark gradient to make the egg's glow stand out prominently.`;
@@ -277,6 +277,8 @@ ATMOSPHERE & PRESENCE:
 ${stageInfo.atmosphere}
 
 CRITICAL REQUIREMENTS:
+- ABSOLUTELY NO hands, NO people, NO human elements in the image
+- Creature should be the ONLY subject
 - This must look like THE SAME ${sanitizedAnimal} from Stage 0, just more powerful
 - Base colors NEVER change: ${consistentFurColor} body, ${consistentEyeColor} eyes
 - Someone who saw Stage ${stage - 1} should immediately recognize this as the next form
