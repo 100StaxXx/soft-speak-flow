@@ -64,10 +64,6 @@ export default function Habits() {
 
   const addHabitMutation = useMutation({
     mutationFn: async () => {
-      if (habits.length >= 2) {
-        throw new Error('Maximum 2 habits allowed');
-      }
-      
       const { error } = await supabase.from('habits').insert({
         user_id: user!.id,
         title: newHabitTitle,
@@ -214,45 +210,21 @@ export default function Habits() {
             <Flame className="w-16 h-16 mx-auto text-primary mb-4 opacity-50" />
             <h3 className="text-xl font-heading font-black text-foreground mb-2">No Habits Yet</h3>
             <p className="text-muted-foreground mb-6">
-              <ContextualText type="empty" context="tracking your habits" fallback="Track up to 2 key habits and build your discipline." />
+              <ContextualText type="empty" context="tracking your habits" fallback="Build habits, earn XP, evolve your companion!" />
             </p>
           </Card>
         )}
 
-        {/* Add Habit Button with Progress */}
-        {habits.length < 2 && !showAddForm && (
-          <div className="space-y-3">
-            {habits.length === 1 && (
-              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <p className="text-sm text-muted-foreground text-center">
-                  <span className="font-bold text-foreground">1 habit down, 1 to go.</span> Choose wisely.
-                </p>
-              </div>
-            )}
-            <Button
-              onClick={() => setShowAddForm(true)}
-              className="w-full h-12 text-sm md:text-base font-bold"
-              size="lg"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Habit ({habits.length}/2)
-            </Button>
-          </div>
-        )}
-
-        {/* Max Habits Reached */}
-        {habits.length === 2 && (
-          <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary border-primary/30">
-            <div className="text-center space-y-2">
-              <div className="flex items-center justify-center gap-2">
-                <Flame className="w-6 h-6 text-primary" />
-                <h3 className="font-heading font-bold text-foreground">You're at max capacity</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Focus on mastering these 2 habits. To add a new one, complete or archive an existing habit first.
-              </p>
-            </div>
-          </Card>
+        {/* Add Habit Button */}
+        {!showAddForm && (
+          <Button
+            onClick={() => setShowAddForm(true)}
+            className="w-full h-12 text-sm md:text-base font-bold"
+            size="lg"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Habit
+          </Button>
         )}
 
         {showAddForm && (
