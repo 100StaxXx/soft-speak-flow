@@ -114,7 +114,7 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           selected_mentor_id: recommendedMentor.id,
-          onboarding_completed: true,
+          // DON'T mark onboarding as complete yet - need to create companion first
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -190,7 +190,7 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           selected_mentor_id: mentorId,
-          onboarding_completed: true,
+          // DON'T mark onboarding as complete yet - need to create companion first
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -204,11 +204,11 @@ export default function Onboarding() {
         description: selectedMentor ? `${selectedMentor.name} is now your guide!` : "Your mentor has been selected!",
       });
 
-      // Wait for the profile to reflect the update to avoid redirect loop
+      // Wait for the profile to reflect the update
       await waitForProfileUpdate(user.id);
 
-      // Navigate without full reload
-      navigate("/", { replace: true });
+      // Move to companion creation instead of navigating away
+      setStage('companion');
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
