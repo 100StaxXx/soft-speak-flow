@@ -57,8 +57,7 @@ const Index = () => {
 
   useEffect(() => {
     // Show onboarding if user has mentor but hasn't completed the feature tour
-    const hasSeenOnboarding = localStorage.getItem('onboardingFlowCompleted');
-    if (user && profile?.selected_mentor_id && !hasSeenOnboarding) {
+    if (user && profile?.selected_mentor_id && !profile?.onboarding_completed) {
       setTimeout(() => setShowOnboarding(true), 1000);
     }
   }, [user, profile]);
@@ -84,7 +83,6 @@ const Index = () => {
         open={showOnboarding} 
         onComplete={() => {
           setShowOnboarding(false);
-          localStorage.setItem('onboardingFlowCompleted', 'true');
         }} 
       />
       <PageTransition>
