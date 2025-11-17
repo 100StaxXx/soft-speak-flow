@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Trophy } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Trophy, Dumbbell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -187,14 +188,13 @@ export default function Challenges() {
                 );
               })
             ) : (
-              <Card className="p-12 text-center bg-card/50 backdrop-blur-sm border-border/50">
-                <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No active challenges</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start a challenge to begin your transformation
-                </p>
-                <Button onClick={() => setActiveTab("available")}>Browse Challenges</Button>
-              </Card>
+              <EmptyState
+                icon={Dumbbell}
+                title="No Active Challenges"
+                description="Ready to level up? Start a challenge from the Available tab and begin your transformation journey today!"
+                actionLabel="Browse Challenges"
+                onAction={() => setActiveTab("available")}
+              />
             )}
           </TabsContent>
 

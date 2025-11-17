@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Target, Trophy, CheckCircle2, Calendar, TrendingUp } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { Plus, Target, Trophy, CheckCircle2, Calendar, TrendingUp, Dumbbell } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -218,14 +219,13 @@ const Progress = () => {
               </div>
 
               {habits.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                  <h3 className="font-semibold mb-2">No Habits Yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Start building better habits today and watch your progress grow!
-                  </p>
-                  <Button onClick={() => setShowHabitForm(true)}>Create Your First Habit</Button>
-                </Card>
+                <EmptyState
+                  icon={Target}
+                  title="No Habits Yet"
+                  description="Start building better habits today! Create your first habit and begin tracking your progress with visual streaks and achievements."
+                  actionLabel="Create First Habit"
+                  onAction={() => setShowHabitForm(true)}
+                />
               ) : (
                 <div className="space-y-3">
                   {habits.map((habit) => (

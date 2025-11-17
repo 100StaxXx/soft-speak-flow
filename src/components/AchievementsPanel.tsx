@@ -5,8 +5,13 @@ import { AchievementBadge } from "./AchievementBadge";
 import { Trophy, TrendingUp } from "lucide-react";
 import { Card } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
+import { EmptyState } from "./EmptyState";
 
-export const AchievementsPanel = () => {
+interface AchievementsPanelProps {
+  showEmptyState?: boolean;
+}
+
+export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelProps) => {
   const { user } = useAuth();
 
   const { data: achievements, isLoading } = useQuery({
@@ -98,6 +103,12 @@ export const AchievementsPanel = () => {
               earnedAt={achievement.earned_at}
             />
           ))
+        ) : showEmptyState ? (
+          <EmptyState
+            icon={Trophy}
+            title="No Achievements Yet"
+            description="Complete habits, maintain streaks, and finish challenges to unlock achievement badges and level up your progress!"
+          />
         ) : (
           <Card className="p-8 text-center">
             <TrendingUp className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
