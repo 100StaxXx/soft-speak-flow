@@ -18,20 +18,29 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get activity details
+    // Get activity details and user's mentor
     const { data: activity, error: activityError } = await supabase
       .from('activity_feed')
-      .select('*, profiles!inner(selected_mentor_id)')
+      .select('*')
       .eq('id', activityId)
       .single()
 
     if (activityError) throw activityError
 
+    // Get user's profile to find their mentor
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('selected_mentor_id')
+      .eq('id', activity.user_id)
+      .single()
+
+    if (profileError) throw profileError
+
     // Get mentor personality
     const { data: mentor } = await supabase
       .from('mentors')
       .select('name, tone_description')
-      .eq('id', activity.profiles.selected_mentor_id)
+      .eq('id', profile.selected_mentor_id)
       .single()
 
     if (!mentor) throw new Error('Mentor not found')
