@@ -4,9 +4,12 @@ import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { useCompanion } from "@/hooks/useCompanion";
+import { Badge } from "@/components/ui/badge";
 
 export const BottomNav = () => {
   const { profile } = useProfile();
+  const { companion, progressToNext } = useCompanion();
 
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
@@ -60,12 +63,19 @@ export const BottomNav = () => {
 
         <NavLink
           to="/companion"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <div className="relative">
+                <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+                {companion && progressToNext > 75 && (
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-primary text-primary-foreground animate-pulse">
+                    !
+                  </Badge>
+                )}
+              </div>
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Companion
               </span>

@@ -134,6 +134,10 @@ export default {
             transform: "translateY(0)",
           },
         },
+        "breathe": {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.03)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -143,6 +147,7 @@ export default {
         "shimmer": "shimmer 2s linear infinite",
         "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         "bounce-subtle": "bounce-subtle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "breathe": "breathe 4s ease-in-out infinite",
       },
     },
   },
