@@ -28,7 +28,7 @@ export default function Habits() {
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
   const personality = useMentorPersonality();
-  const { awardHabitCompletion, awardAllHabitsComplete } = useXPRewards();
+  const { awardHabitCompletion, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [newHabitTitle, setNewHabitTitle] = useState("");
