@@ -1,17 +1,17 @@
-import { useEffect } from "react";
-import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { supabase } from "@/integrations/supabase/client";
 
 export const useWelcomeMessage = () => {
   const { user } = useAuth();
-  const { activities } = useActivityFeed();
   const personality = useMentorPersonality();
+  const hasChecked = useRef(false);
 
   useEffect(() => {
     const addWelcomeMessage = async () => {
-      if (!user || !personality) return;
+      if (!user || !personality || hasChecked.current) return;
+      hasChecked.current = true;
 
       // Check if welcome already exists in database
       const { data: existingWelcome } = await supabase
@@ -59,5 +59,5 @@ export const useWelcomeMessage = () => {
     };
 
     addWelcomeMessage();
-  }, [user, personality, activities]);
+  }, [user, personality]);
 };
