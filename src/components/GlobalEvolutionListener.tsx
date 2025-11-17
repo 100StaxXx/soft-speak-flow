@@ -34,8 +34,10 @@ export const GlobalEvolutionListener = () => {
           const newData = payload.new as any;
           const oldData = payload.old as any;
 
+          console.log('Companion update received:', { newData, oldData });
+
           // Check if stage changed (evolution happened)
-          if (newData.current_stage > oldData.current_stage) {
+          if (oldData && newData.current_stage > oldData.current_stage) {
             console.log('Evolution detected!', {
               oldStage: oldData.current_stage,
               newStage: newData.current_stage,
