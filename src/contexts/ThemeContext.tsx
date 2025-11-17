@@ -52,7 +52,7 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
           .from("mentors")
           .select("theme_config")
           .eq("id", mentorId)
-          .single();
+          .maybeSingle();
 
         if (mentor?.theme_config) {
           const theme = mentor.theme_config as unknown as MentorTheme;

@@ -45,7 +45,7 @@ const PepTalkDetail = () => {
         .from("pep_talks")
         .select("*")
         .eq("id", pepTalkId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       

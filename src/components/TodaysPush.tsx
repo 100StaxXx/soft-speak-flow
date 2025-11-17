@@ -32,7 +32,7 @@ export const TodaysPush = () => {
         .from("mentors")
         .select("slug, name")
         .eq("id", profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
 
       if (!mentor) return;
 
@@ -42,7 +42,7 @@ export const TodaysPush = () => {
         .select("*")
         .eq("for_date", today)
         .eq("mentor_slug", mentor.slug)
-        .single();
+        .maybeSingle();
 
       if (dailyPepTalk) {
         setTodaysPepTalk({ ...dailyPepTalk, mentor_name: mentor.name });

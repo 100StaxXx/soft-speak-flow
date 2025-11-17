@@ -28,7 +28,7 @@ export const DailyContentWidget = () => {
         .from("mentors")
         .select("slug, name")
         .eq("id", profile.selected_mentor_id)
-        .single();
+        .maybeSingle();
 
       if (!mentor) {
         setLoading(false);
@@ -42,7 +42,7 @@ export const DailyContentWidget = () => {
           .select("*")
           .eq("for_date", today)
           .eq("mentor_slug", mentor.slug)
-          .single(),
+          .maybeSingle(),
         supabase
           .from("daily_quotes")
           .select(`
@@ -51,7 +51,7 @@ export const DailyContentWidget = () => {
           `)
           .eq("for_date", today)
           .eq("mentor_slug", mentor.slug)
-          .single()
+          .maybeSingle()
       ]);
 
       setContent({
