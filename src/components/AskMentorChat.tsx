@@ -3,9 +3,11 @@ import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 interface Message {
   role: "user" | "assistant";
@@ -61,6 +63,7 @@ export const AskMentorChat = ({
   hasActiveHabits = false,
   hasActiveChallenges = false
 }: AskMentorChatProps) => {
+  const { user } = useAuth();
   const location = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -68,6 +71,7 @@ export const AskMentorChat = ({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [dailyMessageCount, setDailyMessageCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
@@ -77,7 +81,6 @@ export const AskMentorChat = ({
   useEffect(() => {
     // Check today's message count
     const checkDailyLimit = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const today = new Date().toISOString().split('T')[0];
@@ -92,7 +95,7 @@ export const AskMentorChat = ({
       setDailyMessageCount(count || 0);
     };
     checkDailyLimit();
-  }, [messages]);
+  }, [messages, user]);
 
   useEffect(() => {
     setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
@@ -101,6 +104,20 @@ export const AskMentorChat = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Handle initial message from navigation state
   useEffect(() => {
@@ -179,6 +196,34 @@ export const AskMentorChat = ({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="bg-destructive text-destructive-foreground px-4 py-2 text-sm flex items-center justify-center gap-2">
+          <WifiOff className="h-4 w-4" />
+          <span>You're offline. Messages will be sent when you reconnect.</span>
+        </div>
+      )}
+      
+      {/* Message Limit Indicator */}
+      <div className="px-4 pt-3 pb-2 border-b border-border/50 bg-muted/30">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">
+            Daily messages: {dailyMessageCount}/{DAILY_MESSAGE_LIMIT}
+          </span>
+          <div className="flex gap-1">
+            {Array.from({ length: DAILY_MESSAGE_LIMIT }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-1 w-3 rounded-full transition-colors",
+                  i < dailyMessageCount ? "bg-primary" : "bg-muted"
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && showSuggestions && (
           <div className="space-y-4">
@@ -224,23 +269,14 @@ export const AskMentorChat = ({
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={dailyMessageCount >= DAILY_MESSAGE_LIMIT ? "Daily limit reached" : "Type your message..."}
-            disabled={isLoading || dailyMessageCount >= DAILY_MESSAGE_LIMIT}
+            placeholder="Type your message..."
+            disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" disabled={isLoading || !input.trim() || dailyMessageCount >= DAILY_MESSAGE_LIMIT}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+            <Send className="h-4 w-4" />
           </Button>
         </div>
-        {dailyMessageCount >= DAILY_MESSAGE_LIMIT ? (
-          <p className="text-xs text-destructive mt-2 text-center">
-            Daily limit reached ({DAILY_MESSAGE_LIMIT} messages). Resets tomorrow!
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            {DAILY_MESSAGE_LIMIT - dailyMessageCount} messages remaining today
-          </p>
-        )}
       </form>
     </div>
   );
