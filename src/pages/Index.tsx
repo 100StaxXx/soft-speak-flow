@@ -113,9 +113,12 @@ const Index = () => {
               <MorningCheckIn />
             </Suspense>
             
-            <Suspense fallback={<ComponentLoader />}>
-              <TodaysPepTalk />
-            </Suspense>
+            {/* Today's Pep Talk */}
+            <div data-tour="daily-content">
+              <Suspense fallback={<ComponentLoader />}>
+                <TodaysPepTalk />
+              </Suspense>
+            </div>
 
             <Suspense fallback={<ComponentLoader />}>
               <QuoteOfTheDay />

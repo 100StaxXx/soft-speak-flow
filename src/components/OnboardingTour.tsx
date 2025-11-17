@@ -49,10 +49,13 @@ export const OnboardingTour = () => {
   }, [user, profile, location.pathname]);
 
   const handleJoyrideCallback = async (data: CallBackProps) => {
-    const { status, index, type } = data;
+    const { status, type, action } = data;
 
-    if (type === 'step:after') {
-      setStepIndex(index + 1);
+    // Handle step progression
+    if (type === 'step:after' && action === 'next') {
+      setStepIndex((prev) => prev + 1);
+    } else if (type === 'step:after' && action === 'prev') {
+      setStepIndex((prev) => Math.max(0, prev - 1));
     }
 
     // Tour completed or skipped
