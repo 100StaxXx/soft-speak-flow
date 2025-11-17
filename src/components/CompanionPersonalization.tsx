@@ -77,18 +77,21 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite color</Label>
           <div className="flex justify-center">
-            <div className="relative">
-              <input
-                type="color"
-                value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
-                className="w-32 h-32 rounded-full cursor-pointer border-4 border-primary/20 shadow-glow transition-all hover:scale-105"
-                style={{ 
-                  backgroundColor: selectedColor,
-                }}
-              />
-              <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-br from-white/20 to-transparent" />
-            </div>
+            <label className="cursor-pointer group">
+              <div className="relative w-32 h-32 rounded-full border-4 border-primary/20 shadow-glow transition-all hover:scale-105 overflow-hidden"
+                style={{ backgroundColor: selectedColor }}>
+                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+                <input
+                  type="color"
+                  value={selectedColor}
+                  onChange={(e) => setSelectedColor(e.target.value)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+              </div>
+              <p className="text-center mt-2 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                Click to change
+              </p>
+            </label>
           </div>
         </div>
 
