@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
 import { MentorResult } from "@/components/MentorResult";
@@ -22,6 +22,11 @@ export default function Onboarding() {
   const { createCompanion } = useCompanion();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Scroll to top when stage changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [stage]);
 
   const waitForProfileUpdate = async (userId: string, tries = 8) => {
     for (let i = 0; i < tries; i++) {
