@@ -11,12 +11,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { useCompanion } from "@/hooks/useCompanion";
 
 export const ResetCompanionButton = () => {
-  const [open, setOpen] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { createCompanion } = useCompanion();
 
   const handleReset = async () => {
     try {
@@ -24,8 +36,14 @@ export const ResetCompanionButton = () => {
       const { data, error } = await supabase.functions.invoke('reset-companion');
       if (error) throw error;
       if (data?.success) {
-        toast.success('Companion reset successfully. Create a new one anytime.');
-        setOpen(false);
+        // Invalidate companion queries
+        await queryClient.invalidateQueries({ queryKey: ['companion'] });
+        
+        toast.success('Companion reset! Create your new companion now.');
+        setAlertOpen(false);
+        
+        // Open creation dialog immediately
+        setCreateDialogOpen(true);
       } else {
         throw new Error(data?.error || 'Failed to reset companion');
       }
@@ -37,27 +55,55 @@ export const ResetCompanionButton = () => {
     }
   };
 
+  const handleCreateCompanion = async (data: {
+    favoriteColor: string;
+    spiritAnimal: string;
+    coreElement: string;
+  }) => {
+    await createCompanion.mutateAsync(data);
+    setCreateDialogOpen(false);
+    toast.success('Your new companion has been created!');
+  };
+
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" className="w-full" disabled={loading}>
-          {loading ? 'Resetting…' : 'Reset Companion'}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Reset your companion?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently delete your companion and its evolution history. You can create a new companion after resetting. This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleReset} disabled={loading}>
-            Confirm Reset
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="w-full" disabled={loading}>
+            {loading ? 'Resetting…' : 'Reset Companion'}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset your companion?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your companion and its evolution history. 
+              You'll be able to create a new companion immediately after. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReset} disabled={loading}>
+              {loading ? 'Resetting...' : 'Confirm Reset'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading font-black">
+              Create Your New Companion
+            </DialogTitle>
+          </DialogHeader>
+          <CompanionPersonalization
+            onComplete={handleCreateCompanion}
+            isLoading={createCompanion.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
