@@ -16,7 +16,7 @@ export const MorningCheckIn = () => {
   const { toast } = useToast();
   const personality = useMentorPersonality();
   const queryClient = useQueryClient();
-  const { awardCheckIn } = useXPRewards();
+  const { awardCheckInComplete, XP_REWARDS } = useXPRewards();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +64,7 @@ export const MorningCheckIn = () => {
       if (error) throw error;
 
       // Award XP for check-in
-      awardCheckIn();
+      awardCheckInComplete();
 
       // Generate mentor response in background
       supabase.functions.invoke('generate-check-in-response', {
@@ -147,7 +147,7 @@ export const MorningCheckIn = () => {
             size="lg"
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            {personality?.buttonText("Start My Day") || "Start My Day"} (+5 XP)
+            {personality?.buttonText("Start My Day") || "Start My Day"} (+{XP_REWARDS.CHECK_IN} XP)
           </Button>
         </div>
       </div>

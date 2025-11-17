@@ -21,7 +21,7 @@ export const TodaysPepTalk = () => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
-  const { awardPepTalkListen } = useXPRewards();
+  const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -110,7 +110,7 @@ export const TodaysPepTalk = () => {
       // Award XP when user has listened to 80% of the pep talk
       if (!hasAwardedXP && duration > 0 && time >= duration * 0.8) {
         setHasAwardedXP(true);
-        awardPepTalkListen();
+        awardPepTalkListened();
       }
       
       // Update active word index based on word timestamps
