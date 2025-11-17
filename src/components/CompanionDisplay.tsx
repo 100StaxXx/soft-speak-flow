@@ -98,16 +98,11 @@ export const CompanionDisplay = () => {
         </div>
 
         {/* XP Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">
-              Experience: {companion.current_xp} XP
-            </span>
-            {nextEvolutionXP && (
-              <span className="font-bold text-foreground">
-                Next: {nextEvolutionXP} XP
-              </span>
-            )}
+        <div className="space-y-3">
+          <div className="text-center">
+            <div className="text-sm text-muted-foreground">
+              Stage {companion.current_stage} • {companion.current_xp} / {nextEvolutionXP || '∞'} XP
+            </div>
           </div>
           {nextEvolutionXP && (
             <div className="relative">
@@ -117,6 +112,21 @@ export const CompanionDisplay = () => {
               </div>
             </div>
           )}
+          
+          {/* Dynamic micro-prompt */}
+          <div className="text-center">
+            {nextEvolutionXP && (nextEvolutionXP - companion.current_xp) <= 15 ? (
+              <p className="text-sm font-medium text-primary animate-pulse">
+                Your companion is close to evolving...
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {Math.random() > 0.5 
+                  ? "Do your habits to feed your companion."
+                  : "Complete a challenge to accelerate evolution."}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Traits */}

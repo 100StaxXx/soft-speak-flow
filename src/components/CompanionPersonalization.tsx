@@ -59,19 +59,24 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center">
-      <Card className="max-w-2xl w-full p-8 space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Create Your Companion
+      <Card className="max-w-2xl w-full p-8 space-y-8 shadow-glow animate-scale-in">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+            Let's create your companion.
           </h1>
-          <p className="text-muted-foreground">
-            Your companion will evolve with you on your journey. Make it uniquely yours.
-          </p>
+          <div className="space-y-2 max-w-md mx-auto">
+            <p className="text-lg font-medium text-foreground">
+              This companion grows as you do.
+            </p>
+            <p className="text-muted-foreground">
+              Your habits, your challenges, your consistency — they all evolve it.
+            </p>
+          </div>
         </div>
 
         {/* Color Selection */}
         <div className="space-y-4">
-          <Label className="text-lg font-semibold">Choose Your Favorite Color</Label>
+          <Label className="text-lg font-semibold">Favorite color</Label>
           <div className="grid grid-cols-4 gap-3">
             {COLORS.map((color) => (
               <button
@@ -105,7 +110,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
 
         {/* Animal Selection */}
         <div className="space-y-4">
-          <Label className="text-lg font-semibold">Choose Your Spirit Animal</Label>
+          <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
           <div className="grid grid-cols-4 gap-3">
             {ANIMALS.map((animal) => (
               <button
@@ -128,7 +133,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
 
         {/* Element Selection */}
         <div className="space-y-4">
-          <Label className="text-lg font-semibold">Choose Your Core Element</Label>
+          <Label className="text-lg font-semibold">Element</Label>
           <div className="grid grid-cols-4 gap-3">
             {ELEMENTS.map((element) => (
               <button
@@ -149,6 +154,19 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
           </div>
         </div>
 
+        {isComplete && !isLoading && (
+          <div className="text-center space-y-3 animate-scale-in">
+            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <p className="text-sm font-medium text-foreground">
+                This is your starting form.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Every time you show up for yourself, it will change.
+              </p>
+            </div>
+          </div>
+        )}
+
         <Button
           onClick={() => onComplete({
             favoriteColor: selectedColor,
@@ -156,12 +174,14 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
             coreElement: selectedElement,
           })}
           disabled={!isComplete || isLoading}
-          className="w-full h-12 text-lg"
+          variant="cta"
+          className="w-full"
+          size="lg"
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Creating Your Companion...
+              Creating your companion...
             </>
           ) : (
             "Begin Your Journey"

@@ -62,20 +62,33 @@ serve(async (req) => {
     // Build the prompt
     let prompt = "";
     
+    // Sanitize spirit animal input
+    const safeAnimals = ['dragon', 'phoenix', 'wolf', 'tiger', 'eagle', 'serpent', 'bear', 'fox', 'lion', 'owl', 'raven', 'deer'];
+    let sanitizedAnimal = spiritAnimal.toLowerCase().trim();
+    if (!sanitizedAnimal || sanitizedAnimal.length > 30 || !safeAnimals.some(safe => sanitizedAnimal.includes(safe))) {
+      sanitizedAnimal = 'dragon'; // Default to dragon for invalid inputs
+    }
+    
     if (stage === 0) {
       // Initial generation
       prompt = `Create a mystical glowing egg companion creature in a fantasy art style.
 
 User's personal choices:
 - Primary color scheme: ${favoriteColor} (use this as the dominant color)
-- Spirit animal essence: ${spiritAnimal} (subtle hints of this animal's features)
+- Spirit animal essence: ${sanitizedAnimal} (subtle hints of this animal's features)
 - Elemental affinity: ${coreElement} (add ${coreElement} energy patterns)
 
 ${STAGE_DESCRIPTORS[0]}
 
 The egg should be small, cute, and magical. Incorporate ${favoriteColor} as the main color.
-Add subtle ${spiritAnimal} patterns or silhouettes visible through the translucent shell.
+Add subtle ${sanitizedAnimal} patterns or silhouettes visible through the translucent shell.
 ${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+
+IMPORTANT GUIDELINES:
+- Do not make this creature look evil, demonic, grotesque, or horror themed
+- It should feel encouraging, protective, and inspiring
+- Design for a motivation/mental fitness app
+- Keep it friendly, magical, and uplifting
 
 Style: High quality digital art, mystical, fantasy, glowing, magical, ${favoriteColor} color palette.
 Mood: Warm, hopeful, potential, beginning of a journey.
@@ -86,13 +99,19 @@ Background: Simple dark gradient to make the egg glow stand out.`;
 
 MAINTAIN THESE CORE TRAITS:
 - ${favoriteColor} as the primary color scheme
-- ${spiritAnimal} features (make them MORE prominent at this stage)
+- ${sanitizedAnimal} features (make them MORE prominent at this stage)
 - ${coreElement} elemental energy effects
 
 ${STAGE_DESCRIPTORS[stage as keyof typeof STAGE_DESCRIPTORS]}
 
-The ${spiritAnimal} characteristics should be clearer and more defined now.
+The ${sanitizedAnimal} characteristics should be clearer and more defined now.
 ${ELEMENT_EFFECTS[coreElement as keyof typeof ELEMENT_EFFECTS]}
+
+IMPORTANT GUIDELINES:
+- Do not make this creature look evil, demonic, grotesque, or horror themed
+- It should feel encouraging, protective, and inspiring
+- Design for a motivation/mental fitness app
+- Keep it friendly, powerful, and majestic
 
 Style: Epic fantasy art, more detailed and powerful than before, magical, glowing.
 Keep the same unique identity but amplify the power, size, and majesty.
