@@ -1,7 +1,8 @@
 import { useState, useCallback, memo } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { CheckCircle2, Flame, Trash2, Archive } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { CheckCircle2, Flame, Trash2, Archive, Zap, Mountain } from "lucide-react";
 import { EnhancedShareButton } from "./EnhancedShareButton";
 import { cn } from "@/lib/utils";
 import {
@@ -25,6 +26,7 @@ interface HabitCardProps {
   currentStreak: number;
   longestStreak: number;
   completedToday: boolean;
+  difficulty?: string;
   onComplete: () => void;
 }
 
@@ -34,6 +36,7 @@ export const HabitCard = memo(({
   currentStreak,
   longestStreak,
   completedToday,
+  difficulty = "medium",
   onComplete,
 }: HabitCardProps) => {
   const queryClient = useQueryClient();
@@ -71,7 +74,14 @@ export const HabitCard = memo(({
       <div className="space-y-4 relative z-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg md:text-xl font-heading font-black text-foreground mb-1 break-words">{title}</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-lg md:text-xl font-heading font-black text-foreground break-words">{title}</h3>
+              <Badge variant="secondary" className="text-xs">
+                {difficulty === 'easy' && <><Zap className="h-3 w-3 mr-1" /> Easy</>}
+                {difficulty === 'medium' && <><Flame className="h-3 w-3 mr-1" /> Medium</>}
+                {difficulty === 'hard' && <><Mountain className="h-3 w-3 mr-1" /> Hard</>}
+              </Badge>
+            </div>
             <p className="text-xs text-muted-foreground mb-4">{getStreakMessage()}</p>
             
             <div className="space-y-3">
