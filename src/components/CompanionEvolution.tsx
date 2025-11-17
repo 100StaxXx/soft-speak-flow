@@ -71,6 +71,13 @@ export const CompanionEvolution = ({
       setTimeout(() => {
         setStage(1);
         haptics.medium();
+        // First wave of confetti
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.7, x: 0.3 },
+          colors: ['#A76CFF', '#C084FC', '#E879F9'],
+        });
       }, 500),
       setTimeout(() => {
         setStage(2);
@@ -79,27 +86,57 @@ export const CompanionEvolution = ({
         if (audioRef.current && !isLoadingVoice) {
           audioRef.current.play().catch(err => console.error('Audio play failed:', err));
         }
-        // Confetti burst
+        // MASSIVE confetti burst
         confetti({
-          particleCount: 100,
-          spread: 70,
+          particleCount: 200,
+          spread: 120,
           origin: { y: 0.6 },
-          colors: ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE']
+          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
+          ticks: 500,
+          gravity: 0.6,
+          scalar: 1.8,
         });
+        // Side bursts
+        setTimeout(() => {
+          confetti({
+            particleCount: 100,
+            spread: 80,
+            origin: { y: 0.7, x: 0.2 },
+            colors: ['#A76CFF', '#E879F9'],
+          });
+          confetti({
+            particleCount: 100,
+            spread: 80,
+            origin: { y: 0.7, x: 0.8 },
+            colors: ['#C084FC', '#FFD700'],
+          });
+        }, 200);
       }, 1500),
       setTimeout(() => {
         setStage(3);
         haptics.success();
-        // Second confetti burst
+        // Third massive burst
         confetti({
-          particleCount: 150,
-          spread: 100,
-          origin: { y: 0.6 },
-          colors: ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE']
+          particleCount: 250,
+          spread: 140,
+          origin: { y: 0.5 },
+          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
+          ticks: 600,
+          gravity: 0.5,
+          scalar: 2,
         });
       }, 2500),
       setTimeout(() => {
         setStage(4);
+        // Final sparkle burst
+        confetti({
+          particleCount: 50,
+          spread: 50,
+          origin: { y: 0.6 },
+          colors: ['#FFD700', '#FFA500'],
+          shapes: ['star'],
+          scalar: 1.2,
+        });
       }, 3500),
       setTimeout(() => {
         setStage(0);
@@ -108,7 +145,7 @@ export const CompanionEvolution = ({
           audioRef.current = null;
         }
         onComplete();
-      }, 5000),
+      }, 5500),
     ];
 
     return () => {
