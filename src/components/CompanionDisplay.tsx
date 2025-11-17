@@ -5,6 +5,8 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
+import { CompanionSkeleton } from "@/components/CompanionSkeleton";
+import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { useState, useEffect } from "react";
 
 // Convert hex color to color name
@@ -70,9 +72,21 @@ const STAGE_NAMES = {
 export const CompanionDisplay = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { companion, nextEvolutionXP, progressToNext, evolveCompanion } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading } = useCompanion();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+    
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     if (!evolveCompanion.isSuccess || !evolveCompanion.data) return;
@@ -83,6 +97,7 @@ export const CompanionDisplay = () => {
     setIsEvolving(true);
   }, [evolveCompanion.isSuccess, evolveCompanion.data]);
 
+  if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
   const stageName = STAGE_NAMES[companion.current_stage as keyof typeof STAGE_NAMES] || "Unknown";
@@ -106,43 +121,62 @@ export const CompanionDisplay = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.15),transparent_50%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--accent)/0.15),transparent_50%)]" />
         
-        <div className="relative p-6 md:p-8 space-y-6">
+        <div className="relative p-6 space-y-6">
+          {/* Stage Badge */}
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl md:text-2xl font-heading font-black flex items-center gap-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                <Sparkles className="h-6 w-6 text-primary animate-pulse drop-shadow-[0_0_8px_hsl(var(--primary))]" />
-                Your Companion
-              </h3>
-              <p className="text-sm md:text-base text-muted-foreground font-medium mt-1">{stageName}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-br from-primary via-accent to-primary bg-clip-text text-transparent drop-shadow-lg">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center">
+                <h2 className={`text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent ${!prefersReducedMotion ? 'animate-gradient' : ''}`}>
+                  {stageName}
+                </h2>
+                <AttributeTooltip title="Stage" description="Your companion's evolution stage" />
+              </div>
+              <p className="text-sm text-muted-foreground font-medium">
                 Stage {companion.current_stage}
-              </div>
-              <div className="text-xs md:text-sm text-muted-foreground font-medium mt-1">
-                {companion.spirit_animal}
-              </div>
+              </p>
+            </div>
+            <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`}>
+              <Sparkles className="h-7 w-7 text-primary" />
             </div>
           </div>
 
-          <div className="flex justify-center py-4">
-            {companion.current_image_url ? (
-              <div className="relative group">
-                <div className="absolute -inset-3 bg-gradient-to-r from-primary via-accent to-primary rounded-3xl blur-xl opacity-40 group-hover:opacity-60 transition-all duration-500 animate-pulse" />
-                <div className="absolute -inset-2 bg-gradient-to-r from-accent via-primary to-accent rounded-3xl blur-lg opacity-30 group-hover:opacity-50 transition-all duration-500" />
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-accent/30 rounded-2xl blur opacity-50 group-hover:opacity-75 transition-all duration-300" />
-                <img
-                  src={companion.current_image_url}
-                  alt={`${stageName} companion`}
-                  className="relative max-w-full h-auto max-h-80 md:max-h-96 rounded-2xl shadow-glow-lg transition-all duration-700 group-hover:scale-105 group-hover:shadow-neon animate-[breathe_4s_ease-in-out_infinite] border-2 border-primary/20"
-                  loading="lazy"
-                />
-              </div>
-            ) : (
-              <div className="w-64 h-64 md:w-80 md:h-80 rounded-3xl bg-gradient-to-br from-primary/20 via-accent/20 to-primary/20 animate-pulse flex items-center justify-center shadow-glow-lg">
-                <Sparkles className="h-20 w-20 md:h-24 md:w-24 text-primary animate-pulse drop-shadow-[0_0_12px_hsl(var(--primary))]" />
-              </div>
-            )}
+          {/* Companion Image */}
+          <div className="flex justify-center py-8 relative group">
+            <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} />
+            <div className="relative">
+              <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} />
+              {!imageLoaded && !imageError && (
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center">
+                  <Sparkles className="h-12 w-12 text-primary/50 animate-spin" />
+                </div>
+              )}
+              {imageError && (
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30">
+                  <div className="text-center p-4">
+                    <p className="text-sm text-muted-foreground mb-2">Image unavailable</p>
+                    <button 
+                      onClick={() => {
+                        setImageError(false);
+                        setImageLoaded(false);
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+              <img 
+                src={companion.current_image_url || ""} 
+                alt="Your Companion" 
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoaded(false);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">

@@ -1,6 +1,9 @@
 import { BottomNav } from "@/components/BottomNav";
 import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
+import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
+import { CompanionOnboarding } from "@/components/CompanionOnboarding";
+import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { HabitCalendar } from "@/components/HabitCalendar";
@@ -31,7 +34,7 @@ import { playHabitComplete } from "@/utils/soundEffects";
 
 const Companion = () => {
   const navigate = useNavigate();
-  const { companion } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext } = useCompanion();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -221,17 +224,19 @@ const Companion = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-20">
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 md:h-16 items-center px-4">
-            <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Companion & Progress
-            </h1>
-          </div>
-        </header>
+      <CompanionErrorBoundary>
+        <CompanionOnboarding />
+        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-20">
+          <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container flex h-14 md:h-16 items-center px-4">
+              <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Companion & Progress
+              </h1>
+            </div>
+          </header>
 
-        <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
-          <CompanionDisplay />
+          <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
+            <CompanionDisplay />
 
           <Tabs defaultValue="habits" className="w-full">
             <TabsList className="grid w-full grid-cols-4 h-auto">
@@ -254,6 +259,12 @@ const Companion = () => {
             </TabsList>
 
             <TabsContent value="progress" className="space-y-6 mt-6">
+              <NextEvolutionPreview 
+                currentStage={companion?.current_stage || 0}
+                currentXP={companion?.current_xp || 0}
+                nextEvolutionXP={companion ? nextEvolutionXP : 0}
+                progressPercent={companion ? progressToNext : 0}
+              />
               <XPBreakdown />
               <DailyMissions />
               <WeeklyInsights />
@@ -367,6 +378,7 @@ const Companion = () => {
 
         <BottomNav />
       </div>
+      </CompanionErrorBoundary>
     </PageTransition>
   );
 };
