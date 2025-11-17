@@ -75,8 +75,8 @@ export const useDailyMissions = () => {
 
       if (error) throw error;
       
-      // Award XP
-      await awardCustomXP(mission.xp_reward, `mission_${mission.mission_type}`);
+      // Award XP with display reason
+      await awardCustomXP(mission.xp_reward, `mission_${mission.mission_type}`, "Mission Complete!");
       
       return data;
     },

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect, Suspense, lazy } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { XPProvider } from "@/contexts/XPContext";
 import { useProfile } from "@/hooks/useProfile";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -70,9 +71,10 @@ const AppContent = () => {
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
-      <Suspense fallback={<LoadingFallback />}>
-        <GlobalEvolutionListener />
-        <Routes>
+      <XPProvider>
+        <Suspense fallback={<LoadingFallback />}>
+          <GlobalEvolutionListener />
+          <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -93,6 +95,7 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </XPProvider>
     </ThemeProvider>
   );
 };

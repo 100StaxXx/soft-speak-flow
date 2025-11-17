@@ -82,11 +82,11 @@ export const CompanionDisplay = () => {
         <div className="flex justify-center">
           {companion.current_image_url ? (
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-300" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-300 animate-pulse" />
               <img
                 src={companion.current_image_url}
                 alt={`${stageName} companion`}
-                className="relative max-w-full h-auto max-h-64 rounded-2xl shadow-glow transition-transform duration-300 group-hover:scale-105"
+                className="relative max-w-full h-auto max-h-64 rounded-2xl shadow-glow transition-all duration-700 group-hover:scale-105 animate-[breathe_4s_ease-in-out_infinite]"
                 loading="lazy"
               />
             </div>
