@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { MilestoneModal } from "@/components/MilestoneModal";
 import { StreakMilestoneModal } from "@/components/StreakMilestoneModal";
+import { HabitsPageTour } from "@/components/HabitsPageTour";
 import confetti from "canvas-confetti";
 
 export default function Habits() {
@@ -91,6 +92,10 @@ export default function Habits() {
       setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddForm(false);
       setShowTemplates(true);
+      // Flag that user created their first habit (for tour)
+      if (habits.length === 0) {
+        localStorage.setItem('userHasCreatedFirstHabit', 'true');
+      }
     },
     onError: (error: any) => {
       toast({ title: 'Could not create habit', description: error.message || 'Please try again.', variant: 'destructive' });
@@ -404,6 +409,8 @@ export default function Habits() {
         />
       )}
       
+      <HabitsPageTour />
+
       <BottomNav />
     </div>
   );
