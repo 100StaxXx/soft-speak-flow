@@ -28,9 +28,9 @@ export const FloatingBubbles = ({ onBubbleClick, selectedValue }: FloatingBubble
     }
     
     if (type === "trigger") {
-      return "bg-white/90 text-gray-900 border-petal-pink/40 hover:border-blush-rose/60 hover:bg-white hover:shadow-md font-semibold";
+      return "bg-white text-gray-900 border-petal-pink/40 hover:border-blush-rose/60 hover:shadow-md font-semibold";
     }
-    return "bg-gradient-to-br from-lavender-mist/70 to-petal-pink/50 text-gray-900 border-petal-pink/30 hover:from-lavender-mist hover:to-petal-pink hover:shadow-md font-semibold";
+    return "bg-white text-gray-900 border-petal-pink/40 hover:border-blush-rose/60 hover:shadow-md font-semibold";
   };
 
   return (
