@@ -119,36 +119,6 @@ const Index = () => {
               </div>
             </details>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="p-6 hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate('/habits')}>
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <CheckCircle className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Habits</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {hasActiveHabits ? 'Track progress' : 'Get started'}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 hover:shadow-lg transition-all cursor-pointer group" onClick={() => navigate('/mentor-chat')}>
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <MessageSquare className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Chat</h3>
-                    <p className="text-sm text-muted-foreground">Ask anything</p>
-                  </div>
-                </div>
-              </Card>
-
-              <MentorQuickChat />
-            </div>
           </div>
         </div>
       </PageTransition>
