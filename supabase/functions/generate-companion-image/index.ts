@@ -217,6 +217,36 @@ Art Style: High-quality digital art, mystical fantasy, glowing magical effects, 
 Background: Simple dark gradient to make the egg's glow stand out prominently.`;
     } else {
       // Evolution stages 1-9
+      
+      // Special logic for multi-headed creatures (hydras, cerberus, etc.)
+      const multiHeadedCreatures = ['hydra', 'cerberus', 'chimera'];
+      const isMultiHeaded = multiHeadedCreatures.some(creature => sanitizedAnimal.toLowerCase().includes(creature));
+      
+      let headCountGuidance = '';
+      if (isMultiHeaded) {
+        // Hydras and similar creatures should gain heads as they evolve
+        const headsByStage: { [key: number]: string } = {
+          0: '1 head visible as silhouette in egg',
+          1: '2 heads (just hatched, base form)',
+          2: '3 heads (juvenile growth)',
+          3: '5 heads (adolescent power surge)',
+          4: '7 heads (mature protector)',
+          5: '9 heads (ascended form)',
+          6: '12 heads (ancient elder)',
+          7: '15 heads (mythic avatar)',
+          8: '20 heads (celestial being)',
+          9: '25+ heads (primordial titan)'
+        };
+        
+        const headCount = headsByStage[stage as keyof typeof headsByStage] || `${stage + 1} heads`;
+        headCountGuidance = `\n\nHEAD COUNT REQUIREMENT (CRITICAL FOR ${sanitizedAnimal.toUpperCase()}):
+- MUST have EXACTLY ${headCount}
+- Each head should be distinct but connected to the same body
+- Heads should grow more elaborate and powerful with each stage
+- NEVER reduce the number of heads - this creature ALWAYS gains more heads as it evolves
+- Multiple necks emerging from a single powerful body`;
+      }
+      
       prompt = `Create Stage ${stage} evolution of a ${sanitizedAnimal} companion creature.
 
 EVOLUTION CONTINUITY (CRITICAL - Like Pokemon/Digimon):
@@ -224,7 +254,7 @@ EVOLUTION CONTINUITY (CRITICAL - Like Pokemon/Digimon):
 - Core ${sanitizedAnimal} features (face shape, body structure, distinctive markings) MUST remain consistent
 - Color scheme stays anchored to ${favoriteColor} with same pattern placement
 - Evolution should feel like the SAME creature growing more powerful, NOT a different creature
-- Visual signature elements (eyes, ears, tail, wings if applicable) must carry through all stages
+- Visual signature elements (eyes, ears, tail, wings if applicable) must carry through all stages${headCountGuidance}
 
 MANDATORY COLOR CONSISTENCY (CRITICAL):
 - Eye Color: MUST be exactly "${consistentEyeColor}" in every stage - NEVER change eye color
