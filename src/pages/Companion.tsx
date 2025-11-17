@@ -13,40 +13,13 @@ import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Sparkles, History, Target } from "lucide-react";
+import { Trophy, History, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCompanion } from "@/hooks/useCompanion";
-import { HabitCard } from "@/components/HabitCard";
-import { HabitTemplates } from "@/components/HabitTemplates";
-import { FrequencyPicker } from "@/components/FrequencyPicker";
-import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Plus, X } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import confetti from "canvas-confetti";
-import { useXPRewards } from "@/hooks/useXPRewards";
-import { useActivityFeed } from "@/hooks/useActivityFeed";
-import { playHabitComplete } from "@/utils/soundEffects";
 
 const Companion = () => {
   const navigate = useNavigate();
   const { companion, nextEvolutionXP, progressToNext } = useCompanion();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
-  const { logActivity } = useActivityFeed();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(true);
-  const [newHabitTitle, setNewHabitTitle] = useState("");
-  const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
-  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
