@@ -164,7 +164,7 @@ export default function Tasks() {
         <div className="flex items-center gap-3">
           <Target className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Tasks & Habits</h1>
+            <h1 className="text-3xl font-bold">Quests & Habits</h1>
             <p className="text-muted-foreground">Build your daily momentum</p>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function Tasks() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tasks" className="gap-2" data-tour="tasks-tab">
               <Calendar className="h-4 w-4" />
-              Daily Tasks
+              Daily Quests
             </TabsTrigger>
             <TabsTrigger value="habits" className="gap-2" data-tour="habits-tab">
               <CheckCircle2 className="h-4 w-4" />
@@ -185,8 +185,8 @@ export default function Tasks() {
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold">Today's Tasks</h3>
-                  <p className="text-sm text-muted-foreground">Max 3 tasks per day</p>
+                  <h3 className="font-semibold">Today's Quests</h3>
+                  <p className="text-sm text-muted-foreground">Max 3 quests per day</p>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {tasks.filter(t => t.completed).length}/{tasks.length}
@@ -198,7 +198,7 @@ export default function Tasks() {
                   <div className="space-y-3">
                     <Input
                       data-tour="add-task-input"
-                      placeholder="Add a task..."
+                      placeholder="Add a quest..."
                       value={newTaskText}
                       onChange={(e) => setNewTaskText(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
@@ -254,8 +254,8 @@ export default function Tasks() {
                 {tasks.length === 0 ? (
                   <EmptyState 
                     icon={Calendar}
-                    title="No tasks yet"
-                    description="Add up to 3 tasks to focus on today"
+                    title="No quests yet"
+                    description="Add up to 3 quests to focus on today"
                   />
                 ) : (
                   tasks.map((task, index) => (

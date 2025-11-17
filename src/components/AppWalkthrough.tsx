@@ -33,13 +33,13 @@ const WALKTHROUGH_STEPS: Step[] = [
   // TASKS PAGE
   {
     target: '[data-tour="tasks-tab"]',
-    content: "📋 Let's explore the Tasks section! Here you can manage your daily tasks and habits.",
+    content: "📋 Let's explore the Quests section! Here you can manage your daily quests and habits.",
     placement: "bottom",
     disableBeacon: true,
   },
   {
     target: '[data-tour="add-task-input"]',
-    content: "✍️ Add a task you want to complete today. Make it specific and achievable!",
+    content: "✍️ Add a quest you want to complete today. Make it specific and achievable!",
     placement: "top",
     spotlightClicks: true,
   },
@@ -51,7 +51,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: '[data-tour="first-task"]',
-    content: "✅ Great! Now complete your task by clicking the checkbox. You'll earn XP for your companion!",
+    content: "✅ Great! Now complete your quest by clicking the checkbox. You'll earn XP for your companion!",
     placement: "bottom",
     spotlightClicks: true,
   },
@@ -75,13 +75,13 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Your companion is evolving! Check-in (5 XP) + task (15 XP) + habit (5 XP) = 25 XP. You've passed Stage 1!",
+    content: "🎉 Your companion is evolving! Check-in (5 XP) + quest (15 XP) + habit (5 XP) = 25 XP. You've passed Stage 1!",
     placement: "center",
     disableBeacon: true,
   },
   {
     target: 'body',
-    content: "⚠️ Important limits: Max 5 habits, max 3 tasks per day. Quality over quantity!",
+    content: "⚠️ Important limits: Max 5 habits, max 3 quests per day. Quality over quantity!",
     placement: "center",
   },
   
@@ -185,7 +185,7 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, waitingForAction]);
 
-  // Listen for task completion
+  // Listen for quest completion
   useEffect(() => {
     const handleTaskComplete = () => {
       if (stepIndex === 7 && waitingForAction) {
@@ -231,7 +231,7 @@ export const AppWalkthrough = () => {
 
       // Navigate between pages
       if (index === 3 && action === ACTIONS.NEXT) {
-        // After Ask Mentor, navigate to Tasks
+        // After Ask Mentor, navigate to Quests
         navigate('/tasks');
         setTimeout(() => setStepIndex(4), 500);
       } else if (index === 12 && action === ACTIONS.NEXT) {
@@ -246,7 +246,7 @@ export const AppWalkthrough = () => {
         // Wait for check-in submission
         setWaitingForAction(true);
       } else if (index === 7 && lifecycle === 'complete') {
-        // Wait for task completion
+        // Wait for quest completion
         setWaitingForAction(true);
       } else if (index === 10 && lifecycle === 'complete') {
         // Wait for habit completion (evolution will trigger automatically)
