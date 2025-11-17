@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain } from "lucide-react";
+import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -172,7 +172,7 @@ export default function Tasks() {
         <Tabs defaultValue="tasks" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tasks" className="gap-2" data-tour="tasks-tab">
-              <Calendar className="h-4 w-4" />
+              <Swords className="h-4 w-4" />
               Daily Quests
             </TabsTrigger>
             <TabsTrigger value="habits" className="gap-2" data-tour="habits-tab">

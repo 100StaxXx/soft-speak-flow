@@ -1,4 +1,4 @@
-import { ListChecks, Search, Sparkles, User } from "lucide-react";
+import { ListChecks, Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -89,7 +89,7 @@ export const BottomNav = () => {
         >
           {({ isActive }) => (
             <>
-              <ListChecks className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <Swords className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Quests
               </span>
