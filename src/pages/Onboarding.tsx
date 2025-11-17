@@ -149,7 +149,10 @@ export default function Onboarding() {
     coreElement: string;
   }) => {
     try {
-      // Mark onboarding as complete FIRST for instant navigation
+      // Create companion first and wait for it
+      await createCompanion.mutateAsync(data);
+      
+      // Mark onboarding as complete after companion is created
       if (user) {
         await supabase
           .from('profiles')
@@ -157,16 +160,13 @@ export default function Onboarding() {
           .eq('id', user.id);
       }
       
-      // Navigate immediately - companion creation happens in background
+      // Navigate to home
       navigate("/", { replace: true });
-      
-      // Trigger companion creation without awaiting
-      createCompanion.mutate(data);
     } catch (error) {
       console.error("Error in onboarding:", error);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: "Failed to create companion. Please try again.",
         variant: "destructive",
       });
     }

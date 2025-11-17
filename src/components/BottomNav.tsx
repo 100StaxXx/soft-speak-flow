@@ -6,13 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { useState } from "react";
 
 export const BottomNav = () => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
-  const [showMentorDialog, setShowMentorDialog] = useState(false);
 
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
@@ -30,27 +27,7 @@ export const BottomNav = () => {
 
   return (
     <>
-      <Dialog open={showMentorDialog} onOpenChange={setShowMentorDialog}>
-        <DialogContent className="max-w-2xl p-6">
-          <DialogTitle className="text-2xl font-heading font-black text-center mb-4">
-            {selectedMentor?.name}
-          </DialogTitle>
-          {selectedMentor && (
-            <div className="flex justify-center">
-              <MentorAvatar
-                mentorSlug={selectedMentor.slug || ''}
-                mentorName={selectedMentor.name}
-                primaryColor={selectedMentor.primary_color || '#000'}
-                size="xl"
-                showGlow={true}
-                showBorder={true}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <nav 
+      <nav
         className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50 transition-transform duration-300"
         role="navigation"
         aria-label="Main navigation"
@@ -65,22 +42,14 @@ export const BottomNav = () => {
           {({ isActive }) => (
             <>
               {selectedMentor ? (
-                <div 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMentorDialog(true);
-                  }}
-                  className={`cursor-pointer transition-all duration-300 ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-full' : ''}`}
-                >
-                  <MentorAvatar
-                    mentorSlug={selectedMentor.slug || ''}
-                    mentorName={selectedMentor.name}
-                    primaryColor={selectedMentor.primary_color || '#000'}
-                    size="sm"
-                    className="w-7 h-7"
-                    showBorder={false}
-                  />
-                </div>
+                <MentorAvatar
+                  mentorSlug={selectedMentor.slug || ''}
+                  mentorName={selectedMentor.name}
+                  primaryColor={selectedMentor.primary_color || '#000'}
+                  size="sm"
+                  className="w-7 h-7"
+                  showBorder={false}
+                />
               ) : (
                 <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               )}
