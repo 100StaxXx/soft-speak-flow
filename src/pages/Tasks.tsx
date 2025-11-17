@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target } from "lucide-react";
+import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -39,6 +39,7 @@ export default function Tasks() {
     canAddMore 
   } = useDailyTasks();
   const [newTaskText, setNewTaskText] = useState("");
+  const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -138,8 +139,9 @@ export default function Tasks() {
 
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
-    addTask(newTaskText);
+    addTask({ taskText: newTaskText, difficulty: taskDifficulty });
     setNewTaskText("");
+    setTaskDifficulty("medium");
   };
 
   const handleAddHabit = () => {
@@ -192,22 +194,56 @@ export default function Tasks() {
               </div>
 
               {canAddMore && (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add a task..."
-                    value={newTaskText}
-                    onChange={(e) => setNewTaskText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                    disabled={isAdding}
-                  />
-                  <Button 
-                    onClick={handleAddTask}
-                    disabled={isAdding || !newTaskText.trim()}
-                    size="icon"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Card className="p-4 space-y-4">
+                  <div className="space-y-3">
+                    <Input
+                      placeholder="Add a task..."
+                      value={newTaskText}
+                      onChange={(e) => setNewTaskText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                      disabled={isAdding}
+                    />
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant={taskDifficulty === 'easy' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setTaskDifficulty('easy')}
+                        className="flex-1 gap-2"
+                      >
+                        <Zap className="h-4 w-4" />
+                        Easy (5 XP)
+                      </Button>
+                      <Button
+                        variant={taskDifficulty === 'medium' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setTaskDifficulty('medium')}
+                        className="flex-1 gap-2"
+                      >
+                        <Flame className="h-4 w-4" />
+                        Medium (15 XP)
+                      </Button>
+                      <Button
+                        variant={taskDifficulty === 'hard' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setTaskDifficulty('hard')}
+                        className="flex-1 gap-2"
+                      >
+                        <Mountain className="h-4 w-4" />
+                        Hard (25 XP)
+                      </Button>
+                    </div>
+
+                    <Button 
+                      onClick={handleAddTask}
+                      disabled={isAdding || !newTaskText.trim()}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Task
+                    </Button>
+                  </div>
+                </Card>
               )}
 
               <div className="space-y-2">
@@ -225,19 +261,26 @@ export default function Tasks() {
                         "p-4 flex items-center gap-3 transition-all cursor-pointer hover:bg-accent/50",
                         task.completed && "opacity-60"
                       )}
-                      onClick={() => toggleTask({ taskId: task.id, completed: !task.completed })}
+                      onClick={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
                     >
                       {task.completed ? (
                         <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
                       ) : (
                         <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
                       )}
-                      <span className={cn(
-                        "flex-1",
-                        task.completed && "line-through text-muted-foreground"
-                      )}>
-                        {task.task_text}
-                      </span>
+                      <div className="flex-1">
+                        <span className={cn(
+                          task.completed && "line-through text-muted-foreground"
+                        )}>
+                          {task.task_text}
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          {task.difficulty === 'easy' && <Zap className="h-3 w-3 text-muted-foreground" />}
+                          {task.difficulty === 'medium' && <Flame className="h-3 w-3 text-muted-foreground" />}
+                          {task.difficulty === 'hard' && <Mountain className="h-3 w-3 text-muted-foreground" />}
+                          <span className="text-xs text-muted-foreground">{task.xp_reward} XP</span>
+                        </div>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"

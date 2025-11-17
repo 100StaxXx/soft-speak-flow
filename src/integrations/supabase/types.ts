@@ -609,6 +609,7 @@ export type Database = {
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
+          difficulty: string | null
           id: string
           task_date: string
           task_text: string
@@ -619,6 +620,7 @@ export type Database = {
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          difficulty?: string | null
           id?: string
           task_date?: string
           task_text: string
@@ -629,6 +631,7 @@ export type Database = {
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          difficulty?: string | null
           id?: string
           task_date?: string
           task_text?: string

@@ -28,16 +28,21 @@ export const useDailyTasks = () => {
   });
 
   const addTask = useMutation({
-    mutationFn: async (taskText: string) => {
+    mutationFn: async ({ taskText, difficulty }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard' }) => {
       if (tasks.length >= 3) {
         throw new Error('Maximum 3 tasks per day');
       }
+
+      const xpRewards = { easy: 5, medium: 15, hard: 25 };
+      const xpReward = xpRewards[difficulty];
 
       const { error } = await supabase
         .from('daily_tasks')
         .insert({
           user_id: user!.id,
           task_text: taskText,
+          difficulty,
+          xp_reward: xpReward,
         });
 
       if (error) throw error;
@@ -56,7 +61,7 @@ export const useDailyTasks = () => {
   });
 
   const toggleTask = useMutation({
-    mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
+    mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
       const { error } = await supabase
         .from('daily_tasks')
         .update({
@@ -66,12 +71,12 @@ export const useDailyTasks = () => {
         .eq('id', taskId);
 
       if (error) throw error;
-      return { taskId, completed };
+      return { taskId, completed, xpReward };
     },
-    onSuccess: ({ completed }) => {
+    onSuccess: ({ completed, xpReward }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed) {
-        awardCustomXP(5, 'task_complete', 'Task Complete!');
+        awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
       }
     },
   });
