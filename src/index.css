@@ -304,4 +304,12 @@ All colors MUST be HSL.
     z-index: -1;
   }
 
+  /* iOS Safe Area Support */
+  @supports (padding-top: env(safe-area-inset-top)) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
 }

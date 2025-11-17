@@ -110,7 +110,11 @@ export default {
         "float": "float 3s ease-in-out infinite",
         "skeleton-pulse": "skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
+      },
+      spacing: {
+        'safe': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+      },
     },
-  },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;
