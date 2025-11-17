@@ -173,8 +173,17 @@ export default function Onboarding() {
     coreElement: string;
   }) => {
     try {
-      // Create companion first and wait for it
-      await createCompanion.mutateAsync(data);
+      // Check if companion already exists
+      const { data: existingCompanion } = await supabase
+        .from("user_companion")
+        .select("id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+
+      if (!existingCompanion) {
+        // Create companion only if it doesn't exist
+        await createCompanion.mutateAsync(data);
+      }
       
       // Don't mark onboarding as complete - let the tour handle it
       // Navigate directly to home
