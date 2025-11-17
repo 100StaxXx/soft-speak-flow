@@ -11,6 +11,7 @@ import { HabitCalendar } from "@/components/HabitCalendar";
 import { WeeklyInsights } from "@/components/WeeklyInsights";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
+import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Sparkles, History, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -226,9 +227,18 @@ const Companion = () => {
           </div>
         </header>
 
-        <div className="container px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
-          <div data-tour="companion-display">
+        <div className="container px-3 md:px-4 py-5 md:py-7 space-y-6 md:space-y-8 max-w-4xl mx-auto">
+          <div data-tour="companion-display" className="space-y-4">
             <CompanionDisplay />
+            {companion && (
+              <div className="flex justify-center">
+                <CompanionBadge 
+                  element={companion.core_element} 
+                  stage={companion.current_stage}
+                  showStage={true}
+                />
+              </div>
+            )}
           </div>
 
           <Tabs defaultValue="habits" className="w-full">

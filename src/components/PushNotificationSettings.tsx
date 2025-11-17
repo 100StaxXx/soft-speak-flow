@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NotificationPreview } from "@/components/NotificationPreview";
 import { 
   isPushSupported, 
   subscribeToPush, 
@@ -254,6 +255,13 @@ export const PushNotificationSettings = () => {
             </div>
           )}
         </div>
+
+        {/* Notification Preview */}
+        {pushEnabled && (profile?.daily_push_enabled || profile?.daily_quote_push_enabled) && (
+          <div className="pt-6 mt-6 border-t border-border">
+            <NotificationPreview />
+          </div>
+        )}
       </div>
     </Card>
   );
