@@ -17,6 +17,7 @@ import { PushNotificationSettings } from "@/components/PushNotificationSettings"
 import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
+import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -241,6 +242,17 @@ const Profile = () => {
                     <Button onClick={() => navigate("/mentor-selection")} variant="outline" size="sm"><User className="h-4 w-4 mr-2" />Browse All</Button>
                     <Button onClick={() => navigate("/onboarding")} variant="outline" size="sm"><Repeat className="h-4 w-4 mr-2" />Retake Quiz</Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Companion Reset */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Companion</CardTitle>
+                  <CardDescription>Reset your companion to create a new one</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ResetCompanionButton />
                 </CardContent>
               </Card>
 
