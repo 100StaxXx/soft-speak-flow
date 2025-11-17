@@ -28,11 +28,18 @@ serve(async (req) => {
   try {
     const { mentorSlug, newStage, userId } = await req.json();
 
-    if (!mentorSlug || newStage === undefined) {
-      throw new Error('Missing required parameters');
-    }
-
     console.log(`Generating evolution voice for ${mentorSlug}, stage ${newStage}`);
+
+    if (!mentorSlug || newStage === undefined) {
+      console.warn('Missing mentorSlug or newStage - returning generic response');
+      return new Response(
+        JSON.stringify({ 
+          voiceLine: "Your companion has evolved! Keep up the great work!",
+          audioContent: null 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -40,14 +47,21 @@ serve(async (req) => {
     );
 
     // Get mentor personality details
-    const { data: mentor } = await supabaseClient
+    const { data: mentor, error: mentorError } = await supabaseClient
       .from('mentors')
       .select('name, tone_description, style_description')
       .eq('slug', mentorSlug)
       .single();
 
-    if (!mentor) {
-      throw new Error('Mentor not found');
+    if (!mentor || mentorError) {
+      console.error('Mentor not found or error:', mentorError);
+      return new Response(
+        JSON.stringify({ 
+          voiceLine: "Your companion has evolved! Keep up the great work!",
+          audioContent: null 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Generate AI voice line based on mentor personality
