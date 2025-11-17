@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { LoadingQuote } from "@/components/LoadingQuote";
+import { AppWalkthrough } from "@/components/AppWalkthrough";
 
 // Lazy load heavy components
 const QuoteOfTheDay = lazy(() => import("@/components/QuoteOfTheDay").then(m => ({ default: m.QuoteOfTheDay })));
@@ -114,7 +115,7 @@ const Index = () => {
             </Suspense>
             
             {/* Today's Pep Talk */}
-            <div data-tour="daily-content">
+            <div data-tour="todays-pep-talk">
               <Suspense fallback={<ComponentLoader />}>
                 <TodaysPepTalk />
               </Suspense>
@@ -124,9 +125,11 @@ const Index = () => {
               <QuoteOfTheDay />
             </Suspense>
             
-            <Suspense fallback={<ComponentLoader />}>
-              <MentorQuickChat />
-            </Suspense>
+            <div data-tour="ask-mentor">
+              <Suspense fallback={<ComponentLoader />}>
+                <MentorQuickChat />
+              </Suspense>
+            </div>
           </div>
         </div>
       </PageTransition>
@@ -134,6 +137,7 @@ const Index = () => {
       <Suspense fallback={null}>
         <OnboardingTour />
       </Suspense>
+      <AppWalkthrough />
     </>
   );
 };

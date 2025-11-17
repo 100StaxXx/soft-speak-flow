@@ -30,7 +30,7 @@ export const XP_REWARDS = {
 
 export const EVOLUTION_THRESHOLDS = {
   0: 0,      // Egg
-  1: 20,     // Sparkling Egg
+  1: 10,     // Sparkling Egg (Tutorial-optimized: check-in + habit = 10 XP)
   2: 60,     // Hatchling
   3: 120,    // Guardian
   4: 250,    // Ascended

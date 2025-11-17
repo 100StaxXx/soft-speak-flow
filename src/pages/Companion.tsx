@@ -120,6 +120,9 @@ const Companion = () => {
       if (totalCompleted === habits.length) {
         awardAllHabitsComplete();
       }
+
+      // Dispatch event for walkthrough
+      window.dispatchEvent(new CustomEvent('habit-completed'));
     },
   });
 
@@ -174,6 +177,9 @@ const Companion = () => {
         title: "Habit Added!",
         description: "Complete it daily to earn XP",
       });
+
+      // Dispatch event for walkthrough
+      window.dispatchEvent(new CustomEvent('habit-created'));
     },
   });
 
@@ -290,15 +296,29 @@ const Companion = () => {
               )}
 
               {habits.length < 5 && !showAddForm && showTemplates && (
-                <HabitTemplates 
-                  onSelect={handleTemplateSelect}
-                  onCustom={handleCustomHabit}
-                  existingHabits={habits}
-                />
+                <div data-tour="habit-templates">
+                  <HabitTemplates 
+                    onSelect={handleTemplateSelect}
+                    onCustom={handleCustomHabit}
+                    existingHabits={habits}
+                  />
+                </div>
+              )}
+
+              {!showTemplates && habits.length < 5 && !showAddForm && (
+                <Button 
+                  data-tour="create-habit-button"
+                  onClick={() => setShowTemplates(true)}
+                  variant="outline" 
+                  className="w-full border-dashed border-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Habit ({habits.length}/5)
+                </Button>
               )}
 
               {showAddForm && (
-                <Card className="p-6 space-y-4 border-primary/20">
+                <Card data-tour="habit-form" className="p-6 space-y-4 border-primary/20">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-heading font-bold text-foreground">
                       {newHabitTitle || "New Habit"}
@@ -318,7 +338,7 @@ const Companion = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tour="habit-difficulty">
                     <label className="text-sm font-medium text-foreground">Difficulty</label>
                     <HabitDifficultySelector
                       value={habitDifficulty}

@@ -16,7 +16,7 @@
  * 
  * EVOLUTION THRESHOLDS:
  * - Stage 0 (Egg): 0 XP
- * - Stage 1 (Sparkling Egg): 20 XP
+ * - Stage 1 (Sparkling Egg): 10 XP (Tutorial-optimized)
  * - Stage 2 (Hatchling): 60 XP
  * - Stage 3 (Guardian): 120 XP
  * - Stage 4 (Ascended): 250 XP
