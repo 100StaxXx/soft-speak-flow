@@ -67,6 +67,9 @@ export const MorningCheckIn = () => {
       // Award XP for check-in
       awardCheckInComplete();
 
+      // Dispatch event for walkthrough
+      window.dispatchEvent(new CustomEvent('checkin-complete'));
+
       // Generate mentor response in background
       supabase.functions.invoke('generate-check-in-response', {
         body: { checkInId: checkIn.id }
@@ -123,7 +126,7 @@ export const MorningCheckIn = () => {
   }
 
   return (
-    <Card className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
+    <Card data-tour="morning-checkin" className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -138,12 +141,12 @@ export const MorningCheckIn = () => {
         </div>
 
         <div className="space-y-4">
-          <div>
+          <div data-tour="checkin-mood">
             <label className="text-sm font-bold mb-2 block">How are you feeling?</label>
             <MoodSelector selected={mood} onSelect={setMood} />
           </div>
 
-          <div>
+          <div data-tour="checkin-intention">
             <label className="text-sm font-bold mb-2 flex items-center gap-2">
               <Target className="h-4 w-4" />
               What's your main focus today?

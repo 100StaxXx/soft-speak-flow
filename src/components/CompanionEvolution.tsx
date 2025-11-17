@@ -152,6 +152,10 @@ export const CompanionEvolution = ({
         }
         // Resume ambient music after evolution
         resumeAmbientAfterEvent();
+        
+        // Dispatch event for walkthrough
+        window.dispatchEvent(new CustomEvent('companion-evolved'));
+        
         onComplete();
       }, 5500),
     ];

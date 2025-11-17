@@ -221,6 +221,9 @@ export default function Onboarding() {
       // Wait for the profile to reflect the update
       await waitForProfileUpdate(user.id);
 
+      // Mark onboarding complete for walkthrough trigger
+      localStorage.setItem('onboardingComplete', 'true');
+
       // Move to companion creation instead of navigating away
       setStage('companion');
     } catch (error) {
