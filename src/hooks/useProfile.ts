@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -24,57 +24,47 @@ interface Profile {
 
 export const useProfile = () => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) {
-        setProfile(null);
-        setLoading(false);
-        return;
+  const { data: profile, isLoading: loading } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        throw error;
       }
 
-      try {
-        const { data, error } = await supabase
+      if (!data) {
+        // Auto-create profile on first login if missing
+        const { data: inserted, error: insertError } = await supabase
           .from("profiles")
+          .insert({
+            id: user.id,
+            email: user.email ?? null,
+          })
           .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
+          .single();
 
-        if (error) {
-          console.error("Error fetching profile:", error);
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          throw insertError;
         }
-
-        if (!data) {
-          // Auto-create profile on first login if missing
-          const { data: inserted, error: insertError } = await supabase
-            .from("profiles")
-            .insert({
-              id: user.id,
-              email: user.email ?? null,
-            })
-            .select("*")
-            .single();
-
-          if (insertError) {
-            console.error("Error creating profile:", insertError);
-            setProfile(null);
-          } else {
-            setProfile(inserted);
-          }
-        } else {
-          setProfile(data);
-        }
-      } catch (error) {
-        console.error("Error fetching/creating profile:", error);
-      } finally {
-        setLoading(false);
+        
+        return inserted;
       }
-    };
 
-    fetchProfile();
-  }, [user]);
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes - profile data doesn't change often
+  });
 
-  return { profile, loading };
+  return { profile: profile ?? null, loading };
 };
