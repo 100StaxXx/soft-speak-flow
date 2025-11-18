@@ -258,12 +258,36 @@ export const useCompanion = () => {
         });
       }
 
+      // Auto-generate story chapter for this evolution stage
+      const { data: existingStory } = await supabase
+        .from("companion_stories")
+        .select("id")
+        .eq("companion_id", companion.id)
+        .eq("stage", newStage)
+        .maybeSingle();
+
+      if (!existingStory) {
+        // Generate story chapter in the background
+        supabase.functions.invoke("generate-companion-story", {
+          body: {
+            companionId: companion.id,
+            stage: newStage,
+            tonePreference: "heroic",
+            themeIntensity: "moderate",
+          },
+        }).catch((error) => {
+          console.error("Failed to auto-generate story:", error);
+          // Don't throw - story generation is not critical to evolution
+        });
+      }
+
       return imageData.imageUrl;
     },
     onSuccess: () => {
       toast.dismiss("evolution");
       toast.success("🌟 Evolution complete! Your companion has grown stronger!");
       queryClient.invalidateQueries({ queryKey: ["companion"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
     },
     onError: (error) => {
       toast.dismiss("evolution");
