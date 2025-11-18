@@ -73,7 +73,7 @@ export const MentorChatTour = () => {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.6)',
+          overlayColor: 'rgba(0, 0, 0, 0.7)',
           arrowColor: 'hsl(var(--card))',
           zIndex: 10000,
         },
@@ -101,6 +101,10 @@ export const MentorChatTour = () => {
         },
         buttonSkip: {
           color: 'hsl(var(--muted-foreground))',
+        },
+        spotlight: {
+          borderRadius: '12px',
+          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
         },
       }}
       floaterProps={{
