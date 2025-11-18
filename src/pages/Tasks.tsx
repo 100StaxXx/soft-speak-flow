@@ -172,7 +172,11 @@ export default function Tasks() {
 
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
-    addTask({ taskText: newTaskText, difficulty: taskDifficulty });
+    addTask({ 
+      taskText: newTaskText, 
+      difficulty: taskDifficulty,
+      taskDate: selectedDate.toISOString().split('T')[0]
+    });
     setNewTaskText("");
     setTaskDifficulty("medium");
   };
