@@ -6,17 +6,24 @@ import { EMOTIONAL_TRIGGERS, TOPIC_CATEGORIES } from "@/config/categories";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
 
 export const InspireSection = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+  const [matchingQuotes, setMatchingQuotes] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch matching quotes from database
-  const { data: matchingQuotes, isLoading } = useQuery({
-    queryKey: ['inspire-quotes', selectedCategory, selectedTrigger],
-    queryFn: async () => {
+  const getNextQuote = async () => {
+    // If we already have quotes, just cycle to the next one
+    if (matchingQuotes.length > 0) {
+      setCurrentQuoteIndex((prev) => (prev + 1) % matchingQuotes.length);
+      return;
+    }
+
+    // Otherwise, fetch quotes based on filters
+    setIsLoading(true);
+    try {
       let query = supabase
         .from('quotes')
         .select('*');
@@ -32,21 +39,23 @@ export const InspireSection = () => {
       const { data, error } = await query.limit(20);
       
       if (error) throw error;
-      return data || [];
-    },
-  });
+      
+      if (!data || data.length === 0) {
+        toast.error("No quotes found for this combination");
+        return;
+      }
 
-  const getNextQuote = () => {
-    if (!matchingQuotes || matchingQuotes.length === 0) {
-      toast.error("No quotes found for this combination");
-      return;
+      setMatchingQuotes(data);
+      setCurrentQuoteIndex(0);
+    } catch (error) {
+      console.error("Error fetching quotes:", error);
+      toast.error("Failed to fetch quotes");
+    } finally {
+      setIsLoading(false);
     }
-
-    // Cycle to next quote
-    setCurrentQuoteIndex((prev) => (prev + 1) % matchingQuotes.length);
   };
 
-  const currentQuote = matchingQuotes?.[currentQuoteIndex];
+  const currentQuote = matchingQuotes[currentQuoteIndex];
 
 
   return (
@@ -173,13 +182,6 @@ export const InspireSection = () => {
           </Card>
         )}
 
-        {!isLoading && matchingQuotes && matchingQuotes.length === 0 && (
-          <Card className="p-6 text-center bg-muted/50">
-            <p className="text-sm text-muted-foreground">
-              No quotes found for this combination. Try different filters!
-            </p>
-          </Card>
-        )}
       </div>
     </Card>
   );
