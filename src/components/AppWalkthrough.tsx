@@ -42,37 +42,43 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: '[data-tour="add-task-input"]',
-    content: "✍️ Type 'Complete Tutorial Quest' and press Add Quest. This will be your first achievement!",
+    content: "✍️ Type your first quest here. Try something like 'Complete Tutorial Quest'!",
     placement: "top",
     spotlightClicks: true,
   },
   {
     target: '[data-tour="task-difficulty"]',
-    content: "⚡ Select Medium difficulty (15 XP). This will help your companion evolve!",
+    content: "⚡ Select Medium difficulty (15 XP) for your quest.",
     placement: "top",
     spotlightClicks: true,
   },
   {
+    target: '[data-tour="add-task-button"]',
+    content: "➕ Now click Add Quest to create it!",
+    placement: "left",
+    spotlightClicks: true,
+  },
+  {
     target: '[data-tour="first-task"]',
-    content: "✅ Perfect! Now complete your quest by clicking the checkbox. Watch your companion evolve with 20 total XP!",
+    content: "✅ Great! Now complete your quest by clicking the checkbox. This will give you enough XP to evolve your companion!",
     placement: "bottom",
     spotlightClicks: true,
   },
   {
     target: 'body',
-    content: "🎉 Your companion is evolving! Check-in (5 XP) + Quest (15 XP) = 20 XP. You've reached Stage 2!",
+    content: "🎉 Your companion is evolving! Check-in (5 XP) + Quest (15 XP) = 20 XP total!",
     placement: "center",
     disableBeacon: true,
   },
   {
     target: '[data-tour="habits-tab"]',
-    content: "🔄 Finally, let's create your first habit! Tap the Habits tab.",
+    content: "🔄 Finally, let's create your first habit! Click the Habits tab.",
     placement: "bottom",
     spotlightClicks: true,
   },
   {
     target: 'body',
-    content: "💡 Choose a template or create a custom habit. Habits help you build daily consistency and earn XP each time you complete them!",
+    content: "💡 Choose a template or create a custom habit. Habits help you build daily consistency and earn XP!",
     placement: "center",
     spotlightClicks: true,
   },
@@ -179,12 +185,12 @@ export const AppWalkthrough = () => {
   // Listen for task completion (which triggers evolution)
   useEffect(() => {
     const handleEvolution = () => {
-      if (run && stepIndex === 7 && waitingForAction) {
+      if (run && stepIndex === 8 && waitingForAction) {
         haptics.heavy(); // Strong feedback for evolution milestone
         setWaitingForAction(false);
         // Wait for evolution animation to complete
         setTimeout(() => {
-          setStepIndex(8);
+          setStepIndex(9);
         }, 8000);
       }
     };
@@ -201,10 +207,10 @@ export const AppWalkthrough = () => {
       // User clicked Quests tab, progress to next step
       haptics.medium();
       setTimeout(() => setStepIndex(5), 500);
-    } else if (stepIndex === 9 && location.pathname === '/tasks') {
+    } else if (stepIndex === 10 && location.pathname === '/tasks') {
       // User clicked Habits tab, progress to next step
       haptics.medium();
-      setTimeout(() => setStepIndex(10), 500);
+      setTimeout(() => setStepIndex(11), 500);
     }
   }, [location.pathname, stepIndex, run]);
 
@@ -271,13 +277,13 @@ export const AppWalkthrough = () => {
       } else if (index === 4 && action === ACTIONS.NEXT) {
         // Don't allow "Next" button on tasks-tab step - user must click the tab
         return;
-      } else if (index === 9 && action === ACTIONS.NEXT) {
+      } else if (index === 10 && action === ACTIONS.NEXT) {
         // Don't allow "Next" button on habits-tab step - user must click the tab
         return;
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
         setWaitingForAction(true);
-      } else if (index === 7 && lifecycle === 'complete') {
+      } else if (index === 8 && lifecycle === 'complete') {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       } else {
