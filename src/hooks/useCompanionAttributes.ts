@@ -47,12 +47,19 @@ export const useCompanionAttributes = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
-      // Show toast for significant changes
-      if (Math.abs(data.change) >= 5) {
+      // Show toast for significant changes only (reduced threshold to avoid spam)
+      if (Math.abs(data.change) >= 10) {
         const emoji = data.change > 0 ? "⬆️" : "⬇️";
         const direction = data.change > 0 ? "increased" : "decreased";
-        toast.success(`${emoji} ${data.attribute.charAt(0).toUpperCase() + data.attribute.slice(1)} ${direction}!`);
+        const attribute = data.attribute.charAt(0).toUpperCase() + data.attribute.slice(1);
+        toast.success(`${emoji} ${attribute} ${direction}!`, {
+          duration: 2000, // Shorter duration to reduce notification spam
+        });
       }
+    },
+    onError: (error) => {
+      console.error('Attribute update failed:', error);
+      // Silent failure - don't spam user with errors for background updates
     },
   });
 
