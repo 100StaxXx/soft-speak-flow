@@ -39,6 +39,14 @@ export const CompanionPageTour = () => {
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
+    // Check if tour has been completed or skipped
+    const tourCompleted = localStorage.getItem('companionPageTourComplete') === 'true';
+    
+    // Never show the tour if it's already been completed
+    if (tourCompleted) {
+      return;
+    }
+    
     // CRITICAL: Don't show this tour if the main app walkthrough is active or pending
     const hasSeenAppWalkthrough = localStorage.getItem('hasSeenAppWalkthrough');
     const onboardingComplete = localStorage.getItem('onboardingComplete');
@@ -49,14 +57,12 @@ export const CompanionPageTour = () => {
       return; // AppWalkthrough will handle companion page tutorial
     }
     
-    // Only show this separate tour if:
+    // Only show this separate tour on first visit if:
     // 1. User has completed the main AppWalkthrough
     // 2. They haven't seen this specific companion tour yet
     // 3. They're on the companion page
-    const tourCompleted = localStorage.getItem('companionPageTourComplete') === 'true';
     if (
       user && 
-      !tourCompleted && 
       location.pathname === '/companion' &&
       hasSeenAppWalkthrough === 'true' // Must have fully completed main tutorial
     ) {
