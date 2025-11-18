@@ -37,15 +37,20 @@ export const useXPRewards = () => {
 
   const awardHabitCompletion = async () => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
-    awardXP.mutate({
-      eventType: "habit_complete",
-      xpAmount: XP_REWARDS.HABIT_COMPLETE,
-    });
     
-    // Update companion attributes
-    await updateFocusFromHabit(companion.id);
-    await updateEnergyFromActivity(companion.id);
+    try {
+      showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
+      awardXP.mutate({
+        eventType: "habit_complete",
+        xpAmount: XP_REWARDS.HABIT_COMPLETE,
+      });
+      
+      // Update companion attributes sequentially to avoid race conditions
+      await updateFocusFromHabit(companion.id);
+      await updateEnergyFromActivity(companion.id);
+    } catch (error) {
+      console.error('Error awarding habit completion:', error);
+    }
   };
 
   const awardAllHabitsComplete = () => {
@@ -86,43 +91,58 @@ export const useXPRewards = () => {
 
   const awardCheckInComplete = async () => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
-    awardXP.mutate({
-      eventType: "check_in",
-      xpAmount: XP_REWARDS.CHECK_IN,
-    });
     
-    // Update companion attributes
-    await updateBalanceFromReflection(companion.id);
-    await updateEnergyFromActivity(companion.id);
+    try {
+      showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
+      awardXP.mutate({
+        eventType: "check_in",
+        xpAmount: XP_REWARDS.CHECK_IN,
+      });
+      
+      // Update companion attributes sequentially
+      await updateBalanceFromReflection(companion.id);
+      await updateEnergyFromActivity(companion.id);
+    } catch (error) {
+      console.error('Error awarding check-in:', error);
+    }
   };
 
   const awardStreakMilestone = async (milestone: number) => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.STREAK_MILESTONE, `${milestone} Day Streak!`);
-    awardXP.mutate({
-      eventType: "streak_milestone",
-      xpAmount: XP_REWARDS.STREAK_MILESTONE,
-      metadata: { milestone },
-    });
     
-    // Update companion resilience
-    await updateResilienceFromStreak({
-      companionId: companion.id,
-      streakDays: milestone,
-    });
+    try {
+      showXPToast(XP_REWARDS.STREAK_MILESTONE, `${milestone} Day Streak!`);
+      awardXP.mutate({
+        eventType: "streak_milestone",
+        xpAmount: XP_REWARDS.STREAK_MILESTONE,
+        metadata: { milestone },
+      });
+      
+      // Update companion resilience
+      await updateResilienceFromStreak({
+        companionId: companion.id,
+        streakDays: milestone,
+      });
+    } catch (error) {
+      console.error('Error awarding streak milestone:', error);
+    }
   };
 
   const awardReflectionComplete = async () => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
-    awardXP.mutate({
-      eventType: "reflection",
-      xpAmount: XP_REWARDS.CHECK_IN,
-    });
     
-    // Update companion balance
-    await updateBalanceFromReflection(companion.id);
+    try {
+      showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
+      awardXP.mutate({
+        eventType: "reflection",
+        xpAmount: XP_REWARDS.CHECK_IN,
+      });
+      
+      // Update companion balance
+      await updateBalanceFromReflection(companion.id);
+    } catch (error) {
+      console.error('Error awarding reflection:', error);
+    }
   };
 
   const awardQuoteShared = () => {
