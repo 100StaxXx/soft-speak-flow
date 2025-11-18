@@ -58,6 +58,11 @@ serve(async (req) => {
 
     const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor } = await req.json();
 
+    if (!spiritAnimal) throw new Error("spiritAnimal is required");
+    if (!element) throw new Error("element is required");
+    if (stage === undefined || stage === null) throw new Error("stage is required");
+    if (!favoriteColor) throw new Error("favoriteColor is required");
+
     const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
     if (!stageInfo) throw new Error(`Invalid stage: ${stage}`);
 
