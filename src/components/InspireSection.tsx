@@ -6,41 +6,48 @@ import { EMOTIONAL_TRIGGERS, TOPIC_CATEGORIES } from "@/config/categories";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 export const InspireSection = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
-  const [generatedQuote, setGeneratedQuote] = useState<string>("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
 
-  const generateQuote = async () => {
-    setIsGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-inspire-quote', {
-        body: {
-          emotionalTrigger: selectedTrigger,
-          category: selectedCategory,
-        }
-      });
+  // Fetch matching quotes from database
+  const { data: matchingQuotes, isLoading } = useQuery({
+    queryKey: ['inspire-quotes', selectedCategory, selectedTrigger],
+    queryFn: async () => {
+      let query = supabase
+        .from('quotes')
+        .select('*');
 
-      if (error) {
-        if (error.message.includes("429")) {
-          toast.error("Rate limit exceeded. Please try again in a moment.");
-        } else if (error.message.includes("402")) {
-          toast.error("AI credits exhausted. Please add credits to continue.");
-        } else {
-          toast.error("Failed to generate quote");
-        }
-        throw error;
+      if (selectedCategory) {
+        query = query.eq('category', selectedCategory);
       }
 
-      setGeneratedQuote(data.quote);
-    } catch (error) {
-      console.error("Error generating quote:", error);
-    } finally {
-      setIsGenerating(false);
+      if (selectedTrigger) {
+        query = query.contains('emotional_triggers', [selectedTrigger]);
+      }
+
+      const { data, error } = await query.limit(20);
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const getNextQuote = () => {
+    if (!matchingQuotes || matchingQuotes.length === 0) {
+      toast.error("No quotes found for this combination");
+      return;
     }
+
+    // Cycle to next quote
+    setCurrentQuoteIndex((prev) => (prev + 1) % matchingQuotes.length);
   };
+
+  const currentQuote = matchingQuotes?.[currentQuoteIndex];
+
 
   return (
     <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
@@ -113,35 +120,42 @@ export const InspireSection = () => {
           </div>
         </div>
 
-        {/* Generate Button */}
+        {/* Get Quote Button */}
         <Button
-          onClick={generateQuote}
-          disabled={isGenerating}
+          onClick={getNextQuote}
+          disabled={isLoading || !matchingQuotes || matchingQuotes.length === 0}
           className="w-full"
           size="lg"
         >
-          {isGenerating ? (
+          {isLoading ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
+              Loading...
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              Generate Quote
+              {currentQuote ? 'Next Quote' : 'Get Quote'}
             </>
           )}
         </Button>
 
-        {/* Generated Quote Display */}
-        {generatedQuote && (
+        {/* Quote Display */}
+        {currentQuote && (
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                <p className="text-lg font-medium leading-relaxed italic">
-                  "{generatedQuote}"
-                </p>
+                <div className="flex-1">
+                  <p className="text-lg font-medium leading-relaxed italic mb-2">
+                    "{currentQuote.text}"
+                  </p>
+                  {currentQuote.author && (
+                    <p className="text-sm text-muted-foreground">
+                      — {currentQuote.author}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {selectedTrigger && (
@@ -156,6 +170,14 @@ export const InspireSection = () => {
                 )}
               </div>
             </div>
+          </Card>
+        )}
+
+        {!isLoading && matchingQuotes && matchingQuotes.length === 0 && (
+          <Card className="p-6 text-center bg-muted/50">
+            <p className="text-sm text-muted-foreground">
+              No quotes found for this combination. Try different filters!
+            </p>
           </Card>
         )}
       </div>
