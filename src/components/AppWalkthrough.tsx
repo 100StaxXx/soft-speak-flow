@@ -94,19 +94,25 @@ export const AppWalkthrough = () => {
     if (isMobile) {
       base[6] = {
         ...base[6],
-        target: '[data-tour="week-calendar"]',
+        target: 'body',
         placement: 'top',
         floaterProps: {
           ...((base[6] as any).floaterProps || {}),
-          offset: 8,
+          offset: 0,
         },
         styles: {
           ...((base[6] as any).styles || {}),
           tooltip: {
             ...(((base[6] as any).styles?.tooltip) || {}),
-            marginTop: undefined,
-            marginBottom: '8px',
-            pointerEvents: 'none', // allow tapping underlying UI on mobile
+            marginTop: '8px',
+            marginBottom: undefined,
+            pointerEvents: 'none',
+          },
+          tooltipContainer: {
+            pointerEvents: 'none',
+          },
+          arrow: {
+            display: 'none',
           },
         },
       } as Step;
