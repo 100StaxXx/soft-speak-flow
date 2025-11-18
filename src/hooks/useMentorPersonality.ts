@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface MentorPersonality {
   name: string;
+  slug: string;
   tone: string;
   style: string;
   avatar_url?: string;
+  primary_color: string;
   buttonText: (action: string) => string;
   emptyState: (context: string) => string;
   encouragement: () => string;
@@ -55,7 +57,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
       if (!profile?.selected_mentor_id) return null;
       const { data } = await supabase
         .from('mentors')
-        .select('name, tone_description, style, avatar_url')
+        .select('name, slug, tone_description, style, avatar_url, primary_color')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();
       return data;
@@ -81,9 +83,11 @@ export const useMentorPersonality = (): MentorPersonality | null => {
 
   return {
     name: mentor.name,
+    slug: mentor.slug || '',
     tone: mentor.tone_description,
     style: mentor.style || '',
     avatar_url: mentor.avatar_url || undefined,
+    primary_color: mentor.primary_color || '#000',
     buttonText: template.buttonText!,
     emptyState: template.emptyState!,
     encouragement: template.encouragement!,
