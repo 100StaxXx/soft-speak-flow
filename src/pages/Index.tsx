@@ -76,11 +76,9 @@ const Index = () => {
     );
   }
 
-  // Loading fallback component
+  // Transparent loading fallback to avoid grey boxes during tutorial
   const ComponentLoader = () => (
-    <Card className="p-4 animate-pulse">
-      <div className="h-20 bg-muted/50 rounded" />
-    </Card>
+    <div className="h-20" />
   );
 
   return (
