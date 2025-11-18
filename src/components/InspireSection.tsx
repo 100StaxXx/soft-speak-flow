@@ -132,7 +132,7 @@ export const InspireSection = () => {
         {/* Get Quote Button */}
         <Button
           onClick={getNextQuote}
-          disabled={isLoading || !matchingQuotes || matchingQuotes.length === 0}
+          disabled={isLoading}
           className="w-full"
           size="lg"
         >
