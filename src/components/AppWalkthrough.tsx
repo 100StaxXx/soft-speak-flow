@@ -97,6 +97,7 @@ export const AppWalkthrough = () => {
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
+      // Adjust quest creation step
       base[6] = {
         ...base[6],
         target: '[data-tour="today-quests-header"]',
@@ -111,7 +112,23 @@ export const AppWalkthrough = () => {
             ...(((base[6] as any).styles?.tooltip) || {}),
             marginTop: undefined,
             marginBottom: '8px',
-            pointerEvents: 'none', // allow tapping underlying UI on mobile
+            pointerEvents: 'none',
+          },
+        },
+      } as Step;
+      
+      // Adjust companion page step (step 4) - position below companion image
+      base[4] = {
+        ...base[4],
+        placement: 'bottom',
+        styles: {
+          tooltip: {
+            position: 'fixed',
+            bottom: '180px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'calc(100% - 2rem)',
+            maxWidth: '400px',
           },
         },
       } as Step;
