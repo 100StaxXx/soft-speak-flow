@@ -50,12 +50,18 @@ const WALKTHROUGH_STEPS: Step[] = [
   {
     target: 'body',
     content: "✍️ Perfect! Now create a quest: Type 'Complete Tutorial Quest', select Medium difficulty (15 XP), then click Add Quest. Once created, complete it by clicking the checkbox to evolve your companion!",
-    placement: "center",
+    placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
+    floaterProps: {
+      disableAnimation: true,
+    },
     styles: {
       options: {
         zIndex: 100000,
+      },
+      tooltip: {
+        marginTop: '-280px',
       }
     }
   },
