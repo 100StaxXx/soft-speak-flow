@@ -41,16 +41,32 @@ export const BottomNav = () => {
   const canClickCompanion = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Click Companion tab
   const canClickQuests = tutorialStep === 4 || tutorialStep === 5; // Steps 4-5: Click Quests tab
   
+  console.log('[BottomNav] Tutorial Debug:', {
+    tutorialStep,
+    isTutorialActive,
+    canClickCompanion,
+    canClickQuests
+  });
+  
   const handleNavClick = (e: React.MouseEvent, route: string) => {
     if (!isTutorialActive) return;
     
+    console.log('[BottomNav] Click attempt:', { route, canClickCompanion, canClickQuests });
+    
     // Allow Companion click on steps 2-3
-    if (route === '/companion' && canClickCompanion) return;
+    if (route === '/companion' && canClickCompanion) {
+      console.log('[BottomNav] Allowing Companion click');
+      return;
+    }
     
     // Allow Quests click on steps 4-5
-    if (route === '/tasks' && canClickQuests) return;
+    if (route === '/tasks' && canClickQuests) {
+      console.log('[BottomNav] Allowing Quests click');
+      return;
+    }
     
     // Block all other navigation during tutorial
+    console.log('[BottomNav] Blocking navigation');
     e.preventDefault();
     e.stopPropagation();
   };
