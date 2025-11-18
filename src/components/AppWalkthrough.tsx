@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import Joyride, { CallBackProps, STATUS, Step, ACTIONS, EVENTS } from "react-joyride";
+import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,7 +90,7 @@ const WALKTHROUGH_STEPS: Step[] = [
 ];
 
 export const AppWalkthrough = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [run, setRun] = useState(false);
@@ -121,7 +121,7 @@ export const AppWalkthrough = () => {
 
   useEffect(() => {
     const checkWalkthroughStatus = async () => {
-      if (!user) return;
+      if (!user || !session) return;
 
       const hasSeenWalkthrough = localStorage.getItem('hasSeenAppWalkthrough');
       const onboardingComplete = localStorage.getItem('onboardingComplete');
@@ -145,7 +145,7 @@ export const AppWalkthrough = () => {
     };
 
     checkWalkthroughStatus();
-  }, [user, location.pathname]);
+  }, [user, session, location.pathname, waitForSelector]);
 
 
   // Listen for check-in completion
@@ -160,7 +160,7 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, waitingForAction, run]);
+  }, [stepIndex, waitingForAction, run, safeSetStep]);
 
   // Listen for quest creation to move from input/difficulty to first quest step
   useEffect(() => {
@@ -202,15 +202,15 @@ export const AppWalkthrough = () => {
       haptics.medium();
       setTimeout(() => safeSetStep(11), 500);
     }
-  }, [location.pathname, stepIndex, run]);
+  }, [location.pathname, stepIndex, run, safeSetStep]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
-    const { status, action, index, type, lifecycle } = data;
+    const { status, index, lifecycle } = data;
 
-    // Only allow finishing when tutorial is complete, prevent skipping
+    // Only allow finishing when tutorial is complete
     if (status === STATUS.FINISHED) {
-      haptics.success(); // Celebratory feedback for completing entire tutorial
+      haptics.success();
       
       // Trigger confetti celebration
       const duration = 3000;
@@ -230,14 +230,12 @@ export const AppWalkthrough = () => {
 
         const particleCount = 50 * (timeLeft / duration);
         
-        // Confetti from left side
         confetti({
           ...defaults,
           particleCount,
           origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
         });
         
-        // Confetti from right side
         confetti({
           ...defaults,
           particleCount,
@@ -251,38 +249,40 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    // Handle step progression
-    if (type === EVENTS.STEP_AFTER) {
-      const nextStepIndex = index + (action === ACTIONS.PREV ? -1 : 1);
-
-      // Light haptic feedback for regular step progression
-      if (action === ACTIONS.NEXT) {
-        haptics.light();
-      }
-
-      // Navigate between sections
-      if (index === 3 && action === ACTIONS.NEXT) {
-        // After Ask Mentor, show step to click Quests tab
-        setStepIndex(4);
-      } else if (index === 4 && action === ACTIONS.NEXT) {
-        // Don't allow "Next" button on tasks-tab step - user must click the tab
-        return;
-      } else if ((index === 7 || index === 10) && action === ACTIONS.NEXT) {
-        // Don't allow "Next" button on add quest or habits-tab steps
-        return;
-      } else if (index === 1 && lifecycle === 'complete') {
+    // Set waiting states for steps requiring user actions
+    if (lifecycle === 'complete') {
+      if (index === 1) {
         // Wait for check-in submission
         setWaitingForAction(true);
-      } else if (index === 8 && lifecycle === 'complete') {
+      } else if (index === 8) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
-      } else {
-        setStepIndex(nextStepIndex);
       }
     }
-  }, [navigate, location.pathname]);
+  }, []);
 
-  if (!user) return null;
+  // Lock body scroll during tutorial
+  useEffect(() => {
+    if (run) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = '0';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [run]);
+
+  if (!user || !session) return null;
 
   return (
     <Joyride
@@ -290,24 +290,26 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous
-      showProgress
+      continuous={false}
+      showProgress={false}
       showSkipButton={false}
       disableOverlayClose
       disableCloseOnEsc
       hideCloseButton
       disableScrolling
+      scrollToFirstStep={false}
+      spotlightPadding={0}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.9)',
+          overlayColor: 'transparent',
           zIndex: 10000,
         },
         tooltip: {
           borderRadius: '1.25rem',
-          padding: '2rem',
+          padding: '1.5rem',
           border: '1px solid hsl(var(--border))',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
         },
@@ -317,15 +319,16 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          backgroundColor: 'hsl(var(--primary))',
-          borderRadius: '0.75rem',
-          padding: '0.75rem 1.5rem',
-          fontSize: '0.95rem',
-          fontWeight: '600',
+          display: 'none',
         },
         buttonBack: {
-          color: 'hsl(var(--muted-foreground))',
-          marginRight: '1rem',
+          display: 'none',
+        },
+        buttonClose: {
+          display: 'none',
+        },
+        buttonSkip: {
+          display: 'none',
         },
         overlay: {
           mixBlendMode: 'normal',
