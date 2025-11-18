@@ -54,10 +54,13 @@ const Index = () => {
     checkHabits();
   }, [user]);
 
-  // Only redirect to onboarding if user has no mentor selected
+  // Check for incomplete onboarding and redirect
   useEffect(() => {
-    if (user && profile && !profile.selected_mentor_id && !companionLoading) {
-      navigate("/onboarding");
+    if (user && profile && !companionLoading) {
+      // If onboarding is not complete or user has no mentor, redirect to onboarding
+      if (!profile.onboarding_completed || !profile.selected_mentor_id) {
+        navigate("/onboarding");
+      }
     }
   }, [user, profile, companionLoading, navigate]);
 

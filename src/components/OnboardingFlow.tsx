@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -43,9 +43,40 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
   const { user } = useAuth();
   const progress = ((currentSlide + 1) / slides.length) * 100;
 
-  const handleNext = () => {
+  // Restore progress on mount
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("onboarding_data")
+          .eq("id", user.id)
+          .single();
+        
+        const savedData = data?.onboarding_data as { currentSlide?: number } | null;
+        if (savedData?.currentSlide !== undefined) {
+          setCurrentSlide(savedData.currentSlide);
+        }
+      }
+    };
+    loadProgress();
+  }, [user]);
+
+  const handleNext = async () => {
     if (currentSlide < slides.length - 1) {
-      setCurrentSlide(currentSlide + 1);
+      const nextSlide = currentSlide + 1;
+      setCurrentSlide(nextSlide);
+      
+      // Save progress
+      if (user) {
+        await supabase
+          .from("profiles")
+          .update({ 
+            onboarding_step: 'intro',
+            onboarding_data: { currentSlide: nextSlide }
+          })
+          .eq("id", user.id);
+      }
     } else {
       handleComplete();
     }
@@ -59,7 +90,11 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     if (user) {
       await supabase
         .from("profiles")
-        .update({ onboarding_completed: true })
+        .update({ 
+          onboarding_completed: true,
+          onboarding_step: 'complete',
+          onboarding_data: {}
+        })
         .eq("id", user.id);
     }
     onComplete();

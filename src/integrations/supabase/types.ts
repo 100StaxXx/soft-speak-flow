@@ -1298,6 +1298,8 @@ export type Database = {
           is_premium: boolean | null
           longest_habit_streak: number | null
           onboarding_completed: boolean | null
+          onboarding_data: Json | null
+          onboarding_step: string | null
           preferences: Json | null
           selected_mentor_id: string | null
           timezone: string | null
@@ -1317,6 +1319,8 @@ export type Database = {
           is_premium?: boolean | null
           longest_habit_streak?: number | null
           onboarding_completed?: boolean | null
+          onboarding_data?: Json | null
+          onboarding_step?: string | null
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null
@@ -1336,6 +1340,8 @@ export type Database = {
           is_premium?: boolean | null
           longest_habit_streak?: number | null
           onboarding_completed?: boolean | null
+          onboarding_data?: Json | null
+          onboarding_step?: string | null
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null

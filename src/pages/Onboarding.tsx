@@ -49,6 +49,49 @@ export default function Onboarding() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Restore onboarding progress on mount
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_step, onboarding_data")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile?.onboarding_step && profile.onboarding_step !== 'complete') {
+        const savedData = profile.onboarding_data as { 
+          mentorId?: string;
+          mentorName?: string;
+          explanation?: MentorExplanation;
+        } | null;
+        
+        if (profile.onboarding_step === 'mentor_reveal' && savedData?.mentorId) {
+          // Fetch the mentor from database
+          const { data: mentorData } = await supabase
+            .from('mentors')
+            .select('*')
+            .eq('id', savedData.mentorId)
+            .single();
+          
+          if (mentorData) {
+            setStage('result');
+            setRecommendedMentor(mentorData);
+            if (savedData.explanation) {
+              setExplanation(savedData.explanation);
+            }
+          }
+        } else if (profile.onboarding_step === 'companion') {
+          setStage('companion');
+        } else if (profile.onboarding_step === 'browse') {
+          setStage('browse');
+        }
+      }
+    };
+    loadProgress();
+  }, [user]);
+
   // Scroll to top when stage changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -106,6 +149,24 @@ export default function Onboarding() {
       setExplanation(mentorExplanation);
       setStage('result');
 
+      // Save progress
+      await supabase
+        .from("profiles")
+        .update({
+          onboarding_step: 'mentor_reveal',
+          onboarding_data: {
+            mentorId: bestMentor.id,
+            mentorName: bestMentor.name,
+            explanation: {
+              title: mentorExplanation.title,
+              subtitle: mentorExplanation.subtitle,
+              paragraph: mentorExplanation.paragraph,
+              bullets: mentorExplanation.bullets
+            }
+          }
+        })
+        .eq("id", currentUser.id);
+
       // Save questionnaire responses
       const responses = Object.entries(completedAnswers).map(([questionId, optionId]) => ({
         user_id: currentUser.id,
@@ -151,6 +212,12 @@ export default function Onboarding() {
       // Move to companion creation
       await waitForProfileUpdate();
       setStage('companion');
+      
+      // Save progress
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: 'companion' })
+        .eq("id", user.id);
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
@@ -184,7 +251,11 @@ export default function Onboarding() {
       // Mark onboarding as complete
       await supabase
         .from('profiles')
-        .update({ onboarding_completed: true })
+        .update({ 
+          onboarding_completed: true,
+          onboarding_step: 'complete',
+          onboarding_data: {}
+        })
         .eq('id', user!.id);
       
       // CRITICAL: Invalidate profile cache to force refetch with new data
@@ -208,8 +279,14 @@ export default function Onboarding() {
     }
   };
 
-  const handleSeeAllMentors = () => {
+  const handleSeeAllMentors = async () => {
     setStage('browse');
+    if (user) {
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: 'browse' })
+        .eq("id", user.id);
+    }
   };
 
   const handleMentorSelected = async (mentorId: string) => {
