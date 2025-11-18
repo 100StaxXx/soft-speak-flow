@@ -58,11 +58,16 @@ export const MorningCheckIn = () => {
           mood,
           intention: intention.trim(),
           completed_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,check_in_date,check_in_type'
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Check-in error:', error);
+        throw error;
+      }
 
       // Award XP for check-in
       awardCheckInComplete();
@@ -77,8 +82,12 @@ export const MorningCheckIn = () => {
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
     } catch (error) {
-      console.error(error);
-      toast({ title: "Error", description: "Failed to save check-in", variant: "destructive" });
+      console.error('Check-in save error:', error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to save check-in", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSubmitting(false);
     }
