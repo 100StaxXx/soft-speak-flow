@@ -121,15 +121,19 @@ export const AppWalkthrough = () => {
       base[4] = {
         ...base[4],
         placement: 'center',
+        floaterProps: {
+          disableAnimation: false,
+        },
         styles: {
           tooltip: {
-            position: 'fixed',
-            bottom: '180px',
-            left: '50%',
-            transform: 'translateX(-50%) !important',
-            width: 'calc(100% - 2rem)',
-            maxWidth: '400px',
-            margin: '0 auto',
+            position: 'fixed !important' as any,
+            bottom: '180px !important' as any,
+            left: '1rem !important' as any,
+            right: '1rem !important' as any,
+            width: 'auto !important' as any,
+            maxWidth: '400px !important' as any,
+            margin: '0 auto !important' as any,
+            transform: 'none !important' as any,
           },
         },
       } as Step;
