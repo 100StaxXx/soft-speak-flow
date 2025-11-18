@@ -1,6 +1,24 @@
 import { createRoot } from "react-dom/client";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import "./index.css";
+import { OfflineBanner } from "./components/OfflineBanner";
+
+const App = lazy(() => import("./App").catch(() => {
+  return { default: () => (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-4 p-8">
+        <h1 className="text-2xl font-bold text-foreground">Loading Error</h1>
+        <p className="text-muted-foreground">Unable to load the application. Please refresh the page.</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  )}
+}));
 
 // Register service worker for PWA with optimized caching
 if ('serviceWorker' in navigator) {
@@ -11,18 +29,18 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Lazy load the main app for code splitting
-const App = lazy(() => import("./App.tsx"));
-
 createRoot(document.getElementById("root")!).render(
-  <Suspense fallback={
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center space-y-4">
-        <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-        <p className="text-muted-foreground">Loading...</p>
+  <>
+    <OfflineBanner />
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-foreground">Loading...</p>
+        </div>
       </div>
-    </div>
-  }>
-    <App />
-  </Suspense>
+    }>
+      <App />
+    </Suspense>
+  </>
 );
