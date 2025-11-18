@@ -101,6 +101,11 @@ export const AppWalkthrough = () => {
       await waitForSelector(target, 6000);
     }
     setStepIndex(idx);
+    
+    // Emit custom event for BottomNav to listen to
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+      detail: { step: idx } 
+    }));
   }, [waitForSelector]);
 
   useEffect(() => {
@@ -123,6 +128,10 @@ export const AppWalkthrough = () => {
           await waitForSelector((WALKTHROUGH_STEPS[0].target as string) || 'body', 8000);
           setTimeout(() => {
             setRun(true);
+            // Emit initial tutorial step
+            window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+              detail: { step: 0 } 
+            }));
           }, 300);
         }
       }
@@ -236,6 +245,11 @@ export const AppWalkthrough = () => {
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
+      
+      // Clear tutorial step to re-enable navigation
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
       return;
     }
 
