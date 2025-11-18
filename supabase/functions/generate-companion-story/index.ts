@@ -173,6 +173,7 @@ serve(async (req) => {
       .single();
 
     const onboardingData = profile?.onboarding_data || {};
+    const userName = onboardingData.userName || user.email?.split('@')[0] || 'Hero';
     const userGoal = onboardingData.userGoal || "achieving personal growth";
     const userPersonality = onboardingData.userPersonality || "determined";
     const creaturePersonality = onboardingData.creaturePersonality || "loyal and brave";
@@ -212,7 +213,7 @@ Your goals:
 • NEVER alter creature anatomy; only grow or enhance it
 
 USER VARIABLES:
-- User Name: ${user.email?.split('@')[0] || 'Hero'}
+- User Name: ${userName}
 - Creature Species: ${companion.spirit_animal}
 - Species Traits: ${speciesTraits}
 - Element: ${companion.core_element}
