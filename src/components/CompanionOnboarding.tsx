@@ -37,6 +37,12 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     description: "Your companion's Spirit Animal, Element, and Color were chosen based on your preferences. They make your companion unique!",
     icon: Sparkles,
     highlight: "attributes"
+  },
+  {
+    title: "Your Epic Story",
+    description: "Every evolution unlocks a new chapter in your companion's mythic journey. Read how you grow together through 21 stages of adventure!",
+    icon: Sparkles,
+    highlight: "story"
   }
 ];
 

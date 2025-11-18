@@ -80,7 +80,7 @@ export const CompanionStoryJournal = () => {
   const isCurrentStage = viewingStage === companion.current_stage;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="story-tab">
       {/* Header */}
       <Card className="border-primary/20 bg-gradient-to-br from-background to-primary/5">
         <CardHeader>
