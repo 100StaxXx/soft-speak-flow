@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const WALKTHROUGH_STEPS: Step[] = [
   // HOME PAGE - Check-in
@@ -87,6 +88,27 @@ export const AppWalkthrough = () => {
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
 
+  const isMobile = useIsMobile();
+  const steps = useMemo<Step[]>(() => {
+    const base = [...WALKTHROUGH_STEPS];
+    if (isMobile) {
+      base[6] = {
+        ...base[6],
+        target: '[data-tour="week-calendar"]',
+        placement: 'top',
+        styles: {
+          ...((base[6] as any).styles || {}),
+          tooltip: {
+            ...(((base[6] as any).styles?.tooltip) || {}),
+            marginTop: undefined,
+            marginBottom: '8px',
+          },
+        },
+      } as Step;
+    }
+    return base;
+  }, [isMobile]);
+
   // Utility: wait for a selector to exist before advancing
   const waitForSelector = useCallback((selector: string, timeout = 5000) => {
     return new Promise<void>((resolve) => {
@@ -102,7 +124,7 @@ export const AppWalkthrough = () => {
 
   // Utility: safely set step after ensuring target exists
   const safeSetStep = useCallback(async (idx: number) => {
-    const target = WALKTHROUGH_STEPS[idx]?.target as string | undefined;
+    const target = (steps[idx] as Step | undefined)?.target as string | undefined;
     if (target && target !== 'body') {
       await waitForSelector(target, 6000);
     }
@@ -112,7 +134,7 @@ export const AppWalkthrough = () => {
     window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
       detail: { step: idx } 
     }));
-  }, [waitForSelector]);
+  }, [waitForSelector, steps]);
 
   useEffect(() => {
     const checkWalkthroughStatus = async () => {
@@ -131,7 +153,7 @@ export const AppWalkthrough = () => {
 
         if (companion && location.pathname === '/') {
           // Wait for initial step target to be present, then start
-          await waitForSelector((WALKTHROUGH_STEPS[0].target as string) || 'body', 8000);
+          await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
           setTimeout(() => {
             setRun(true);
             // Emit initial tutorial step
@@ -144,7 +166,7 @@ export const AppWalkthrough = () => {
     };
 
     checkWalkthroughStatus();
-  }, [user, session, location.pathname, waitForSelector]);
+  }, [user, session, location.pathname, waitForSelector, steps]);
 
 
   // Listen for mood selection to advance from step 0 to step 1
@@ -293,7 +315,7 @@ export const AppWalkthrough = () => {
 
   return (
     <Joyride
-      steps={WALKTHROUGH_STEPS}
+      steps={steps}
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
