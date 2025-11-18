@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
+import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { useState, useEffect } from "react";
 
 // Convert hex color to color name
@@ -142,6 +143,14 @@ export const CompanionDisplay = () => {
 
           {/* Companion Image */}
           <div className="flex justify-center py-8 relative group">
+            {/* Energy-based glow effect */}
+            <div 
+              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`}
+              style={{
+                background: `radial-gradient(circle, hsl(var(--primary) / ${(companion.energy ?? 100) / 200}), hsl(var(--accent) / ${(companion.energy ?? 100) / 200}), transparent)`,
+              }}
+              aria-hidden="true" 
+            />
             <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div className="relative">
               <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} aria-hidden="true" />
@@ -210,6 +219,9 @@ export const CompanionDisplay = () => {
               </div>
             </div>
           </div>
+
+          {/* Companion Attributes */}
+          <CompanionAttributes companion={companion} />
         </div>
       </Card>
     </>
