@@ -98,7 +98,7 @@ export const useCompanion = () => {
           body: {
             favoriteColor: data.favoriteColor,
             spiritAnimal: data.spiritAnimal,
-            coreElement: data.coreElement,
+            element: data.coreElement,
             stage: 0,
             eyeColor,
             furColor,
@@ -218,7 +218,7 @@ export const useCompanion = () => {
           body: {
             favoriteColor: companion.favorite_color,
             spiritAnimal: companion.spirit_animal,
-            coreElement: companion.core_element,
+            element: companion.core_element,
             stage: newStage,
             previousImageUrl: companion.current_image_url,
             eyeColor: companion.eye_color || `glowing ${companion.favorite_color}`,
