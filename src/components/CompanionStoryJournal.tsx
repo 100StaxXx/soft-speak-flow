@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
@@ -35,9 +35,17 @@ const INTENSITY_OPTIONS = [
 
 export const CompanionStoryJournal = () => {
   const { companion } = useCompanion();
+  // Always default to current companion stage
   const [viewingStage, setViewingStage] = useState(companion?.current_stage || 0);
   const [selectedTone, setSelectedTone] = useState("heroic");
   const [selectedIntensity, setSelectedIntensity] = useState("moderate");
+  
+  // Update viewing stage when companion stage changes
+  useEffect(() => {
+    if (companion?.current_stage !== undefined) {
+      setViewingStage(companion.current_stage);
+    }
+  }, [companion?.current_stage]);
   
   const { story, allStories, isLoading, generateStory, regenerateStory } = useCompanionStory(
     companion?.id,
