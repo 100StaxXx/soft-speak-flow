@@ -165,8 +165,8 @@ export const AppWalkthrough = () => {
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
-      if (run && stepIndex === 1 && waitingForAction) {
-        haptics.success(); // Celebratory feedback for check-in
+      if (run && stepIndex <= 1) {
+        haptics.success();
         setWaitingForAction(false);
         safeSetStep(2);
       }
@@ -174,7 +174,7 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, waitingForAction, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep]);
 
   // Listen for quest creation to move from input/difficulty to first quest step
   useEffect(() => {
