@@ -201,13 +201,14 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, run, safeSetStep]);
 
-  // Listen for mission completion - do NOT advance yet, wait for evolution
+  // Listen for mission completion - hide tutorial step immediately
   useEffect(() => {
     const handleTaskCompleted = () => {
       if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
-        // Don't advance yet - wait for evolution complete event
+        // Hide tutorial immediately when quest is checked
+        setRun(false);
       }
     };
 
@@ -215,11 +216,12 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('mission-completed', handleTaskCompleted);
   }, [run, stepIndex]);
 
-  // Listen for evolution completion to trigger final step
+  // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (run && stepIndex === 6) {
-        // Evolution complete with confetti - now show final step
+      if (!run && stepIndex === 6) {
+        // Evolution complete - now show final congratulations step
+        setRun(true);
         setTimeout(() => safeSetStep(7), 500);
       }
     };
