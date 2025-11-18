@@ -131,9 +131,6 @@ export const CompanionEvolution = ({
           gravity: 0.5,
           scalar: 2,
         });
-        
-        // Dispatch event for walkthrough after confetti
-        window.dispatchEvent(new CustomEvent('evolution-complete'));
       }, 2500),
       setTimeout(() => {
         setStage(4);
@@ -156,8 +153,11 @@ export const CompanionEvolution = ({
         // Resume ambient music after evolution
         resumeAmbientAfterEvent();
         
-        // Dispatch event for walkthrough
+        // Dispatch event for walkthrough when user closes modal
         window.dispatchEvent(new CustomEvent('companion-evolved'));
+        
+        // Dispatch evolution-complete for tutorial on modal close
+        window.dispatchEvent(new CustomEvent('evolution-complete'));
         
         onComplete();
       }, 5500),
