@@ -183,9 +183,9 @@ export const CompanionDisplay = () => {
                         setImageLoaded(false);
                       }}
                       className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
-                      aria-label="Retry loading companion image"
+                      aria-label="Try again"
                     >
-                      Retry
+                      Try again
                     </button>
                   </div>
                 </div>

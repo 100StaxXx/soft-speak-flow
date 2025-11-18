@@ -79,7 +79,7 @@ const CompanionErrorFallback = ({ error }: { error: Error | null }) => {
         {error && (
           <details className="mt-4 text-xs text-muted-foreground max-w-full">
             <summary className="cursor-pointer hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary rounded">
-              Technical Details
+              More details
             </summary>
             <pre className="mt-2 p-3 bg-background/50 rounded text-left overflow-auto max-h-32" aria-label="Error details">
               {error.message}

@@ -109,13 +109,13 @@ export const useCompanion = () => {
             }
           );
           if (error) throw error;
-          if (!imageResult?.imageUrl) throw new Error("Failed to generate companion image");
+          if (!imageResult?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
           return imageResult;
         },
         { maxAttempts: 3, initialDelay: 2000 }
       );
 
-      if (!imageData?.imageUrl) throw new Error("Failed to generate companion image");
+      if (!imageData?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
 
       // Create companion record with color specifications
       const { data: companionData, error: createError } = await supabase
@@ -162,11 +162,11 @@ export const useCompanion = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      toast.success("Your companion has been created!");
+      toast.success("🎉 Your companion is ready!");
     },
     onError: (error) => {
       console.error("Failed to create companion:", error);
-      toast.error("Failed to create your companion. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Unable to create your companion. Please try again.");
     },
   });
 
@@ -250,7 +250,7 @@ export const useCompanion = () => {
       );
 
       if (imageError) throw imageError;
-      if (!imageData?.imageUrl) throw new Error("Failed to generate evolution image");
+      if (!imageData?.imageUrl) throw new Error("Unable to generate evolution image. Please try again.");
 
       // Update companion
       const { error: updateError } = await supabase
@@ -314,7 +314,7 @@ export const useCompanion = () => {
     onError: (error) => {
       toast.dismiss("evolution");
       console.error("Evolution failed:", error);
-      toast.error("Evolution failed. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Unable to evolve your companion. Please try again.");
     },
   });
 
