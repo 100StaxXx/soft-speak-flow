@@ -326,12 +326,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          backgroundColor: 'hsl(var(--primary))',
-          color: 'hsl(var(--primary-foreground))',
-          borderRadius: '0.75rem',
-          padding: '0.75rem 1.5rem',
-          fontSize: '1rem',
-          fontWeight: '600',
+          display: 'none',
         },
         buttonBack: {
           display: 'none',
