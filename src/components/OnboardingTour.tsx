@@ -91,7 +91,7 @@ export const OnboardingTour = () => {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.6)',
+          overlayColor: 'transparent',
           arrowColor: 'hsl(var(--card))',
           zIndex: 10000,
         },
