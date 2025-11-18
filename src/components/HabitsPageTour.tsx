@@ -8,6 +8,12 @@ const tourSteps: Step[] = [
     content: "Tap here to check off your habit and earn XP! Completing habits grows your companion and builds your streak.",
     placement: "bottom",
     disableBeacon: true,
+    spotlightPadding: 8,
+    styles: {
+      spotlight: {
+        borderRadius: '12px',
+      },
+    },
   },
 ];
 
@@ -64,7 +70,7 @@ export const HabitsPageTour = () => {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'transparent',
+          overlayColor: 'rgba(0, 0, 0, 0.7)',
           zIndex: 10000,
         },
         tooltip: {
@@ -80,11 +86,10 @@ export const HabitsPageTour = () => {
           color: 'hsl(var(--muted-foreground))',
         },
         spotlight: {
-          boxShadow: 'none',
-          backgroundColor: 'transparent',
+          borderRadius: '12px',
+          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
         },
       }}
-      disableOverlay
       locale={{
         last: 'Got it!',
         skip: 'Skip',
