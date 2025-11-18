@@ -23,13 +23,23 @@ export const useWelcomeMessage = () => {
       
       if (existingWelcome) return;
 
+      // Get user's name from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user.id)
+        .single();
+
+      const onboardingData = (profile?.onboarding_data as any) || {};
+      const userName = onboardingData.userName || user.email?.split('@')[0] || 'friend';
+
       // Create welcome message
       const welcomeMessages: Record<string, string> = {
-        tough: `Listen up. You're here because you want to change. Good. I don't do hand-holding, but I will push you every single day. Let's see what you're made of.`,
-        direct: `Welcome. I'm here to keep you on track, no distractions. We'll build your habits, stay consistent, and get results. Let's get started.`,
-        empathetic: `Hey, I'm glad you're here. This journey isn't always easy, but you don't have to do it alone. I'll be with you every step of the way. You've got this.`,
-        supportive: `Welcome! I'm so excited to be part of your journey. Together, we're going to build something amazing. Remember, progress over perfection. Let's do this!`,
-        wise: `Welcome, my friend. Every great journey begins with a single step. Today, you took that step. I'll be here to guide you, to listen, and to help you grow.`
+        tough: `Listen up, ${userName}. You're here because you want to change. Good. I don't do hand-holding, but I will push you every single day. Let's see what you're made of.`,
+        direct: `Welcome, ${userName}. I'm here to keep you on track, no distractions. We'll build your habits, stay consistent, and get results. Let's get started.`,
+        empathetic: `Hey ${userName}, I'm glad you're here. This journey isn't always easy, but you don't have to do it alone. I'll be with you every step of the way. You've got this.`,
+        supportive: `Welcome, ${userName}! I'm so excited to be part of your journey. Together, we're going to build something amazing. Remember, progress over perfection. Let's do this!`,
+        wise: `Welcome, ${userName}. Every great journey begins with a single step. Today, you took that step. I'll be here to guide you, to listen, and to help you grow.`
       };
 
       const toneKeyword = personality.tone.toLowerCase();

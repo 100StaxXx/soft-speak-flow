@@ -347,13 +347,22 @@ export default function Onboarding() {
       }
       
       console.log("Marking onboarding as complete...");
-      // Mark onboarding as complete
+      // Keep userName when marking onboarding as complete
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user!.id)
+        .single();
+
+      const currentOnboardingData = (currentProfile?.onboarding_data as any) || {};
+      const userName = currentOnboardingData.userName;
+
       const { error: completeError } = await supabase
         .from('profiles')
         .update({ 
           onboarding_completed: true,
           onboarding_step: 'complete',
-          onboarding_data: {}
+          onboarding_data: userName ? { userName } : {}
         })
         .eq('id', user!.id);
         
