@@ -14,6 +14,11 @@ export interface Companion {
   current_image_url: string | null;
   eye_color?: string;
   fur_color?: string;
+  energy?: number;
+  resilience?: number;
+  focus?: number;
+  balance?: number;
+  last_energy_update?: string;
   created_at: string;
   updated_at: string;
 }
