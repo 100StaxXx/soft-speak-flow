@@ -11,7 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { LoadingQuote } from "@/components/LoadingQuote";
 import { AppWalkthrough } from "@/components/AppWalkthrough";
-import { DailyContentWidget } from "@/components/DailyContentWidget";
+import { InspireSection } from "@/components/InspireSection";
 
 // Lazy load heavy components
 const QuoteOfTheDay = lazy(() => import("@/components/QuoteOfTheDay").then(m => ({ default: m.QuoteOfTheDay })));
@@ -126,9 +126,9 @@ const Index = () => {
               <QuoteOfTheDay />
             </Suspense>
 
-            {/* Inspire Section */}
+            {/* Inspire Section - Browse by category and emotion */}
             <Suspense fallback={<ComponentLoader />}>
-              <DailyContentWidget />
+              <InspireSection />
             </Suspense>
             
             <div data-tour="ask-mentor">
