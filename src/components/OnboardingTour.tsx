@@ -120,6 +120,10 @@ export const OnboardingTour = () => {
         buttonSkip: {
           color: 'hsl(var(--muted-foreground))',
         },
+        spotlight: {
+          boxShadow: 'none',
+          backgroundColor: 'transparent',
+        },
       }}
       floaterProps={{
         styles: {
@@ -129,6 +133,7 @@ export const OnboardingTour = () => {
           },
         },
       }}
+      disableOverlay
       locale={{
         back: 'Back',
         close: 'Close',

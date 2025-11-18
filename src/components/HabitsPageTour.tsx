@@ -79,7 +79,12 @@ export const HabitsPageTour = () => {
         buttonBack: {
           color: 'hsl(var(--muted-foreground))',
         },
+        spotlight: {
+          boxShadow: 'none',
+          backgroundColor: 'transparent',
+        },
       }}
+      disableOverlay
       locale={{
         last: 'Got it!',
         skip: 'Skip',
