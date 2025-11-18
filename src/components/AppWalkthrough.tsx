@@ -66,20 +66,8 @@ const WALKTHROUGH_STEPS: Step[] = [
     disableBeacon: true,
   },
   {
-    target: '[data-tour="habits-tab"]',
-    content: "🔄 Finally, let's create your first habit! Click the Habits tab.",
-    placement: "bottom",
-    spotlightClicks: true,
-  },
-  {
     target: 'body',
-    content: "💡 Choose a template or create a custom habit. Habits help you build daily consistency and earn XP!",
-    placement: "center",
-    spotlightClicks: true,
-  },
-  {
-    target: 'body',
-    content: "🎓 Tutorial complete! You've learned the basics: daily check-ins, quests, and habits. Keep completing them to evolve your companion to higher stages. Remember: consistency is key! 🚀",
+    content: "🎓 Tutorial complete! You've learned the basics: daily check-ins and quests. Keep completing them to evolve your companion to higher stages. Remember: consistency is key! 🚀",
     placement: "center",
   },
 ];
@@ -205,10 +193,6 @@ export const AppWalkthrough = () => {
       // User clicked Quests tab, progress to quest creation step
       haptics.medium();
       setTimeout(() => safeSetStep(6), 500);
-    } else if (stepIndex === 9 && location.pathname === '/tasks') {
-      // User clicked Habits tab, progress to next step
-      haptics.medium();
-      setTimeout(() => safeSetStep(10), 500);
     }
   }, [location.pathname, stepIndex, run, safeSetStep]);
 
