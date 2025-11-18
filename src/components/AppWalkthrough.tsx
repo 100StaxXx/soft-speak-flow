@@ -19,6 +19,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     target: '[data-tour="checkin-intention"]',
     content: "💭 Now, what's your main focus for today? Enter your intention here.",
     placement: "top",
+    disableBeacon: true,
     spotlightClicks: true,
   },
   {
