@@ -25,19 +25,24 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Nice! You just earned +5 XP! Now tap the Quests tab at the bottom to start building your first quest!",
+    content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.",
     placement: "center",
     disableBeacon: true,
   },
+  
+  // COMPANION PAGE
   {
-    target: '[data-tour="todays-pep-talk"]',
-    content: "🎯 Here's your personalized pep talk for today - crafted just for you by your mentor!",
-    placement: "bottom",
+    target: '[data-tour="companion-tab"]',
+    content: "🐾 Let's meet your companion! Tap the Companion tab to see them.",
+    placement: "top",
+    disableBeacon: true,
+    spotlightClicks: true,
   },
   {
-    target: '[data-tour="ask-mentor"]',
-    content: "💬 Need guidance anytime? Use this quick chat to ask your mentor anything.",
-    placement: "top",
+    target: 'body',
+    content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now let's create your first quest! Tap the Quests tab.",
+    placement: "center",
+    disableBeacon: true,
   },
   
   // TASKS PAGE
@@ -193,7 +198,7 @@ export const AppWalkthrough = () => {
       if (run && stepIndex <= 1) {
         haptics.success();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration step
+        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
       }
     };
 
@@ -204,7 +209,7 @@ export const AppWalkthrough = () => {
   // Listen for mission completion - hide tutorial step immediately
   useEffect(() => {
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 6) {
+      if (run && stepIndex === 8) {
         haptics.heavy();
         setWaitingForAction(false);
         // Hide tutorial immediately when quest is checked
@@ -219,10 +224,10 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (!run && stepIndex === 6) {
+      if (!run && stepIndex === 8) {
         // Evolution complete - now show final congratulations step
         setRun(true);
-        setTimeout(() => safeSetStep(7), 500);
+        setTimeout(() => safeSetStep(9), 500);
       }
     };
 
@@ -235,17 +240,29 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (!run) return;
     
-    if (stepIndex === 2 && location.pathname === '/tasks') {
-      // User clicked Quests tab from XP step, skip directly to quest creation with immediate display
+    if (stepIndex === 2 && location.pathname === '/companion') {
+      // User clicked Companion tab from XP step
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(6);
-      }, 100); // Very short delay to ensure UI is ready
+        setStepIndex(4);
+      }, 100);
+    } else if (stepIndex === 4 && location.pathname === '/tasks') {
+      // User clicked Quests tab from companion step
+      haptics.medium();
+      setTimeout(() => {
+        setStepIndex(8);
+      }, 100);
+    } else if (stepIndex === 3 && location.pathname === '/companion') {
+      // User clicked Companion tab
+      haptics.medium();
+      setTimeout(() => {
+        setStepIndex(4);
+      }, 100);
     } else if (stepIndex === 5 && location.pathname === '/tasks') {
-      // User clicked Quests tab, progress to quest creation step immediately
+      // User clicked Quests tab
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(6);
+        setStepIndex(8);
       }, 100);
     }
   }, [location.pathname, stepIndex, run]);
@@ -367,7 +384,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: stepIndex === 7 ? 'block' : 'none',
+          display: stepIndex === 9 ? 'block' : 'none',
           backgroundColor: 'hsl(var(--primary))',
           padding: '0.75rem 2rem',
           fontSize: '1rem',
