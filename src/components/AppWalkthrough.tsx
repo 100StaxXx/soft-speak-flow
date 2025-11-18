@@ -117,25 +117,11 @@ export const AppWalkthrough = () => {
         },
       } as Step;
       
-      // Adjust companion page step (step 4) - position below companion image
+      // Adjust companion page step (step 4) - target XP bar below image
       base[4] = {
         ...base[4],
-        placement: 'center',
-        floaterProps: {
-          disableAnimation: false,
-        },
-        styles: {
-          tooltip: {
-            position: 'fixed !important' as any,
-            bottom: '180px !important' as any,
-            left: '1rem !important' as any,
-            right: '1rem !important' as any,
-            width: 'auto !important' as any,
-            maxWidth: '400px !important' as any,
-            margin: '0 auto !important' as any,
-            transform: 'none !important' as any,
-          },
-        },
+        target: '[data-tour="companion-tooltip-anchor"]',
+        placement: 'top',
       } as Step;
     }
     return base;

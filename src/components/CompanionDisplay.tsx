@@ -180,7 +180,7 @@ export const CompanionDisplay = () => {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3" data-tour="companion-tooltip-anchor">
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {companion.current_xp} / {nextEvolutionXP} XP to next evolution
