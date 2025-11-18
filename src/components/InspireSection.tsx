@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Sparkles, RefreshCw } from "lucide-react";
@@ -14,6 +14,12 @@ export const InspireSection = () => {
   const [matchingQuotes, setMatchingQuotes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Reset results when filters change so next click fetches fresh set
+  useEffect(() => {
+    setMatchingQuotes([]);
+    setCurrentQuoteIndex(0);
+  }, [selectedCategory, selectedTrigger]);
+
   const getNextQuote = async () => {
     // If we already have quotes, just cycle to the next one
     if (matchingQuotes.length > 0) {
@@ -21,34 +27,71 @@ export const InspireSection = () => {
       return;
     }
 
-    // Otherwise, fetch quotes based on filters
     setIsLoading(true);
-    try {
+
+    const fetchQuotes = async (
+      useCategory: boolean,
+      useTrigger: boolean,
+      requireAuthor = true
+    ) => {
       let query = supabase
         .from('quotes')
         .select('*');
 
-      if (selectedCategory) {
-        query = query.eq('category', selectedCategory);
+      if (requireAuthor) {
+        query = query.not('author', 'is', null);
       }
 
-      if (selectedTrigger) {
+      if (useCategory && selectedCategory) {
+        query = query.eq('category', selectedCategory);
+      }
+      if (useTrigger && selectedTrigger) {
         query = query.contains('emotional_triggers', [selectedTrigger]);
       }
 
       const { data, error } = await query.limit(20);
-      
       if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        toast.error("No quotes found for this combination");
+      return data || [];
+    };
+    try {
+      // Try exact match first
+      let data = await fetchQuotes(true, true);
+      let fellBack = false;
+
+      // Fall back to category only
+      if (!data.length && selectedCategory) {
+        fellBack = true;
+        data = await fetchQuotes(true, false);
+      }
+      // Fall back to trigger only
+      if (!data.length && selectedTrigger) {
+        fellBack = true;
+        data = await fetchQuotes(false, true);
+      }
+      // Fall back to any recent quotes with authors
+      if (!data.length) {
+        fellBack = true;
+        data = await fetchQuotes(false, false);
+      }
+      // Last resort: ignore author requirement
+      if (!data.length) {
+        fellBack = true;
+        data = await fetchQuotes(false, false, false);
+      }
+
+      if (!data.length) {
+        toast.error("No quotes found. Try different filters.");
         return;
+      }
+
+      if (fellBack) {
+        toast.info("Showing the closest matches we found.");
       }
 
       setMatchingQuotes(data);
       setCurrentQuoteIndex(0);
     } catch (error) {
-      console.error("Error fetching quotes:", error);
+      console.error('Error fetching quotes:', error);
       toast.error("Failed to fetch quotes");
     } finally {
       setIsLoading(false);
@@ -56,7 +99,6 @@ export const InspireSection = () => {
   };
 
   const currentQuote = matchingQuotes[currentQuoteIndex];
-
 
   return (
     <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
