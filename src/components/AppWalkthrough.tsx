@@ -319,7 +319,10 @@ export const AppWalkthrough = () => {
           display: 'none',
         },
         buttonClose: {
-          display: 'none',
+          display: 'none !important',
+          opacity: 0,
+          visibility: 'hidden',
+          pointerEvents: 'none',
         },
         buttonSkip: {
           display: 'none',
