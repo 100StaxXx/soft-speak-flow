@@ -283,9 +283,9 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous
+      continuous={false}
       showProgress={false}
-      showSkipButton
+      showSkipButton={false}
       disableOverlayClose
       disableCloseOnEsc
       hideCloseButton
