@@ -34,6 +34,9 @@ const Search = lazy(() => import("./pages/Search"));
 const Companion = lazy(() => import("./pages/Companion"));
 const PepTalks = lazy(() => import("./pages/PepTalks"));
 
+// Import AppWalkthrough eagerly since it needs to persist across all pages
+import { AppWalkthrough } from "@/components/AppWalkthrough";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -78,6 +81,7 @@ const AppContent = memo(() => {
       <XPProvider>
         <Suspense fallback={<LoadingFallback />}>
           <GlobalEvolutionListener />
+          <AppWalkthrough />
           <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />

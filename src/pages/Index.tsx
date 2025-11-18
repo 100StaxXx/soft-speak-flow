@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { LoadingQuote } from "@/components/LoadingQuote";
-import { AppWalkthrough } from "@/components/AppWalkthrough";
 import { InspireSection } from "@/components/InspireSection";
 
 // Lazy load heavy components
@@ -143,7 +142,6 @@ const Index = () => {
       <Suspense fallback={null}>
         <OnboardingTour />
       </Suspense>
-      <AppWalkthrough />
     </>
   );
 };
