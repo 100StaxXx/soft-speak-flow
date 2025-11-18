@@ -85,8 +85,8 @@ export default function Tasks() {
   // Add habit mutation
   const addHabitMutation = useMutation({
     mutationFn: async () => {
-      if (habits.length >= 5) {
-        throw new Error('Maximum 5 habits allowed');
+      if (habits.length >= 2) {
+        throw new Error('Maximum 2 habits allowed');
       }
       
       const { error } = await supabase.from('habits').insert({
