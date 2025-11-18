@@ -77,11 +77,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
-    styles: {
-      buttonNext: {
-        display: 'block',
-      }
-    }
   },
 ];
 
@@ -367,12 +362,12 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous={false}
+      continuous={true}
       showProgress={false}
       showSkipButton={false}
-      disableOverlayClose
-      disableCloseOnEsc
-      hideCloseButton
+      disableOverlayClose={stepIndex !== 7}
+      disableCloseOnEsc={stepIndex !== 7}
+      hideCloseButton={stepIndex !== 7}
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
