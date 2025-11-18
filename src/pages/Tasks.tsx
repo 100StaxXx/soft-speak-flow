@@ -189,7 +189,7 @@ export default function Tasks() {
 
           <TabsContent value="quests" className="space-y-4 mt-4">
             {/* Week Calendar Navigation */}
-            <Card className="p-4 bg-gradient-to-br from-primary/5 to-accent/5">
+            <Card data-tour="week-calendar" className="p-4 bg-gradient-to-br from-primary/5 to-accent/5">
               <div className="flex items-center justify-between mb-3">
                 <Button
                   variant="ghost"
