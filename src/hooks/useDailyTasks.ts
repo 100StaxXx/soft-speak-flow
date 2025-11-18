@@ -58,6 +58,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       toast({ title: "Task added successfully!" });
+      // Notify tutorial listener to advance to the next step
+      window.dispatchEvent(new CustomEvent('task-added'));
     },
     onError: (error: Error) => {
       toast({
