@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.generate-evolution-voice]
 verify_jwt = false
+
+[functions.generate-inspire-quote]
+verify_jwt = false

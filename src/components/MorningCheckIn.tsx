@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { MentorAvatar } from "@/components/MentorAvatar";
 
 export const MorningCheckIn = () => {
   const { user } = useAuth();
@@ -101,12 +101,14 @@ export const MorningCheckIn = () => {
             {existingCheckIn.mentor_response && personality && (
               <div className="bg-gradient-to-br from-secondary/50 to-accent/5 rounded-lg p-4 border border-primary/10">
                 <div className="flex items-start gap-3">
-                  <Avatar className="h-12 w-12 flex-shrink-0 border-2 border-primary/30 shadow-glow-sm">
-                    <AvatarImage src={personality.avatar_url} alt={personality.name} />
-                    <AvatarFallback className="bg-primary/20 text-primary font-bold">
-                      {personality.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <MentorAvatar
+                    mentorSlug={personality.slug || ''}
+                    mentorName={personality.name}
+                    primaryColor={personality.primary_color || '#000'}
+                    size="sm"
+                    className="flex-shrink-0"
+                    showBorder={true}
+                  />
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{personality.name}</p>
