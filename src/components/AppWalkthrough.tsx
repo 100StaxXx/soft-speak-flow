@@ -61,14 +61,15 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Your companion is evolving! Check-in (5 XP) + Quest (15 XP) = 20 XP total!",
+    content: "🎉 Congratulations! You've mastered the basics! You know how to check in daily and create quests to earn XP. Keep building your momentum and watch your companion evolve through amazing stages. Your journey starts now! 🚀",
     placement: "center",
     disableBeacon: true,
-  },
-  {
-    target: 'body',
-    content: "🎓 Tutorial complete! You've learned the basics: daily check-ins and quests. Keep completing them to evolve your companion to higher stages. Remember: consistency is key! 🚀",
-    placement: "center",
+    locale: { last: 'Begin Your Adventure' },
+    styles: {
+      buttonNext: {
+        display: 'block',
+      }
+    }
   },
 ];
 
@@ -343,7 +344,7 @@ export const AppWalkthrough = () => {
       locale={{
         back: 'Back',
         close: '',
-        last: 'Finish',
+        last: 'Begin Your Adventure',
         next: 'Next',
       }}
     />
