@@ -1,8 +1,8 @@
 // Service Worker Configuration for PWA
 // Optimized for iOS and better caching
 
-const CACHE_NAME = 'soft-speak-flow-v1';
-const RUNTIME_CACHE = 'runtime-cache-v1';
+const CACHE_NAME = 'soft-speak-flow-v2';
+const RUNTIME_CACHE = 'runtime-cache-v2';
 
 // Cache critical assets immediately
 const PRECACHE_URLS = [
