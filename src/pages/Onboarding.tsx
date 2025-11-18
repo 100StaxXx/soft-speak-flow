@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
+import { retryWithBackoff } from "@/utils/retry";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 
@@ -271,13 +272,26 @@ export default function Onboarding() {
 
       if (!existingCompanion) {
         console.log("Creating new companion...");
-        // Create companion
+        // Create companion with retry logic for slow connections
         try {
-          await createCompanion.mutateAsync(data);
+          await retryWithBackoff(
+            () => createCompanion.mutateAsync(data),
+            { 
+              maxAttempts: 3, 
+              initialDelay: 1000,
+              shouldRetry: (error: any) => {
+                // Retry on network errors and timeouts
+                const isNetworkError = error?.message?.includes('fetch') || 
+                                     error?.message?.includes('network') ||
+                                     error?.message?.includes('timeout');
+                return isNetworkError;
+              }
+            }
+          );
           console.log("Companion created successfully");
         } catch (companionError: any) {
-          console.error("Companion creation error:", companionError);
-          throw new Error(companionError?.message || "Failed to create companion");
+          console.error("Companion creation error after retries:", companionError);
+          throw new Error(companionError?.message || "Failed to create companion. Please check your connection.");
         }
       } else {
         console.log("Companion already exists, skipping creation");
