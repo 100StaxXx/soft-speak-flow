@@ -125,15 +125,15 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
                 key={element.name}
                 onClick={() => setSelectedElement(element.name)}
                 className={`
-                  p-4 rounded-lg border-2 transition-all duration-200
+                  p-3 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center min-h-[100px]
                   ${selectedElement === element.name
                     ? "border-primary bg-primary/10 scale-105 shadow-lg"
                     : "border-border hover:border-primary/50 hover:scale-105"
                   }
                 `}
               >
-                <div className={`text-4xl mb-2 ${element.color}`}>{element.emoji}</div>
-                <div className="text-sm font-medium">{element.name}</div>
+                <div className={`text-3xl mb-1 ${element.color}`}>{element.emoji}</div>
+                <div className="text-xs font-medium text-center leading-tight">{element.name}</div>
               </button>
             ))}
           </div>
