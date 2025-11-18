@@ -333,7 +333,12 @@ export const AppWalkthrough = () => {
         overlay: {
           mixBlendMode: 'normal',
         },
+        spotlight: {
+          boxShadow: 'none',
+          backgroundColor: 'transparent',
+        },
       }}
+      disableOverlay
       locale={{
         back: 'Back',
         close: 'Close',
