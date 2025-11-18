@@ -136,6 +136,7 @@ export const AppWalkthrough = () => {
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
+      localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
       window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
@@ -261,6 +262,7 @@ export const AppWalkthrough = () => {
           // Wait for initial step target to be present, then start
           await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
           setTimeout(() => {
+            localStorage.setItem('appWalkthroughActive', 'true');
             setRun(true);
             // Emit initial tutorial step
             window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
@@ -409,6 +411,7 @@ export const AppWalkthrough = () => {
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
+      localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
       window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
@@ -487,6 +490,7 @@ export const AppWalkthrough = () => {
           pointerEvents: 'auto',
           touchAction: 'none',
           userSelect: 'none',
+          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         },
         tooltipContent: {
           fontSize: '1rem',
