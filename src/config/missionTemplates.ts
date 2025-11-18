@@ -26,44 +26,8 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     progressTarget: 1
   },
   { 
-    type: "habit_complete_3", 
-    text: "Complete 3 habits today", 
-    xp: 15, 
-    difficulty: 'medium', 
-    category: 'habits',
-    autoComplete: true,
-    progressTarget: 3,
-    chainMissions: ['bonus_habit_streak']
-  },
-  { 
-    type: "habit_complete_5", 
-    text: "Complete 5 habits today", 
-    xp: 25, 
-    difficulty: 'hard', 
-    category: 'habits',
-    autoComplete: true,
-    progressTarget: 5
-  },
-  { 
     type: "all_habits", 
-    text: "Complete all your habits", 
-    xp: 30, 
-    difficulty: 'hard', 
-    category: 'habits',
-    autoComplete: true,
-    chainMissions: ['bonus_perfect_day']
-  },
-  { 
-    type: "habit_early_bird", 
-    text: "Complete a habit before 9 AM", 
-    xp: 10, 
-    difficulty: 'medium', 
-    category: 'habits',
-    autoComplete: true
-  },
-  { 
-    type: "habit_night_owl", 
-    text: "Complete a habit after 8 PM", 
+    text: "Complete all your habits today", 
     xp: 10, 
     difficulty: 'medium', 
     category: 'habits',
@@ -74,7 +38,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { 
     type: "check_in_morning", 
     text: "Complete your morning check-in", 
-    xp: 8, 
+    xp: 5, 
     difficulty: 'easy', 
     category: 'wellness',
     autoComplete: true
@@ -96,81 +60,30 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     category: 'wellness',
     autoComplete: true
   },
-  { 
-    type: "reflection_detailed", 
-    text: "Write a detailed reflection (100+ words)", 
-    xp: 20, 
-    difficulty: 'hard', 
-    category: 'wellness',
-    autoComplete: true
-  },
 
   // === LEARNING CATEGORY ===
   { 
     type: "pep_talk_listen", 
     text: "Listen to today's pep talk", 
-    xp: 8, 
+    xp: 3, 
     difficulty: 'easy', 
-    category: 'learning',
-    autoComplete: true
-  },
-  { 
-    type: "pep_talk_full", 
-    text: "Listen to full pep talk (100%)", 
-    xp: 15, 
-    difficulty: 'medium', 
     category: 'learning',
     autoComplete: true
   },
   { 
     type: "mentor_chat_start", 
-    text: "Start a conversation with your mentor", 
+    text: "Chat with your mentor", 
     xp: 10, 
     difficulty: 'easy', 
     category: 'learning',
     autoComplete: true
   },
   { 
-    type: "mentor_chat_deep", 
-    text: "Have an extended chat with your mentor (5+ messages)", 
-    xp: 25, 
-    difficulty: 'hard', 
-    category: 'learning',
-    autoComplete: true,
-    progressTarget: 5
-  },
-  { 
-    type: "library_explore", 
-    text: "Browse the library", 
-    xp: 5, 
+    type: "quote_read", 
+    text: "Read today's quote", 
+    xp: 3, 
     difficulty: 'easy', 
     category: 'learning',
-    autoComplete: true
-  },
-
-  // === SOCIAL CATEGORY ===
-  { 
-    type: "quote_favorite", 
-    text: "Save a quote to favorites", 
-    xp: 5, 
-    difficulty: 'easy', 
-    category: 'social',
-    autoComplete: true
-  },
-  { 
-    type: "quote_share", 
-    text: "Share an inspiring quote", 
-    xp: 10, 
-    difficulty: 'medium', 
-    category: 'social',
-    autoComplete: true
-  },
-  { 
-    type: "pep_talk_share", 
-    text: "Share a pep talk", 
-    xp: 12, 
-    difficulty: 'medium', 
-    category: 'social',
     autoComplete: true
   },
 
@@ -184,69 +97,18 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
     autoComplete: true
   },
   { 
-    type: "companion_interact", 
-    text: "Interact with your companion 3 times", 
-    xp: 15, 
-    difficulty: 'medium', 
-    category: 'growth',
-    autoComplete: true,
-    progressTarget: 3
-  },
-  { 
-    type: "challenge_join", 
-    text: "Start or continue a weekly challenge", 
-    xp: 15, 
-    difficulty: 'medium', 
-    category: 'growth',
-    autoComplete: true
-  },
-  { 
-    type: "challenge_complete_day", 
-    text: "Complete today's challenge task", 
-    xp: 20, 
-    difficulty: 'hard', 
-    category: 'growth',
-    autoComplete: true
-  },
-  { 
-    type: "streak_maintain", 
-    text: "Maintain your habit streak", 
-    xp: 10, 
-    difficulty: 'medium', 
-    category: 'growth',
-    autoComplete: true
-  },
-  { 
     type: "profile_update", 
-    text: "Update your profile or preferences", 
+    text: "Update your profile", 
     xp: 5, 
     difficulty: 'easy', 
     category: 'growth',
     autoComplete: false // Manual
   },
-
-  // === BONUS MISSIONS (Unlocked by chains) ===
   { 
-    type: "bonus_habit_streak", 
-    text: "BONUS: Keep your streak alive today", 
-    xp: 25, 
+    type: "streak_maintain", 
+    text: "Maintain your daily streak", 
+    xp: 10, 
     difficulty: 'medium', 
-    category: 'habits',
-    autoComplete: true
-  },
-  { 
-    type: "bonus_perfect_day", 
-    text: "BONUS: Achieve a perfect day", 
-    xp: 50, 
-    difficulty: 'hard', 
-    category: 'growth',
-    autoComplete: true
-  },
-  { 
-    type: "bonus_triple_threat", 
-    text: "BONUS: Complete 3 different categories today", 
-    xp: 35, 
-    difficulty: 'hard', 
     category: 'growth',
     autoComplete: true
   },
