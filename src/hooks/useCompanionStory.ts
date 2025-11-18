@@ -63,6 +63,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
       companionId: string;
       stage: number;
       tonePreference?: string;
+      themeIntensity?: string;
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -74,7 +75,8 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
           body: { 
             companionId: params.companionId, 
             stage: params.stage, 
-            tonePreference: params.tonePreference || "heroic" 
+            tonePreference: params.tonePreference || "heroic",
+            themeIntensity: params.themeIntensity || "moderate"
           },
         }
       );
@@ -100,6 +102,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
       companionId: string;
       stage: number;
       tonePreference: string;
+      themeIntensity?: string;
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -117,7 +120,8 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
           body: { 
             companionId: params.companionId, 
             stage: params.stage, 
-            tonePreference: params.tonePreference 
+            tonePreference: params.tonePreference,
+            themeIntensity: params.themeIntensity || "moderate"
           },
         }
       );

@@ -30,13 +30,52 @@ const EVOLUTION_THEMES = [
   "Origin of Creation"
 ];
 
+// Species anatomical traits for accuracy
+const SPECIES_TRAITS: Record<string, string> = {
+  "Wolf": "Four-legged canine with powerful legs, flowing fur, pointed ears, and a long bushy tail",
+  "Tiger": "Four-legged feline with muscular build, striped coat, retractable claws, and a long tail for balance",
+  "Eagle": "Winged raptor with sharp talons, hooked beak, feathered wings, and keen forward-facing eyes",
+  "Dolphin": "Sleek marine mammal with streamlined body, dorsal fin, flippers, and a playful intelligence",
+  "Bear": "Four-legged ursine with massive frame, thick fur, powerful claws, and a short tail",
+  "Lion": "Four-legged feline with golden mane (males), muscular body, sharp claws, and commanding presence",
+  "Phoenix": "Mythic bird with fiery plumage, long tail feathers, powerful wings, and a crest of flame",
+  "Dragon": "Winged reptilian with four legs, scales, horns, long tail, and wings emerging from shoulder blades",
+  "Unicorn": "Four-legged equine with single spiraling horn, flowing mane and tail, and graceful hooves",
+  "Griffin": "Hybrid with eagle head and wings, lion body and legs, sharp talons, and a long tail",
+  "Owl": "Winged nocturnal bird with forward-facing eyes, silent flight feathers, sharp talons, and rotating head",
+  "Fox": "Four-legged canine with slender build, pointed ears, bushy tail, and agile movements",
+  "Shark": "Streamlined predator with dorsal fin, powerful tail, rows of teeth, and gill slits",
+  "Kraken": "Massive cephalopod with eight tentacles, large mantle, beak, and intelligent eyes",
+  "Serpent": "Legless reptile with long sinuous body, scales, forked tongue, and flexible spine",
+  "Raven": "Winged corvid with black feathers, sharp beak, intelligent eyes, and grasping talons",
+  "Panther": "Four-legged feline with sleek black coat, retractable claws, long tail, and silent movement",
+  "Stag": "Four-legged cervine with branching antlers, powerful legs, hooves, and graceful posture",
+  "Falcon": "Winged raptor with streamlined body, sharp talons, hooked beak, and incredible speed",
+  "Lynx": "Four-legged feline with tufted ears, short tail, powerful legs, and thick winter coat",
+  "Orca": "Marine mammal with black and white coloring, dorsal fin, powerful tail flukes, and intelligent mind",
+  "Pegasus": "Winged equine with four legs, feathered wings, flowing mane and tail, and hooves",
+  "T-Rex": "Bipedal dinosaur with massive jaws, tiny arms, powerful tail for balance, and thick scales",
+  "Velociraptor": "Bipedal dinosaur with sickle claws, feathered body, long tail, and pack intelligence",
+  "Mammoth": "Four-legged prehistoric elephant with long curved tusks, thick fur, and massive size",
+  "Jellyfish": "Marine invertebrate with translucent bell, trailing tentacles, and graceful pulsing movement",
+  "Octopus": "Eight-armed cephalopod with soft body, intelligent eyes, color-changing skin, and beak",
+  "Butterfly": "Winged insect with four colorful wings, slender body, antennae, and delicate flight",
+  "Hummingbird": "Tiny winged bird with iridescent feathers, long beak, rapid wing beats, and hovering flight",
+  "Salamander": "Four-legged amphibian with long tail, moist skin, delicate limbs, and regenerative abilities",
+  // Add more as needed - default will handle others
+};
+
+const getSpeciesTraits = (creature: string): string => {
+  return SPECIES_TRAITS[creature] || `A ${creature.toLowerCase()} with its natural anatomical structure and movement patterns`;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { companionId, stage, tonePreference = 'heroic' } = await req.json();
+    const { companionId, stage, tonePreference = 'heroic', themeIntensity = 'moderate' } = await req.json();
 
     if (!companionId || stage === undefined) {
       throw new Error('companionId and stage are required');
@@ -78,40 +117,125 @@ serve(async (req) => {
     const userPersonality = onboardingData.userPersonality || "determined";
     const creaturePersonality = onboardingData.creaturePersonality || "loyal and brave";
 
-    // Build the story generation prompt
-    const storyPrompt = `You are the Story Engine for a mythic coming-of-age adventure series.
-Generate a single chapter for the user based on their creature, evolution stage, element, colors, personality, and life goal.
+    // Get previous chapter for memory notes
+    let memoryNotes = "This is the beginning of your journey.";
+    if (stage > 0) {
+      const { data: prevStory } = await supabaseClient
+        .from('companion_stories')
+        .select('main_story, lore_expansion')
+        .eq('companion_id', companionId)
+        .eq('stage', stage - 1)
+        .maybeSingle();
+
+      if (prevStory) {
+        // Extract key details from previous chapter for continuity
+        const loreItems = Array.isArray(prevStory.lore_expansion) ? prevStory.lore_expansion : [];
+        const lastSentence = prevStory.main_story?.split('.').slice(-2, -1)[0] || '';
+        memoryNotes = `Previous chapter: ${lastSentence}. ${loreItems.slice(0, 2).join(' ')}`;
+      }
+    }
+
+    const speciesTraits = getSpeciesTraits(companion.spirit_animal);
+
+    // Build the V2 story generation prompt
+    const storyPrompt = `You are STORY ENGINE V2 — a refined mythic adventure generator that produces a single chapter of a personalized hero journey for the user and their evolving creature companion.
+
+Your goals:
+• tell a consistent, emotionally resonant story
+• preserve anatomical accuracy of the chosen creature
+• escalate scale, stakes, and epicness with each evolution stage
+• mirror the user's real-life goal in symbolic story beats
+• maintain continuity with previous chapters
+• deepen the bond between user and creature
+• introduce clean lore that gets richer as the story progresses
+• integrate elemental, species-specific, and color-specific visuals naturally
+• NEVER alter creature anatomy; only grow or enhance it
 
 USER VARIABLES:
 - User Name: ${user.email?.split('@')[0] || 'Hero'}
-- Creature: ${companion.spirit_animal}
+- Creature Species: ${companion.spirit_animal}
+- Species Traits: ${speciesTraits}
 - Element: ${companion.core_element}
 - Primary Color: ${companion.favorite_color}
+- Secondary Color: ${companion.fur_color || companion.favorite_color}
 - Eye Color: ${companion.eye_color || `glowing ${companion.favorite_color}`}
-- Fur/Skin Color: ${companion.fur_color || companion.favorite_color}
 - Creature Personality: ${creaturePersonality}
 - User Personality: ${userPersonality}
 - User Goal: ${userGoal}
 - Evolution Stage: ${stage} (${EVOLUTION_THEMES[stage]})
-- Tone Preference: ${tonePreference}
+- Tone: ${tonePreference}
+- Theme Intensity: ${themeIntensity}
+- Memory Notes: ${memoryNotes}
 
-CRITICAL RULES:
-- NEVER alter the creature's biological structure (${companion.spirit_animal} stays a ${companion.spirit_animal})
-- Keep elemental visuals consistent with ${companion.core_element}
-- Reference colors subtly: ${companion.favorite_color}, ${companion.eye_color}
-- Make it feel like an anime x RPG x mythic epic hybrid
-- The creature's growth reflects the user's growth toward "${userGoal}"
-- Each chapter must feel like the SAME creature evolving through all 21 stages
+STRUCTURE FOR EACH CHAPTER:
 
-STRUCTURE (respond ONLY in valid JSON):
+1. **Chapter Title**
+   One cinematic, emotionally charged title aligned with the evolution stage theme.
+
+2. **Intro Line (1–2 sentences)**
+   A bold opening that instantly sets the mood and tone for this chapter.
+
+3. **Main Story (250–400 words)**
+   The chapter must:
+   • reflect the evolution stage theme (${EVOLUTION_THEMES[stage]})
+   • show clear, species-faithful physical evolution
+   • keep the creature anatomically consistent with ${speciesTraits}
+   • incorporate ${companion.favorite_color}, ${companion.fur_color}, and ${companion.eye_color} subtly and beautifully
+   • display elemental effects appropriate to ${companion.core_element}
+   • include at least one "Goal Mirror Moment" tied to "${userGoal}"
+   • reference at least one detail from: ${memoryNotes}
+   • escalate danger appropriate to stage tier:
+       ∙ Stages 0–5: local/natural threats
+       ∙ Stages 6–10: named foes or magical dangers
+       ∙ Stages 11–14: ancient/legendary forces
+       ∙ Stages 15–20: cosmic/titanic threats
+   • deepen the bond between user and creature
+   • feel like part of a larger mythic arc
+
+4. **Bond Moment (1–2 sentences)**
+   A ritual-like emotional connection unique to this chapter.
+
+5. **Life Lesson (1–2 sentences)**
+   A metaphorical lesson that subtly reinforces the user's real-life goal: "${userGoal}"
+
+6. **Lore Expansion (3–7 bullet points)**
+   Must include:
+   • ONE "World Truth"
+   • ONE "Historical Reference"
+   • ONE "Foreshadowing Seed" for future chapters
+   • optional: elemental lore, species lore, geography, old myths
+
+7. **Next Evolution Hook (1–2 sentences)**
+   A cliffhanger leading directly into the next chapter's evolution theme.
+
+WRITING RULES:
+• Never contradict previous lore or biology
+• Never force evolution changes inappropriate for the species
+• Element is decoration, mood, and power — not transformation
+• Tone scales with stage + theme intensity
+• The story must feel handcrafted, not generic
+• Always keep the user at the emotional center
+• Creature growth mirrors user growth
+• Build a mythic epic chapter by chapter
+• Avoid repetition across stages
+• Use vivid but controlled sensory imagery
+• Maintain continuity through Memory Notes
+
+CRITICAL: Respond ONLY in valid JSON format:
 {
-  "chapter_title": "One powerful cinematic title matching stage ${stage}",
-  "intro_line": "Bold 1-2 sentence dramatic opener",
-  "main_story": "250-400 word story reflecting ${EVOLUTION_THEMES[stage]} theme, emotional bond, obstacles, visuals, and user's goal",
-  "bond_moment": "1-2 sentence focused emotional connection moment",
-  "life_lesson": "1-2 sentence grounded metaphorical lesson tied to ${userGoal}",
-  "lore_expansion": ["3-7 bullet points of world-building, legends, prophecies, elemental lore"],
-  "next_hook": "1-2 sentence cliffhanger leading to stage ${stage + 1 <= 20 ? stage + 1 : stage}"
+  "chapter_title": "...",
+  "intro_line": "...",
+  "main_story": "...",
+  "bond_moment": "...",
+  "life_lesson": "...",
+  "lore_expansion": [
+    "World Truth: ...",
+    "Historical Reference: ...",
+    "Foreshadowing Seed: ...",
+    "Additional Lore: ...",
+    "Additional Lore: ..."
+  ],
+  "next_hook": "..."
 }
 
 Generate now:`;
@@ -131,15 +255,15 @@ Generate now:`;
         messages: [
           {
             role: 'system',
-            content: 'You are a master storyteller creating personalized mythic adventures. Always respond with valid JSON only.'
+            content: 'You are STORY ENGINE V2, a master mythic storyteller. You create personalized hero journeys that maintain perfect continuity, anatomical accuracy, and emotional resonance. Always respond with valid JSON only. Never alter creature biology.'
           },
           {
             role: 'user',
             content: storyPrompt
           }
         ],
-        temperature: 0.8,
-        max_tokens: 2000,
+        temperature: 0.85,
+        max_tokens: 2500,
       }),
     });
 
@@ -178,6 +302,8 @@ Generate now:`;
         lore_expansion: storyData.lore_expansion,
         next_hook: storyData.next_hook,
         tone_preference: tonePreference,
+      }, {
+        onConflict: 'companion_id,stage'
       })
       .select()
       .single();
