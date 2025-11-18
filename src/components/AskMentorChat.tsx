@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,72 +78,7 @@ export const AskMentorChat = ({
 
   const DAILY_MESSAGE_LIMIT = 10;
 
-  useEffect(() => {
-    // Check today's message count
-    const checkDailyLimit = async () => {
-      if (!user) return;
-
-      const today = new Date().toISOString().split('T')[0];
-      const { count } = await supabase
-        .from('mentor_chats')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('role', 'user')
-        .gte('created_at', `${today}T00:00:00`)
-        .lte('created_at', `${today}T23:59:59`);
-      
-      setDailyMessageCount(count || 0);
-    };
-    checkDailyLimit();
-  }, [messages, user]);
-
-  useEffect(() => {
-    setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
-  }, [mentorTone, hasActiveHabits, hasActiveChallenges]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Handle initial message from navigation state
-  useEffect(() => {
-    const initialMessage = location.state?.initialMessage;
-    if (initialMessage && !hasProcessedInitialMessage.current) {
-      hasProcessedInitialMessage.current = true;
-      setShowSuggestions(false);
-      sendMessage(initialMessage);
-    }
-  }, [location.state]);
-
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || isLoading) return;
-    setInput("");
-    await sendMessage(text);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setShowSuggestions(false);
-    sendMessage(suggestion);
-  };
-
-  const sendMessage = async (text: string) => {
+  const sendMessage = useCallback(async (text: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
@@ -196,7 +131,73 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
+  }, [dailyMessageCount, toast, mentorName, mentorTone, messages, DAILY_MESSAGE_LIMIT]);
+
+  useEffect(() => {
+    // Check today's message count
+    const checkDailyLimit = async () => {
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('mentor_chats')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('role', 'user')
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`);
+      
+      setDailyMessageCount(count || 0);
+    };
+    checkDailyLimit();
+  }, [messages, user]);
+
+  useEffect(() => {
+    setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
+  }, [mentorTone, hasActiveHabits, hasActiveChallenges]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Handle initial message from navigation state
+  useEffect(() => {
+    const initialMessage = location.state?.initialMessage;
+    if (initialMessage && !hasProcessedInitialMessage.current) {
+      hasProcessedInitialMessage.current = true;
+      setShowSuggestions(false);
+      sendMessage(initialMessage);
+    }
+  }, [location.state, sendMessage]);
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
+    setInput("");
+    await sendMessage(text);
   };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setShowSuggestions(false);
+    sendMessage(suggestion);
+  };
+
 
   return (
     <div className="flex flex-col h-full">
