@@ -37,6 +37,7 @@ The quote should be:
 - Action-oriented and empowering
 - Specific to their emotional state and needs
 - Written in a bold, confident voice
+- Use quotation marks (") not asterisks (*) for emphasis
 
 Do NOT include the author name or attribution. Just the quote itself.`;
 
