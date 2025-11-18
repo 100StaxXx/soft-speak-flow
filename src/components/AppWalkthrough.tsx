@@ -23,6 +23,12 @@ const WALKTHROUGH_STEPS: Step[] = [
     spotlightClicks: true,
   },
   {
+    target: 'body',
+    content: "🎉 Nice! You just earned +5 XP! XP fuels your companion's evolution - keep earning to unlock new stages and abilities!",
+    placement: "center",
+    disableBeacon: true,
+  },
+  {
     target: '[data-tour="todays-pep-talk"]',
     content: "🎯 Here's your personalized pep talk for today - crafted just for you by your mentor!",
     placement: "bottom",
@@ -168,7 +174,7 @@ export const AppWalkthrough = () => {
       if (run && stepIndex <= 1) {
         haptics.success();
         setWaitingForAction(false);
-        safeSetStep(2);
+        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration step
       }
     };
 
@@ -179,9 +185,9 @@ export const AppWalkthrough = () => {
   // Listen for quest creation to move from input/difficulty to first quest step
   useEffect(() => {
     const handleTaskAdded = () => {
-      if (run && stepIndex === 7) {
+      if (run && stepIndex === 8) {
         haptics.medium();
-        setTimeout(() => safeSetStep(8), 400);
+        setTimeout(() => safeSetStep(9), 400);
       }
     };
 
@@ -192,10 +198,10 @@ export const AppWalkthrough = () => {
   // Listen for companion evolution after completing first quest
   useEffect(() => {
     const handleEvolution = () => {
-      if (run && stepIndex === 8 && waitingForAction) {
+      if (run && stepIndex === 9 && waitingForAction) {
         haptics.heavy();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(9), 2000);
+        setTimeout(() => safeSetStep(10), 2000);
       }
     };
 
@@ -207,14 +213,14 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (!run) return;
     
-    if (stepIndex === 4 && location.pathname === '/tasks') {
+    if (stepIndex === 5 && location.pathname === '/tasks') {
       // User clicked Quests tab, progress to next step
       haptics.medium();
-      setTimeout(() => safeSetStep(5), 500);
-    } else if (stepIndex === 10 && location.pathname === '/tasks') {
+      setTimeout(() => safeSetStep(6), 500);
+    } else if (stepIndex === 11 && location.pathname === '/tasks') {
       // User clicked Habits tab, progress to next step
       haptics.medium();
-      setTimeout(() => safeSetStep(11), 500);
+      setTimeout(() => safeSetStep(12), 500);
     }
   }, [location.pathname, stepIndex, run, safeSetStep]);
 
@@ -265,10 +271,7 @@ export const AppWalkthrough = () => {
 
     // Set waiting states for steps requiring user actions
     if (lifecycle === 'complete') {
-      if (index === 1) {
-        // Wait for check-in submission
-        setWaitingForAction(true);
-      } else if (index === 8) {
+      if (index === 9) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       }
@@ -333,7 +336,12 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: 'none',
+          backgroundColor: 'hsl(var(--primary))',
+          color: 'hsl(var(--primary-foreground))',
+          borderRadius: '0.75rem',
+          padding: '0.75rem 1.5rem',
+          fontSize: '1rem',
+          fontWeight: '600',
         },
         buttonBack: {
           display: 'none',
