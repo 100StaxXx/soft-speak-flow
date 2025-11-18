@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { LoadingQuote } from "@/components/LoadingQuote";
-import { InspireSection } from "@/components/InspireSection";
 
 // Lazy load heavy components
 const QuoteOfTheDay = lazy(() => import("@/components/QuoteOfTheDay").then(m => ({ default: m.QuoteOfTheDay })));
@@ -130,11 +129,6 @@ const Index = () => {
                 <MentorQuickChat />
               </Suspense>
             </div>
-
-            {/* Inspire Section - Browse by category and emotion */}
-            <Suspense fallback={<ComponentLoader />}>
-              <InspireSection />
-            </Suspense>
           </div>
         </div>
       </PageTransition>
