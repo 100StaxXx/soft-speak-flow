@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { retryWithBackoff } from "@/utils/retry";
 
 export interface Companion {
   id: string;
@@ -91,22 +92,29 @@ export const useCompanion = () => {
       const eyeColor = `glowing ${data.favoriteColor}`;
       const furColor = data.favoriteColor;
 
-      // Generate initial companion image with color specifications
-      const { data: imageData, error: imageError } = await supabase.functions.invoke(
-        "generate-companion-image",
-        {
-          body: {
-            favoriteColor: data.favoriteColor,
-            spiritAnimal: data.spiritAnimal,
-            element: data.coreElement,
-            stage: 0,
-            eyeColor,
-            furColor,
-          },
-        }
+      // Generate initial companion image with color specifications (with retry)
+      const imageData = await retryWithBackoff(
+        async () => {
+          const { data: imageResult, error } = await supabase.functions.invoke(
+            "generate-companion-image",
+            {
+              body: {
+                favoriteColor: data.favoriteColor,
+                spiritAnimal: data.spiritAnimal,
+                element: data.coreElement,
+                stage: 0,
+                eyeColor,
+                furColor,
+              },
+            }
+          );
+          if (error) throw error;
+          if (!imageResult?.imageUrl) throw new Error("Failed to generate companion image");
+          return imageResult;
+        },
+        { maxAttempts: 3, initialDelay: 2000 }
       );
 
-      if (imageError) throw imageError;
       if (!imageData?.imageUrl) throw new Error("Failed to generate companion image");
 
       // Create companion record with color specifications
