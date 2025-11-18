@@ -9,10 +9,11 @@ import { DailyMissions } from "@/components/DailyMissions";
 import { HabitCalendar } from "@/components/HabitCalendar";
 import { WeeklyInsights } from "@/components/WeeklyInsights";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
+import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, History, TrendingUp } from "lucide-react";
+import { Trophy, History, TrendingUp, BookOpen } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 
 const Companion = () => {
@@ -49,10 +50,14 @@ const Companion = () => {
           </div>
 
           <Tabs defaultValue="progress" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsList className="grid w-full grid-cols-4 h-auto">
               <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="progress-tab">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Progress</span>
+              </TabsTrigger>
+              <TabsTrigger value="story" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="story-tab">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Story</span>
               </TabsTrigger>
               <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="achievements-tab">
                 <Trophy className="h-4 w-4" />
@@ -79,6 +84,10 @@ const Companion = () => {
                 <DailyMissions />
               </div>
               <WeeklyInsights />
+            </TabsContent>
+
+            <TabsContent value="story" className="space-y-6 mt-6">
+              <CompanionStoryJournal />
             </TabsContent>
 
             <TabsContent value="achievements" className="space-y-6 mt-6">

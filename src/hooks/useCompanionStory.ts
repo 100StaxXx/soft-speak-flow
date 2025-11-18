@@ -1,0 +1,148 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
+import { toast } from "sonner";
+
+export interface CompanionStory {
+  id: string;
+  companion_id: string;
+  user_id: string;
+  stage: number;
+  chapter_title: string;
+  intro_line: string;
+  main_story: string;
+  bond_moment: string;
+  life_lesson: string;
+  lore_expansion: string[];
+  next_hook: string;
+  tone_preference: string;
+  generated_at: string;
+}
+
+export const useCompanionStory = (companionId?: string, stage?: number) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: story, isLoading } = useQuery({
+    queryKey: ["companion-story", companionId, stage],
+    queryFn: async () => {
+      if (!companionId || stage === undefined) return null;
+
+      const { data, error } = await supabase
+        .from("companion_stories")
+        .select("*")
+        .eq("companion_id", companionId)
+        .eq("stage", stage)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as CompanionStory | null;
+    },
+    enabled: !!companionId && stage !== undefined,
+  });
+
+  const { data: allStories } = useQuery({
+    queryKey: ["companion-stories-all", companionId],
+    queryFn: async () => {
+      if (!companionId) return [];
+
+      const { data, error } = await supabase
+        .from("companion_stories")
+        .select("*")
+        .eq("companion_id", companionId)
+        .order("stage", { ascending: true });
+
+      if (error) throw error;
+      return data as CompanionStory[];
+    },
+    enabled: !!companionId,
+  });
+
+  const generateStory = useMutation({
+    mutationFn: async (params: {
+      companionId: string;
+      stage: number;
+      tonePreference?: string;
+    }) => {
+      if (!user) throw new Error("Not authenticated");
+
+      toast.loading("Your story is being written...", { id: "story-gen" });
+
+      const { data, error } = await supabase.functions.invoke(
+        "generate-companion-story",
+        {
+          body: { 
+            companionId: params.companionId, 
+            stage: params.stage, 
+            tonePreference: params.tonePreference || "heroic" 
+          },
+        }
+      );
+
+      if (error) throw error;
+      return data as CompanionStory;
+    },
+    onSuccess: () => {
+      toast.dismiss("story-gen");
+      toast.success("📖 New chapter unlocked!");
+      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+    },
+    onError: (error) => {
+      toast.dismiss("story-gen");
+      console.error("Story generation failed:", error);
+      toast.error("Failed to generate story. Please try again.");
+    },
+  });
+
+  const regenerateStory = useMutation({
+    mutationFn: async (params: {
+      companionId: string;
+      stage: number;
+      tonePreference: string;
+    }) => {
+      if (!user) throw new Error("Not authenticated");
+
+      toast.loading("Rewriting your story...", { id: "story-regen" });
+
+      await supabase
+        .from("companion_stories")
+        .delete()
+        .eq("companion_id", params.companionId)
+        .eq("stage", params.stage);
+
+      const { data, error } = await supabase.functions.invoke(
+        "generate-companion-story",
+        {
+          body: { 
+            companionId: params.companionId, 
+            stage: params.stage, 
+            tonePreference: params.tonePreference 
+          },
+        }
+      );
+
+      if (error) throw error;
+      return data as CompanionStory;
+    },
+    onSuccess: () => {
+      toast.dismiss("story-regen");
+      toast.success("📖 Story rewritten!");
+      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+    },
+    onError: (error) => {
+      toast.dismiss("story-regen");
+      console.error("Story regeneration failed:", error);
+      toast.error("Failed to regenerate story.");
+    },
+  });
+
+  return {
+    story,
+    allStories,
+    isLoading,
+    generateStory,
+    regenerateStory,
+  };
+};

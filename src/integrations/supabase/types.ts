@@ -393,6 +393,62 @@ export type Database = {
           },
         ]
       }
+      companion_stories: {
+        Row: {
+          bond_moment: string
+          chapter_title: string
+          companion_id: string
+          generated_at: string
+          id: string
+          intro_line: string
+          life_lesson: string
+          lore_expansion: Json
+          main_story: string
+          next_hook: string
+          stage: number
+          tone_preference: string
+          user_id: string
+        }
+        Insert: {
+          bond_moment: string
+          chapter_title: string
+          companion_id: string
+          generated_at?: string
+          id?: string
+          intro_line: string
+          life_lesson: string
+          lore_expansion?: Json
+          main_story: string
+          next_hook: string
+          stage: number
+          tone_preference?: string
+          user_id: string
+        }
+        Update: {
+          bond_moment?: string
+          chapter_title?: string
+          companion_id?: string
+          generated_at?: string
+          id?: string
+          intro_line?: string
+          life_lesson?: string
+          lore_expansion?: Json
+          main_story?: string
+          next_hook?: string
+          stage?: number
+          tone_preference?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_stories_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_check_ins: {
         Row: {
           check_in_date: string
