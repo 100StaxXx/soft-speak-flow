@@ -136,6 +136,20 @@ export const useCompanion = () => {
         xp_at_evolution: 0,
       });
 
+      // Generate the first chapter of the companion's story
+      try {
+        await supabase.functions.invoke('generate-companion-story', {
+          body: {
+            companionId: companionData.id,
+            userId: user.id,
+            stage: 0
+          }
+        });
+      } catch (storyError) {
+        console.error("Error generating initial companion story:", storyError);
+        // Don't fail companion creation if story generation fails
+      }
+
       return companionData;
     },
     onSuccess: () => {
