@@ -33,14 +33,29 @@ export const XP_REWARDS = {
   STREAK_MILESTONE: 15,
 };
 
+// 21-Stage Evolution System: Early stages fast, late stages exponential
 export const EVOLUTION_THRESHOLDS = {
-  0: 0,      // Egg
-  1: 10,     // Sparkling Egg (Tutorial-optimized: check-in + habit = 10 XP)
-  2: 60,     // Hatchling
-  3: 120,    // Guardian
-  4: 250,    // Ascended
-  5: 500,    // Mythic
-  6: 1200,   // Final Titan
+  0: 0,       // Dormant Egg
+  1: 10,      // Cracking Awakening (Tutorial-optimized)
+  2: 30,      // Newborn Emergence
+  3: 60,      // Early Infant
+  4: 100,     // Juvenile Form
+  5: 150,     // Young Explorer
+  6: 210,     // Adolescent Guardian
+  7: 280,     // Initiate Protector
+  8: 360,     // Seasoned Guardian
+  9: 450,     // Mature Protector
+  10: 550,    // Veteran Form (achievable in 2-3 months)
+  11: 700,    // Elevated Form (endgame begins)
+  12: 900,    // Ascended Form
+  13: 1150,   // Ether-Born Avatar
+  14: 1450,   // Primordial Aspect
+  15: 1800,   // Colossus Form
+  16: 2250,   // Cosmic Guardian
+  17: 2800,   // Astral Overlord
+  18: 3500,   // Universal Sovereign
+  19: 4400,   // Mythic Apex
+  20: 5500,   // Origin of Creation (ultimate form)
 };
 
 export const useCompanion = () => {
