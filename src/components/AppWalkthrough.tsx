@@ -226,11 +226,15 @@ export const AppWalkthrough = () => {
   // Listen for mission completion - hide tutorial step immediately
   useEffect(() => {
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 8) {
+      if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
         // Hide tutorial immediately when quest is checked
         setRun(false);
+        // Clear tutorial step to re-enable navigation
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+          detail: { step: null } 
+        }));
       }
     };
 
@@ -241,10 +245,10 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (!run && stepIndex === 8) {
+      if (!run && stepIndex === 6) {
         // Evolution complete - now show final congratulations step
         setRun(true);
-        setTimeout(() => safeSetStep(9), 500);
+        setTimeout(() => safeSetStep(7), 500);
       }
     };
 
@@ -261,28 +265,28 @@ export const AppWalkthrough = () => {
       // User clicked Companion tab from XP step
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(4);
+        safeSetStep(4);
       }, 100);
     } else if (stepIndex === 4 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(8);
+        safeSetStep(6);
       }, 100);
     } else if (stepIndex === 3 && location.pathname === '/companion') {
       // User clicked Companion tab
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(4);
+        safeSetStep(4);
       }, 100);
     } else if (stepIndex === 5 && location.pathname === '/tasks') {
       // User clicked Quests tab
       haptics.medium();
       setTimeout(() => {
-        setStepIndex(8);
+        safeSetStep(6);
       }, 100);
     }
-  }, [location.pathname, stepIndex, run]);
+  }, [location.pathname, stepIndex, run, safeSetStep]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
@@ -336,7 +340,7 @@ export const AppWalkthrough = () => {
 
     // Set waiting states for steps requiring user actions
     if (lifecycle === 'complete') {
-      if (index === 7) {
+      if (index === 6) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       }
@@ -401,7 +405,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: stepIndex === 9 ? 'block' : 'none',
+          display: stepIndex === 7 ? 'block' : 'none',
           backgroundColor: 'hsl(var(--primary))',
           padding: '0.75rem 2rem',
           fontSize: '1rem',
