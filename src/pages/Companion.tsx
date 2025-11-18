@@ -3,7 +3,6 @@ import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { CompanionOnboarding } from "@/components/CompanionOnboarding";
-import { CompanionPageTour } from "@/components/CompanionPageTour";
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
@@ -25,7 +24,6 @@ const Companion = () => {
 
   return (
     <PageTransition>
-      <CompanionPageTour />
       <CompanionErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
