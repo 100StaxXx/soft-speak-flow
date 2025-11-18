@@ -148,6 +148,19 @@ export const AppWalkthrough = () => {
   }, [user, session, location.pathname, waitForSelector]);
 
 
+  // Listen for mood selection to advance from step 0 to step 1
+  useEffect(() => {
+    const handleMoodSelected = () => {
+      if (run && stepIndex === 0) {
+        haptics.light();
+        setTimeout(() => safeSetStep(1), 300);
+      }
+    };
+
+    window.addEventListener('mood-selected', handleMoodSelected);
+    return () => window.removeEventListener('mood-selected', handleMoodSelected);
+  }, [stepIndex, run, safeSetStep]);
+
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
@@ -310,8 +323,8 @@ export const AppWalkthrough = () => {
         tooltip: {
           borderRadius: '1.25rem',
           padding: '1.5rem',
-          border: '1px solid hsl(var(--border))',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+          border: '3px solid hsl(var(--primary))',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
         },
         tooltipContent: {
           fontSize: '1rem',

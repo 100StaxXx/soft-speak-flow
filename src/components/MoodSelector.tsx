@@ -29,7 +29,10 @@ export const MoodSelector = ({ onSelect, selected }: MoodSelectorProps) => {
             key={mood.id}
             variant={isSelected ? "default" : "outline"}
             className={`h-auto py-2.5 flex-col gap-1 ${isSelected ? "" : "hover:border-primary"}`}
-            onClick={() => onSelect(mood.id)}
+            onClick={() => {
+              onSelect(mood.id);
+              window.dispatchEvent(new CustomEvent('mood-selected'));
+            }}
           >
             <Icon className={`h-5 w-5 ${isSelected ? "" : mood.color}`} />
             <span className="text-[8px] leading-none text-center">{mood.label}</span>
