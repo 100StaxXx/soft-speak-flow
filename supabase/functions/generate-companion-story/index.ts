@@ -30,97 +30,39 @@ const EVOLUTION_THEMES = [
   "Origin of Creation"
 ];
 
-// Species anatomical traits for accuracy - comprehensive coverage for all companions
+// Species anatomical traits for accuracy
 const SPECIES_TRAITS: Record<string, string> = {
-  // Canines & Wolves
   "Wolf": "Four-legged canine with powerful legs, flowing fur, pointed ears, and a long bushy tail",
-  "Fox": "Four-legged canine with slender build, pointed ears, bushy tail, and agile movements",
-  "Dog": "Four-legged canine companion with floppy or pointed ears, expressive eyes, and wagging tail",
-  "Hyena": "Four-legged canine with powerful jaws, sloping back, spotted or striped coat, and cackling vocalization",
-  
-  // Big Cats
   "Tiger": "Four-legged feline with muscular build, striped coat, retractable claws, and a long tail for balance",
-  "Lion": "Four-legged feline with golden mane (males), muscular body, sharp claws, and commanding presence",
-  "Panther": "Four-legged feline with sleek black coat, retractable claws, long tail, and silent movement",
-  "Jaguar": "Four-legged feline with powerful build, rosette-patterned coat, strong jaws, and swimming ability",
-  "Snow Leopard": "Four-legged feline with thick fur, long tail for balance, large paws, and mountain-adapted build",
-  "Cheetah": "Four-legged feline with slender aerodynamic build, spotted coat, non-retractable claws, and incredible speed",
-  "Puma / Cougar": "Four-legged feline with tawny coat, powerful hind legs, long tail, and solitary nature",
-  "Lynx": "Four-legged feline with tufted ears, short tail, powerful legs, and thick winter coat",
-  "Cat": "Four-legged feline with retractable claws, whiskers, flexible spine, and graceful movements",
-  
-  // Bears & Large Mammals
-  "Bear": "Four-legged ursine with massive frame, thick fur, powerful claws, and a short tail",
-  "Gorilla": "Bipedal primate with massive chest, long arms, knuckle-walking gait, and intelligent eyes",
-  "Elephant": "Four-legged pachyderm with trunk, large ears, tusks, and thick wrinkled skin",
-  "Hippo": "Four-legged semi-aquatic mammal with massive jaws, barrel-shaped body, and webbed feet",
-  "Rhino": "Four-legged mammal with armored skin, one or two horns, massive build, and sturdy legs",
-  
-  // Birds of Prey
   "Eagle": "Winged raptor with sharp talons, hooked beak, feathered wings, and keen forward-facing eyes",
-  "Falcon": "Winged raptor with streamlined body, sharp talons, hooked beak, and incredible speed",
-  "Hawk": "Winged raptor with broad wings, sharp talons, hooked beak, and excellent hunting vision",
-  "Owl": "Winged nocturnal bird with forward-facing eyes, silent flight feathers, sharp talons, and rotating head",
-  
-  // Other Birds
-  "Raven": "Winged corvid with black feathers, sharp beak, intelligent eyes, and grasping talons",
-  "Parrot": "Winged bird with curved beak, colorful plumage, zygodactyl feet, and vocal mimicry ability",
-  "Penguin": "Flightless bird with flipper-like wings, webbed feet, waterproof feathers, and upright waddle",
-  "Hummingbird": "Tiny winged bird with iridescent feathers, long beak, rapid wing beats, and hovering flight",
-  
-  // Marine Mammals
   "Dolphin": "Sleek marine mammal with streamlined body, dorsal fin, flippers, and a playful intelligence",
-  "Orca": "Marine mammal with black and white coloring, dorsal fin, powerful tail flukes, and intelligent mind",
-  
-  // Fish & Aquatic
-  "Shark": "Streamlined predator with dorsal fin, powerful tail, rows of teeth, and gill slits",
-  "Sea Turtle": "Marine reptile with hard shell, flippers, streamlined body, and ancient lineage",
-  
-  // Cephalopods
-  "Octopus": "Eight-armed cephalopod with soft body, intelligent eyes, color-changing skin, and beak",
-  "Kraken": "Massive legendary cephalopod with multiple tentacles, large mantle, powerful beak, and ocean dominance",
-  
-  // Equines
-  "Unicorn": "Four-legged equine with single spiraling horn, flowing mane and tail, and graceful hooves",
-  "Pegasus": "Winged equine with four legs, feathered wings, flowing mane and tail, and hooves",
-  "Horse (Stallion)": "Four-legged equine with powerful muscular build, flowing mane and tail, and strong hooves",
-  
-  // Mythical Fire/Sky
+  "Bear": "Four-legged ursine with massive frame, thick fur, powerful claws, and a short tail",
+  "Lion": "Four-legged feline with golden mane (males), muscular body, sharp claws, and commanding presence",
   "Phoenix": "Mythic bird with fiery plumage, long tail feathers, powerful wings, and a crest of flame",
   "Dragon": "Winged reptilian with four legs, scales, horns, long tail, and wings emerging from shoulder blades",
-  "Gryphon": "Hybrid with eagle head and wings, lion body and legs, sharp talons, and a long tail",
-  
-  // Serpentine & Reptiles
-  "Snake": "Legless reptile with long sinuous body, scales, forked tongue, and flexible spine",
-  "Basilisk": "Mythical serpent with lethal gaze, crowned head, serpentine body, and venomous nature",
-  
-  // Multi-headed Mythicals
-  "Hydra": "Multi-headed serpentine dragon with regenerating heads, long necks, scales, and aquatic adaptation",
-  
-  // Sea Monsters
-  "Leviathan": "Colossal sea serpent with massive scaled body, powerful tail, ancient presence, and ocean supremacy",
-  
-  // Marsupials & Unique
-  "Kangaroo": "Bipedal marsupial with powerful hind legs, long tail for balance, pouch, and hopping locomotion",
-  "Sloth": "Four-limbed mammal with long curved claws, shaggy fur, slow deliberate movements, and tree-dwelling nature",
-  
-  // Mystical Canines
-  "Kitsune": "Magical fox spirit with multiple tails, shapeshifting ability, mystical fire, and ancient wisdom",
-  
-  // Other Mammals
+  "Unicorn": "Four-legged equine with single spiraling horn, flowing mane and tail, and graceful hooves",
+  "Griffin": "Hybrid with eagle head and wings, lion body and legs, sharp talons, and a long tail",
+  "Owl": "Winged nocturnal bird with forward-facing eyes, silent flight feathers, sharp talons, and rotating head",
+  "Fox": "Four-legged canine with slender build, pointed ears, bushy tail, and agile movements",
+  "Shark": "Streamlined predator with dorsal fin, powerful tail, rows of teeth, and gill slits",
+  "Kraken": "Massive cephalopod with eight tentacles, large mantle, beak, and intelligent eyes",
+  "Serpent": "Legless reptile with long sinuous body, scales, forked tongue, and flexible spine",
+  "Raven": "Winged corvid with black feathers, sharp beak, intelligent eyes, and grasping talons",
+  "Panther": "Four-legged feline with sleek black coat, retractable claws, long tail, and silent movement",
   "Stag": "Four-legged cervine with branching antlers, powerful legs, hooves, and graceful posture",
-  
-  // Invertebrates
-  "Jellyfish": "Marine invertebrate with translucent bell, trailing tentacles, and graceful pulsing movement",
-  "Butterfly": "Winged insect with four colorful wings, slender body, antennae, and delicate flight",
-  
-  // Amphibians
-  "Salamander": "Four-legged amphibian with long tail, moist skin, delicate limbs, and regenerative abilities",
-  
-  // Dinosaurs
+  "Falcon": "Winged raptor with streamlined body, sharp talons, hooked beak, and incredible speed",
+  "Lynx": "Four-legged feline with tufted ears, short tail, powerful legs, and thick winter coat",
+  "Orca": "Marine mammal with black and white coloring, dorsal fin, powerful tail flukes, and intelligent mind",
+  "Pegasus": "Winged equine with four legs, feathered wings, flowing mane and tail, and hooves",
   "T-Rex": "Bipedal dinosaur with massive jaws, tiny arms, powerful tail for balance, and thick scales",
   "Velociraptor": "Bipedal dinosaur with sickle claws, feathered body, long tail, and pack intelligence",
-  "Mammoth": "Four-legged prehistoric elephant with long curved tusks, thick fur, and massive size"
+  "Mammoth": "Four-legged prehistoric elephant with long curved tusks, thick fur, and massive size",
+  "Jellyfish": "Marine invertebrate with translucent bell, trailing tentacles, and graceful pulsing movement",
+  "Octopus": "Eight-armed cephalopod with soft body, intelligent eyes, color-changing skin, and beak",
+  "Butterfly": "Winged insect with four colorful wings, slender body, antennae, and delicate flight",
+  "Hummingbird": "Tiny winged bird with iridescent feathers, long beak, rapid wing beats, and hovering flight",
+  "Salamander": "Four-legged amphibian with long tail, moist skin, delicate limbs, and regenerative abilities",
+  // Add more as needed - default will handle others
 };
 
 const getSpeciesTraits = (creature: string): string => {

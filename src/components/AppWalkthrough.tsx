@@ -14,15 +14,9 @@ const WALKTHROUGH_STEPS: Step[] = [
   {
     target: '[data-tour="morning-checkin"]',
     content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.",
-    placement: "auto",
+    placement: "bottom",
     disableBeacon: true,
     spotlightClicks: true,
-    spotlightPadding: 8,
-    styles: {
-      spotlight: {
-        borderRadius: '16px',
-      },
-    },
   },
   {
     target: '[data-tour="checkin-intention"]',
@@ -30,12 +24,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    spotlightPadding: 8,
-    styles: {
-      spotlight: {
-        borderRadius: '12px',
-      },
-    },
   },
   {
     target: 'body',
@@ -51,12 +39,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    spotlightPadding: 12,
-    styles: {
-      spotlight: {
-        borderRadius: '16px',
-      },
-    },
   },
   {
     target: 'body',
@@ -72,12 +54,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    spotlightPadding: 12,
-    styles: {
-      spotlight: {
-        borderRadius: '16px',
-      },
-    },
   },
   {
     target: 'body',
@@ -494,7 +470,7 @@ export const AppWalkthrough = () => {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.75)',
+          overlayColor: 'transparent',
           zIndex: 10000,
         },
         tooltip: {
@@ -534,11 +510,11 @@ export const AppWalkthrough = () => {
           mixBlendMode: 'normal',
         },
         spotlight: {
-          borderRadius: '12px',
-          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
+          boxShadow: 'none',
+          backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={false}
+      disableOverlay={stepIndex !== 7}
       locale={{
         back: 'Back',
         close: '',

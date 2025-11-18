@@ -14,56 +14,26 @@ const tourSteps: Step[] = [
     target: '[data-tour="companion-display"]',
     content: '✨ This is your companion! Watch it evolve through multiple stages as you earn XP from completing habits and missions.',
     placement: 'bottom',
-    spotlightPadding: 12,
-    styles: {
-      spotlight: {
-        borderRadius: '16px',
-      },
-    },
   },
   {
     target: '[data-tour="habits-tab"]',
     content: '📋 Track your daily habits here. Completing habits earns XP for your companion and helps you build consistency.',
     placement: 'bottom',
-    spotlightPadding: 10,
-    styles: {
-      spotlight: {
-        borderRadius: '12px',
-      },
-    },
   },
   {
     target: '[data-tour="progress-tab"]',
     content: '📊 View your progress, streaks, and XP breakdown to see how you\'re doing.',
     placement: 'bottom',
-    spotlightPadding: 10,
-    styles: {
-      spotlight: {
-        borderRadius: '12px',
-      },
-    },
   },
   {
     target: '[data-tour="achievements-tab"]',
     content: '🏆 Unlock achievements as you reach milestones on your journey.',
     placement: 'bottom',
-    spotlightPadding: 10,
-    styles: {
-      spotlight: {
-        borderRadius: '12px',
-      },
-    },
   },
   {
     target: '[data-tour="story-tab"]',
     content: '📖 Read your companion\'s epic story! Each evolution stage unlocks a new chapter of your mythic adventure together.',
     placement: 'bottom',
-    spotlightPadding: 10,
-    styles: {
-      spotlight: {
-        borderRadius: '12px',
-      },
-    },
   },
 ];
 
@@ -138,7 +108,7 @@ export const CompanionPageTour = () => {
           primaryColor: 'hsl(var(--primary))',
           textColor: 'hsl(var(--foreground))',
           backgroundColor: 'hsl(var(--card))',
-          overlayColor: 'rgba(0, 0, 0, 0.7)',
+          overlayColor: 'rgba(0, 0, 0, 0.6)',
           arrowColor: 'hsl(var(--card))',
           zIndex: 10000,
         },
@@ -166,10 +136,6 @@ export const CompanionPageTour = () => {
         },
         buttonSkip: {
           color: 'hsl(var(--muted-foreground))',
-        },
-        spotlight: {
-          borderRadius: '12px',
-          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
         },
       }}
       floaterProps={{
