@@ -179,25 +179,32 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, waitingForAction, run]);
 
-  // Quest completion triggers evolution (no need for separate listener)
-  // Evolution listener handles the transition
+  // Listen for quest creation to move from input/difficulty to first quest step
+  useEffect(() => {
+    const handleTaskAdded = () => {
+      if (run && stepIndex === 7) {
+        haptics.medium();
+        setTimeout(() => safeSetStep(8), 400);
+      }
+    };
 
-  // Listen for task completion (which triggers evolution)
+    window.addEventListener('task-added', handleTaskAdded);
+    return () => window.removeEventListener('task-added', handleTaskAdded);
+  }, [run, stepIndex, safeSetStep]);
+
+  // Listen for companion evolution after completing first quest
   useEffect(() => {
     const handleEvolution = () => {
       if (run && stepIndex === 8 && waitingForAction) {
-        haptics.heavy(); // Strong feedback for evolution milestone
+        haptics.heavy();
         setWaitingForAction(false);
-        // Wait for evolution animation to complete
-        setTimeout(() => {
-          setStepIndex(9);
-        }, 8000);
+        setTimeout(() => safeSetStep(9), 2000);
       }
     };
 
     window.addEventListener('companion-evolved', handleEvolution);
     return () => window.removeEventListener('companion-evolved', handleEvolution);
-  }, [stepIndex, waitingForAction, run]);
+  }, [run, stepIndex, waitingForAction, safeSetStep]);
 
   // Listen for route changes to progress tutorial
   useEffect(() => {
@@ -206,11 +213,11 @@ export const AppWalkthrough = () => {
     if (stepIndex === 4 && location.pathname === '/tasks') {
       // User clicked Quests tab, progress to next step
       haptics.medium();
-      setTimeout(() => setStepIndex(5), 500);
+      setTimeout(() => safeSetStep(5), 500);
     } else if (stepIndex === 10 && location.pathname === '/tasks') {
       // User clicked Habits tab, progress to next step
       haptics.medium();
-      setTimeout(() => setStepIndex(11), 500);
+      setTimeout(() => safeSetStep(11), 500);
     }
   }, [location.pathname, stepIndex, run]);
 
@@ -277,8 +284,8 @@ export const AppWalkthrough = () => {
       } else if (index === 4 && action === ACTIONS.NEXT) {
         // Don't allow "Next" button on tasks-tab step - user must click the tab
         return;
-      } else if (index === 10 && action === ACTIONS.NEXT) {
-        // Don't allow "Next" button on habits-tab step - user must click the tab
+      } else if ((index === 7 || index === 10) && action === ACTIONS.NEXT) {
+        // Don't allow "Next" button on add quest or habits-tab steps
         return;
       } else if (index === 1 && lifecycle === 'complete') {
         // Wait for check-in submission
