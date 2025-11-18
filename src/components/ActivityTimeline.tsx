@@ -34,6 +34,9 @@ const activityLabels: Record<string, string> = {
   chat_message: "chatted with mentor",
   reflection_completed: "completed reflection",
   goal_set: "set a goal",
+  companion_evolved: "companion evolved",
+  mission_completed: "completed a mission",
+  streak_milestone: "reached a streak milestone"
 };
 
 export const ActivityTimeline = () => {

@@ -196,7 +196,7 @@ serve(async (req) => {
       }
     }
 
-    const speciesTraits = getSpeciesTraits(companion.spirit_animal);
+    const speciesTraits = SPECIES_TRAITS[companion.spirit_animal] || `A ${companion.spirit_animal.toLowerCase()} with its natural anatomical structure and movement patterns`;
 
     // Build the V2 story generation prompt
     const storyPrompt = `You are STORY ENGINE V2 — a refined mythic adventure generator that produces a single chapter of a personalized hero journey for the user and their evolving creature companion.
