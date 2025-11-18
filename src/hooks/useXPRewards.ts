@@ -1,21 +1,51 @@
 import { useCompanion, XP_REWARDS } from "@/hooks/useCompanion";
 import { useXPToast } from "@/contexts/XPContext";
+import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Centralized XP reward system
  * Use these helpers instead of hard-coding XP values across components
  */
 export const useXPRewards = () => {
+  const { user } = useAuth();
   const { companion, awardXP } = useCompanion();
   const { showXPToast } = useXPToast();
+  const {
+    updateEnergyFromActivity,
+    updateFocusFromHabit,
+    updateBalanceFromReflection,
+    updateResilienceFromStreak,
+  } = useCompanionAttributes();
 
-  const awardHabitCompletion = () => {
+  // Fetch current habit streak for resilience updates
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('current_habit_streak')
+        .eq('id', user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const awardHabitCompletion = async () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
     awardXP.mutate({
       eventType: "habit_complete",
       xpAmount: XP_REWARDS.HABIT_COMPLETE,
     });
+    
+    // Update companion attributes
+    await updateFocusFromHabit(companion.id);
+    await updateEnergyFromActivity(companion.id);
   };
 
   const awardAllHabitsComplete = () => {
@@ -54,16 +84,20 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardCheckInComplete = () => {
+  const awardCheckInComplete = async () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
     awardXP.mutate({
       eventType: "check_in",
       xpAmount: XP_REWARDS.CHECK_IN,
     });
+    
+    // Update companion attributes
+    await updateBalanceFromReflection(companion.id);
+    await updateEnergyFromActivity(companion.id);
   };
 
-  const awardStreakMilestone = (milestone: number) => {
+  const awardStreakMilestone = async (milestone: number) => {
     if (!companion) return;
     showXPToast(XP_REWARDS.STREAK_MILESTONE, `${milestone} Day Streak!`);
     awardXP.mutate({
@@ -71,15 +105,24 @@ export const useXPRewards = () => {
       xpAmount: XP_REWARDS.STREAK_MILESTONE,
       metadata: { milestone },
     });
+    
+    // Update companion resilience
+    await updateResilienceFromStreak({
+      companionId: companion.id,
+      streakDays: milestone,
+    });
   };
 
-  const awardReflectionComplete = () => {
+  const awardReflectionComplete = async () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
     awardXP.mutate({
       eventType: "reflection",
       xpAmount: XP_REWARDS.CHECK_IN,
     });
+    
+    // Update companion balance
+    await updateBalanceFromReflection(companion.id);
   };
 
   const awardQuoteShared = () => {

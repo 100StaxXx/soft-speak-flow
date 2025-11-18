@@ -3,11 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useCompanion } from "@/hooks/useCompanion";
+import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companion } = useCompanion();
+  const { updateEnergyFromActivity } = useCompanionAttributes();
   const { awardCustomXP } = useXPRewards();
 
   const taskDate = selectedDate 
@@ -92,11 +96,17 @@ export const useDailyTasks = (selectedDate?: Date) => {
       if (error) throw error;
       return { taskId, completed, xpReward, wasAlreadyCompleted };
     },
-    onSuccess: ({ completed, xpReward, wasAlreadyCompleted }) => {
+    onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       // Only award XP if completing for the FIRST time
       if (completed && !wasAlreadyCompleted) {
-        awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        
+        // Update companion energy
+        if (companion) {
+          await updateEnergyFromActivity(companion.id);
+        }
+        
         // Dispatch event for walkthrough
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
