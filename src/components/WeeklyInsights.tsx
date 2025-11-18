@@ -49,14 +49,15 @@ export const WeeklyInsights = () => {
         .gte('created_at', start)
         .lte('created_at', end);
       
-      // Get completed quests (daily_missions) this week
+      // Get completed quests (daily_missions) this week - filter by mission_date instead of completed_at
+      // This ensures missions completed during onboarding/tutorial show up if they're for this week
       const { data: quests } = await supabase
         .from('daily_missions')
         .select('*')
         .eq('user_id', user.id)
         .eq('completed', true)
-        .gte('completed_at', start)
-        .lte('completed_at', end);
+        .gte('mission_date', start.split('T')[0])
+        .lte('mission_date', end.split('T')[0]);
 
       // Get activity feed for insights
       const { data: activities } = await supabase
