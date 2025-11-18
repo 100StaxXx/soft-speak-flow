@@ -48,16 +48,16 @@ const WALKTHROUGH_STEPS: Step[] = [
     spotlightClicks: true,
   },
   {
-    target: '[data-tour="add-task-input"]',
-    content: "✍️ Create your first quest! Type something like 'Complete Tutorial Quest', select Medium difficulty (15 XP), and click Add Quest to create it.",
-    placement: "top",
-    spotlightClicks: true,
-  },
-  {
-    target: '[data-tour="first-task"]',
-    content: "✅ Great! Now complete your quest by clicking the checkbox. This will give you enough XP to evolve your companion!",
-    placement: "bottom",
-    spotlightClicks: true,
+    target: 'body',
+    content: "✍️ Perfect! Now create a quest: Type 'Complete Tutorial Quest', select Medium difficulty (15 XP), then click Add Quest. Once created, complete it by clicking the checkbox to evolve your companion!",
+    placement: "center",
+    disableBeacon: true,
+    spotlightClicks: false,
+    styles: {
+      options: {
+        zIndex: 100000,
+      }
+    }
   },
   {
     target: 'body',
@@ -159,47 +159,40 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, run, safeSetStep]);
 
-  // Listen for quest creation to move to checkbox step
+  // Listen for quest completion to advance to final step
   useEffect(() => {
-    const handleTaskAdded = () => {
+    const handleTaskCompleted = () => {
       if (run && stepIndex === 6) {
-        haptics.medium();
-        setTimeout(() => safeSetStep(7), 400);
-      }
-    };
-
-    window.addEventListener('task-added', handleTaskAdded);
-    return () => window.removeEventListener('task-added', handleTaskAdded);
-  }, [run, stepIndex, safeSetStep]);
-
-  // Listen for companion evolution after completing first quest
-  useEffect(() => {
-    const handleEvolution = () => {
-      if (run && stepIndex === 7 && waitingForAction) {
         haptics.heavy();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(8), 2000);
+        // Wait for evolution modal to appear and dismiss
+        setTimeout(() => safeSetStep(7), 3000);
       }
     };
 
-    window.addEventListener('companion-evolved', handleEvolution);
-    return () => window.removeEventListener('companion-evolved', handleEvolution);
-  }, [run, stepIndex, waitingForAction, safeSetStep]);
+    window.addEventListener('mission-completed', handleTaskCompleted);
+    return () => window.removeEventListener('mission-completed', handleTaskCompleted);
+  }, [run, stepIndex, safeSetStep]);
+
 
   // Listen for route changes to progress tutorial
   useEffect(() => {
     if (!run) return;
     
     if (stepIndex === 2 && location.pathname === '/tasks') {
-      // User clicked Quests tab from XP step, skip directly to quest creation
+      // User clicked Quests tab from XP step, skip directly to quest creation with immediate display
       haptics.medium();
-      setTimeout(() => safeSetStep(6), 500);
+      setTimeout(() => {
+        setStepIndex(6);
+      }, 100); // Very short delay to ensure UI is ready
     } else if (stepIndex === 5 && location.pathname === '/tasks') {
-      // User clicked Quests tab, progress to quest creation step
+      // User clicked Quests tab, progress to quest creation step immediately
       haptics.medium();
-      setTimeout(() => safeSetStep(6), 500);
+      setTimeout(() => {
+        setStepIndex(6);
+      }, 100);
     }
-  }, [location.pathname, stepIndex, run, safeSetStep]);
+  }, [location.pathname, stepIndex, run]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
