@@ -77,6 +77,11 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
+    styles: {
+      tooltip: {
+        pointerEvents: 'auto',
+      },
+    },
   },
 ];
 
@@ -384,6 +389,7 @@ export const AppWalkthrough = () => {
           padding: '1.5rem',
           border: '3px solid hsl(var(--primary))',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+          pointerEvents: 'auto',
         },
         tooltipContent: {
           fontSize: '1rem',
