@@ -125,17 +125,17 @@ const Index = () => {
             <Suspense fallback={<ComponentLoader />}>
               <QuoteOfTheDay />
             </Suspense>
-
-            {/* Inspire Section - Browse by category and emotion */}
-            <Suspense fallback={<ComponentLoader />}>
-              <InspireSection />
-            </Suspense>
             
             <div data-tour="ask-mentor">
               <Suspense fallback={<ComponentLoader />}>
                 <MentorQuickChat />
               </Suspense>
             </div>
+
+            {/* Inspire Section - Browse by category and emotion */}
+            <Suspense fallback={<ComponentLoader />}>
+              <InspireSection />
+            </Suspense>
           </div>
         </div>
       </PageTransition>
