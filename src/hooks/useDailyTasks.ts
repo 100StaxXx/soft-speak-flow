@@ -88,7 +88,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
       if (completed) {
         awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         // Dispatch event for walkthrough
-        window.dispatchEvent(new CustomEvent('task-complete'));
+        window.dispatchEvent(new CustomEvent('mission-completed'));
       }
     },
   });
