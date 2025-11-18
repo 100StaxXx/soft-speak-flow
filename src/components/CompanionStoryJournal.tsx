@@ -20,16 +20,24 @@ const STAGE_NAMES = [
 const TONE_OPTIONS = [
   { value: "soft", label: "Soft & Gentle" },
   { value: "heroic", label: "Heroic & Epic" },
+  { value: "epic", label: "Epic Adventure" },
   { value: "cinematic", label: "Cinematic" },
   { value: "dark", label: "Dark & Intense" },
-  { value: "romantic", label: "Romantic" },
+  { value: "emotional", label: "Emotional" },
   { value: "mysterious", label: "Mysterious" },
+];
+
+const INTENSITY_OPTIONS = [
+  { value: "soft", label: "Soft" },
+  { value: "moderate", label: "Moderate" },
+  { value: "epic", label: "Epic" },
 ];
 
 export const CompanionStoryJournal = () => {
   const { companion } = useCompanion();
   const [viewingStage, setViewingStage] = useState(companion?.current_stage || 0);
   const [selectedTone, setSelectedTone] = useState("heroic");
+  const [selectedIntensity, setSelectedIntensity] = useState("moderate");
   
   const { story, allStories, isLoading, generateStory, regenerateStory } = useCompanionStory(
     companion?.id,
@@ -54,6 +62,7 @@ export const CompanionStoryJournal = () => {
       companionId: companion.id,
       stage: viewingStage,
       tonePreference: selectedTone,
+      themeIntensity: selectedIntensity,
     });
   };
 
@@ -62,6 +71,7 @@ export const CompanionStoryJournal = () => {
       companionId: companion.id,
       stage: viewingStage,
       tonePreference: selectedTone,
+      themeIntensity: selectedIntensity,
     });
   };
 
@@ -137,23 +147,38 @@ export const CompanionStoryJournal = () => {
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-2">
-                <Select value={selectedTone} onValueChange={setSelectedTone}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONE_OPTIONS.map(tone => (
-                      <SelectItem key={tone.value} value={tone.value}>
-                        {tone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedTone} onValueChange={setSelectedTone}>
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TONE_OPTIONS.map(tone => (
+                        <SelectItem key={tone.value} value={tone.value}>
+                          {tone.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedIntensity} onValueChange={setSelectedIntensity}>
+                    <SelectTrigger className="w-[110px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTENSITY_OPTIONS.map(intensity => (
+                        <SelectItem key={intensity.value} value={intensity.value}>
+                          {intensity.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRegenerate}
                   disabled={regenerateStory.isPending}
+                  className="w-full"
                 >
                   <RefreshCw className="h-3 w-3 mr-1" />
                   Rewrite
@@ -228,18 +253,32 @@ export const CompanionStoryJournal = () => {
             </div>
             {viewingStage <= companion.current_stage && (
               <div className="flex flex-col items-center gap-3 mt-2">
-                <Select value={selectedTone} onValueChange={setSelectedTone}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Choose tone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONE_OPTIONS.map(tone => (
-                      <SelectItem key={tone.value} value={tone.value}>
-                        {tone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedTone} onValueChange={setSelectedTone}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Choose tone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TONE_OPTIONS.map(tone => (
+                        <SelectItem key={tone.value} value={tone.value}>
+                          {tone.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedIntensity} onValueChange={setSelectedIntensity}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Intensity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTENSITY_OPTIONS.map(intensity => (
+                        <SelectItem key={intensity.value} value={intensity.value}>
+                          {intensity.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button onClick={handleGenerate} disabled={generateStory.isPending}>
                   <Sparkles className="h-4 w-4 mr-2" />
                   Generate Chapter
