@@ -178,12 +178,14 @@ STRUCTURE FOR EACH CHAPTER:
 3. **Main Story (250–400 words)**
    The chapter must:
    • reflect the evolution stage theme (${EVOLUTION_THEMES[stage]})
+   ${stage === 0 ? '• establish the ORIGIN: describe the creature as newly formed, vulnerable, taking its first breath in this world\n   • introduce the first meeting between user and creature - a fateful encounter\n   • set the tone for a legendary journey about to begin' : ''}
+   ${stage === 1 ? '• build DIRECTLY from Stage 0: the creature from the origin chapter is now awakening to its true potential\n   • reference specific details from the Stage 0 origin story\n   • show the first signs of growth and power emerging' : ''}
    • show clear, species-faithful physical evolution
    • keep the creature anatomically consistent with ${speciesTraits}
    • incorporate ${companion.favorite_color}, ${companion.fur_color}, and ${companion.eye_color} subtly and beautifully
    • display elemental effects appropriate to ${companion.core_element}
    • include at least one "Goal Mirror Moment" tied to "${userGoal}"
-   • reference at least one detail from: ${memoryNotes}
+   ${stage > 0 ? `• reference at least one detail from: ${memoryNotes}` : ''}
    • escalate danger appropriate to stage tier:
        ∙ Stages 0–5: local/natural threats
        ∙ Stages 6–10: named foes or magical dangers
