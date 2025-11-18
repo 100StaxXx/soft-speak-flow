@@ -2,7 +2,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
-import { CompanionOnboarding } from "@/components/CompanionOnboarding";
+
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
@@ -19,9 +19,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext } = useCompanion();
 
-  if (!companion) {
-    return <CompanionOnboarding />;
-  }
+  // Companion is always created during onboarding, so no need for fallback UI here
 
   return (
     <PageTransition>
