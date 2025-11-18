@@ -11,13 +11,27 @@ interface NextEvolutionPreviewProps {
 }
 
 const STAGE_NAMES = {
-  0: "Mysterious Egg",
-  1: "Sparkling Egg",
-  2: "Young Hatchling",
-  3: "Noble Guardian",
-  4: "Ascended Form",
-  5: "Mythic Being",
-  6: "Eternal Titan",
+  0: "Dormant Egg",
+  1: "Cracking Awakening",
+  2: "Newborn Emergence",
+  3: "Early Infant Form",
+  4: "Juvenile Form",
+  5: "Young Explorer",
+  6: "Adolescent Guardian",
+  7: "Initiate Protector",
+  8: "Seasoned Guardian",
+  9: "Mature Protector",
+  10: "Veteran Form",
+  11: "Elevated Form",
+  12: "Ascended Form",
+  13: "Ether-Born Avatar",
+  14: "Primordial Aspect",
+  15: "Colossus Form",
+  16: "Cosmic Guardian",
+  17: "Astral Overlord",
+  18: "Universal Sovereign",
+  19: "Mythic Apex",
+  20: "Origin of Creation",
 };
 
 const XP_TIPS = [
@@ -34,10 +48,10 @@ export const NextEvolutionPreview = ({
   nextEvolutionXP,
   progressPercent,
 }: NextEvolutionPreviewProps) => {
-  const nextStage = Math.min(currentStage + 1, 6);
+  const nextStage = Math.min(currentStage + 1, 20);
   const nextStageName = STAGE_NAMES[nextStage as keyof typeof STAGE_NAMES];
   const xpNeeded = nextEvolutionXP - currentXP;
-  const isMaxStage = currentStage >= 6;
+  const isMaxStage = currentStage >= 20;
 
   if (isMaxStage) {
     return (
