@@ -71,7 +71,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     content: "🎉 Congratulations! You've mastered the basics! You know how to check in daily and create quests to earn XP. Keep building your momentum and watch your companion evolve through amazing stages. Your journey starts now! 🚀",
     placement: "center",
     disableBeacon: true,
-    locale: { last: 'Begin Your Adventure' },
+    locale: { last: 'Begin Adventure' },
     styles: {
       buttonNext: {
         display: 'block',
@@ -201,19 +201,31 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, run, safeSetStep]);
 
-  // Listen for quest completion to advance to final step
+  // Listen for mission completion - do NOT advance yet, wait for evolution
   useEffect(() => {
     const handleTaskCompleted = () => {
       if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
-        // Wait for evolution modal to appear and dismiss
-        setTimeout(() => safeSetStep(7), 3000);
+        // Don't advance yet - wait for evolution complete event
       }
     };
 
     window.addEventListener('mission-completed', handleTaskCompleted);
     return () => window.removeEventListener('mission-completed', handleTaskCompleted);
+  }, [run, stepIndex]);
+
+  // Listen for evolution completion to trigger final step
+  useEffect(() => {
+    const handleEvolutionComplete = () => {
+      if (run && stepIndex === 6) {
+        // Evolution complete with confetti - now show final step
+        setTimeout(() => safeSetStep(7), 500);
+      }
+    };
+
+    window.addEventListener('evolution-complete', handleEvolutionComplete);
+    return () => window.removeEventListener('evolution-complete', handleEvolutionComplete);
   }, [run, stepIndex, safeSetStep]);
 
 
