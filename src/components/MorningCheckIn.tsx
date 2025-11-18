@@ -102,9 +102,10 @@ export const MorningCheckIn = () => {
               <div className="bg-gradient-to-br from-secondary/50 to-accent/5 rounded-lg p-4 border border-primary/10">
                 <div className="flex items-start gap-3">
                   <MentorAvatar
-                    mentorSlug={personality.slug || ''}
+                    mentorSlug={(personality.slug || '').toLowerCase()}
                     mentorName={personality.name}
                     primaryColor={personality.primary_color || '#000'}
+                    avatarUrl={personality.avatar_url || undefined}
                     size="sm"
                     className="flex-shrink-0"
                     showBorder={true}
