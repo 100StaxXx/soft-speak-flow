@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
+import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 const WALKTHROUGH_STEPS: Step[] = [
   // HOME PAGE - Check-in
@@ -92,6 +94,92 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
+
+  // Custom tooltip for final step with explicit click handling
+  const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
+    if (index !== 7) return null;
+    
+    const handleFinish = () => {
+      haptics.success();
+      
+      // Trigger confetti celebration
+      const duration = 3000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10001 };
+
+      function randomInRange(min: number, max: number) {
+        return Math.random() * (max - min) + min;
+      }
+
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+        });
+        
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+        });
+      }, 250);
+      
+      setRun(false);
+      localStorage.setItem('hasSeenAppWalkthrough', 'true');
+      localStorage.removeItem('onboardingComplete');
+      
+      // Clear tutorial step to re-enable navigation
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
+    };
+
+    return (
+      <Card 
+        {...tooltipProps}
+        className="border-[3px] border-primary shadow-2xl"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 100000,
+          maxWidth: '90vw',
+          width: '400px',
+          pointerEvents: 'auto',
+          touchAction: 'auto',
+        }}
+      >
+        <div className="p-6 text-center space-y-4">
+          <div className="text-base leading-relaxed">
+            {step.content}
+          </div>
+          <Button
+            onClick={handleFinish}
+            size="lg"
+            className="w-full text-base font-bold"
+            style={{
+              pointerEvents: 'auto',
+              touchAction: 'auto',
+              cursor: 'pointer',
+            }}
+          >
+            Begin Adventure
+          </Button>
+        </div>
+      </Card>
+    );
+  }, []);
+
 
   const isMobile = useIsMobile();
   const steps = useMemo<Step[]>(() => {
@@ -376,6 +464,7 @@ export const AppWalkthrough = () => {
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
+      tooltipComponent={stepIndex === 7 ? CustomFinalTooltip : undefined}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
