@@ -62,8 +62,17 @@ export const MentorAvatar = ({
   showGlow = false,
   style,
 }: MentorAvatarProps) => {
-  const mentorImage = MENTOR_IMAGES[mentorSlug] || avatarUrl;
-  const imagePosition = POSITION_MAP[mentorSlug] || 'center 25%';
+  // Normalize slug and fall back to name-derived key
+  const baseSlug = (mentorSlug || '').trim().toLowerCase();
+  const nameSlug = (mentorName || '').trim().toLowerCase().replace(/\s+/g, '-');
+  const key = MENTOR_IMAGES[baseSlug]
+    ? baseSlug
+    : MENTOR_IMAGES[nameSlug]
+    ? nameSlug
+    : baseSlug || nameSlug;
+
+  const mentorImage = MENTOR_IMAGES[key] || avatarUrl;
+  const imagePosition = POSITION_MAP[key] || 'center 25%';
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
