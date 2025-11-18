@@ -22,14 +22,6 @@ const App = lazy(() => import("./App").catch(() => {
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Unregister all service workers to clear cache
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        registration.unregister();
-      });
-    });
-    
-    // Register fresh service worker
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
       // Silent fail - not critical for app functionality
     });
