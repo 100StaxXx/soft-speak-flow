@@ -32,6 +32,7 @@ const Library = lazy(() => import("./pages/Library"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const Search = lazy(() => import("./pages/Search"));
 const Companion = lazy(() => import("./pages/Companion"));
+const PepTalks = lazy(() => import("./pages/PepTalks"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,7 +93,8 @@ const AppContent = memo(() => {
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/inspire" element={<Navigate to="/library" replace />} />
+          <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
+          <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
           <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />

@@ -370,7 +370,7 @@ export const TodaysPepTalk = () => {
             variant="outline" 
             size="sm"
             className="w-full"
-            onClick={() => navigate("/inspire")}
+            onClick={() => navigate("/pep-talks")}
           >
             Browse More Pep Talks
           </Button>
