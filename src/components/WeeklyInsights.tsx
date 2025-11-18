@@ -55,8 +55,8 @@ export const WeeklyInsights = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('completed', true)
-        .gte('created_at', start)
-        .lte('created_at', end);
+        .gte('completed_at', start)
+        .lte('completed_at', end);
 
       // Get activity feed for insights
       const { data: activities } = await supabase
