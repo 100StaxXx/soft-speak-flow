@@ -30,6 +30,11 @@ const tourSteps: Step[] = [
     content: '🏆 Unlock achievements as you reach milestones on your journey.',
     placement: 'bottom',
   },
+  {
+    target: '[data-tour="story-tab"]',
+    content: '📖 Read your companion\'s epic story! Each evolution stage unlocks a new chapter of your mythic adventure together.',
+    placement: 'bottom',
+  },
 ];
 
 export const CompanionPageTour = () => {
