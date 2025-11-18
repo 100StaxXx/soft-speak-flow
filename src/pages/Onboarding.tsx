@@ -260,6 +260,8 @@ export default function Onboarding() {
     coreElement: string;
   }) => {
     try {
+      console.log("Starting companion creation:", data);
+      
       // Check if companion already exists
       const { data: existingCompanion } = await supabase
         .from("user_companion")
@@ -268,12 +270,22 @@ export default function Onboarding() {
         .maybeSingle();
 
       if (!existingCompanion) {
+        console.log("Creating new companion...");
         // Create companion
-        await createCompanion.mutateAsync(data);
+        try {
+          await createCompanion.mutateAsync(data);
+          console.log("Companion created successfully");
+        } catch (companionError: any) {
+          console.error("Companion creation error:", companionError);
+          throw new Error(companionError?.message || "Failed to create companion");
+        }
+      } else {
+        console.log("Companion already exists, skipping creation");
       }
       
+      console.log("Marking onboarding as complete...");
       // Mark onboarding as complete
-      await supabase
+      const { error: completeError } = await supabase
         .from('profiles')
         .update({ 
           onboarding_completed: true,
@@ -281,6 +293,11 @@ export default function Onboarding() {
           onboarding_data: {}
         })
         .eq('id', user!.id);
+        
+      if (completeError) {
+        console.error("Error completing onboarding:", completeError);
+        throw completeError;
+      }
       
       // CRITICAL: Invalidate profile cache to force refetch with new data
       await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });
@@ -291,13 +308,14 @@ export default function Onboarding() {
       // Small delay to ensure cache is updated
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      console.log("Navigating to home...");
       // Navigate directly to home
       navigate("/", { replace: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in onboarding:", error);
       toast({
         title: "Error",
-        description: "Failed to create companion. Please try again.",
+        description: error?.message || "Failed to create companion. Please try again.",
         variant: "destructive",
       });
     }
