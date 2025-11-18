@@ -245,7 +245,7 @@ export default function Tasks() {
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold">
+                  <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
                   <p className="text-sm text-muted-foreground">Max 3 quests per day</p>

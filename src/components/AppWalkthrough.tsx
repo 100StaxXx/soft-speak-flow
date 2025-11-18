@@ -94,11 +94,11 @@ export const AppWalkthrough = () => {
     if (isMobile) {
       base[6] = {
         ...base[6],
-        target: '[data-tour="week-calendar"]',
+        target: '[data-tour="today-quests-header"]',
         placement: 'top',
         floaterProps: {
           ...((base[6] as any).floaterProps || {}),
-          offset: 8,
+          offset: 0,
         },
         styles: {
           ...((base[6] as any).styles || {}),
