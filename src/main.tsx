@@ -1,7 +1,6 @@
 import { createRoot } from "react-dom/client";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy } from "react";
 import "./index.css";
-import { OfflineBanner } from "./components/OfflineBanner";
 
 const App = lazy(() => import("./App").catch(() => {
   return { default: () => (
@@ -30,17 +29,14 @@ if ('serviceWorker' in navigator) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <>
-    <OfflineBanner />
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-foreground">Loading...</p>
-        </div>
+  <Suspense fallback={
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        <p>Loading...</p>
       </div>
-    }>
-      <App />
-    </Suspense>
-  </>
+    </div>
+  }>
+    <App />
+  </Suspense>
 );
