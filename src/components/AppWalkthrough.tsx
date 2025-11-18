@@ -57,7 +57,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "✍️ Perfect! Now create a quest: Type 'Complete Tutorial Quest', select Medium difficulty (15 XP), then click Add Quest. Once created, complete it by clicking the checkbox to evolve your companion!",
+    content: "✍️ Perfect! Now create a quest: Type 'Complete Tutorial Quest', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
     placement: 'center',
     disableBeacon: true,
     spotlightClicks: false,
@@ -95,7 +95,7 @@ export const AppWalkthrough = () => {
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
 
-  // Custom tooltip for final step with explicit click handling
+  // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
     if (index !== 7) return null;
     
@@ -137,7 +137,7 @@ export const AppWalkthrough = () => {
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
       
-      // Clear tutorial step to re-enable navigation
+      // Clear tutorial step
       window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
         detail: { step: null } 
       }));
@@ -302,15 +302,15 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
   }, [stepIndex, run, safeSetStep]);
 
-  // Listen for mission completion - hide tutorial step immediately
+  // Listen for mission completion
   useEffect(() => {
     const handleTaskCompleted = () => {
       if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
-        // Hide tutorial immediately when quest is checked
         setRun(false);
-        // Clear tutorial step to re-enable navigation
+        
+        // Clear tutorial step
         window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
           detail: { step: null } 
         }));
@@ -410,7 +410,7 @@ export const AppWalkthrough = () => {
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
       
-      // Clear tutorial step to re-enable navigation
+      // Clear tutorial step
       window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
         detail: { step: null } 
       }));
