@@ -41,11 +41,13 @@ export const XPBreakdown = () => {
     task_complete: "Quests",
     check_in: "Check-in",
     pep_talk: "Pep Talk",
+    pep_talk_listen: "Pep Talk Listen",
     all_habits_complete: "All Habits Bonus",
     mission_check_in: "Mission",
     mission_pep_talk: "Mission",
     mission_habits_3: "Mission",
     mission_all_habits: "Mission",
+    mission_profile_update: "Profile Update",
   };
 
   return (
