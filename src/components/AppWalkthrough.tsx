@@ -403,6 +403,7 @@ export const AppWalkthrough = () => {
           fontSize: '1rem',
           fontWeight: 'bold',
           borderRadius: '0.75rem',
+          pointerEvents: 'auto',
         },
         buttonBack: {
           display: 'none',
@@ -424,7 +425,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay
+      disableOverlay={stepIndex !== 7}
       locale={{
         back: 'Back',
         close: '',
