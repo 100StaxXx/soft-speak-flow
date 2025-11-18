@@ -61,7 +61,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         zIndex: 100000,
       },
       tooltip: {
-        marginTop: '120px',
+        marginTop: '280px',
       }
     }
   },
