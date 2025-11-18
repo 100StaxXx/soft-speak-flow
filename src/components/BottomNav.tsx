@@ -38,12 +38,16 @@ export const BottomNav = () => {
 
   // Determine if navigation should be blocked
   const isTutorialActive = tutorialStep !== null;
-  const canClickQuests = tutorialStep === 2; // Only allow clicking Quests on step 2
+  const canClickCompanion = tutorialStep === 3; // Step 3: Click Companion tab
+  const canClickQuests = tutorialStep === 5; // Step 5: Click Quests tab
   
   const handleNavClick = (e: React.MouseEvent, route: string) => {
     if (!isTutorialActive) return;
     
-    // Allow Quests click on step 2, block everything else
+    // Allow Companion click on step 3
+    if (route === '/companion' && canClickCompanion) return;
+    
+    // Allow Quests click on step 5
     if (route === '/tasks' && canClickQuests) return;
     
     // Block all other navigation during tutorial
@@ -90,8 +94,9 @@ export const BottomNav = () => {
         <NavLink
           to="/companion"
           onClick={(e) => handleNavClick(e, '/companion')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${isTutorialActive ? 'pointer-events-none opacity-50' : ''}`}
+          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${isTutorialActive && !canClickCompanion ? 'pointer-events-none opacity-50' : ''}`}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          data-tour="companion-tab"
         >
           {({ isActive }) => (
             <>
