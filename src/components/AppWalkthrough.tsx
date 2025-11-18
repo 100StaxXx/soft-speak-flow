@@ -96,12 +96,17 @@ export const AppWalkthrough = () => {
         ...base[6],
         target: '[data-tour="week-calendar"]',
         placement: 'top',
+        floaterProps: {
+          ...((base[6] as any).floaterProps || {}),
+          offset: 8,
+        },
         styles: {
           ...((base[6] as any).styles || {}),
           tooltip: {
             ...(((base[6] as any).styles?.tooltip) || {}),
             marginTop: undefined,
             marginBottom: '8px',
+            pointerEvents: 'none', // allow tapping underlying UI on mobile
           },
         },
       } as Step;
