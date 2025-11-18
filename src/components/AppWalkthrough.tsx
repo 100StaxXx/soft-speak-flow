@@ -24,7 +24,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Nice! You just earned +5 XP! XP fuels your companion's evolution - keep earning to unlock new stages and abilities!",
+    content: "🎉 Nice! You just earned +5 XP! Now tap the Quests tab at the bottom to start building your first quest!",
     placement: "center",
     disableBeacon: true,
   },
@@ -189,7 +189,11 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (!run) return;
     
-    if (stepIndex === 5 && location.pathname === '/tasks') {
+    if (stepIndex === 2 && location.pathname === '/tasks') {
+      // User clicked Quests tab from XP step, skip directly to quest creation
+      haptics.medium();
+      setTimeout(() => safeSetStep(6), 500);
+    } else if (stepIndex === 5 && location.pathname === '/tasks') {
       // User clicked Quests tab, progress to quest creation step
       haptics.medium();
       setTimeout(() => safeSetStep(6), 500);
