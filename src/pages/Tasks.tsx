@@ -333,8 +333,17 @@ export default function Tasks() {
                       disabled={isAdding || !newTaskText.trim()}
                       className="w-full"
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Quest
+                      {isAdding ? (
+                        <>
+                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Quest
+                        </>
+                      )}
                     </Button>
                   </div>
                 </Card>
