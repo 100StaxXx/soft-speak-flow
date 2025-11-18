@@ -81,7 +81,10 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Story generation error:", error);
+        throw new Error("Unable to write your story right now. Please try again.");
+      }
       return data as CompanionStory;
     },
     onSuccess: () => {
@@ -93,7 +96,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     onError: (error) => {
       toast.dismiss("story-gen");
       console.error("Story generation failed:", error);
-      toast.error("Failed to generate story. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.");
     },
   });
 
@@ -126,7 +129,10 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Story regeneration error:", error);
+        throw new Error("Unable to rewrite your story. Please try again.");
+      }
       return data as CompanionStory;
     },
     onSuccess: () => {
@@ -138,7 +144,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     onError: (error) => {
       toast.dismiss("story-regen");
       console.error("Story regeneration failed:", error);
-      toast.error("Failed to regenerate story.");
+      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.");
     },
   });
 
