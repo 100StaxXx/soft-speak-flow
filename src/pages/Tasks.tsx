@@ -117,24 +117,41 @@ export default function Tasks() {
       const today = new Date().toISOString().split('T')[0];
       
       if (isCompleted) {
+        // Unchecking - remove completion record but DON'T remove XP
         const { error } = await supabase
           .from('habit_completions')
           .delete()
           .eq('habit_id', habitId)
           .eq('date', today);
         if (error) throw error;
+        return { isCompleting: false };
       } else {
+        // Check if this habit was already completed today (to prevent XP spam)
+        const { data: existingCompletion } = await supabase
+          .from('habit_completions')
+          .select('id')
+          .eq('habit_id', habitId)
+          .eq('user_id', user!.id)
+          .eq('date', today)
+          .maybeSingle();
+
+        // Insert new completion
         const { error } = await supabase
           .from('habit_completions')
           .insert({ habit_id: habitId, user_id: user!.id, date: today });
         if (error) throw error;
         
-        const habit = habits.find(h => h.id === habitId);
-        const xpAmount = habitDifficulty === 'easy' ? 5 : habitDifficulty === 'hard' ? 20 : 10;
-        await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+        // Only award XP if this is the FIRST completion today
+        if (!existingCompletion) {
+          const habit = habits.find(h => h.id === habitId);
+          const xpAmount = habit?.difficulty === 'easy' ? 5 : habit?.difficulty === 'hard' ? 20 : 10;
+          await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+          
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+          haptics.success();
+        }
         
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-        haptics.success();
+        return { isCompleting: true };
       }
     },
     onSuccess: () => {

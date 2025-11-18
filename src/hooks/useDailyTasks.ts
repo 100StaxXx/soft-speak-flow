@@ -72,6 +72,15 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
+      // Check if this task was already completed before (to prevent XP spam)
+      const { data: existingTask } = await supabase
+        .from('daily_tasks')
+        .select('completed_at')
+        .eq('id', taskId)
+        .single();
+
+      const wasAlreadyCompleted = existingTask?.completed_at !== null;
+
       const { error } = await supabase
         .from('daily_tasks')
         .update({
@@ -81,11 +90,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .eq('id', taskId);
 
       if (error) throw error;
-      return { taskId, completed, xpReward };
+      return { taskId, completed, xpReward, wasAlreadyCompleted };
     },
-    onSuccess: ({ completed, xpReward }) => {
+    onSuccess: ({ completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      if (completed) {
+      // Only award XP if completing for the FIRST time
+      if (completed && !wasAlreadyCompleted) {
         awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         // Dispatch event for walkthrough
         window.dispatchEvent(new CustomEvent('mission-completed'));
