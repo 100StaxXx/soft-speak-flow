@@ -131,6 +131,9 @@ export const CompanionEvolution = ({
           gravity: 0.5,
           scalar: 2,
         });
+        
+        // Dispatch event for walkthrough after confetti
+        window.dispatchEvent(new CustomEvent('evolution-complete'));
       }, 2500),
       setTimeout(() => {
         setStage(4);
