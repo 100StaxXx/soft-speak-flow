@@ -367,7 +367,12 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: 'none',
+          display: stepIndex === 7 ? 'block' : 'none',
+          backgroundColor: 'hsl(var(--primary))',
+          padding: '0.75rem 2rem',
+          fontSize: '1rem',
+          fontWeight: 'bold',
+          borderRadius: '0.75rem',
         },
         buttonBack: {
           display: 'none',
