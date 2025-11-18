@@ -186,20 +186,40 @@ export default function Onboarding() {
   };
 
   const handleConfirmMentor = async () => {
-    if (!user || !recommendedMentor) return;
+    if (!user || !recommendedMentor) {
+      toast({
+        title: "Error",
+        description: "User or mentor information is missing",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setSelecting(true);
+      
+      console.log("Selecting mentor:", {
+        userId: user.id,
+        mentorId: recommendedMentor.id,
+        mentorName: recommendedMentor.name
+      });
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           selected_mentor_id: recommendedMentor.id,
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
+
+      console.log("Profile updated successfully:", data);
 
       // Invalidate profile cache
       await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
@@ -214,15 +234,19 @@ export default function Onboarding() {
       setStage('companion');
       
       // Save progress
-      await supabase
+      const { error: progressError } = await supabase
         .from("profiles")
         .update({ onboarding_step: 'companion' })
         .eq("id", user.id);
-    } catch (error) {
+        
+      if (progressError) {
+        console.error("Error saving onboarding progress:", progressError);
+      }
+    } catch (error: any) {
       console.error("Error selecting mentor:", error);
       toast({
         title: "Error",
-        description: "Failed to select mentor",
+        description: error?.message || "Failed to select mentor",
         variant: "destructive",
       });
     } finally {
