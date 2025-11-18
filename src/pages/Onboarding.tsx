@@ -5,6 +5,7 @@ import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
 import { MentorResult } from "@/components/MentorResult";
 import { MentorGrid } from "@/components/MentorGrid";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { NameInput } from "@/components/NameInput";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,7 @@ interface MentorExplanation {
 }
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'questionnaire' | 'result' | 'browse' | 'companion'>('questionnaire');
+  const [stage, setStage] = useState<'name' | 'questionnaire' | 'result' | 'browse' | 'companion'>('name');
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
@@ -66,6 +67,7 @@ export default function Onboarding() {
           mentorId?: string;
           mentorName?: string;
           explanation?: MentorExplanation;
+          userName?: string;
         } | null;
         
         if (profile.onboarding_step === 'mentor_reveal' && savedData?.mentorId) {
@@ -87,6 +89,8 @@ export default function Onboarding() {
           setStage('companion');
         } else if (profile.onboarding_step === 'browse') {
           setStage('browse');
+        } else if (profile.onboarding_step === 'questionnaire' && savedData?.userName) {
+          setStage('questionnaire');
         }
       }
     };
@@ -103,6 +107,51 @@ export default function Onboarding() {
     // Small delay to ensure UI state updates
     await new Promise((r) => setTimeout(r, 100));
     return true;
+  };
+
+  const handleNameSubmit = async (name: string) => {
+    if (!user) return;
+
+    try {
+      setSelecting(true);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .single();
+
+      const existingData = (profile?.onboarding_data as any) || {};
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_step: 'questionnaire',
+          onboarding_data: {
+            ...existingData,
+            userName: name,
+          },
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Welcome!",
+        description: `Nice to meet you, ${name}!`,
+      });
+
+      setStage('questionnaire');
+    } catch (error: any) {
+      console.error("Error saving name:", error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to save name",
+        variant: "destructive",
+      });
+    } finally {
+      setSelecting(false);
+    }
   };
 
   const handleQuestionnaireComplete = async (completedAnswers: Record<string, string>) => {
@@ -391,6 +440,13 @@ export default function Onboarding() {
 
   return (
     <>
+      {stage === "name" && (
+        <NameInput
+          onComplete={handleNameSubmit}
+          isLoading={selecting}
+        />
+      )}
+
       {stage === "questionnaire" && (
         <EnhancedQuestionnaire onComplete={handleQuestionnaireComplete} />
       )}
