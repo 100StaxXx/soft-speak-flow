@@ -157,31 +157,28 @@ const Auth = () => {
       {/* Current Quote Slide Only - Click anywhere to advance */}
       <section
         onClick={scrollToForm}
-        className="snap-start h-screen relative flex items-center justify-center cursor-pointer"
-        style={{
-          background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
-        }}
+        className="snap-start h-screen relative flex items-center justify-center cursor-pointer bg-gradient-to-br from-primary/10 via-background to-secondary/20"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(270_60%_50%/0.1),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15),transparent_50%)]" />
         
         <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
           <blockquote className="space-y-8">
             <p 
               key={`quote-${currentSlide}`}
-              className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight animate-fade-in"
+              className="text-4xl md:text-6xl lg:text-7xl font-heading text-foreground leading-tight animate-fade-in"
             >
               "{motivationalQuotes[currentSlide].quote}"
             </p>
             <footer 
               key={`author-${currentSlide}`}
-              className="text-2xl md:text-3xl text-royal-purple font-semibold animate-fade-in-delayed"
+              className="text-2xl md:text-3xl text-primary font-semibold animate-fade-in-delayed"
             >
               — {motivationalQuotes[currentSlide].author}
             </footer>
           </blockquote>
         </div>
 
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple">
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-primary">
           <ChevronDown className="w-12 h-12" />
         </div>
       </section>
@@ -189,16 +186,13 @@ const Auth = () => {
       {/* Auth Form Section */}
       <section
         id="auth-form"
-        className="snap-start min-h-screen relative flex items-center justify-center py-20"
-        style={{
-          background: `linear-gradient(180deg, hsl(0 0% 7%), hsl(270 50% 35% / 0.05))`,
-        }}
+        className="snap-start min-h-screen relative flex items-center justify-center py-20 bg-background"
       >
         <div className="w-full max-w-md px-6 space-y-8">
           <div className="space-y-6">
             <form onSubmit={handleAuth} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
+                <Label htmlFor="email" className="text-muted-foreground text-sm uppercase tracking-wide">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -206,11 +200,11 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                  className="bg-card border-primary/30 text-foreground h-12 focus:border-primary"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-steel text-sm uppercase tracking-wide">Password</Label>
+                <Label htmlFor="password" className="text-muted-foreground text-sm uppercase tracking-wide">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -218,12 +212,12 @@ const Auth = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                  className="bg-card border-primary/30 text-foreground h-12 focus:border-primary"
                 />
               </div>
               <Button
                 type="submit"
-                className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
+                className="w-full h-12 text-lg"
                 disabled={loading}
               >
                 {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
@@ -244,7 +238,7 @@ const Auth = () => {
                 type="button"
                 variant="outline"
                 onClick={() => handleOAuthSignIn('google')}
-                className="bg-obsidian/50 border-royal-purple/30 text-pure-white hover:bg-royal-purple/10 hover:border-royal-purple"
+                className="bg-card border-primary/30 text-foreground hover:bg-primary/10 hover:border-primary"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -258,7 +252,7 @@ const Auth = () => {
                 type="button"
                 variant="outline"
                 onClick={() => handleOAuthSignIn('apple')}
-                className="bg-obsidian/50 border-royal-purple/30 text-pure-white hover:bg-royal-purple/10 hover:border-royal-purple"
+                className="bg-card border-primary/30 text-foreground hover:bg-primary/10 hover:border-primary"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
@@ -271,7 +265,7 @@ const Auth = () => {
               <Button
                 variant="link"
                 onClick={() => setIsLogin(!isLogin)}
-                className="text-royal-purple hover:text-accent-purple"
+                className="text-primary hover:text-accent"
               >
                 {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
