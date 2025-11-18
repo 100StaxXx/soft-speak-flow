@@ -279,9 +279,9 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous={false}
+      continuous
       showProgress={false}
-      showSkipButton={false}
+      showSkipButton
       disableOverlayClose
       disableCloseOnEsc
       hideCloseButton
@@ -338,7 +338,7 @@ export const AppWalkthrough = () => {
       disableOverlay
       locale={{
         back: 'Back',
-        close: 'Close',
+        close: '',
         last: 'Finish',
         next: 'Next',
       }}
