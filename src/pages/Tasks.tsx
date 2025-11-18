@@ -18,6 +18,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { useCompanion } from "@/hooks/useCompanion";
+import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,8 @@ export default function Tasks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
+  const { companion } = useCompanion();
+  const { updateFocusFromHabit, updateEnergyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   
   // Calendar state for quest scheduling
@@ -146,6 +150,12 @@ export default function Tasks() {
           const habit = habits.find(h => h.id === habitId);
           const xpAmount = habit?.difficulty === 'easy' ? 5 : habit?.difficulty === 'hard' ? 20 : 10;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+          
+          // Update companion attributes
+          if (companion) {
+            await updateFocusFromHabit(companion.id);
+            await updateEnergyFromActivity(companion.id);
+          }
           
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
           haptics.success();
