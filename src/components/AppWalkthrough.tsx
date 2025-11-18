@@ -120,15 +120,16 @@ export const AppWalkthrough = () => {
       // Adjust companion page step (step 4) - position below companion image
       base[4] = {
         ...base[4],
-        placement: 'bottom',
+        placement: 'center',
         styles: {
           tooltip: {
             position: 'fixed',
             bottom: '180px',
             left: '50%',
-            transform: 'translateX(-50%)',
+            transform: 'translateX(-50%) !important',
             width: 'calc(100% - 2rem)',
             maxWidth: '400px',
+            margin: '0 auto',
           },
         },
       } as Step;
