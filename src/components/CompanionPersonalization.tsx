@@ -32,7 +32,7 @@ const ANIMALS = [
 const ELEMENTS = [
   { name: "Fire", emoji: "🔥", color: "text-orange-500" },
   { name: "Water", emoji: "💧", color: "text-blue-500" },
-  { name: "Earth", emoji: "🌍", color: "text-green-600" },
+  { name: "Earth", emoji: "🪨", color: "text-green-600" },
   { name: "Air", emoji: "💨", color: "text-cyan-400" },
   { name: "Lightning", emoji: "⚡", color: "text-yellow-400" },
   { name: "Ice", emoji: "❄️", color: "text-blue-300" },
