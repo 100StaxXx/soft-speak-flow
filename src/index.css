@@ -32,7 +32,7 @@ All colors MUST be HSL.
     --electric-purple: 280 90% 70%;
     --neon-glow: 270 100% 75%;
     
-    /* Primary RGB for effects */
+    /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
     
     /* Semantic Tokens */
