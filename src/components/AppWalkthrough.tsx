@@ -51,6 +51,13 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    styles: {
+      tooltip: {
+        left: '50%',
+        transform: 'translateX(-50%)',
+        maxWidth: '90vw',
+      }
+    }
   },
   
   // TASKS PAGE
