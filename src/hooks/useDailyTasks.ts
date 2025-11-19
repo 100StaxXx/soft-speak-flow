@@ -129,16 +129,35 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
+      // Check if task is completed - prevent deletion to avoid XP exploit
+      const { data: task } = await supabase
+        .from('daily_tasks')
+        .select('completed, completed_at')
+        .eq('id', taskId)
+        .single();
+      
+      if (task?.completed || task?.completed_at) {
+        throw new Error('Cannot delete completed quests. They\'re part of your journey!');
+      }
+
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
-        .eq('id', taskId);
+        .eq('id', taskId)
+        .eq('completed', false); // Extra safety: only delete if not completed
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      toast({ title: "Task deleted" });
+      toast({ title: "Quest deleted" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Cannot delete quest",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
