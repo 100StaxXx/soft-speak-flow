@@ -1700,6 +1700,7 @@ export type Database = {
           mind: number | null
           soul: number | null
           spirit_animal: string
+          story_tone: string
           updated_at: string
           user_id: string
         }
@@ -1718,6 +1719,7 @@ export type Database = {
           mind?: number | null
           soul?: number | null
           spirit_animal: string
+          story_tone?: string
           updated_at?: string
           user_id: string
         }
@@ -1736,6 +1738,7 @@ export type Database = {
           mind?: number | null
           soul?: number | null
           spirit_animal?: string
+          story_tone?: string
           updated_at?: string
           user_id?: string
         }

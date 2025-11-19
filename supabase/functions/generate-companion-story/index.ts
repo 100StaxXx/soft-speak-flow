@@ -188,7 +188,7 @@ serve(async (req) => {
   }
 
   try {
-    const { companionId, stage, tonePreference = 'heroic', themeIntensity = 'moderate' } = await req.json();
+    const { companionId, stage } = await req.json();
 
     if (!companionId || stage === undefined) {
       throw new Error('companionId and stage are required');
@@ -208,7 +208,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) throw new Error('Unauthorized');
 
-    // Get companion details
+    // Get companion details including story_tone
     const { data: companion, error: companionError } = await supabaseClient
       .from('user_companion')
       .select('*')
@@ -217,6 +217,9 @@ serve(async (req) => {
 
     if (companionError || !companion) throw new Error('Companion not found');
     if (companion.user_id !== user.id) throw new Error('Unauthorized');
+
+    // Use companion's stored tone preference
+    const tonePreference = companion.story_tone || 'epic_adventure';
 
     // Get user profile for personality and goals
     const { data: profile } = await supabaseClient
@@ -282,7 +285,6 @@ USER VARIABLES:
 - User Goal: ${userGoal}
 - Evolution Stage: ${stage} (${EVOLUTION_THEMES[stage]})
 - Tone: ${tonePreference}
-- Theme Intensity: ${themeIntensity}
 - Memory Notes: ${memoryNotes}
 
 STRUCTURE FOR EACH CHAPTER:
