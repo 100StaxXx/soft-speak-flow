@@ -339,6 +339,15 @@ All colors MUST be HSL.
   /* React Joyride Custom Styles - Border Pulse Only */
   .__floater__open {
     filter: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+
+  .react-joyride__tooltip {
+    opacity: 1 !important;
+    transition: none !important;
+    animation: none !important;
   }
 
   @keyframes spotlight-border-pulse {
