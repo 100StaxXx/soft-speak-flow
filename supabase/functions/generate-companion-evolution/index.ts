@@ -146,45 +146,85 @@ serve(async (req) => {
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    // 3. Fetch previous evolution image
-    let previousImageUrl = companion.current_image_url;
+    // Special handling for silhouette stages (0->1) and fresh baby start (1->2)
+    let userPrompt: string;
+    
+    if (nextStage === 1) {
+      // Stage 0 -> 1: Silhouette of stage 20 inside cracking egg
+      console.log("Creating stage 1 silhouette (preview of stage 20)");
+      userPrompt = `Create a mystical egg with luminous cracks spreading across its surface, leaking ${companion.core_element} energy. 
+Through the larger cracks, a dark shadowy silhouette is visible - showing only the magnificent outline of a powerful, ultimate form of a ${companion.spirit_animal} creature (what it would look like at its final evolution stage 20). 
 
-    if (!previousImageUrl) {
-      const { data: latestEvolution } = await supabase
-        .from("companion_evolutions")
-        .select("image_url")
-        .eq("companion_id", companion.id)
-        .order("evolved_at", { ascending: false })
-        .limit(1)
-        .single();
+The silhouette must be:
+- Completely dark and featureless (just a shadow/outline)
+- Show the basic majestic shape and powerful presence of an ultimate ${companion.spirit_animal}
+- Maintain the ${companion.core_element} elemental theme in the aura
+- Use ${companion.favorite_color} in the energy emanating from the cracks
+- Be large and imposing in shadow form, curled within the egg but clearly powerful
 
-      previousImageUrl = latestEvolution?.image_url;
-    }
+The egg itself should have the same mystical properties as stage 0, but now cracking with ${companion.core_element} light.`;
 
-    console.log("Previous image URL:", previousImageUrl);
+    } else if (nextStage === 2) {
+      // Stage 1 -> 2: Fresh baby start, NOT based on stage 1
+      console.log("Creating stage 2 baby (fresh start, not based on stage 1)");
+      userPrompt = `Create a tiny newborn ${companion.spirit_animal} that has just emerged from its egg, fragile and newborn.
 
-    let previousFeatures: any = {};
+This is a FRESH START - do not reference the previous silhouette image.
 
-    // 4a. Extract features from previous image using vision AI
-    if (previousImageUrl) {
-      console.log("Analyzing previous image with vision AI...");
+Requirements:
+- Anatomically accurate baby ${companion.spirit_animal}
+- Oversized curious eyes in ${companion.eye_color || companion.favorite_color} color
+- Soft, delicate body with early ${companion.fur_color || companion.favorite_color} coloring on fur/feathers/scales
+- Faint ${companion.core_element} aura flickering gently around it
+- Small, vulnerable, and adorable
+- Species-accurate features but in infant proportions
+- ${companion.favorite_color} tones should be subtle and natural
+
+The creature should look like it just hatched, still wet from the egg, taking its first curious look at the world.`;
+
+    } else {
+      // Stages 2+ use existing logic with image reference
+      console.log("Using existing evolution logic with image reference");
       
-      try {
-        const visionResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `Analyze this creature companion image in extreme detail. List:
+      // 3. Fetch previous evolution image
+      let previousImageUrl = companion.current_image_url;
+
+      if (!previousImageUrl) {
+        const { data: latestEvolution } = await supabase
+          .from("companion_evolutions")
+          .select("image_url")
+          .eq("companion_id", companion.id)
+          .order("evolved_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        previousImageUrl = latestEvolution?.image_url;
+      }
+
+      console.log("Previous image URL:", previousImageUrl);
+
+      let previousFeatures: any = {};
+
+      // 4a. Extract features from previous image using vision AI
+      if (previousImageUrl) {
+        console.log("Analyzing previous image with vision AI...");
+        
+        try {
+          const visionResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${lovableApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: `Analyze this creature companion image in extreme detail. List:
 1. Main color palette (exact colors, hex if possible)
 2. Secondary colors and accents
 3. Body silhouette (shape, proportions)
@@ -195,44 +235,44 @@ serve(async (req) => {
 8. Unique identifying marks or patterns
 
 Be extremely specific and detailed. This will be used to maintain 95% continuity in the next evolution.`
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: previousImageUrl
+                    },
+                    {
+                      type: "image_url",
+                      image_url: {
+                        url: previousImageUrl
+                      }
                     }
-                  }
-                ]
-              }
-            ]
-          })
-        });
+                  ]
+                }
+              ]
+            })
+          });
 
-        if (visionResponse.ok) {
-          const visionData = await visionResponse.json();
-          const analysisText = visionData.choices[0]?.message?.content;
-          previousFeatures.vision_analysis = analysisText;
-          console.log("Vision analysis complete");
+          if (visionResponse.ok) {
+            const visionData = await visionResponse.json();
+            const analysisText = visionData.choices[0]?.message?.content;
+            previousFeatures.vision_analysis = analysisText;
+            console.log("Vision analysis complete");
+          }
+        } catch (visionError) {
+          console.warn("Vision analysis failed, continuing with metadata only:", visionError);
         }
-      } catch (visionError) {
-        console.warn("Vision analysis failed, continuing with metadata only:", visionError);
       }
-    }
 
-    // 4b. Load stored metadata from database
-    const { data: metadata } = await supabase
-      .from("companion_evolutions")
-      .select("*")
-      .eq("companion_id", companion.id)
-      .eq("stage", currentStage)
-      .single();
+      // 4b. Load stored metadata from database
+      const { data: metadata } = await supabase
+        .from("companion_evolutions")
+        .select("*")
+        .eq("companion_id", companion.id)
+        .eq("stage", currentStage)
+        .single();
 
-    if (metadata) {
-      previousFeatures.stored_metadata = metadata;
-    }
+      if (metadata) {
+        previousFeatures.stored_metadata = metadata;
+      }
 
-    // 5. Build evolution prompt with ultra-strict continuity
-    const userPrompt = `Here is the previous evolution of this companion.
+      // 5. Build evolution prompt with ultra-strict continuity
+      userPrompt = `Here is the previous evolution of this companion.
 
 PREVIOUS STAGE ANALYSIS:
 ${previousFeatures.vision_analysis || "No previous image available - this is the first evolution"}
@@ -265,6 +305,7 @@ Focus on:
 - Same elemental effects (enhanced but same location)
 
 Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
+    }
 
     console.log("Generating evolution image...");
 
