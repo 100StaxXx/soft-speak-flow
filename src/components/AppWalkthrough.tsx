@@ -82,6 +82,8 @@ const WALKTHROUGH_STEPS: Step[] = [
         mixBlendMode: 'normal' as const,
       },
       tooltip: {
+        left: '50% !important' as any,
+        transform: 'translateX(-50%) !important' as any,
         minWidth: '300px',
         maxWidth: '85vw',
         padding: '1.5rem',
