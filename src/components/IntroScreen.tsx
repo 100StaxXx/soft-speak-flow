@@ -14,7 +14,8 @@ export const IntroScreen = ({ onComplete }: IntroScreenProps) => {
     }, 4000);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!show) return null;
 
