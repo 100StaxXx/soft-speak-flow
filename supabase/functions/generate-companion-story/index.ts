@@ -6,6 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to convert hex colors to descriptive names
+function getColorName(hexColor: string): string {
+  // Remove # if present
+  const hex = hexColor.replace('#', '').toLowerCase();
+  
+  const colorMap: Record<string, string> = {
+    '9333ea': 'purple',
+    '8b5cf6': 'violet', 
+    'a855f7': 'purple',
+    '6366f1': 'indigo',
+    '3b82f6': 'blue',
+    '0ea5e9': 'sky blue',
+    '06b6d4': 'cyan',
+    '14b8a6': 'teal',
+    '10b981': 'emerald',
+    '22c55e': 'green',
+    '84cc16': 'lime',
+    'eab308': 'yellow',
+    'f59e0b': 'amber',
+    'f97316': 'orange',
+    'ef4444': 'red',
+    'ec4899': 'pink',
+    'f43f5e': 'rose',
+  };
+  
+  // Return mapped color or extract RGB to approximate
+  if (colorMap[hex]) return colorMap[hex];
+  
+  // Parse RGB values to determine general color
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  if (r > g && r > b) return 'red';
+  if (g > r && g > b) return 'green';
+  if (b > r && b > g) return 'blue';
+  if (r > 200 && g > 200 && b > 200) return 'white';
+  if (r < 50 && g < 50 && b < 50) return 'black';
+  return 'vibrant';
+}
+
 const EVOLUTION_THEMES = [
   "Fate sleeping",
   "Awakening",
@@ -221,9 +262,9 @@ USER VARIABLES:
 - Creature Species: ${companion.spirit_animal}
 - Species Traits: ${speciesTraits}
 - Element: ${companion.core_element}
-- Primary Color: ${companion.favorite_color}
-- Secondary Color: ${companion.fur_color || companion.favorite_color}
-- Eye Color: ${companion.eye_color || `glowing ${companion.favorite_color}`}
+- Primary Color: A vibrant ${getColorName(companion.favorite_color)} hue
+- Secondary Color: ${companion.fur_color ? `A ${getColorName(companion.fur_color)} tone` : `A ${getColorName(companion.favorite_color)} tone`}
+- Eye Color: ${companion.eye_color ? getColorName(companion.eye_color) : `glowing ${getColorName(companion.favorite_color)}`}
 - Creature Personality: ${creaturePersonality}
 - User Personality: ${userPersonality}
 - User Goal: ${userGoal}
