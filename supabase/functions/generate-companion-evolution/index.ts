@@ -6,8 +6,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// XP thresholds for each evolution stage
-const EVOLUTION_THRESHOLDS = [0, 20, 60, 120, 250, 500, 1200, 2000, 3500, 5500, 8000, 12000, 18000, 25000, 35000];
+// XP thresholds for each evolution stage - MUST match useCompanion.ts
+const EVOLUTION_THRESHOLDS = {
+  0: 0,       // Dormant Egg
+  1: 10,      // Cracking Awakening (Tutorial-optimized)
+  2: 30,      // Newborn Emergence
+  3: 60,      // Early Infant
+  4: 100,     // Juvenile Form
+  5: 150,     // Young Explorer
+  6: 210,     // Adolescent Guardian
+  7: 280,     // Initiate Protector
+  8: 360,     // Seasoned Guardian
+  9: 450,     // Mature Protector
+  10: 550,    // Veteran Form (achievable in 2-3 months)
+  11: 700,    // Elevated Form (endgame begins)
+  12: 900,    // Ascended Form
+  13: 1150,   // Ether-Born Avatar
+  14: 1450,   // Primordial Aspect
+  15: 1800,   // Colossus Form
+  16: 2250,   // Cosmic Guardian
+  17: 2800,   // Astral Overlord
+  18: 3500,   // Universal Sovereign
+  19: 4400,   // Mythic Apex
+  20: 5500,   // Origin of Creation (ultimate form)
+} as const;
 
 const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
 Your TOP PRIORITY is absolute visual continuity with the previous evolution.
@@ -98,14 +120,15 @@ serve(async (req) => {
     console.log("Current stage:", currentStage, "XP:", currentXP);
 
     // 2. Determine if evolution is needed
-    if (currentStage >= EVOLUTION_THRESHOLDS.length - 1) {
+    const maxStage = 20;
+    if (currentStage >= maxStage) {
       return new Response(
         JSON.stringify({ evolved: false, message: "Max stage reached", current_stage: currentStage, xp: currentXP }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const nextThreshold = EVOLUTION_THRESHOLDS[currentStage + 1];
+    const nextThreshold = EVOLUTION_THRESHOLDS[currentStage + 1 as keyof typeof EVOLUTION_THRESHOLDS];
     
     if (currentXP < nextThreshold) {
       return new Response(
@@ -369,23 +392,29 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
 });
 
 function getStageGuidance(stage: number): string {
-  const guidance = [
-    "A tiny newborn form, just emerged, fragile but alive",
-    "Small infant form, gaining stability",
-    "Young creature, playful and growing",
-    "Juvenile form with developing features",
-    "Adolescent with strengthening presence",
-    "Young adult, confident and capable",
-    "Mature guardian, powerful and poised",
-    "Seasoned protector, battle-tested",
-    "Veteran form, wise and formidable",
-    "Elevated being, touching ethereal power",
-    "Ascended form, radiating mastery",
-    "Legendary avatar, commanding presence",
-    "Mythic entity, transcendent power",
-    "Ultimate form, peak of evolution",
-    "Divine manifestation, apex existence"
-  ];
+  const guidance: Record<number, string> = {
+    0: "A small mystical egg with faint elemental glow",
+    1: "Egg cracking with energy leaking out",
+    2: "A tiny newborn creature, fragile but alive",
+    3: "Small infant form, gaining stability",
+    4: "Young creature, playful and growing",
+    5: "Juvenile with developing features",
+    6: "Adolescent with strengthening presence",
+    7: "Young adult, confident and capable",
+    8: "Mature guardian, powerful and poised",
+    9: "Seasoned protector, battle-tested",
+    10: "Veteran form, wise and formidable",
+    11: "Elevated being, touching ethereal power",
+    12: "Ascended form, radiating mastery",
+    13: "Legendary avatar, commanding presence",
+    14: "Mythic entity, transcendent power",
+    15: "Colossus form, immense presence",
+    16: "Cosmic guardian, stellar energy",
+    17: "Astral overlord, reality-bending",
+    18: "Universal sovereign, cosmic authority",
+    19: "Mythic apex, near-divine",
+    20: "Ultimate form, peak of evolution - divine manifestation"
+  };
 
   return guidance[stage] || "Continued evolution";
 }
