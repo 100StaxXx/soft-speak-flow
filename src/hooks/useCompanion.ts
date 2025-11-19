@@ -281,28 +281,40 @@ export const useCompanion = () => {
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests
       if (evolutionInProgress.current) {
-        throw new Error('Evolution in progress');
+        console.log('Evolution already in progress, skipping');
+        return null; // Return null instead of throwing
       }
       evolutionInProgress.current = true;
       
-      if (!user || !companion) throw new Error("No companion found");
+      if (!user || !companion) {
+        evolutionInProgress.current = false;
+        throw new Error("No companion found");
+      }
 
       setIsEvolvingLoading(true);
 
-      // Call the new evolution edge function with strict continuity
-      const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
-        "generate-companion-evolution",
-        {
-          body: {
-            userId: user.id,
-          },
-        }
-      );
+      try {
+        // Call the new evolution edge function with strict continuity
+        const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
+          "generate-companion-evolution",
+          {
+            body: {
+              userId: user.id,
+            },
+          }
+        );
 
-      if (evolutionError) throw evolutionError;
-      if (!evolutionData?.evolved) {
-        throw new Error(evolutionData?.error || "Evolution not triggered");
-      }
+        if (evolutionError) {
+          evolutionInProgress.current = false;
+          throw evolutionError;
+        }
+        
+        if (!evolutionData?.evolved) {
+          evolutionInProgress.current = false;
+          setIsEvolvingLoading(false);
+          console.log('Evolution not triggered:', evolutionData?.message);
+          return null; // Return null instead of throwing when evolution isn't needed
+        }
 
       const evolutionId = evolutionData.evolution_id;
 
@@ -369,15 +381,23 @@ export const useCompanion = () => {
         });
       }
 
-      return evolutionData.image_url;
+        return evolutionData.image_url;
+      } catch (error) {
+        evolutionInProgress.current = false;
+        setIsEvolvingLoading(false);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (imageUrl) => {
       evolutionInProgress.current = false;
-      // Don't hide overlay here - let CompanionEvolution handle it
-      // The overlay will remain visible until the animation completes
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+      // Only invalidate queries if evolution actually happened
+      if (imageUrl) {
+        // Don't hide overlay here - let CompanionEvolution handle it
+        // The overlay will remain visible until the animation completes
+        queryClient.invalidateQueries({ queryKey: ["companion"] });
+        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+        queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+      }
     },
     onError: (error) => {
       evolutionInProgress.current = false;
