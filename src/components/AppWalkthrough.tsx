@@ -74,34 +74,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: 'center',
     disableBeacon: true,
     spotlightClicks: false,
-    styles: {
-      options: {
-        zIndex: 100000,
-      },
-      overlay: {
-        mixBlendMode: 'normal' as const,
-      },
-      tooltip: {
-        position: 'fixed' as const,
-        top: '50% !important' as any,
-        left: '50% !important' as any,
-        transform: 'translate(-50%, -50%) !important' as any,
-        margin: '0 !important' as any,
-        width: 'auto',
-        minWidth: '300px',
-        maxWidth: '85vw',
-        padding: '1.5rem',
-        borderRadius: '1.25rem',
-        border: '3px solid hsl(var(--primary))',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
-      },
-      tooltipContent: {
-        fontSize: '1rem',
-        lineHeight: '1.6',
-        padding: '0.5rem 0',
-        textAlign: 'left' as const,
-      }
-    }
   },
   {
     target: 'body',
@@ -124,6 +96,34 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
+
+  // Custom tooltip for quest creation step
+  const CustomQuestTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
+    if (index !== 6) return null;
+    
+    return (
+      <Card 
+        {...tooltipProps}
+        className="border-[3px] border-primary shadow-2xl"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 100000,
+          maxWidth: '85vw',
+          width: '400px',
+          pointerEvents: 'none',
+        }}
+      >
+        <div className="p-6 text-center space-y-4">
+          <div className="text-base leading-relaxed">
+            {step.content}
+          </div>
+        </div>
+      </Card>
+    );
+  }, []);
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
@@ -507,7 +507,7 @@ export const AppWalkthrough = () => {
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
-      tooltipComponent={stepIndex === 7 ? CustomFinalTooltip : undefined}
+      tooltipComponent={stepIndex === 6 ? CustomQuestTooltip : stepIndex === 7 ? CustomFinalTooltip : undefined}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
