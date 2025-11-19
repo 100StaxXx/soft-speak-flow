@@ -7,9 +7,11 @@ import { useEffect, Suspense, lazy, memo } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { useProfile } from "@/hooks/useProfile";
+import { useCompanion } from "@/hooks/useCompanion";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
@@ -75,12 +77,14 @@ function ScrollToTop() {
 
 const AppContent = memo(() => {
   const { profile } = useProfile();
+  const { isEvolvingLoading } = useCompanion();
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
       <XPProvider>
         <Suspense fallback={<LoadingFallback />}>
           <GlobalEvolutionListener />
+          <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
           <AppWalkthrough />
           <Routes>
           <Route path="/auth" element={<Auth />} />
