@@ -6,8 +6,9 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { useEffect, Suspense, lazy, memo } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
+import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { useProfile } from "@/hooks/useProfile";
-import { useCompanion } from "@/hooks/useCompanion";
+import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
@@ -77,7 +78,7 @@ function ScrollToTop() {
 
 const AppContent = memo(() => {
   const { profile } = useProfile();
-  const { isEvolvingLoading } = useCompanion();
+  const { isEvolvingLoading } = useEvolution();
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
@@ -122,15 +123,17 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <InstallPWA />
-          <BrowserRouter>
-            <ScrollToTop />
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
+        <EvolutionProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <InstallPWA />
+            <BrowserRouter>
+              <ScrollToTop />
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </EvolutionProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

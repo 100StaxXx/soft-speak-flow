@@ -4,13 +4,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
-import { useCompanion } from "@/hooks/useCompanion";
+import { useEvolution } from "@/contexts/EvolutionContext";
 
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
-  const { isEvolvingLoading, setIsEvolvingLoading } = useCompanion() as any;
+  const { setIsEvolvingLoading } = useEvolution();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
@@ -99,9 +99,7 @@ export const GlobalEvolutionListener = () => {
         setEvolutionData(null);
         setPreviousStage(null);
         // Hide overlay after evolution animation completes
-        if (setIsEvolvingLoading) {
-          setIsEvolvingLoading(false);
-        }
+        setIsEvolvingLoading(false);
       }}
     />
   );
