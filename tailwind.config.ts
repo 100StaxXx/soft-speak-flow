@@ -152,6 +152,9 @@ export default {
         "bounce-subtle": "bounce-subtle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "breathe": "breathe 4s ease-in-out infinite",
       },
+      perspective: {
+        "1000": "1000px",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
