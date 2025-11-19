@@ -63,7 +63,10 @@ const Index = () => {
   useEffect(() => {
     if (!user || companionLoading) return;
     
-    if (profile) {
+    // Check localStorage first to avoid race conditions with profile updates
+    const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
+    
+    if (profile && !onboardingComplete) {
       // If onboarding is not complete or user has no mentor, redirect to onboarding
       if (!profile.onboarding_completed || !profile.selected_mentor_id) {
         navigate("/onboarding");
