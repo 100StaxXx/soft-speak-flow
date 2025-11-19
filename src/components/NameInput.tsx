@@ -47,7 +47,7 @@ export const NameInput = ({ onComplete, isLoading }: NameInputProps) => {
         <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <div className="space-y-3">
             <Label htmlFor="name" className="text-base font-semibold text-foreground/90">
-              Your name, traveler
+              What do we call you?
             </Label>
             <Input
               id="name"
