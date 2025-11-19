@@ -112,11 +112,34 @@ export const useCompanion = () => {
               },
             }
           );
-          if (error) throw error;
+          
+          // Handle specific error codes from edge function
+          if (error) {
+            if (error.message?.includes("INSUFFICIENT_CREDITS") || error.message?.includes("Insufficient AI credits")) {
+              throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
+            }
+            if (error.message?.includes("RATE_LIMITED") || error.message?.includes("AI service is currently busy")) {
+              throw new Error("The service is currently busy. Please wait a moment and try again.");
+            }
+            throw error;
+          }
+          
           if (!imageResult?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
           return imageResult;
         },
-        { maxAttempts: 3, initialDelay: 2000 }
+        { 
+          maxAttempts: 3, 
+          initialDelay: 2000,
+          shouldRetry: (error: any) => {
+            // Don't retry on payment/credits errors
+            if (error?.message?.includes("INSUFFICIENT_CREDITS") || 
+                error?.message?.includes("temporarily unavailable") ||
+                error?.message?.includes("contact support")) {
+              return false;
+            }
+            return true;
+          }
+        }
       );
 
       if (!imageData?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
