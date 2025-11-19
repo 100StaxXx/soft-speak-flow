@@ -43,6 +43,11 @@ export const useDailyMissions = () => {
       const mission = missions?.find(m => m.id === missionId);
       if (!mission) throw new Error("Mission not found");
 
+      // Check if already completed to prevent XP spam
+      if (mission.completed) {
+        throw new Error("Mission already completed");
+      }
+
       const { data, error } = await supabase
         .from('daily_missions')
         .update({ 
@@ -50,10 +55,12 @@ export const useDailyMissions = () => {
           completed_at: new Date().toISOString() 
         })
         .eq('id', missionId)
+        .eq('completed', false) // Only update if not already completed
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Mission already completed");
       
       // Award XP with display reason
       await awardCustomXP(mission.xp_reward, `mission_${mission.mission_type}`, "Mission Complete!");

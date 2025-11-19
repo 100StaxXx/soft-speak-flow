@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,8 @@ import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function Tasks() {
   const { user } = useAuth();
@@ -356,7 +358,7 @@ export default function Tasks() {
               <div className="space-y-2">
                 {tasks.length === 0 ? (
                   <EmptyState 
-                    icon={Calendar}
+                    icon={Target}
                     title="No quests yet"
                     description="Add up to 3 quests to focus on today"
                   />
