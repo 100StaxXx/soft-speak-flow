@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -14,6 +15,19 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Duck ambient music when playing
+  useEffect(() => {
+    if (isPlaying) {
+      duckAmbient();
+    } else {
+      unduckAmbient();
+    }
+
+    return () => {
+      unduckAmbient();
+    };
+  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
