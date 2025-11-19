@@ -136,9 +136,13 @@ export const DailyMissions = () => {
                     variant="outline"
                     onClick={() => handleComplete(mission.id)}
                     disabled={isCompleting}
-                    className="transition-transform hover:scale-105 active:scale-95 hover:bg-accent/10 hover:border-accent/60"
+                    className="transition-transform hover:scale-105 active:scale-95 hover:bg-accent/10 hover:border-accent/60 min-w-[90px]"
                   >
-                    Complete
+                    {isCompleting ? (
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                    ) : (
+                      "Complete"
+                    )}
                   </Button>
                 )}
               </div>

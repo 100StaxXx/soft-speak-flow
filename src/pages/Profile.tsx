@@ -26,6 +26,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("account");
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isChangingMentor, setIsChangingMentor] = useState(false);
 
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
     queryKey: ["adaptive-push-settings", user?.id],
@@ -91,7 +93,8 @@ const Profile = () => {
   };
 
   const handleChangeMentor = async (mentorId: string) => {
-    if (!user) return;
+    if (!user || isChangingMentor) return;
+    setIsChangingMentor(true);
     try {
       const { error } = await supabase
         .from("profiles")
@@ -102,6 +105,19 @@ const Profile = () => {
       window.location.reload();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsChangingMentor(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      navigate("/auth");
+    } catch (error: any) {
+      toast({ title: "Error signing out", description: error.message, variant: "destructive" });
+      setIsSigningOut(false);
     }
   };
 
@@ -119,10 +135,6 @@ const Profile = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
-  };
 
   if (!user) {
     return (
@@ -233,8 +245,10 @@ const Profile = () => {
                       </div>
                     </div>
                   )}
-                  <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor}>
-                    <SelectTrigger><SelectValue placeholder="Select a mentor" /></SelectTrigger>
+                  <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor} disabled={isChangingMentor}>
+                    <SelectTrigger disabled={isChangingMentor}>
+                      <SelectValue placeholder={isChangingMentor ? "Changing mentor..." : "Select a mentor"} />
+                    </SelectTrigger>
                     <SelectContent>
                       {mentors?.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
                     </SelectContent>
@@ -257,8 +271,14 @@ const Profile = () => {
                 </CardContent>
               </Card>
 
-              <Button onClick={handleSignOut} variant="outline" className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                <LogOut className="h-4 w-4 mr-2" />Sign Out
+              <Button 
+                onClick={handleSignOut} 
+                variant="outline" 
+                className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                disabled={isSigningOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {isSigningOut ? "Signing out..." : "Sign Out"}
               </Button>
             </TabsContent>
 
