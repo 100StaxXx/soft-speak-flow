@@ -144,19 +144,22 @@ export const useCompanion = () => {
         xp_at_evolution: 0,
       });
 
-      // Generate the first chapter of the companion's story
-      try {
-        await supabase.functions.invoke('generate-companion-story', {
-          body: {
-            companionId: companionData.id,
-            userId: user.id,
-            stage: 0
-          }
-        });
-      } catch (storyError) {
-        console.error("Error generating initial companion story:", storyError);
+      // Auto-generate the first chapter of the companion's story in background
+      supabase.functions.invoke('generate-companion-story', {
+        body: {
+          companionId: companionData.id,
+          stage: 0,
+          tonePreference: "heroic",
+          themeIntensity: "moderate",
+        }
+      }).then(() => {
+        console.log("Stage 0 story generation started");
+        queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      }).catch((storyError) => {
+        console.error("Failed to auto-generate stage 0 story:", storyError);
         // Don't fail companion creation if story generation fails
-      }
+      });
 
       return companionData;
     },
@@ -297,8 +300,12 @@ export const useCompanion = () => {
             tonePreference: "heroic",
             themeIntensity: "moderate",
           },
+        }).then(() => {
+          console.log(`Stage ${newStage} story generation started`);
+          queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+          queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
         }).catch((error) => {
-          console.error("Failed to auto-generate story:", error);
+          console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
           // Don't throw - story generation is not critical to evolution
         });
       }
