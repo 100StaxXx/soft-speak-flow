@@ -23,7 +23,7 @@ const Companion = () => {
   // Companion is always created during onboarding, so no need for fallback UI here
 
   return (
-    <PageTransition>
+      <PageTransition>
       <CompanionErrorBoundary>
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -98,11 +98,10 @@ const Companion = () => {
             </TabsContent>
           </Tabs>
         </div>
-
-        <BottomNav />
       </div>
       </CompanionErrorBoundary>
-    </PageTransition>
+      <BottomNav />
+      </PageTransition>
   );
 };
 

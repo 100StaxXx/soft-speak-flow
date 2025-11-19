@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
-import { useRef } from "react";
+import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
 export interface Companion {
@@ -69,7 +69,7 @@ export const useCompanion = () => {
   const evolutionInProgress = useRef(false);
   const xpInProgress = useRef(false);
 
-  const { data: companion, isLoading } = useQuery({
+  const { data: companion, isLoading, error } = useQuery({
     queryKey: ["companion", user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -84,6 +84,8 @@ export const useCompanion = () => {
       return data as Companion | null;
     },
     enabled: !!user,
+    staleTime: 30000, // 30 seconds - prevents unnecessary refetches
+    retry: 2,
   });
 
   const createCompanion = useMutation({
@@ -415,17 +417,21 @@ export const useCompanion = () => {
     },
   });
 
-  const nextEvolutionXP = companion
-    ? EVOLUTION_THRESHOLDS[(companion.current_stage + 1) as keyof typeof EVOLUTION_THRESHOLDS]
-    : null;
+  // Memoize calculated values to prevent unnecessary recalculations
+  const nextEvolutionXP = useMemo(() => {
+    if (!companion) return null;
+    return EVOLUTION_THRESHOLDS[(companion.current_stage + 1) as keyof typeof EVOLUTION_THRESHOLDS];
+  }, [companion?.current_stage]);
 
-  const progressToNext = companion && nextEvolutionXP
-    ? ((companion.current_xp / nextEvolutionXP) * 100)
-    : 0;
+  const progressToNext = useMemo(() => {
+    if (!companion || !nextEvolutionXP) return 0;
+    return ((companion.current_xp / nextEvolutionXP) * 100);
+  }, [companion?.current_xp, nextEvolutionXP]);
 
   return {
     companion,
     isLoading,
+    error,
     createCompanion,
     awardXP,
     evolveCompanion,

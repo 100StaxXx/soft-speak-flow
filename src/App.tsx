@@ -76,17 +76,29 @@ function ScrollToTop() {
   return null;
 }
 
+// Separate component for evolution-aware features
+const EvolutionAwareContent = memo(() => {
+  const { isEvolvingLoading } = useEvolution();
+  
+  return (
+    <>
+      <GlobalEvolutionListener />
+      <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
+      <AppWalkthrough />
+    </>
+  );
+});
+
+EvolutionAwareContent.displayName = 'EvolutionAwareContent';
+
 const AppContent = memo(() => {
   const { profile } = useProfile();
-  const { isEvolvingLoading } = useEvolution();
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
       <XPProvider>
         <Suspense fallback={<LoadingFallback />}>
-          <GlobalEvolutionListener />
-          <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
-          <AppWalkthrough />
+          <EvolutionAwareContent />
           <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
@@ -113,6 +125,8 @@ const AppContent = memo(() => {
     </ThemeProvider>
   );
 });
+
+AppContent.displayName = 'AppContent';
 
 const App = () => {
   useEffect(() => {
