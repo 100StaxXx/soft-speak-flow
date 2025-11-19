@@ -39,21 +39,20 @@ export const EvolutionCardGallery = () => {
 
       if (error) throw error;
       
-      const mappedCards = (data || []).map(card => {
-        const evolutionImageUrl = (card as any).companion_evolutions?.image_url;
-        console.log('Card mapping:', {
-          stage: card.evolution_stage,
-          cardImageUrl: card.image_url,
-          evolutionImageUrl,
-          finalImageUrl: card.image_url || evolutionImageUrl
-        });
-        return {
-          ...card,
-          image_url: card.image_url || evolutionImageUrl
-        };
-      }) as EvolutionCard[];
+      // Deduplicate cards by card_id to prevent duplicates
+      const uniqueCards = new Map<string, any>();
+      (data || []).forEach(card => {
+        if (!uniqueCards.has(card.card_id)) {
+          const evolutionImageUrl = (card as any).companion_evolutions?.image_url;
+          uniqueCards.set(card.card_id, {
+            ...card,
+            image_url: card.image_url || evolutionImageUrl
+          });
+        }
+      });
       
-      console.log('Total cards fetched:', mappedCards.length);
+      const mappedCards = Array.from(uniqueCards.values()) as EvolutionCard[];
+      console.log('Total unique cards:', mappedCards.length);
       return mappedCards;
     },
     enabled: !!user,
