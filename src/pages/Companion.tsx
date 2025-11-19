@@ -14,7 +14,7 @@ import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, History, TrendingUp, BookOpen, Sparkles } from "lucide-react";
+import { Trophy, TrendingUp, BookOpen, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 
 const Companion = () => {
@@ -49,7 +49,7 @@ const Companion = () => {
           </div>
 
           <Tabs defaultValue="progress" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 h-auto">
+            <TabsList className="grid w-full grid-cols-4 h-auto">
               <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="progress-tab">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Progress</span>
@@ -65,10 +65,6 @@ const Companion = () => {
               <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="achievements-tab">
                 <Trophy className="h-4 w-4" />
                 <span className="hidden sm:inline">Achievements</span>
-              </TabsTrigger>
-              <TabsTrigger value="evolution" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="evolution-tab">
-                <History className="h-4 w-4" />
-                <span className="hidden sm:inline">Evolution</span>
               </TabsTrigger>
             </TabsList>
 
@@ -90,7 +86,16 @@ const Companion = () => {
             </TabsContent>
 
             <TabsContent value="cards" className="space-y-6 mt-6">
-              <EvolutionCardGallery />
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Evolution Cards</h3>
+                  <EvolutionCardGallery />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Evolution History</h3>
+                  {companion && <CompanionEvolutionHistory companionId={companion.id} />}
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="story" className="space-y-6 mt-6">
@@ -99,10 +104,6 @@ const Companion = () => {
 
             <TabsContent value="achievements" className="space-y-6 mt-6">
               <AchievementsPanel />
-            </TabsContent>
-
-            <TabsContent value="evolution" className="space-y-6 mt-6">
-              {companion && <CompanionEvolutionHistory companionId={companion.id} />}
             </TabsContent>
           </Tabs>
         </div>
