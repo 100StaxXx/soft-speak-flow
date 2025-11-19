@@ -115,7 +115,24 @@ export const TodaysPepTalk = () => {
     runSync();
   }, [pepTalk?.id]);
 
-
+  // Check if XP was already awarded for this specific pep talk
+  useEffect(() => {
+    const checkXPStatus = async () => {
+      if (!pepTalk?.id || !profile?.id) return;
+      
+      const { data } = await supabase
+        .from('xp_events')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('event_type', 'pep_talk_listen')
+        .eq('event_metadata->>pep_talk_id', pepTalk.id)
+        .maybeSingle();
+      
+      setHasAwardedXP(!!data);
+    };
+    
+    checkXPStatus();
+  }, [pepTalk?.id, profile?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -125,8 +142,8 @@ export const TodaysPepTalk = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
       
-      // Award XP when user has listened to 80% of the pep talk
-      if (!hasAwardedXP && duration > 0 && time >= duration * 0.8) {
+      // Award XP when user has listened to 80% (only once per pep talk)
+      if (!hasAwardedXP && duration > 0 && time >= duration * 0.8 && pepTalk?.id && profile?.id) {
         setHasAwardedXP(true);
         awardPepTalkListened();
       }
@@ -157,7 +174,7 @@ export const TodaysPepTalk = () => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk?.transcript, activeWordIndex]);
+  }, [pepTalk?.transcript, activeWordIndex, hasAwardedXP, duration, awardPepTalkListened, pepTalk?.id, profile?.id]);
 
   // Auto-scroll to active word
   useEffect(() => {
