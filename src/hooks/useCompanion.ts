@@ -274,13 +274,46 @@ export const useCompanion = () => {
         .eq("stage", newStage)
         .maybeSingle();
 
+      let evolutionId;
       if (!existingEvolution) {
-        await supabase.from("companion_evolutions").insert({
-          companion_id: companion.id,
-          stage: newStage,
-          image_url: imageData.imageUrl,
-          xp_at_evolution: currentXP,
+        const { data: newEvolution, error: evolutionError } = await supabase
+          .from("companion_evolutions")
+          .insert({
+            companion_id: companion.id,
+            stage: newStage,
+            image_url: imageData.imageUrl,
+            xp_at_evolution: currentXP,
+          })
+          .select()
+          .single();
+
+        if (evolutionError) throw evolutionError;
+        evolutionId = newEvolution.id;
+      } else {
+        evolutionId = existingEvolution.id;
+      }
+
+      // Generate evolution card
+      try {
+        await supabase.functions.invoke("generate-evolution-card", {
+          body: {
+            companionId: companion.id,
+            evolutionId: evolutionId,
+            stage: newStage,
+            species: companion.spirit_animal,
+            element: companion.core_element,
+            color: companion.favorite_color,
+            userAttributes: {
+              energy: companion.energy || 0,
+              resilience: companion.resilience || 0,
+              focus: companion.focus || 0,
+              balance: companion.balance || 0,
+            },
+          },
         });
+      } catch (cardError) {
+        console.error("Failed to generate evolution card:", cardError);
+        // Don't fail the evolution if card generation fails
       }
 
       // Auto-generate story chapter for this evolution stage

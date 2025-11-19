@@ -358,6 +358,94 @@ export type Database = {
         }
         Relationships: []
       }
+      companion_evolution_cards: {
+        Row: {
+          bond_level: number | null
+          card_id: string
+          companion_id: string
+          created_at: string | null
+          creature_name: string
+          element: string
+          evolution_id: string
+          evolution_stage: number
+          frame_type: string
+          generated_at: string | null
+          id: string
+          image_url: string | null
+          lore_seed: string
+          rarity: string
+          species: string
+          stats: Json
+          story_text: string
+          traits: string[] | null
+          user_id: string
+        }
+        Insert: {
+          bond_level?: number | null
+          card_id: string
+          companion_id: string
+          created_at?: string | null
+          creature_name: string
+          element: string
+          evolution_id: string
+          evolution_stage: number
+          frame_type: string
+          generated_at?: string | null
+          id?: string
+          image_url?: string | null
+          lore_seed: string
+          rarity: string
+          species: string
+          stats?: Json
+          story_text: string
+          traits?: string[] | null
+          user_id: string
+        }
+        Update: {
+          bond_level?: number | null
+          card_id?: string
+          companion_id?: string
+          created_at?: string | null
+          creature_name?: string
+          element?: string
+          evolution_id?: string
+          evolution_stage?: number
+          frame_type?: string
+          generated_at?: string | null
+          id?: string
+          image_url?: string | null
+          lore_seed?: string
+          rarity?: string
+          species?: string
+          stats?: Json
+          story_text?: string
+          traits?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_evolution_cards_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_evolution_cards_evolution_id_fkey"
+            columns: ["evolution_id"]
+            isOneToOne: false
+            referencedRelation: "companion_evolutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_evolution_cards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_evolutions: {
         Row: {
           companion_id: string
