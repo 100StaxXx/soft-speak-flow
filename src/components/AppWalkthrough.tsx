@@ -51,6 +51,9 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    floaterProps: {
+      hideArrow: true,
+    },
     styles: {
       tooltip: {
         left: '50%',
