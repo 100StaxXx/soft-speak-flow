@@ -83,10 +83,11 @@ const WALKTHROUGH_STEPS: Step[] = [
       },
       tooltip: {
         position: 'fixed',
-        top: '20px',
+        top: '50%',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: 'translate(-50%, -50%)',
         maxWidth: '90vw',
+        width: 'auto',
         marginTop: '0',
       }
     }
