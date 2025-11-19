@@ -30,9 +30,27 @@ export const TodaysPepTalk = () => {
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [hasAwardedXP, setHasAwardedXP] = useState(false);
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+
+  // Track walkthrough state
+  useEffect(() => {
+    const checkWalkthrough = () => {
+      setIsWalkthroughActive(Boolean(localStorage.getItem('appWalkthroughActive')));
+    };
+
+    checkWalkthrough();
+    
+    // Listen for walkthrough state changes
+    const handleTutorialChange = () => checkWalkthrough();
+    window.addEventListener('tutorial-step-change', handleTutorialChange);
+    
+    return () => {
+      window.removeEventListener('tutorial-step-change', handleTutorialChange);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
@@ -300,7 +318,8 @@ export const TodaysPepTalk = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(-10)}
-                className="h-10 w-10 rounded-full hover:bg-primary/20"
+                disabled={isWalkthroughActive}
+                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipBack className="h-4 w-4" />
               </Button>
@@ -308,7 +327,8 @@ export const TodaysPepTalk = () => {
               <Button
                 size="icon"
                 onClick={togglePlayPause}
-                className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 transition-all"
+                disabled={isWalkthroughActive}
+                className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPlaying ? (
                   <Pause className="h-5 w-5" fill="currentColor" />
@@ -321,7 +341,8 @@ export const TodaysPepTalk = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(10)}
-                className="h-10 w-10 rounded-full hover:bg-primary/20"
+                disabled={isWalkthroughActive}
+                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <SkipForward className="h-4 w-4" />
               </Button>
@@ -334,6 +355,7 @@ export const TodaysPepTalk = () => {
                 max={duration || 100}
                 step={0.1}
                 onValueChange={handleSeek}
+                disabled={isWalkthroughActive}
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
