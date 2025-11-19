@@ -30,6 +30,18 @@ const RARITY_COLORS: Record<string, string> = {
   legendary: "from-amber-400 to-amber-600",
 };
 
+const ELEMENT_SYMBOLS: Record<string, string> = {
+  fire: "🔥",
+  water: "💧",
+  earth: "🌍",
+  air: "💨",
+  lightning: "⚡",
+  ice: "❄️",
+  nature: "🌿",
+  shadow: "🌑",
+  light: "✨",
+};
+
 export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -71,6 +83,10 @@ export function EvolutionCardFlip({ card }: Props) {
             )}
             
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            
+            <Badge className="absolute top-2 left-2 bg-background/90 backdrop-blur-sm text-xs">
+              {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"}
+            </Badge>
             
             <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
               Stage {card.evolution_stage}
