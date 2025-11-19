@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
+import { useRef } from "react";
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -13,6 +14,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { companion } = useCompanion();
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP } = useXPRewards();
+  
+  // Prevent rapid-fire clicks
+  const toggleInProgress = useRef(false);
 
   const taskDate = selectedDate 
     ? selectedDate.toISOString().split('T')[0]
@@ -76,6 +80,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
+      // Prevent double-clicks
+      if (toggleInProgress.current) {
+        throw new Error('Please wait...');
+      }
+      toggleInProgress.current = true;
+
       // Check if this task was already completed before (to prevent XP spam)
       const { data: existingTask } = await supabase
         .from('daily_tasks')
@@ -110,6 +120,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
         // Dispatch event for walkthrough
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
+      toggleInProgress.current = false;
+    },
+    onError: () => {
+      toggleInProgress.current = false;
     },
   });
 
