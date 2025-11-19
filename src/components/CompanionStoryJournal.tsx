@@ -147,46 +147,44 @@ export const CompanionStoryJournal = () => {
       {story ? (
         <Card className="border-muted/50">
           <CardHeader>
-            <div className="flex items-start justify-between">
+            <div className="space-y-4">
               <div>
                 <CardTitle className="text-2xl mb-2">{story.chapter_title}</CardTitle>
                 <CardDescription className="text-base italic">
                   {story.intro_line}
                 </CardDescription>
               </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <Select value={selectedTone} onValueChange={setSelectedTone}>
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TONE_OPTIONS.map(tone => (
-                        <SelectItem key={tone.value} value={tone.value}>
-                          {tone.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedIntensity} onValueChange={setSelectedIntensity}>
-                    <SelectTrigger className="w-[110px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INTENSITY_OPTIONS.map(intensity => (
-                        <SelectItem key={intensity.value} value={intensity.value}>
-                          {intensity.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex gap-2">
+                <Select value={selectedTone} onValueChange={setSelectedTone}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TONE_OPTIONS.map(tone => (
+                      <SelectItem key={tone.value} value={tone.value}>
+                        {tone.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedIntensity} onValueChange={setSelectedIntensity}>
+                  <SelectTrigger className="w-[110px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INTENSITY_OPTIONS.map(intensity => (
+                      <SelectItem key={intensity.value} value={intensity.value}>
+                        {intensity.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRegenerate}
                   disabled={regenerateStory.isPending}
-                  className="w-full"
+                  className="ml-auto"
                 >
                   <RefreshCw className="h-3 w-3 mr-1" />
                   Rewrite
