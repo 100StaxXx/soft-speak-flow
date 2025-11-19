@@ -54,6 +54,11 @@ const Index = () => {
     checkHabits();
   }, [user]);
 
+  // Show intro first, before any checks
+  if (showIntro) {
+    return <IntroScreen onComplete={() => setShowIntro(false)} />;
+  }
+
   // Check for incomplete onboarding and redirect
   useEffect(() => {
     if (!user || companionLoading) return;
@@ -65,10 +70,6 @@ const Index = () => {
       }
     }
   }, [user, profile, companionLoading, navigate]);
-
-  if (showIntro) {
-    return <IntroScreen onComplete={() => setShowIntro(false)} />;
-  }
 
   if (isTransitioning) {
     return (
