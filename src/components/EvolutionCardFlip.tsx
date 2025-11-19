@@ -155,6 +155,10 @@ export function EvolutionCardFlip({ card }: Props) {
                       
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                       
+                      <Badge className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-base px-3 py-1">
+                        {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"} {card.element}
+                      </Badge>
+                      
                       <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-base px-3 py-1">
                         Stage {card.evolution_stage}
                       </Badge>
