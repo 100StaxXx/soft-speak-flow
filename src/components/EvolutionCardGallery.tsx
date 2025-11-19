@@ -43,9 +43,9 @@ export const EvolutionCardGallery = () => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-[420px] rounded-xl" />
+          <Skeleton key={i} className="h-[280px] rounded-xl" />
         ))}
       </div>
     );
@@ -64,7 +64,7 @@ export const EvolutionCardGallery = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-3 gap-3">
       {cards.map((card) => (
         <EvolutionCardFlip key={card.id} card={card} />
       ))}
