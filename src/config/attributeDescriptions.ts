@@ -1,61 +1,47 @@
 export const ATTRIBUTE_DESCRIPTIONS = {
-  energy: {
-    icon: "⚡",
-    name: "Energy",
-    whatItMeans: "Your drive, physical momentum, and ability to take action. The \"get up and move\" stat.",
+  body: {
+    icon: "💪",
+    name: "Body",
+    whatItMeans: "Your physical energy, movement, and ability to take action. The fuel for real-world execution.",
     boostedBy: [
-      "Hitting the gym",
-      "Morning routine wins",
+      "Working out / hitting the gym",
+      "Morning routines",
       "Cleaning your space",
-      "Taking a walk",
+      "Taking walks",
       "Cold showers",
-      "Any task that requires physical or immediate action"
+      "Any physical activity or immediate action"
     ],
-    whenGrows: "You feel more alive, motivated, and ready to attack the day. Your companion becomes more explosive and energetic."
+    whenGrows: "You feel more alive, energized, and ready to move. Your companion becomes more powerful and dynamic."
   },
-  resilience: {
-    icon: "🛡",
-    name: "Resilience",
-    whatItMeans: "Your mental toughness, discipline, and ability to push through discomfort. The \"still going even when you don't feel like it\" stat.",
+  mind: {
+    icon: "🧠",
+    name: "Mind",
+    whatItMeans: "Your mental focus, clarity, and intellectual productivity. The power to learn, think, and create.",
     boostedBy: [
-      "No porn / no weed / no junk food",
+      "Reading books",
+      "Studying / learning new skills",
+      "Deep work sessions",
+      "Business planning",
+      "Problem-solving",
+      "Creative projects",
+      "Time blocking / planning"
+    ],
+    whenGrows: "Your thoughts become sharper and more focused. You unlock clarity and direction. Your companion becomes wiser and more strategic."
+  },
+  soul: {
+    icon: "✨",
+    name: "Soul",
+    whatItMeans: "Your inner peace, emotional resilience, and connection to what matters. The foundation of a meaningful life.",
+    boostedBy: [
+      "Meditation / reflection",
       "Journaling",
-      "Meditation",
-      "Sticking to boundaries",
-      "Holding promises to yourself",
-      "Doing something difficult instead of avoiding it"
+      "Quality time with loved ones",
+      "Acts of kindness",
+      "Self-care practices",
+      "Setting healthy boundaries",
+      "Gratitude practices"
     ],
-    whenGrows: "You become harder to shake, and your companion becomes more formidable and unbreakable."
-  },
-  focus: {
-    icon: "🎯",
-    name: "Focus",
-    whatItMeans: "Your attention, clarity, productivity, and ability to make real progress. The \"lock in, get it done\" stat.",
-    boostedBy: [
-      "Reading",
-      "Studying / learning a skill",
-      "Work tasks",
-      "Business steps",
-      "Editing content",
-      "Tracking finances",
-      "Time blocking"
-    ],
-    whenGrows: "Your life gets sharper. You move with direction instead of distraction. Your companion becomes sharper, smarter, and more precise."
-  },
-  balance: {
-    icon: "⚖️",
-    name: "Balance",
-    whatItMeans: "Your emotional grounding, relationships, self-care, and ability to maintain peace. The \"keep your life steady and meaningful\" stat.",
-    boostedBy: [
-      "Calling family or checking on a friend",
-      "Talking to your partner",
-      "Self-care moments",
-      "Cooking a meal",
-      "Taking a mindful walk",
-      "Spending time with people who matter",
-      "Healthy breaks and recovery"
-    ],
-    whenGrows: "You feel centered. Life feels smoother, calmer, and more aligned. Your companion becomes serene, wise, and stable."
+    whenGrows: "You feel centered, grounded, and at peace. Life becomes more meaningful. Your companion radiates calm strength and wisdom."
   }
 } as const;
 

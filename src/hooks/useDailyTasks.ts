@@ -11,7 +11,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
-  const { updateEnergyFromActivity } = useCompanionAttributes();
+  const { updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP } = useXPRewards();
 
   const taskDate = selectedDate 
@@ -102,9 +102,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
       if (completed && !wasAlreadyCompleted) {
         await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         
-        // Update companion energy
+        // Update companion body
         if (companion) {
-          await updateEnergyFromActivity(companion.id);
+          await updateBodyFromActivity(companion.id);
         }
         
         // Dispatch event for walkthrough
