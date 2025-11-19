@@ -293,24 +293,38 @@ export const useCompanion = () => {
         evolutionId = existingEvolution.id;
       }
 
-      // Generate evolution card
+      // Generate evolution cards for all stages up to current stage
       try {
-        await supabase.functions.invoke("generate-evolution-card", {
-          body: {
-            companionId: companion.id,
-            evolutionId: evolutionId,
-            stage: newStage,
-            species: companion.spirit_animal,
-            element: companion.core_element,
-            color: companion.favorite_color,
-            userAttributes: {
-              energy: companion.energy || 0,
-              resilience: companion.resilience || 0,
-              focus: companion.focus || 0,
-              balance: companion.balance || 0,
-            },
-          },
-        });
+        // Check which cards already exist
+        const { data: existingCards } = await supabase
+          .from("companion_evolution_cards")
+          .select("evolution_stage")
+          .eq("companion_id", companion.id);
+
+        const existingStages = new Set(existingCards?.map(c => c.evolution_stage) || []);
+
+        // Generate cards for missing stages (stages 1 through newStage)
+        for (let stage = 1; stage <= newStage; stage++) {
+          if (!existingStages.has(stage)) {
+            console.log(`Generating card for stage ${stage}`);
+            await supabase.functions.invoke("generate-evolution-card", {
+              body: {
+                companionId: companion.id,
+                evolutionId: evolutionId,
+                stage: stage,
+                species: companion.spirit_animal,
+                element: companion.core_element,
+                color: companion.favorite_color,
+                userAttributes: {
+                  energy: companion.energy || 0,
+                  resilience: companion.resilience || 0,
+                  focus: companion.focus || 0,
+                  balance: companion.balance || 0,
+                },
+              },
+            });
+          }
+        }
       } catch (cardError) {
         console.error("Failed to generate evolution card:", cardError);
         // Don't fail the evolution if card generation fails
