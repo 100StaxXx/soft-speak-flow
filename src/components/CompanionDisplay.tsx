@@ -8,6 +8,7 @@ import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
+import { CompanionBadge } from "@/components/CompanionBadge";
 import { useState, useEffect } from "react";
 
 // Convert hex color to color name
@@ -204,6 +205,13 @@ export const CompanionDisplay = () => {
           </div>
 
           <div className="space-y-3" data-tour="companion-tooltip-anchor">
+            <div className="flex justify-center mb-3">
+              <CompanionBadge 
+                element={companion.core_element} 
+                stage={companion.current_stage}
+                showStage={true}
+              />
+            </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {companion.current_xp} / {nextEvolutionXP} XP to next evolution
