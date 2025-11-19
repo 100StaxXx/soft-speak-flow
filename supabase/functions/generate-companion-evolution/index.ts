@@ -310,6 +310,9 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
     console.log("Generating evolution image...");
 
     // 6. Generate new evolution image with Nano Banana
+    // For stages 0->1 and 1->2, don't use the continuity system prompt
+    const shouldUseContinuityPrompt = nextStage > 2;
+    
     const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -318,11 +321,16 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image-preview",
-        messages: [
+        messages: shouldUseContinuityPrompt ? [
           {
             role: "system",
             content: SYSTEM_PROMPT
           },
+          {
+            role: "user",
+            content: userPrompt
+          }
+        ] : [
           {
             role: "user",
             content: userPrompt
