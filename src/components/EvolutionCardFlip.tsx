@@ -41,7 +41,7 @@ export function EvolutionCardFlip({ card }: Props) {
 
   return (
     <div 
-      className="relative h-[420px] cursor-pointer perspective-1000"
+      className="relative h-[280px] cursor-pointer perspective-1000"
       onClick={handleFlip}
     >
       <motion.div
@@ -52,48 +52,48 @@ export function EvolutionCardFlip({ card }: Props) {
         {/* Front */}
         <div className="absolute w-full h-full backface-hidden">
           <div className={`h-full rounded-xl border-2 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-[2px] shadow-lg`}>
-            <div className="h-full rounded-lg bg-card flex flex-col overflow-hidden">
-              {/* Image */}
-              <div className="relative h-[260px] bg-muted overflow-hidden">
-                {card.image_url ? (
-                  <img 
-                    src={card.image_url} 
-                    alt={card.creature_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                    No Image
-                  </div>
-                )}
-                <Badge className="absolute top-2 right-2 bg-background/80 backdrop-blur">
-                  Stage {card.evolution_stage}
-                </Badge>
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 p-4 space-y-3">
-                <div>
-                  <h3 className="font-bold text-lg truncate">{card.creature_name}</h3>
-                  <p className="text-sm text-muted-foreground capitalize">{card.species} • {card.element}</p>
+            <div className="h-full rounded-lg bg-card relative overflow-hidden">
+              {/* Background Image */}
+              {card.image_url ? (
+                <img 
+                  src={card.image_url} 
+                  alt={card.creature_name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center text-muted-foreground text-xs">
+                  No Image
                 </div>
+              )}
+              
+              {/* Overlays */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              
+              {/* Stage Badge */}
+              <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
+                Stage {card.evolution_stage}
+              </Badge>
 
+              {/* Bottom Info */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
+                <h3 className="font-bold text-sm text-white drop-shadow-lg">{card.creature_name}</h3>
+                
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Power</span>
+                <div className="grid grid-cols-2 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
+                  <div className="flex justify-between text-white/90">
+                    <span>⚡</span>
                     <span className="font-semibold">{stats.power || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Defense</span>
+                  <div className="flex justify-between text-white/90">
+                    <span>🛡️</span>
                     <span className="font-semibold">{stats.defense || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Speed</span>
+                  <div className="flex justify-between text-white/90">
+                    <span>💨</span>
                     <span className="font-semibold">{stats.speed || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Wisdom</span>
+                  <div className="flex justify-between text-white/90">
+                    <span>🧠</span>
                     <span className="font-semibold">{stats.wisdom || 0}</span>
                   </div>
                 </div>
@@ -105,24 +105,23 @@ export function EvolutionCardFlip({ card }: Props) {
         {/* Back */}
         <div className="absolute w-full h-full backface-hidden rotate-y-180">
           <div className={`h-full rounded-xl border-2 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-[2px] shadow-lg`}>
-            <div className="h-full rounded-lg bg-card p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg">{card.creature_name}</h3>
-                <Badge variant="outline" className="capitalize">{card.rarity}</Badge>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-muted-foreground mb-2">Lore</h4>
-                  <p className="text-sm leading-relaxed">{card.story_text}</p>
+            <div className="h-full rounded-lg bg-card p-4 flex flex-col overflow-hidden">
+              <div className="space-y-2 flex-1 overflow-y-auto">
+                {/* Full Name & Title */}
+                <div className="text-center pb-2 border-b border-border">
+                  <h3 className="font-bold text-sm">{card.creature_name}</h3>
+                  <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                    {card.species} of {card.element}
+                  </p>
                 </div>
 
+                {/* Traits */}
                 {card.traits && card.traits.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-2">Traits</h4>
-                    <div className="flex flex-wrap gap-2">
+                    <h4 className="text-xs font-semibold mb-1.5 text-primary">Traits</h4>
+                    <div className="flex flex-wrap gap-1">
                       {card.traits.map((trait, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
+                        <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0">
                           {trait}
                         </Badge>
                       ))}
@@ -130,11 +129,18 @@ export function EvolutionCardFlip({ card }: Props) {
                   </div>
                 )}
 
-                <div className="pt-2 border-t space-y-1 text-xs text-muted-foreground">
-                  <p>Element: <span className="text-foreground capitalize">{card.element}</span></p>
-                  <p>Species: <span className="text-foreground capitalize">{card.species}</span></p>
-                  <p>Stage: <span className="text-foreground">{card.evolution_stage}</span></p>
+                {/* Story/Lore */}
+                <div>
+                  <h4 className="text-xs font-semibold mb-1.5 text-primary">Lore</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-6">
+                    {card.story_text}
+                  </p>
                 </div>
+              </div>
+
+              {/* Footer */}
+              <div className="text-center pt-2 mt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground">Stage {card.evolution_stage}</p>
               </div>
             </div>
           </div>
