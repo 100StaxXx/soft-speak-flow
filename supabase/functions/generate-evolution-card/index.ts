@@ -32,7 +32,7 @@ serve(async (req) => {
       species, 
       element, 
       color,
-      userAttributes // energy, resilience, focus, balance
+      userAttributes // mind, body, soul
     } = await req.json();
 
     console.log('Generating evolution card for:', { companionId, stage, species, element });
@@ -62,15 +62,12 @@ serve(async (req) => {
     else if (stage >= 3) rarity = 'Epic';
     else if (stage >= 1) rarity = 'Rare';
 
-    // Generate stats based on stage and attributes
+    // Generate stats based on stage and Mind/Body/Soul attributes
     const baseStatValue = 10 + (stage * 5);
     const stats = {
-      strength: Math.floor(baseStatValue + (userAttributes?.energy || 0) / 2),
-      agility: Math.floor(baseStatValue + (userAttributes?.focus || 0) / 2),
-      vitality: Math.floor(baseStatValue + (userAttributes?.resilience || 0) / 2),
-      intellect: Math.floor(baseStatValue + (userAttributes?.balance || 0) / 2),
-      spirit: Math.floor(baseStatValue + ((userAttributes?.energy || 0) + (userAttributes?.resilience || 0)) / 4),
-      affinity: Math.floor(baseStatValue + (stage * 2))
+      mind: Math.floor(baseStatValue + (userAttributes?.mind || 0) / 2),
+      body: Math.floor(baseStatValue + (userAttributes?.body || 0) / 2),
+      soul: Math.floor(baseStatValue + (userAttributes?.soul || 0) / 2)
     };
 
     // Generate frame type based on element
@@ -82,10 +79,9 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const personality = userAttributes?.energy > 60 ? 'bold and energetic' :
-                       userAttributes?.resilience > 60 ? 'steadfast and enduring' :
-                       userAttributes?.focus > 60 ? 'sharp and calculated' :
-                       userAttributes?.balance > 60 ? 'harmonious and wise' : 'mysterious and evolving';
+    const personality = userAttributes?.body > 60 ? 'powerful and energetic' :
+                       userAttributes?.mind > 60 ? 'wise and focused' :
+                       userAttributes?.soul > 60 ? 'compassionate and deeply connected' : 'mysterious and evolving';
     
     const vibes = stage >= 15 ? 'ancient, radiant, transcendent' :
                  stage >= 10 ? 'majestic, powerful, legendary' :

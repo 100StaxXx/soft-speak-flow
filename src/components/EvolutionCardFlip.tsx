@@ -35,7 +35,7 @@ export function EvolutionCardFlip({ card }: Props) {
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
 
-  const stats = card.stats as { power?: number; defense?: number; speed?: number; wisdom?: number };
+  const stats = card.stats as { mind?: number; body?: number; soul?: number };
 
   const handleCardClick = () => {
     tap();
@@ -79,22 +79,18 @@ export function EvolutionCardFlip({ card }: Props) {
             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
               <h3 className="font-bold text-sm text-white drop-shadow-lg">{card.creature_name}</h3>
               
-              <div className="grid grid-cols-2 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
-                <div className="flex justify-between text-white/90">
-                  <span>⚡</span>
-                  <span className="font-semibold">{stats.power || 0}</span>
-                </div>
-                <div className="flex justify-between text-white/90">
-                  <span>🛡️</span>
-                  <span className="font-semibold">{stats.defense || 0}</span>
-                </div>
-                <div className="flex justify-between text-white/90">
-                  <span>💨</span>
-                  <span className="font-semibold">{stats.speed || 0}</span>
-                </div>
-                <div className="flex justify-between text-white/90">
+              <div className="grid grid-cols-3 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
+                <div className="flex flex-col items-center text-white/90">
                   <span>🧠</span>
-                  <span className="font-semibold">{stats.wisdom || 0}</span>
+                  <span className="font-semibold">{stats.mind || 0}</span>
+                </div>
+                <div className="flex flex-col items-center text-white/90">
+                  <span>💪</span>
+                  <span className="font-semibold">{stats.body || 0}</span>
+                </div>
+                <div className="flex flex-col items-center text-white/90">
+                  <span>🔥</span>
+                  <span className="font-semibold">{stats.soul || 0}</span>
                 </div>
               </div>
             </div>
@@ -150,22 +146,21 @@ export function EvolutionCardFlip({ card }: Props) {
                       <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
                         <h3 className="font-bold text-2xl text-white drop-shadow-lg">{card.creature_name}</h3>
                         
-                        <div className="grid grid-cols-2 gap-2 text-base bg-black/50 backdrop-blur-sm rounded-xl p-4">
-                          <div className="flex justify-between text-white">
-                            <span>⚡ Power</span>
-                            <span className="font-bold">{stats.power || 0}</span>
+                        <div className="grid grid-cols-3 gap-3 text-base bg-black/50 backdrop-blur-sm rounded-xl p-4">
+                          <div className="flex flex-col items-center text-white">
+                            <span className="text-2xl mb-1">🧠</span>
+                            <span className="text-xs opacity-80">Mind</span>
+                            <span className="font-bold text-lg">{stats.mind || 0}</span>
                           </div>
-                          <div className="flex justify-between text-white">
-                            <span>🛡️ Defense</span>
-                            <span className="font-bold">{stats.defense || 0}</span>
+                          <div className="flex flex-col items-center text-white">
+                            <span className="text-2xl mb-1">💪</span>
+                            <span className="text-xs opacity-80">Body</span>
+                            <span className="font-bold text-lg">{stats.body || 0}</span>
                           </div>
-                          <div className="flex justify-between text-white">
-                            <span>💨 Speed</span>
-                            <span className="font-bold">{stats.speed || 0}</span>
-                          </div>
-                          <div className="flex justify-between text-white">
-                            <span>🧠 Wisdom</span>
-                            <span className="font-bold">{stats.wisdom || 0}</span>
+                          <div className="flex flex-col items-center text-white">
+                            <span className="text-2xl mb-1">🔥</span>
+                            <span className="text-xs opacity-80">Soul</span>
+                            <span className="font-bold text-lg">{stats.soul || 0}</span>
                           </div>
                         </div>
                       </div>
