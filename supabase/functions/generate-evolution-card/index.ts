@@ -71,31 +71,49 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const aiPrompt = `You are a master storyteller creating a unique evolution card for a companion creature.
+    // Derive personality and vibes from user attributes
+    const personality = userAttributes?.energy > 60 ? 'bold and energetic' :
+                       userAttributes?.resilience > 60 ? 'steadfast and enduring' :
+                       userAttributes?.focus > 60 ? 'sharp and calculated' :
+                       userAttributes?.balance > 60 ? 'harmonious and wise' : 'mysterious and evolving';
+    
+    const vibes = stage >= 15 ? 'ancient, radiant, transcendent' :
+                 stage >= 10 ? 'majestic, powerful, legendary' :
+                 stage >= 5 ? 'fierce, loyal, determined' :
+                 'curious, cute, eager';
 
-CREATURE DETAILS:
+    const aiPrompt = `You are a master fantasy creature naming expert. Generate a UNIQUE, ORIGINAL creature name for this companion.
+
+CREATURE ATTRIBUTES:
 - Species: ${species}
 - Element: ${element}
+- Primary Color: ${color}
+- Secondary Color: ${element} undertones
+- Personality: ${personality}
+- Vibes: ${vibes}
 - Evolution Stage: ${stage}/20
 - Rarity: ${rarity}
-- Color Theme: ${color}
 
-USER'S ATTRIBUTES (their real-life growth):
-- Energy: ${userAttributes?.energy || 0}
-- Resilience: ${userAttributes?.resilience || 0}
-- Focus: ${userAttributes?.focus || 0}
-- Balance: ${userAttributes?.balance || 0}
+NAME GENERATION RULES:
+• 1-2 words maximum
+• Must be mythic, elegant, and slightly otherworldly
+• Easy to pronounce
+• NO references to Pokémon, Digimon, Marvel, Warcraft, or mythology
+• NO real-world names
+• NO numbers
+• Must feel ORIGINAL and fresh
+• Should evoke the creature's element, species, and personality
 
 Generate a card with these exact fields in JSON:
 
 {
-  "creature_name": "A powerful, evocative name that fits the species and element",
+  "creature_name": "Generate a unique name following all rules above. Make it memorable and fitting.",
   "traits": ["3-5 dynamic trait names that reflect the creature's abilities and stage"],
-  "story_text": "2-4 paragraphs telling this evolution's story. Make it epic, personal, and tied to the user's growth journey. This creature evolved because the user grew.",
-  "lore_seed": "One mysterious sentence hinting at deeper mythology or prophecy"
+  "story_text": "2-4 paragraphs telling this evolution's story. Make it epic, personal, and tied to the user's growth journey. This creature evolved because the user grew. Use the generated creature name throughout the story.",
+  "lore_seed": "One mysterious sentence hinting at deeper mythology or prophecy, mentioning the creature's name"
 }
 
-Make it LEGENDARY. This card represents real human progress.`;
+Make it LEGENDARY. This card represents real human progress. The name must be truly original and memorable.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
