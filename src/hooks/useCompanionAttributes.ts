@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
-export type AttributeType = 'resilience' | 'focus' | 'balance' | 'energy';
+export type AttributeType = 'mind' | 'body' | 'soul';
 
 interface UpdateAttributeParams {
   companionId: string;
@@ -28,7 +28,7 @@ export const useCompanionAttributes = () => {
 
       if (fetchError) throw fetchError;
 
-      const currentValue = companion[attribute] ?? (attribute === 'energy' ? 100 : 0);
+      const currentValue = companion[attribute] ?? (attribute === 'body' ? 100 : 0);
       const newValue = Math.max(0, Math.min(100, currentValue + amount));
 
       // Update the attribute
@@ -63,74 +63,74 @@ export const useCompanionAttributes = () => {
     },
   });
 
-  const updateEnergyFromActivity = useMutation({
+  const updateBodyFromActivity = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Award +10 energy for daily activity, capped at 100
+      // Award +10 body for daily activity, capped at 100
       await updateAttribute.mutateAsync({
         companionId,
-        attribute: 'energy',
+        attribute: 'body',
         amount: 10,
       });
     },
   });
 
-  const updateResilienceFromStreak = useMutation({
+  const updateSoulFromStreak = useMutation({
     mutationFn: async ({ companionId, streakDays }: { companionId: string; streakDays: number }) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Award resilience based on streak milestones
-      let resilienceGain = 0;
-      if (streakDays === 7) resilienceGain = 5;
-      else if (streakDays === 14) resilienceGain = 10;
-      else if (streakDays === 30) resilienceGain = 15;
-      else if (streakDays % 7 === 0) resilienceGain = 2; // Small bonus every week
+      // Award soul based on streak milestones
+      let soulGain = 0;
+      if (streakDays === 7) soulGain = 5;
+      else if (streakDays === 14) soulGain = 10;
+      else if (streakDays === 30) soulGain = 15;
+      else if (streakDays % 7 === 0) soulGain = 2; // Small bonus every week
 
-      if (resilienceGain > 0) {
+      if (soulGain > 0) {
         await updateAttribute.mutateAsync({
           companionId,
-          attribute: 'resilience',
-          amount: resilienceGain,
+          attribute: 'soul',
+          amount: soulGain,
         });
       }
     },
   });
 
-  const updateFocusFromHabit = useMutation({
+  const updateMindFromHabit = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Award +2 focus per habit completion
+      // Award +2 mind per habit completion
       await updateAttribute.mutateAsync({
         companionId,
-        attribute: 'focus',
+        attribute: 'mind',
         amount: 2,
       });
     },
   });
 
-  const updateBalanceFromReflection = useMutation({
+  const updateSoulFromReflection = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Award +3 balance for check-ins and reflections
+      // Award +3 soul for check-ins and reflections
       await updateAttribute.mutateAsync({
         companionId,
-        attribute: 'balance',
+        attribute: 'soul',
         amount: 3,
       });
     },
   });
 
-  const decayEnergy = useMutation({
+  const decayBody = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Decrease energy by -5 for inactivity
+      // Decrease body by -5 for inactivity
       await updateAttribute.mutateAsync({
         companionId,
-        attribute: 'energy',
+        attribute: 'body',
         amount: -5,
       });
     },
@@ -138,10 +138,10 @@ export const useCompanionAttributes = () => {
 
   return {
     updateAttribute: updateAttribute.mutateAsync,
-    updateEnergyFromActivity: updateEnergyFromActivity.mutateAsync,
-    updateResilienceFromStreak: updateResilienceFromStreak.mutateAsync,
-    updateFocusFromHabit: updateFocusFromHabit.mutateAsync,
-    updateBalanceFromReflection: updateBalanceFromReflection.mutateAsync,
-    decayEnergy: decayEnergy.mutateAsync,
+    updateBodyFromActivity: updateBodyFromActivity.mutateAsync,
+    updateSoulFromStreak: updateSoulFromStreak.mutateAsync,
+    updateMindFromHabit: updateMindFromHabit.mutateAsync,
+    updateSoulFromReflection: updateSoulFromReflection.mutateAsync,
+    decayBody: decayBody.mutateAsync,
   };
 };

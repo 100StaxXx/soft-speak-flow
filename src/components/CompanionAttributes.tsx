@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Target, Scale, Zap } from "lucide-react";
-import { Companion } from "@/hooks/useCompanion";
+import { Brain, Dumbbell, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,34 +12,28 @@ import {
 import { ATTRIBUTE_DESCRIPTIONS, AttributeType } from "@/config/attributeDescriptions";
 
 interface CompanionAttributesProps {
-  companion: Companion & {
-    energy?: number;
-    resilience?: number;
-    focus?: number;
-    balance?: number;
+  companion: {
+    body?: number;
+    mind?: number;
+    soul?: number;
   };
 }
 
 const ATTRIBUTE_INFO = {
-  energy: {
-    icon: Zap,
-    label: "Energy",
-    color: "text-yellow-500",
+  body: {
+    icon: Dumbbell,
+    label: "Body",
+    color: "text-orange-500",
   },
-  resilience: {
-    icon: Shield,
-    label: "Resilience",
-    color: "text-blue-500",
-  },
-  focus: {
-    icon: Target,
-    label: "Focus",
+  mind: {
+    icon: Brain,
+    label: "Mind",
     color: "text-purple-500",
   },
-  balance: {
-    icon: Scale,
-    label: "Balance",
-    color: "text-green-500",
+  soul: {
+    icon: Sparkles,
+    label: "Soul",
+    color: "text-blue-500",
   },
 };
 
@@ -48,10 +41,9 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
   const [selectedAttribute, setSelectedAttribute] = useState<AttributeType | null>(null);
   
   const attributes = [
-    { key: 'energy' as AttributeType, value: companion.energy ?? 100 },
-    { key: 'resilience' as AttributeType, value: companion.resilience ?? 0 },
-    { key: 'focus' as AttributeType, value: companion.focus ?? 0 },
-    { key: 'balance' as AttributeType, value: companion.balance ?? 0 },
+    { key: 'body' as AttributeType, value: companion.body ?? 100 },
+    { key: 'mind' as AttributeType, value: companion.mind ?? 0 },
+    { key: 'soul' as AttributeType, value: companion.soul ?? 0 },
   ];
 
   const attributeDetails = selectedAttribute ? ATTRIBUTE_DESCRIPTIONS[selectedAttribute] : null;
@@ -112,21 +104,21 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
                 <h4 className="font-semibold text-foreground mb-1">What it means:</h4>
                 <p className="text-muted-foreground">{attributeDetails.whatItMeans}</p>
               </div>
-
+              
               <div>
-                <h4 className="font-semibold text-foreground mb-2">Boosted by habits like:</h4>
-                <ul className="space-y-1 text-muted-foreground">
-                  {attributeDetails.boostedBy.map((habit, index) => (
+                <h4 className="font-semibold text-foreground mb-2">Boosted by:</h4>
+                <ul className="space-y-1.5 text-muted-foreground">
+                  {attributeDetails.boostedBy.map((item, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <span className="text-primary mt-0.5">•</span>
-                      <span>{habit}</span>
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-
-              <div className="pt-2 border-t">
-                <h4 className="font-semibold text-foreground mb-1">When this grows:</h4>
+              
+              <div className="pt-2 border-t border-border/50">
+                <h4 className="font-semibold text-foreground mb-1">When it grows:</h4>
                 <p className="text-muted-foreground italic">{attributeDetails.whenGrows}</p>
               </div>
             </div>

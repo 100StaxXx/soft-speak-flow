@@ -14,10 +14,10 @@ export const useXPRewards = () => {
   const { companion, awardXP } = useCompanion();
   const { showXPToast } = useXPToast();
   const {
-    updateEnergyFromActivity,
-    updateFocusFromHabit,
-    updateBalanceFromReflection,
-    updateResilienceFromStreak,
+    updateBodyFromActivity,
+    updateMindFromHabit,
+    updateSoulFromReflection,
+    updateSoulFromStreak,
   } = useCompanionAttributes();
 
   // Fetch current habit streak for resilience updates
@@ -46,8 +46,8 @@ export const useXPRewards = () => {
       });
       
       // Update companion attributes sequentially to avoid race conditions
-      await updateFocusFromHabit(companion.id);
-      await updateEnergyFromActivity(companion.id);
+      await updateMindFromHabit(companion.id);
+      await updateBodyFromActivity(companion.id);
     } catch (error) {
       console.error('Error awarding habit completion:', error);
     }
@@ -100,8 +100,8 @@ export const useXPRewards = () => {
       });
       
       // Update companion attributes sequentially
-      await updateBalanceFromReflection(companion.id);
-      await updateEnergyFromActivity(companion.id);
+      await updateSoulFromReflection(companion.id);
+      await updateBodyFromActivity(companion.id);
     } catch (error) {
       console.error('Error awarding check-in:', error);
     }
@@ -118,8 +118,8 @@ export const useXPRewards = () => {
         metadata: { milestone },
       });
       
-      // Update companion resilience
-      await updateResilienceFromStreak({
+      // Update companion soul
+      await updateSoulFromStreak({
         companionId: companion.id,
         streakDays: milestone,
       });
@@ -138,8 +138,8 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update companion balance
-      await updateBalanceFromReflection(companion.id);
+      // Update companion soul
+      await updateSoulFromReflection(companion.id);
     } catch (error) {
       console.error('Error awarding reflection:', error);
     }

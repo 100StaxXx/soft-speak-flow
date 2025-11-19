@@ -15,10 +15,9 @@ export interface Companion {
   current_image_url: string | null;
   eye_color?: string;
   fur_color?: string;
-  energy?: number;
-  resilience?: number;
-  focus?: number;
-  balance?: number;
+  body?: number;
+  mind?: number;
+  soul?: number;
   last_energy_update?: string;
   created_at: string;
   updated_at: string;
@@ -316,10 +315,9 @@ export const useCompanion = () => {
                 element: companion.core_element,
                 color: companion.favorite_color,
                 userAttributes: {
-                  energy: companion.energy || 0,
-                  resilience: companion.resilience || 0,
-                  focus: companion.focus || 0,
-                  balance: companion.balance || 0,
+                  body: companion.body || 0,
+                  mind: companion.mind || 0,
+                  soul: companion.soul || 0,
                 },
               },
             });

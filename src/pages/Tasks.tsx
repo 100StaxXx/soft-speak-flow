@@ -33,7 +33,7 @@ export default function Tasks() {
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
   const { companion } = useCompanion();
-  const { updateFocusFromHabit, updateEnergyFromActivity } = useCompanionAttributes();
+  const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   
   // Calendar state for quest scheduling
@@ -155,8 +155,8 @@ export default function Tasks() {
           
           // Update companion attributes
           if (companion) {
-            await updateFocusFromHabit(companion.id);
-            await updateEnergyFromActivity(companion.id);
+            await updateMindFromHabit(companion.id);
+            await updateBodyFromActivity(companion.id);
           }
           
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });

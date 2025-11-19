@@ -1686,58 +1686,55 @@ export type Database = {
       }
       user_companion: {
         Row: {
-          balance: number | null
+          body: number | null
           core_element: string
           created_at: string
           current_image_url: string | null
           current_stage: number
           current_xp: number
-          energy: number | null
           eye_color: string | null
           favorite_color: string
-          focus: number | null
           fur_color: string | null
           id: string
           last_energy_update: string | null
-          resilience: number | null
+          mind: number | null
+          soul: number | null
           spirit_animal: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          balance?: number | null
+          body?: number | null
           core_element: string
           created_at?: string
           current_image_url?: string | null
           current_stage?: number
           current_xp?: number
-          energy?: number | null
           eye_color?: string | null
           favorite_color: string
-          focus?: number | null
           fur_color?: string | null
           id?: string
           last_energy_update?: string | null
-          resilience?: number | null
+          mind?: number | null
+          soul?: number | null
           spirit_animal: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          balance?: number | null
+          body?: number | null
           core_element?: string
           created_at?: string
           current_image_url?: string | null
           current_stage?: number
           current_xp?: number
-          energy?: number | null
           eye_color?: string | null
           favorite_color?: string
-          focus?: number | null
           fur_color?: string | null
           id?: string
           last_energy_update?: string | null
-          resilience?: number | null
+          mind?: number | null
+          soul?: number | null
           spirit_animal?: string
           updated_at?: string
           user_id?: string

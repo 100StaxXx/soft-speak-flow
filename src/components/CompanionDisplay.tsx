@@ -157,11 +157,11 @@ export const CompanionDisplay = () => {
 
           {/* Companion Image */}
           <div className="flex justify-center py-8 relative group">
-            {/* Energy-based glow effect */}
+            {/* Body-based glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--primary) / ${(companion.energy ?? 100) / 200}), hsl(var(--accent) / ${(companion.energy ?? 100) / 200}), transparent)`,
+                background: `radial-gradient(circle, hsl(var(--primary) / ${(companion.body ?? 100) / 200}), hsl(var(--accent) / ${(companion.body ?? 100) / 200}), transparent)`,
               }}
               aria-hidden="true" 
             />
@@ -235,7 +235,11 @@ export const CompanionDisplay = () => {
           </div>
 
           {/* Companion Attributes */}
-          <CompanionAttributes companion={companion} />
+          <CompanionAttributes companion={{ 
+            body: companion.body, 
+            mind: companion.mind,
+            soul: companion.soul
+          }} />
         </div>
       </Card>
     </>
