@@ -88,7 +88,7 @@ const STAGE_NAMES = {
 export const CompanionDisplay = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
