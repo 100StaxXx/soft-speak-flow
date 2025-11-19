@@ -25,9 +25,15 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Show intro after component mounts
+    const introTimer = setTimeout(() => setShowIntro(true), 100);
+    return () => clearTimeout(introTimer);
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
