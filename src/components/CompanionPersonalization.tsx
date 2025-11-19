@@ -149,6 +149,32 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
           </div>
         </div>
 
+        {/* Story Tone Selection */}
+        <div className="space-y-4">
+          <Label className="text-lg font-semibold">Story tone</Label>
+          <p className="text-sm text-muted-foreground">
+            Choose how your companion's story unfolds
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {STORY_TONES.map((tone) => (
+              <button
+                key={tone.value}
+                onClick={() => setSelectedTone(tone.value)}
+                className={`
+                  p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-3
+                  ${selectedTone === tone.value
+                    ? "border-primary bg-primary/10 scale-105 shadow-lg"
+                    : "border-border hover:border-primary/50 hover:scale-105"
+                  }
+                `}
+              >
+                <span className="text-2xl">{tone.emoji}</span>
+                <span className="font-medium">{tone.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {isComplete && !isLoading && (
           <div className="text-center space-y-3 animate-scale-in">
             <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
