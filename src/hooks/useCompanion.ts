@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 export interface Companion {
   id: string;
@@ -66,6 +66,7 @@ export const useCompanion = () => {
   // Prevent duplicate evolution/XP requests during lag
   const evolutionInProgress = useRef(false);
   const xpInProgress = useRef(false);
+  const [isEvolvingLoading, setIsEvolvingLoading] = useState(false);
 
   const { data: companion, isLoading } = useQuery({
     queryKey: ["companion", user?.id],
@@ -271,7 +272,7 @@ export const useCompanion = () => {
       
       if (!user || !companion) throw new Error("No companion found");
 
-      toast.loading("Your companion is evolving...", { id: "evolution" });
+      setIsEvolvingLoading(true);
 
       // Generate evolved image with consistent colors
       const { data: imageData, error: imageError } = await supabase.functions.invoke(
@@ -397,15 +398,14 @@ export const useCompanion = () => {
     },
     onSuccess: () => {
       evolutionInProgress.current = false;
-      toast.dismiss("evolution");
-      toast.success("🌟 Evolution complete! Your companion has grown stronger!");
+      setIsEvolvingLoading(false);
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
     },
     onError: (error) => {
       evolutionInProgress.current = false;
-      toast.dismiss("evolution");
+      setIsEvolvingLoading(false);
       console.error("Evolution failed:", error);
       toast.error(error instanceof Error ? error.message : "Unable to evolve your companion. Please try again.");
     },
@@ -427,5 +427,6 @@ export const useCompanion = () => {
     evolveCompanion,
     nextEvolutionXP,
     progressToNext,
+    isEvolvingLoading,
   };
 };
