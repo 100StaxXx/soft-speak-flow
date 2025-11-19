@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
+import { IntroScreen } from "@/components/IntroScreen";
 
 const authSchema = z.object({
   email: z.string()
@@ -18,35 +19,13 @@ const authSchema = z.object({
     .max(100, "Password too long")
 });
 
-const motivationalQuotes = [
-  {
-    quote: "The only way to do great work is to love what you do.",
-    author: "Steve Jobs"
-  },
-  {
-    quote: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-    author: "Winston Churchill"
-  },
-  {
-    quote: "Believe you can and you're halfway there.",
-    author: "Theodore Roosevelt"
-  },
-  {
-    quote: "The future belongs to those who believe in the beauty of their dreams.",
-    author: "Eleanor Roosevelt"
-  },
-  {
-    quote: "It does not matter how slowly you go as long as you do not stop.",
-    author: "Confucius"
-  }
-];
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [showIntro, setShowIntro] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -76,13 +55,6 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % motivationalQuotes.length);
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,44 +120,16 @@ const Auth = () => {
     }
   };
 
+  if (showIntro) {
+    return <IntroScreen onComplete={() => setShowIntro(false)} />;
+  }
+
   const scrollToForm = () => {
     document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
     <div className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
-      {/* Current Quote Slide Only - Click anywhere to advance */}
-      <section
-        onClick={scrollToForm}
-        className="snap-start h-screen relative flex items-center justify-center cursor-pointer"
-        style={{
-          background: `linear-gradient(135deg, hsl(270 60% 50% / 0.1), hsl(270 50% 35% / 0.2)), hsl(0 0% 7%)`,
-        }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(270_60%_50%/0.1),transparent_50%)]" />
-        
-        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-          <blockquote className="space-y-8">
-            <p 
-              key={`quote-${currentSlide}`}
-              className="text-4xl md:text-6xl lg:text-7xl font-heading text-pure-white leading-tight animate-fade-in"
-            >
-              "{motivationalQuotes[currentSlide].quote}"
-            </p>
-            <footer 
-              key={`author-${currentSlide}`}
-              className="text-2xl md:text-3xl text-royal-purple font-semibold animate-fade-in-delayed"
-            >
-              — {motivationalQuotes[currentSlide].author}
-            </footer>
-          </blockquote>
-        </div>
-
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce text-royal-purple">
-          <ChevronDown className="w-12 h-12" />
-        </div>
-      </section>
-
       {/* Auth Form Section */}
       <section
         id="auth-form"
