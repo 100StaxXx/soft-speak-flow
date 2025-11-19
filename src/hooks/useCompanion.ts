@@ -93,6 +93,7 @@ export const useCompanion = () => {
       favoriteColor: string;
       spiritAnimal: string;
       coreElement: string;
+      storyTone: string;
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -156,6 +157,7 @@ export const useCompanion = () => {
           favorite_color: data.favoriteColor,
           spirit_animal: data.spiritAnimal,
           core_element: data.coreElement,
+          story_tone: data.storyTone,
           current_stage: 0,
           current_xp: 0,
           current_image_url: imageData.imageUrl,

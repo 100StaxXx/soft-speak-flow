@@ -62,8 +62,6 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     mutationFn: async (params: {
       companionId: string;
       stage: number;
-      tonePreference?: string;
-      themeIntensity?: string;
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -74,9 +72,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
         {
           body: { 
             companionId: params.companionId, 
-            stage: params.stage, 
-            tonePreference: params.tonePreference || "heroic",
-            themeIntensity: params.themeIntensity || "moderate"
+            stage: params.stage,
           },
         }
       );
@@ -100,59 +96,10 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     },
   });
 
-  const regenerateStory = useMutation({
-    mutationFn: async (params: {
-      companionId: string;
-      stage: number;
-      tonePreference: string;
-      themeIntensity?: string;
-    }) => {
-      if (!user) throw new Error("Not authenticated");
-
-      toast.loading("Rewriting your story...", { id: "story-regen" });
-
-      await supabase
-        .from("companion_stories")
-        .delete()
-        .eq("companion_id", params.companionId)
-        .eq("stage", params.stage);
-
-      const { data, error } = await supabase.functions.invoke(
-        "generate-companion-story",
-        {
-          body: { 
-            companionId: params.companionId, 
-            stage: params.stage, 
-            tonePreference: params.tonePreference,
-            themeIntensity: params.themeIntensity || "moderate"
-          },
-        }
-      );
-
-      if (error) {
-        console.error("Story regeneration error:", error);
-        throw new Error("Unable to rewrite your story. Please try again.");
-      }
-      return data as CompanionStory;
-    },
-    onSuccess: () => {
-      toast.dismiss("story-regen");
-      toast.success("📖 Story rewritten!");
-      queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-    },
-    onError: (error) => {
-      toast.dismiss("story-regen");
-      console.error("Story regeneration failed:", error);
-      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.");
-    },
-  });
-
   return {
     story,
     allStories,
     isLoading,
     generateStory,
-    regenerateStory,
   };
 };

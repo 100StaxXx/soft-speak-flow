@@ -40,11 +40,20 @@ const ELEMENTS = [
   { name: "Shadow", emoji: "🌑", color: "text-purple-600" },
 ];
 
+const STORY_TONES = [
+  { value: "soft_gentle", label: "Soft & Gentle", emoji: "🌸" },
+  { value: "epic_adventure", label: "Epic Adventure", emoji: "⚔️" },
+  { value: "emotional_heartfelt", label: "Emotional & Heartfelt", emoji: "💖" },
+  { value: "dark_intense", label: "Dark & Intense", emoji: "🌑" },
+  { value: "whimsical_playful", label: "Whimsical & Playful", emoji: "✨" },
+];
+
 interface CompanionPersonalizationProps {
   onComplete: (data: {
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
+    storyTone: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -53,8 +62,9 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   const [selectedColor, setSelectedColor] = useState<string>("#9333EA");
   const [selectedAnimal, setSelectedAnimal] = useState<string>("");
   const [selectedElement, setSelectedElement] = useState<string>("");
+  const [selectedTone, setSelectedTone] = useState<string>("epic_adventure");
 
-  const isComplete = selectedColor && selectedAnimal && selectedElement;
+  const isComplete = selectedColor && selectedAnimal && selectedElement && selectedTone;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center">
@@ -157,6 +167,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
             favoriteColor: selectedColor,
             spiritAnimal: selectedAnimal,
             coreElement: selectedElement,
+            storyTone: selectedTone,
           })}
           disabled={!isComplete || isLoading}
           variant="cta"

@@ -59,6 +59,7 @@ export const ResetCompanionButton = () => {
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
+    storyTone: string;
   }) => {
     await createCompanion.mutateAsync(data);
     setCreateDialogOpen(false);

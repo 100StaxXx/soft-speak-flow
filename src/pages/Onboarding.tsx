@@ -308,6 +308,7 @@ export default function Onboarding() {
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
+    storyTone: string;
   }) => {
     try {
       console.log("Starting companion creation:", data);
