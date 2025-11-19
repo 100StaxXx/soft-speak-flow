@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
+import { useRef } from "react";
 
 export interface Companion {
   id: string;
@@ -61,6 +62,10 @@ export const EVOLUTION_THRESHOLDS = {
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Prevent duplicate evolution/XP requests during lag
+  const evolutionInProgress = useRef(false);
+  const xpInProgress = useRef(false);
 
   const { data: companion, isLoading } = useQuery({
     queryKey: ["companion", user?.id],
@@ -219,6 +224,7 @@ export const useCompanion = () => {
       return { shouldEvolve, newStage, newXP };
     },
     onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
+      xpInProgress.current = false;
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
       if (shouldEvolve && companion) {
@@ -227,10 +233,19 @@ export const useCompanion = () => {
         evolveCompanion.mutate({ newStage, currentXP: newXP });
       }
     },
+    onError: () => {
+      xpInProgress.current = false;
+    },
   });
 
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
+      // Prevent duplicate evolution requests
+      if (evolutionInProgress.current) {
+        throw new Error('Evolution in progress');
+      }
+      evolutionInProgress.current = true;
+      
       if (!user || !companion) throw new Error("No companion found");
 
       toast.loading("Your companion is evolving...", { id: "evolution" });
@@ -358,12 +373,15 @@ export const useCompanion = () => {
       return imageData.imageUrl;
     },
     onSuccess: () => {
+      evolutionInProgress.current = false;
       toast.dismiss("evolution");
       toast.success("🌟 Evolution complete! Your companion has grown stronger!");
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
     },
     onError: (error) => {
+      evolutionInProgress.current = false;
       toast.dismiss("evolution");
       console.error("Evolution failed:", error);
       toast.error(error instanceof Error ? error.message : "Unable to evolve your companion. Please try again.");
