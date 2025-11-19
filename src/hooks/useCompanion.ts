@@ -215,6 +215,14 @@ export const useCompanion = () => {
       metadata?: Record<string, any>;
     }) => {
       if (!user || !companion) throw new Error("No companion found");
+      
+      // Prevent duplicate XP awards
+      if (xpInProgress.current) {
+        console.warn('XP award already in progress, skipping duplicate');
+        return { shouldEvolve: false, newStage: companion.current_stage, newXP: companion.current_xp };
+      }
+      
+      xpInProgress.current = true;
 
       const newXP = companion.current_xp + xpAmount;
       
@@ -262,8 +270,10 @@ export const useCompanion = () => {
         evolveCompanion.mutate({ newStage, currentXP: newXP });
       }
     },
-    onError: () => {
+    onError: (error) => {
       xpInProgress.current = false;
+      console.error('XP award failed:', error);
+      toast.error("Failed to award XP. Please try again.");
     },
   });
 

@@ -56,7 +56,9 @@ const Index = () => {
 
   // Check for incomplete onboarding and redirect
   useEffect(() => {
-    if (user && profile && !companionLoading) {
+    if (!user || companionLoading) return;
+    
+    if (profile) {
       // If onboarding is not complete or user has no mentor, redirect to onboarding
       if (!profile.onboarding_completed || !profile.selected_mentor_id) {
         navigate("/onboarding");
