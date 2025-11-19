@@ -86,16 +86,7 @@ const Companion = () => {
             </TabsContent>
 
             <TabsContent value="cards" className="space-y-6 mt-6">
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Evolution Cards</h3>
-                  <EvolutionCardGallery />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Evolution History</h3>
-                  {companion && <CompanionEvolutionHistory companionId={companion.id} />}
-                </div>
-              </div>
+              <EvolutionCardGallery />
             </TabsContent>
 
             <TabsContent value="story" className="space-y-6 mt-6">
