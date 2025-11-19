@@ -253,6 +253,8 @@ export const useCompanion = () => {
       
       if (shouldEvolve && companion) {
         toast.success("🎉 Your companion is ready to evolve!");
+        // Show overlay immediately
+        setIsEvolvingLoading(true);
         // Trigger evolution
         evolveCompanion.mutate({ newStage, currentXP: newXP });
       }
