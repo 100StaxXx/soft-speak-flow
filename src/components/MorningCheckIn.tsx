@@ -185,8 +185,17 @@ export const MorningCheckIn = () => {
             className="w-full h-12"
             size="lg"
           >
-            <Sparkles className="h-4 w-4 mr-2" />
-            {personality?.buttonText("Start My Day") || "Start My Day"} (+{XP_REWARDS.CHECK_IN} XP)
+            {isSubmitting ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2" />
+                Setting Intention...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                {personality?.buttonText("Start My Day") || "Start My Day"} (+{XP_REWARDS.CHECK_IN} XP)
+              </>
+            )}
           </Button>
         </div>
       </div>
