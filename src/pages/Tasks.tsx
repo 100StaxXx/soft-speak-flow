@@ -196,7 +196,17 @@ export default function Tasks() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 relative">
+      {/* Loading Overlay */}
+      {isAdding && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="h-12 w-12 mx-auto animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-lg font-medium">Adding your quest...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <BrandTagline />
 
