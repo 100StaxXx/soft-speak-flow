@@ -46,23 +46,23 @@ export const DailyMissions = () => {
   };
 
   return (
-    <Card className="p-5 md:p-6 bg-gradient-to-br from-accent/10 via-card to-primary/10 border-accent/30 hover:border-accent/50 transition-all duration-500 hover:shadow-glow shadow-medium relative overflow-hidden group">
+    <Card className="p-4 sm:p-5 md:p-6 bg-gradient-to-br from-accent/10 via-card to-primary/10 border-accent/30 hover:border-accent/50 transition-all duration-500 hover:shadow-glow shadow-medium relative overflow-hidden group">
       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="relative space-y-4 z-10">
+      <div className="relative space-y-3 sm:space-y-4 z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
-              <Target className="h-5 w-5 text-accent" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
             </div>
             <div>
-              <h3 className="font-heading font-black text-lg">Daily Missions</h3>
-              <p className="text-xs text-muted-foreground">
+              <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {completedCount}/{totalCount} complete
               </p>
             </div>
           </div>
           {allComplete && (
-            <div className="text-xs font-bold text-green-500 animate-pulse">
+            <div className="text-[10px] sm:text-xs font-bold text-green-500 animate-pulse">
               All Done! 🎉
             </div>
           )}
@@ -81,17 +81,17 @@ export const DailyMissions = () => {
             return (
               <div
                 key={mission.id}
-                className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all ${
                   mission.completed
                     ? "bg-accent/5 border-accent/20 opacity-60"
                     : "bg-background border-border hover:border-accent/40"
                 } ${mission.is_bonus ? "border-yellow-500/30 bg-yellow-500/5" : ""}`}
               >
-                <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                   {mission.completed ? (
-                    <CheckCircle2 className="h-5 w-5 text-accent flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent flex-shrink-0" />
                   ) : (
-                    <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <Circle className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
