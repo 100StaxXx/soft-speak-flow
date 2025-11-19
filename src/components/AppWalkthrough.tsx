@@ -315,9 +315,9 @@ export const AppWalkthrough = () => {
       if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
-        setRun(false);
+        // Don't hide tutorial yet - wait for evolution to complete
         
-        // Clear tutorial step
+        // Clear tutorial step temporarily during evolution
         window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
           detail: { step: null } 
         }));
@@ -331,16 +331,18 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (!run && stepIndex === 6) {
+      if (stepIndex === 6) {
         // Evolution complete - now show final congratulations step
+        haptics.success();
         setRun(true);
+        setWaitingForAction(false);
         setTimeout(() => safeSetStep(7), 500);
       }
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     return () => window.removeEventListener('evolution-complete', handleEvolutionComplete);
-  }, [run, stepIndex, safeSetStep]);
+  }, [stepIndex, safeSetStep]);
 
 
   // Listen for route changes to progress tutorial
