@@ -83,14 +83,16 @@ const WALKTHROUGH_STEPS: Step[] = [
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '300px',
-        minWidth: '280px',
+        width: 'auto',
+        minWidth: '320px',
         maxWidth: '85vw',
-        textAlign: 'center' as const,
         padding: '24px',
+        borderRadius: '12px',
       },
       tooltipContent: {
-        textAlign: 'center' as const,
+        textAlign: 'left' as const,
+        padding: '0',
+        width: '100%',
       }
     }
   },
