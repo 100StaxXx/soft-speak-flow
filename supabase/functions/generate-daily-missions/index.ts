@@ -6,52 +6,67 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface MissionTemplate {
-  type: string;
-  text: string;
+interface GeneratedMission {
+  mission: string;
   xp: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   category: string;
-  autoComplete: boolean;
-  progressTarget?: number;
-  chainMissions?: string[];
+  difficulty?: string;
 }
 
-const MISSION_TEMPLATES: MissionTemplate[] = [
-  // Habits
-  { type: "habit_complete_1", text: "Complete 1 habit today", xp: 5, difficulty: 'easy', category: 'habits', autoComplete: true, progressTarget: 1 },
-  { type: "habit_complete_3", text: "Complete 3 habits today", xp: 15, difficulty: 'medium', category: 'habits', autoComplete: true, progressTarget: 3, chainMissions: ['bonus_habit_streak'] },
-  { type: "habit_complete_5", text: "Complete 5 habits today", xp: 25, difficulty: 'hard', category: 'habits', autoComplete: true, progressTarget: 5 },
-  { type: "all_habits", text: "Complete all your habits", xp: 30, difficulty: 'hard', category: 'habits', autoComplete: true, chainMissions: ['bonus_perfect_day'] },
-  { type: "habit_early_bird", text: "Complete a habit before 9 AM", xp: 10, difficulty: 'medium', category: 'habits', autoComplete: true },
-  { type: "habit_night_owl", text: "Complete a habit after 8 PM", xp: 10, difficulty: 'medium', category: 'habits', autoComplete: true },
-  
-  // Wellness
-  { type: "check_in_morning", text: "Complete your morning check-in", xp: 8, difficulty: 'easy', category: 'wellness', autoComplete: true },
-  { type: "mood_log", text: "Log your mood 3 times today", xp: 12, difficulty: 'medium', category: 'wellness', autoComplete: true, progressTarget: 3 },
-  { type: "reflection_write", text: "Write a reflection note", xp: 10, difficulty: 'easy', category: 'wellness', autoComplete: true },
-  { type: "reflection_detailed", text: "Write a detailed reflection (100+ words)", xp: 20, difficulty: 'hard', category: 'wellness', autoComplete: true },
-  
-  // Learning
-  { type: "pep_talk_listen", text: "Listen to today's pep talk", xp: 8, difficulty: 'easy', category: 'learning', autoComplete: true },
-  { type: "pep_talk_full", text: "Listen to full pep talk (100%)", xp: 15, difficulty: 'medium', category: 'learning', autoComplete: true },
-  { type: "mentor_chat_start", text: "Start a conversation with your mentor", xp: 10, difficulty: 'easy', category: 'learning', autoComplete: true },
-  { type: "mentor_chat_deep", text: "Have an extended chat (5+ messages)", xp: 25, difficulty: 'hard', category: 'learning', autoComplete: true, progressTarget: 5 },
-  { type: "library_explore", text: "Browse the library", xp: 5, difficulty: 'easy', category: 'learning', autoComplete: true },
-  
-  // Social
-  { type: "quote_favorite", text: "Save a quote to favorites", xp: 5, difficulty: 'easy', category: 'social', autoComplete: true },
-  { type: "quote_share", text: "Share an inspiring quote", xp: 10, difficulty: 'medium', category: 'social', autoComplete: true },
-  { type: "pep_talk_share", text: "Share a pep talk", xp: 12, difficulty: 'medium', category: 'social', autoComplete: true },
-  
-  // Growth
-  { type: "companion_visit", text: "Visit your companion", xp: 5, difficulty: 'easy', category: 'growth', autoComplete: true },
-  { type: "companion_interact", text: "Interact with companion 3 times", xp: 15, difficulty: 'medium', category: 'growth', autoComplete: true, progressTarget: 3 },
-  { type: "challenge_join", text: "Start or continue a challenge", xp: 15, difficulty: 'medium', category: 'growth', autoComplete: true },
-  { type: "challenge_complete_day", text: "Complete today's challenge", xp: 20, difficulty: 'hard', category: 'growth', autoComplete: true },
-  { type: "streak_maintain", text: "Maintain your habit streak", xp: 10, difficulty: 'medium', category: 'growth', autoComplete: true },
-  { type: "profile_update", text: "Update your profile", xp: 5, difficulty: 'easy', category: 'growth', autoComplete: false },
-];
+const MISSION_GENERATION_PROMPT = `You are a mission generator for a personal growth app. Generate 3 daily missions that follow these strict rules:
+
+**CORE RULES:**
+- Missions must be simple, safe, and achievable in under 10 minutes
+- Missions should promote momentum, clarity, connection, or discipline
+- Do NOT include anything dangerous, expensive, medical, or emotionally heavy
+- Missions must be actionable TODAY, without needing extra items
+- Always keep it 1 sentence
+- Tone should feel like gentle guidance from a mentor
+
+**SAFETY FILTERS (NEVER INCLUDE):**
+🚫 Driving, intense exercise, mixing supplements
+🚫 Buying something, traveling far, booking services
+🚫 Confronting someone, serious emotional conversations
+🚫 Weight loss, trauma, grief, medical advice
+🚫 Anything requiring specific items (except universal ones like water, phone, notebook)
+
+**MISSION STRUCTURE:**
+Include exactly 1 mission from each category:
+
+1. **Connection Mission** ("good human day" - kindness/gratitude)
+   - Text a friend/family and check in
+   - Send someone a compliment
+   - Thank someone for something small
+   - Reach out to someone you haven't spoken to
+   - Tell someone you appreciate them
+
+2. **Quick Win** (momentum/confidence builder)
+   - Do one thing you've been avoiding for less than 5 minutes
+   - Finish one tiny task right now
+   - Complete the easiest to-do item first
+   - Organize your home screen for 2 minutes
+
+3. **Identity Mission** (supports habits/discipline)
+   - Complete all your habits today
+   - Do something your future self will thank you for
+   - Give yourself a 2-minute discipline burst
+
+**XP ALLOCATION:**
+- Connection missions: 5-10 XP
+- Quick wins: 5-10 XP
+- Identity missions: 10-15 XP
+
+**OUTPUT FORMAT (JSON only, no markdown):**
+[
+  {
+    "mission": "exact mission text in one sentence",
+    "xp": number (5-15),
+    "category": "connection" | "quick_win" | "identity",
+    "difficulty": "easy" | "medium"
+  }
+]
+
+Generate 3 missions now - one from each category. Return ONLY the JSON array, no other text.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -81,84 +96,102 @@ serve(async (req) => {
       );
     }
 
-    // Get user's profile and history for personalization
+    // Get user's profile for context
     const { data: profile } = await supabase
       .from('profiles')
-      .select('current_habit_streak, preferences')
+      .select('current_habit_streak')
       .eq('id', userId)
       .single();
 
-    const { data: habits } = await supabase
-      .from('habits')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('is_active', true);
-
-    const habitCount = habits?.length || 0;
     const streak = profile?.current_habit_streak || 0;
 
-    // Smart mission selection based on user data
-    let selectedTemplates: MissionTemplate[] = [];
-    
-    // Always include 1 easy mission
-    const easyMissions = MISSION_TEMPLATES.filter(m => m.difficulty === 'easy');
-    selectedTemplates.push(easyMissions[Math.floor(Math.random() * easyMissions.length)]);
-    
-    // Add 1-2 medium missions
-    const mediumMissions = MISSION_TEMPLATES.filter(m => m.difficulty === 'medium');
-    selectedTemplates.push(mediumMissions[Math.floor(Math.random() * mediumMissions.length)]);
-    
-    // Personalized 3rd mission
-    if (streak >= 7) {
-      // High streak users get harder missions
-      const hardMissions = MISSION_TEMPLATES.filter(m => m.difficulty === 'hard');
-      selectedTemplates.push(hardMissions[Math.floor(Math.random() * hardMissions.length)]);
-    } else {
-      // New users get another easy/medium
-      const mixedMissions = MISSION_TEMPLATES.filter(m => m.difficulty !== 'hard');
-      selectedTemplates.push(mixedMissions[Math.floor(Math.random() * mixedMissions.length)]);
+    // Call Lovable AI to generate missions
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    // Adjust habit missions based on actual habit count
-    selectedTemplates = selectedTemplates.map(mission => {
-      if (mission.type.startsWith('habit_complete_')) {
-        const target = mission.progressTarget || 1;
-        if (target > habitCount && habitCount > 0) {
-          // Adjust to realistic target
-          return {
-            ...mission,
-            text: `Complete ${habitCount} habit${habitCount > 1 ? 's' : ''} today`,
-            progressTarget: habitCount,
-            xp: habitCount * 5
-          };
-        }
-      }
-      return mission;
+    console.log(`Generating AI missions for user ${userId} (streak: ${streak})`);
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: MISSION_GENERATION_PROMPT
+          },
+          {
+            role: 'user',
+            content: `Generate 3 daily missions for a user with ${streak} day habit streak. Make them personal and encouraging.`
+          }
+        ],
+        temperature: 0.9,
+      }),
     });
 
-    // Insert missions
-    const missionsToInsert = selectedTemplates.map(m => ({
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI API error:', errorText);
+      throw new Error(`Failed to generate missions with AI: ${errorText}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const generatedText = aiData.choices[0].message.content;
+    
+    console.log('AI response:', generatedText);
+
+    // Parse AI response
+    let missions: GeneratedMission[];
+    try {
+      // Remove markdown code blocks if present
+      const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      missions = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', generatedText);
+      throw new Error('Invalid AI response format');
+    }
+
+    if (!Array.isArray(missions) || missions.length !== 3) {
+      console.error('Invalid mission count:', missions);
+      throw new Error('AI did not generate exactly 3 missions');
+    }
+
+    console.log('Parsed missions:', missions);
+
+    // Map to database format
+    const missionsToInsert = missions.map((m) => ({
       user_id: userId,
-      mission_type: m.type,
-      mission_text: m.text,
-      xp_reward: m.xp,
       mission_date: today,
-      difficulty: m.difficulty,
-      category: m.category,
-      auto_complete: m.autoComplete,
-      progress_target: m.progressTarget || 1,
+      mission_text: m.mission,
+      mission_type: m.category || 'general',
+      category: m.category || 'general',
+      xp_reward: m.xp || 10,
+      difficulty: m.difficulty || 'medium',
+      auto_complete: false, // AI-generated missions are manual completion
+      completed: false,
+      progress_target: 1,
       progress_current: 0,
       is_bonus: false,
     }));
 
+    // Insert missions
     const { data: created, error } = await supabase
       .from('daily_missions')
       .insert(missionsToInsert)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error inserting missions:', error);
+      throw error;
+    }
 
-    console.log(`Generated ${created.length} missions for user ${userId}`);
+    console.log(`Generated ${created?.length || 0} missions for user ${userId}`);
 
     return new Response(
       JSON.stringify({ missions: created, generated: true }),
