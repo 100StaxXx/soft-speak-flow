@@ -46,19 +46,11 @@ const WALKTHROUGH_STEPS: Step[] = [
     spotlightClicks: true,
   },
   {
-    target: 'body',
+    target: '[data-tour="tasks-tab"]',
     content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now let's create your first quest! Tap the Quests tab.",
     placement: "top",
     disableBeacon: true,
-    styles: {
-      tooltip: {
-        position: 'fixed',
-        top: '120px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        maxWidth: '90vw',
-      }
-    }
+    spotlightClicks: true,
   },
   
   // TASKS PAGE
