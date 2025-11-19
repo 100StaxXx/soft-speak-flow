@@ -47,7 +47,8 @@ export default function Tasks() {
     addTask, 
     toggleTask, 
     deleteTask, 
-    isAdding, 
+    isAdding,
+    isToggling,
     canAddMore 
   } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
@@ -378,10 +379,15 @@ export default function Tasks() {
                       key={task.id}
                       data-tour={index === 0 ? "first-task" : undefined}
                       className={cn(
-                        "p-4 flex items-center gap-3 transition-all cursor-pointer hover:bg-accent/50",
-                        task.completed && "opacity-60"
+                        "p-4 flex items-center gap-3 transition-all hover:bg-accent/50",
+                        task.completed && "opacity-60",
+                        isToggling ? "pointer-events-none opacity-50" : "cursor-pointer"
                       )}
-                      onClick={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
+                      onClick={() => {
+                        if (!isToggling) {
+                          toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward });
+                        }
+                      }}
                     >
                       {task.completed ? (
                         <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
