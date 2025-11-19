@@ -183,11 +183,10 @@ Make it LEGENDARY. This is the birth of a companion.`;
     }
 
     // Calculate bond level based on user attributes
-    const totalAttributes = (userAttributes?.energy || 0) + 
-                          (userAttributes?.resilience || 0) + 
-                          (userAttributes?.focus || 0) + 
-                          (userAttributes?.balance || 0);
-    const bondLevel = Math.min(100, Math.floor(10 + (totalAttributes / 4) + (stage * 2)));
+    const totalAttributes = (userAttributes?.mind || 0) + 
+                          (userAttributes?.body || 0) + 
+                          (userAttributes?.soul || 0);
+    const bondLevel = Math.min(100, Math.floor(10 + (totalAttributes / 3) + (stage * 2)));
 
     // Insert the card into database
     const { data: card, error: insertError } = await supabaseClient

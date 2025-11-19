@@ -317,6 +317,7 @@ export const useCompanion = () => {
         }
 
       const evolutionId = evolutionData.evolution_id;
+        const newStage = evolutionData.new_stage;
 
       // Generate evolution cards for all stages up to current stage
       try {
@@ -332,10 +333,19 @@ export const useCompanion = () => {
         for (let stage = 1; stage <= newStage; stage++) {
           if (!existingStages.has(stage)) {
             console.log(`Generating card for stage ${stage}`);
+            
+            // Get the evolution record for this stage
+            const { data: evolutionRecord } = await supabase
+              .from("companion_evolutions")
+              .select("id")
+              .eq("companion_id", companion.id)
+              .eq("stage", stage)
+              .single();
+            
             await supabase.functions.invoke("generate-evolution-card", {
               body: {
                 companionId: companion.id,
-                evolutionId: evolutionId,
+                evolutionId: evolutionRecord?.id || evolutionId,
                 stage: stage,
                 species: companion.spirit_animal,
                 element: companion.core_element,
