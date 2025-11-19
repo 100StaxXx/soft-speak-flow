@@ -219,7 +219,7 @@ export const CompanionStoryJournal = () => {
             <div>
               <h3 className="text-sm font-semibold mb-3">Lore & Legends</h3>
               <ul className="space-y-2">
-                {story.lore_expansion.map((lore, i) => (
+                {(Array.isArray(story.lore_expansion) ? story.lore_expansion : []).map((lore, i) => (
                   <li key={i} className="text-sm text-muted-foreground flex gap-2">
                     <span className="text-primary">•</span>
                     <span>{lore}</span>

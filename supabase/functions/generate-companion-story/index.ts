@@ -407,6 +407,17 @@ Generate now:`;
       throw new Error('Failed to parse story data');
     }
 
+    // Validate story data fields
+    if (!storyData.chapter_title || !storyData.intro_line || !storyData.main_story || 
+        !storyData.bond_moment || !storyData.life_lesson || !storyData.next_hook) {
+      throw new Error('Invalid story data: missing required fields');
+    }
+
+    // Ensure lore_expansion is an array
+    const loreExpansion = Array.isArray(storyData.lore_expansion) 
+      ? storyData.lore_expansion 
+      : [];
+
     // Save to database
     const { data: savedStory, error: saveError } = await supabaseClient
       .from('companion_stories')
@@ -419,7 +430,7 @@ Generate now:`;
         main_story: storyData.main_story,
         bond_moment: storyData.bond_moment,
         life_lesson: storyData.life_lesson,
-        lore_expansion: storyData.lore_expansion,
+        lore_expansion: loreExpansion,
         next_hook: storyData.next_hook,
         tone_preference: tonePreference,
       }, {
