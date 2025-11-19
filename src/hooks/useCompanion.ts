@@ -182,8 +182,6 @@ export const useCompanion = () => {
         body: {
           companionId: companionData.id,
           stage: 0,
-          tonePreference: "heroic",
-          themeIntensity: "moderate",
         }
       }).then(() => {
         console.log("Stage 0 story generation started");

@@ -213,7 +213,7 @@ serve(async (req) => {
       .from('user_companion')
       .select('*')
       .eq('id', companionId)
-      .single();
+      .maybeSingle();
 
     if (companionError || !companion) throw new Error('Companion not found');
     if (companion.user_id !== user.id) throw new Error('Unauthorized');
@@ -226,7 +226,7 @@ serve(async (req) => {
       .from('profiles')
       .select('onboarding_data')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const onboardingData = profile?.onboarding_data || {};
     const userName = onboardingData.userName || user.email?.split('@')[0] || 'Hero';
