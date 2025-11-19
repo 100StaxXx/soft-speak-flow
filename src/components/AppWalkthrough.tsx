@@ -315,7 +315,9 @@ export const AppWalkthrough = () => {
       if (run && stepIndex === 6) {
         haptics.heavy();
         setWaitingForAction(false);
-        // Don't hide tutorial yet - wait for evolution to complete
+        
+        // PAUSE the tour completely during evolution animation
+        setRun(false);
         
         // Clear tutorial step temporarily during evolution
         window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
