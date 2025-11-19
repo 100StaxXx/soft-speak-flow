@@ -56,7 +56,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         left: '50%',
         transform: 'translateX(-50%)',
         maxWidth: '90vw',
-        marginBottom: '20px',
+        marginBottom: '100px',
       }
     }
   },
