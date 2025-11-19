@@ -95,14 +95,14 @@ const Index = () => {
         />
       </Suspense>
       <PageTransition>
-        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
-          <div className="max-w-4xl mx-auto px-4 py-7 md:py-9 space-y-6 md:space-y-8">
+        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
             {/* Header */}
-            <div className="mb-4 md:mb-6">
-              <h1 className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
                 Mentor
               </h1>
-              <p className="text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
+              <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
             </div>
 
             {/* Priority Content - Load with Suspense for better UX */}

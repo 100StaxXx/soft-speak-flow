@@ -41,32 +41,22 @@ export const BottomNav = () => {
   const canClickCompanion = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Click Companion tab
   const canClickQuests = tutorialStep === 4 || tutorialStep === 5; // Steps 4-5: Click Quests tab
   
-  console.log('[BottomNav] Tutorial Debug:', {
-    tutorialStep,
-    isTutorialActive,
-    canClickCompanion,
-    canClickQuests
-  });
+  // Remove console logs for production
   
   const handleNavClick = (e: React.MouseEvent, route: string) => {
     if (!isTutorialActive) return;
     
-    console.log('[BottomNav] Click attempt:', { route, canClickCompanion, canClickQuests });
-    
     // Allow Companion click on steps 2-3
     if (route === '/companion' && canClickCompanion) {
-      console.log('[BottomNav] Allowing Companion click');
       return;
     }
     
     // Allow Quests click on steps 4-5
     if (route === '/tasks' && canClickQuests) {
-      console.log('[BottomNav] Allowing Quests click');
       return;
     }
     
     // Block all other navigation during tutorial
-    console.log('[BottomNav] Blocking navigation');
     e.preventDefault();
     e.stopPropagation();
   };
@@ -74,11 +64,11 @@ export const BottomNav = () => {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50 transition-transform duration-300"
+        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50 transition-transform duration-300 safe-area-bottom"
         role="navigation"
         aria-label="Main navigation"
       >
-        <div className="max-w-lg mx-auto flex items-center justify-around px-1 py-2.5">
+        <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
         <NavLink
           to="/"
           end
