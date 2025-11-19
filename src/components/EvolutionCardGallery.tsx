@@ -30,24 +30,33 @@ export const EvolutionCardGallery = () => {
       
       const { data, error } = await supabase
         .from("companion_evolution_cards")
-        .select(`
-          *,
-          companion_evolutions(image_url)
-        `)
+        .select("*")
         .eq("user_id", user.id)
         .order("evolution_stage", { ascending: true });
 
       if (error) throw error;
       
-      // Deduplicate cards by card_id to prevent duplicates
-      const uniqueCards = new Map<string, any>();
-      (data || []).forEach(card => {
-        if (!uniqueCards.has(card.card_id)) {
-          const evolutionImageUrl = (card as any).companion_evolutions?.image_url;
-          uniqueCards.set(card.card_id, {
+      // Fetch the correct image for each card from companion_evolutions using evolution_id
+      const cardsWithImages = await Promise.all(
+        (data || []).map(async (card) => {
+          const { data: evolutionData } = await supabase
+            .from("companion_evolutions")
+            .select("image_url")
+            .eq("id", card.evolution_id)
+            .single();
+          
+          return {
             ...card,
-            image_url: card.image_url || evolutionImageUrl
-          });
+            image_url: evolutionData?.image_url || card.image_url
+          };
+        })
+      );
+      
+      // Deduplicate cards by card_id
+      const uniqueCards = new Map<string, any>();
+      cardsWithImages.forEach(card => {
+        if (!uniqueCards.has(card.card_id)) {
+          uniqueCards.set(card.card_id, card);
         }
       });
       
