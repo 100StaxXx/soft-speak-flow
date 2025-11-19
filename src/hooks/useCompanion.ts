@@ -252,9 +252,9 @@ export const useCompanion = () => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
       if (shouldEvolve && companion) {
-        toast.success("🎉 Your companion is ready to evolve!");
-        // Show overlay immediately
+        // Show overlay immediately BEFORE toast
         setIsEvolvingLoading(true);
+        toast.success("🎉 Your companion is ready to evolve!");
         // Trigger evolution
         evolveCompanion.mutate({ newStage, currentXP: newXP });
       }
@@ -400,7 +400,8 @@ export const useCompanion = () => {
     },
     onSuccess: () => {
       evolutionInProgress.current = false;
-      setIsEvolvingLoading(false);
+      // Don't hide overlay here - let CompanionEvolution handle it
+      // The overlay will remain visible until the animation completes
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
       queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
@@ -430,5 +431,6 @@ export const useCompanion = () => {
     nextEvolutionXP,
     progressToNext,
     isEvolvingLoading,
+    setIsEvolvingLoading,
   };
 };
