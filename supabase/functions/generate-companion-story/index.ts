@@ -7,9 +7,21 @@ const corsHeaders = {
 };
 
 // Helper function to convert hex colors to descriptive names
-function getColorName(hexColor: string): string {
+function getColorName(color: string): string {
+  if (!color) return 'vibrant';
+  
+  // If it's already a color name (no # or not 6 hex chars), return it
+  if (!color.includes('#') && !/^[0-9A-Fa-f]{6}$/.test(color.replace('#', ''))) {
+    return color.toLowerCase();
+  }
+  
   // Remove # if present
-  const hex = hexColor.replace('#', '').toLowerCase();
+  const hex = color.replace('#', '').toLowerCase();
+  
+  // If not a valid hex, return as-is
+  if (!/^[0-9a-f]{6}$/.test(hex)) {
+    return color.toLowerCase();
+  }
   
   const colorMap: Record<string, string> = {
     '9333ea': 'purple',
