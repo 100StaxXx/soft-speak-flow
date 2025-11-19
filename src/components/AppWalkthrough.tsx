@@ -71,24 +71,21 @@ const WALKTHROUGH_STEPS: Step[] = [
   {
     target: 'body',
     content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
-    placement: 'top',
+    placement: 'center',
     disableBeacon: true,
     spotlightClicks: false,
-    floaterProps: {
-      disableAnimation: true,
-    },
     styles: {
       options: {
         zIndex: 100000,
       },
       tooltip: {
-        position: 'fixed',
-        top: '50%',
+        position: 'fixed' as const,
+        top: '45%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        maxWidth: '90vw',
+        maxWidth: '85vw',
         width: 'auto',
-        marginTop: '0',
+        textAlign: 'center' as const,
       }
     }
   },
