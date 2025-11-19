@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
-import { useRef, useState } from "react";
+import { useRef } from "react";
+import { useEvolution } from "@/contexts/EvolutionContext";
 
 export interface Companion {
   id: string;
@@ -62,11 +63,11 @@ export const EVOLUTION_THRESHOLDS = {
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
   
   // Prevent duplicate evolution/XP requests during lag
   const evolutionInProgress = useRef(false);
   const xpInProgress = useRef(false);
-  const [isEvolvingLoading, setIsEvolvingLoading] = useState(false);
 
   const { data: companion, isLoading } = useQuery({
     queryKey: ["companion", user?.id],
@@ -431,6 +432,5 @@ export const useCompanion = () => {
     nextEvolutionXP,
     progressToNext,
     isEvolvingLoading,
-    setIsEvolvingLoading,
   };
 };
