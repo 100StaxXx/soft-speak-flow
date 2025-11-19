@@ -15,7 +15,7 @@ import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -243,9 +243,28 @@ export default function Tasks() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <h3 className="font-semibold text-sm">
-                  {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
-                </h3>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="font-semibold text-sm hover:bg-accent/50 h-8 gap-2"
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                
                 <Button
                   variant="ghost"
                   size="sm"
