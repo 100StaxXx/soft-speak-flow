@@ -32,7 +32,7 @@ export const EvolutionCardGallery = () => {
         .from("companion_evolution_cards")
         .select(`
           *,
-          companion_evolutions!inner(image_url)
+          companion_evolutions(image_url)
         `)
         .eq("user_id", user.id)
         .order("evolution_stage", { ascending: true });
