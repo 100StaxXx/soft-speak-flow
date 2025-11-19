@@ -7,6 +7,8 @@ class AmbientMusicManager {
   private fadeInterval: NodeJS.Timeout | null = null;
   private currentTrack = 'ambient';
   private isPausedForEvent = false; // Track if paused for major events
+  private originalVolume = 0.05; // Store original volume before ducking
+  private isDucked = false; // Track if currently ducked
 
   // Ambient music URLs - these would be your actual music files
   private tracks = {
@@ -246,6 +248,63 @@ class AmbientMusicManager {
     });
   }
 
+  // Duck volume for other audio (e.g., pep talks)
+  duck() {
+    if (!this.audio || this.isDucked || this.isMuted) return;
+    
+    this.isDucked = true;
+    this.originalVolume = this.volume;
+    const duckedVolume = this.volume * 0.15; // Reduce to 15% of original
+    
+    if (this.fadeInterval) clearInterval(this.fadeInterval);
+    
+    const startVolume = this.audio.volume;
+    const steps = 10;
+    const stepDuration = 300 / steps;
+    const volumeDecrement = (startVolume - duckedVolume) / steps;
+    let currentStep = 0;
+
+    this.fadeInterval = setInterval(() => {
+      if (!this.audio) return;
+      
+      currentStep++;
+      this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), duckedVolume);
+      
+      if (currentStep >= steps) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
+    }, stepDuration);
+  }
+
+  // Restore volume after ducking
+  unduck() {
+    if (!this.audio || !this.isDucked || this.isMuted) return;
+    
+    this.isDucked = false;
+    const targetVolume = this.originalVolume;
+    
+    if (this.fadeInterval) clearInterval(this.fadeInterval);
+    
+    const startVolume = this.audio.volume;
+    const steps = 10;
+    const stepDuration = 500 / steps;
+    const volumeIncrement = (targetVolume - startVolume) / steps;
+    let currentStep = 0;
+
+    this.fadeInterval = setInterval(() => {
+      if (!this.audio) return;
+      
+      currentStep++;
+      this.audio.volume = Math.min(startVolume + (volumeIncrement * currentStep), targetVolume);
+      
+      if (currentStep >= steps) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
+    }, stepDuration);
+  }
+
   // Get current state
   getState() {
     return {
@@ -268,3 +327,5 @@ export const toggleAmbientMute = () => ambientMusic.toggleMute();
 export const setAmbientVolume = (volume: number) => ambientMusic.setVolume(volume);
 export const changeAmbientTrack = (track: 'ambient' | 'meditation' | 'focus' | 'energy') => 
   ambientMusic.changeTrack(track);
+export const duckAmbient = () => ambientMusic.duck();
+export const unduckAmbient = () => ambientMusic.unduck();
