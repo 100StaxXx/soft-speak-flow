@@ -507,10 +507,10 @@ export default function Tasks() {
                       <div>
                         <h3 className="font-semibold">Your Habits</h3>
                         <p className="text-sm text-muted-foreground">
-                          {habits.length}/5 habits
+                          {habits.length}/2 habits
                         </p>
                       </div>
-                      {habits.length < 5 && (
+                      {habits.length < 2 && (
                         <Button onClick={() => setShowAddHabit(true)} size="sm">
                           <Plus className="h-4 w-4 mr-2" />
                           Add
