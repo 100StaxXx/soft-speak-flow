@@ -30,13 +30,19 @@ export const EvolutionCardGallery = () => {
       
       const { data, error } = await supabase
         .from("companion_evolution_cards")
-        .select("*")
+        .select(`
+          *,
+          companion_evolutions!inner(image_url)
+        `)
         .eq("user_id", user.id)
         .order("evolution_stage", { ascending: true });
 
       if (error) throw error;
       
-      return (data || []) as EvolutionCard[];
+      return (data || []).map(card => ({
+        ...card,
+        image_url: card.image_url || (card as any).companion_evolutions?.image_url
+      })) as EvolutionCard[];
     },
     enabled: !!user,
   });
