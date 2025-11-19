@@ -39,7 +39,7 @@ export const BottomNav = () => {
   // Determine if navigation should be blocked
   const isTutorialActive = tutorialStep !== null;
   const canClickCompanion = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Click Companion tab
-  const canClickQuests = tutorialStep === 4 || tutorialStep === 5 || tutorialStep === 6; // Steps 4-6: Click Quests tab
+  const canClickQuests = tutorialStep === 4 || tutorialStep === 5; // Steps 4-5: Click Quests tab
   
   // Remove console logs for production
   
