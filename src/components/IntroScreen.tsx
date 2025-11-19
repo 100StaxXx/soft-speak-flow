@@ -10,8 +10,8 @@ export const IntroScreen = ({ onComplete }: IntroScreenProps) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShow(false);
-      setTimeout(onComplete, 500);
-    }, 2500);
+      setTimeout(onComplete, 1500);
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
@@ -39,15 +39,22 @@ export const IntroScreen = ({ onComplete }: IntroScreenProps) => {
 
         {/* App title with cinematic reveal */}
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-6xl md:text-7xl font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-fade-in tracking-wider"
+          <h1 className="text-6xl md:text-7xl font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-wider"
               style={{
                 textShadow: '0 0 30px hsl(var(--primary)/0.5)',
-                animation: 'fade-in 0.8s ease-out, scale-in 0.6s ease-out'
+                animation: 'fade-in 2s ease-out, scale-in 1.8s ease-out',
+                opacity: 0,
+                animationFillMode: 'forwards'
               }}>
             R-EVOLUTION
           </h1>
-          <p className="text-lg text-muted-foreground/80 animate-fade-in tracking-widest" 
-             style={{ animationDelay: '0.3s', opacity: 0, animationFillMode: 'forwards' }}>
+          <p className="text-lg text-muted-foreground/80 tracking-widest" 
+             style={{ 
+               animation: 'fade-in 2s ease-out',
+               animationDelay: '0.8s', 
+               opacity: 0, 
+               animationFillMode: 'forwards' 
+             }}>
             YOUR JOURNEY BEGINS
           </p>
         </div>
