@@ -178,21 +178,25 @@ serve(async (req) => {
     const userPersonality = onboardingData.userPersonality || "determined";
     const creaturePersonality = onboardingData.creaturePersonality || "loyal and brave";
 
-    // Get previous chapter for memory notes
+    // Get ALL previous chapters for full continuity (not just the previous one)
     let memoryNotes = "This is the beginning of your journey.";
     if (stage > 0) {
-      const { data: prevStory } = await supabaseClient
+      const { data: previousStories } = await supabaseClient
         .from('companion_stories')
-        .select('main_story, lore_expansion')
+        .select('stage, chapter_title, main_story, bond_moment, lore_expansion, next_hook')
         .eq('companion_id', companionId)
-        .eq('stage', stage - 1)
-        .maybeSingle();
+        .lt('stage', stage)
+        .order('stage', { ascending: true });
 
-      if (prevStory) {
-        // Extract key details from previous chapter for continuity
-        const loreItems = Array.isArray(prevStory.lore_expansion) ? prevStory.lore_expansion : [];
-        const lastSentence = prevStory.main_story?.split('.').slice(-2, -1)[0] || '';
-        memoryNotes = `Previous chapter: ${lastSentence}. ${loreItems.slice(0, 2).join(' ')}`;
+      if (previousStories && previousStories.length > 0) {
+        // Build comprehensive memory notes from ALL previous chapters
+        memoryNotes = previousStories
+          .map((s: any) => {
+            const loreItems = Array.isArray(s.lore_expansion) ? s.lore_expansion.slice(0, 3).join('; ') : '';
+            const storySnippet = s.main_story?.substring(0, 200) || '';
+            return `Stage ${s.stage} - "${s.chapter_title}":\nKey moments: ${storySnippet}...\nBond: ${s.bond_moment}\nLore: ${loreItems}\nNext hook: ${s.next_hook}`;
+          })
+          .join('\n\n');
       }
     }
 
