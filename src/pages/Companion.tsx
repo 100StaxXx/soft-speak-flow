@@ -2,7 +2,6 @@ import { BottomNav } from "@/components/BottomNav";
 import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
-
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
@@ -20,88 +19,77 @@ import { useCompanion } from "@/hooks/useCompanion";
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext } = useCompanion();
 
-  // Companion is always created during onboarding, so no need for fallback UI here
-
   return (
-      <PageTransition>
+    <PageTransition>
       <CompanionErrorBoundary>
-      <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-14 md:h-16 items-center px-4">
-            <h1 className="text-xl md:text-2xl font-heading font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Companion & Progress
-            </h1>
-          </div>
-        </header>
-
-        <div className="container px-3 md:px-4 py-5 md:py-7 space-y-6 md:space-y-8 max-w-4xl mx-auto">
-          <div data-tour="companion-display" className="space-y-4">
-            <CompanionDisplay />
-            {companion && (
-              <div className="flex justify-center">
+        <div className="min-h-screen bg-background pb-20">
+          <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container flex h-16 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h1 className="font-heading font-black text-xl">Companion</h1>
+              </div>
+              {companion && (
                 <CompanionBadge 
-                  element={companion.core_element} 
+                  element={companion.core_element}
                   stage={companion.current_stage}
                   showStage={true}
                 />
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </header>
 
-          <Tabs defaultValue="progress" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto">
-              <TabsTrigger value="progress" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="progress-tab">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Progress</span>
+          <Tabs defaultValue="overview" className="container py-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Overview
               </TabsTrigger>
-              <TabsTrigger value="cards" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm">
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Cards</span>
+              <TabsTrigger value="progress">
+                <Trophy className="h-4 w-4 mr-2" />
+                Progress
               </TabsTrigger>
-              <TabsTrigger value="story" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="story-tab">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Story</span>
+              <TabsTrigger value="story">
+                <BookOpen className="h-4 w-4 mr-2" />
+                Story
               </TabsTrigger>
-              <TabsTrigger value="achievements" className="flex-col md:flex-row gap-1 md:gap-2 py-2 md:py-2.5 text-xs md:text-sm" data-tour="achievements-tab">
-                <Trophy className="h-4 w-4" />
-                <span className="hidden sm:inline">Achievements</span>
+              <TabsTrigger value="cards">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Cards
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="progress" className="space-y-6 mt-6">
-              <HabitCalendar />
+            <TabsContent value="overview" className="space-y-6 mt-6">
+              <CompanionDisplay />
               <NextEvolutionPreview 
-                currentStage={companion?.current_stage || 0}
                 currentXP={companion?.current_xp || 0}
-                nextEvolutionXP={companion ? nextEvolutionXP : 0}
-                progressPercent={companion ? progressToNext : 0}
+                nextEvolutionXP={nextEvolutionXP || 0}
+                currentStage={companion?.current_stage || 0}
+                progressPercent={progressToNext}
               />
-              <div data-tour="xp-breakdown">
-                <XPBreakdown />
-              </div>
-              <div data-tour="daily-missions">
-                <DailyMissions />
-              </div>
-              <WeeklyInsights />
+              <XPBreakdown />
+              <DailyMissions />
             </TabsContent>
 
-            <TabsContent value="cards" className="space-y-6 mt-6">
-              <EvolutionCardGallery />
+            <TabsContent value="progress" className="space-y-6 mt-6">
+              <HabitCalendar />
+              <WeeklyInsights />
+              <AchievementsPanel />
+              {companion && <CompanionEvolutionHistory companionId={companion.id} />}
             </TabsContent>
 
             <TabsContent value="story" className="space-y-6 mt-6">
               <CompanionStoryJournal />
             </TabsContent>
 
-            <TabsContent value="achievements" className="space-y-6 mt-6">
-              <AchievementsPanel />
+            <TabsContent value="cards" className="space-y-6 mt-6">
+              <EvolutionCardGallery />
             </TabsContent>
           </Tabs>
         </div>
-      </div>
       </CompanionErrorBoundary>
       <BottomNav />
-      </PageTransition>
+    </PageTransition>
   );
 };
 

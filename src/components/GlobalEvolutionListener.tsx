@@ -81,7 +81,7 @@ export const GlobalEvolutionListener = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, queryClient]);
+  }, [user, queryClient, profile?.selected_mentor_id, setIsEvolvingLoading]);
 
   if (!isEvolving || !evolutionData) {
     return null;

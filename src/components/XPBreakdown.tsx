@@ -7,7 +7,7 @@ import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 
 export const XPBreakdown = () => {
   const { user } = useAuth();
-  const { currentStreak, multiplier, nextMilestone } = useStreakMultiplier();
+  const { currentStreak = 0, multiplier = 1, nextMilestone } = useStreakMultiplier();
   const today = new Date().toISOString().split('T')[0];
 
   const { data: todayXP } = useQuery({

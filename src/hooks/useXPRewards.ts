@@ -155,7 +155,10 @@ export const useXPRewards = () => {
   };
 
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string) => {
-    if (!companion) return;
+    if (!companion) {
+      console.warn('Attempted to award XP without companion');
+      return;
+    }
     if (displayReason) {
       showXPToast(xpAmount, displayReason);
     }
