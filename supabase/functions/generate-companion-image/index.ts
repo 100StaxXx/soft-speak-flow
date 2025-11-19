@@ -18,8 +18,18 @@ const ELEMENT_EFFECTS = {
 };
 
 const EVOLUTION_STAGES = {
-  0: { name: "Dormant Egg", prompt: "A small, hand-sized mystical egg or origin core. Smooth surface with faint {element} glow. Subtle markings in {color} tones. Inside, the silhouette of a {spirit} is faintly visible, curled and sleeping. Gentle pulsing energy." },
-  1: { name: "Cracking Awakening", prompt: "The origin egg fracturing with glowing cracks of {element} energy. The internal silhouette of the {spirit} shifts. {element} light leaks out. Shell reveals {spirit}-accurate textures beginning to form." },
+  0: { 
+    name: "Dormant Egg", 
+    prompt: "A mystical egg floating in gentle {element} energy. The egg has a smooth, opalescent surface with subtle {color} undertones. Deep within the translucent shell, a dark shadowy silhouette is barely visible - the mysterious outline of a powerful, mature {spirit} creature curled in dormant slumber. The silhouette should be a dark, featureless shadow showing only the basic shape and posture of what will become a majestic creature at stage 15. Faint {element} glow pulses around the egg.",
+    useFutureSilhouette: true,
+    futureStage: 15
+  },
+  1: { 
+    name: "Cracking Awakening", 
+    prompt: "The same mystical egg now with luminous cracks spreading across its surface, leaking {element} energy. Through the larger cracks, a dark shadowy silhouette is more visible - the outline of an even more powerful {spirit} creature in its ultimate form (stage 20), still curled but beginning to stir. The silhouette remains a dark, featureless shadow showing only the magnificent shape and presence of the creature's final evolution. {color} light emanates from the fractures.",
+    useFutureSilhouette: true,
+    futureStage: 20
+  },
   2: { name: "Newborn Emergence", prompt: "A tiny {spirit} fully emerged from the egg, fragile and newborn. Anatomically accurate to species. Oversized curious eyes, soft body, faint markings in {color} tones on fur/feathers/scales. Gentle {element} aura flickering around it." },
   3: { name: "Early Infant Form", prompt: "A slightly larger infant {spirit}, steadier posture but still round proportions. Bright curious eyes. Species-specific textures becoming clearer. {element} effects forming tiny motifs around body." },
   4: { name: "Juvenile Form", prompt: "A young {spirit} with lengthening body and strengthening limbs. Playful movements. Fur/feathers/scales showing early patterning in {color} tones. {element} energy forming natural highlights." },
@@ -67,9 +77,29 @@ serve(async (req) => {
     if (!stageInfo) throw new Error(`Invalid stage: ${stage}`);
 
     const elementEffect = ELEMENT_EFFECTS[element.toLowerCase() as keyof typeof ELEMENT_EFFECTS] || ELEMENT_EFFECTS.light;
-    const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
+    
+    let fullPrompt: string;
+    
+    // Stage 0 uses special silhouette prompt
+    if (stage === 0) {
+      fullPrompt = `Ultra high quality digital art, photorealistic fantasy magical egg:\n\nA mystical egg floating in gentle ${element} energy. The egg has a smooth, opalescent surface with subtle ${favoriteColor} undertones and delicate natural patterns. 
 
-    const fullPrompt = `Ultra high quality digital art, photorealistic fantasy creature:\n\n${basePrompt}\n\nCRITICAL: MUST be anatomically accurate ${spiritAnimal}. Maintain EXACT ${spiritAnimal} silhouette, proportions, and features.\n\nCOLORS: Primary ${favoriteColor}, Eyes ${eyeColor || favoriteColor}, Fur/Feathers/Scales ${furColor || favoriteColor}, Element ${elementEffect}\n\nSTYLE: Hyper-detailed textures, cinematic lighting, ethereal magical atmosphere, depth of field\n\nStage ${stage}: ${stageInfo.name}\n${element} element creature\nPerfect ${spiritAnimal} anatomy\n\nUltra detailed, 8K quality, professional concept art`;
+CRITICAL: Deep within the semi-translucent shell, there must be a dark shadowy silhouette barely visible - the mysterious outline of a powerful, majestic ${spiritAnimal} creature curled in dormant slumber (showing what it will look like at stage 15 - a fully mature, impressive form).
+
+The silhouette should be:
+- Completely dark and featureless (just a shadow/outline)  
+- Show the basic powerful shape of a mature ${spiritAnimal}
+- Curled in sleeping position inside the egg
+- Barely visible through the translucent egg shell
+- Mysterious and promising
+
+The egg itself glows softly with ${element} energy (${elementEffect}), with faint pulses of ${favoriteColor} light.
+
+Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra detailed 8K quality, professional fantasy concept art`;
+    } else {
+      const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
+      fullPrompt = `Ultra high quality digital art, photorealistic fantasy creature:\n\n${basePrompt}\n\nCRITICAL: MUST be anatomically accurate ${spiritAnimal}. Maintain EXACT ${spiritAnimal} silhouette, proportions, and features.\n\nCOLORS: Primary ${favoriteColor}, Eyes ${eyeColor || favoriteColor}, Fur/Feathers/Scales ${furColor || favoriteColor}, Element ${elementEffect}\n\nSTYLE: Hyper-detailed textures, cinematic lighting, ethereal magical atmosphere, depth of field\n\nStage ${stage}: ${stageInfo.name}\n${element} element creature\nPerfect ${spiritAnimal} anatomy\n\nUltra detailed, 8K quality, professional concept art`;
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
