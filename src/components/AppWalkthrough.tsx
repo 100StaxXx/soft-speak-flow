@@ -554,7 +554,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5 || stepIndex === 7}
+      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5 || stepIndex === 6 || stepIndex === 7}
       locale={{
         back: 'Back',
         close: '',
