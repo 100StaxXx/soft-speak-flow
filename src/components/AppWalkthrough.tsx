@@ -552,7 +552,6 @@ export const AppWalkthrough = () => {
         spotlight: {
           boxShadow: 'none',
           backgroundColor: 'transparent',
-          pointerEvents: stepIndex === 4 ? 'none' : 'auto',
         },
       }}
       disableOverlay={stepIndex === 3 || stepIndex === 4 || stepIndex === 5 || stepIndex === 7}
