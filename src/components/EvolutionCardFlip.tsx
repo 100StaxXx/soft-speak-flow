@@ -42,8 +42,6 @@ const ELEMENT_SYMBOLS: Record<string, string> = {
   light: "✨",
 };
 
-const STAGE_LABELS = ["Seedling", "Growing", "Awakening", "Evolved", "Transcendent"];
-
 export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -91,7 +89,7 @@ export function EvolutionCardFlip({ card }: Props) {
             </Badge>
             
             <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
-              {STAGE_LABELS[card.evolution_stage - 1] || `Stage ${card.evolution_stage}`}
+              Stage {card.evolution_stage}
             </Badge>
 
             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
