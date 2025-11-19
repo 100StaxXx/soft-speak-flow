@@ -78,21 +78,28 @@ const WALKTHROUGH_STEPS: Step[] = [
       options: {
         zIndex: 100000,
       },
+      overlay: {
+        mixBlendMode: 'normal' as const,
+      },
       tooltip: {
         position: 'fixed' as const,
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
+        top: '50% !important' as any,
+        left: '50% !important' as any,
+        transform: 'translate(-50%, -50%) !important' as any,
+        margin: '0 !important' as any,
         width: 'auto',
-        minWidth: '320px',
+        minWidth: '300px',
         maxWidth: '85vw',
-        padding: '24px',
-        borderRadius: '12px',
+        padding: '1.5rem',
+        borderRadius: '1.25rem',
+        border: '3px solid hsl(var(--primary))',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
       },
       tooltipContent: {
+        fontSize: '1rem',
+        lineHeight: '1.6',
+        padding: '0.5rem 0',
         textAlign: 'left' as const,
-        padding: '0',
-        width: '100%',
       }
     }
   },
