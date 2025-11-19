@@ -336,4 +336,33 @@ All colors MUST be HSL.
     z-index: -1;
   }
 
+  /* React Joyride Custom Styles - Border Pulse Only */
+  .__floater__open {
+    filter: none !important;
+  }
+
+  @keyframes spotlight-border-pulse {
+    0%, 100% {
+      box-shadow: 
+        0 0 0 4px hsl(var(--primary) / 0.4),
+        0 0 20px hsl(var(--primary) / 0.3);
+    }
+    50% {
+      box-shadow: 
+        0 0 0 6px hsl(var(--primary) / 0.7),
+        0 0 30px hsl(var(--primary) / 0.5);
+    }
+  }
+
+  .react-joyride__spotlight {
+    background-color: transparent !important;
+    border-radius: var(--radius) !important;
+    animation: spotlight-border-pulse 2s ease-in-out infinite !important;
+  }
+
+  .react-joyride__overlay {
+    background-color: hsl(0 0% 0% / 0.75) !important;
+  }
+
 }
+
