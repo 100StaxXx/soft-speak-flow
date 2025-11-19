@@ -37,6 +37,17 @@ serve(async (req) => {
 
     console.log('Generating evolution card for:', { companionId, stage, species, element });
 
+    // Check if this companion already has cards with a name (to maintain consistency)
+    const { data: existingCards } = await supabaseClient
+      .from('companion_evolution_cards')
+      .select('creature_name')
+      .eq('companion_id', companionId)
+      .order('evolution_stage', { ascending: true })
+      .limit(1);
+
+    const existingName = existingCards && existingCards.length > 0 ? existingCards[0].creature_name : null;
+    console.log('Existing creature name:', existingName);
+
     // Generate card ID
     const randomHex = crypto.randomUUID().split('-')[0].toUpperCase();
     const cardId = `ALP-${species.toUpperCase()}-${user.id.split('-')[0].toUpperCase()}-E${stage}-${randomHex}`;
@@ -71,7 +82,6 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    // Derive personality and vibes from user attributes
     const personality = userAttributes?.energy > 60 ? 'bold and energetic' :
                        userAttributes?.resilience > 60 ? 'steadfast and enduring' :
                        userAttributes?.focus > 60 ? 'sharp and calculated' :
@@ -82,7 +92,33 @@ serve(async (req) => {
                  stage >= 5 ? 'fierce, loyal, determined' :
                  'curious, cute, eager';
 
-    const aiPrompt = `You are a master fantasy creature naming expert. Generate a UNIQUE, ORIGINAL creature name for this companion.
+    let aiPrompt;
+    
+    if (existingName) {
+      // Use existing name and generate story for evolution
+      aiPrompt = `You are a master storyteller continuing the legend of a companion creature named "${existingName}".
+
+CREATURE ATTRIBUTES:
+- Name: ${existingName} (DO NOT CHANGE THIS)
+- Species: ${species}
+- Element: ${element}
+- Evolution Stage: ${stage}/20 (evolved from stage ${stage - 1})
+- Rarity: ${rarity}
+- Personality: ${personality}
+
+Generate a card with these exact fields in JSON:
+
+{
+  "creature_name": "${existingName}",
+  "traits": ["3-5 dynamic trait names that reflect ${existingName}'s NEW abilities at stage ${stage}"],
+  "story_text": "2-4 paragraphs telling how ${existingName} has evolved to stage ${stage}. Make it epic and personal, showing growth and new power.",
+  "lore_seed": "One mysterious sentence about ${existingName}'s destiny or deeper mythology"
+}
+
+Make it LEGENDARY. ${existingName} is growing stronger.`;
+    } else {
+      // First evolution - generate a new name
+      aiPrompt = `You are a master fantasy creature naming expert. Generate a UNIQUE, ORIGINAL creature name for this companion's FIRST evolution.
 
 CREATURE ATTRIBUTES:
 - Species: ${species}
@@ -107,13 +143,14 @@ NAME GENERATION RULES:
 Generate a card with these exact fields in JSON:
 
 {
-  "creature_name": "Generate a unique name following all rules above. Make it memorable and fitting.",
-  "traits": ["3-5 dynamic trait names that reflect the creature's abilities and stage"],
-  "story_text": "2-4 paragraphs telling this evolution's story. Make it epic, personal, and tied to the user's growth journey. This creature evolved because the user grew. Use the generated creature name throughout the story.",
-  "lore_seed": "One mysterious sentence hinting at deeper mythology or prophecy, mentioning the creature's name"
+  "creature_name": "Generate a unique name following all rules above. This will be permanent.",
+  "traits": ["3-5 dynamic trait names that reflect the creature's abilities at stage ${stage}"],
+  "story_text": "2-4 paragraphs telling the origin story of this newly awakened creature. Use the generated name throughout.",
+  "lore_seed": "One mysterious sentence hinting at the creature's destiny, mentioning its name"
 }
 
-Make it LEGENDARY. This card represents real human progress. The name must be truly original and memorable.`;
+Make it LEGENDARY. This is the birth of a companion.`;
+    }
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
