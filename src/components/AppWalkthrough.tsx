@@ -69,39 +69,34 @@ const WALKTHROUGH_STEPS: Step[] = [
     spotlightClicks: true,
   },
   {
-    target: 'body',
+    target: '[data-tour="today-quests-header"]',
     content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
-    placement: 'center',
+    placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
-      styles: {
-        options: {
-          zIndex: 100000,
-        },
-        overlay: {
-          mixBlendMode: 'normal' as const,
-        },
-        tooltip: {
-          position: 'fixed' as const,
-          top: '35% !important' as any,
-          left: '50% !important' as any,
-          transform: 'translate(-50%, -50%) !important' as any,
-          margin: '0 !important' as any,
-          width: 'auto',
-          minWidth: '300px',
-          maxWidth: '85vw',
-          padding: '1.5rem',
-          borderRadius: '1.25rem',
-          border: '3px solid hsl(var(--primary))',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
-        },
-        tooltipContent: {
-          fontSize: '1rem',
-          lineHeight: '1.6',
-          padding: '0.5rem 0',
-          textAlign: 'left' as const,
-        }
+    styles: {
+      options: {
+        zIndex: 100000,
+      },
+      overlay: {
+        mixBlendMode: 'normal' as const,
+      },
+      tooltip: {
+        minWidth: '300px',
+        maxWidth: '85vw',
+        padding: '1.5rem',
+        borderRadius: '1.25rem',
+        border: '3px solid hsl(var(--primary))',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+        marginBottom: '12px',
+      },
+      tooltipContent: {
+        fontSize: '1rem',
+        lineHeight: '1.6',
+        padding: '0.5rem 0',
+        textAlign: 'left' as const,
       }
+    }
   },
   {
     target: 'body',
