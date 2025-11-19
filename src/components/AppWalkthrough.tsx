@@ -74,6 +74,10 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
+    floaterProps: {
+      disableAnimation: true,
+      hideArrow: false,
+    },
     styles: {
       options: {
         zIndex: 100000,
@@ -82,10 +86,6 @@ const WALKTHROUGH_STEPS: Step[] = [
         mixBlendMode: 'normal' as const,
       },
       tooltip: {
-        position: 'fixed' as const,
-        top: '120px !important' as any,
-        left: '50% !important' as any,
-        transform: 'translateX(-50%) !important' as any,
         minWidth: '300px',
         maxWidth: '85vw',
         padding: '1.5rem',
