@@ -183,6 +183,7 @@ export const CompanionEvolution = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-primary/30 to-black flex items-center justify-center overflow-hidden"
+        style={{ pointerEvents: 'auto', touchAction: 'none' }}
       >
         {/* Intense animated background glow */}
         <motion.div
