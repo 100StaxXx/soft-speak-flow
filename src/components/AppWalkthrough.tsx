@@ -465,30 +465,24 @@ export const AppWalkthrough = () => {
     }
   }, []);
 
-  // Lock body scroll and touch during tutorial
+  // Lock body scroll during tutorial but allow pointer events for spotlight clicks
   useEffect(() => {
     if (run) {
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.top = '0';
-      document.body.style.touchAction = 'none';
-      document.body.style.userSelect = 'none';
     } else {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
-      document.body.style.touchAction = '';
-      document.body.style.userSelect = '';
     }
     return () => {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
-      document.body.style.touchAction = '';
-      document.body.style.userSelect = '';
     };
   }, [run]);
 
@@ -524,8 +518,6 @@ export const AppWalkthrough = () => {
           border: '3px solid hsl(var(--primary))',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
           pointerEvents: 'auto',
-          touchAction: 'none',
-          userSelect: 'none',
           animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         },
         tooltipContent: {
