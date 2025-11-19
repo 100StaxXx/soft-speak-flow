@@ -289,62 +289,22 @@ export const useCompanion = () => {
 
       setIsEvolvingLoading(true);
 
-      // Generate evolved image with consistent colors
-      const { data: imageData, error: imageError } = await supabase.functions.invoke(
-        "generate-companion-image",
+      // Call the new evolution edge function with strict continuity
+      const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
+        "generate-companion-evolution",
         {
           body: {
-            favoriteColor: companion.favorite_color,
-            spiritAnimal: companion.spirit_animal,
-            element: companion.core_element,
-            stage: newStage,
-            previousImageUrl: companion.current_image_url,
-            eyeColor: companion.eye_color || `glowing ${companion.favorite_color}`,
-            furColor: companion.fur_color || companion.favorite_color,
+            userId: user.id,
           },
         }
       );
 
-      if (imageError) throw imageError;
-      if (!imageData?.imageUrl) throw new Error("Unable to generate evolution image. Please try again.");
-
-      // Update companion
-      const { error: updateError } = await supabase
-        .from("user_companion")
-        .update({
-          current_stage: newStage,
-          current_image_url: imageData.imageUrl,
-        })
-        .eq("id", companion.id);
-
-      if (updateError) throw updateError;
-
-      // Record evolution (check if it doesn't already exist for this stage)
-      const { data: existingEvolution } = await supabase
-        .from("companion_evolutions")
-        .select("id")
-        .eq("companion_id", companion.id)
-        .eq("stage", newStage)
-        .maybeSingle();
-
-      let evolutionId;
-      if (!existingEvolution) {
-        const { data: newEvolution, error: evolutionError } = await supabase
-          .from("companion_evolutions")
-          .insert({
-            companion_id: companion.id,
-            stage: newStage,
-            image_url: imageData.imageUrl,
-            xp_at_evolution: currentXP,
-          })
-          .select()
-          .single();
-
-        if (evolutionError) throw evolutionError;
-        evolutionId = newEvolution.id;
-      } else {
-        evolutionId = existingEvolution.id;
+      if (evolutionError) throw evolutionError;
+      if (!evolutionData?.evolved) {
+        throw new Error(evolutionData?.error || "Evolution not triggered");
       }
+
+      const evolutionId = evolutionData.evolution_id;
 
       // Generate evolution cards for all stages up to current stage
       try {
@@ -409,7 +369,7 @@ export const useCompanion = () => {
         });
       }
 
-      return imageData.imageUrl;
+      return evolutionData.image_url;
     },
     onSuccess: () => {
       evolutionInProgress.current = false;
