@@ -1,47 +1,58 @@
 export const ATTRIBUTE_DESCRIPTIONS = {
-  body: {
-    icon: "💪",
-    name: "Body",
-    whatItMeans: "Your physical energy, movement, and ability to take action. The fuel for real-world execution.",
-    boostedBy: [
-      "Working out / hitting the gym",
-      "Morning routines",
-      "Cleaning your space",
-      "Taking walks",
-      "Cold showers",
-      "Any physical activity or immediate action"
-    ],
-    whenGrows: "You feel more alive, energized, and ready to move. Your companion becomes more powerful and dynamic."
-  },
   mind: {
     icon: "🧠",
     name: "Mind",
-    whatItMeans: "Your mental focus, clarity, and intellectual productivity. The power to learn, think, and create.",
+    whatItMeans: "Anything that strengthens clarity, mental discipline, or focus. The foundation of wisdom and unlocking hidden potential.",
     boostedBy: [
-      "Reading books",
-      "Studying / learning new skills",
-      "Deep work sessions",
-      "Business planning",
-      "Problem-solving",
-      "Creative projects",
-      "Time blocking / planning"
+      "Reading",
+      "Journaling",
+      "Meditation",
+      "Learning a new skill",
+      "No-phone blocks",
+      "Planning your day",
+      "Affirmations",
+      "Dopamine detox actions",
+      "Studying",
+      "Therapy-style reflection prompts"
     ],
-    whenGrows: "Your thoughts become sharper and more focused. You unlock clarity and direction. Your companion becomes wiser and more strategic."
+    whenGrows: "You unlock insight, clarity, and wisdom. Your mind sharpens and you discover hidden potential within yourself. Your companion becomes more intelligent and perceptive."
+  },
+  body: {
+    icon: "💪",
+    name: "Body",
+    whatItMeans: "Anything that improves your physical life, health, strength, and environment. The engine of transformation.",
+    boostedBy: [
+      "Hitting the gym",
+      "Stretching",
+      "Walking / tracking steps",
+      "Hydration goals",
+      "Diet and nutrition goals",
+      "Cleaning your room",
+      "Sleep goals",
+      "Cold showers",
+      "10-minute workouts",
+      "Healthy routine stacking"
+    ],
+    whenGrows: "You build strength, endurance, and undergo physical transformation. Your environment becomes cleaner and healthier. Your companion evolves with raw power and vitality."
   },
   soul: {
-    icon: "✨",
+    icon: "🔥",
     name: "Soul",
-    whatItMeans: "Your inner peace, emotional resilience, and connection to what matters. The foundation of a meaningful life.",
+    whatItMeans: "The most unique category — the one that gives your life HEART. Anything that improves your emotion, relationships, purpose, connection, identity, creativity, and character.",
     boostedBy: [
-      "Meditation / reflection",
-      "Journaling",
-      "Quality time with loved ones",
-      "Acts of kindness",
-      "Self-care practices",
-      "Setting healthy boundaries",
-      "Gratitude practices"
+      "Show love to someone",
+      "Call a family member",
+      "Spend quality time with your partner",
+      "Do something kind",
+      "Create something meaningful",
+      "Take a walk outside",
+      "Express gratitude",
+      "Prayer or spiritual practice",
+      "Deep breath moments",
+      "Watch the sunset",
+      "Do one thing that grounds you"
     ],
-    whenGrows: "You feel centered, grounded, and at peace. Life becomes more meaningful. Your companion radiates calm strength and wisdom."
+    whenGrows: "You feel deeply connected to what matters. Your relationships deepen, your purpose clarifies, and your character strengthens. Your companion radiates warmth, wisdom, and profound meaning."
   }
 } as const;
 
