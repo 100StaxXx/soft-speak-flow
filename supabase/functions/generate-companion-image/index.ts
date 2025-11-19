@@ -83,6 +83,34 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("Lovable AI error:", errorText);
+      
+      // Handle specific error cases
+      if (aiResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Insufficient AI credits. Please contact support or try again later.",
+            code: "INSUFFICIENT_CREDITS"
+          }), 
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 402 
+          }
+        );
+      }
+      
+      if (aiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ 
+            error: "AI service is currently busy. Please wait a moment and try again.",
+            code: "RATE_LIMITED"
+          }), 
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+            status: 429 
+          }
+        );
+      }
+      
       throw new Error(`Lovable AI request failed: ${aiResponse.status}`);
     }
 
