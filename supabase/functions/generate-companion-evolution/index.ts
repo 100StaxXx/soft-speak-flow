@@ -164,26 +164,8 @@ The silhouette must be:
 
 The egg itself should have the same mystical properties as stage 0, but now cracking with ${companion.core_element} light.`;
 
-    } else if (nextStage === 2) {
-      // Stage 1 -> 2: Fresh baby start, NOT based on stage 1
-      console.log("Creating stage 2 baby (fresh start, not based on stage 1)");
-      userPrompt = `Create a tiny newborn ${companion.spirit_animal} that has just emerged from its egg, fragile and newborn.
-
-This is a FRESH START - do not reference the previous silhouette image.
-
-Requirements:
-- Anatomically accurate baby ${companion.spirit_animal}
-- Oversized curious eyes in ${companion.eye_color || companion.favorite_color} color
-- Soft, delicate body with early ${companion.fur_color || companion.favorite_color} coloring on fur/feathers/scales
-- Faint ${companion.core_element} aura flickering gently around it
-- Small, vulnerable, and adorable
-- Species-accurate features but in infant proportions
-- ${companion.favorite_color} tones should be subtle and natural
-
-The creature should look like it just hatched, still wet from the egg, taking its first curious look at the world.`;
-
     } else {
-      // Stages 2+ use existing logic with image reference
+      // Stages 2+: ALWAYS use image analysis for strict color continuity
       console.log("Using existing evolution logic with image reference");
       
       // 3. Fetch previous evolution image
