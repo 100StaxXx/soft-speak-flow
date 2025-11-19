@@ -62,7 +62,7 @@ export const MorningCheckIn = () => {
           onConflict: 'user_id,check_in_date,check_in_type'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Check-in error:', error);

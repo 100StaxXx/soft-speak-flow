@@ -43,7 +43,7 @@ export const EvolutionCardGallery = () => {
             .from("companion_evolutions")
             .select("image_url")
             .eq("id", card.evolution_id)
-            .single();
+            .maybeSingle();
           
           return {
             ...card,
