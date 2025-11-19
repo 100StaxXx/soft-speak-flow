@@ -17,6 +17,11 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "bottom",
     disableBeacon: true,
     spotlightClicks: true,
+    styles: {
+      tooltip: {
+        marginTop: '-120px',
+      }
+    }
   },
   {
     target: '[data-tour="checkin-intention"]',
