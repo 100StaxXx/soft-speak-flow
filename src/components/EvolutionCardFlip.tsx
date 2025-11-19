@@ -33,7 +33,7 @@ const RARITY_COLORS: Record<string, string> = {
 const ELEMENT_SYMBOLS: Record<string, string> = {
   fire: "🔥",
   water: "💧",
-  earth: "🌍",
+  earth: "🪨",
   air: "💨",
   lightning: "⚡",
   ice: "❄️",
@@ -41,6 +41,8 @@ const ELEMENT_SYMBOLS: Record<string, string> = {
   shadow: "🌑",
   light: "✨",
 };
+
+const STAGE_LABELS = ["Seedling", "Growing", "Awakening", "Evolved", "Transcendent"];
 
 export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -89,7 +91,7 @@ export function EvolutionCardFlip({ card }: Props) {
             </Badge>
             
             <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
-              Stage {card.evolution_stage}
+              {STAGE_LABELS[card.evolution_stage - 1] || `Stage ${card.evolution_stage}`}
             </Badge>
 
             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
