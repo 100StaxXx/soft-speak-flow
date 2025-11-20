@@ -81,16 +81,26 @@ const Index = () => {
           .maybeSingle();
 
         if (dailyPepTalk) {
-          // Fetch a quote that matches the pep talk's themes
-          const { data: quote } = await supabase
+          // Try to fetch a quote that matches category first, then fall back to any quote
+          let { data: quotes } = await supabase
             .from("quotes")
             .select("text, author")
-            .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
-            .limit(1)
-            .maybeSingle();
+            .eq("category", dailyPepTalk.topic_category)
+            .limit(10);
 
-          if (quote) {
-            setTodaysQuote(quote);
+          // If no category match, get any quotes
+          if (!quotes || quotes.length === 0) {
+            const { data: allQuotes } = await supabase
+              .from("quotes")
+              .select("text, author")
+              .limit(20);
+            quotes = allQuotes;
+          }
+
+          // Pick a random quote
+          if (quotes && quotes.length > 0) {
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            setTodaysQuote(randomQuote);
           }
         }
       }
