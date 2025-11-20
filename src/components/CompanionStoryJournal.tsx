@@ -58,11 +58,9 @@ export const CompanionStoryJournal = () => {
     });
   };
 
-  // Check if this stage can be accessed (must have generated previous stages)
+  // Check if this stage can be accessed (must be at or below companion's current stage)
   const canAccessStage = (stage: number) => {
-    if (stage === 0) return true; // Stage 0 always accessible
-    const previousStage = stage - 1;
-    return allStories?.some(s => s.stage === previousStage) ?? false;
+    return stage <= companion.current_stage;
   };
 
   const isStageUnlocked = canAccessStage(viewingStage);
@@ -75,14 +73,14 @@ export const CompanionStoryJournal = () => {
           Story Journal
         </h1>
         <p className="text-muted-foreground">
-          Your companion's epic journey through {STAGE_NAMES.length} legendary chapters
+          Your companion's epic journey - unlock new chapters as they evolve
         </p>
       </div>
 
       {/* Progress indicator */}
       <div className="flex justify-center items-center gap-2">
         <div className="text-sm text-muted-foreground">
-          Chapters Written: {allStories?.length || 0} / {STAGE_NAMES.length}
+          Unlocked: Prologue + {companion.current_stage} Chapters ({allStories?.length || 0} written)
         </div>
       </div>
 
@@ -100,7 +98,9 @@ export const CompanionStoryJournal = () => {
           </Button>
 
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">Chapter {viewingStage + 1}</p>
+            <p className="text-sm text-muted-foreground">
+              {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}
+            </p>
             <p className="font-semibold">{STAGE_NAMES[viewingStage]}</p>
           </div>
 
@@ -128,7 +128,10 @@ export const CompanionStoryJournal = () => {
             <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Chapter Locked</h3>
             <p className="text-muted-foreground">
-              Complete the previous chapter to unlock this one.
+              {viewingStage === 0 
+                ? "Complete companion creation to unlock the Prologue"
+                : `This chapter unlocks when your companion reaches Stage ${viewingStage}`
+              }
             </p>
           </Card>
         )}
@@ -138,7 +141,9 @@ export const CompanionStoryJournal = () => {
           <div className="space-y-6">
             {/* Chapter Title */}
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold">{story.chapter_title}</h2>
+              <h2 className="text-2xl font-bold">
+                {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}: {story.chapter_title}
+              </h2>
               <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
             </div>
 
@@ -188,7 +193,10 @@ export const CompanionStoryJournal = () => {
             <div>
               <h3 className="text-xl font-semibold mb-2">Chapter Not Yet Written</h3>
               <p className="text-muted-foreground mb-6">
-                Generate this chapter of your companion's story to continue the journey.
+                {viewingStage === 0 
+                  ? "The beginning of your companion's story awaits..."
+                  : `Generate this chapter of your companion's story to continue the journey.`
+                }
               </p>
               
               <Button
@@ -204,7 +212,7 @@ export const CompanionStoryJournal = () => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate Chapter
+                    Generate {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}
                   </>
                 )}
               </Button>
