@@ -286,24 +286,44 @@ export const AppWalkthrough = () => {
       const onboardingComplete = localStorage.getItem('onboardingComplete');
 
       if (!hasSeenWalkthrough && onboardingComplete === 'true') {
-        // Check if user just completed onboarding and has a companion
-        const { data: companion } = await supabase
-          .from('user_companion')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        try {
+          // Check if user just completed onboarding and has a companion
+          const { data: companion } = await supabase
+            .from('user_companion')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-        if (companion && location.pathname === '/') {
-          // Wait for initial step target to be present, then start
-          await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
-          setTimeout(() => {
-            localStorage.setItem('appWalkthroughActive', 'true');
-            setRun(true);
-            // Emit initial tutorial step
-            window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-              detail: { step: 0 } 
-            }));
-          }, 300);
+          if (companion && location.pathname === '/') {
+            // Wait for DOM to be fully ready
+            await new Promise(resolve => {
+              if (document.readyState === 'complete') {
+                resolve(undefined);
+              } else {
+                window.addEventListener('load', () => resolve(undefined), { once: true });
+              }
+            });
+            
+            // Wait for initial step target to be present with longer timeout
+            await waitForSelector(((steps[0] as Step).target as string) || 'body', 10000);
+            
+            // Extra delay to ensure all components are mounted
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Double-check the target still exists before starting
+            const target = document.querySelector(((steps[0] as Step).target as string) || 'body');
+            if (target) {
+              localStorage.setItem('appWalkthroughActive', 'true');
+              setRun(true);
+              // Emit initial tutorial step
+              window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+                detail: { step: 0 } 
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Walkthrough initialization error:', error);
+          // Don't start tutorial if there's an error
         }
       }
     };
