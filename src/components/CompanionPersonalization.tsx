@@ -109,15 +109,15 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
           <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
-            <SelectTrigger className="w-full h-14 text-base">
+            <SelectTrigger className="w-full h-14 text-base pointer-events-auto">
               <SelectValue placeholder="Choose your spirit creature..." />
             </SelectTrigger>
-            <SelectContent className="max-h-[300px] bg-card border-border">
+            <SelectContent className="max-h-[300px] bg-popover border-border shadow-lg z-50 pointer-events-auto">
               {ANIMALS.map((animal) => (
                 <SelectItem 
                   key={animal} 
                   value={animal}
-                  className="cursor-pointer hover:bg-accent/50"
+                  className="cursor-pointer hover:bg-accent/50 pointer-events-auto"
                 >
                   {animal}
                 </SelectItem>
