@@ -32,7 +32,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "darius",
     mentorName: "Darius",
     voiceName: "Brian",
-    voiceId: "nPczCjzI2devNBz1zQrb",
+    voiceId: "rWyjfFeMZ6PxkHqD3wGC",
     defaultIntensity: "high",
     categories: ["discipline", "tough-love", "accountability"],
     voiceSettings: {
