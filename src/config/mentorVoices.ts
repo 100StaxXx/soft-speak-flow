@@ -101,8 +101,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   kai: {
     mentorSlug: "kai",
     mentorName: "Kai",
-    voiceName: "Adam",
-    voiceId: "pNInz6obpgDQGcFmaJgB",
+    voiceName: "Callum",
+    voiceId: "N2lVS1w4EtoT3dr4eOWO",
     defaultIntensity: "high",
     categories: ["energy", "action", "momentum"],
     voiceSettings: {
