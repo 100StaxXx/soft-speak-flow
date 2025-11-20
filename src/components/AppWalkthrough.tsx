@@ -17,6 +17,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "bottom",
     disableBeacon: true,
     spotlightClicks: true,
+    disableOverlay: true,
     styles: {
       tooltip: {
         marginTop: '-120px',
@@ -29,6 +30,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    disableOverlay: true,
   },
   {
     target: 'body',
