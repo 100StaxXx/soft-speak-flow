@@ -229,25 +229,8 @@ export default function Tasks() {
         taskText: pendingTaskData.text, 
         difficulty: pendingTaskData.difficulty,
         taskDate: pendingTaskData.date,
+        isMainQuest: isMainQuest,
       });
-      
-      // If user chose main quest, set it after creation
-      if (isMainQuest) {
-        // Wait for task to be created and refetch
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, pendingTaskData.date] }).then(() => {
-            setTimeout(() => {
-              const queryState = queryClient.getQueryState(['daily-tasks', user?.id, pendingTaskData.date]);
-              const updatedTasks = queryState?.data as any[];
-              
-              if (updatedTasks && Array.isArray(updatedTasks) && updatedTasks.length > 0) {
-                const newestTask = updatedTasks[0]; // Newest task (ordered DESC)
-                setMainQuest(newestTask.id);
-              }
-            }, 100);
-          });
-        }, 200);
-      }
       
       // Clear form
       setNewTaskText("");

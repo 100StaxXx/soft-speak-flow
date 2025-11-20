@@ -39,10 +39,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
   });
 
   const addTask = useMutation({
-    mutationFn: async ({ taskText, difficulty, taskDate: customDate }: { 
+    mutationFn: async ({ taskText, difficulty, taskDate: customDate, isMainQuest }: { 
       taskText: string; 
       difficulty: 'easy' | 'medium' | 'hard';
       taskDate?: string;
+      isMainQuest?: boolean;
     }) => {
       if (tasks.length >= 3) {
         throw new Error('Maximum 3 tasks per day');
@@ -59,6 +60,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
           difficulty,
           xp_reward: xpReward,
           task_date: customDate || taskDate,
+          is_main_quest: isMainQuest ?? false,
         });
 
       if (error) throw error;
