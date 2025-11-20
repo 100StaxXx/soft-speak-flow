@@ -45,7 +45,7 @@ export const HabitsPageTour = () => {
     if (action === 'next' || action === 'prev') {
       setStepIndex(index + (action === 'next' ? 1 : -1));
     }
-  }, []);
+  }, [setRun, setStepIndex]);
 
   if (!user) return null;
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Joyride, { Step, CallBackProps, STATUS } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "react-router-dom";
@@ -43,7 +43,7 @@ export const MentorChatTour = () => {
     }
   }, [user, location.pathname]);
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
+  const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { status, index, type } = data;
 
     if (type === 'step:after') {
@@ -55,7 +55,7 @@ export const MentorChatTour = () => {
       setRun(false);
       localStorage.setItem('mentorChatTourComplete', 'true');
     }
-  };
+  }, [setRun, setStepIndex]);
 
   if (!user) return null;
 
