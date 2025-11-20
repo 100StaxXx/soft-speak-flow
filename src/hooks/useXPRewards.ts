@@ -29,7 +29,7 @@ export const useXPRewards = () => {
         .from('profiles')
         .select('current_habit_streak')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       return data;
     },
     enabled: !!user,

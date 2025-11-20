@@ -75,9 +75,9 @@ export default function Reflection() {
           onConflict: 'user_id,reflection_date'
         })
         .select()
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error || !reflection) throw error || new Error('Failed to save reflection');
 
       // Trigger AI reply generation in background
       supabase.functions.invoke('generate-reflection-reply', {
