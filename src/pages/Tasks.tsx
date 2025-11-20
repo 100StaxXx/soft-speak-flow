@@ -215,8 +215,9 @@ export default function Tasks() {
       const hasMainQuest = currentTasks.some(task => task.is_main_quest);
       
       // If no main quest exists, get the newest task and prompt
+      // Tasks are ordered by created_at DESC, so the newest is first
       if (!hasMainQuest && currentTasks.length > 0) {
-        const newestTask = currentTasks[currentTasks.length - 1];
+        const newestTask = currentTasks[0];
         setPendingTaskId(newestTask.id);
         setShowMainQuestPrompt(true);
       }
