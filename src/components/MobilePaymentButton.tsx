@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PaymentRequestButtonElement } from "@stripe/react-stripe-js";
 import { useStripe } from "@stripe/react-stripe-js";
 import { useToast } from "@/hooks/use-toast";
+import type { PaymentRequest } from "@stripe/stripe-js";
 
 interface MobilePaymentButtonProps {
   amount: number; // Amount in cents
@@ -18,7 +19,7 @@ export const MobilePaymentButton = ({
 }: MobilePaymentButtonProps) => {
   const stripe = useStripe();
   const { toast } = useToast();
-  const [paymentRequest, setPaymentRequest] = useState<any>(null);
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [canMakePayment, setCanMakePayment] = useState(false);
 
   useEffect(() => {
