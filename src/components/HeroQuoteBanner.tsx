@@ -105,7 +105,7 @@ export const HeroQuoteBanner = () => {
           alt={mentor.name}
           className="w-full h-full object-cover object-top scale-110"
         />
-        <div className="absolute inset-0 bg-background/60" />
+        <div className="absolute inset-0 bg-background/80" />
       </div>
 
       {/* Quote Content */}
