@@ -17,8 +17,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   atlas: {
     mentorSlug: "atlas",
     mentorName: "Atlas",
-    voiceName: "Will",
-    voiceId: "bIHbv24MWmeRgasZH58o",
+    voiceName: "George",
+    voiceId: "JBFqnCBsd6RMkjVDRZzb",
     defaultIntensity: "medium",
     categories: ["motivation", "discipline", "growth"],
     voiceSettings: {
