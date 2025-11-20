@@ -262,12 +262,14 @@ export default function Onboarding() {
         })
         .eq('id', user.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Supabase update error:", error);
         throw error;
       }
+      
+      if (!data) throw new Error("Failed to update profile");
 
       console.log("Profile updated successfully:", data);
 

@@ -29,7 +29,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAchievements } from "@/hooks/useAchievements";
-import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useProfile } from "@/hooks/useProfile";
@@ -44,7 +43,6 @@ export default function Tasks() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { logActivity } = useActivityFeed();
   const { profile } = useProfile();
   const { companion } = useCompanion();
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
@@ -204,27 +202,33 @@ export default function Tasks() {
     const currentTasks = tasks.filter(t => t.task_date === taskDate);
     const hasMainQuest = currentTasks.some(task => task.is_main_quest);
     
-    await addTask({ 
-      taskText: newTaskText, 
-      difficulty: taskDifficulty,
-      taskDate: taskDate
-    });
-    
-    setNewTaskText("");
-    setTaskDifficulty("medium");
-    
-    // After task is added, check if we should prompt for main quest
-    // Wait a moment for the task to be added to the list
-    setTimeout(() => {
+    try {
+      await addTask({ 
+        taskText: newTaskText, 
+        difficulty: taskDifficulty,
+        taskDate: taskDate
+      });
+      
+      setNewTaskText("");
+      setTaskDifficulty("medium");
+      
+      // If no main quest exists, prompt after successful add
       if (!hasMainQuest) {
-        const updatedTasks = tasks.filter(t => t.task_date === taskDate);
-        if (updatedTasks.length > 0) {
-          const newestTask = updatedTasks[0]; // Tasks are ordered by created_at DESC
-          setPendingTaskId(newestTask.id);
-          setShowMainQuestPrompt(true);
-        }
+        // Query will be invalidated by addTask, wait for refetch
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] }).then(() => {
+            const { data: updatedTasks } = queryClient.getQueryState(['daily-tasks', user?.id, taskDate]) || {};
+            if (updatedTasks && Array.isArray(updatedTasks) && updatedTasks.length > 0) {
+              const newestTask = updatedTasks[0]; // Tasks are ordered by created_at DESC
+              setPendingTaskId(newestTask.id);
+              setShowMainQuestPrompt(true);
+            }
+          });
+        }, 300);
       }
-    }, 500);
+    } catch (error) {
+      console.error('Failed to add task:', error);
+    }
   };
   
   const handleMainQuestResponse = (makeMainQuest: boolean) => {

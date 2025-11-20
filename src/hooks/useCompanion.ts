@@ -167,9 +167,10 @@ export const useCompanion = () => {
           fur_color: furColor,
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
+      if (!companionData) throw new Error("Failed to create companion");
 
       // Record initial evolution
       await supabase.from("companion_evolutions").insert({

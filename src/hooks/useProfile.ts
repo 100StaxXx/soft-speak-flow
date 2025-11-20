@@ -50,12 +50,14 @@ export const useProfile = () => {
             email: user.email ?? null,
           })
           .select("*")
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           console.error("Error creating profile:", insertError);
           throw insertError;
         }
+        
+        if (!inserted) throw new Error("Failed to create profile");
         
         return inserted;
       }
