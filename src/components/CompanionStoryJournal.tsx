@@ -113,7 +113,7 @@ export const CompanionStoryJournal = () => {
                 setViewingStage(nextStage);
               }
             }}
-            disabled={viewingStage === 20 || !canAccessStage(viewingStage + 1)}
+            disabled={viewingStage >= STAGE_NAMES.length - 1 || !canAccessStage(viewingStage + 1)}
           >
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
