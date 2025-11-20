@@ -52,14 +52,18 @@ const WALKTHROUGH_STEPS: Step[] = [
     disableBeacon: true,
     spotlightClicks: true,
     floaterProps: {
-      hideArrow: true,
+      hideArrow: false,
     },
     styles: {
       tooltip: {
         left: '50%',
         transform: 'translateX(-50%)',
         maxWidth: '90vw',
-        marginBottom: '100px',
+        marginBottom: '120px',
+        pointerEvents: 'none' as const,
+      },
+      tooltipContent: {
+        pointerEvents: 'auto' as const,
       }
     }
   },
