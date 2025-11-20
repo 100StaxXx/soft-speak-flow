@@ -46,6 +46,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    disableOverlay: true,
   },
   {
     target: '[data-tour="tasks-tab"]',
@@ -53,6 +54,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    disableOverlay: true,
     floaterProps: {
       hideArrow: true,
     },
@@ -73,13 +75,15 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    disableOverlay: true,
   },
   {
     target: '[data-tour="today-quests-header"]',
     content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
     placement: 'top',
     disableBeacon: true,
-    spotlightClicks: false,
+    spotlightClicks: true,
+    disableOverlay: true,
     floaterProps: {
       disableAnimation: true,
       hideArrow: false,
@@ -87,9 +91,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     styles: {
       options: {
         zIndex: 100000,
-      },
-      overlay: {
-        mixBlendMode: 'normal' as const,
       },
       tooltip: {
         minWidth: '300px',
