@@ -38,6 +38,10 @@ const Index = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [mentorImage, setMentorImage] = useState<string>("");
+  const [todaysQuote, setTodaysQuote] = useState<{
+    text: string;
+    author: string | null;
+  } | null>(null);
 
   // Map mentor slugs to local images
   const mentorImages: Record<string, string> = {
@@ -52,9 +56,9 @@ const Index = () => {
     'solace': solaceImage,
   };
 
-  // Fetch mentor image
+  // Fetch mentor image and quote
   useEffect(() => {
-    const fetchMentorImage = async () => {
+    const fetchMentorData = async () => {
       if (!profile?.selected_mentor_id) return;
 
       const { data: mentorData } = await supabase
@@ -66,10 +70,33 @@ const Index = () => {
       if (mentorData) {
         const imageUrl = mentorData.avatar_url || mentorImages[mentorData.slug] || mentorImages['darius'];
         setMentorImage(imageUrl);
+
+        // Get today's pep talk to find related quote
+        const today = new Date().toISOString().split("T")[0];
+        const { data: dailyPepTalk } = await supabase
+          .from("daily_pep_talks")
+          .select("emotional_triggers, topic_category")
+          .eq("for_date", today)
+          .eq("mentor_slug", mentorData.slug)
+          .maybeSingle();
+
+        if (dailyPepTalk) {
+          // Fetch a quote that matches the pep talk's themes
+          const { data: quote } = await supabase
+            .from("quotes")
+            .select("text, author")
+            .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (quote) {
+            setTodaysQuote(quote);
+          }
+        }
       }
     };
 
-    fetchMentorImage();
+    fetchMentorData();
   }, [profile?.selected_mentor_id]);
 
   useEffect(() => {
@@ -170,6 +197,22 @@ const Index = () => {
             <ErrorBoundary>
               <MentorNudges />
             </ErrorBoundary>
+
+            {/* Quote of the Day */}
+            {todaysQuote && (
+              <div className="text-right px-4 sm:px-6">
+                <blockquote className="max-w-2xl ml-auto">
+                  <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-[hsl(var(--mentor-darius))] leading-relaxed">
+                    "{todaysQuote.text}"
+                  </p>
+                  {todaysQuote.author && (
+                    <footer className="mt-2 font-serif italic text-sm sm:text-base text-[hsl(var(--mentor-darius))]/80">
+                      — {todaysQuote.author}
+                    </footer>
+                  )}
+                </blockquote>
+              </div>
+            )}
             
             <ErrorBoundary>
               <MorningCheckIn />
