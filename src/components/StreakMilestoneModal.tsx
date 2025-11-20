@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, Trophy, Crown, Star } from "lucide-react";
 import confetti from "canvas-confetti";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 interface StreakMilestoneModalProps {
@@ -83,6 +83,8 @@ export const StreakMilestoneModal = ({ open, streak, onClose }: StreakMilestoneM
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md border-0 bg-transparent shadow-none p-0">
+        <DialogTitle className="sr-only">{config.title}</DialogTitle>
+        <DialogDescription className="sr-only">{config.message}</DialogDescription>
         <AnimatePresence>
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { Badge } from "./ui/badge";
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { X } from "lucide-react";
 
 interface EvolutionCard {
@@ -119,7 +119,11 @@ export function EvolutionCardFlip({ card }: Props) {
         setIsOpen(open);
         if (!open) setIsFlipped(false);
       }}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-transparent border-0 overflow-hidden">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-transparent border-0 overflow-hidden" aria-describedby="evolution-card-description">
+          <DialogTitle className="sr-only">{card.creature_name} - Evolution Card</DialogTitle>
+          <span id="evolution-card-description" className="sr-only">
+            Detailed view of {card.creature_name}, a {card.rarity} {card.element} {card.species} at evolution stage {card.evolution_stage}
+          </span>
           <div className="relative w-full h-[80vh] flex items-center justify-center">
             <button
               onClick={() => setIsOpen(false)}

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Trophy, Flame } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -84,6 +84,10 @@ export const MilestoneModal = ({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
+        <DialogTitle className="sr-only">Habit Milestone Achieved</DialogTitle>
+        <DialogDescription className="sr-only">
+          You've reached a {streak}-day streak for {habitTitle}. Celebrate your achievement and share your success!
+        </DialogDescription>
         <Tabs defaultValue="celebrate" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="celebrate">Celebrate</TabsTrigger>
