@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Progress } from "@/components/ui/progress";
 import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
 import { HabitCard } from "@/components/HabitCard";
@@ -63,7 +63,9 @@ export default function Tasks() {
     setMainQuest,
     isAdding,
     isToggling,
-    canAddMore 
+    canAddMore,
+    completedCount,
+    totalCount 
   } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -73,6 +75,14 @@ export default function Tasks() {
     difficulty: "easy" | "medium" | "hard";
     date: string;
   } | null>(null);
+  
+  // Calculate total XP for the day
+  const totalXP = tasks.reduce((sum, task) => {
+    if (task.completed) {
+      return sum + (task.is_main_quest ? task.xp_reward * 2 : task.xp_reward);
+    }
+    return sum;
+  }, 0);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -377,9 +387,27 @@ export default function Tasks() {
                   <p className="text-sm text-muted-foreground">Max 3 quests per day</p>
                 </div>
                 <div className="text-sm font-medium text-primary">
-                  {tasks.filter(t => t.completed).length}/{tasks.length}
+                  {completedCount}/{totalCount}
                 </div>
               </div>
+
+              {/* Progress Bar */}
+              {totalCount > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Progress: {completedCount}/{totalCount} Complete
+                    </span>
+                    <span className="text-primary font-semibold">
+                      +{totalXP} XP Today
+                    </span>
+                  </div>
+                  <Progress 
+                    value={(completedCount / totalCount) * 100} 
+                    className="h-2"
+                  />
+                </div>
+              )}
 
               {canAddMore && (
                 <Card className="p-4 space-y-4">
@@ -617,32 +645,45 @@ export default function Tasks() {
         </Tabs>
       </div>
 
-      <AlertDialog 
+      <Drawer 
         open={showMainQuestPrompt} 
         onOpenChange={(open) => {
           if (!open) {
-            // User closed dialog without choosing - default to side quest
+            // User closed drawer without choosing - default to side quest
             handleMainQuestResponse(false);
           }
         }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Set as Main Quest?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Would you like to make this your main quest for the day? Main quests award 2x XP!
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => handleMainQuestResponse(false)}>
-              No, thanks
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleMainQuestResponse(true)}>
-              Yes, make it main quest
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <DrawerContent>
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-[hsl(45,100%,60%)]" />
+              Set as Main Quest?
+            </DrawerTitle>
+            <DrawerDescription>
+              Main quests award 2x XP and help you focus on what matters most today.
+            </DrawerDescription>
+          </DrawerHeader>
+          <DrawerFooter className="pt-4">
+            <Button 
+              onClick={() => handleMainQuestResponse(true)}
+              className="w-full gap-2 bg-gradient-to-r from-[hsl(45,100%,60%)] to-primary hover:opacity-90 text-background font-semibold"
+            >
+              <Star className="h-4 w-4" />
+              Set as Main Quest
+            </Button>
+            <DrawerClose asChild>
+              <Button 
+                variant="outline" 
+                onClick={() => handleMainQuestResponse(false)}
+                className="w-full"
+              >
+                Add as Side Quest
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       <BottomNav />
     </div>
