@@ -107,7 +107,7 @@ serve(async (req) => {
       .from("user_companion")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (companionError || !companion) {
       console.error("Companion fetch error:", companionError);
@@ -180,7 +180,7 @@ The egg itself should have the same mystical properties as stage 0, but now crac
           .eq("companion_id", companion.id)
           .order("evolved_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         previousImageUrl = latestEvolution?.image_url;
       }
@@ -249,7 +249,7 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
         .select("*")
         .eq("companion_id", companion.id)
         .eq("stage", currentStage)
-        .single();
+        .maybeSingle();
 
       if (metadata) {
         previousFeatures.stored_metadata = metadata;
@@ -374,7 +374,7 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
         evolved_at: new Date().toISOString()
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (evolutionError) {
       console.error("Evolution record error:", evolutionError);
