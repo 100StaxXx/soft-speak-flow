@@ -108,7 +108,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         border: '3px solid hsl(var(--primary))',
         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
         marginTop: '-120px',
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         position: 'relative' as const,
       },
       tooltipContent: {
@@ -116,6 +116,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         lineHeight: '1.6',
         padding: '0.5rem 0',
         textAlign: 'left' as const,
+        pointerEvents: 'none',
       }
     }
   },
