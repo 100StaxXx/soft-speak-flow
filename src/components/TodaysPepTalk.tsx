@@ -17,12 +17,27 @@ interface CaptionWord {
   end: number;
 }
 
+interface DailyPepTalk {
+  id: string;
+  for_date: string;
+  mentor_slug: string;
+  title: string;
+  summary: string;
+  script: string;
+  audio_url: string;
+  topic_category: string;
+  intensity: string;
+  emotional_triggers: string[];
+  transcript: CaptionWord[];
+  mentor_name?: string;
+}
+
 export const TodaysPepTalk = () => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
   const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
-  const [pepTalk, setPepTalk] = useState<any>(null);
+  const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -77,12 +92,14 @@ export const TodaysPepTalk = () => {
         .maybeSingle();
 
       if (data) {
-        const transcript = Array.isArray(data.transcript) ? data.transcript : [];
+        const transcript = Array.isArray(data.transcript) 
+          ? (data.transcript as unknown as CaptionWord[]) 
+          : [];
         setPepTalk({ 
           ...data, 
           mentor_name: mentor.name,
-          transcript
-        });
+          transcript,
+        } as DailyPepTalk);
       }
       setLoading(false);
     };
