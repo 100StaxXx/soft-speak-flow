@@ -755,6 +755,7 @@ export type Database = {
           created_at: string | null
           difficulty: string | null
           id: string
+          is_main_quest: boolean | null
           task_date: string
           task_text: string
           user_id: string
@@ -766,6 +767,7 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           id?: string
+          is_main_quest?: boolean | null
           task_date?: string
           task_text: string
           user_id: string
@@ -777,6 +779,7 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           id?: string
+          is_main_quest?: boolean | null
           task_date?: string
           task_text?: string
           user_id?: string

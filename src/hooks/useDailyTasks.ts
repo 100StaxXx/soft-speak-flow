@@ -161,6 +161,44 @@ export const useDailyTasks = (selectedDate?: Date) => {
     },
   });
 
+  // Mutation to set a task as main quest
+  const setMainQuestMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // First, unset any existing main quest for this date
+      const { error: unsetError } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: false })
+        .eq('user_id', user.id)
+        .eq('task_date', taskDate);
+
+      if (unsetError) throw unsetError;
+
+      // Then set the selected task as main quest
+      const { error: setError } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: true })
+        .eq('id', taskId);
+
+      if (setError) throw setError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, taskDate] });
+      toast({
+        title: "Main Quest Updated! ⚔️",
+        description: "This is now your main quest for today.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
 
@@ -170,8 +208,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
     deleteTask: deleteTask.mutate,
+    setMainQuest: setMainQuestMutation.mutate,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
+    isSettingMainQuest: setMainQuestMutation.isPending,
     completedCount,
     totalCount,
     canAddMore: tasks.length < 3,

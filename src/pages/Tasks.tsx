@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrandTagline } from "@/components/BrandTagline";
@@ -50,7 +51,8 @@ export default function Tasks() {
     tasks, 
     addTask, 
     toggleTask, 
-    deleteTask, 
+    deleteTask,
+    setMainQuest,
     isAdding,
     isToggling,
     canAddMore 
@@ -394,62 +396,65 @@ export default function Tasks() {
                 </Card>
               )}
 
-              <div className="space-y-2">
+              {/* Quest List */}
+              <div className="space-y-6">
                 {tasks.length === 0 ? (
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description="Add up to 3 quests to focus on today"
+                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
                   />
-                ) : (
-                  tasks.map((task, index) => (
-                    <Card 
-                      key={task.id}
-                      data-tour={index === 0 ? "first-task" : undefined}
-                      className={cn(
-                        "p-4 flex items-center gap-3 transition-all hover:bg-accent/50",
-                        task.completed && "opacity-60",
-                        isToggling ? "pointer-events-none opacity-50" : "cursor-pointer"
-                      )}
-                      onClick={() => {
-                        if (!isToggling) {
-                          toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward });
-                        }
-                      }}
-                    >
-                      {task.completed ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
-                      )}
-                      <div className="flex-1">
-                        <span className={cn(
-                          task.completed && "line-through text-muted-foreground"
-                        )}>
-                          {task.task_text}
-                        </span>
-                        <div className="flex items-center gap-2 mt-1">
-                          {task.difficulty === 'easy' && <Zap className="h-3 w-3 text-muted-foreground" />}
-                          {task.difficulty === 'medium' && <Flame className="h-3 w-3 text-muted-foreground" />}
-                          {task.difficulty === 'hard' && <Mountain className="h-3 w-3 text-muted-foreground" />}
-                          <span className="text-xs text-muted-foreground">{task.xp_reward} XP</span>
+                ) : (() => {
+                  const mainQuest = tasks.find(t => t.is_main_quest);
+                  const sideQuests = tasks.filter(t => !t.is_main_quest);
+                  
+                  return (
+                    <>
+                      {/* Main Quest Section */}
+                      {mainQuest && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-xl">⚔️</div>
+                            <h3 className="font-semibold text-foreground">Main Quest</h3>
+                            <div className="ml-auto">
+                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                                2x XP
+                              </span>
+                            </div>
+                          </div>
+                          <TaskCard
+                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
+                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                            onDelete={() => deleteTask(mainQuest.id)}
+                            isMainQuest={true}
+                          />
                         </div>
-                      </div>
-                      {!task.completed && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteTask(task.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       )}
-                    </Card>
-                  ))
-                )}
+
+                      {/* Side Quests */}
+                      {sideQuests.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-lg">📜</div>
+                            <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {sideQuests.map((task) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
+                                onDelete={() => deleteTask(task.id)}
+                                onSetMainQuest={() => setMainQuest(task.id)}
+                                showPromoteButton={!mainQuest}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </Card>
           </TabsContent>
