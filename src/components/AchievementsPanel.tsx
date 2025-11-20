@@ -57,13 +57,7 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
           <Trophy className="h-6 w-6 text-primary" />
           <h3 className="text-lg font-semibold">Your Achievements</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-foreground">
-              {stats.total_achievements}
-            </div>
-            <div className="text-xs text-muted-foreground">Total</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold bg-gradient-to-br from-purple-400 to-purple-600 bg-clip-text text-transparent">
               {stats.platinum_count}
