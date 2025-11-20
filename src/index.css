@@ -319,6 +319,29 @@ All colors MUST be HSL.
     }
   }
 
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(0);
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-40px);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
   .animate-fade-in {
     animation: fadeIn 2.5s ease-out forwards;
   }
