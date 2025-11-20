@@ -119,7 +119,7 @@ const Index = () => {
             </ErrorBoundary>
 
             {/* Priority Content - Negative margin to overlap banner */}
-            <div className="-mt-32 relative z-10 px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
+            <div className="-mt-20 relative z-10 px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
               <ErrorBoundary>
                 <MentorNudges />
               </ErrorBoundary>
