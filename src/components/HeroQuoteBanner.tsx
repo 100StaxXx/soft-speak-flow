@@ -97,7 +97,7 @@ export const HeroQuoteBanner = () => {
   const mentorImageUrl = mentor.avatar_url || mentorImages[mentor.slug] || mentorImages['darius'];
 
   return (
-    <div className="relative w-full h-[35vh] min-h-[300px] overflow-hidden mb-6">
+    <div className="relative w-full h-[25vh] min-h-[200px] overflow-hidden mb-6">
       {/* Mentor Background Image - Dimmed */}
       <div className="absolute inset-0">
         <img 
