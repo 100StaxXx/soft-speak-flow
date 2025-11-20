@@ -86,6 +86,11 @@ const WALKTHROUGH_STEPS: Step[] = [
       disableAnimation: true,
       hideArrow: false,
       offset: 20,
+      styles: {
+        floater: {
+          pointerEvents: 'none' as const,
+        }
+      }
     },
     styles: {
       options: {
@@ -93,6 +98,7 @@ const WALKTHROUGH_STEPS: Step[] = [
       },
       overlay: {
         mixBlendMode: 'normal' as const,
+        pointerEvents: 'none' as const,
       },
       tooltip: {
         minWidth: '300px',
@@ -102,14 +108,14 @@ const WALKTHROUGH_STEPS: Step[] = [
         border: '3px solid hsl(var(--primary))',
         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
         marginTop: '-120px',
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
+        position: 'relative' as const,
       },
       tooltipContent: {
         fontSize: '1rem',
         lineHeight: '1.6',
         padding: '0.5rem 0',
         textAlign: 'left' as const,
-        pointerEvents: 'auto',
       }
     }
   },
