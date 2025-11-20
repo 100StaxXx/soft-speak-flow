@@ -333,7 +333,7 @@ All colors MUST be HSL.
     }
   }
 
-  @keyframes shimmer {
+  @keyframes shimmerBackground {
     0% {
       background-position: -200% center;
     }
