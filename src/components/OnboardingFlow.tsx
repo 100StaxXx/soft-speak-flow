@@ -96,6 +96,9 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
           onboarding_data: {}
         })
         .eq("id", user.id);
+      
+      // Set localStorage flag so AppWalkthrough knows to start
+      localStorage.setItem('onboardingComplete', 'true');
     }
     onComplete();
   };
