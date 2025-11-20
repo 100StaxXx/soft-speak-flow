@@ -24,14 +24,14 @@ const Index = () => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const [showIntro, setShowIntro] = useState(() => {
-    return !sessionStorage.getItem('hasVisitedHome');
+    return !localStorage.getItem('hasSeenIntro');
   });
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    sessionStorage.setItem('hasVisitedHome', 'true');
+    localStorage.setItem('hasSeenIntro', 'true');
   }, []);
 
   useEffect(() => {
