@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
@@ -30,7 +30,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .select('*')
         .eq('user_id', user!.id)
         .eq('task_date', taskDate)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false }); // Newest first for main quest detection
       
       if (error) throw error;
       return data || [];
