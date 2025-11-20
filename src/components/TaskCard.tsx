@@ -103,6 +103,7 @@ export const TaskCard = ({
               }}
               className="opacity-0 group-hover:opacity-100 transition-opacity"
               title="Set as Main Quest"
+              data-tour="promote-button"
             >
               <Star className="h-4 w-4" />
             </Button>
