@@ -345,7 +345,7 @@ export const useCompanion = () => {
               .select("id")
               .eq("companion_id", companion.id)
               .eq("stage", stage)
-              .single();
+              .maybeSingle();
             
             await supabase.functions.invoke("generate-evolution-card", {
               body: {

@@ -24,115 +24,125 @@ export const useMissionAutoComplete = () => {
   useEffect(() => {
     if (!user || !activities || activities.length === 0) return;
 
+    let mounted = true;
+
     const checkAndCompleteMissions = async () => {
-      // Get today's incomplete missions
-      const { data: missions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('mission_date', today)
-        .eq('completed', false)
-        .eq('auto_complete', true);
+      try {
+        // Get today's incomplete missions
+        const { data: missions, error: missionsError } = await supabase
+          .from('daily_missions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('mission_date', today)
+          .eq('completed', false)
+          .eq('auto_complete', true);
 
-      if (!missions || missions.length === 0) return;
+        if (missionsError) {
+          console.error("Error fetching missions:", missionsError);
+          return;
+        }
 
-      // Get today's activities
-      const todayStart = new Date(today).getTime();
-      const todayActivities = activities.filter(a => 
-        new Date(a.created_at).getTime() >= todayStart
-      );
+        if (!missions || missions.length === 0 || !mounted) return;
 
-      for (const mission of missions) {
-        const missionConfig = MISSION_ACTIVITY_MAP[mission.mission_type];
-        if (!missionConfig) continue;
-
-        const activityTypes = Array.isArray(missionConfig.activityType) 
-          ? missionConfig.activityType 
-          : [missionConfig.activityType];
-
-        // Count matching activities
-        const matchingActivities = todayActivities.filter(activity => 
-          activityTypes.includes(activity.activity_type)
+        // Get today's activities
+        const todayStart = new Date(today).getTime();
+        const todayActivities = activities.filter(a => 
+          new Date(a.created_at).getTime() >= todayStart
         );
 
-        let shouldComplete = false;
-        let newProgress = mission.progress_current;
+        for (const mission of missions) {
+          if (!mounted) break;
 
-        if (missionConfig.validator) {
-          // Custom validation logic
-          for (const activity of matchingActivities) {
-            if (missionConfig.validator(activity.activity_data, newProgress, mission.progress_target)) {
-              newProgress++;
-              if (newProgress >= mission.progress_target) {
-                shouldComplete = true;
-                break;
+          const missionConfig = MISSION_ACTIVITY_MAP[mission.mission_type];
+          if (!missionConfig) continue;
+
+          const activityTypes = Array.isArray(missionConfig.activityType) 
+            ? missionConfig.activityType 
+            : [missionConfig.activityType];
+
+          // Count matching activities
+          const matchingActivities = todayActivities.filter(activity => 
+            activityTypes.includes(activity.activity_type)
+          );
+
+          let shouldComplete = false;
+          let newProgress = mission.progress_current;
+
+          if (missionConfig.validator) {
+            // Custom validation logic
+            for (const activity of matchingActivities) {
+              if (missionConfig.validator(activity.activity_data, newProgress, mission.progress_target)) {
+                newProgress++;
+                if (newProgress >= mission.progress_target) {
+                  shouldComplete = true;
+                  break;
+                }
               }
             }
+          } else {
+            // Simple count-based completion
+            newProgress = matchingActivities.length;
+            shouldComplete = newProgress >= mission.progress_target;
           }
-        } else {
-          // Simple count-based completion
-          newProgress = matchingActivities.length;
-          shouldComplete = newProgress >= mission.progress_target;
-        }
 
-        // Update progress
-        if (newProgress !== mission.progress_current) {
-          await supabase
-            .from('daily_missions')
-            .update({ progress_current: newProgress })
-            .eq('id', mission.id);
-        }
+          // Update progress
+          if (newProgress !== mission.progress_current && mounted) {
+            await supabase
+              .from('daily_missions')
+              .update({ progress_current: newProgress })
+              .eq('id', mission.id);
+          }
 
-        // Complete mission if criteria met
-        if (shouldComplete && !mission.completed) {
-          const { error } = await supabase
-            .from('daily_missions')
-            .update({ 
-              completed: true, 
-              completed_at: new Date().toISOString(),
-              progress_current: mission.progress_target 
-            })
-            .eq('id', mission.id);
+          // Complete mission if criteria met
+          if (shouldComplete && !mission.completed && mounted) {
+            const { error } = await supabase
+              .from('daily_missions')
+              .update({ 
+                completed: true, 
+                completed_at: new Date().toISOString(),
+                progress_current: mission.progress_target 
+              })
+              .eq('id', mission.id);
 
-          if (!error) {
-            // Award XP
-            await awardCustomXP(
-              mission.xp_reward, 
-              `mission_${mission.mission_type}`, 
-              `Mission Complete! ${mission.mission_text}`
-            );
+            if (!error && mounted) {
+              // Award XP
+              await awardCustomXP(
+                mission.xp_reward, 
+                `mission_${mission.mission_type}`, 
+                `Mission Complete! ${mission.mission_text}`
+              );
 
-            // Show toast
-            toast({ 
-              title: "Mission Auto-Completed! 🎯", 
-              description: `${mission.mission_text} (+${mission.xp_reward} XP)`
-            });
+              // Show toast
+              toast({ 
+                title: "Mission Auto-Completed! 🎯", 
+                description: `${mission.mission_text} (+${mission.xp_reward} XP)`
+              });
 
-            // Play sound
-            playMissionComplete();
+              // Play sound
+              playMissionComplete();
 
-            // Small confetti
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.7 },
-              colors: ['#A76CFF', '#C084FC', '#E879F9'],
-            });
+              // Small confetti
+              confetti({
+                particleCount: 50,
+                spread: 60,
+                origin: { y: 0.7 },
+                colors: ['#A76CFF', '#C084FC', '#E879F9'],
+              });
 
-            // Check for chain missions
-            const template = mission.mission_type;
-            if (template && MISSION_ACTIVITY_MAP[template]) {
-              // Trigger chain bonus missions if configured
-              // This would be implemented in a separate function
+              // Invalidate queries
+              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
             }
-
-            // Invalidate queries
-            queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
           }
         }
+      } catch (error) {
+        console.error("Error in mission auto-complete:", error);
       }
     };
 
     checkAndCompleteMissions();
-  }, [activities, user, today]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [activities, user, today, awardCustomXP, toast, queryClient]);
 };

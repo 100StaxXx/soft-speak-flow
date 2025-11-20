@@ -51,7 +51,7 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
           .from("profiles")
           .select("onboarding_data")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
         
         const savedData = data?.onboarding_data as { currentSlide?: number } | null;
         if (savedData?.currentSlide !== undefined) {
