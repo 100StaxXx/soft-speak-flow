@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
 import { HabitCard } from "@/components/HabitCard";
@@ -59,6 +69,9 @@ export default function Tasks() {
   } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const previousTaskCountRef = useRef(tasks.length);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -184,6 +197,26 @@ export default function Tasks() {
     },
   });
 
+  // Detect when a new task is added and check for main quest prompt
+  useEffect(() => {
+    const taskDate = selectedDate.toISOString().split('T')[0];
+    const currentTasks = tasks.filter(t => t.task_date === taskDate);
+    
+    // Check if a task was just added
+    if (currentTasks.length > previousTaskCountRef.current) {
+      const hasMainQuest = currentTasks.some(task => task.is_main_quest);
+      
+      // If no main quest exists, get the newest task and prompt
+      if (!hasMainQuest && currentTasks.length > 0) {
+        const newestTask = currentTasks[currentTasks.length - 1];
+        setPendingTaskId(newestTask.id);
+        setShowMainQuestPrompt(true);
+      }
+    }
+    
+    previousTaskCountRef.current = currentTasks.length;
+  }, [tasks, selectedDate]);
+
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
     addTask({ 
@@ -193,6 +226,14 @@ export default function Tasks() {
     });
     setNewTaskText("");
     setTaskDifficulty("medium");
+  };
+  
+  const handleMainQuestResponse = (makeMainQuest: boolean) => {
+    if (makeMainQuest && pendingTaskId) {
+      setMainQuest(pendingTaskId);
+    }
+    setShowMainQuestPrompt(false);
+    setPendingTaskId(null);
   };
 
   const handleAddHabit = () => {
@@ -564,6 +605,25 @@ export default function Tasks() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showMainQuestPrompt} onOpenChange={setShowMainQuestPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set as Main Quest?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to make this your main quest for the day? Main quests award 2x XP!
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => handleMainQuestResponse(false)}>
+              No, thanks
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleMainQuestResponse(true)}>
+              Yes, make it main quest
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
