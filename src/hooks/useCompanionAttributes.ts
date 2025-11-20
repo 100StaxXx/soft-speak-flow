@@ -24,7 +24,7 @@ export const useCompanionAttributes = () => {
         .from("user_companion")
         .select(attribute)
         .eq("id", companionId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
 

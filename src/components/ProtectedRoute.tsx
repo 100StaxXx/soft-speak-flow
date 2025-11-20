@@ -17,35 +17,43 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Wait for auth to load
-    if (authLoading || profileLoading) return;
+    let mounted = true;
 
-    // Redirect to auth if not logged in
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
+    const checkAuthAndProfile = async () => {
+      // Wait for auth to load
+      if (authLoading || profileLoading) return;
 
-    // Redirect to onboarding if mentor required and profile missing or not selected
-    if (requireMentor && (!profile || !profile.selected_mentor_id)) {
-      // Double-check server state to avoid stale client redirect
-      (async () => {
+      // Redirect to auth if not logged in
+      if (!user) {
+        if (mounted) navigate("/auth");
+        return;
+      }
+
+      // Redirect to onboarding if mentor required and profile missing or not selected
+      if (requireMentor && (!profile || !profile.selected_mentor_id)) {
+        // Double-check server state to avoid stale client redirect
         try {
-          if (!user) return;
           const { data } = await supabase
             .from('profiles')
             .select('selected_mentor_id')
             .eq('id', user.id)
             .maybeSingle();
 
-          if (!data?.selected_mentor_id) {
+          if (mounted && !data?.selected_mentor_id) {
             navigate("/onboarding");
           }
-        } catch {
-          navigate("/onboarding");
+        } catch (error) {
+          console.error("Error checking profile:", error);
+          if (mounted) navigate("/onboarding");
         }
-      })();
-    }
+      }
+    };
+
+    checkAuthAndProfile();
+
+    return () => {
+      mounted = false;
+    };
   }, [user, profile, authLoading, profileLoading, requireMentor, navigate]);
 
   // Animate progress bar while loading
