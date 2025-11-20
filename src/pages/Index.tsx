@@ -9,13 +9,21 @@ import { BottomNav } from "@/components/BottomNav";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { HeroQuoteBanner } from "@/components/HeroQuoteBanner";
 import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
+import dariusImage from "@/assets/darius-sage.png";
+import novaImage from "@/assets/nova-sage.png";
+import lumiImage from "@/assets/lumi-sage.png";
+import kaiImage from "@/assets/kai-sage.png";
+import atlasImage from "@/assets/atlas-sage.png";
+import siennaImage from "@/assets/sienna-sage.png";
+import eliImage from "@/assets/eli-sage.png";
+import strykerImage from "@/assets/stryker-sage.png";
+import solaceImage from "@/assets/solace-sage.png";
 
 const Index = () => {
   const { user } = useAuth();
@@ -29,6 +37,40 @@ const Index = () => {
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [mentorImage, setMentorImage] = useState<string>("");
+
+  // Map mentor slugs to local images
+  const mentorImages: Record<string, string> = {
+    'darius': dariusImage,
+    'nova': novaImage,
+    'lumi': lumiImage,
+    'kai': kaiImage,
+    'atlas': atlasImage,
+    'sienna': siennaImage,
+    'eli': eliImage,
+    'stryker': strykerImage,
+    'solace': solaceImage,
+  };
+
+  // Fetch mentor image
+  useEffect(() => {
+    const fetchMentorImage = async () => {
+      if (!profile?.selected_mentor_id) return;
+
+      const { data: mentorData } = await supabase
+        .from("mentors")
+        .select("avatar_url, slug")
+        .eq("id", profile.selected_mentor_id)
+        .maybeSingle();
+
+      if (mentorData) {
+        const imageUrl = mentorData.avatar_url || mentorImages[mentorData.slug] || mentorImages['darius'];
+        setMentorImage(imageUrl);
+      }
+    };
+
+    fetchMentorImage();
+  }, [profile?.selected_mentor_id]);
 
   useEffect(() => {
     localStorage.setItem('hasSeenIntro', 'true');
@@ -110,24 +152,29 @@ const Index = () => {
         />
       </ErrorBoundary>
       <PageTransition>
-        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 space-y-4 sm:space-y-6 md:space-y-8">
-            
-            {/* Hero Quote Banner */}
-            <ErrorBoundary>
-              <HeroQuoteBanner />
-            </ErrorBoundary>
+        {/* Fixed Background Image */}
+        {mentorImage && (
+          <div className="fixed inset-0 z-0">
+            <img 
+              src={mentorImage} 
+              alt="Mentor background"
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-background/85" />
+          </div>
+        )}
 
-            {/* Priority Content - Negative margin to overlap banner */}
-            <div className="-mt-20 relative z-10 px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
-              <ErrorBoundary>
-                <MentorNudges />
-              </ErrorBoundary>
-              
-              <ErrorBoundary>
-                <MorningCheckIn />
-              </ErrorBoundary>
+        {/* Scrollable Content */}
+        <div className="relative z-10 min-h-screen pb-24 sm:pb-24">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-8 space-y-4 sm:space-y-6 md:space-y-8">
+            <ErrorBoundary>
+              <MentorNudges />
+            </ErrorBoundary>
             
+            <ErrorBoundary>
+              <MorningCheckIn />
+            </ErrorBoundary>
+          
             <div data-tour="todays-pep-talk">
               <ErrorBoundary>
                 <TodaysPepTalk />
@@ -138,7 +185,6 @@ const Index = () => {
               <ErrorBoundary>
                 <MentorQuickChat />
               </ErrorBoundary>
-            </div>
             </div>
           </div>
         </div>
