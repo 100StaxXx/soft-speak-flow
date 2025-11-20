@@ -313,31 +313,43 @@ export const TodaysPepTalk = () => {
   if (!pepTalk) return null;
 
   return (
-    <Card className="relative overflow-hidden group animate-fade-in">
-      {/* Background gradients */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/10 to-background opacity-60" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-accent/20 opacity-40" />
+    <Card className="relative overflow-hidden group animate-fade-in rounded-3xl border-2">
+      {/* Pokemon-style gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-accent/15 to-primary/10 animate-gradient-shift" />
       
-      {/* Animated glows */}
-      <div className="absolute -top-1/3 -right-1/3 w-2/3 h-2/3 bg-primary/20 blur-3xl rounded-full animate-pulse" />
-      <div className="absolute -bottom-1/3 -left-1/3 w-2/3 h-2/3 bg-accent/20 blur-3xl rounded-full animate-pulse" style={{ animationDelay: "1s" }} />
+      {/* Sparkle particles when playing */}
+      {isPlaying && (
+        <>
+          <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-primary rounded-full animate-sparkle" />
+          <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: '0.3s' }} />
+          <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '0.6s' }} />
+          <div className="absolute top-1/2 right-1/3 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle" style={{ animationDelay: '0.9s' }} />
+        </>
+      )}
       
-      <div className="relative p-6 space-y-4">
-        {/* Header */}
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-          <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {personality?.name ? `${personality.name}'s Message` : "Today's Pep Talk"}
+      {/* Glowing orbs */}
+      <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/20 blur-3xl rounded-full animate-pulse-slow" />
+      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-accent/20 blur-3xl rounded-full animate-pulse-slow" style={{ animationDelay: "1.5s" }} />
+      
+      <div className="relative p-6 md:p-8 space-y-6">
+        {/* Header with sparkle icon */}
+        <div className="flex items-center justify-center gap-2">
+          <div className="relative">
+            <Sparkles className="h-6 w-6 text-primary animate-pulse-slow" />
+            <div className="absolute inset-0 bg-primary/30 blur-md rounded-full" />
+          </div>
+          <h2 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient-text">
+            {personality?.name ? `${personality.name}'s Daily Message` : "Today's Pep Talk"}
           </h2>
         </div>
 
-        {/* Content */}
-        <div className="space-y-4 p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-          <div className="space-y-2">
-            <h3 className="font-bold text-foreground">
+        {/* Bubble card content */}
+        <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-glow">
+          <div className="space-y-3 text-center">
+            <h3 className="text-xl md:text-2xl font-bold text-foreground">
               {pepTalk.title}
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               {pepTalk.summary}
             </p>
           </div>
@@ -345,45 +357,57 @@ export const TodaysPepTalk = () => {
           {/* Audio Player */}
           <audio ref={audioRef} src={pepTalk.audio_url} preload="metadata" />
           
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Large central play button */}
+            <div className="flex items-center justify-center">
+              <Button
+                size="icon"
+                onClick={togglePlayPause}
+                disabled={isWalkthroughActive}
+                className={cn(
+                  "h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
+                  isPlaying 
+                    ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110" 
+                    : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110"
+                )}
+              >
+                {isPlaying ? (
+                  <Pause className="h-8 w-8" fill="currentColor" />
+                ) : (
+                  <Play className="h-8 w-8 ml-1" fill="currentColor" />
+                )}
+              </Button>
+            </div>
+
             {/* Playback Controls */}
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(-10)}
                 disabled={isWalkthroughActive}
-                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
               >
                 <SkipBack className="h-4 w-4" />
               </Button>
 
-              <Button
-                size="icon"
-                onClick={togglePlayPause}
-                disabled={isWalkthroughActive}
-                className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5" fill="currentColor" />
-                ) : (
-                  <Play className="h-5 w-5 ml-0.5" fill="currentColor" />
-                )}
-              </Button>
+              <div className="text-xs text-muted-foreground font-medium">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(10)}
                 disabled={isWalkthroughActive}
-                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
               >
                 <SkipForward className="h-4 w-4" />
               </Button>
             </div>
 
             {/* Progress Bar */}
-            <div className="space-y-2">
+            <div className="space-y-2 px-2">
               <Slider
                 value={[currentTime]}
                 max={duration || 100}
@@ -392,14 +416,10 @@ export const TodaysPepTalk = () => {
                 disabled={isWalkthroughActive}
                 className="w-full"
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{formatTime(currentTime)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
             </div>
 
-            {/* Transcript Section */}
-            <div className="space-y-2 p-3 rounded-lg bg-background/50 border border-border/50">
+            {/* Transcript bubble */}
+            <div className="space-y-2 p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-primary/20 shadow-soft">
               {!showFullTranscript ? renderTranscriptPreview() : renderFullTranscript()}
               
               {pepTalk?.script && (
@@ -407,9 +427,9 @@ export const TodaysPepTalk = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowFullTranscript(!showFullTranscript)}
-                  className="w-full justify-between mt-2"
+                  className="w-full justify-between mt-2 rounded-full hover:bg-primary/10 transition-all"
                 >
-                  <span className="text-xs">
+                  <span className="text-xs font-medium">
                     {showFullTranscript ? "Show Less" : "Show Full Transcript"}
                   </span>
                   {showFullTranscript ? (
@@ -424,8 +444,8 @@ export const TodaysPepTalk = () => {
           
           <Button 
             variant="outline" 
-            size="sm"
-            className="w-full"
+            size="lg"
+            className="w-full rounded-full border-2 hover:bg-primary/10 hover:scale-105 transition-all shadow-soft"
             onClick={() => navigate("/pep-talks")}
           >
             Browse More Pep Talks

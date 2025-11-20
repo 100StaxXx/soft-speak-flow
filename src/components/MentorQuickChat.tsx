@@ -45,37 +45,53 @@ export const MentorQuickChat = () => {
   };
 
   return (
-    <Card className="p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <MessageCircle className="h-5 w-5 text-primary" />
-        <h3 className="font-bold text-foreground">
-          {personality?.name ? `Ask ${personality.name}` : "Quick Chat"}
-        </h3>
-      </div>
+    <Card className="p-6 space-y-5 rounded-3xl border-2 border-primary/20 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 animate-gradient-shift" />
       
-      <div className="space-y-2">
-        {currentQuestions.map((question, index) => (
-          <button
-            key={index}
-            onClick={() => handleQuestionClick(question)}
-            className="w-full text-left px-4 py-3 rounded-lg bg-secondary/50 hover:bg-secondary hover:shadow-glow transition-all text-sm text-foreground hover:scale-[1.02]"
-          >
-            "{question}"
-          </button>
-        ))}
-      </div>
+      <div className="relative z-10 space-y-5">
+        <div className="flex items-center justify-center gap-2">
+          <div className="relative">
+            <MessageCircle className="h-6 w-6 text-primary" />
+            <div className="absolute inset-0 bg-primary/20 blur-md rounded-full animate-pulse-slow" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground">
+            {personality?.name ? `Ask ${personality.name}` : "Quick Chat"}
+          </h3>
+        </div>
+        
+        {/* Big rounded pill buttons */}
+        <div className="space-y-3">
+          {currentQuestions.map((question, index) => (
+            <button
+              key={index}
+              onClick={() => handleQuestionClick(question)}
+              className="group relative w-full text-center px-6 py-4 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 border-2 border-primary/30 hover:border-primary/50 transition-all text-sm font-medium text-foreground hover:scale-105 hover:shadow-glow active:scale-95"
+            >
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/0 to-accent/0 group-hover:from-primary/10 group-hover:to-accent/10 transition-all" />
+              <span className="relative">{question}</span>
+            </button>
+          ))}
+        </div>
 
-      <form onSubmit={handleCustomSubmit} className="flex gap-2">
-        <Input
-          value={customQuestion}
-          onChange={(e) => setCustomQuestion(e.target.value)}
-          placeholder="Or ask your own question..."
-          className="flex-1"
-        />
-        <Button type="submit" size="icon" disabled={!customQuestion.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+        {/* Custom question input */}
+        <form onSubmit={handleCustomSubmit} className="flex gap-2">
+          <Input
+            value={customQuestion}
+            onChange={(e) => setCustomQuestion(e.target.value)}
+            placeholder="Or type your own..."
+            className="flex-1 rounded-full border-2 focus:border-primary/50 transition-all"
+          />
+          <Button 
+            type="submit" 
+            size="icon" 
+            disabled={!customQuestion.trim()}
+            className="rounded-full h-10 w-10 shadow-soft hover:shadow-glow transition-all hover:scale-110 disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </div>
     </Card>
   );
 };
