@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -189,12 +189,12 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         )}
 
         <Button
-          onClick={() => onComplete({
+          onClick={useCallback(() => onComplete({
             favoriteColor: selectedColor,
             spiritAnimal: selectedAnimal,
             coreElement: selectedElement,
             storyTone: selectedTone,
-          })}
+          }), [selectedColor, selectedAnimal, selectedElement, selectedTone, onComplete])}
           disabled={!isComplete || isLoading}
           variant="cta"
           className="w-full"
