@@ -262,7 +262,7 @@ export default function Onboarding() {
         })
         .eq('id', user.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Supabase update error:", error);
