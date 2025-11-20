@@ -17,9 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useAchievements } from "@/hooks/useAchievements";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
+import { useProfile } from "@/hooks/useProfile";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { cn } from "@/lib/utils";
@@ -32,9 +34,11 @@ export default function Tasks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { logActivity } = useActivityFeed();
+  const { profile } = useProfile();
   const { companion } = useCompanion();
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
+  const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
   
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -158,6 +162,11 @@ export default function Tasks() {
           if (companion) {
             await updateMindFromHabit(companion.id);
             await updateBodyFromActivity(companion.id);
+          }
+          
+          // Check for streak achievements
+          if (profile?.current_habit_streak) {
+            await checkStreakAchievements(profile.current_habit_streak);
           }
           
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });

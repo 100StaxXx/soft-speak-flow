@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
+import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
 
 export const useDailyMissions = () => {
@@ -10,6 +11,7 @@ export const useDailyMissions = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
+  const { checkFirstTimeAchievements } = useAchievements();
   const today = new Date().toISOString().split('T')[0];
 
   const { data: missions, isLoading } = useQuery({
@@ -64,6 +66,17 @@ export const useDailyMissions = () => {
       
       // Award XP with display reason
       await awardCustomXP(mission.xp_reward, `mission_${mission.mission_type}`, "Mission Complete!");
+      
+      // Check for first mission achievement
+      const { count } = await supabase
+        .from('daily_missions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .eq('completed', true);
+      
+      if (count === 1) {
+        await checkFirstTimeAchievements('mission');
+      }
       
       return data;
     },

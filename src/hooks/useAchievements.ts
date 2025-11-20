@@ -120,9 +120,74 @@ export const useAchievements = () => {
     }
   };
 
+  const checkFirstTimeAchievements = async (type: 'habit' | 'checkin' | 'peptalk' | 'mission') => {
+    const achievementMap = {
+      habit: {
+        type: "first_habit",
+        title: "Habit Builder",
+        description: "Created your first habit",
+        icon: "check",
+        tier: "bronze" as const,
+      },
+      checkin: {
+        type: "first_checkin",
+        title: "Morning Person",
+        description: "Completed your first check-in",
+        icon: "sunrise",
+        tier: "bronze" as const,
+      },
+      peptalk: {
+        type: "first_peptalk",
+        title: "Mentor's Student",
+        description: "Listened to your first pep talk",
+        icon: "headphones",
+        tier: "bronze" as const,
+      },
+      mission: {
+        type: "first_mission",
+        title: "Mission Started",
+        description: "Completed your first mission",
+        icon: "target",
+        tier: "bronze" as const,
+      },
+    };
+
+    await awardAchievement(achievementMap[type]);
+  };
+
+  const checkCompanionAchievements = async (stage: number) => {
+    if (stage === 5) {
+      await awardAchievement({
+        type: "companion_stage_5",
+        title: "Growth Guardian",
+        description: "Evolved companion to Stage 5",
+        icon: "sparkles",
+        tier: "silver",
+      });
+    } else if (stage === 10) {
+      await awardAchievement({
+        type: "companion_stage_10",
+        title: "Evolution Master",
+        description: "Evolved companion to Stage 10",
+        icon: "star",
+        tier: "gold",
+      });
+    } else if (stage === 20) {
+      await awardAchievement({
+        type: "companion_max",
+        title: "Legendary Bond",
+        description: "Reached maximum companion evolution",
+        icon: "crown",
+        tier: "platinum",
+      });
+    }
+  };
+
   return {
     awardAchievement,
     checkStreakAchievements,
     checkChallengeAchievements,
+    checkFirstTimeAchievements,
+    checkCompanionAchievements,
   };
 };
