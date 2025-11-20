@@ -263,16 +263,17 @@ export const AppWalkthrough = () => {
 
   // Utility: safely set step after ensuring target exists
   const safeSetStep = useCallback(async (idx: number) => {
+    // Emit custom event for BottomNav FIRST so navigation becomes clickable immediately
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+      detail: { step: idx } 
+    }));
+    
+    setStepIndex(idx);
+    
     const target = (steps[idx] as Step | undefined)?.target as string | undefined;
     if (target && target !== 'body') {
       await waitForSelector(target, 6000);
     }
-    setStepIndex(idx);
-    
-    // Emit custom event for BottomNav to listen to
-    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-      detail: { step: idx } 
-    }));
   }, [waitForSelector, steps]);
 
   useEffect(() => {
