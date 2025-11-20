@@ -103,19 +103,19 @@ export const HeroQuoteBanner = () => {
         <img 
           src={mentorImageUrl} 
           alt={mentor.name}
-          className="w-full h-full object-cover object-top"
+          className="w-full h-full object-cover object-top scale-110"
         />
         <div className="absolute inset-0 bg-background/60" />
       </div>
 
       {/* Quote Content */}
-      <div className="relative h-full flex items-center justify-center p-8 md:p-12">
-        <blockquote className="max-w-4xl text-center">
-          <p className="font-cinzel text-3xl md:text-5xl lg:text-6xl font-bold text-foreground leading-relaxed">
+      <div className="relative h-full flex items-end justify-end p-8 md:p-12">
+        <blockquote className="max-w-2xl text-right">
+          <p className="font-serif italic text-xl md:text-2xl lg:text-3xl text-foreground leading-relaxed">
             "{todaysQuote.text}"
           </p>
           {todaysQuote.author && (
-            <footer className="mt-6 font-cinzel text-xl md:text-2xl text-foreground/80">
+            <footer className="mt-4 font-serif italic text-base md:text-lg text-foreground/80">
               — {todaysQuote.author}
             </footer>
           )}
