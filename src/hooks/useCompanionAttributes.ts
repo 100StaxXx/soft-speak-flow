@@ -24,9 +24,9 @@ export const useCompanionAttributes = () => {
         .from("user_companion")
         .select(attribute)
         .eq("id", companionId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError) throw fetchError;
+      if (fetchError || !companion) throw fetchError || new Error('Companion not found');
 
       const currentValue = companion[attribute] ?? (attribute === 'body' ? 100 : 0);
       const newValue = Math.max(0, Math.min(100, currentValue + amount));

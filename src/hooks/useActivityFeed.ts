@@ -51,9 +51,9 @@ export const useActivityFeed = () => {
           activity_data: data,
         })
         .select()
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error || !activity) throw error || new Error('Failed to create activity');
 
       // Trigger AI comment generation in background
       supabase.functions.invoke('generate-activity-comment', {

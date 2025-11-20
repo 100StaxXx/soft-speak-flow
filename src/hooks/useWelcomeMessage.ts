@@ -28,7 +28,7 @@ export const useWelcomeMessage = () => {
         .from('profiles')
         .select('onboarding_data')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       const onboardingData = (profile?.onboarding_data as any) || {};
       const userName = onboardingData.userName || user.email?.split('@')[0] || 'friend';
