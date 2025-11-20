@@ -463,7 +463,7 @@ export const AppWalkthrough = () => {
         setWaitingForAction(true);
       }
     }
-  }, []);
+  }, [setRun, setWaitingForAction]);
 
   // Lock body scroll during tutorial but allow pointer events for spotlight clicks
   useEffect(() => {
