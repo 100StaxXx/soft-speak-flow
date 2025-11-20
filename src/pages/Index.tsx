@@ -62,11 +62,6 @@ const Index = () => {
     }
   }, [user, profileLoading, companionLoading]);
 
-  // Show intro first, before any checks
-  if (showIntro) {
-    return <IntroScreen onComplete={() => setShowIntro(false)} />;
-  }
-
   // Check for incomplete onboarding and redirect (only after data is ready)
   useEffect(() => {
     if (!user || !isReady) return;
@@ -81,6 +76,11 @@ const Index = () => {
       }
     }
   }, [user, isReady, profile, navigate]);
+
+  // Show intro first, before any checks
+  if (showIntro) {
+    return <IntroScreen onComplete={() => setShowIntro(false)} />;
+  }
 
   // Show loading state while critical data loads
   if (isTransitioning || !isReady) {
