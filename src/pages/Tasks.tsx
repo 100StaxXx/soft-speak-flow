@@ -72,6 +72,7 @@ export default function Tasks() {
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
   const previousTaskCountRef = useRef(tasks.length);
+  const previousDateRef = useRef(selectedDate.toISOString().split('T')[0]);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -201,6 +202,13 @@ export default function Tasks() {
   useEffect(() => {
     const taskDate = selectedDate.toISOString().split('T')[0];
     const currentTasks = tasks.filter(t => t.task_date === taskDate);
+    
+    // Reset counter if date changed
+    if (taskDate !== previousDateRef.current) {
+      previousTaskCountRef.current = currentTasks.length;
+      previousDateRef.current = taskDate;
+      return;
+    }
     
     // Check if a task was just added
     if (currentTasks.length > previousTaskCountRef.current) {
