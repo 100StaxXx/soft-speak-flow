@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense, lazy } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,20 +6,16 @@ import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
 import { IntroScreen } from "@/components/IntroScreen";
 import { BottomNav } from "@/components/BottomNav";
-import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
-import { LoadingQuote } from "@/components/LoadingQuote";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-// Lazy load heavy components
-const QuoteOfTheDay = lazy(() => import("@/components/QuoteOfTheDay").then(m => ({ default: m.QuoteOfTheDay })));
-const MentorQuickChat = lazy(() => import("@/components/MentorQuickChat").then(m => ({ default: m.MentorQuickChat })));
-const TodaysPepTalk = lazy(() => import("@/components/TodaysPepTalk").then(m => ({ default: m.TodaysPepTalk })));
-const MorningCheckIn = lazy(() => import("@/components/MorningCheckIn").then(m => ({ default: m.MorningCheckIn })));
-const MentorNudges = lazy(() => import("@/components/MentorNudges").then(m => ({ default: m.MentorNudges })));
-const OnboardingTour = lazy(() => import("@/components/OnboardingTour").then(m => ({ default: m.OnboardingTour })));
-const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
+import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
+import { MentorQuickChat } from "@/components/MentorQuickChat";
+import { TodaysPepTalk } from "@/components/TodaysPepTalk";
+import { MorningCheckIn } from "@/components/MorningCheckIn";
+import { MentorNudges } from "@/components/MentorNudges";
+import { OnboardingTour } from "@/components/OnboardingTour";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 
 const Index = () => {
   const { user } = useAuth();
@@ -100,22 +96,18 @@ const Index = () => {
     );
   }
 
-  // Transparent loading fallback to avoid grey boxes during tutorial
-  const ComponentLoader = () => (
-    <div className="h-20" />
-  );
+  // Simple loading fallback
+  const ComponentLoader = () => <div className="h-20" />;
 
   return (
     <>
       <ErrorBoundary>
-        <Suspense fallback={<ComponentLoader />}>
-          <OnboardingFlow 
-            open={showOnboarding} 
-            onComplete={() => {
-              setShowOnboarding(false);
-            }} 
-          />
-        </Suspense>
+        <OnboardingFlow 
+          open={showOnboarding} 
+          onComplete={() => {
+            setShowOnboarding(false);
+          }} 
+        />
       </ErrorBoundary>
       <PageTransition>
         <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
@@ -128,39 +120,28 @@ const Index = () => {
               <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
             </div>
 
-            {/* Priority Content - Load with Suspense for better UX */}
+            {/* Priority Content */}
             <ErrorBoundary>
-              <Suspense fallback={<ComponentLoader />}>
-                <MentorNudges />
-              </Suspense>
+              <MentorNudges />
             </ErrorBoundary>
             
             <ErrorBoundary>
-              <Suspense fallback={<ComponentLoader />}>
-                <MorningCheckIn />
-              </Suspense>
+              <MorningCheckIn />
             </ErrorBoundary>
             
-            {/* Today's Pep Talk */}
             <div data-tour="todays-pep-talk">
               <ErrorBoundary>
-                <Suspense fallback={<ComponentLoader />}>
-                  <TodaysPepTalk />
-                </Suspense>
+                <TodaysPepTalk />
               </ErrorBoundary>
             </div>
 
             <ErrorBoundary>
-              <Suspense fallback={<ComponentLoader />}>
-                <QuoteOfTheDay />
-              </Suspense>
+              <QuoteOfTheDay />
             </ErrorBoundary>
             
             <div data-tour="ask-mentor">
               <ErrorBoundary>
-                <Suspense fallback={<ComponentLoader />}>
-                  <MentorQuickChat />
-                </Suspense>
+                <MentorQuickChat />
               </ErrorBoundary>
             </div>
           </div>
@@ -168,9 +149,7 @@ const Index = () => {
       </PageTransition>
       <BottomNav />
       <ErrorBoundary>
-        <Suspense fallback={null}>
-          <OnboardingTour />
-        </Suspense>
+        <OnboardingTour />
       </ErrorBoundary>
     </>
   );
