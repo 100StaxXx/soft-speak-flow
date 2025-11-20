@@ -311,11 +311,11 @@ export const AppWalkthrough = () => {
 
   // Listen for mood selection to advance from step 0 to step 1
   useEffect(() => {
+    if (!run || stepIndex !== 0) return;
+    
     const handleMoodSelected = () => {
-      if (run && stepIndex === 0) {
-        haptics.light();
-        setTimeout(() => safeSetStep(1), 300);
-      }
+      haptics.light();
+      setTimeout(() => safeSetStep(1), 300);
     };
 
     window.addEventListener('mood-selected', handleMoodSelected);
@@ -324,12 +324,12 @@ export const AppWalkthrough = () => {
 
   // Listen for check-in completion
   useEffect(() => {
+    if (!run || stepIndex > 1) return;
+    
     const handleCheckInComplete = () => {
-      if (run && stepIndex <= 1) {
-        haptics.success();
-        setWaitingForAction(false);
-        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
-      }
+      haptics.success();
+      setWaitingForAction(false);
+      setTimeout(() => safeSetStep(2), 500);
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
@@ -338,19 +338,19 @@ export const AppWalkthrough = () => {
 
   // Listen for mission completion
   useEffect(() => {
+    if (!run || stepIndex !== 6) return;
+    
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 6) {
-        haptics.heavy();
-        setWaitingForAction(false);
-        
-        // PAUSE the tour completely during evolution animation
-        setRun(false);
-        
-        // Clear tutorial step temporarily during evolution
-        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-          detail: { step: null } 
-        }));
-      }
+      haptics.heavy();
+      setWaitingForAction(false);
+      
+      // PAUSE the tour completely during evolution animation
+      setRun(false);
+      
+      // Clear tutorial step temporarily during evolution
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
     };
 
     window.addEventListener('mission-completed', handleTaskCompleted);
@@ -359,14 +359,14 @@ export const AppWalkthrough = () => {
 
   // Listen for evolution completion to show final step
   useEffect(() => {
+    if (stepIndex !== 6) return;
+    
     const handleEvolutionComplete = () => {
-      if (stepIndex === 6) {
-        // Evolution complete - now show final congratulations step
-        haptics.success();
-        setRun(true);
-        setWaitingForAction(false);
-        setTimeout(() => safeSetStep(7), 500);
-      }
+      // Evolution complete - now show final congratulations step
+      haptics.success();
+      setRun(true);
+      setWaitingForAction(false);
+      setTimeout(() => safeSetStep(7), 500);
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
