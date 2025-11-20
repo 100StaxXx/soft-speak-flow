@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Quote, Sparkles } from "lucide-react";
+import dariusImage from "@/assets/darius-sage.png";
+import novaImage from "@/assets/nova-sage.png";
+import lumiImage from "@/assets/lumi-sage.png";
+import kaiImage from "@/assets/kai-sage.png";
+import atlasImage from "@/assets/atlas-sage.png";
+import siennaImage from "@/assets/sienna-sage.png";
+import eliImage from "@/assets/eli-sage.png";
+import strykerImage from "@/assets/stryker-sage.png";
+import solaceImage from "@/assets/solace-sage.png";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 interface QuoteData {
@@ -19,10 +27,22 @@ interface Mentor {
 
 export const HeroQuoteBanner = () => {
   const { profile } = useProfile();
-  const personality = useMentorPersonality();
   const [todaysQuote, setTodaysQuote] = useState<QuoteData | null>(null);
   const [mentor, setMentor] = useState<Mentor | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Map mentor slugs to local images
+  const mentorImages: Record<string, string> = {
+    'darius': dariusImage,
+    'nova': novaImage,
+    'lumi': lumiImage,
+    'kai': kaiImage,
+    'atlas': atlasImage,
+    'sienna': siennaImage,
+    'eli': eliImage,
+    'stryker': strykerImage,
+    'solace': solaceImage,
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,19 +94,19 @@ export const HeroQuoteBanner = () => {
 
   if (loading || !todaysQuote || !mentor) return null;
 
+  const mentorImageUrl = mentor.avatar_url || mentorImages[mentor.slug] || mentorImages['darius'];
+
   return (
     <div className="relative w-full h-[75vh] min-h-[500px] overflow-hidden rounded-3xl mb-6 shadow-hard">
       {/* Mentor Background Image - Dimmed */}
-      {mentor.avatar_url && (
-        <div className="absolute inset-0">
-          <img 
-            src={mentor.avatar_url} 
-            alt={mentor.name}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-background/60" />
-        </div>
-      )}
+      <div className="absolute inset-0">
+        <img 
+          src={mentorImageUrl} 
+          alt={mentor.name}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-background/60" />
+      </div>
 
       {/* Quote Content */}
       <div className="relative h-full flex items-center justify-center p-8 md:p-12">
