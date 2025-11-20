@@ -8,12 +8,18 @@ export const IntroScreen = ({ onComplete }: IntroScreenProps) => {
   const [show, setShow] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let timer1: NodeJS.Timeout;
+    let timer2: NodeJS.Timeout;
+    
+    timer1 = setTimeout(() => {
       setShow(false);
-      setTimeout(onComplete, 1500);
+      timer2 = setTimeout(onComplete, 1500);
     }, 4000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer1);
+      if (timer2) clearTimeout(timer2);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
