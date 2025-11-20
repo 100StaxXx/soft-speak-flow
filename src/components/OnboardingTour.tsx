@@ -13,13 +13,23 @@ const tourSteps: Step[] = [
     disableBeacon: true,
   },
   {
-    target: '[data-tour="daily-content"]',
-    content: '🎯 Start your day with a personalized pep talk from your mentor tailored to your needs.',
-    placement: 'bottom',
+    target: 'body',
+    content: '📜 Notice the inspiring quote at the top? Scroll down to explore all your personalized content.',
+    placement: 'center',
+  },
+  {
+    target: '[data-tour="todays-pep-talk"]',
+    content: '🎯 Here\'s your daily pep talk - personalized motivation from your mentor. Scroll to see it!',
+    placement: 'top',
+  },
+  {
+    target: '[data-tour="ask-mentor"]',
+    content: '💬 Need guidance? Ask your mentor anything using this quick chat feature.',
+    placement: 'top',
   },
   {
     target: 'body',
-    content: '✨ You\'re all set! Use the bottom navigation to explore: Progress (habits, challenges, achievements), Inspire (motivational content), and Search (find anything).',
+    content: '✨ You\'re all set! Use the bottom navigation to explore: Progress (habits, challenges, achievements), Inspire (motivational content), and Search.',
     placement: 'center',
   },
 ];
@@ -49,13 +59,33 @@ export const OnboardingTour = () => {
   }, [user, profile, location.pathname]);
 
   const handleJoyrideCallback = async (data: CallBackProps) => {
-    const { status, type, action } = data;
+    const { status, type, action, index } = data;
 
-    // Handle step progression
+    // Auto-scroll to elements that might not be visible
     if (type === 'step:after' && action === 'next') {
       setStepIndex((prev) => prev + 1);
+      
+      // Scroll to pep talk section when advancing to that step
+      if (index === 1) {
+        const pepTalkElement = document.querySelector('[data-tour="todays-pep-talk"]');
+        if (pepTalkElement) {
+          pepTalkElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      // Scroll to ask mentor when advancing to that step
+      if (index === 2) {
+        const mentorElement = document.querySelector('[data-tour="ask-mentor"]');
+        if (mentorElement) {
+          mentorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     } else if (type === 'step:after' && action === 'prev') {
       setStepIndex((prev) => Math.max(0, prev - 1));
+      
+      // Scroll back to top when going back to early steps
+      if (index <= 1) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
 
     // Tour completed or skipped
