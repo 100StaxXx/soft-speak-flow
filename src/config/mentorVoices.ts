@@ -115,7 +115,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   stryker: {
     mentorSlug: "stryker",
     mentorName: "Stryker",
-    voiceName: "Adam",
+    voiceName: "Rich",
     voiceId: "pNInz6obpgDQGcFmaJgB",
     defaultIntensity: "high",
     categories: ["strength", "resilience", "power"],
