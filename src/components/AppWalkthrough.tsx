@@ -85,6 +85,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     floaterProps: {
       disableAnimation: true,
       hideArrow: false,
+      offset: 20,
     },
     styles: {
       options: {
@@ -100,12 +101,15 @@ const WALKTHROUGH_STEPS: Step[] = [
         borderRadius: '1.25rem',
         border: '3px solid hsl(var(--primary))',
         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+        marginTop: '-120px',
+        pointerEvents: 'none',
       },
       tooltipContent: {
         fontSize: '1rem',
         lineHeight: '1.6',
         padding: '0.5rem 0',
         textAlign: 'left' as const,
+        pointerEvents: 'auto',
       }
     }
   },
