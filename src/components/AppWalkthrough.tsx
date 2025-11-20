@@ -170,7 +170,6 @@ export const AppWalkthrough = () => {
       
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
-      localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
@@ -469,7 +468,6 @@ export const AppWalkthrough = () => {
       
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
-      localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
