@@ -30,20 +30,14 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
     },
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ["achievement-stats", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_achievement_stats")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data || { total_achievements: 0, bronze_count: 0, silver_count: 0, gold_count: 0, platinum_count: 0 };
-    },
-  });
+  // Calculate stats from achievements
+  const stats = {
+    total_achievements: achievements?.length || 0,
+    bronze_count: achievements?.filter(a => a.tier === 'bronze').length || 0,
+    silver_count: achievements?.filter(a => a.tier === 'silver').length || 0,
+    gold_count: achievements?.filter(a => a.tier === 'gold').length || 0,
+    platinum_count: achievements?.filter(a => a.tier === 'platinum').length || 0,
+  };
 
   if (isLoading) {
     return (
@@ -63,30 +57,36 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
           <Trophy className="h-6 w-6 text-primary" />
           <h3 className="text-lg font-semibold">Your Achievements</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-foreground">
-              {stats?.total_achievements || 0}
+              {stats.total_achievements}
             </div>
             <div className="text-xs text-muted-foreground">Total</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-500">
-              {stats?.platinum_count || 0}
+            <div className="text-2xl font-bold bg-gradient-to-br from-purple-400 to-purple-600 bg-clip-text text-transparent">
+              {stats.platinum_count}
             </div>
             <div className="text-xs text-muted-foreground">Platinum</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-500">
-              {stats?.gold_count || 0}
+            <div className="text-2xl font-bold bg-gradient-to-br from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
+              {stats.gold_count}
             </div>
             <div className="text-xs text-muted-foreground">Gold</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-400">
-              {stats?.silver_count || 0}
+            <div className="text-2xl font-bold bg-gradient-to-br from-gray-300 to-gray-500 bg-clip-text text-transparent">
+              {stats.silver_count}
             </div>
             <div className="text-xs text-muted-foreground">Silver</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold bg-gradient-to-br from-orange-500 to-orange-700 bg-clip-text text-transparent">
+              {stats.bronze_count}
+            </div>
+            <div className="text-xs text-muted-foreground">Bronze</div>
           </div>
         </div>
       </Card>
