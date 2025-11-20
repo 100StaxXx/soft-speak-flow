@@ -304,7 +304,7 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.5-flash-image",
         messages: shouldUseContinuityPrompt ? [
           {
             role: "system",
