@@ -163,7 +163,7 @@ export const MorningCheckIn = () => {
             <Sunrise className="h-5 w-5 text-orange-500" />
           </div>
           <div>
-            <h3 className="font-heading font-black text-lg md:text-xl">Check-in</h3>
+            <h3 className="font-heading font-black text-2xl md:text-3xl text-[hsl(30,100%,60%)]">CHECK-IN</h3>
             <p className="text-xs md:text-sm text-muted-foreground">
               {personality?.name} wants to know: How are you feeling?
             </p>
