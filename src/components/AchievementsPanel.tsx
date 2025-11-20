@@ -6,6 +6,7 @@ import { Trophy, TrendingUp } from "lucide-react";
 import { Card } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { EmptyState } from "./EmptyState";
+import { UnlockedPepTalksPanel } from "./UnlockedPepTalksPanel";
 
 interface AchievementsPanelProps {
   showEmptyState?: boolean;
@@ -119,6 +120,9 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
           </Card>
         )}
       </div>
+
+      {/* Unlocked Pep Talks */}
+      <UnlockedPepTalksPanel />
     </div>
   );
 };
