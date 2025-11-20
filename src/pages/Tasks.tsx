@@ -68,7 +68,11 @@ export default function Tasks() {
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
-  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const [pendingTaskData, setPendingTaskData] = useState<{
+    text: string;
+    difficulty: "easy" | "medium" | "hard";
+    date: string;
+  } | null>(null);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -195,54 +199,69 @@ export default function Tasks() {
   });
 
 
-  const handleAddTask = async () => {
+  const handleAddTask = () => {
     if (!newTaskText.trim()) return;
     
     const taskDate = selectedDate.toISOString().split('T')[0];
-    // tasks is already filtered by selectedDate from useDailyTasks
     const hasMainQuest = tasks.some(task => task.is_main_quest);
+    
+    // Store task data temporarily
+    setPendingTaskData({
+      text: newTaskText,
+      difficulty: taskDifficulty,
+      date: taskDate,
+    });
+    
+    // If no main quest exists, ask user BEFORE creating the task
+    if (!hasMainQuest) {
+      setShowMainQuestPrompt(true);
+    } else {
+      // Main quest already exists, create as side quest
+      actuallyAddTask(false);
+    }
+  };
+  
+  const actuallyAddTask = async (isMainQuest: boolean) => {
+    if (!pendingTaskData) return;
     
     try {
       await addTask({ 
-        taskText: newTaskText, 
-        difficulty: taskDifficulty,
-        taskDate: taskDate
+        taskText: pendingTaskData.text, 
+        difficulty: pendingTaskData.difficulty,
+        taskDate: pendingTaskData.date,
       });
       
-      setNewTaskText("");
-      setTaskDifficulty("medium");
-      
-      // If no main quest exists, prompt after successful add
-      if (!hasMainQuest) {
-        // Wait for query to refetch and get the newly added task
+      // If user chose main quest, set it after creation
+      if (isMainQuest) {
+        // Wait for task to be created and refetch
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, taskDate] }).then(() => {
-            // Give it a moment to refetch
+          queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, pendingTaskData.date] }).then(() => {
             setTimeout(() => {
-              const queryState = queryClient.getQueryState(['daily-tasks', user?.id, taskDate]);
+              const queryState = queryClient.getQueryState(['daily-tasks', user?.id, pendingTaskData.date]);
               const updatedTasks = queryState?.data as any[];
               
               if (updatedTasks && Array.isArray(updatedTasks) && updatedTasks.length > 0) {
-                // Find the task that was just added (newest task, ordered DESC by created_at)
-                const newestTask = updatedTasks[0];
-                setPendingTaskId(newestTask.id);
-                setShowMainQuestPrompt(true);
+                const newestTask = updatedTasks[0]; // Newest task (ordered DESC)
+                setMainQuest(newestTask.id);
               }
             }, 100);
           });
         }, 200);
       }
+      
+      // Clear form
+      setNewTaskText("");
+      setTaskDifficulty("medium");
+      setPendingTaskData(null);
     } catch (error) {
       console.error('Failed to add task:', error);
+      setPendingTaskData(null);
     }
   };
   
   const handleMainQuestResponse = (makeMainQuest: boolean) => {
-    if (makeMainQuest && pendingTaskId) {
-      setMainQuest(pendingTaskId);
-    }
     setShowMainQuestPrompt(false);
-    setPendingTaskId(null);
+    actuallyAddTask(makeMainQuest);
   };
 
   const handleAddHabit = () => {
