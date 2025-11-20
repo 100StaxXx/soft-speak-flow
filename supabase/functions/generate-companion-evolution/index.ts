@@ -107,7 +107,7 @@ serve(async (req) => {
       .from("user_companion")
       .select("*")
       .eq("user_id", userId)
-      .maybeSingle();
+      .single();
 
     if (companionError || !companion) {
       console.error("Companion fetch error:", companionError);
@@ -153,18 +153,16 @@ serve(async (req) => {
       // Stage 0 -> 1: Silhouette of stage 20 inside cracking egg
       console.log("Creating stage 1 silhouette (preview of stage 20)");
       userPrompt = `Create a mystical egg with luminous cracks spreading across its surface, leaking ${companion.core_element} energy. 
-Through the larger cracks, an EXTREMELY DARK, PITCH BLACK silhouette is visible - showing only the magnificent outline of a powerful, ultimate form of a ${companion.spirit_animal} creature (what it would look like at its final evolution stage 20). 
+Through the larger cracks, a dark shadowy silhouette is visible - showing only the magnificent outline of a powerful, ultimate form of a ${companion.spirit_animal} creature (what it would look like at its final evolution stage 20). 
 
-The silhouette MUST be:
-- Rendered as a PURE BLACK SHADOW with NO details, NO colors, NO textures visible
-- Appear like an inky black void or deep shadow with crisp edges
-- Show only the basic majestic shape and imposing presence of an ultimate ${companion.spirit_animal}
-- Create dramatic contrast against the glowing ${companion.core_element} energy
-- Maintain the ${companion.core_element} elemental theme in the aura surrounding the egg
-- Use ${companion.favorite_color} in the brilliant energy emanating from the cracks
-- Be large and imposing in pure shadow form, curled within the egg but clearly powerful
+The silhouette must be:
+- Completely dark and featureless (just a shadow/outline)
+- Show the basic majestic shape and powerful presence of an ultimate ${companion.spirit_animal}
+- Maintain the ${companion.core_element} elemental theme in the aura
+- Use ${companion.favorite_color} in the energy emanating from the cracks
+- Be large and imposing in shadow form, curled within the egg but clearly powerful
 
-The egg itself should have the same mystical properties as stage 0, but now cracking with bright ${companion.core_element} light that highlights the pitch black silhouette inside.`;
+The egg itself should have the same mystical properties as stage 0, but now cracking with ${companion.core_element} light.`;
 
     } else {
       // Stages 2+: ALWAYS use image analysis for strict color continuity
@@ -180,7 +178,7 @@ The egg itself should have the same mystical properties as stage 0, but now crac
           .eq("companion_id", companion.id)
           .order("evolved_at", { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .single();
 
         previousImageUrl = latestEvolution?.image_url;
       }
@@ -249,7 +247,7 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
         .select("*")
         .eq("companion_id", companion.id)
         .eq("stage", currentStage)
-        .maybeSingle();
+        .single();
 
       if (metadata) {
         previousFeatures.stored_metadata = metadata;
@@ -304,7 +302,7 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "google/gemini-2.5-flash-image-preview",
         messages: shouldUseContinuityPrompt ? [
           {
             role: "system",
@@ -374,7 +372,7 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
         evolved_at: new Date().toISOString()
       })
       .select()
-      .maybeSingle();
+      .single();
 
     if (evolutionError) {
       console.error("Evolution record error:", evolutionError);

@@ -134,5 +134,5 @@ export const useMissionAutoComplete = () => {
     };
 
     checkAndCompleteMissions();
-  }, [activities, user, today, awardCustomXP, toast, queryClient]);
+  }, [activities, user, today]);
 };

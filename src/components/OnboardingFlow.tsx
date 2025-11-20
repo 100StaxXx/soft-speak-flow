@@ -51,7 +51,7 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
           .from("profiles")
           .select("onboarding_data")
           .eq("id", user.id)
-          .maybeSingle();
+          .single();
         
         const savedData = data?.onboarding_data as { currentSlide?: number } | null;
         if (savedData?.currentSlide !== undefined) {
@@ -96,9 +96,6 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
           onboarding_data: {}
         })
         .eq("id", user.id);
-      
-      // Set localStorage flag so AppWalkthrough knows to start
-      localStorage.setItem('onboardingComplete', 'true');
     }
     onComplete();
   };

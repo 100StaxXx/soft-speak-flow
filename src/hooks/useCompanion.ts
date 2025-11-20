@@ -165,9 +165,9 @@ export const useCompanion = () => {
           fur_color: furColor,
         })
         .select()
-        .maybeSingle();
+        .single();
 
-      if (createError || !companionData) throw createError || new Error('Failed to create companion');
+      if (createError) throw createError;
 
       // Record initial evolution
       await supabase.from("companion_evolutions").insert({
@@ -340,7 +340,7 @@ export const useCompanion = () => {
               .select("id")
               .eq("companion_id", companion.id)
               .eq("stage", stage)
-              .maybeSingle();
+              .single();
             
             await supabase.functions.invoke("generate-evolution-card", {
               body: {

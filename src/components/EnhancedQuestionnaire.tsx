@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { QUESTIONNAIRE } from "@/config/questionnaire";
@@ -17,11 +17,11 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep]);
 
-  const handleStart = useCallback(() => {
+  const handleStart = () => {
     setCurrentStep(0);
-  }, []);
+  };
 
-  const handleAnswer = useCallback((questionId: string, optionId: string) => {
+  const handleAnswer = (questionId: string, optionId: string) => {
     const newAnswers = { ...answers, [questionId]: optionId };
     setAnswers(newAnswers);
 
@@ -35,15 +35,15 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
         onComplete(newAnswers);
       }
     }, 400);
-  }, [answers, currentStep, onComplete]);
+  };
 
-  const handleBack = useCallback(() => {
+  const handleBack = () => {
     if (typeof currentStep === 'number' && currentStep > 0) {
       setCurrentStep(currentStep - 1);
     } else {
       setCurrentStep('welcome');
     }
-  }, [currentStep]);
+  };
 
   if (currentStep === 'welcome') {
     return (

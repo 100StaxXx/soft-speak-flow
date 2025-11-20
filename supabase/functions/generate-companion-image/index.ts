@@ -20,13 +20,13 @@ const ELEMENT_EFFECTS = {
 const EVOLUTION_STAGES = {
   0: { 
     name: "Dormant Egg", 
-    prompt: "A mystical egg floating in gentle {element} energy. The egg has a smooth, opalescent surface with subtle {color} undertones. Deep within the translucent shell, an EXTREMELY DARK, PITCH BLACK silhouette is barely visible - the mysterious outline of a powerful, mature {spirit} creature curled in dormant slumber. The silhouette must be rendered as a PURE BLACK SHADOW with NO details, NO colors, NO textures - just a solid dark outline showing only the basic shape and posture of what will become a majestic creature at stage 15. The shadow should appear like an inky black void against the glowing interior of the egg. Faint {element} glow pulses around the egg.",
+    prompt: "A mystical egg floating in gentle {element} energy. The egg has a smooth, opalescent surface with subtle {color} undertones. Deep within the translucent shell, a dark shadowy silhouette is barely visible - the mysterious outline of a powerful, mature {spirit} creature curled in dormant slumber. The silhouette should be a dark, featureless shadow showing only the basic shape and posture of what will become a majestic creature at stage 15. Faint {element} glow pulses around the egg.",
     useFutureSilhouette: true,
     futureStage: 15
   },
   1: { 
     name: "Cracking Awakening", 
-    prompt: "The same mystical egg now with luminous cracks spreading across its surface, leaking {element} energy. Through the larger cracks, an EXTREMELY DARK, PITCH BLACK silhouette is more visible - the outline of an even more powerful {spirit} creature in its ultimate form (stage 20), still curled but beginning to stir. The silhouette MUST be rendered as a PURE BLACK SHADOW with NO details, NO colors, NO textures - just a solid, deep shadow showing only the magnificent shape and imposing presence of the creature's final evolution. It should appear like an inky black void or deep shadow with crisp edges. {color} light emanates brilliantly from the fractures, creating dramatic contrast against the pitch black silhouette.",
+    prompt: "The same mystical egg now with luminous cracks spreading across its surface, leaking {element} energy. Through the larger cracks, a dark shadowy silhouette is more visible - the outline of an even more powerful {spirit} creature in its ultimate form (stage 20), still curled but beginning to stir. The silhouette remains a dark, featureless shadow showing only the magnificent shape and presence of the creature's final evolution. {color} light emanates from the fractures.",
     useFutureSilhouette: true,
     futureStage: 20
   },

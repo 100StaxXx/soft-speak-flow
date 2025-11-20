@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,12 +13,12 @@ interface NameInputProps {
 export const NameInput = ({ onComplete, isLoading }: NameInputProps) => {
   const [name, setName] = useState<string>("");
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
       onComplete(name.trim());
     }
-  }, [name, onComplete]);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center relative overflow-hidden">

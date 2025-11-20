@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Joyride, { Step, CallBackProps, STATUS } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -48,7 +48,7 @@ export const OnboardingTour = () => {
     }
   }, [user, profile, location.pathname]);
 
-  const handleJoyrideCallback = useCallback((data: CallBackProps) => {
+  const handleJoyrideCallback = async (data: CallBackProps) => {
     const { status, type, action } = data;
 
     // Handle step progression
@@ -62,17 +62,15 @@ export const OnboardingTour = () => {
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
       
-      // Mark onboarding as completed - defer async work with setTimeout
+      // Mark onboarding as completed
       if (user) {
-        setTimeout(() => {
-          supabase
-            .from('profiles')
-            .update({ onboarding_completed: true })
-            .eq('id', user.id);
-        }, 0);
+        await supabase
+          .from('profiles')
+          .update({ onboarding_completed: true })
+          .eq('id', user.id);
       }
     }
-  }, [user, setRun, setStepIndex]);
+  };
 
   const onboardingCompleted = (profile as any)?.onboarding_completed;
   if (!user || !profile || onboardingCompleted) {

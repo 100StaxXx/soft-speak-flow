@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,14 +27,14 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = useCallback(async () => {
+  const signOut = async () => {
     try {
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
     }
-  }, []);
+  };
 
   return { user, session, loading, signOut };
 };

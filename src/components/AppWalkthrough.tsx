@@ -17,7 +17,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "bottom",
     disableBeacon: true,
     spotlightClicks: true,
-    disableOverlay: true,
     styles: {
       tooltip: {
         marginTop: '-120px',
@@ -30,7 +29,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    disableOverlay: true,
   },
   {
     target: 'body',
@@ -46,7 +44,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    disableOverlay: true,
   },
   {
     target: '[data-tour="tasks-tab"]',
@@ -54,7 +51,6 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    disableOverlay: true,
     floaterProps: {
       hideArrow: true,
     },
@@ -75,15 +71,13 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
-    disableOverlay: true,
   },
   {
     target: '[data-tour="today-quests-header"]',
     content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
     placement: 'top',
     disableBeacon: true,
-    spotlightClicks: true,
-    disableOverlay: true,
+    spotlightClicks: false,
     floaterProps: {
       disableAnimation: true,
       hideArrow: false,
@@ -91,6 +85,9 @@ const WALKTHROUGH_STEPS: Step[] = [
     styles: {
       options: {
         zIndex: 100000,
+      },
+      overlay: {
+        mixBlendMode: 'normal' as const,
       },
       tooltip: {
         minWidth: '300px',
@@ -170,6 +167,7 @@ export const AppWalkthrough = () => {
       
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
+      localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
@@ -285,44 +283,24 @@ export const AppWalkthrough = () => {
       const onboardingComplete = localStorage.getItem('onboardingComplete');
 
       if (!hasSeenWalkthrough && onboardingComplete === 'true') {
-        try {
-          // Check if user just completed onboarding and has a companion
-          const { data: companion } = await supabase
-            .from('user_companion')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        // Check if user just completed onboarding and has a companion
+        const { data: companion } = await supabase
+          .from('user_companion')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-          if (companion && location.pathname === '/') {
-            // Wait for DOM to be fully ready
-            await new Promise(resolve => {
-              if (document.readyState === 'complete') {
-                resolve(undefined);
-              } else {
-                window.addEventListener('load', () => resolve(undefined), { once: true });
-              }
-            });
-            
-            // Wait for initial step target to be present with longer timeout
-            await waitForSelector(((steps[0] as Step).target as string) || 'body', 10000);
-            
-            // Extra delay to ensure all components are mounted
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Double-check the target still exists before starting
-            const target = document.querySelector(((steps[0] as Step).target as string) || 'body');
-            if (target) {
-              localStorage.setItem('appWalkthroughActive', 'true');
-              setRun(true);
-              // Emit initial tutorial step
-              window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-                detail: { step: 0 } 
-              }));
-            }
-          }
-        } catch (error) {
-          console.error('Walkthrough initialization error:', error);
-          // Don't start tutorial if there's an error
+        if (companion && location.pathname === '/') {
+          // Wait for initial step target to be present, then start
+          await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
+          setTimeout(() => {
+            localStorage.setItem('appWalkthroughActive', 'true');
+            setRun(true);
+            // Emit initial tutorial step
+            window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+              detail: { step: 0 } 
+            }));
+          }, 300);
         }
       }
     };
@@ -333,11 +311,11 @@ export const AppWalkthrough = () => {
 
   // Listen for mood selection to advance from step 0 to step 1
   useEffect(() => {
-    if (!run || stepIndex !== 0) return;
-    
     const handleMoodSelected = () => {
-      haptics.light();
-      setTimeout(() => safeSetStep(1), 300);
+      if (run && stepIndex === 0) {
+        haptics.light();
+        setTimeout(() => safeSetStep(1), 300);
+      }
     };
 
     window.addEventListener('mood-selected', handleMoodSelected);
@@ -346,12 +324,12 @@ export const AppWalkthrough = () => {
 
   // Listen for check-in completion
   useEffect(() => {
-    if (!run || stepIndex > 1) return;
-    
     const handleCheckInComplete = () => {
-      haptics.success();
-      setWaitingForAction(false);
-      setTimeout(() => safeSetStep(2), 500);
+      if (run && stepIndex <= 1) {
+        haptics.success();
+        setWaitingForAction(false);
+        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
+      }
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
@@ -360,19 +338,19 @@ export const AppWalkthrough = () => {
 
   // Listen for mission completion
   useEffect(() => {
-    if (!run || stepIndex !== 6) return;
-    
     const handleTaskCompleted = () => {
-      haptics.heavy();
-      setWaitingForAction(false);
-      
-      // PAUSE the tour completely during evolution animation
-      setRun(false);
-      
-      // Clear tutorial step temporarily during evolution
-      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-        detail: { step: null } 
-      }));
+      if (run && stepIndex === 6) {
+        haptics.heavy();
+        setWaitingForAction(false);
+        
+        // PAUSE the tour completely during evolution animation
+        setRun(false);
+        
+        // Clear tutorial step temporarily during evolution
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+          detail: { step: null } 
+        }));
+      }
     };
 
     window.addEventListener('mission-completed', handleTaskCompleted);
@@ -381,14 +359,14 @@ export const AppWalkthrough = () => {
 
   // Listen for evolution completion to show final step
   useEffect(() => {
-    if (stepIndex !== 6) return;
-    
     const handleEvolutionComplete = () => {
-      // Evolution complete - now show final congratulations step
-      haptics.success();
-      setRun(true);
-      setWaitingForAction(false);
-      setTimeout(() => safeSetStep(7), 500);
+      if (stepIndex === 6) {
+        // Evolution complete - now show final congratulations step
+        haptics.success();
+        setRun(true);
+        setWaitingForAction(false);
+        setTimeout(() => safeSetStep(7), 500);
+      }
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
@@ -468,6 +446,7 @@ export const AppWalkthrough = () => {
       
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
+      localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
       
       // Clear tutorial step
@@ -484,7 +463,7 @@ export const AppWalkthrough = () => {
         setWaitingForAction(true);
       }
     }
-  }, [setRun, setWaitingForAction]);
+  }, []);
 
   // Lock body scroll during tutorial but allow pointer events for spotlight clicks
   useEffect(() => {

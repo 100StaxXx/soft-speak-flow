@@ -4,7 +4,6 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCallback } from "react";
 
 /**
  * Centralized XP reward system
@@ -30,13 +29,13 @@ export const useXPRewards = () => {
         .from('profiles')
         .select('current_habit_streak')
         .eq('id', user.id)
-        .maybeSingle();
+        .single();
       return data;
     },
     enabled: !!user,
   });
 
-  const awardHabitCompletion = useCallback(async () => {
+  const awardHabitCompletion = async () => {
     if (!companion) return;
     
     try {
@@ -52,45 +51,45 @@ export const useXPRewards = () => {
     } catch (error) {
       console.error('Error awarding habit completion:', error);
     }
-  }, [companion, showXPToast, awardXP, updateMindFromHabit, updateBodyFromActivity]);
+  };
 
-  const awardAllHabitsComplete = useCallback(() => {
+  const awardAllHabitsComplete = () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.ALL_HABITS_COMPLETE, "All Habits Complete!");
     awardXP.mutate({
       eventType: "all_habits_complete",
       xpAmount: XP_REWARDS.ALL_HABITS_COMPLETE,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
-  const awardChallengeCompletion = useCallback(() => {
+  const awardChallengeCompletion = () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.CHALLENGE_COMPLETE, "Challenge Complete!");
     awardXP.mutate({
       eventType: "challenge_complete",
       xpAmount: XP_REWARDS.CHALLENGE_COMPLETE,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
-  const awardWeeklyChallengeCompletion = useCallback(() => {
+  const awardWeeklyChallengeCompletion = () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.WEEKLY_CHALLENGE, "Weekly Challenge Done!");
     awardXP.mutate({
       eventType: "weekly_challenge",
       xpAmount: XP_REWARDS.WEEKLY_CHALLENGE,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
-  const awardPepTalkListened = useCallback(() => {
+  const awardPepTalkListened = () => {
     if (!companion) return;
     showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Pep Talk Listened!");
     awardXP.mutate({
       eventType: "pep_talk_listen",
       xpAmount: XP_REWARDS.PEP_TALK_LISTEN,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
-  const awardCheckInComplete = useCallback(async () => {
+  const awardCheckInComplete = async () => {
     if (!companion) return;
     
     try {
@@ -106,9 +105,9 @@ export const useXPRewards = () => {
     } catch (error) {
       console.error('Error awarding check-in:', error);
     }
-  }, [companion, showXPToast, awardXP, updateSoulFromReflection, updateBodyFromActivity]);
+  };
 
-  const awardStreakMilestone = useCallback(async (milestone: number) => {
+  const awardStreakMilestone = async (milestone: number) => {
     if (!companion) return;
     
     try {
@@ -127,64 +126,70 @@ export const useXPRewards = () => {
     } catch (error) {
       console.error('Error awarding streak milestone:', error);
     }
-  }, [companion, showXPToast, awardXP, updateSoulFromStreak]);
+  };
 
-  const awardReflectionComplete = useCallback(async () => {
+  const awardReflectionComplete = async () => {
     if (!companion) return;
     
     try {
-      showXPToast(5, "Reflection Complete!");
+      showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
       awardXP.mutate({
-        eventType: "reflection_complete",
-        xpAmount: 5,
+        eventType: "reflection",
+        xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update soul from reflection
+      // Update companion soul
       await updateSoulFromReflection(companion.id);
     } catch (error) {
       console.error('Error awarding reflection:', error);
     }
-  }, [companion, showXPToast, awardXP, updateSoulFromReflection]);
+  };
 
-  const awardQuoteShared = useCallback(() => {
+  const awardQuoteShared = () => {
     if (!companion) return;
-    showXPToast(3, "Quote Shared!");
+    showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Quote Shared!");
     awardXP.mutate({
       eventType: "quote_shared",
-      xpAmount: 3,
+      xpAmount: XP_REWARDS.PEP_TALK_LISTEN,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
-  const awardMissionComplete = useCallback((xpReward: number) => {
-    if (!companion) return;
-    showXPToast(xpReward, "Mission Complete!");
-    awardXP.mutate({
-      eventType: "mission_complete",
-      xpAmount: xpReward,
-    });
-  }, [companion, showXPToast, awardXP]);
-
-  const awardCustomXP = useCallback((xpAmount: number, eventType: string, reason: string) => {
-    if (!companion) return;
-    showXPToast(xpAmount, reason);
+  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string) => {
+    if (!companion) {
+      console.warn('Attempted to award XP without companion');
+      return;
+    }
+    if (displayReason) {
+      showXPToast(xpAmount, displayReason);
+    }
     awardXP.mutate({
       eventType,
       xpAmount,
     });
-  }, [companion, showXPToast, awardXP]);
+  };
 
   return {
+    // Primary XP awards matching your spec
     awardHabitCompletion,
     awardAllHabitsComplete,
     awardChallengeCompletion,
     awardWeeklyChallengeCompletion,
     awardPepTalkListened,
     awardCheckInComplete,
+    
+    // Additional XP awards
     awardStreakMilestone,
     awardReflectionComplete,
     awardQuoteShared,
-    awardMissionComplete,
     awardCustomXP,
+    
+    // Legacy aliases (for backward compatibility)
+    awardCheckIn: awardCheckInComplete,
+    awardChallengeComplete: awardChallengeCompletion,
+    awardWeeklyChallenge: awardWeeklyChallengeCompletion,
+    awardPepTalkListen: awardPepTalkListened,
+    
+    // XP constants for display
     XP_REWARDS,
   };
 };

@@ -91,7 +91,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .from('daily_tasks')
         .select('completed_at')
         .eq('id', taskId)
-        .maybeSingle();
+        .single();
 
       const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
@@ -134,7 +134,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .from('daily_tasks')
         .select('completed, completed_at')
         .eq('id', taskId)
-        .maybeSingle();
+        .single();
       
       if (task?.completed || task?.completed_at) {
         throw new Error('Cannot delete completed quests. They\'re part of your journey!');

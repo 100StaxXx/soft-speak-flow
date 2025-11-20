@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -30,7 +30,7 @@ export const ResetCompanionButton = () => {
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
 
-  const handleReset = useCallback(async () => {
+  const handleReset = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase.functions.invoke('reset-companion');
@@ -53,9 +53,9 @@ export const ResetCompanionButton = () => {
     } finally {
       setLoading(false);
     }
-  }, [queryClient]);
+  };
 
-  const handleCreateCompanion = useCallback(async (data: {
+  const handleCreateCompanion = async (data: {
     favoriteColor: string;
     spiritAnimal: string;
     coreElement: string;
@@ -64,7 +64,7 @@ export const ResetCompanionButton = () => {
     await createCompanion.mutateAsync(data);
     setCreateDialogOpen(false);
     toast.success('Your new companion has been created!');
-  }, [createCompanion]);
+  };
 
   return (
     <>

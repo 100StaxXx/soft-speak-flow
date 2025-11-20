@@ -60,7 +60,7 @@ export default function Onboarding() {
         .from("profiles")
         .select("onboarding_step, onboarding_data")
         .eq("id", user.id)
-        .maybeSingle();
+        .single();
       
       if (profile?.onboarding_step && profile.onboarding_step !== 'complete') {
         const savedData = profile.onboarding_data as { 
@@ -76,7 +76,7 @@ export default function Onboarding() {
             .from('mentors')
             .select('*')
             .eq('id', savedData.mentorId)
-            .maybeSingle();
+            .single();
           
           if (mentorData) {
             setStage('result');
@@ -119,7 +119,7 @@ export default function Onboarding() {
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
-        .maybeSingle();
+        .single();
 
       const existingData = (profile?.onboarding_data as any) || {};
 
@@ -262,7 +262,7 @@ export default function Onboarding() {
         })
         .eq('id', user.id)
         .select()
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error("Supabase update error:", error);
@@ -353,7 +353,7 @@ export default function Onboarding() {
         .from('profiles')
         .select('onboarding_data')
         .eq('id', user!.id)
-        .maybeSingle();
+        .single();
 
       const currentOnboardingData = (currentProfile?.onboarding_data as any) || {};
       const userName = currentOnboardingData.userName;
