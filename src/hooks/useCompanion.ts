@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
 import { useRef, useMemo, useCallback } from "react";
@@ -63,6 +64,7 @@ export const EVOLUTION_THRESHOLDS = {
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
   
   // Prevent duplicate evolution/XP requests during lag
@@ -263,6 +265,9 @@ export const useCompanion = () => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
       if (shouldEvolve && companion) {
+        // Check for companion stage achievements
+        await checkCompanionAchievements(newStage);
+        
         // Show overlay immediately BEFORE toast
         setIsEvolvingLoading(true);
         toast.success("🎉 Your companion is ready to evolve!");

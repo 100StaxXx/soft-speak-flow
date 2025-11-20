@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useAchievements } from "@/hooks/useAchievements";
 import { Textarea } from "@/components/ui/textarea";
 import { MoodSelector } from "./MoodSelector";
 import { Sunrise, Target, Sparkles } from "lucide-react";
@@ -18,6 +19,7 @@ export const MorningCheckIn = () => {
   const personality = useMentorPersonality();
   const queryClient = useQueryClient();
   const { awardCheckInComplete, XP_REWARDS } = useXPRewards();
+  const { checkFirstTimeAchievements } = useAchievements();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,6 +73,16 @@ export const MorningCheckIn = () => {
 
       // Award XP for check-in
       awardCheckInComplete();
+      
+      // Check for first check-in achievement
+      const { count } = await supabase
+        .from('daily_check_ins')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      
+      if (count === 1) {
+        await checkFirstTimeAchievements('checkin');
+      }
 
       // Dispatch event for walkthrough
       window.dispatchEvent(new CustomEvent('checkin-complete'));
