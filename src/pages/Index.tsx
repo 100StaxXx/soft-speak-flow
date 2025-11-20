@@ -111,21 +111,22 @@ const Index = () => {
       </ErrorBoundary>
       <PageTransition>
         <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 space-y-4 sm:space-y-6 md:space-y-8">
             
             {/* Hero Quote Banner */}
             <ErrorBoundary>
               <HeroQuoteBanner />
             </ErrorBoundary>
 
-            {/* Priority Content */}
-            <ErrorBoundary>
-              <MentorNudges />
-            </ErrorBoundary>
-            
-            <ErrorBoundary>
-              <MorningCheckIn />
-            </ErrorBoundary>
+            {/* Priority Content - Negative margin to overlap banner */}
+            <div className="-mt-32 relative z-10 px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
+              <ErrorBoundary>
+                <MentorNudges />
+              </ErrorBoundary>
+              
+              <ErrorBoundary>
+                <MorningCheckIn />
+              </ErrorBoundary>
             
             <div data-tour="todays-pep-talk">
               <ErrorBoundary>
@@ -137,6 +138,7 @@ const Index = () => {
               <ErrorBoundary>
                 <MentorQuickChat />
               </ErrorBoundary>
+            </div>
             </div>
           </div>
         </div>
