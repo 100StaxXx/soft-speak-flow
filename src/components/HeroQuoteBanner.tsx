@@ -97,13 +97,13 @@ export const HeroQuoteBanner = () => {
   const mentorImageUrl = mentor.avatar_url || mentorImages[mentor.slug] || mentorImages['darius'];
 
   return (
-    <div className="relative w-full h-[75vh] min-h-[500px] overflow-hidden rounded-3xl mb-6 shadow-hard">
+    <div className="relative w-full h-[75vh] min-h-[500px] overflow-hidden mb-6">
       {/* Mentor Background Image - Dimmed */}
       <div className="absolute inset-0">
         <img 
           src={mentorImageUrl} 
           alt={mentor.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover object-top"
         />
         <div className="absolute inset-0 bg-background/60" />
       </div>
