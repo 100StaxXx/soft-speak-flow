@@ -634,7 +634,15 @@ export default function Tasks() {
         </Tabs>
       </div>
 
-      <AlertDialog open={showMainQuestPrompt} onOpenChange={setShowMainQuestPrompt}>
+      <AlertDialog 
+        open={showMainQuestPrompt} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // User closed dialog without choosing - default to side quest
+            handleMainQuestResponse(false);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Set as Main Quest?</AlertDialogTitle>

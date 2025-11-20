@@ -205,7 +205,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   return {
     tasks,
     isLoading,
-    addTask: addTask.mutate,
+    addTask: addTask.mutateAsync, // Use mutateAsync for await support
     toggleTask: toggleTask.mutate,
     deleteTask: deleteTask.mutate,
     setMainQuest: setMainQuestMutation.mutate,
