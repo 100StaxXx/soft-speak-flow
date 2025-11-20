@@ -44,31 +44,23 @@ export const MentorQuickChat = () => {
     }
   };
 
-  const QUESTION_ICONS = ["💪", "🎯", "🚀"];
-
   return (
-    <div className="rounded-3xl p-6 bg-gradient-to-br from-[#B2DFDB] via-[#C8E6C9] to-[#DCEDC8] dark:from-card dark:via-card/95 dark:to-card/90 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="relative">
-          <MessageCircle className="h-6 w-6 text-[#00897B] dark:text-primary" />
-          <div className="absolute inset-0 bg-[#00897B]/20 dark:bg-primary/20 blur-md rounded-full" />
-        </div>
-        <h3 className="font-black text-xl text-[#00695C] dark:text-foreground">
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <MessageCircle className="h-5 w-5 text-primary" />
+        <h3 className="font-bold text-foreground">
           {personality?.name ? `Ask ${personality.name}` : "Quick Chat"}
         </h3>
       </div>
       
-      <div className="space-y-3 mb-4">
+      <div className="space-y-2">
         {currentQuestions.map((question, index) => (
           <button
             key={index}
             onClick={() => handleQuestionClick(question)}
-            className="group w-full flex items-center gap-3 px-5 py-4 rounded-full bg-gradient-to-r from-[#80CBC4] to-[#4DB6AC] dark:from-primary/70 dark:to-primary/50 hover:from-[#4DB6AC] hover:to-[#26A69A] dark:hover:from-primary dark:hover:to-primary/70 shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.15)] hover:scale-105 transition-all duration-300"
+            className="w-full text-left px-4 py-3 rounded-lg bg-secondary/50 hover:bg-secondary hover:shadow-glow transition-all text-sm text-foreground hover:scale-[1.02]"
           >
-            <span className="text-2xl group-hover:animate-bounce">{QUESTION_ICONS[index]}</span>
-            <span className="text-sm font-bold text-white text-left flex-1">
-              {question}
-            </span>
+            "{question}"
           </button>
         ))}
       </div>
@@ -78,17 +70,12 @@ export const MentorQuickChat = () => {
           value={customQuestion}
           onChange={(e) => setCustomQuestion(e.target.value)}
           placeholder="Or ask your own question..."
-          className="flex-1 rounded-full border-2 border-[#80CBC4]/40 dark:border-primary/40 bg-white/60 dark:bg-background/50 focus:border-[#00897B] dark:focus:border-primary"
+          className="flex-1"
         />
-        <Button 
-          type="submit" 
-          size="icon" 
-          disabled={!customQuestion.trim()}
-          className="rounded-full w-12 h-12 bg-gradient-to-r from-[#00897B] to-[#00695C] dark:from-primary dark:to-primary/80 hover:scale-110 transition-all shadow-[0_4px_12px_rgba(0,137,123,0.3)] dark:shadow-glow"
-        >
-          <Send className="h-5 w-5" />
+        <Button type="submit" size="icon" disabled={!customQuestion.trim()}>
+          <Send className="h-4 w-4" />
         </Button>
       </form>
-    </div>
+    </Card>
   );
 };
