@@ -47,8 +47,14 @@ export const TaskCard = ({
     if (task.completed && !justCompleted) {
       setJustCompleted(true);
       setShowXP(true);
-      const timer = setTimeout(() => setShowXP(false), 2000);
+      const timer = setTimeout(() => {
+        setShowXP(false);
+        setJustCompleted(false); // Reset so animation can play again
+      }, 2000);
       return () => clearTimeout(timer);
+    } else if (!task.completed && justCompleted) {
+      // Reset when task is uncompleted
+      setJustCompleted(false);
     }
   }, [task.completed, justCompleted]);
 
@@ -57,11 +63,13 @@ export const TaskCard = ({
       {/* Floating XP Animation */}
       {showXP && (
         <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-          <div className="animate-[fadeIn_0.3s_ease-out,slideUp_2s_ease-out] opacity-0 text-lg font-bold" 
-               style={{ 
-                 animation: 'fadeInUp 2s ease-out',
-                 color: isMainQuest ? 'hsl(45, 100%, 60%)' : 'hsl(var(--primary))'
-               }}>
+          <div 
+            className="text-lg font-bold"
+            style={{ 
+              animation: 'fadeInUp 2s ease-out',
+              color: isMainQuest ? 'hsl(45, 100%, 60%)' : 'hsl(var(--primary))'
+            }}
+          >
             +{task.xp_reward} XP
           </div>
         </div>
@@ -81,9 +89,7 @@ export const TaskCard = ({
           // Side Quest Styling
           !isMainQuest && "hover:shadow-lg border-border/50",
           // Completed state
-          task.completed && "opacity-60",
-          // Completion flash
-          justCompleted && !task.completed && (isMainQuest ? "animate-[pulse_0.6s_ease-out]" : "")
+          task.completed && "opacity-60"
         )}
       >
         {/* Gold Glow Overlay for Main Quest */}
