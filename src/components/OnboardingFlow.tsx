@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Target, TrendingUp, MessageCircleHeart, Sparkles } from "lucide-react";
@@ -106,6 +106,8 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
   return (
     <Dialog open={open} onOpenChange={(open) => !open && handleComplete()}>
       <DialogContent className="max-w-lg">
+        <DialogTitle className="sr-only">{slide.title}</DialogTitle>
+        <DialogDescription className="sr-only">{slide.description}</DialogDescription>
         <div className="space-y-6 py-6">
           {/* Progress Bar */}
           <div className="space-y-2">
