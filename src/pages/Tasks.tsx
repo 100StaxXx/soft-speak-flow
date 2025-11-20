@@ -199,8 +199,8 @@ export default function Tasks() {
     if (!newTaskText.trim()) return;
     
     const taskDate = selectedDate.toISOString().split('T')[0];
-    const currentTasks = tasks.filter(t => t.task_date === taskDate);
-    const hasMainQuest = currentTasks.some(task => task.is_main_quest);
+    // tasks is already filtered by selectedDate from useDailyTasks
+    const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     try {
       await addTask({ 
@@ -214,17 +214,23 @@ export default function Tasks() {
       
       // If no main quest exists, prompt after successful add
       if (!hasMainQuest) {
-        // Query will be invalidated by addTask, wait for refetch
+        // Wait for query to refetch and get the newly added task
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] }).then(() => {
-            const { data: updatedTasks } = queryClient.getQueryState(['daily-tasks', user?.id, taskDate]) || {};
-            if (updatedTasks && Array.isArray(updatedTasks) && updatedTasks.length > 0) {
-              const newestTask = updatedTasks[0]; // Tasks are ordered by created_at DESC
-              setPendingTaskId(newestTask.id);
-              setShowMainQuestPrompt(true);
-            }
+          queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, taskDate] }).then(() => {
+            // Give it a moment to refetch
+            setTimeout(() => {
+              const queryState = queryClient.getQueryState(['daily-tasks', user?.id, taskDate]);
+              const updatedTasks = queryState?.data as any[];
+              
+              if (updatedTasks && Array.isArray(updatedTasks) && updatedTasks.length > 0) {
+                // Find the task that was just added (newest task, ordered DESC by created_at)
+                const newestTask = updatedTasks[0];
+                setPendingTaskId(newestTask.id);
+                setShowMainQuestPrompt(true);
+              }
+            }, 100);
           });
-        }, 300);
+        }, 200);
       }
     } catch (error) {
       console.error('Failed to add task:', error);
