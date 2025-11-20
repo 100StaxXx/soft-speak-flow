@@ -94,9 +94,14 @@ export const TaskCard = ({
       >
         {/* Gold Glow Overlay for Main Quest */}
         {isMainQuest && !task.completed && (
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[hsl(45,100%,60%)]/10 to-transparent 
-                          animate-[shimmer_3s_ease-in-out_infinite] pointer-events-none" 
-               style={{ backgroundSize: '200% 100%' }} />
+          <div 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ 
+              background: 'linear-gradient(90deg, transparent, hsl(45, 100%, 60%, 0.1), transparent)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmerBackground 3s ease-in-out infinite'
+            }} 
+          />
         )}
         
         {/* Star Badge for Main Quest */}

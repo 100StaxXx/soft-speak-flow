@@ -256,6 +256,13 @@ export default function Tasks() {
     setShowMainQuestPrompt(false);
     actuallyAddTask(makeMainQuest);
   };
+  
+  const handleDrawerClose = () => {
+    // Only default to side quest if user dismissed without choosing
+    if (pendingTaskData && showMainQuestPrompt) {
+      handleMainQuestResponse(false);
+    }
+  };
 
   const handleAddHabit = () => {
     if (!newHabitTitle.trim()) {
@@ -649,8 +656,8 @@ export default function Tasks() {
         open={showMainQuestPrompt} 
         onOpenChange={(open) => {
           if (!open) {
-            // User closed drawer without choosing - default to side quest
-            handleMainQuestResponse(false);
+            // Small delay to ensure button click is processed first
+            setTimeout(handleDrawerClose, 50);
           }
         }}
       >
