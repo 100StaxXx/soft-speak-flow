@@ -71,8 +71,6 @@ export default function Tasks() {
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
-  const previousTaskCountRef = useRef(tasks.length);
-  const previousDateRef = useRef(selectedDate.toISOString().split('T')[0]);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -198,43 +196,35 @@ export default function Tasks() {
     },
   });
 
-  // Detect when a new task is added and check for main quest prompt
-  useEffect(() => {
+
+  const handleAddTask = async () => {
+    if (!newTaskText.trim()) return;
+    
     const taskDate = selectedDate.toISOString().split('T')[0];
     const currentTasks = tasks.filter(t => t.task_date === taskDate);
+    const hasMainQuest = currentTasks.some(task => task.is_main_quest);
     
-    // Reset counter if date changed
-    if (taskDate !== previousDateRef.current) {
-      previousTaskCountRef.current = currentTasks.length;
-      previousDateRef.current = taskDate;
-      return;
-    }
-    
-    // Check if a task was just added
-    if (currentTasks.length > previousTaskCountRef.current) {
-      const hasMainQuest = currentTasks.some(task => task.is_main_quest);
-      
-      // If no main quest exists, get the newest task and prompt
-      // Tasks are ordered by created_at DESC, so the newest is first
-      if (!hasMainQuest && currentTasks.length > 0) {
-        const newestTask = currentTasks[0];
-        setPendingTaskId(newestTask.id);
-        setShowMainQuestPrompt(true);
-      }
-    }
-    
-    previousTaskCountRef.current = currentTasks.length;
-  }, [tasks, selectedDate]);
-
-  const handleAddTask = () => {
-    if (!newTaskText.trim()) return;
-    addTask({ 
+    await addTask({ 
       taskText: newTaskText, 
       difficulty: taskDifficulty,
-      taskDate: selectedDate.toISOString().split('T')[0]
+      taskDate: taskDate
     });
+    
     setNewTaskText("");
     setTaskDifficulty("medium");
+    
+    // After task is added, check if we should prompt for main quest
+    // Wait a moment for the task to be added to the list
+    setTimeout(() => {
+      if (!hasMainQuest) {
+        const updatedTasks = tasks.filter(t => t.task_date === taskDate);
+        if (updatedTasks.length > 0) {
+          const newestTask = updatedTasks[0]; // Tasks are ordered by created_at DESC
+          setPendingTaskId(newestTask.id);
+          setShowMainQuestPrompt(true);
+        }
+      }
+    }, 500);
   };
   
   const handleMainQuestResponse = (makeMainQuest: boolean) => {
