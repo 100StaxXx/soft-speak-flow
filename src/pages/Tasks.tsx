@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { EmptyState } from "@/components/EmptyState";
+import { QuestsPageTour } from "@/components/QuestsPageTour";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +60,21 @@ export default function Tasks() {
   } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+
+  // Tutorial state
+  const [showQuestsTour, setShowQuestsTour] = useState(false);
+
+  // Check if user has seen the quests tour
+  useEffect(() => {
+    const hasSeenQuestsTour = localStorage.getItem('hasSeenQuestsTour');
+    if (!hasSeenQuestsTour && tasks && tasks.length === 0) {
+      // Show tour after a brief delay when user first visits with no tasks
+      const timer = setTimeout(() => {
+        setShowQuestsTour(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [tasks]);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -222,7 +238,16 @@ export default function Tasks() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <BrandTagline />
 
-        <div className="flex items-center gap-3">
+        {/* Quests Tour */}
+        <QuestsPageTour 
+          run={showQuestsTour}
+          onComplete={() => {
+            setShowQuestsTour(false);
+            localStorage.setItem('hasSeenQuestsTour', 'true');
+          }}
+        />
+
+        <div className="flex items-center gap-3" data-tour="quests-welcome">
           <Target className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold">Quests & Habits</h1>
@@ -333,7 +358,7 @@ export default function Tasks() {
                 <Card className="p-4 space-y-4">
                   <div className="space-y-3">
                     <Input
-                      data-tour="add-task-input"
+                      data-tour="add-quest-input"
                       placeholder="Add a quest..."
                       value={newTaskText}
                       onChange={(e) => setNewTaskText(e.target.value)}
@@ -412,7 +437,7 @@ export default function Tasks() {
                     <>
                       {/* Main Quest Section */}
                       {mainQuest && (
-                        <div>
+                        <div data-tour="main-quest-section">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="text-xl">⚔️</div>
                             <h3 className="font-semibold text-foreground">Main Quest</h3>
@@ -422,18 +447,20 @@ export default function Tasks() {
                               </span>
                             </div>
                           </div>
-                          <TaskCard
-                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
-                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
-                            onDelete={() => deleteTask(mainQuest.id)}
-                            isMainQuest={true}
-                          />
+                          <div data-tour="quest-completion">
+                            <TaskCard
+                              task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
+                              onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                              onDelete={() => deleteTask(mainQuest.id)}
+                              isMainQuest={true}
+                            />
+                          </div>
                         </div>
                       )}
 
                       {/* Side Quests */}
                       {sideQuests.length > 0 && (
-                        <div>
+                        <div data-tour="side-quests-section">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="text-lg">📜</div>
                             <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
