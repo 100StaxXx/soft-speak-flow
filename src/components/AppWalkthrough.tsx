@@ -78,7 +78,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: '[data-tour="today-quests-header"]',
-    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. Once created, complete it by tapping the checkbox to evolve your companion!",
+    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. This will become your MAIN QUEST - the one thing that moves your day forward! Main Quests earn 2x XP.",
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
@@ -111,7 +111,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   },
   {
     target: 'body',
-    content: "🎉 Congratulations! You've mastered the basics! You know how to check in daily and create quests to earn XP. Keep building your momentum and watch your companion evolve through amazing stages. Your journey starts now! 🚀",
+    content: "🎉 Congratulations! You've mastered the basics! You know how to check in daily and create quests. Your first quest is now your MAIN QUEST (2x XP!) - you can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
