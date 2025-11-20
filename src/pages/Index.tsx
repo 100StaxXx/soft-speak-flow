@@ -16,12 +16,15 @@ import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { Play, MessageCircle } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
+  const personality = useMentorPersonality();
   const navigate = useNavigate();
   const [showIntro, setShowIntro] = useState(() => {
     return !localStorage.getItem('hasSeenIntro');
@@ -110,14 +113,52 @@ const Index = () => {
         />
       </ErrorBoundary>
       <PageTransition>
-        <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
-            {/* Header */}
-            <div className="mb-3 sm:mb-4 md:mb-6">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
-                Mentor
+        <div className="min-h-screen bg-gradient-to-br from-[#E8F5E9] via-[#F3E5F5] to-[#E1F5FE] dark:from-background dark:via-background/95 dark:to-accent/10 pb-24 sm:pb-24">
+          {/* Hero Banner */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#66BB6A] via-[#AB47BC] to-[#7E57C2] dark:from-primary/60 dark:via-accent/60 dark:to-primary/40 px-6 py-12 mb-6">
+            {/* Sparkles Background */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute top-[10%] left-[15%] w-3 h-3 bg-white/60 rounded-full animate-sparkle" />
+              <div className="absolute top-[25%] right-[20%] w-2 h-2 bg-white/70 rounded-full animate-sparkle" style={{ animationDelay: '0.5s' }} />
+              <div className="absolute bottom-[30%] left-[30%] w-2.5 h-2.5 bg-white/50 rounded-full animate-sparkle" style={{ animationDelay: '1s' }} />
+              <div className="absolute bottom-[15%] right-[25%] w-2 h-2 bg-white/60 rounded-full animate-sparkle" style={{ animationDelay: '1.5s' }} />
+              <div className="absolute top-[40%] right-[40%] w-3 h-3 bg-white/40 rounded-full animate-sparkle" style={{ animationDelay: '0.8s' }} />
+            </div>
+            
+            <div className="relative z-10 text-center space-y-3">
+              <h1 className="text-4xl md:text-5xl font-heading font-black text-white drop-shadow-lg animate-bounce-gentle">
+                Your Growth Journey Begins
               </h1>
-              <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
+              <p className="text-lg text-white/90 font-medium">Start your adventure with {personality?.name || 'your mentor'}!</p>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-6">
+            {/* Main Action Tiles */}
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => document.querySelector('[data-tour="todays-pep-talk"]')?.scrollIntoView({ behavior: 'smooth' })}
+                className="group bg-gradient-to-br from-[#FFE082] to-[#FFD54F] dark:from-primary/80 dark:to-primary/60 rounded-3xl p-6 shadow-[0_8px_16px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.15)] hover:scale-105 transition-all duration-300"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 bg-white/40 dark:bg-white/20 rounded-full flex items-center justify-center group-hover:animate-bounce">
+                    <Play className="w-8 h-8 text-[#F57C00] dark:text-white" fill="currentColor" />
+                  </div>
+                  <span className="font-bold text-[#F57C00] dark:text-white text-lg">Daily Pep Talk</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => navigate('/mentor-chat')}
+                className="group bg-gradient-to-br from-[#CE93D8] to-[#BA68C8] dark:from-accent/80 dark:to-accent/60 rounded-3xl p-6 shadow-[0_8px_16px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.15)] hover:scale-105 transition-all duration-300"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 bg-white/40 dark:bg-white/20 rounded-full flex items-center justify-center group-hover:animate-bounce">
+                    <MessageCircle className="w-8 h-8 text-[#7B1FA2] dark:text-white" />
+                  </div>
+                  <span className="font-bold text-[#7B1FA2] dark:text-white text-lg">Ask {personality?.name || 'Mentor'}</span>
+                </div>
+              </button>
             </div>
 
             {/* Priority Content */}
