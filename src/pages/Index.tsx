@@ -9,7 +9,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { QuoteOfTheDay } from "@/components/QuoteOfTheDay";
+import { HeroQuoteBanner } from "@/components/HeroQuoteBanner";
 import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
@@ -111,14 +111,12 @@ const Index = () => {
       </ErrorBoundary>
       <PageTransition>
         <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24 sm:pb-24">
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
-            {/* Header */}
-            <div className="mb-3 sm:mb-4 md:mb-6">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-2">
-                Mentor
-              </h1>
-              <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Your personal growth journey starts here</p>
-            </div>
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-5 sm:py-7 md:py-9 space-y-4 sm:space-y-6 md:space-y-8">
+            
+            {/* Hero Quote Banner */}
+            <ErrorBoundary>
+              <HeroQuoteBanner />
+            </ErrorBoundary>
 
             {/* Priority Content */}
             <ErrorBoundary>
@@ -134,10 +132,6 @@ const Index = () => {
                 <TodaysPepTalk />
               </ErrorBoundary>
             </div>
-
-            <ErrorBoundary>
-              <QuoteOfTheDay />
-            </ErrorBoundary>
             
             <div data-tour="ask-mentor">
               <ErrorBoundary>
