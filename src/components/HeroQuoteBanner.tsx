@@ -111,11 +111,11 @@ export const HeroQuoteBanner = () => {
       {/* Quote Content */}
       <div className="relative h-full flex items-end justify-end p-8 md:p-12">
         <blockquote className="max-w-2xl text-right">
-          <p className="font-serif italic text-xl md:text-2xl lg:text-3xl text-foreground leading-relaxed">
+          <p className="font-serif italic text-xl md:text-2xl lg:text-3xl text-foreground/70 leading-relaxed">
             "{todaysQuote.text}"
           </p>
           {todaysQuote.author && (
-            <footer className="mt-4 font-serif italic text-base md:text-lg text-foreground/80">
+            <footer className="mt-4 font-serif italic text-base md:text-lg text-foreground/60">
               — {todaysQuote.author}
             </footer>
           )}
