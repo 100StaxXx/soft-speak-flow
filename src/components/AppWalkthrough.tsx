@@ -9,21 +9,21 @@ import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
-  { id: "home-checkin", target: '[data-tour="morning-checkin"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'top', disableBeacon: true, spotlightClicks: true },
-  { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true },
-  { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true },
-  { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true } },
-  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } } },
-  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' }, styles: { tooltip: { pointerEvents: 'auto' } } },
+  { id: "mentor-intro", target: 'body', content: "👋 Welcome! This is your AI mentor - they'll guide and motivate you throughout your journey. Let's explore what they can do! Tap 'Next' to continue.", placement: 'center', disableBeacon: true },
+  { id: "navigate-to-companion", target: 'body', content: "✨ Now let's meet your companion! They'll grow and evolve as you complete quests. Tap the Companion icon at the bottom to continue.", placement: "center", disableBeacon: true },
+  { id: "companion-intro", target: '[data-tour="companion-display"]', content: "🐾 This is your companion! They evolve through multiple stages as you earn XP from completing habits and quests. Watch them grow stronger with you!", placement: "bottom", disableBeacon: true },
+  { id: "navigate-to-quests", target: 'body', content: "📋 Ready to start earning XP? Let's create your first quest! Tap the Quests icon at the bottom.", placement: "center", disableBeacon: true },
+  { id: "create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Create your first quest! Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST with 2x XP!", placement: 'top', disableBeacon: true, spotlightClicks: true },
+  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Complete your Main Quest to earn XP and evolve your companion. Your adventure begins now! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' } },
 ];
 
 const STEP_INDEX = {
-  HOME_CHECKIN: 0,
-  CHECKIN_INTENTION: 1,
-  XP_CELEBRATION: 2,
-  COMPANION_VIEW: 3,
-  QUEST_CREATION: 4,
-  FINAL_CONGRATULATIONS: 5,
+  MENTOR_INTRO: 0,
+  NAVIGATE_TO_COMPANION: 1,
+  COMPANION_INTRO: 2,
+  NAVIGATE_TO_QUESTS: 3,
+  CREATE_QUEST: 4,
+  FINAL_CONGRATS: 5,
 } as const;
 
 export const AppWalkthrough = () => {
