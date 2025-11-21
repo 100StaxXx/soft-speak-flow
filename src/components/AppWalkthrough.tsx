@@ -274,9 +274,9 @@ export const AppWalkthrough = () => {
       // Don't advance yet - wait for evolution to complete
     };
 
-    const handleEvolutionStart = () => {
-      console.log('[Tutorial] Evolution starting, hiding quest tooltip.');
-      // Hide the tooltip by temporarily pausing the tour
+    const handleEvolutionLoadingStart = () => {
+      console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
+      // Hide the tooltip as soon as the loading overlay appears
       setRun(false);
     };
 
@@ -290,15 +290,15 @@ export const AppWalkthrough = () => {
     };
 
     window.addEventListener('mission-completed', handleQuestCompleted);
-    window.addEventListener('companion-evolution-start', handleEvolutionStart);
+    window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     
     return () => {
       window.removeEventListener('mission-completed', handleQuestCompleted);
-      window.removeEventListener('companion-evolution-start', handleEvolutionStart);
+      window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-complete', handleEvolutionComplete);
     };
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+  }, [stepIndex, safeSetStep, createTrackedTimeout]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status } = data;

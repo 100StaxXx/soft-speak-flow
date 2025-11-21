@@ -288,6 +288,10 @@ export const useCompanion = () => {
         
         // Show overlay immediately BEFORE toast
         setIsEvolvingLoading(true);
+        
+        // Notify walkthrough that evolution loading has started (for hiding tooltips)
+        window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+        
         toast.success("🎉 Your companion is ready to evolve!");
         // Trigger evolution
         evolveCompanion.mutate({ newStage, currentXP: newXP });
