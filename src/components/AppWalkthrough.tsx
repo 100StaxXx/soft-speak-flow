@@ -182,9 +182,18 @@ export const AppWalkthrough = () => {
         // 3. Morning check-in is NOT complete (so the form is visible)
         if (profile.onboarding_completed === true && !isWalkthroughCompleted && !isCheckInComplete) {
           console.log('[AppWalkthrough] ✅ Starting walkthrough!');
-          setTimeout(() => {
-            setRun(true);
-          }, 100);
+          // Wait for the target element to be ready before starting
+          const startWalkthrough = async () => {
+            const found = await waitForSelector('[data-tour="checkin-mood"]', 3000);
+            if (found) {
+              console.log('[AppWalkthrough] Target element found, starting now!');
+              setRun(true);
+            } else {
+              console.warn('[AppWalkthrough] Target element not found, retrying...');
+              setTimeout(startWalkthrough, 500);
+            }
+          };
+          startWalkthrough();
         } else {
           console.log('[AppWalkthrough] ❌ Not starting:', {
             reason: !profile.onboarding_completed 
