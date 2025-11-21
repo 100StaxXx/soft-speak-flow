@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 
@@ -13,6 +14,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
   const { updateBodyFromActivity } = useCompanionAttributes();
+  const { awardCustomXP } = useXPRewards();
 
   const toggleInProgress = useRef(false);
 
@@ -83,9 +85,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
     onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
-        // awardCustomXP should be server-validated
-        const { useXPRewards } = await import("@/hooks/useXPRewards");
-        const { awardCustomXP } = useXPRewards();
+        console.log('[useDailyTasks] Quest completed, awarding XP:', xpReward);
         await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
