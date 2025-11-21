@@ -26,10 +26,25 @@ export const MorningCheckIn = () => {
 
   const today = new Date().toISOString().split('T')[0];
 
+  // Check if walkthrough is active
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
+
   const { data: existingCheckIn } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
     queryFn: async () => {
       if (!user) return null;
+      
+      // Check if walkthrough is ongoing
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
+      const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
+      setIsWalkthroughActive(!isWalkthroughCompleted);
+      
       const { data } = await supabase
         .from('daily_check_ins')
         .select('*')
@@ -105,7 +120,8 @@ export const MorningCheckIn = () => {
     }
   };
 
-  if (existingCheckIn?.completed_at) {
+  // Don't show completed state during walkthrough - always show the form
+  if (existingCheckIn?.completed_at && !isWalkthroughActive) {
     return (
       <Card data-tour="morning-checkin" className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
         <div className="flex items-start gap-4">
