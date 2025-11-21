@@ -264,10 +264,22 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Tutorial completed or skipped');
       setRun(false);
       if (user) {
+        // Fetch existing onboarding_data to preserve userName and other fields
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const existingData = (profile?.onboarding_data as any) || {};
+
         await supabase
           .from('profiles')
           .update({
-            onboarding_data: { walkthrough_completed: true }
+            onboarding_data: {
+              ...existingData,
+              walkthrough_completed: true
+            }
           })
           .eq('id', user.id);
         console.log('[Tutorial] Saved walkthrough_completed to database');

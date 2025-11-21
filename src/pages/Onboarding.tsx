@@ -200,12 +200,22 @@ export default function Onboarding() {
       setExplanation(mentorExplanation);
       setStage('result');
 
-      // Save progress
+      // Fetch existing onboarding_data to preserve userName
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      const existingData = (existingProfile?.onboarding_data as any) || {};
+
+      // Save progress - preserve existing data like userName
       await supabase
         .from("profiles")
         .update({
           onboarding_step: 'mentor_reveal',
           onboarding_data: {
+            ...existingData,
             mentorId: bestMentor.id,
             mentorName: bestMentor.name,
             explanation: {
@@ -354,7 +364,7 @@ export default function Onboarding() {
       }
       
       console.log("Marking onboarding as complete...");
-      // Keep userName when marking onboarding as complete
+      // Keep ALL existing onboarding_data (userName, walkthrough_completed, etc.) when marking onboarding as complete
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('onboarding_data')
@@ -362,14 +372,13 @@ export default function Onboarding() {
         .maybeSingle();
 
       const currentOnboardingData = (currentProfile?.onboarding_data as any) || {};
-      const userName = currentOnboardingData.userName;
 
       const { error: completeError } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           onboarding_completed: true,
           onboarding_step: 'complete',
-          onboarding_data: userName ? { userName } : {}
+          onboarding_data: currentOnboardingData
         })
         .eq('id', user!.id);
         
