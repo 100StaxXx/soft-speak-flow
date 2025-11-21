@@ -13,8 +13,8 @@ const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true, hideFooter: true },
   { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true, hideFooter: true },
   { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true }, hideFooter: true },
-  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
-  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' } },
+  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. Once added, CHECK IT OFF to complete it and earn your XP! This triggers your companion's first evolution!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
+  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest was your MAIN QUEST (2x XP = 20 XP total!) and you just witnessed your companion evolve! You can add up to 3 more quests each day. Keep completing quests to grow your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' } },
 ];
 
 const STEP_INDEX = {
@@ -265,32 +265,38 @@ export const AppWalkthrough = () => {
     }
   }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
-  // Step 4: Listen for quest creation
+  // Step 4: Listen for quest completion (checkbox click)
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
-    const handleTaskCreated = () => {
-      console.log('[Tutorial] Quest created! Advancing to final step.');
-      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+    const handleQuestCompleted = () => {
+      console.log('[Tutorial] Quest completed! Waiting for evolution to finish...');
+      // Don't advance yet - wait for evolution to complete
     };
 
     const handleEvolutionStart = () => {
       console.log('[Tutorial] Evolution starting, hiding quest tooltip.');
       // Hide the tooltip by temporarily pausing the tour
       setRun(false);
-      // Re-enable after evolution completes to show final step
-      createTrackedTimeout(() => {
-        setRun(true);
-      }, 100);
     };
 
-    window.addEventListener('task-created', handleTaskCreated);
-    window.addEventListener('companion-evolution-start', handleEvolutionStart);
-    return () => {
-      window.removeEventListener('task-created', handleTaskCreated);
-      window.removeEventListener('companion-evolution-start', handleEvolutionStart);
+    const handleEvolutionComplete = () => {
+      console.log('[Tutorial] Evolution complete! Showing final congratulations step.');
+      // Re-enable the tour and advance to final step
+      setRun(true);
+      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
     };
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+
+    window.addEventListener('mission-completed', handleQuestCompleted);
+    window.addEventListener('companion-evolution-start', handleEvolutionStart);
+    window.addEventListener('evolution-complete', handleEvolutionComplete);
+    
+    return () => {
+      window.removeEventListener('mission-completed', handleQuestCompleted);
+      window.removeEventListener('companion-evolution-start', handleEvolutionStart);
+      window.removeEventListener('evolution-complete', handleEvolutionComplete);
+    };
+  }, [stepIndex, run, safeSetStep]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status } = data;
