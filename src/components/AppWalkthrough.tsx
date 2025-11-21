@@ -370,8 +370,7 @@ export const AppWalkthrough = () => {
   const interactiveStepIndices: number[] = [
     STEP_INDEX.XP_CELEBRATION,
     STEP_INDEX.COMPANION_VIEW,
-    STEP_INDEX.QUEST_CREATION,
-    STEP_INDEX.FINAL_CONGRATULATIONS
+    STEP_INDEX.QUEST_CREATION
   ];
 
   if (!user) return null;
@@ -387,7 +386,7 @@ export const AppWalkthrough = () => {
       continuous={false}
       showProgress={false}
       showSkipButton={false}
-      hideCloseButton={true}
+      hideCloseButton={stepIndex !== STEP_INDEX.FINAL_CONGRATULATIONS}
       disableOverlay={interactiveStepIndices.includes(stepIndex)}
       spotlightPadding={8}
       disableCloseOnEsc
@@ -415,7 +414,7 @@ export const AppWalkthrough = () => {
         hideArrow: false,
       }}
       locale={{
-        last: 'Begin Adventure',
+        last: 'Close',
       }}
     />
   );
