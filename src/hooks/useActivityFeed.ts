@@ -2,10 +2,40 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
+// Define activity data types based on activity types
+export interface HabitActivityData {
+  habitId?: string;
+  habitName?: string;
+  streak?: number;
+}
+
+export interface MissionActivityData {
+  missionId?: string;
+  missionTitle?: string;
+  xpAwarded?: number;
+}
+
+export interface StreakActivityData {
+  streak?: number;
+  milestone?: number;
+}
+
+export interface EvolutionActivityData {
+  newStage?: number;
+  previousStage?: number;
+}
+
+export type ActivityData =
+  | HabitActivityData
+  | MissionActivityData
+  | StreakActivityData
+  | EvolutionActivityData
+  | Record<string, unknown>;
+
 export interface ActivityFeedItem {
   id: string;
   activity_type: string;
-  activity_data: any;
+  activity_data: ActivityData;
   mentor_comment: string | null;
   mentor_voice_url: string | null;
   created_at: string;
@@ -34,12 +64,12 @@ export const useActivityFeed = () => {
   });
 
   const logActivity = useMutation({
-    mutationFn: async ({ 
-      type, 
-      data 
-    }: { 
-      type: string; 
-      data: any;
+    mutationFn: async ({
+      type,
+      data
+    }: {
+      type: string;
+      data: ActivityData;
     }) => {
       if (!user) throw new Error("Not authenticated");
       

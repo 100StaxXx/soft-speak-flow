@@ -66,9 +66,10 @@ export const useCompanion = () => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
-  
+
   // Prevent duplicate evolution/XP requests during lag
   const evolutionInProgress = useRef(false);
+  const evolutionPromise = useRef<Promise<unknown> | null>(null);
   const xpInProgress = useRef(false);
 
   const { data: companion, isLoading, error } = useQuery({
@@ -134,14 +135,15 @@ export const useCompanion = () => {
           if (!imageResult?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
           return imageResult;
         },
-        { 
-          maxAttempts: 3, 
+        {
+          maxAttempts: 3,
           initialDelay: 2000,
-          shouldRetry: (error: any) => {
+          shouldRetry: (error: unknown) => {
             // Don't retry on payment/credits errors
-            if (error?.message?.includes("INSUFFICIENT_CREDITS") || 
-                error?.message?.includes("temporarily unavailable") ||
-                error?.message?.includes("contact support")) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes("INSUFFICIENT_CREDITS") ||
+                errorMessage.includes("temporarily unavailable") ||
+                errorMessage.includes("contact support")) {
               return false;
             }
             return true;
@@ -180,19 +182,46 @@ export const useCompanion = () => {
         xp_at_evolution: 0,
       });
 
-      // Auto-generate the first chapter of the companion's story in background
-      supabase.functions.invoke('generate-companion-story', {
-        body: {
-          companionId: companionData.id,
-          stage: 0,
+      // Auto-generate the first chapter of the companion's story in background with retry
+      const generateStoryWithRetry = async (attempts = 3) => {
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+          try {
+            const { data, error } = await supabase.functions.invoke('generate-companion-story', {
+              body: {
+                companionId: companionData.id,
+                stage: 0,
+              }
+            });
+
+            if (error) throw error;
+
+            console.log("Stage 0 story generation started");
+            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+            return;
+          } catch (storyError) {
+            const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
+            const isTransient = errorMessage.includes('network') ||
+                               errorMessage.includes('timeout') ||
+                               errorMessage.includes('temporarily unavailable');
+
+            if (attempt < attempts && isTransient) {
+              console.log(`Story generation attempt ${attempt} failed, retrying...`);
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+              continue;
+            }
+
+            console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
+            // Don't fail companion creation if story generation fails
+            // Story can be regenerated later by the user
+            break;
+          }
         }
-      }).then(() => {
-        console.log("Stage 0 story generation started");
-        queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      }).catch((storyError) => {
-        console.error("Failed to auto-generate stage 0 story:", storyError);
-        // Don't fail companion creation if story generation fails
+      };
+
+      // Start story generation in background (don't await)
+      generateStoryWithRetry().catch(() => {
+        // Final catch to prevent unhandled rejection
       });
 
       return companionData;
@@ -285,21 +314,25 @@ export const useCompanion = () => {
 
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
-      // Prevent duplicate evolution requests
-      if (evolutionInProgress.current) {
-        console.log('Evolution already in progress, skipping');
-        return null; // Return null instead of throwing
+      // Prevent duplicate evolution requests - wait for any ongoing evolution
+      if (evolutionInProgress.current && evolutionPromise.current) {
+        console.log('Evolution already in progress, waiting for completion');
+        await evolutionPromise.current;
+        return null;
       }
+
       evolutionInProgress.current = true;
-      
-      if (!user || !companion) {
-        evolutionInProgress.current = false;
-        throw new Error("No companion found");
-      }
 
-      setIsEvolvingLoading(true);
+      // Create a promise to track this evolution
+      const evolutionExecution = (async () => {
+        if (!user || !companion) {
+          evolutionInProgress.current = false;
+          throw new Error("No companion found");
+        }
 
-      try {
+        setIsEvolvingLoading(true);
+
+        try {
         // Call the new evolution edge function with strict continuity
         const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
           "generate-companion-evolution",
@@ -397,11 +430,21 @@ export const useCompanion = () => {
         });
       }
 
-        return evolutionData.image_url;
-      } catch (error) {
-        evolutionInProgress.current = false;
-        setIsEvolvingLoading(false);
-        throw error;
+          return evolutionData.image_url;
+        } catch (error) {
+          evolutionInProgress.current = false;
+          setIsEvolvingLoading(false);
+          throw error;
+        }
+      })();
+
+      // Track the promise for race condition prevention
+      evolutionPromise.current = evolutionExecution;
+
+      try {
+        return await evolutionExecution;
+      } finally {
+        evolutionPromise.current = null;
       }
     },
     onSuccess: (imageUrl) => {
