@@ -153,21 +153,41 @@ export const AppWalkthrough = () => {
         const walkthroughData = profile.onboarding_data as { walkthrough_completed?: boolean } | null;
         const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
 
+        // Check if morning check-in is already completed today
+        const today = new Date().toISOString().split('T')[0];
+        const { data: checkIn } = await supabase
+          .from('daily_check_ins')
+          .select('completed_at')
+          .eq('user_id', user.id)
+          .eq('check_in_type', 'morning')
+          .eq('check_in_date', today)
+          .maybeSingle();
+
+        const isCheckInComplete = !!checkIn?.completed_at;
+
         console.log('[AppWalkthrough] Status check:', {
           onboarding_completed: profile.onboarding_completed,
           walkthrough_completed: isWalkthroughCompleted,
+          checkin_completed: isCheckInComplete,
           full_onboarding_data: walkthroughData
         });
 
-        // Only run if onboarding is complete AND walkthrough is NOT complete
-        if (profile.onboarding_completed === true && !isWalkthroughCompleted) {
+        // Only run if:
+        // 1. Onboarding is complete
+        // 2. Walkthrough is NOT complete
+        // 3. Morning check-in is NOT complete (so the form is visible)
+        if (profile.onboarding_completed === true && !isWalkthroughCompleted && !isCheckInComplete) {
           console.log('[AppWalkthrough] ✅ Starting walkthrough!');
           setTimeout(() => {
             setRun(true);
           }, 800);
         } else {
           console.log('[AppWalkthrough] ❌ Not starting:', {
-            reason: !profile.onboarding_completed ? 'onboarding not complete' : 'walkthrough already done'
+            reason: !profile.onboarding_completed 
+              ? 'onboarding not complete' 
+              : isWalkthroughCompleted 
+              ? 'walkthrough already done'
+              : 'check-in already complete'
           });
         }
       } catch (error) {
