@@ -39,7 +39,7 @@ export const XP_REWARDS = {
 // 21-Stage Evolution System: Early stages fast, late stages exponential
 export const EVOLUTION_THRESHOLDS = {
   0: 0,       // Dormant Egg
-  1: 10,      // Cracking Awakening (Tutorial-optimized)
+  1: 15,      // Cracking Awakening (Check-in + Quest completion)
   2: 30,      // Newborn Emergence
   3: 60,      // Early Infant
   4: 100,     // Juvenile Form
