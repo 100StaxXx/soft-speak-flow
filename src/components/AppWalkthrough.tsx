@@ -377,10 +377,8 @@ export const AppWalkthrough = () => {
         hideArrow: false,
       }}
       locale={{
-        last: 'Close',
-        back: 'Back',
+        last: 'Begin Adventure',
       }}
-      hideBackButton={true}
     />
   );
 };
