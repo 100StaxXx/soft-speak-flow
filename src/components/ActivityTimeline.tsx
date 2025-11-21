@@ -193,7 +193,7 @@ export const ActivityTimeline = () => {
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm text-muted-foreground">
                     You {label}
-                    {activity.activity_data?.habit_title && (
+                    {'habit_title' in activity.activity_data && typeof activity.activity_data.habit_title === 'string' && (
                       <span className="font-semibold text-foreground"> • {activity.activity_data.habit_title}</span>
                     )}
                   </p>

@@ -6,6 +6,7 @@ import { useAuth } from "./useAuth";
 export interface HabitActivityData {
   habitId?: string;
   habitName?: string;
+  habit_title?: string;
   streak?: number;
 }
 
@@ -75,11 +76,11 @@ export const useActivityFeed = () => {
       
       const { data: activity, error } = await supabase
         .from('activity_feed')
-        .insert({
+        .insert([{
           user_id: user.id,
           activity_type: type,
-          activity_data: data,
-        })
+          activity_data: data as any,
+        }])
         .select()
         .maybeSingle();
 
