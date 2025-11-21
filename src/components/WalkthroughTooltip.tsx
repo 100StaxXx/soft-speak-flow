@@ -7,6 +7,13 @@ import { X } from "lucide-react";
  * Custom tooltip component for the walkthrough that ensures mobile responsiveness
  * Specifically addresses the close button being tappable on mobile devices
  */
+
+// Mobile-optimized button styles to ensure proper touch interaction
+const MOBILE_BUTTON_STYLES = {
+  minHeight: "44px",
+  touchAction: "manipulation" as const,
+};
+
 export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
   continuous,
   index,
@@ -37,7 +44,7 @@ export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
       {!hideCloseButton && (
         <button
           {...closeProps}
-          className="absolute top-2 right-2 z-50 rounded-full p-2 hover:bg-accent/20 active:bg-accent/30 transition-colors touch-manipulation"
+          className="absolute top-2 right-2 z-50 rounded-full p-2 hover:bg-accent/20 active:bg-accent/30 transition-colors"
           style={{
             // Ensure minimum tap target size for mobile (44x44px recommended by Apple/Google)
             minWidth: "44px",
@@ -72,11 +79,8 @@ export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
             {...backProps}
             variant="outline"
             size="lg"
-            className="flex-1 touch-manipulation"
-            style={{
-              minHeight: "44px",
-              touchAction: "manipulation",
-            }}
+            className="flex-1"
+            style={MOBILE_BUTTON_STYLES}
           >
             Back
           </Button>
@@ -87,11 +91,8 @@ export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
             {...primaryProps}
             variant="default"
             size="lg"
-            className="flex-1 touch-manipulation"
-            style={{
-              minHeight: "44px",
-              touchAction: "manipulation",
-            }}
+            className="flex-1"
+            style={MOBILE_BUTTON_STYLES}
           >
             {isLastStep ? "Close" : "Next"}
           </Button>
@@ -102,11 +103,8 @@ export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
             {...skipProps}
             variant="outline"
             size="lg"
-            className="flex-1 touch-manipulation"
-            style={{
-              minHeight: "44px",
-              touchAction: "manipulation",
-            }}
+            className="flex-1"
+            style={MOBILE_BUTTON_STYLES}
           >
             Skip
           </Button>
