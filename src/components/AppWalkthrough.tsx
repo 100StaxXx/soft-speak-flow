@@ -9,12 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
-  { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true },
-  { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true },
-  { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true },
-  { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true } },
-  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } } },
-  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' }, styles: { tooltip: { pointerEvents: 'auto' } } },
+  { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true, hideFooter: true },
+  { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true, hideFooter: true },
+  { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true, hideFooter: true },
+  { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true }, hideFooter: true },
+  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
+  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' } },
 ];
 
 const STEP_INDEX = {
@@ -155,30 +155,105 @@ export const AppWalkthrough = () => {
     return () => window.removeEventListener('onboarding-complete', handleOnboardingComplete);
   }, [user, session, waitForSelector]);
 
-  // Listen for quest creation to advance from step 4 -> 5
+  // Step 0: Listen for mood selection
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !waitingForAction) return;
+    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) return;
+
+    const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
+    const handleMoodClick = () => {
+      console.log('[Tutorial] Mood selected, advancing to intention step');
+      safeSetStep(STEP_INDEX.CHECKIN_INTENTION);
+    };
+
+    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
+    return () => moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
+  }, [stepIndex, run, safeSetStep]);
+
+  // Step 1: Listen for intention submission
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.CHECKIN_INTENTION || !run) return;
+
+    const checkForSubmit = () => {
+      const intentionField = document.querySelector('[data-tour="checkin-intention"]') as HTMLTextAreaElement | null;
+      if (intentionField && intentionField.value.trim().length > 0) {
+        const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]');
+        if (submitButton && !(submitButton as HTMLButtonElement).disabled) {
+          const observer = new MutationObserver(() => {
+            if ((submitButton as HTMLButtonElement).disabled) {
+              observer.disconnect();
+              createTrackedTimeout(async () => {
+                confetti({
+                  particleCount: 100,
+                  spread: 70,
+                  origin: { y: 0.6 }
+                });
+                await safeSetStep(STEP_INDEX.XP_CELEBRATION);
+              }, 1500);
+            }
+          });
+          observer.observe(submitButton, { attributes: true });
+        }
+      }
+    };
+
+    const intervalId = createTrackedInterval(checkForSubmit, 500);
+    return () => clearInterval(intervalId);
+  }, [stepIndex, run, safeSetStep, createTrackedInterval, createTrackedTimeout]);
+
+  // Step 2: Listen for companion tab click
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
+
+    const navCompanion = document.querySelector('a[href="/companion"]');
+    const handleNavClick = () => {
+      createTrackedTimeout(async () => {
+        await safeSetStep(STEP_INDEX.COMPANION_VIEW);
+      }, 1500);
+    };
+
+    if (navCompanion) {
+      navCompanion.addEventListener('click', handleNavClick);
+      return () => navCompanion.removeEventListener('click', handleNavClick);
+    }
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+
+  // Step 3: Listen for tasks/quests tab click
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
+
+    const navTasks = document.querySelector('a[href="/tasks"]');
+    const handleNavClick = () => {
+      createTrackedTimeout(async () => {
+        await safeSetStep(STEP_INDEX.QUEST_CREATION);
+      }, 1500);
+    };
+
+    if (navTasks) {
+      navTasks.addEventListener('click', handleNavClick);
+      return () => navTasks.removeEventListener('click', handleNavClick);
+    }
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+
+  // Step 4: Listen for quest creation
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
     const handleTaskCreated = () => {
       console.log('[Tutorial] Quest created! Advancing to final step.');
-      setWaitingForAction(false);
       safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
     };
 
     window.addEventListener('task-created', handleTaskCreated);
     return () => window.removeEventListener('task-created', handleTaskCreated);
-  }, [stepIndex, waitingForAction, safeSetStep]);
+  }, [stepIndex, run, safeSetStep]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
-    const { status, action, index, type, lifecycle } = data;
-
-    console.log('[Tutorial] Joyride callback:', { status, action, index, type, lifecycle });
+    const { status } = data;
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       console.log('[Tutorial] Tutorial completed or skipped');
       setRun(false);
       if (user) {
-        // Fetch existing onboarding_data to preserve userName and other fields
         const { data: profile } = await supabase
           .from('profiles')
           .select('onboarding_data')
@@ -198,89 +273,8 @@ export const AppWalkthrough = () => {
           .eq('id', user.id);
         console.log('[Tutorial] Saved walkthrough_completed to database');
       }
-      return;
     }
-
-    // Step 0 -> 1: Check-in selected
-    if (index === STEP_INDEX.HOME_CHECKIN && type === 'step:after') {
-      const intentionField = document.querySelector('[data-tour="checkin-intention"]');
-      if (intentionField) {
-        await safeSetStep(STEP_INDEX.CHECKIN_INTENTION);
-      }
-    }
-
-    // Step 1 -> 2: Intention submitted, show XP celebration
-    if (index === STEP_INDEX.CHECKIN_INTENTION && type === 'step:after') {
-      const checkForSubmit = () => {
-        const intentionField = document.querySelector('[data-tour="checkin-intention"]') as HTMLTextAreaElement | null;
-        if (intentionField && intentionField.value.trim().length > 0) {
-          const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]');
-          if (submitButton && !(submitButton as HTMLButtonElement).disabled) {
-            const observer = new MutationObserver(() => {
-              if ((submitButton as HTMLButtonElement).disabled) {
-                observer.disconnect();
-                createTrackedTimeout(async () => {
-                  confetti({
-                    particleCount: 100,
-                    spread: 70,
-                    origin: { y: 0.6 }
-                  });
-                  await safeSetStep(STEP_INDEX.XP_CELEBRATION);
-                }, 1500);
-              }
-            });
-            observer.observe(submitButton, { attributes: true });
-          }
-        }
-      };
-
-      const timeoutId = createTrackedTimeout(() => {
-        checkForSubmit();
-        const checkInterval = setInterval(() => {
-          checkForSubmit();
-        }, 500);
-        createTrackedTimeout(() => clearInterval(checkInterval), 10000);
-      }, 1000);
-    }
-
-    // Step 2 -> 3: Navigate to companion page
-    if (index === STEP_INDEX.XP_CELEBRATION && action === 'next') {
-      const navCompanion = document.querySelector('a[href="/companion"]');
-      if (navCompanion) {
-        setWaitingForAction(true);
-        const handleNavClick = () => {
-          createTrackedTimeout(async () => {
-            await safeSetStep(STEP_INDEX.COMPANION_VIEW);
-            setWaitingForAction(false);
-          }, 1500);
-          navCompanion.removeEventListener('click', handleNavClick);
-        };
-        navCompanion.addEventListener('click', handleNavClick);
-      }
-    }
-
-    // Step 3 -> 4: Navigate to tasks page
-    if (index === STEP_INDEX.COMPANION_VIEW && action === 'next') {
-      const navTasks = document.querySelector('a[href="/tasks"]');
-      if (navTasks) {
-        setWaitingForAction(true);
-        const handleNavClick = () => {
-          createTrackedTimeout(async () => {
-            await safeSetStep(STEP_INDEX.QUEST_CREATION);
-            setWaitingForAction(false);
-          }, 1500);
-          navTasks.removeEventListener('click', handleNavClick);
-        };
-        navTasks.addEventListener('click', handleNavClick);
-      }
-    }
-
-    // Step 4: Wait for quest creation (handled by event listener above)
-    if (index === STEP_INDEX.QUEST_CREATION && type === 'step:after') {
-      setWaitingForAction(true);
-    }
-
-  }, [user, safeSetStep, createTrackedTimeout]);
+  }, [user]);
 
   const interactiveStepIndices: number[] = [
     STEP_INDEX.XP_CELEBRATION,
@@ -299,11 +293,13 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous
-      showProgress
-      showSkipButton
+      continuous={false}
+      showProgress={false}
+      showSkipButton={false}
       disableOverlay={interactiveStepIndices.includes(stepIndex)}
       spotlightPadding={8}
+      disableCloseOnEsc
+      disableScrolling={false}
       styles={{
         options: {
           zIndex: 10000,
@@ -321,23 +317,13 @@ export const AppWalkthrough = () => {
           borderRadius: '0.5rem',
           padding: '0.5rem 1rem',
         },
-        buttonBack: {
-          color: 'hsl(var(--muted-foreground))',
-        },
-        buttonSkip: {
-          color: 'hsl(var(--muted-foreground))',
-        },
       }}
       floaterProps={{
         disableAnimation: false,
         hideArrow: false,
       }}
       locale={{
-        back: 'Back',
-        close: 'Close',
-        last: 'Finish',
-        next: 'Next',
-        skip: 'Skip',
+        last: 'Begin Adventure',
       }}
     />
   );
