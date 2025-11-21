@@ -9,6 +9,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+// Step indices for clarity and maintainability
+const STEP_MOOD_CHECKIN = 0;
+const STEP_INTENTION = 1;
+const STEP_XP_CELEBRATION = 2;
+const STEP_COMPANION_SHOW = 3;
+const STEP_CREATE_QUEST = 4;
+const STEP_FINAL_CONGRATULATIONS = 5;
+
 const WALKTHROUGH_STEPS: Step[] = [
   // Step 0: HOME PAGE - Check-in mood
   {
@@ -136,7 +144,7 @@ export const AppWalkthrough = () => {
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
-    if (index !== 5) return null;
+    if (index !== STEP_FINAL_CONGRATULATIONS) return null;
     
     const handleFinish = () => {
       haptics.success();
@@ -234,15 +242,20 @@ export const AppWalkthrough = () => {
     timeoutsRef.current = [];
   }, []);
 
+  // Helper to find step by id or target
+  const findStepIndex = useCallback((steps: Step[], id: string, target: string) => {
+    return steps.findIndex(s => 
+      (s as Step & { id?: string }).id === id || 
+      (s as Step).target === target
+    );
+  }, []);
+
   const isMobile = useIsMobile();
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
       // Adjust quest creation step (step 4) using findIndex
-      const tasksStepIdx = base.findIndex(s => 
-        (s as Step & { id?: string }).id === 'tasks-create-quest' || 
-        (s as Step).target === '[data-tour="today-quests-header"]'
-      );
+      const tasksStepIdx = findStepIndex(base, 'tasks-create-quest', '[data-tour="today-quests-header"]');
       if (tasksStepIdx !== -1) {
         const tasksStep = base[tasksStepIdx] as Step & { floaterProps?: { styles?: Record<string, unknown> }, styles?: { tooltip?: Record<string, unknown> } };
         base[tasksStepIdx] = {
@@ -266,10 +279,7 @@ export const AppWalkthrough = () => {
       }
 
       // Adjust companion page step (step 3) using findIndex
-      const companionStepIdx = base.findIndex(s => 
-        (s as Step & { id?: string }).id === 'companion-show' || 
-        (s as Step).target === '[data-tour="companion-tooltip-anchor"]'
-      );
+      const companionStepIdx = findStepIndex(base, 'companion-show', '[data-tour="companion-tooltip-anchor"]');
       if (companionStepIdx !== -1) {
         base[companionStepIdx] = {
           ...base[companionStepIdx],
@@ -279,7 +289,7 @@ export const AppWalkthrough = () => {
       }
     }
     return base;
-  }, [isMobile]);
+  }, [isMobile, findStepIndex]);
 
   // Utility: wait for a selector to exist before advancing, returns boolean indicating success
   const waitForSelector = useCallback((selector: string, timeout = 5000): Promise<boolean> => {
@@ -340,13 +350,13 @@ export const AppWalkthrough = () => {
 
         if (companion && location.pathname === '/') {
           // Wait for initial step target to be present, then start
-          await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
+          await waitForSelector(((steps[STEP_MOOD_CHECKIN] as Step).target as string) || 'body', 8000);
           scheduleTimeout(() => {
             localStorage.setItem('appWalkthroughActive', 'true');
             setRun(true);
             // Emit initial tutorial step
             window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-              detail: { step: 0 } 
+              detail: { step: STEP_MOOD_CHECKIN } 
             }));
           }, 300);
         }
@@ -360,11 +370,11 @@ export const AppWalkthrough = () => {
   // Listen for mood selection to advance from step 0 to step 1
   useEffect(() => {
     const handleMoodSelected = () => {
-      if (run && stepIndex === 0) {
+      if (run && stepIndex === STEP_MOOD_CHECKIN) {
         haptics.light();
         scheduleTimeout(() => {
-          if (run && stepIndex === 0) {
-            safeSetStep(1);
+          if (run && stepIndex === STEP_MOOD_CHECKIN) {
+            safeSetStep(STEP_INTENTION);
           }
         }, 300);
       }
@@ -377,12 +387,12 @@ export const AppWalkthrough = () => {
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
-      if (run && stepIndex <= 1) {
+      if (run && stepIndex <= STEP_INTENTION) {
         haptics.success();
         setWaitingForAction(false);
         scheduleTimeout(() => {
-          if (run && stepIndex <= 1) {
-            safeSetStep(2); // Go to XP celebration, then companion
+          if (run && stepIndex <= STEP_INTENTION) {
+            safeSetStep(STEP_XP_CELEBRATION); // Go to XP celebration, then companion
           }
         }, 500);
       }
@@ -395,7 +405,7 @@ export const AppWalkthrough = () => {
   // Listen for mission completion
   useEffect(() => {
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 4) {
+      if (run && stepIndex === STEP_CREATE_QUEST) {
         haptics.heavy();
         setWaitingForAction(false);
 
@@ -416,14 +426,14 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (stepIndex === 4) {
+      if (stepIndex === STEP_CREATE_QUEST) {
         // Evolution complete - now show final congratulations step
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
         scheduleTimeout(() => {
-          if (stepIndex === 4) {
-            safeSetStep(5);
+          if (stepIndex === STEP_CREATE_QUEST) {
+            safeSetStep(STEP_FINAL_CONGRATULATIONS);
           }
         }, 500);
       }
@@ -439,27 +449,27 @@ export const AppWalkthrough = () => {
     if (!run) return;
 
     // Step 2 -> 3: User navigated to companion page
-    if (stepIndex === 2 && location.pathname === '/companion') {
+    if (stepIndex === STEP_XP_CELEBRATION && location.pathname === '/companion') {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
       scheduleTimeout(() => {
-        if (run && stepIndex === 2) {
-          safeSetStep(3);
+        if (run && stepIndex === STEP_XP_CELEBRATION) {
+          safeSetStep(STEP_COMPANION_SHOW);
         }
       }, 100);
     } 
     // Step 3 -> 4: User navigated to tasks page
-    else if (stepIndex === 3 && location.pathname === '/tasks') {
+    else if (stepIndex === STEP_COMPANION_SHOW && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
       scheduleTimeout(() => {
-        if (run && stepIndex === 3) {
-          safeSetStep(4);
+        if (run && stepIndex === STEP_COMPANION_SHOW) {
+          safeSetStep(STEP_CREATE_QUEST);
         }
       }, 100);
     }
     // Step 4: User navigated back to companion (stay on step 4, don't break)
-    else if (stepIndex === 4 && location.pathname === '/companion') {
+    else if (stepIndex === STEP_CREATE_QUEST && location.pathname === '/companion') {
       // User navigated back - no action needed, stay on current step
     }
   }, [location.pathname, stepIndex, run, safeSetStep, scheduleTimeout]);
@@ -517,7 +527,7 @@ export const AppWalkthrough = () => {
 
     // Set waiting states for steps requiring user actions
     if (lifecycle === 'complete') {
-      if (index === 4) {
+      if (index === STEP_CREATE_QUEST) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       }
@@ -561,7 +571,7 @@ export const AppWalkthrough = () => {
   if (!user || !session) return null;
 
   // Define interactive steps where overlay should be disabled
-  const interactiveSteps = [2, 3, 4, 5];
+  const interactiveSteps = [STEP_XP_CELEBRATION, STEP_COMPANION_SHOW, STEP_CREATE_QUEST, STEP_FINAL_CONGRATULATIONS];
 
   return (
     <Joyride
@@ -572,13 +582,13 @@ export const AppWalkthrough = () => {
       continuous={true}
       showProgress={false}
       showSkipButton={false}
-      disableOverlayClose={stepIndex !== 5}
-      disableCloseOnEsc={stepIndex !== 5}
-      hideCloseButton={stepIndex !== 5}
+      disableOverlayClose={stepIndex !== STEP_FINAL_CONGRATULATIONS}
+      disableCloseOnEsc={stepIndex !== STEP_FINAL_CONGRATULATIONS}
+      hideCloseButton={stepIndex !== STEP_FINAL_CONGRATULATIONS}
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
-      tooltipComponent={stepIndex === 5 ? CustomFinalTooltip : undefined}
+      tooltipComponent={stepIndex === STEP_FINAL_CONGRATULATIONS ? CustomFinalTooltip : undefined}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
@@ -603,7 +613,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: stepIndex === 5 ? 'block' : 'none',
+          display: stepIndex === STEP_FINAL_CONGRATULATIONS ? 'block' : 'none',
           backgroundColor: 'hsl(var(--primary))',
           padding: '0.75rem 2rem',
           fontSize: '1rem',
