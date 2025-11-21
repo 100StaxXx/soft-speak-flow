@@ -267,7 +267,7 @@ export const AppWalkthrough = () => {
 
   // Step 4: Listen for quest completion (checkbox click)
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION) return;
 
     const handleQuestCompleted = () => {
       console.log('[Tutorial] Quest completed! Waiting for evolution to finish...');
@@ -284,7 +284,9 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Evolution complete! Showing final congratulations step.');
       // Re-enable the tour and advance to final step
       setRun(true);
-      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+      createTrackedTimeout(() => {
+        safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+      }, 300);
     };
 
     window.addEventListener('mission-completed', handleQuestCompleted);
@@ -296,7 +298,7 @@ export const AppWalkthrough = () => {
       window.removeEventListener('companion-evolution-start', handleEvolutionStart);
       window.removeEventListener('evolution-complete', handleEvolutionComplete);
     };
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status } = data;
