@@ -37,7 +37,7 @@ const STAGE_NAMES = {
 const XP_TIPS = [
   { action: "Complete a habit", xp: "5-20 XP", icon: "✓" },
   { action: "Finish all daily habits", xp: "+10 XP bonus", icon: "🎯" },
-  { action: "Complete daily missions", xp: "5-30 XP each", icon: "⚡" },
+  { action: "Complete daily missions", xp: "5-20 XP each", icon: "⚡" },
   { action: "Weekly challenge day", xp: "20 XP", icon: "💪" },
   { action: "Streak milestones", xp: "15 XP", icon: "🔥" },
 ];
