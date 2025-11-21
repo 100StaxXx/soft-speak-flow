@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
 export interface Subscription {
@@ -17,6 +15,9 @@ export interface Subscription {
 export function useSubscription() {
   const { user } = useAuth();
 
+  // Temporary: subscriptions table not yet migrated
+  // TODO: Uncomment when subscriptions table is created
+  /*
   const { data: subscription, isLoading, error, refetch } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: async () => {
@@ -36,6 +37,12 @@ export function useSubscription() {
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+  */
+
+  const subscription = null;
+  const isLoading = false;
+  const error = null;
+  const refetch = async () => {};
 
   // Helper functions
   const isActive = subscription?.status === "active" || subscription?.status === "trialing";
@@ -90,19 +97,9 @@ export function useSubscription() {
 }
 
 export async function cancelSubscription(subscriptionId: string) {
-  const { data, error } = await supabase.functions.invoke("cancel-subscription", {
-    body: { subscriptionId },
-  });
-
-  if (error) throw error;
-  return data;
+  throw new Error("Subscriptions not yet implemented");
 }
 
 export async function resumeSubscription(subscriptionId: string) {
-  const { data, error } = await supabase.functions.invoke("resume-subscription", {
-    body: { subscriptionId },
-  });
-
-  if (error) throw error;
-  return data;
+  throw new Error("Subscriptions not yet implemented");
 }

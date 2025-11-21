@@ -10,7 +10,7 @@ import Confetti from "react-confetti";
 export default function PremiumSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { refetch: refetchProfile } = useProfile();
+  const { profile, loading } = useProfile();
   const { refetch: refetchSubscription, isTrialing, trialDaysRemaining } = useSubscription();
   const [showConfetti, setShowConfetti] = useState(true);
   const [isVerifying, setIsVerifying] = useState(true);
@@ -24,10 +24,7 @@ export default function PremiumSuccess() {
         // Wait a moment for webhook to process
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        await Promise.all([
-          refetchProfile(),
-          refetchSubscription(),
-        ]);
+        await refetchSubscription();
       }
       setIsVerifying(false);
     };
@@ -37,7 +34,7 @@ export default function PremiumSuccess() {
     // Stop confetti after 5 seconds
     const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => clearTimeout(timer);
-  }, [sessionId, refetchProfile, refetchSubscription]);
+  }, [sessionId, refetchSubscription]);
 
   if (isVerifying) {
     return (

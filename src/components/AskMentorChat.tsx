@@ -153,12 +153,14 @@ export const AskMentorChat = ({
       setDailyMessageCount(prev => prev + 1);
 
       // Save both messages even with fallback
-      await supabase.from('mentor_chats').insert([
-        { user_id: user.id, role: 'user', content: text },
-        { user_id: user.id, role: 'assistant', content: fallback.content }
-      ]).catch(() => {
+      try {
+        await supabase.from('mentor_chats').insert([
+          { user_id: user.id, role: 'user', content: text },
+          { user_id: user.id, role: 'assistant', content: fallback.content }
+        ]);
+      } catch (error) {
         // Silently fail if database insert fails - at least user got a response
-      });
+      }
     } finally {
       setIsLoading(false);
     }
