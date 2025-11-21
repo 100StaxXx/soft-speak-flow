@@ -534,6 +534,12 @@ All colors MUST be HSL.
     background-color: hsl(0 0% 0% / 0.75) !important;
   }
 
+  /* Ensure all buttons in custom walkthrough tooltip are touch-friendly */
+  .react-joyride__tooltip button {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
