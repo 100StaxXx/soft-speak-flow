@@ -246,9 +246,22 @@ export default function Challenges() {
               </div>
             ) : (
               <Card className="p-12 text-center bg-card/50 backdrop-blur-sm border-border/50">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No challenges available</h3>
-                <p className="text-muted-foreground">Check back soon for new challenges</p>
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold">No challenges available yet</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Challenges are special limited-time activities that help you grow faster.
+                      Check back regularly for new opportunities to earn bonus XP and exclusive rewards!
+                    </p>
+                  </div>
+                  <div className="pt-2 flex items-center gap-2 justify-center text-xs text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>New challenges coming soon</span>
+                  </div>
+                </div>
               </Card>
             )}
           </TabsContent>

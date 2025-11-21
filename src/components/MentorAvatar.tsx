@@ -94,6 +94,8 @@ export const MentorAvatar = ({
           alt={mentorName}
           className="w-full h-full object-cover"
           style={{ objectPosition: imagePosition }}
+          loading="lazy"
+          decoding="async"
         />
       ) : (
         <div

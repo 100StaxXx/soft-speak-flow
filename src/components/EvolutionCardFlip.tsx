@@ -71,10 +71,12 @@ export function EvolutionCardFlip({ card }: Props) {
         <div className={`h-full rounded-xl border-2 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-[2px] shadow-lg`}>
           <div className="h-full rounded-lg bg-card relative overflow-hidden">
             {card.image_url ? (
-              <img 
-                src={card.image_url} 
+              <img
+                src={card.image_url}
                 alt={card.creature_name}
                 className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center text-muted-foreground text-xs">
@@ -146,10 +148,12 @@ export function EvolutionCardFlip({ card }: Props) {
                   <div className={`h-full rounded-2xl border-4 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-1 shadow-2xl`}>
                     <div className="h-full rounded-xl bg-card relative overflow-hidden">
                       {card.image_url ? (
-                        <img 
-                          src={card.image_url} 
+                        <img
+                          src={card.image_url}
                           alt={card.creature_name}
                           className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">

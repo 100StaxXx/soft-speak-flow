@@ -94,6 +94,8 @@ export const QuoteImageGenerator = ({
               src={generatedImage}
               alt={`Quote: ${quoteText}`}
               className="w-full h-auto"
+              loading="lazy"
+              decoding="async"
             />
           </div>
           <div className="flex gap-2">

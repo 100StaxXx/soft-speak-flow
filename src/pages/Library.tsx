@@ -240,11 +240,21 @@ export default function Library() {
               </div>
             ) : (
               <Card className="p-12 text-center bg-card/50 backdrop-blur-sm border-border/50">
-                <Download className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No downloads yet</h3>
-                <p className="text-muted-foreground">
-                  Downloaded content will appear here
-                </p>
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <Download className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold">No downloads yet</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Download pep talks and quotes for offline access. Your downloaded content will appear here.
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate("/pep-talks")} className="mt-4">
+                    <Headphones className="h-4 w-4 mr-2" />
+                    Browse Pep Talks
+                  </Button>
+                </div>
               </Card>
             )}
           </TabsContent>
