@@ -107,7 +107,7 @@ export const MorningCheckIn = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+      <Card data-tour="morning-checkin" className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Sunrise className="h-6 w-6 text-orange-500" />
