@@ -594,7 +594,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={interactiveStepIndices.includes(stepIndex)}
+      disableOverlay={interactiveStepIndices.includes(stepIndex as 2 | 3 | 4 | 5)}
       locale={{
         back: 'Back',
         close: '',

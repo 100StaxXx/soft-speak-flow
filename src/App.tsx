@@ -118,6 +118,8 @@ const AppContent = memo(() => {
           <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
           <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
