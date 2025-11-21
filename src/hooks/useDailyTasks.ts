@@ -2,23 +2,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useXPRewards } from "@/hooks/useXPRewards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useRef } from "react";
+import { getQuestXP } from "@/config/xpRewards";
 
-/**
- * useDailyTasks
- * - Fixed xpRewards mapping to canonical values.
- * - TODO: prefer importing centralized XP constants (e.g., XP_REWARDS) to avoid future drift.
- */
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
   const { updateBodyFromActivity } = useCompanionAttributes();
-  const { awardCustomXP } = useXPRewards();
 
   const toggleInProgress = useRef(false);
 
@@ -42,13 +36,14 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const addTask = useMutation({
     mutationFn: async ({ taskText, difficulty, taskDate: customDate, isMainQuest }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard'; taskDate?: string; isMainQuest?: boolean; }) => {
-      if (tasks.length >= 3) {
+      // Re-check latest tasks to mitigate races
+      await queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, customDate || taskDate] });
+      const latest = queryClient.getQueryData(['daily-tasks', user?.id, customDate || taskDate]) || [];
+      if (latest.length >= 3) {
         throw new Error('Maximum 3 tasks per day');
       }
 
-      // Canonical XP values. Keep in sync with src/config/xpSystem.ts.
-      const xpRewards = { easy: 5, medium: 10, hard: 20 };
-      const xpReward = xpRewards[difficulty];
+      const xpReward = getQuestXP(difficulty);
 
       const { error } = await supabase
         .from('daily_tasks')
@@ -88,6 +83,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
     onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
+        // awardCustomXP should be server-validated
+        const { awardCustomXP } = await import("@/hooks/useXPRewards");
         await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
