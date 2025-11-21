@@ -272,9 +272,23 @@ export const AppWalkthrough = () => {
       safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
     };
 
+    const handleEvolutionStart = () => {
+      console.log('[Tutorial] Evolution starting, hiding quest tooltip.');
+      // Hide the tooltip by temporarily pausing the tour
+      setRun(false);
+      // Re-enable after evolution completes to show final step
+      createTrackedTimeout(() => {
+        setRun(true);
+      }, 100);
+    };
+
     window.addEventListener('task-created', handleTaskCreated);
-    return () => window.removeEventListener('task-created', handleTaskCreated);
-  }, [stepIndex, run, safeSetStep]);
+    window.addEventListener('companion-evolution-start', handleEvolutionStart);
+    return () => {
+      window.removeEventListener('task-created', handleTaskCreated);
+      window.removeEventListener('companion-evolution-start', handleEvolutionStart);
+    };
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status } = data;
