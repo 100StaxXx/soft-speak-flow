@@ -15,6 +15,7 @@ import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, TrendingUp, BookOpen, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionPageTour } from "@/components/CompanionPageTour";
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext } = useCompanion();
@@ -89,6 +90,7 @@ const Companion = () => {
         </div>
       </CompanionErrorBoundary>
       <BottomNav />
+      <CompanionPageTour />
     </PageTransition>
   );
 };
