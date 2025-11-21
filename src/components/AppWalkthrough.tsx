@@ -534,7 +534,7 @@ export const AppWalkthrough = () => {
           border: '3px solid hsl(var(--primary))',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
           pointerEvents: 'auto',
-          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          animation: 'tooltip-border-pulse 2s ease-in-out infinite',
         },
         tooltipContent: {
           fontSize: '1rem',
