@@ -10,13 +10,13 @@ interface MuteChangeEvent extends CustomEvent {
 // Ambient music system with persistence
 class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
-  private volume = 0.05; // Subtle background volume
+  private volume = 0.025; // Subtle background volume (2.5%)
   private isMuted = false;
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
   private currentTrack = 'ambient';
   private isPausedForEvent = false; // Track if paused for major events
-  private originalVolume = 0.05; // Store original volume before ducking
+  private originalVolume = 0.025; // Store original volume before ducking
   private isDucked = false; // Track if currently ducked
 
   // Ambient music URLs - these would be your actual music files
