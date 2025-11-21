@@ -56,10 +56,10 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (err) {
-    console.error("Webhook error:", err.message);
+  } catch (err: any) {
+    console.error("Webhook error:", err?.message);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err?.message || 'Unknown error' }),
       { status: 400 }
     );
   }

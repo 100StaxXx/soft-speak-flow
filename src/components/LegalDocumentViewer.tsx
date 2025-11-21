@@ -72,7 +72,7 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
 
                 // Bold text
                 if (line.startsWith('**') && line.endsWith('**')) {
-                  return <p key={index} className="font-bold mt-3 mb-2">{line.replaceAll('**', '')}</p>;
+                  return <p key={index} className="font-bold mt-3 mb-2">{line.replace(/\*\*/g, '')}</p>;
                 }
 
                 // List items
