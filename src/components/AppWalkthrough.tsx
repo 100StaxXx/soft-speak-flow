@@ -7,6 +7,7 @@ import { haptics } from "@/utils/haptics";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
+import { WalkthroughTooltip } from "@/components/WalkthroughTooltip";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true, hideFooter: true },
@@ -393,6 +394,7 @@ export const AppWalkthrough = () => {
       spotlightPadding={8}
       disableCloseOnEsc
       disableScrolling={false}
+      tooltipComponent={WalkthroughTooltip}
       styles={{
         options: {
           zIndex: 10000,
