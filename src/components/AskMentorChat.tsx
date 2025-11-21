@@ -317,7 +317,7 @@ export const AskMentorChat = ({
             disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+          <Button type="submit" disabled={isLoading || !input.trim()} size="icon" aria-label="Send message">
             <Send className="h-4 w-4" />
           </Button>
         </div>

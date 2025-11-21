@@ -75,6 +75,7 @@ export const MentorNudges = () => {
                     size="icon"
                     className="h-6 w-6 -mt-1"
                     onClick={() => dismissNudge(nudge.id)}
+                    aria-label="Dismiss nudge"
                   >
                     <X className="h-3 w-3" />
                   </Button>

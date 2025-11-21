@@ -82,11 +82,12 @@ export const MentorQuickChat = () => {
             placeholder="Or type your own..."
             className="flex-1 rounded-full border-2 focus:border-primary/50 transition-all"
           />
-          <Button 
-            type="submit" 
-            size="icon" 
+          <Button
+            type="submit"
+            size="icon"
             disabled={!customQuestion.trim()}
             className="rounded-full h-10 w-10 shadow-soft hover:shadow-glow transition-all hover:scale-110 disabled:opacity-50"
+            aria-label="Send question"
           >
             <Send className="h-4 w-4" />
           </Button>

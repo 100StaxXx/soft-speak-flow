@@ -145,6 +145,7 @@ export const TranscriptEditor = ({ transcript, onChange, audioUrl }: TranscriptE
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteWord(index)}
+                    aria-label="Delete word"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
