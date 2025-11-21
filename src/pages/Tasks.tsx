@@ -581,59 +581,84 @@ export default function Tasks() {
               </Card>
             ) : (
               <>
-                {habits.length === 0 ? (
-                  showTemplates ? (
-                    <HabitTemplates
-                      onSelect={(title, frequency) => {
-                        setNewHabitTitle(title);
-                        setShowTemplates(false);
-                        setShowAddHabit(true);
-                      }}
-                      onCustom={() => setShowAddHabit(true)}
-                      existingHabits={habits}
-                    />
-                  ) : (
-                    <EmptyState
-                      icon={Target}
-                      title="No habits yet"
-                      description="Create your first habit to start building momentum"
-                      actionLabel="Add Habit"
-                      onAction={() => setShowAddHabit(true)}
-                    />
-                  )
+                {showTemplates ? (
+                  <HabitTemplates
+                    onSelect={(title, frequency) => {
+                      setNewHabitTitle(title);
+                      setSelectedDays(frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : []);
+                      setShowTemplates(false);
+                      setShowAddHabit(true);
+                    }}
+                    onCustom={() => {
+                      setShowTemplates(false);
+                      setShowAddHabit(true);
+                    }}
+                    existingHabits={habits}
+                  />
                 ) : (
                   <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">Your Habits</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {habits.length}/5 habits
-                        </p>
+                    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h2 className="text-xl font-semibold">Your Habits</h2>
+                          <p className="text-sm text-muted-foreground">Track daily progress</p>
+                        </div>
+                        {habits.length < 5 && (
+                          <Button
+                            onClick={() => setShowAddHabit(true)}
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Habit
+                          </Button>
+                        )}
                       </div>
-                      {habits.length < 5 && (
-                        <Button onClick={() => setShowAddHabit(true)} size="sm">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add
-                        </Button>
+
+                      {habits.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Daily Progress
+                            </span>
+                            <span className="text-primary font-semibold">
+                              {completions.length}/{habits.length}
+                            </span>
+                          </div>
+                          <Progress value={habitProgress * 100} className="h-2" />
+                        </div>
                       )}
-                    </div>
+                    </Card>
 
                     <div className="space-y-3">
-                      {habits.map((habit) => {
-                        const isCompleted = completions.some(c => c.habit_id === habit.id);
-                        return (
-                          <HabitCard
-                            key={habit.id}
-                            id={habit.id}
-                            title={habit.title}
-                            currentStreak={habit.current_streak || 0}
-                            longestStreak={habit.longest_streak || 0}
-                            completedToday={isCompleted}
-                            difficulty={habit.difficulty}
-                            onComplete={() => toggleHabitMutation.mutate({ habitId: habit.id, isCompleted })}
-                          />
-                        );
-                      })}
+                      {habits.length === 0 ? (
+                        <EmptyState
+                          icon={CheckCircle2}
+                          title="No habits yet"
+                          description="Create your first habit to start building momentum"
+                          actionLabel="Create Habit"
+                          onAction={() => setShowAddHabit(true)}
+                        />
+                      ) : (
+                        habits.map(habit => {
+                          const isCompleted = completions.some(c => c.habit_id === habit.id);
+                          return (
+                            <HabitCard
+                              key={habit.id}
+                              id={habit.id}
+                              title={habit.title}
+                              currentStreak={habit.current_streak || 0}
+                              longestStreak={habit.longest_streak || 0}
+                              completedToday={isCompleted}
+                              difficulty={habit.difficulty}
+                              onComplete={() => toggleHabitMutation.mutate({ 
+                                habitId: habit.id, 
+                                isCompleted 
+                              })}
+                            />
+                          );
+                        })
+                      )}
                     </div>
                   </>
                 )}
