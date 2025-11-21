@@ -90,8 +90,8 @@ export const useXPRewards = () => {
   };
 
   const awardCheckInComplete = async () => {
-    if (!companion) return;
-    
+    if (!companion || awardXP.isPending) return;
+
     try {
       showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
       awardXP.mutate({
