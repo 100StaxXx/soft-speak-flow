@@ -177,6 +177,8 @@ export const AppWalkthrough = () => {
         const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
         if (found) {
           console.log('[AppWalkthrough] All components ready, starting tour');
+          // Scroll to top before starting the walkthrough
+          window.scrollTo(0, 0);
           setRun(true);
         } else {
           console.warn('[AppWalkthrough] Failed to find initial tour element after timeout');
