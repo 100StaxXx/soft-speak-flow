@@ -68,7 +68,7 @@ export default function Tasks() {
     completedCount,
     totalCount 
   } = useDailyTasks(selectedDate);
-  const [newTaskText, setNewTaskText] = useState(");
+  const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<{
@@ -88,7 +88,7 @@ export default function Tasks() {
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
-  const [newHabitTitle, setNewHabitTitle] = useState(");
+  const [newHabitTitle, setNewHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
@@ -580,8 +580,64 @@ export default function Tasks() {
                 </Button>
               </Card>
             ) : (
-              <> ... 
-              {/* Additional code omitted for brevity */} 
+              <>
+                {habits.length === 0 ? (
+                  showTemplates ? (
+                    <HabitTemplates
+                      onSelect={(title, frequency) => {
+                        setNewHabitTitle(title);
+                        setShowTemplates(false);
+                        setShowAddHabit(true);
+                      }}
+                      onCustom={() => setShowAddHabit(true)}
+                      existingHabits={habits}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Target}
+                      title="No habits yet"
+                      description="Create your first habit to start building momentum"
+                      actionLabel="Add Habit"
+                      onAction={() => setShowAddHabit(true)}
+                    />
+                  )
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">Your Habits</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {habits.length}/5 habits
+                        </p>
+                      </div>
+                      {habits.length < 5 && (
+                        <Button onClick={() => setShowAddHabit(true)} size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {habits.map((habit) => {
+                        const isCompleted = completions.some(c => c.habit_id === habit.id);
+                        return (
+                          <HabitCard
+                            key={habit.id}
+                            id={habit.id}
+                            title={habit.title}
+                            currentStreak={habit.current_streak || 0}
+                            longestStreak={habit.longest_streak || 0}
+                            completedToday={isCompleted}
+                            difficulty={habit.difficulty}
+                            onComplete={() => toggleHabitMutation.mutate({ habitId: habit.id, isCompleted })}
+                          />
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </>
             )}
 
             {habits.length === 5 && !showAddHabit && (
