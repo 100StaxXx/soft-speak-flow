@@ -55,8 +55,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
         if (countError) throw countError;
 
-        if (existingTasks && existingTasks.length >= 3) {
-          throw new Error('Maximum 3 tasks per day');
+        if (existingTasks && existingTasks.length >= 4) {
+          throw new Error('Maximum 4 tasks per day');
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -146,7 +146,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const canAddMore = tasks.length < 3;
+  const canAddMore = tasks.length < 4;
 
   return {
     tasks,
