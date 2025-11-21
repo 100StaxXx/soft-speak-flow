@@ -173,11 +173,13 @@ export const AppWalkthrough = () => {
 
       if (!isWalkthroughCompleted) {
         console.log('[AppWalkthrough] Starting walkthrough after onboarding');
+        // Reset to step 0 before starting
+        setStepIndex(0);
         // Wait for navigation and DOM to settle with longer timeout for safety
         await new Promise(resolve => setTimeout(resolve, 1200));
         const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
         if (found) {
-          console.log('[AppWalkthrough] All components ready, starting tour');
+          console.log('[AppWalkthrough] All components ready, starting tour from step 0');
           // Scroll to top before starting the walkthrough with slight delay
           await new Promise(resolve => setTimeout(resolve, 100));
           window.scrollTo({ top: 0, behavior: 'instant' });
