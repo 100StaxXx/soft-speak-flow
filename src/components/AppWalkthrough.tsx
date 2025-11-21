@@ -127,111 +127,47 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    // Check if we just completed onboarding
-    const justCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
-    
-    if (justCompletedOnboarding) {
-      console.log('[AppWalkthrough] ✅ Just completed onboarding, starting walkthrough immediately!');
-      // Clear the flag
-      localStorage.removeItem('onboardingComplete');
+    const checkWalkthroughStatus = async () => {
+      // First check if walkthrough was already completed
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user.id)
+        .maybeSingle();
       
-      // Wait for the check-in form to render, then start
-      const startWalkthrough = async () => {
-        const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
-        if (found) {
-          console.log('[AppWalkthrough] Target element found, starting walkthrough!');
-          setRun(true);
-        } else {
-          console.warn('[AppWalkthrough] Target element not found after onboarding');
-        }
-      };
-      startWalkthrough();
-      return;
-    }
+      const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
+      const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
+      
+      if (isWalkthroughCompleted) {
+        console.log('[AppWalkthrough] Walkthrough already completed, clearing any stale flags');
+        localStorage.removeItem('onboardingComplete');
+        return;
+      }
 
-    // Otherwise check database to see if we should run the walkthrough
-    const checkAndStartTutorial = async () => {
-      try {
-        console.log('[AppWalkthrough] Fetching profile for user:', user.id);
-
-        const today = new Date().toISOString().split('T')[0];
-
-        // Run both queries in parallel for faster loading
-        const [profileResult, checkInResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('onboarding_data, onboarding_completed')
-            .eq('id', user.id)
-            .maybeSingle(),
-          supabase
-            .from('daily_check_ins')
-            .select('completed_at')
-            .eq('user_id', user.id)
-            .eq('check_in_type', 'morning')
-            .eq('check_in_date', today)
-            .maybeSingle()
-        ]);
-
-        const { data: profile, error } = profileResult;
-
-        if (error) {
-          console.error('[AppWalkthrough] Profile fetch error:', error);
-          return;
-        }
-
-        if (!profile) {
-          console.error('[AppWalkthrough] No profile found');
-          return;
-        }
-
-        console.log('[AppWalkthrough] Raw profile data:', profile);
-
-        // Check if walkthrough is completed
-        const walkthroughData = profile.onboarding_data as { walkthrough_completed?: boolean } | null;
-        const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
-
-        const isCheckInComplete = !!checkInResult.data?.completed_at;
-
-        console.log('[AppWalkthrough] Status check:', {
-          onboarding_completed: profile.onboarding_completed,
-          walkthrough_completed: isWalkthroughCompleted,
-          checkin_completed: isCheckInComplete,
-          full_onboarding_data: walkthroughData
-        });
-
-        // Only run if:
-        // 1. Onboarding is complete
-        // 2. Walkthrough is NOT complete
-        // 3. Morning check-in is NOT complete (so the form is visible)
-        if (profile.onboarding_completed === true && !isWalkthroughCompleted && !isCheckInComplete) {
-          console.log('[AppWalkthrough] ✅ Starting walkthrough!');
-          // Wait for the target element to be ready before starting
-          const startWalkthrough = async () => {
-            const found = await waitForSelector('[data-tour="checkin-mood"]', 3000);
-            if (found) {
-              console.log('[AppWalkthrough] Target element found, starting now!');
-              setRun(true);
-            } else {
-              console.warn('[AppWalkthrough] Target element not found, retrying...');
-              setTimeout(startWalkthrough, 500);
-            }
-          };
-          startWalkthrough();
-        } else {
-          console.log('[AppWalkthrough] ❌ Not starting:', {
-            reason: !profile.onboarding_completed 
-              ? 'onboarding not complete' 
-              : isWalkthroughCompleted 
-              ? 'walkthrough already done'
-              : 'check-in already complete'
-          });
-        }
-      } catch (error) {
-        console.error('[AppWalkthrough] Error:', error);
+      // Check if we just completed onboarding
+      const justCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
+      
+      if (justCompletedOnboarding) {
+        console.log('[AppWalkthrough] ✅ Just completed onboarding, starting walkthrough immediately!');
+        // Clear the flag
+        localStorage.removeItem('onboardingComplete');
+        
+        // Wait for the check-in form to render, then start
+        const startWalkthrough = async () => {
+          const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
+          if (found) {
+            console.log('[AppWalkthrough] Target element found, starting walkthrough!');
+            setRun(true);
+          } else {
+            console.warn('[AppWalkthrough] Target element not found after onboarding');
+          }
+        };
+        startWalkthrough();
+        return;
       }
     };
 
-    checkAndStartTutorial();
+    checkWalkthroughStatus();
   }, [user, session, waitForSelector]);
 
   // Listen for quest creation to advance from step 4 -> 5
