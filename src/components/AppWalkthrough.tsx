@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -46,6 +46,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: "top",
     disableBeacon: true,
     spotlightClicks: true,
+    id: 'companion-show',
     floaterProps: {
       hideArrow: true,
     },
@@ -61,7 +62,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         pointerEvents: 'auto' as const,
       }
     }
-  },
+  } as Step & { id: string },
 
   // Step 4: TASKS PAGE - Create quest instructions
   {
@@ -70,6 +71,7 @@ const WALKTHROUGH_STEPS: Step[] = [
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
+    id: 'tasks-create-quest',
     floaterProps: {
       disableAnimation: true,
       hideArrow: false,
@@ -107,7 +109,7 @@ const WALKTHROUGH_STEPS: Step[] = [
         pointerEvents: 'none',
       }
     }
-  },
+  } as Step & { id: string },
   // Step 5: Final congratulations
   {
     target: 'body',
@@ -130,6 +132,7 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
+  const timeoutsRef = useRef<number[]>([]);
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
@@ -147,7 +150,7 @@ export const AppWalkthrough = () => {
         return Math.random() * (max - min) + min;
       }
 
-      const interval: any = setInterval(function() {
+      const interval = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
 
         if (timeLeft <= 0) {
@@ -218,47 +221,73 @@ export const AppWalkthrough = () => {
   }, []);
 
 
+  // Helper to schedule timeouts and track them for cleanup
+  const scheduleTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeoutId = window.setTimeout(callback, delay);
+    timeoutsRef.current.push(timeoutId);
+    return timeoutId;
+  }, []);
+
+  // Clear all pending timeouts
+  const clearAllTimeouts = useCallback(() => {
+    timeoutsRef.current.forEach(id => window.clearTimeout(id));
+    timeoutsRef.current = [];
+  }, []);
+
   const isMobile = useIsMobile();
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
-      // Adjust quest creation step (step 4)
-      base[4] = {
-        ...base[4],
-        target: '[data-tour="today-quests-header"]',
-        placement: 'top',
-        floaterProps: {
-          ...((base[4] as any).floaterProps || {}),
-          offset: 0,
-        },
-        styles: {
-          ...((base[4] as any).styles || {}),
-          tooltip: {
-            ...(((base[4] as any).styles?.tooltip) || {}),
-            marginTop: undefined,
-            marginBottom: '8px',
-            pointerEvents: 'none',
+      // Adjust quest creation step (step 4) using findIndex
+      const tasksStepIdx = base.findIndex(s => 
+        (s as Step & { id?: string }).id === 'tasks-create-quest' || 
+        (s as Step).target === '[data-tour="today-quests-header"]'
+      );
+      if (tasksStepIdx !== -1) {
+        const tasksStep = base[tasksStepIdx] as Step & { floaterProps?: { styles?: Record<string, unknown> }, styles?: { tooltip?: Record<string, unknown> } };
+        base[tasksStepIdx] = {
+          ...tasksStep,
+          target: '[data-tour="today-quests-header"]',
+          placement: 'top',
+          floaterProps: {
+            ...(tasksStep.floaterProps || {}),
+            offset: 0,
           },
-        },
-      } as Step;
+          styles: {
+            ...(tasksStep.styles || {}),
+            tooltip: {
+              ...(tasksStep.styles?.tooltip || {}),
+              marginTop: undefined,
+              marginBottom: '8px',
+              pointerEvents: 'none',
+            },
+          },
+        } as Step;
+      }
 
-      // Adjust companion page step (step 3) - target XP bar below image
-      base[3] = {
-        ...base[3],
-        target: '[data-tour="companion-tooltip-anchor"]',
-        placement: 'top',
-      } as Step;
+      // Adjust companion page step (step 3) using findIndex
+      const companionStepIdx = base.findIndex(s => 
+        (s as Step & { id?: string }).id === 'companion-show' || 
+        (s as Step).target === '[data-tour="companion-tooltip-anchor"]'
+      );
+      if (companionStepIdx !== -1) {
+        base[companionStepIdx] = {
+          ...base[companionStepIdx],
+          target: '[data-tour="companion-tooltip-anchor"]',
+          placement: 'top',
+        } as Step;
+      }
     }
     return base;
   }, [isMobile]);
 
-  // Utility: wait for a selector to exist before advancing
-  const waitForSelector = useCallback((selector: string, timeout = 5000) => {
-    return new Promise<void>((resolve) => {
+  // Utility: wait for a selector to exist before advancing, returns boolean indicating success
+  const waitForSelector = useCallback((selector: string, timeout = 5000): Promise<boolean> => {
+    return new Promise((resolve) => {
       const start = Date.now();
       const check = () => {
-        if (document.querySelector(selector)) return resolve();
-        if (Date.now() - start > timeout) return resolve();
+        if (document.querySelector(selector)) return resolve(true);
+        if (Date.now() - start > timeout) return resolve(false);
         requestAnimationFrame(check);
       };
       check();
@@ -284,10 +313,10 @@ export const AppWalkthrough = () => {
       // Wait for element to exist
       const elementFound = await waitForSelector(target, 6000);
 
-      // If element still not found after timeout, log warning but continue
-      const element = document.querySelector(target);
-      if (!element) {
-        console.warn(`Tutorial element not found: ${target} for step ${idx}`);
+      // If element not found after timeout, log warning and fallback
+      if (!elementFound) {
+        console.warn(`Tutorial element not found: ${target} for step ${idx}. Continuing with fallback.`);
+        // Element not found - step will use body as fallback if needed
       }
     }
 
@@ -312,7 +341,7 @@ export const AppWalkthrough = () => {
         if (companion && location.pathname === '/') {
           // Wait for initial step target to be present, then start
           await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
-          setTimeout(() => {
+          scheduleTimeout(() => {
             localStorage.setItem('appWalkthroughActive', 'true');
             setRun(true);
             // Emit initial tutorial step
@@ -325,7 +354,7 @@ export const AppWalkthrough = () => {
     };
 
     checkWalkthroughStatus();
-  }, [user, session, location.pathname, waitForSelector, steps]);
+  }, [user, session, location.pathname, waitForSelector, steps, scheduleTimeout]);
 
 
   // Listen for mood selection to advance from step 0 to step 1
@@ -333,13 +362,17 @@ export const AppWalkthrough = () => {
     const handleMoodSelected = () => {
       if (run && stepIndex === 0) {
         haptics.light();
-        setTimeout(() => safeSetStep(1), 300);
+        scheduleTimeout(() => {
+          if (run && stepIndex === 0) {
+            safeSetStep(1);
+          }
+        }, 300);
       }
     };
 
     window.addEventListener('mood-selected', handleMoodSelected);
     return () => window.removeEventListener('mood-selected', handleMoodSelected);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, scheduleTimeout]);
 
   // Listen for check-in completion
   useEffect(() => {
@@ -347,13 +380,17 @@ export const AppWalkthrough = () => {
       if (run && stepIndex <= 1) {
         haptics.success();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
+        scheduleTimeout(() => {
+          if (run && stepIndex <= 1) {
+            safeSetStep(2); // Go to XP celebration, then companion
+          }
+        }, 500);
       }
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, scheduleTimeout]);
 
   // Listen for mission completion
   useEffect(() => {
@@ -384,33 +421,48 @@ export const AppWalkthrough = () => {
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(5), 500);
+        scheduleTimeout(() => {
+          if (stepIndex === 4) {
+            safeSetStep(5);
+          }
+        }, 500);
       }
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     return () => window.removeEventListener('evolution-complete', handleEvolutionComplete);
-  }, [stepIndex, safeSetStep]);
+  }, [stepIndex, safeSetStep, scheduleTimeout]);
 
 
   // Listen for route changes to progress tutorial
   useEffect(() => {
     if (!run) return;
 
+    // Step 2 -> 3: User navigated to companion page
     if (stepIndex === 2 && location.pathname === '/companion') {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
-      setTimeout(() => {
-        safeSetStep(3);
+      scheduleTimeout(() => {
+        if (run && stepIndex === 2) {
+          safeSetStep(3);
+        }
       }, 100);
-    } else if (stepIndex === 3 && location.pathname === '/tasks') {
+    } 
+    // Step 3 -> 4: User navigated to tasks page
+    else if (stepIndex === 3 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
-      setTimeout(() => {
-        safeSetStep(4);
+      scheduleTimeout(() => {
+        if (run && stepIndex === 3) {
+          safeSetStep(4);
+        }
       }, 100);
     }
-  }, [location.pathname, stepIndex, run, safeSetStep]);
+    // Step 4: User navigated back to companion (stay on step 4, don't break)
+    else if (stepIndex === 4 && location.pathname === '/companion') {
+      // User navigated back - no action needed, stay on current step
+    }
+  }, [location.pathname, stepIndex, run, safeSetStep, scheduleTimeout]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
@@ -429,7 +481,7 @@ export const AppWalkthrough = () => {
         return Math.random() * (max - min) + min;
       }
 
-      const interval: any = setInterval(function() {
+      const interval = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
 
         if (timeLeft <= 0) {
@@ -472,6 +524,19 @@ export const AppWalkthrough = () => {
     }
   }, []);
 
+  // Clear timeouts on unmount or when run changes
+  useEffect(() => {
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
+
+  useEffect(() => {
+    if (!run) {
+      clearAllTimeouts();
+    }
+  }, [run, clearAllTimeouts]);
+
   // Lock body scroll during tutorial but allow pointer events for spotlight clicks
   useEffect(() => {
     if (run) {
@@ -494,6 +559,9 @@ export const AppWalkthrough = () => {
   }, [run]);
 
   if (!user || !session) return null;
+
+  // Define interactive steps where overlay should be disabled
+  const interactiveSteps = [2, 3, 4, 5];
 
   return (
     <Joyride
@@ -563,7 +631,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5}
+      disableOverlay={interactiveSteps.includes(stepIndex)}
       locale={{
         back: 'Back',
         close: '',
