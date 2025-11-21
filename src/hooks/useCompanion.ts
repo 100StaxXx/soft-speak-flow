@@ -246,7 +246,29 @@ export const useCompanion = () => {
       xpAmount: number;
       metadata?: Record<string, any>;
     }) => {
-      if (!user || !companion) throw new Error("No companion found");
+      if (!user) throw new Error("No user found");
+      
+      // CRITICAL: Ensure companion is loaded before awarding XP
+      if (!companion) {
+        console.warn('Companion not loaded yet, retrying...');
+        // Refetch companion data
+        await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const freshCompanion = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+        if (!freshCompanion) {
+          throw new Error("No companion found after retry");
+        }
+        // Use fresh companion for calculation
+        const companionToUse = freshCompanion;
+        
+        // Prevent duplicate XP awards
+        if (xpInProgress.current) {
+          console.warn('XP award already in progress, skipping duplicate');
+          return { shouldEvolve: false, newStage: companionToUse.current_stage, newXP: companionToUse.current_xp };
+        }
+        
+        return await performXPAward(companionToUse, xpAmount, eventType, metadata, user);
+      }
       
       // Prevent duplicate XP awards
       if (xpInProgress.current) {
@@ -254,53 +276,7 @@ export const useCompanion = () => {
         return { shouldEvolve: false, newStage: companion.current_stage, newXP: companion.current_xp };
       }
       
-      xpInProgress.current = true;
-
-      const newXP = companion.current_xp + xpAmount;
-      
-      // Check if evolution is needed
-      const currentThreshold = EVOLUTION_THRESHOLDS[companion.current_stage as keyof typeof EVOLUTION_THRESHOLDS];
-      const nextStage = companion.current_stage + 1;
-      const nextThreshold = EVOLUTION_THRESHOLDS[nextStage as keyof typeof EVOLUTION_THRESHOLDS];
-      
-      console.log('[XP Award Debug]', {
-        currentStage: companion.current_stage,
-        currentXP: companion.current_xp,
-        xpAmount,
-        newXP,
-        currentThreshold,
-        nextStage,
-        nextThreshold,
-        willEvolve: nextThreshold && newXP >= nextThreshold
-      });
-      
-      let shouldEvolve = false;
-      let newStage = companion.current_stage;
-      
-      if (nextThreshold && newXP >= nextThreshold) {
-        shouldEvolve = true;
-        newStage = nextStage;
-        console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
-      }
-
-      // Record XP event
-      await supabase.from("xp_events").insert({
-        user_id: user.id,
-        companion_id: companion.id,
-        event_type: eventType,
-        xp_earned: xpAmount,
-        event_metadata: metadata,
-      });
-
-      // Update companion XP
-      const { error: updateError } = await supabase
-        .from("user_companion")
-        .update({ current_xp: newXP })
-        .eq("id", companion.id);
-
-      if (updateError) throw updateError;
-
-      return { shouldEvolve, newStage, newXP };
+      return await performXPAward(companion, xpAmount, eventType, metadata, user);
     },
     onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
       xpInProgress.current = false;
@@ -323,6 +299,64 @@ export const useCompanion = () => {
       toast.error("Failed to award XP. Please try again.");
     },
   });
+
+  // Helper function to perform XP award logic
+  const performXPAward = async (
+    companionData: Companion,
+    xpAmount: number,
+    eventType: string,
+    metadata: Record<string, any>,
+    currentUser: typeof user
+  ) => {
+    xpInProgress.current = true;
+
+    const newXP = companionData.current_xp + xpAmount;
+    
+    // Check if evolution is needed
+    const currentThreshold = EVOLUTION_THRESHOLDS[companionData.current_stage as keyof typeof EVOLUTION_THRESHOLDS];
+    const nextStage = companionData.current_stage + 1;
+    const nextThreshold = EVOLUTION_THRESHOLDS[nextStage as keyof typeof EVOLUTION_THRESHOLDS];
+    
+    console.log('[XP Award Debug]', {
+      currentStage: companionData.current_stage,
+      currentXP: companionData.current_xp,
+      xpAmount,
+      newXP,
+      currentThreshold,
+      nextStage,
+      nextThreshold,
+      willEvolve: nextThreshold && newXP >= nextThreshold
+    });
+    
+    let shouldEvolve = false;
+    let newStage = companionData.current_stage;
+    
+    if (nextThreshold && newXP >= nextThreshold) {
+      shouldEvolve = true;
+      newStage = nextStage;
+      console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
+    }
+
+    // Record XP event
+    await supabase.from("xp_events").insert({
+      user_id: currentUser!.id,
+      companion_id: companionData.id,
+      event_type: eventType,
+      xp_earned: xpAmount,
+      event_metadata: metadata,
+    });
+
+    // Update companion XP
+    const { error: updateError } = await supabase
+      .from("user_companion")
+      .update({ current_xp: newXP })
+      .eq("id", companionData.id);
+
+    if (updateError) throw updateError;
+
+    return { shouldEvolve, newStage, newXP };
+  };
+
 
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
