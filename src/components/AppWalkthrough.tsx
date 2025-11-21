@@ -66,7 +66,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 4: TASKS PAGE - Create quest instructions
   {
     target: '[data-tour="today-quests-header"]',
-    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (30 total!) - the one thing that moves your day forward!",
+    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Easy difficulty (5 XP), tap Add Quest, then tap 'Set as Main Quest' in the popup. This earns you 2x XP (10 total!) and triggers your companion's first evolution!",
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
@@ -111,7 +111,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 5: Final congratulations
   {
     target: 'body',
-    content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 30 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
+    content: "🎉 Congratulations! You've completed your first day! You earned 15 XP and your companion evolved to Stage 1 (Cracking Awakening)! Continue completing quests (max 3/day) and building habits (max 2 active) to help them grow. Your journey has begun! 🚀",
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
