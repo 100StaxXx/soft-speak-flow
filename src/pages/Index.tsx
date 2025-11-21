@@ -13,7 +13,6 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
-import { OnboardingTour } from "@/components/OnboardingTour";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import dariusImage from "@/assets/darius-sage.png";
 import novaImage from "@/assets/nova-sage.png";
@@ -243,9 +242,6 @@ const Index = () => {
         </div>
       </PageTransition>
       <BottomNav />
-      <ErrorBoundary>
-        <OnboardingTour />
-      </ErrorBoundary>
     </>
   );
 };
