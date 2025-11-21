@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getHabitXP } from "@/config/xpRewards";
 import {
   Drawer,
   DrawerClose,
@@ -181,7 +182,7 @@ export default function Tasks() {
         // Only award XP if this is the FIRST completion today
         if (!existingCompletion) {
           const habit = habits.find(h => h.id === habitId);
-          const xpAmount = habit?.difficulty === 'easy' ? 5 : habit?.difficulty === 'hard' ? 20 : 10;
+          const xpAmount = habit?.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
           
           // Update companion attributes

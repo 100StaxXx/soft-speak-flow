@@ -1,17 +1,26 @@
 /**
  * XP System Configuration & Reference
- * 
- * All XP rewards are centralized in useXPRewards hook.
- * Use the hook helpers instead of hard-coding XP values.
- * 
- * XP VALUES (Difficulty-Based System):
+ *
+ * All XP rewards are centralized in @/config/xpRewards.ts
+ * Import from there instead of hard-coding XP values.
+ *
+ * XP VALUES:
+ *
+ * QUESTS (One-time missions, max 3/day):
+ * - Easy Quest: 5 XP
+ * - Medium Quest: 15 XP
+ * - Hard Quest: 25 XP
+ * - Main Quest Multiplier: 2x
+ *
+ * HABITS (Recurring daily activities, max 2 active):
  * - Easy Habit: 5 XP
  * - Medium Habit: 10 XP
  * - Hard Habit: 20 XP
  * - All Habits Complete (daily bonus): 10 XP
+ *
+ * SYSTEM ACTIVITIES:
  * - Check-in: 5 XP
  * - Pep Talk Listened (80%+): 3 XP
- * - Daily Missions: 5-20 XP (varies by mission)
  * - Streak Milestone: 15 XP
  * 
  * EVOLUTION THRESHOLDS:
