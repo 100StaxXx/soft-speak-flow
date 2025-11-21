@@ -38,7 +38,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
     mutationFn: async ({ taskText, difficulty, taskDate: customDate, isMainQuest }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard'; taskDate?: string; isMainQuest?: boolean; }) => {
       // Re-check latest tasks to mitigate races
       await queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, customDate || taskDate] });
-      const latest = queryClient.getQueryData(['daily-tasks', user?.id, customDate || taskDate]) || [];
+      const latest = queryClient.getQueryData(['daily-tasks', user?.id, customDate || taskDate]) as any[] || [];
       if (latest.length >= 3) {
         throw new Error('Maximum 3 tasks per day');
       }
@@ -84,7 +84,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
         // awardCustomXP should be server-validated
-        const { awardCustomXP } = await import("@/hooks/useXPRewards");
+        const { useXPRewards } = await import("@/hooks/useXPRewards");
+        const { awardCustomXP } = useXPRewards();
         await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
