@@ -180,7 +180,7 @@ export const AppWalkthrough = () => {
           console.log('[AppWalkthrough] ✅ Starting walkthrough!');
           setTimeout(() => {
             setRun(true);
-          }, 800);
+          }, 300);
         } else {
           console.log('[AppWalkthrough] ❌ Not starting:', {
             reason: !profile.onboarding_completed 
