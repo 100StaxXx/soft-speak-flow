@@ -175,25 +175,25 @@ export const AppWalkthrough = () => {
 
     const checkForSubmit = () => {
       const intentionField = document.querySelector('[data-tour="checkin-intention"]') as HTMLTextAreaElement | null;
-      if (intentionField && intentionField.value.trim().length > 0) {
-        const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]');
-        if (submitButton && !(submitButton as HTMLButtonElement).disabled) {
-          const observer = new MutationObserver(() => {
-            if ((submitButton as HTMLButtonElement).disabled) {
-              observer.disconnect();
-              createTrackedTimeout(async () => {
-                confetti({
-                  particleCount: 100,
-                  spread: 70,
-                  origin: { y: 0.6 }
-                });
-                await safeSetStep(STEP_INDEX.XP_CELEBRATION);
-              }, 1500);
-            }
-          });
-          observer.observe(submitButton, { attributes: true });
+      if (!intentionField || !intentionField.value || intentionField.value.trim().length === 0) return;
+
+      const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+      if (!submitButton || submitButton.disabled) return;
+
+      const observer = new MutationObserver(() => {
+        if (submitButton.disabled) {
+          observer.disconnect();
+          createTrackedTimeout(async () => {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+            await safeSetStep(STEP_INDEX.XP_CELEBRATION);
+          }, 1500);
         }
-      }
+      });
+      observer.observe(submitButton, { attributes: true });
     };
 
     const intervalId = createTrackedInterval(checkForSubmit, 500);
