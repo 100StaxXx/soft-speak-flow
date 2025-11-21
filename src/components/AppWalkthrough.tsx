@@ -230,7 +230,6 @@ export const AppWalkthrough = () => {
       if (questStepIndex !== -1) {
         base[questStepIndex] = {
           ...base[questStepIndex],
-          target: '[data-tour="today-quests-header"]',
           placement: 'top',
           floaterProps: {
             ...((base[questStepIndex] as any).floaterProps || {}),
@@ -253,7 +252,6 @@ export const AppWalkthrough = () => {
       if (companionStepIndex !== -1) {
         base[companionStepIndex] = {
           ...base[companionStepIndex],
-          target: '[data-tour="companion-tooltip-anchor"]',
           placement: 'top',
         } as Step;
       }
@@ -283,11 +281,7 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    const step = steps[idx] as Step | undefined;
-    if (!step) {
-      console.warn(`Tutorial step ${idx} does not exist. Total steps: ${steps.length}`);
-      return;
-    }
+    const step = steps[idx];
 
     // Emit custom event for BottomNav FIRST so navigation becomes clickable immediately
     window.dispatchEvent(new CustomEvent('tutorial-step-change', {
