@@ -120,13 +120,36 @@ export const AppWalkthrough = () => {
     setStepIndex(idx);
   }, [steps, waitForSelector]);
 
-  // Initialize tutorial state from DB
+  // Initialize tutorial state - listen for onboarding completion flag
   useEffect(() => {
     if (!user || !session) {
       console.log('[AppWalkthrough] No user/session yet');
       return;
     }
 
+    // Check if we just completed onboarding
+    const justCompletedOnboarding = localStorage.getItem('onboardingComplete') === 'true';
+    
+    if (justCompletedOnboarding) {
+      console.log('[AppWalkthrough] ✅ Just completed onboarding, starting walkthrough immediately!');
+      // Clear the flag
+      localStorage.removeItem('onboardingComplete');
+      
+      // Wait for the check-in form to render, then start
+      const startWalkthrough = async () => {
+        const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
+        if (found) {
+          console.log('[AppWalkthrough] Target element found, starting walkthrough!');
+          setRun(true);
+        } else {
+          console.warn('[AppWalkthrough] Target element not found after onboarding');
+        }
+      };
+      startWalkthrough();
+      return;
+    }
+
+    // Otherwise check database to see if we should run the walkthrough
     const checkAndStartTutorial = async () => {
       try {
         console.log('[AppWalkthrough] Fetching profile for user:', user.id);
@@ -209,7 +232,7 @@ export const AppWalkthrough = () => {
     };
 
     checkAndStartTutorial();
-  }, [user, session]);
+  }, [user, session, waitForSelector]);
 
   // Listen for quest creation to advance from step 4 -> 5
   useEffect(() => {
