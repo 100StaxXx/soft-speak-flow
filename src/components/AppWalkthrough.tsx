@@ -107,6 +107,9 @@ export const AppWalkthrough = () => {
       return;
     }
 
+    // Scroll to top when advancing to a new step
+    window.scrollTo(0, 0);
+
     window.dispatchEvent(new CustomEvent('tutorial-step-change', { detail: { step: idx } }));
 
     const target = step.target as string | undefined;
