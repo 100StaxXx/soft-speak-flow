@@ -80,7 +80,7 @@ You agree not to:
 ## 8. Intellectual Property Rights
 
 ### 8.1 Our Rights
-The App and its original content, features, and functionality are owned by Alil Revolution and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
+The App and its original content, features, and functionality are owned by R-Evoltution LLC and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
 
 ### 8.2 Limited License
 We grant you a limited, non-exclusive, non-transferable, revocable license to use the App for personal, non-commercial purposes, subject to these Terms.
@@ -90,11 +90,12 @@ If you provide us with feedback or suggestions about the App, we may use and sha
 
 ## 9. Premium Features and Payments
 
-### 9.1 Subscription Services
-- Some features may require a paid subscription
+### 9.1 Subscription Services and In-App Purchases
+- Some features may require a paid subscription or in-app purchases
 - Subscription fees are charged in advance on a recurring basis (monthly or annually)
+- In-app purchases provide one-time access to premium features or content
 - All fees are in US Dollars unless otherwise stated
-- Fees are non-refundable except as required by law
+- Fees are non-refundable except as required by law or platform policy (Apple App Store, Google Play Store)
 
 ### 9.2 Payment Processing
 - Payments are processed securely through Stripe
@@ -108,8 +109,8 @@ If you provide us with feedback or suggestions about the App, we may use and sha
 - No refunds are provided for partial subscription periods
 
 ### 9.4 Price Changes
-- We reserve the right to change subscription prices with 30 days' notice
-- Price changes will take effect at the start of your next billing cycle
+- We reserve the right to change subscription prices and in-app purchase prices with 30 days' notice
+- Price changes for subscriptions will take effect at the start of your next billing cycle
 - Continued use after a price change constitutes acceptance of the new price
 
 ## 10. Disclaimer of Warranties
@@ -133,7 +134,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW:
 
 ## 12. Indemnification
 
-You agree to indemnify, defend, and hold harmless Alil Revolution, its officers, directors, employees, and agents from any claims, damages, liabilities, costs, and expenses (including legal fees) arising from:
+You agree to indemnify, defend, and hold harmless R-Evoltution LLC, its officers, directors, employees, and agents from any claims, damages, liabilities, costs, and expenses (including legal fees) arising from:
 - Your use of the App
 - Your violation of these Terms
 - Your violation of any rights of another party
@@ -167,7 +168,7 @@ We reserve the right to modify these Terms at any time. We will:
 ## 15. Governing Law and Disputes
 
 ### 15.1 Governing Law
-These Terms shall be governed by and construed in accordance with the laws of [Your State/Country], without regard to conflict of law provisions.
+These Terms shall be governed by and construed in accordance with the laws of the State of New Mexico, United States of America, without regard to conflict of law provisions.
 
 ### 15.2 Dispute Resolution
 Before filing any formal legal action, you agree to first contact us to attempt to resolve any disputes informally.
@@ -185,6 +186,8 @@ The App may contain links to third-party websites or services that are not owned
 Third-party services include:
 - Supabase (data storage and authentication)
 - Stripe (payment processing)
+- Artificial Intelligence services (for mentor chat and personalized content generation)
+- Mobile app platforms (Apple App Store, Google Play Store)
 - Other integrated services
 
 ## 17. Privacy
@@ -193,7 +196,7 @@ Your privacy is important to us. Please review our Privacy Policy, which explain
 
 ## 18. Entire Agreement
 
-These Terms, together with our Privacy Policy, constitute the entire agreement between you and Alil Revolution regarding the use of the App.
+These Terms, together with our Privacy Policy, constitute the entire agreement between you and R-Evoltution LLC regarding the use of the App.
 
 ## 19. Severability
 

@@ -38,6 +38,7 @@ Welcome to Soft Speak Flow ("we," "our," or "us"). We respect your privacy and a
 - Payment method details (processed securely through Stripe)
 - Transaction history
 - Subscription status
+- In-app purchase records
 
 ### 2.2 Automatically Collected Information
 
@@ -84,14 +85,16 @@ We use your information for the following purposes:
 ### 3.2 To Personalize Your Experience
 - Customize content based on your preferences and activity
 - Provide relevant pep talks, quotes, and mentor guidance
+- Generate AI-powered mentor responses tailored to your needs
 - Adapt difficulty and challenge levels
 - Remember your settings and preferences
 
 ### 3.3 To Process Transactions
-- Process subscription payments
+- Process subscription payments and in-app purchases
 - Maintain billing records
 - Prevent fraud and unauthorized access
 - Provide receipts and transaction history
+- Manage refund requests in accordance with platform policies
 
 ### 3.4 To Communicate with You
 - Send important updates about the App
@@ -125,9 +128,20 @@ We share information with third-party service providers who perform services on 
 - Privacy Policy: [https://supabase.com/privacy](https://supabase.com/privacy)
 
 **Stripe** (Payment Processing)
-- Processes subscription payments securely
+- Processes subscription payments and in-app purchases securely
 - Stores payment method information
 - Privacy Policy: [https://stripe.com/privacy](https://stripe.com/privacy)
+
+**Artificial Intelligence Service Providers**
+- Process mentor chat messages and generate personalized responses
+- Analyze user inputs to provide relevant motivational content
+- We use AI services that do not retain or train on your personal data
+- All data sent to AI providers is anonymized where possible
+
+**Mobile App Platforms** (Apple App Store, Google Play Store)
+- Process in-app purchases and subscription management
+- Provide app distribution and update services
+- Subject to their respective privacy policies
 
 **Cloud Hosting Services**
 - Host and deliver app content
@@ -160,6 +174,7 @@ We retain your information for as long as necessary to:
 **Specific Retention Periods:**
 - Account data: Retained while your account is active, plus 30 days after deletion
 - Wellness data: Retained while your account is active, deleted upon account deletion
+- AI chat conversations: Retained for 90 days for quality improvement, then deleted
 - Transaction records: Retained for 7 years for legal and tax compliance
 - Analytics data: Aggregated and anonymized after 2 years
 - Support communications: Retained for 3 years
@@ -243,7 +258,7 @@ If you are located in the European Economic Area (EEA), you have additional righ
 
 ### 10.1 Legal Basis for Processing
 We process your personal data based on:
-- **Consent:** You have given consent for processing
+- **Consent:** You have given consent for processing (e.g., AI-powered features, marketing communications)
 - **Contract:** Processing is necessary to provide our services
 - **Legal Obligation:** Processing is required by law
 - **Legitimate Interest:** Processing is necessary for our legitimate business interests
@@ -256,6 +271,11 @@ We process your personal data based on:
 
 ### 10.3 Data Protection Officer
 For GDPR-related inquiries, contact: alilrevolution@gmail.com
+
+**Company Information:**
+R-Evoltution LLC
+Email: alilrevolution@gmail.com
+Jurisdiction: New Mexico, USA
 
 ## 11. California Privacy Rights (CCPA)
 
@@ -332,7 +352,9 @@ In the unlikely event of a data breach that affects your personal information:
 
 If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices:
 
+**Company:** R-Evoltution LLC
 **Email:** alilrevolution@gmail.com
+**Location:** New Mexico, USA
 
 **Subject Line:** Please include "Privacy Request" in your subject line
 
