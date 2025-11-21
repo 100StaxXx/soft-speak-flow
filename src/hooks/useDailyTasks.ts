@@ -17,6 +17,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { awardCustomXP } = useXPRewards();
 
   const toggleInProgress = useRef(false);
+  const addInProgress = useRef(false);
 
   const taskDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
@@ -38,27 +39,43 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const addTask = useMutation({
     mutationFn: async ({ taskText, difficulty, taskDate: customDate, isMainQuest }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard'; taskDate?: string; isMainQuest?: boolean; }) => {
-      // Re-check latest tasks to mitigate races
-      await queryClient.invalidateQueries({ queryKey: ['daily-tasks', user?.id, customDate || taskDate] });
-      const latest = queryClient.getQueryData(['daily-tasks', user?.id, customDate || taskDate]) as any[] || [];
-      if (latest.length >= 3) {
-        throw new Error('Maximum 3 tasks per day');
+      // Prevent duplicate submissions
+      if (addInProgress.current) {
+        throw new Error('Please wait...');
       }
+      addInProgress.current = true;
 
-      const xpReward = getQuestXP(difficulty);
+      try {
+        // Fetch fresh task count from database directly to avoid race conditions
+        const { data: existingTasks, error: countError } = await supabase
+          .from('daily_tasks')
+          .select('id')
+          .eq('user_id', user!.id)
+          .eq('task_date', customDate || taskDate);
 
-      const { error } = await supabase
-        .from('daily_tasks')
-        .insert({
-          user_id: user!.id,
-          task_text: taskText,
-          difficulty,
-          xp_reward: xpReward,
-          task_date: customDate || taskDate,
-          is_main_quest: isMainQuest ?? false,
-        });
+        if (countError) throw countError;
 
-      if (error) throw error;
+        if (existingTasks && existingTasks.length >= 3) {
+          throw new Error('Maximum 3 tasks per day');
+        }
+
+        const xpReward = getQuestXP(difficulty);
+
+        const { error } = await supabase
+          .from('daily_tasks')
+          .insert({
+            user_id: user!.id,
+            task_text: taskText,
+            difficulty,
+            xp_reward: xpReward,
+            task_date: customDate || taskDate,
+            is_main_quest: isMainQuest ?? false,
+          });
+
+        if (error) throw error;
+      } finally {
+        addInProgress.current = false;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -66,6 +83,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
       window.dispatchEvent(new CustomEvent('task-added'));
     },
     onError: (error: Error) => {
+      addInProgress.current = false;
       toast({ title: "Failed to add task", description: error.message, variant: "destructive" });
     },
   });
