@@ -18,6 +18,7 @@ import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { AchievementsPanel } from "@/components/AchievementsPanel";
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
+import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 
 const Profile = () => {
@@ -229,6 +230,8 @@ const Profile = () => {
                   )}
                 </CardContent>
               </Card>
+
+              {profile?.is_premium && <SubscriptionManagement />}
 
               <Card>
                 <CardHeader>

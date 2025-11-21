@@ -1,21 +1,43 @@
-import { Crown, Check } from "lucide-react";
+import { Crown, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { NativePaymentButton } from "@/components/NativePaymentButton";
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 
 const Premium = () => {
   const navigate = useNavigate();
   const { profile } = useProfile();
+  const { subscription, isTrialing, trialDaysRemaining } = useSubscription();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubscribe = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Payment integration will be available soon. Contact support for early access.",
-    });
+  const handleSubscribe = async (plan: "monthly" | "yearly" = "monthly") => {
+    try {
+      setIsLoading(true);
+
+      const { data, error } = await supabase.functions.invoke("create-subscription-checkout", {
+        body: { plan },
+      });
+
+      if (error) throw error;
+
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      console.error("Subscription error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create checkout session. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   if (profile?.is_premium) {
@@ -28,15 +50,29 @@ const Premium = () => {
           <h1 className="font-display text-4xl text-foreground mb-4">
             You're Premium!
           </h1>
-          <p className="text-muted-foreground mb-8">
+          <p className="text-muted-foreground mb-4">
             Enjoy unlimited access to all content
           </p>
-          <Button
-            onClick={() => navigate("/")}
-            className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-medium px-8 py-6 rounded-3xl shadow-soft"
-          >
-            Back to Home
-          </Button>
+          {isTrialing && (
+            <p className="text-sm text-muted-foreground mb-6 bg-accent/20 p-3 rounded-lg">
+              🎉 Free trial • {trialDaysRemaining} days remaining
+            </p>
+          )}
+          <div className="space-y-3">
+            <Button
+              onClick={() => navigate("/")}
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-medium px-8 py-6 rounded-3xl shadow-soft"
+            >
+              Back to Home
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/profile")}
+              className="w-full"
+            >
+              Manage Subscription
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -117,24 +153,27 @@ const Premium = () => {
               </div>
             </div>
 
-            <NativePaymentButton
-              amount={999}
-              currency="usd"
-              label="Premium Subscription - $9.99"
-              onSuccess={() => {
-                toast({
-                  title: "Welcome to Premium!",
-                  description: "Your subscription is now active.",
-                });
-              }}
-            />
-            
-            <p className="text-xs text-steel text-center mt-2">
-              Supports Apple Pay and Google Pay
+            <Button
+              onClick={() => handleSubscribe("monthly")}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-royal-gold to-gold-accent hover:opacity-90 text-obsidian font-black uppercase tracking-wide py-7 rounded-2xl shadow-glow transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Start 7-Day Free Trial"
+              )}
+            </Button>
+
+            <p className="text-xs text-steel text-center mt-4">
+              Then $9.99/month • Cancel anytime during trial • No charge until trial ends
             </p>
-            
+
             <p className="text-xs text-steel text-center">
-              Cancel anytime. No commitments.
+              Secure payment powered by Stripe
             </p>
           </CardContent>
         </Card>
