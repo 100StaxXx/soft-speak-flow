@@ -386,19 +386,23 @@ export default function Onboarding() {
 
       const currentOnboardingData = (currentProfile?.onboarding_data as any) || {};
 
-      const { error: completeError } = await supabase
+      const { data: updatedProfile, error: completeError } = await supabase
         .from('profiles')
         .update({
           onboarding_completed: true,
           onboarding_step: 'complete',
           onboarding_data: currentOnboardingData
         })
-        .eq('id', user!.id);
+        .eq('id', user!.id)
+        .select()
+        .single();
         
       if (completeError) {
         console.error("Error completing onboarding:", completeError);
         throw completeError;
       }
+      
+      console.log("Onboarding marked complete:", updatedProfile);
       
       // CRITICAL: Invalidate profile cache to force refetch with new data
       await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });
@@ -406,8 +410,8 @@ export default function Onboarding() {
       // Set flag in localStorage for immediate check
       localStorage.setItem('onboardingComplete', 'true');
       
-      // Small delay to ensure cache is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait longer to ensure database update propagates
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("Navigating to home...");
       // Navigate directly to home
