@@ -194,24 +194,47 @@ export const AppWalkthrough = () => {
 
   // Initialize tutorial state from DB
   useEffect(() => {
-    if (!user || !session) return;
+    if (!user || !session) {
+      console.log('[Tutorial] Waiting for user and session...', { hasUser: !!user, hasSession: !!session });
+      return;
+    }
 
     const checkAndStartTutorial = async () => {
       try {
-        const { data: profile } = await supabase
+        console.log('[Tutorial] Checking tutorial status for user:', user.id);
+
+        const { data: profile, error } = await supabase
           .from('profiles')
-          .select('onboarding_data')
+          .select('onboarding_data, onboarding_completed')
           .eq('id', user.id)
           .maybeSingle();
+
+        if (error) {
+          console.error('[Tutorial] Error fetching profile:', error);
+          return;
+        }
+
+        console.log('[Tutorial] Profile data:', {
+          onboarding_data: profile?.onboarding_data,
+          onboarding_completed: profile?.onboarding_completed
+        });
 
         const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
         const isCompleted = walkthroughData?.walkthrough_completed ?? false;
 
+        console.log('[Tutorial] Walkthrough status:', { isCompleted, walkthroughData });
+
         if (!isCompleted) {
-          setRun(true);
+          console.log('[Tutorial] Starting tutorial!');
+          // Small delay to ensure all DOM elements are rendered
+          setTimeout(() => {
+            setRun(true);
+          }, 500);
+        } else {
+          console.log('[Tutorial] Tutorial already completed, skipping');
         }
       } catch (error) {
-        console.error('Error checking tutorial status:', error);
+        console.error('[Tutorial] Error checking tutorial status:', error);
       }
     };
 
@@ -235,7 +258,10 @@ export const AppWalkthrough = () => {
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status, action, index, type, lifecycle } = data;
 
+    console.log('[Tutorial] Joyride callback:', { status, action, index, type, lifecycle });
+
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      console.log('[Tutorial] Tutorial completed or skipped');
       setRun(false);
       if (user) {
         await supabase
@@ -244,6 +270,7 @@ export const AppWalkthrough = () => {
             onboarding_data: { walkthrough_completed: true }
           })
           .eq('id', user.id);
+        console.log('[Tutorial] Saved walkthrough_completed to database');
       }
       return;
     }
@@ -337,6 +364,8 @@ export const AppWalkthrough = () => {
   ];
 
   if (!user) return null;
+
+  console.log('[Tutorial] Rendering Joyride with:', { run, stepIndex, stepsCount: steps.length });
 
   return (
     <Joyride
