@@ -35,7 +35,7 @@ export const WalkthroughTooltip: React.FC<TooltipRenderProps> = ({
   return (
     <div
       {...tooltipProps}
-      className="relative bg-card text-card-foreground rounded-2xl border-[3px] border-primary/80 shadow-2xl p-6 max-w-[85vw] sm:max-w-md"
+      className="relative bg-card text-card-foreground rounded-2xl border-[3px] border-primary/80 shadow-2xl p-6 w-[90vw] max-w-md"
       style={{
         animation: "tooltip-border-pulse 2s ease-in-out infinite",
       }}
