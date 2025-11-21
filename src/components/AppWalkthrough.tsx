@@ -251,7 +251,9 @@ export const AppWalkthrough = () => {
     const navCompanion = document.querySelector('a[href="/companion"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
-        // Scroll to top immediately when entering companion page
+        // Ensure we scroll to top with multiple attempts for reliability on mobile
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        await new Promise(resolve => setTimeout(resolve, 100));
         window.scrollTo({ top: 0, behavior: 'instant' });
         await safeSetStep(STEP_INDEX.COMPANION_VIEW);
       }, DELAYS.POST_NAV_COMPANION);
