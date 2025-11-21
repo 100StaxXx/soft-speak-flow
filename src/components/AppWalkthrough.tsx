@@ -107,9 +107,6 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    // Scroll to top when advancing to a new step
-    window.scrollTo(0, 0);
-
     window.dispatchEvent(new CustomEvent('tutorial-step-change', { detail: { step: idx } }));
 
     const target = step.target as string | undefined;
@@ -120,6 +117,10 @@ export const AppWalkthrough = () => {
         return;
       }
     }
+
+    // Scroll to top when advancing to a new step, with slight delay to ensure DOM is ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    window.scrollTo({ top: 0, behavior: 'instant' });
 
     setStepIndex(idx);
   }, [steps, waitForSelector]);
@@ -177,8 +178,10 @@ export const AppWalkthrough = () => {
         const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
         if (found) {
           console.log('[AppWalkthrough] All components ready, starting tour');
-          // Scroll to top before starting the walkthrough
-          window.scrollTo(0, 0);
+          // Scroll to top before starting the walkthrough with slight delay
+          await new Promise(resolve => setTimeout(resolve, 100));
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          await new Promise(resolve => setTimeout(resolve, 50));
           setRun(true);
         } else {
           console.warn('[AppWalkthrough] Failed to find initial tour element after timeout');
