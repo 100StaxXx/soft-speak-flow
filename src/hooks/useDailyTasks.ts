@@ -97,10 +97,52 @@ export const useDailyTasks = (selectedDate?: Date) => {
     onError: () => { toggleInProgress.current = false; },
   });
 
+  const deleteTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase.from('daily_tasks').delete().eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      toast({ title: "Task deleted successfully!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const setMainQuest = useMutation({
+    mutationFn: async (taskId: string) => {
+      // First, unset all main quests
+      await supabase.from('daily_tasks').update({ is_main_quest: false }).eq('user_id', user!.id).eq('task_date', taskDate);
+      // Then set the selected one
+      const { error } = await supabase.from('daily_tasks').update({ is_main_quest: true }).eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      toast({ title: "Main quest updated!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update main quest", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const completedCount = tasks.filter(t => t.completed).length;
+  const totalCount = tasks.length;
+  const canAddMore = tasks.length < 3;
+
   return {
     tasks,
     isLoading,
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
+    deleteTask: deleteTask.mutate,
+    setMainQuest: setMainQuest.mutate,
+    isAdding: addTask.isPending,
+    isToggling: toggleTask.isPending,
+    canAddMore,
+    completedCount,
+    totalCount,
   };
 };

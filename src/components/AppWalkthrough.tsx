@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Joyride, { Step, CallBackProps, STATUS, TooltipRenderProps } from "react-joyride";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { haptics } from "@/utils/haptics";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +82,15 @@ const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
     styles: { tooltip: { pointerEvents: 'auto' } },
   },
 ];
+
+const STEP_INDEX = {
+  HOME_CHECKIN: 0,
+  CHECKIN_INTENTION: 1,
+  XP_CELEBRATION: 2,
+  COMPANION_VIEW: 3,
+  QUEST_CREATION: 4,
+  FINAL_CONGRATULATIONS: 5,
+} as const;
 
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
@@ -175,4 +184,206 @@ export const AppWalkthrough = () => {
     if (target && target !== 'body') {
       const found = await waitForSelector(target, 6000);
       if (!found) {
-        console.warn(`Tutorial anchor not found for selector \
+        console.warn(`Tutorial anchor not found for selector "${target}". Skipping to next step.`);
+        return;
+      }
+    }
+
+    setStepIndex(idx);
+  }, [steps, waitForSelector]);
+
+  // Initialize tutorial state from DB
+  useEffect(() => {
+    if (!user || !session) return;
+
+    const checkAndStartTutorial = async () => {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
+        const isCompleted = walkthroughData?.walkthrough_completed ?? false;
+
+        if (!isCompleted) {
+          setRun(true);
+        }
+      } catch (error) {
+        console.error('Error checking tutorial status:', error);
+      }
+    };
+
+    checkAndStartTutorial();
+  }, [user, session]);
+
+  // Listen for quest creation to advance from step 4 -> 5
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !waitingForAction) return;
+
+    const handleTaskCreated = () => {
+      console.log('[Tutorial] Quest created! Advancing to final step.');
+      setWaitingForAction(false);
+      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+    };
+
+    window.addEventListener('task-created', handleTaskCreated);
+    return () => window.removeEventListener('task-created', handleTaskCreated);
+  }, [stepIndex, waitingForAction, safeSetStep]);
+
+  const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
+    const { status, action, index, type, lifecycle } = data;
+
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      setRun(false);
+      if (user) {
+        await supabase
+          .from('profiles')
+          .update({
+            onboarding_data: { walkthrough_completed: true }
+          })
+          .eq('id', user.id);
+      }
+      return;
+    }
+
+    // Step 0 -> 1: Check-in selected
+    if (index === STEP_INDEX.HOME_CHECKIN && type === 'step:after') {
+      const intentionField = document.querySelector('[data-tour="checkin-intention"]');
+      if (intentionField) {
+        await safeSetStep(STEP_INDEX.CHECKIN_INTENTION);
+      }
+    }
+
+    // Step 1 -> 2: Intention submitted, show XP celebration
+    if (index === STEP_INDEX.CHECKIN_INTENTION && type === 'step:after') {
+      const checkForSubmit = () => {
+        const intentionField = document.querySelector('[data-tour="checkin-intention"]') as HTMLTextAreaElement | null;
+        if (intentionField && intentionField.value.trim().length > 0) {
+          const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]');
+          if (submitButton && !(submitButton as HTMLButtonElement).disabled) {
+            const observer = new MutationObserver(() => {
+              if ((submitButton as HTMLButtonElement).disabled) {
+                observer.disconnect();
+                createTrackedTimeout(async () => {
+                  confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                  });
+                  await safeSetStep(STEP_INDEX.XP_CELEBRATION);
+                }, 1500);
+              }
+            });
+            observer.observe(submitButton, { attributes: true });
+          }
+        }
+      };
+
+      const timeoutId = createTrackedTimeout(() => {
+        checkForSubmit();
+        const checkInterval = setInterval(() => {
+          checkForSubmit();
+        }, 500);
+        createTrackedTimeout(() => clearInterval(checkInterval), 10000);
+      }, 1000);
+    }
+
+    // Step 2 -> 3: Navigate to companion page
+    if (index === STEP_INDEX.XP_CELEBRATION && action === 'next') {
+      const navCompanion = document.querySelector('a[href="/companion"]');
+      if (navCompanion) {
+        setWaitingForAction(true);
+        const handleNavClick = () => {
+          createTrackedTimeout(async () => {
+            await safeSetStep(STEP_INDEX.COMPANION_VIEW);
+            setWaitingForAction(false);
+          }, 1500);
+          navCompanion.removeEventListener('click', handleNavClick);
+        };
+        navCompanion.addEventListener('click', handleNavClick);
+      }
+    }
+
+    // Step 3 -> 4: Navigate to tasks page
+    if (index === STEP_INDEX.COMPANION_VIEW && action === 'next') {
+      const navTasks = document.querySelector('a[href="/tasks"]');
+      if (navTasks) {
+        setWaitingForAction(true);
+        const handleNavClick = () => {
+          createTrackedTimeout(async () => {
+            await safeSetStep(STEP_INDEX.QUEST_CREATION);
+            setWaitingForAction(false);
+          }, 1500);
+          navTasks.removeEventListener('click', handleNavClick);
+        };
+        navTasks.addEventListener('click', handleNavClick);
+      }
+    }
+
+    // Step 4: Wait for quest creation (handled by event listener above)
+    if (index === STEP_INDEX.QUEST_CREATION && type === 'step:after') {
+      setWaitingForAction(true);
+    }
+
+  }, [user, safeSetStep, createTrackedTimeout]);
+
+  const interactiveStepIndices: number[] = [
+    STEP_INDEX.XP_CELEBRATION,
+    STEP_INDEX.COMPANION_VIEW,
+    STEP_INDEX.QUEST_CREATION,
+    STEP_INDEX.FINAL_CONGRATULATIONS
+  ];
+
+  if (!user) return null;
+
+  return (
+    <Joyride
+      steps={steps}
+      run={run}
+      stepIndex={stepIndex}
+      callback={handleJoyrideCallback}
+      continuous
+      showProgress
+      showSkipButton
+      disableOverlay={interactiveStepIndices.includes(stepIndex)}
+      spotlightPadding={8}
+      styles={{
+        options: {
+          zIndex: 10000,
+          primaryColor: 'hsl(var(--primary))',
+          textColor: 'hsl(var(--foreground))',
+          backgroundColor: 'hsl(var(--background))',
+          arrowColor: 'hsl(var(--background))',
+        },
+        tooltip: {
+          borderRadius: '1rem',
+          padding: '1.5rem',
+        },
+        buttonNext: {
+          backgroundColor: 'hsl(var(--primary))',
+          borderRadius: '0.5rem',
+          padding: '0.5rem 1rem',
+        },
+        buttonBack: {
+          color: 'hsl(var(--muted-foreground))',
+        },
+        buttonSkip: {
+          color: 'hsl(var(--muted-foreground))',
+        },
+      }}
+      floaterProps={{
+        disableAnimation: false,
+        hideArrow: false,
+      }}
+      locale={{
+        back: 'Back',
+        close: 'Close',
+        last: 'Finish',
+        next: 'Next',
+        skip: 'Skip',
+      }}
+    />
+  );
+};
