@@ -36,6 +36,8 @@ const Challenges = lazy(() => import("./pages/Challenges"));
 const Search = lazy(() => import("./pages/Search"));
 const Companion = lazy(() => import("./pages/Companion"));
 const PepTalks = lazy(() => import("./pages/PepTalks"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 // Import AppWalkthrough eagerly since it needs to persist across all pages
 import { AppWalkthrough } from "@/components/AppWalkthrough";
