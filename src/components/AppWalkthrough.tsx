@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 const WALKTHROUGH_STEPS: Step[] = [
-  // HOME PAGE - Check-in
+  // Step 0: HOME PAGE - Check-in mood
   {
     target: '[data-tour="morning-checkin"]',
     content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.",
@@ -23,6 +23,7 @@ const WALKTHROUGH_STEPS: Step[] = [
       }
     }
   },
+  // Step 1: Check-in intention
   {
     target: '[data-tour="checkin-intention"]',
     content: "💭 Now, what's your main focus for today? Enter your intention here.",
@@ -30,23 +31,17 @@ const WALKTHROUGH_STEPS: Step[] = [
     disableBeacon: true,
     spotlightClicks: true,
   },
+  // Step 2: XP celebration and navigate to companion
   {
     target: 'body',
     content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.",
     placement: "center",
     disableBeacon: true,
   },
-  
-  // COMPANION PAGE
+
+  // Step 3: COMPANION PAGE - Show companion and navigate to tasks
   {
-    target: '[data-tour="companion-tab"]',
-    content: "🐾 Let's meet your companion! Tap the Companion tab to see them.",
-    placement: "top",
-    disableBeacon: true,
-    spotlightClicks: true,
-  },
-  {
-    target: '[data-tour="tasks-tab"]',
+    target: '[data-tour="companion-tooltip-anchor"]',
     content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now let's create your first quest! Tap the Quests tab.",
     placement: "top",
     disableBeacon: true,
@@ -67,18 +62,11 @@ const WALKTHROUGH_STEPS: Step[] = [
       }
     }
   },
-  
-  // TASKS PAGE
-  {
-    target: '[data-tour="tasks-tab"]',
-    content: "📋 Now let's build your first quest! Tap the Quests tab to get started.",
-    placement: "top",
-    disableBeacon: true,
-    spotlightClicks: true,
-  },
+
+  // Step 4: TASKS PAGE - Create quest instructions
   {
     target: '[data-tour="today-quests-header"]',
-    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. This will become your MAIN QUEST - the one thing that moves your day forward! Main Quests earn 2x XP.",
+    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!",
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
@@ -120,9 +108,10 @@ const WALKTHROUGH_STEPS: Step[] = [
       }
     }
   },
+  // Step 5: Final congratulations
   {
     target: 'body',
-    content: "🎉 Congratulations! You've mastered the basics! You know how to check in daily and create quests. Your first quest is now your MAIN QUEST (2x XP!) - you can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
+    content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
@@ -144,7 +133,7 @@ export const AppWalkthrough = () => {
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
-    if (index !== 7) return null;
+    if (index !== 5) return null;
     
     const handleFinish = () => {
       haptics.success();
@@ -233,29 +222,29 @@ export const AppWalkthrough = () => {
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
-      // Adjust quest creation step
-      base[6] = {
-        ...base[6],
+      // Adjust quest creation step (step 4)
+      base[4] = {
+        ...base[4],
         target: '[data-tour="today-quests-header"]',
         placement: 'top',
         floaterProps: {
-          ...((base[6] as any).floaterProps || {}),
+          ...((base[4] as any).floaterProps || {}),
           offset: 0,
         },
         styles: {
-          ...((base[6] as any).styles || {}),
+          ...((base[4] as any).styles || {}),
           tooltip: {
-            ...(((base[6] as any).styles?.tooltip) || {}),
+            ...(((base[4] as any).styles?.tooltip) || {}),
             marginTop: undefined,
             marginBottom: '8px',
             pointerEvents: 'none',
           },
         },
       } as Step;
-      
-      // Adjust companion page step (step 4) - target XP bar below image
-      base[4] = {
-        ...base[4],
+
+      // Adjust companion page step (step 3) - target XP bar below image
+      base[3] = {
+        ...base[3],
         target: '[data-tour="companion-tooltip-anchor"]',
         placement: 'top',
       } as Step;
@@ -278,17 +267,31 @@ export const AppWalkthrough = () => {
 
   // Utility: safely set step after ensuring target exists
   const safeSetStep = useCallback(async (idx: number) => {
-    // Emit custom event for BottomNav FIRST so navigation becomes clickable immediately
-    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-      detail: { step: idx } 
-    }));
-    
-    setStepIndex(idx);
-    
-    const target = (steps[idx] as Step | undefined)?.target as string | undefined;
-    if (target && target !== 'body') {
-      await waitForSelector(target, 6000);
+    const step = steps[idx] as Step | undefined;
+
+    if (!step) {
+      console.warn(`Tutorial step ${idx} does not exist. Total steps: ${steps.length}`);
+      return;
     }
+
+    // Emit custom event for BottomNav FIRST so navigation becomes clickable immediately
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', {
+      detail: { step: idx }
+    }));
+
+    const target = step.target as string | undefined;
+    if (target && target !== 'body') {
+      // Wait for element to exist
+      const elementFound = await waitForSelector(target, 6000);
+
+      // If element still not found after timeout, log warning but continue
+      const element = document.querySelector(target);
+      if (!element) {
+        console.warn(`Tutorial element not found: ${target} for step ${idx}`);
+      }
+    }
+
+    setStepIndex(idx);
   }, [waitForSelector, steps]);
 
   useEffect(() => {
@@ -355,16 +358,16 @@ export const AppWalkthrough = () => {
   // Listen for mission completion
   useEffect(() => {
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 6) {
+      if (run && stepIndex === 4) {
         haptics.heavy();
         setWaitingForAction(false);
-        
+
         // PAUSE the tour completely during evolution animation
         setRun(false);
-        
+
         // Clear tutorial step temporarily during evolution
-        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-          detail: { step: null } 
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', {
+          detail: { step: null }
         }));
       }
     };
@@ -376,12 +379,12 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (stepIndex === 6) {
+      if (stepIndex === 4) {
         // Evolution complete - now show final congratulations step
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(7), 500);
+        setTimeout(() => safeSetStep(5), 500);
       }
     };
 
@@ -393,30 +396,18 @@ export const AppWalkthrough = () => {
   // Listen for route changes to progress tutorial
   useEffect(() => {
     if (!run) return;
-    
+
     if (stepIndex === 2 && location.pathname === '/companion') {
-      // User clicked Companion tab from XP step
+      // User clicked Companion tab from XP celebration step
       haptics.medium();
       setTimeout(() => {
-        safeSetStep(4);
+        safeSetStep(3);
       }, 100);
-    } else if (stepIndex === 4 && location.pathname === '/tasks') {
+    } else if (stepIndex === 3 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
       setTimeout(() => {
-        safeSetStep(6);
-      }, 100);
-    } else if (stepIndex === 3 && location.pathname === '/companion') {
-      // User clicked Companion tab
-      haptics.medium();
-      setTimeout(() => {
         safeSetStep(4);
-      }, 100);
-    } else if (stepIndex === 5 && location.pathname === '/tasks') {
-      // User clicked Quests tab
-      haptics.medium();
-      setTimeout(() => {
-        safeSetStep(6);
       }, 100);
     }
   }, [location.pathname, stepIndex, run, safeSetStep]);
@@ -474,7 +465,7 @@ export const AppWalkthrough = () => {
 
     // Set waiting states for steps requiring user actions
     if (lifecycle === 'complete') {
-      if (index === 6) {
+      if (index === 4) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       }
@@ -513,13 +504,13 @@ export const AppWalkthrough = () => {
       continuous={true}
       showProgress={false}
       showSkipButton={false}
-      disableOverlayClose={stepIndex !== 7}
-      disableCloseOnEsc={stepIndex !== 7}
-      hideCloseButton={stepIndex !== 7}
+      disableOverlayClose={stepIndex !== 5}
+      disableCloseOnEsc={stepIndex !== 5}
+      hideCloseButton={stepIndex !== 5}
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
-      tooltipComponent={stepIndex === 7 ? CustomFinalTooltip : undefined}
+      tooltipComponent={stepIndex === 5 ? CustomFinalTooltip : undefined}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
@@ -544,7 +535,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: stepIndex === 7 ? 'block' : 'none',
+          display: stepIndex === 5 ? 'block' : 'none',
           backgroundColor: 'hsl(var(--primary))',
           padding: '0.75rem 2rem',
           fontSize: '1rem',
@@ -572,7 +563,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5 || stepIndex === 6 || stepIndex === 7}
+      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5}
       locale={{
         back: 'Back',
         close: '',
