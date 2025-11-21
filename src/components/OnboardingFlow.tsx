@@ -107,6 +107,12 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
         .eq("id", user.id);
     }
     onComplete();
+    
+    // Wait for dialog to close and page to settle before dispatching event
+    setTimeout(() => {
+      console.log('[OnboardingFlow] Dispatching onboarding-complete event');
+      window.dispatchEvent(new CustomEvent('onboarding-complete'));
+    }, 500);
   };
 
   const slide = slides[currentSlide];
