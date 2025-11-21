@@ -26,6 +26,21 @@ const STEP_INDEX = {
   FINAL_CONGRATULATIONS: 5,
 } as const;
 
+const DELAYS = {
+  POST_CHECKIN_CONFETTI: 1500,
+  POST_NAV_COMPANION: 1500,
+  POST_NAV_TASKS: 1500,
+  POST_EVOLUTION: 300,
+  ONBOARDING_WAIT: 1200,
+  INITIAL_ELEMENT_WAIT: 5000,
+  SCROLL_DELAY: 100,
+  SCROLL_FINAL_DELAY: 50,
+} as const;
+
+const TIMEOUTS = {
+  EVOLUTION_COMPLETE: 15000, // 15 seconds fallback if evolution doesn't complete
+} as const;
+
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
   const isMobile = useIsMobile();
@@ -119,7 +134,7 @@ export const AppWalkthrough = () => {
     }
 
     // Scroll to top when advancing to a new step, with slight delay to ensure DOM is ready
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_DELAY));
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     setStepIndex(idx);
@@ -176,14 +191,14 @@ export const AppWalkthrough = () => {
         // Reset to step 0 before starting
         setStepIndex(0);
         // Wait for navigation and DOM to settle with longer timeout for safety
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
+        await new Promise(resolve => setTimeout(resolve, DELAYS.ONBOARDING_WAIT));
+        const found = await waitForSelector('[data-tour="checkin-mood"]', DELAYS.INITIAL_ELEMENT_WAIT);
         if (found) {
           console.log('[AppWalkthrough] All components ready, starting tour from step 0');
           // Scroll to top before starting the walkthrough with slight delay
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_DELAY));
           window.scrollTo({ top: 0, behavior: 'instant' });
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_FINAL_DELAY));
           setRun(true);
         } else {
           console.warn('[AppWalkthrough] Failed to find initial tour element after timeout');
@@ -222,7 +237,7 @@ export const AppWalkthrough = () => {
           origin: { y: 0.6 }
         });
         await safeSetStep(STEP_INDEX.XP_CELEBRATION);
-      }, 1500);
+      }, DELAYS.POST_CHECKIN_CONFETTI);
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
@@ -239,7 +254,7 @@ export const AppWalkthrough = () => {
         // Scroll to top immediately when entering companion page
         window.scrollTo({ top: 0, behavior: 'instant' });
         await safeSetStep(STEP_INDEX.COMPANION_VIEW);
-      }, 1500);
+      }, DELAYS.POST_NAV_COMPANION);
     };
 
     if (navCompanion) {
@@ -256,7 +271,7 @@ export const AppWalkthrough = () => {
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
         await safeSetStep(STEP_INDEX.QUEST_CREATION);
-      }, 1500);
+      }, DELAYS.POST_NAV_TASKS);
     };
 
     if (navTasks) {
@@ -269,6 +284,8 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION) return;
 
+    let evolutionTimeoutId: number | null = null;
+
     const handleQuestCompleted = () => {
       console.log('[Tutorial] Quest completed! Waiting for evolution to finish...');
       // Don't advance yet - wait for evolution to complete
@@ -278,15 +295,31 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
       // Hide the tooltip as soon as the loading overlay appears
       setRun(false);
+      
+      // Set a fallback timeout in case evolution-complete never fires
+      evolutionTimeoutId = createTrackedTimeout(() => {
+        console.warn('[Tutorial] Evolution timeout reached, proceeding to final step');
+        setRun(true);
+        createTrackedTimeout(() => {
+          safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+        }, DELAYS.POST_EVOLUTION);
+      }, TIMEOUTS.EVOLUTION_COMPLETE);
     };
 
     const handleEvolutionComplete = () => {
       console.log('[Tutorial] Evolution complete! Showing final congratulations step.');
+      
+      // Clear the fallback timeout
+      if (evolutionTimeoutId !== null) {
+        clearTimeout(evolutionTimeoutId);
+        evolutionTimeoutId = null;
+      }
+      
       // Re-enable the tour and advance to final step
       setRun(true);
       createTrackedTimeout(() => {
         safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
-      }, 300);
+      }, DELAYS.POST_EVOLUTION);
     };
 
     window.addEventListener('mission-completed', handleQuestCompleted);
@@ -294,6 +327,11 @@ export const AppWalkthrough = () => {
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     
     return () => {
+      // Clean up timeout if component unmounts or step changes
+      if (evolutionTimeoutId !== null) {
+        clearTimeout(evolutionTimeoutId);
+      }
+      
       window.removeEventListener('mission-completed', handleQuestCompleted);
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-complete', handleEvolutionComplete);
