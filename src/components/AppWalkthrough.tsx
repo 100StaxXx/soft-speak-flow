@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -131,52 +131,75 @@ export const AppWalkthrough = () => {
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
 
+  // Track active timeouts for proper cleanup
+  const activeTimeouts = useRef<Set<NodeJS.Timeout>>(new Set());
+
+  // Utility: Create tracked timeout that auto-cleans up
+  const createTrackedTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeout = setTimeout(() => {
+      activeTimeouts.current.delete(timeout);
+      callback();
+    }, delay);
+    activeTimeouts.current.add(timeout);
+    return timeout;
+  }, []);
+
+  // Cleanup all active timeouts
+  const clearAllTimeouts = useCallback(() => {
+    activeTimeouts.current.forEach(clearTimeout);
+    activeTimeouts.current.clear();
+  }, []);
+
+  // Shared confetti celebration logic
+  const triggerConfettiCelebration = useCallback(() => {
+    const duration = 3000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10001 };
+
+    function randomInRange(min: number, max: number) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+      });
+
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+      });
+    }, 250);
+  }, []);
+
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
     if (index !== 5) return null;
     
     const handleFinish = () => {
       haptics.success();
-      
-      // Trigger confetti celebration
-      const duration = 3000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10001 };
+      triggerConfettiCelebration();
+      clearAllTimeouts();
 
-      function randomInRange(min: number, max: number) {
-        return Math.random() * (max - min) + min;
-      }
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
-      }, 250);
-      
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
-      
+
       // Clear tutorial step
-      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-        detail: { step: null } 
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', {
+        detail: { step: null }
       }));
     };
 
@@ -215,39 +238,46 @@ export const AppWalkthrough = () => {
         </div>
       </Card>
     );
-  }, []);
+  }, [triggerConfettiCelebration, clearAllTimeouts]);
 
 
   const isMobile = useIsMobile();
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
-      // Adjust quest creation step (step 4)
-      base[4] = {
-        ...base[4],
-        target: '[data-tour="today-quests-header"]',
-        placement: 'top',
-        floaterProps: {
-          ...((base[4] as any).floaterProps || {}),
-          offset: 0,
-        },
-        styles: {
-          ...((base[4] as any).styles || {}),
-          tooltip: {
-            ...(((base[4] as any).styles?.tooltip) || {}),
-            marginTop: undefined,
-            marginBottom: '8px',
-            pointerEvents: 'none',
+      // Find and adjust quest creation step (target: today-quests-header)
+      const questStepIdx = base.findIndex(s => s.target === '[data-tour="today-quests-header"]');
+      if (questStepIdx !== -1) {
+        const questStep = base[questStepIdx] as Step & { floaterProps?: Record<string, unknown>; styles?: Record<string, unknown> };
+        base[questStepIdx] = {
+          ...questStep,
+          target: '[data-tour="today-quests-header"]',
+          placement: 'top',
+          floaterProps: {
+            ...(questStep.floaterProps || {}),
+            offset: 0,
           },
-        },
-      } as Step;
+          styles: {
+            ...(questStep.styles || {}),
+            tooltip: {
+              ...((questStep.styles as Record<string, Record<string, unknown>>)?.tooltip || {}),
+              marginTop: undefined,
+              marginBottom: '8px',
+              pointerEvents: 'none',
+            },
+          },
+        } as Step;
+      }
 
-      // Adjust companion page step (step 3) - target XP bar below image
-      base[3] = {
-        ...base[3],
-        target: '[data-tour="companion-tooltip-anchor"]',
-        placement: 'top',
-      } as Step;
+      // Find and adjust companion page step (target: companion-tooltip-anchor)
+      const companionStepIdx = base.findIndex(s => s.target === '[data-tour="companion-tooltip-anchor"]');
+      if (companionStepIdx !== -1) {
+        base[companionStepIdx] = {
+          ...base[companionStepIdx],
+          target: '[data-tour="companion-tooltip-anchor"]',
+          placement: 'top',
+        } as Step;
+      }
     }
     return base;
   }, [isMobile]);
@@ -312,12 +342,12 @@ export const AppWalkthrough = () => {
         if (companion && location.pathname === '/') {
           // Wait for initial step target to be present, then start
           await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
-          setTimeout(() => {
+          createTrackedTimeout(() => {
             localStorage.setItem('appWalkthroughActive', 'true');
             setRun(true);
             // Emit initial tutorial step
-            window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-              detail: { step: 0 } 
+            window.dispatchEvent(new CustomEvent('tutorial-step-change', {
+              detail: { step: 0 }
             }));
           }, 300);
         }
@@ -325,7 +355,7 @@ export const AppWalkthrough = () => {
     };
 
     checkWalkthroughStatus();
-  }, [user, session, location.pathname, waitForSelector, steps]);
+  }, [user, session, location.pathname, waitForSelector, steps, createTrackedTimeout]);
 
 
   // Listen for mood selection to advance from step 0 to step 1
@@ -333,13 +363,13 @@ export const AppWalkthrough = () => {
     const handleMoodSelected = () => {
       if (run && stepIndex === 0) {
         haptics.light();
-        setTimeout(() => safeSetStep(1), 300);
+        createTrackedTimeout(() => safeSetStep(1), 300);
       }
     };
 
     window.addEventListener('mood-selected', handleMoodSelected);
     return () => window.removeEventListener('mood-selected', handleMoodSelected);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   // Listen for check-in completion
   useEffect(() => {
@@ -347,13 +377,13 @@ export const AppWalkthrough = () => {
       if (run && stepIndex <= 1) {
         haptics.success();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
+        createTrackedTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
       }
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   // Listen for mission completion
   useEffect(() => {
@@ -384,13 +414,13 @@ export const AppWalkthrough = () => {
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(5), 500);
+        createTrackedTimeout(() => safeSetStep(5), 500);
       }
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     return () => window.removeEventListener('evolution-complete', handleEvolutionComplete);
-  }, [stepIndex, safeSetStep]);
+  }, [stepIndex, safeSetStep, createTrackedTimeout]);
 
 
   // Listen for route changes to progress tutorial
@@ -400,17 +430,17 @@ export const AppWalkthrough = () => {
     if (stepIndex === 2 && location.pathname === '/companion') {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
-      setTimeout(() => {
+      createTrackedTimeout(() => {
         safeSetStep(3);
       }, 100);
     } else if (stepIndex === 3 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
-      setTimeout(() => {
+      createTrackedTimeout(() => {
         safeSetStep(4);
       }, 100);
     }
-  }, [location.pathname, stepIndex, run, safeSetStep]);
+  }, [location.pathname, stepIndex, run, safeSetStep, createTrackedTimeout]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
@@ -419,46 +449,17 @@ export const AppWalkthrough = () => {
     // Only allow finishing when tutorial is complete
     if (status === STATUS.FINISHED) {
       haptics.success();
-      
-      // Trigger confetti celebration
-      const duration = 3000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10001 };
+      triggerConfettiCelebration();
+      clearAllTimeouts();
 
-      function randomInRange(min: number, max: number) {
-        return Math.random() * (max - min) + min;
-      }
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
-      }, 250);
-      
       setRun(false);
       localStorage.setItem('hasSeenAppWalkthrough', 'true');
       localStorage.removeItem('onboardingComplete');
       localStorage.removeItem('appWalkthroughActive');
-      
+
       // Clear tutorial step
-      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-        detail: { step: null } 
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', {
+        detail: { step: null }
       }));
       return;
     }
@@ -470,7 +471,17 @@ export const AppWalkthrough = () => {
         setWaitingForAction(true);
       }
     }
-  }, []);
+  }, [triggerConfettiCelebration, clearAllTimeouts]);
+
+  // Cleanup timeouts when tutorial stops or component unmounts
+  useEffect(() => {
+    if (!run) {
+      clearAllTimeouts();
+    }
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [run, clearAllTimeouts]);
 
   // Lock body scroll during tutorial but allow pointer events for spotlight clicks
   useEffect(() => {
