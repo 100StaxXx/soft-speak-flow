@@ -1,3 +1,12 @@
+// Custom event interfaces
+interface VolumeChangeEvent extends CustomEvent {
+  detail: number;
+}
+
+interface MuteChangeEvent extends CustomEvent {
+  detail: boolean;
+}
+
 // Ambient music system with persistence
 class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
@@ -45,12 +54,14 @@ class AmbientMusicManager {
     
     // Listen for volume/mute changes
     if (typeof window !== 'undefined') {
-      window.addEventListener('bg-music-volume-change', (e: any) => {
-        this.setVolume(e.detail);
+      window.addEventListener('bg-music-volume-change', (e: Event) => {
+        const volumeEvent = e as VolumeChangeEvent;
+        this.setVolume(volumeEvent.detail);
       });
-      
-      window.addEventListener('bg-music-mute-change', (e: any) => {
-        if (e.detail) {
+
+      window.addEventListener('bg-music-mute-change', (e: Event) => {
+        const muteEvent = e as MuteChangeEvent;
+        if (muteEvent.detail) {
           this.mute();
         } else {
           this.unmute();

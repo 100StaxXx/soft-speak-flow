@@ -6,6 +6,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface PushError {
+  push_id: string;
+  error: string;
+  attempt?: number;
+}
+
+// Retry helper for transient failures
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  maxAttempts = 3,
+  delayMs = 1000
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isTransient = errorMessage.includes('network') ||
+                         errorMessage.includes('timeout') ||
+                         errorMessage.includes('ECONNREFUSED');
+
+      if (attempt < maxAttempts && isTransient) {
+        console.log(`Attempt ${attempt} failed, retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -45,7 +79,7 @@ serve(async (req) => {
 
     let dispatched = 0;
     let skipped = 0;
-    const errors: any[] = [];
+    const errors: PushError[] = [];
 
     for (const push of pendingPushes || []) {
       try {
@@ -101,26 +135,29 @@ serve(async (req) => {
               }
             };
 
-            // Send push notification using Web Push
-            const webPushResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `key=${Deno.env.get('FCM_SERVER_KEY') || ''}`
-              },
-              body: JSON.stringify({
-                to: subscription.endpoint,
-                ...pushPayload
-              })
-            });
+            // Send push notification using Web Push with retry
+            await retryOperation(async () => {
+              const webPushResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `key=${Deno.env.get('FCM_SERVER_KEY') || ''}`
+                },
+                body: JSON.stringify({
+                  to: subscription.endpoint,
+                  ...pushPayload
+                })
+              });
 
-            if (!webPushResponse.ok) {
-              console.error(`Push notification failed for subscription:`, await webPushResponse.text());
-            } else {
+              if (!webPushResponse.ok) {
+                const errorText = await webPushResponse.text();
+                throw new Error(`Push notification failed: ${errorText}`);
+              }
               console.log(`Push notification sent successfully`);
-            }
+            }, 3, 500);
           } catch (subError) {
             console.error(`Error sending to subscription:`, subError);
+            // Don't fail the entire push if one subscription fails
           }
         }
 

@@ -142,11 +142,12 @@ export default function Onboarding() {
       });
 
       setStage('questionnaire');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving name:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save name";
       toast({
         title: "Error",
-        description: error?.message || "Failed to save name",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -294,11 +295,12 @@ export default function Onboarding() {
       if (progressError) {
         console.error("Error saving onboarding progress:", progressError);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error selecting mentor:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to select mentor";
       toast({
         title: "Error",
-        description: error?.message || "Failed to select mentor",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -328,22 +330,24 @@ export default function Onboarding() {
         try {
           await retryWithBackoff(
             () => createCompanion.mutateAsync(data),
-            { 
-              maxAttempts: 3, 
+            {
+              maxAttempts: 3,
               initialDelay: 1000,
-              shouldRetry: (error: any) => {
+              shouldRetry: (error: unknown) => {
                 // Retry on network errors and timeouts
-                const isNetworkError = error?.message?.includes('fetch') || 
-                                     error?.message?.includes('network') ||
-                                     error?.message?.includes('timeout');
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isNetworkError = errorMessage.includes('fetch') ||
+                                     errorMessage.includes('network') ||
+                                     errorMessage.includes('timeout');
                 return isNetworkError;
               }
             }
           );
           console.log("Companion created successfully");
-        } catch (companionError: any) {
+        } catch (companionError: unknown) {
           console.error("Companion creation error after retries:", companionError);
-          throw new Error(companionError?.message || "Failed to create companion. Please check your connection.");
+          const errorMessage = companionError instanceof Error ? companionError.message : "Failed to create companion. Please check your connection.";
+          throw new Error(errorMessage);
         }
       } else {
         console.log("Companion already exists, skipping creation");
@@ -386,11 +390,12 @@ export default function Onboarding() {
       console.log("Navigating to home...");
       // Navigate directly to home
       navigate("/", { replace: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error in onboarding:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create companion. Please try again.";
       toast({
         title: "Error",
-        description: error?.message || "Failed to create companion. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }

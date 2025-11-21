@@ -4,6 +4,7 @@ class SoundManager {
   private masterVolume = 0.5;
   private isMuted = false;
   private sounds: Map<string, HTMLAudioElement> = new Map();
+  private activeIntervals: Set<NodeJS.Timeout> = new Set();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -28,7 +29,15 @@ class SoundManager {
   toggleMute() {
     this.isMuted = !this.isMuted;
     localStorage.setItem('sound_muted', this.isMuted.toString());
+    if (this.isMuted) {
+      this.stopAllAmbientSounds();
+    }
     return this.isMuted;
+  }
+
+  stopAllAmbientSounds() {
+    this.activeIntervals.forEach(interval => clearInterval(interval));
+    this.activeIntervals.clear();
   }
 
   private createOscillator(frequency: number, duration: number, type: OscillatorType = 'sine'): AudioBufferSourceNode | null {
@@ -214,6 +223,7 @@ class SoundManager {
     const interval = setInterval(() => {
       if (this.isMuted) {
         clearInterval(interval);
+        this.activeIntervals.delete(interval);
         return;
       }
       frequencies.forEach(freq => {
@@ -221,7 +231,13 @@ class SoundManager {
       });
     }, 2000);
 
-    return () => clearInterval(interval);
+    // Track the interval for cleanup
+    this.activeIntervals.add(interval);
+
+    return () => {
+      clearInterval(interval);
+      this.activeIntervals.delete(interval);
+    };
   }
 
   playCalming() {

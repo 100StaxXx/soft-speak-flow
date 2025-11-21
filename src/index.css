@@ -490,20 +490,37 @@ All colors MUST be HSL.
 
   .react-joyride__tooltip {
     opacity: 1 !important;
+    background-color: hsl(var(--card)) !important;
     transition: none !important;
-    animation: none !important;
+    animation: tooltip-border-pulse 2s ease-in-out infinite !important;
   }
 
   @keyframes spotlight-border-pulse {
     0%, 100% {
-      box-shadow: 
+      box-shadow:
         0 0 0 4px hsl(var(--primary) / 0.4),
         0 0 20px hsl(var(--primary) / 0.3);
     }
     50% {
-      box-shadow: 
+      box-shadow:
         0 0 0 6px hsl(var(--primary) / 0.7),
         0 0 30px hsl(var(--primary) / 0.5);
+    }
+  }
+
+  @keyframes tooltip-border-pulse {
+    0%, 100% {
+      border-color: hsl(var(--primary) / 0.8);
+      box-shadow:
+        0 0 0 2px hsl(var(--primary) / 0.3),
+        0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    50% {
+      border-color: hsl(var(--primary) / 1);
+      box-shadow:
+        0 0 0 4px hsl(var(--primary) / 0.5),
+        0 0 40px hsl(var(--primary) / 0.3),
+        0 20px 50px rgba(0, 0, 0, 0.5);
     }
   }
 
