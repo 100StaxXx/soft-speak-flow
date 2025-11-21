@@ -8,6 +8,7 @@ This app now has a complete **$9.99/month subscription system with 7-day free tr
 
 ✅ **Database Schema** - Complete subscription tracking (profiles, subscriptions, payment_history tables)
 ✅ **Stripe Integration** - Checkout, webhooks, subscriptions
+✅ **Multiple Payment Methods** - Credit cards, Apple Pay, Google Pay, Link, Cash App Pay
 ✅ **7-Day Free Trial** - Automatic trial for all new subscribers
 ✅ **Subscription Management** - Cancel/resume subscriptions
 ✅ **Premium UI** - Beautiful checkout and success pages
@@ -65,6 +66,28 @@ This creates:
    - `invoice.payment_failed`
    - `checkout.session.completed`
 5. Copy the **Signing secret** (starts with `whsec_...`)
+
+#### Enable Apple Pay and Google Pay
+
+1. Go to **Settings > Payment methods** in Stripe Dashboard
+2. Under **Wallets**, enable:
+   - ✅ **Apple Pay** - Available on Safari, iOS devices
+   - ✅ **Google Pay** - Available on Chrome, Android devices
+   - ✅ **Link** (optional) - Stripe's one-click payment method
+   - ✅ **Cash App Pay** (optional) - Popular US payment method
+
+3. **Apple Pay Domain Verification** (for web):
+   - Add your domain to Apple Pay verified domains
+   - Download verification file from Stripe
+   - Place it at: `/.well-known/apple-developer-merchantid-domain-association`
+   - For Supabase hosting, this is handled automatically via Stripe Checkout
+
+4. **Google Pay** - Works automatically, no extra setup needed
+
+**Note:** Apple Pay and Google Pay will automatically appear in Stripe Checkout when:
+- User's browser/device supports them
+- Payment methods are enabled in your Stripe account
+- User has saved cards in their wallet
 
 ---
 

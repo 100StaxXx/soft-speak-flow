@@ -172,6 +172,14 @@ const Premium = () => {
               Then $9.99/month • Cancel anytime during trial • No charge until trial ends
             </p>
 
+            <div className="flex items-center justify-center gap-2 text-xs text-steel">
+              <span>💳 Card</span>
+              <span>•</span>
+              <span>🍎 Apple Pay</span>
+              <span>•</span>
+              <span>🔵 Google Pay</span>
+            </div>
+
             <p className="text-xs text-steel text-center">
               Secure payment powered by Stripe
             </p>

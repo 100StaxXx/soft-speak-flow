@@ -107,7 +107,13 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
-      payment_method_types: ["card"],
+      payment_method_types: ["card", "cashapp", "link"],
+      // Stripe will automatically detect and show Google Pay and Apple Pay when available
+      payment_method_options: {
+        card: {
+          setup_future_usage: "off_session",
+        },
+      },
       line_items: [
         {
           price: priceId,
