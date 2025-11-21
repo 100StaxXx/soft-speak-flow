@@ -70,6 +70,9 @@ export const GlobalEvolutionListener = () => {
               mentorSlug,
             });
             setIsEvolving(true);
+            
+            // Notify walkthrough that evolution is starting
+            window.dispatchEvent(new CustomEvent('companion-evolution-start'));
 
             // Invalidate companion query to refresh data
             queryClient.invalidateQueries({ queryKey: ['companion'] });
