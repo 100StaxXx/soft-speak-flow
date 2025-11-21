@@ -491,7 +491,7 @@ All colors MUST be HSL.
   .react-joyride__tooltip {
     opacity: 1 !important;
     transition: none !important;
-    animation: none !important;
+    animation: tooltip-border-pulse 2s ease-in-out infinite !important;
   }
 
   @keyframes spotlight-border-pulse {
