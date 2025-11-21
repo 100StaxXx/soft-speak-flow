@@ -88,12 +88,21 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
 
   const handleComplete = async () => {
     if (user) {
+      // Fetch existing onboarding_data to preserve userName, walkthrough_completed, etc.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const existingData = (profile?.onboarding_data as any) || {};
+
       await supabase
         .from("profiles")
-        .update({ 
+        .update({
           onboarding_completed: true,
           onboarding_step: 'complete',
-          onboarding_data: {}
+          onboarding_data: existingData
         })
         .eq("id", user.id);
     }
