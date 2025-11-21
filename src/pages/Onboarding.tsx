@@ -414,6 +414,8 @@ export default function Onboarding() {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("Navigating to home...");
+      // Dispatch event to trigger walkthrough
+      window.dispatchEvent(new CustomEvent('onboarding-complete'));
       // Navigate directly to home
       navigate("/", { replace: true });
     } catch (error: unknown) {
