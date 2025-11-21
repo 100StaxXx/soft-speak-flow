@@ -490,6 +490,7 @@ All colors MUST be HSL.
 
   .react-joyride__tooltip {
     opacity: 1 !important;
+    background-color: hsl(var(--card)) !important;
     transition: none !important;
     animation: tooltip-border-pulse 2s ease-in-out infinite !important;
   }

@@ -535,6 +535,8 @@ export const AppWalkthrough = () => {
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
           pointerEvents: 'auto',
           animation: 'tooltip-border-pulse 2s ease-in-out infinite',
+          backgroundColor: 'hsl(var(--card))',
+          opacity: 1,
         },
         tooltipContent: {
           fontSize: '1rem',
