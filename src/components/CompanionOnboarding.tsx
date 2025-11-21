@@ -159,6 +159,7 @@ export const CompanionOnboarding = () => {
                     size="icon"
                     onClick={handleSkip}
                     className="h-8 w-8"
+                    aria-label="Skip onboarding"
                   >
                     <X className="h-4 w-4" />
                   </Button>

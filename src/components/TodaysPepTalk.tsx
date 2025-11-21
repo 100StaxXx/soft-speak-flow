@@ -366,10 +366,11 @@ export const TodaysPepTalk = () => {
                 disabled={isWalkthroughActive}
                 className={cn(
                   "h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
-                  isPlaying 
-                    ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110" 
+                  isPlaying
+                    ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110"
                     : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110"
                 )}
+                aria-label={isPlaying ? "Pause pep talk" : "Play pep talk"}
               >
                 {isPlaying ? (
                   <Pause className="h-8 w-8" fill="currentColor" />
@@ -387,6 +388,7 @@ export const TodaysPepTalk = () => {
                 onClick={() => skipTime(-10)}
                 disabled={isWalkthroughActive}
                 className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                aria-label="Skip back 10 seconds"
               >
                 <SkipBack className="h-4 w-4" />
               </Button>
@@ -401,6 +403,7 @@ export const TodaysPepTalk = () => {
                 onClick={() => skipTime(10)}
                 disabled={isWalkthroughActive}
                 className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                aria-label="Skip forward 10 seconds"
               >
                 <SkipForward className="h-4 w-4" />
               </Button>

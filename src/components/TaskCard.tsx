@@ -117,6 +117,7 @@ export const TaskCard = ({
         <button
           onClick={onToggle}
           className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform"
+          aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
         >
           {task.completed ? (
             <CheckCircle2 className={cn(
@@ -125,7 +126,7 @@ export const TaskCard = ({
             )} />
           ) : (
             <Circle className={cn(
-              "h-6 w-6 transition-all", 
+              "h-6 w-6 transition-all",
               isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
             )} />
           )}
@@ -173,7 +174,7 @@ export const TaskCard = ({
                   onSetMainQuest();
                 }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Set as Main Quest"
+                aria-label="Set as Main Quest"
               >
                 <Star className="h-4 w-4 text-[hsl(45,100%,60%)]" />
               </Button>
@@ -189,6 +190,7 @@ export const TaskCard = ({
                   onDelete();
                 }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                aria-label="Delete task"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

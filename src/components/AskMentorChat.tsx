@@ -3,15 +3,17 @@ import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, WifiOff } from "lucide-react";
+import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  isFallback?: boolean;
 }
 
 interface AskMentorChatProps {
@@ -126,12 +128,41 @@ export const AskMentorChat = ({
         { user_id: user.id, role: 'assistant', content: data.response }
       ]);
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to send message", variant: "destructive" });
-      setMessages((prev) => prev.slice(0, -1));
+      console.error("Mentor chat error:", error);
+
+      // Use fallback response instead of just showing error
+      const fallback = isOnline
+        ? getFallbackResponse(text, mentorName, mentorTone)
+        : getConnectionErrorFallback(mentorName);
+
+      const fallbackMsg: Message = {
+        role: "assistant",
+        content: fallback.content,
+        isFallback: true
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
+
+      // Show subtle notification that fallback was used
+      toast({
+        title: "Connection issue",
+        description: "Using offline response. Your message was saved.",
+        duration: 3000
+      });
+
+      // Still increment count and save to history
+      setDailyMessageCount(prev => prev + 1);
+
+      // Save both messages even with fallback
+      await supabase.from('mentor_chats').insert([
+        { user_id: user.id, role: 'user', content: text },
+        { user_id: user.id, role: 'assistant', content: fallback.content }
+      ]).catch(() => {
+        // Silently fail if database insert fails - at least user got a response
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, toast, mentorName, mentorTone, messages, DAILY_MESSAGE_LIMIT]);
+  }, [dailyMessageCount, toast, mentorName, mentorTone, messages, DAILY_MESSAGE_LIMIT, isOnline]);
 
   useEffect(() => {
     // Check today's message count
@@ -252,8 +283,16 @@ export const AskMentorChat = ({
 
         {messages.map((msg, idx) => (
           <Card key={idx} className={`p-4 ${msg.role === 'user' ? 'ml-8 bg-primary/10' : 'mr-8'}`}>
-            <div className="font-semibold mb-1 text-sm">
-              {msg.role === 'user' ? 'You' : mentorName}
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-semibold text-sm">
+                {msg.role === 'user' ? 'You' : mentorName}
+              </div>
+              {msg.isFallback && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>Offline mode</span>
+                </div>
+              )}
             </div>
             <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
           </Card>
@@ -278,7 +317,7 @@ export const AskMentorChat = ({
             disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+          <Button type="submit" disabled={isLoading || !input.trim()} size="icon" aria-label="Send message">
             <Send className="h-4 w-4" />
           </Button>
         </div>

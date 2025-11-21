@@ -94,6 +94,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
             size="icon"
             onClick={() => skipTime(-10)}
             className="rounded-full hover:bg-secondary"
+            aria-label="Skip back 10 seconds"
           >
             <SkipBack className="h-5 w-5" />
           </Button>
@@ -103,6 +104,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
             size="icon"
             onClick={togglePlayPause}
             className="h-16 w-16 rounded-full bg-gradient-to-br from-blush-rose to-petal-pink hover:shadow-glow transition-all"
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (
               <Pause className="h-8 w-8" fill="currentColor" />
@@ -116,6 +118,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
             size="icon"
             onClick={() => skipTime(10)}
             className="rounded-full hover:bg-secondary"
+            aria-label="Skip forward 10 seconds"
           >
             <SkipForward className="h-5 w-5" />
           </Button>

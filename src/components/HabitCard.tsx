@@ -146,6 +146,7 @@ export const HabitCard = memo(({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100"
+                    aria-label="Archive habit"
                   >
                     <Archive className="w-4 h-4" />
                   </Button>

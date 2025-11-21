@@ -38,6 +38,7 @@ const Companion = lazy(() => import("./pages/Companion"));
 const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 
 // Import AppWalkthrough eagerly since it needs to persist across all pages
 import { AppWalkthrough } from "@/components/AppWalkthrough";
@@ -108,6 +109,7 @@ const AppContent = memo(() => {
           <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+          <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
           <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
           <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
