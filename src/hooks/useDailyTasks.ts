@@ -49,7 +49,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw new Error('Maximum 3 tasks per day');
       }
 
-      const xpRewards = { easy: 5, medium: 15, hard: 25 };
+      // XP rewards for task difficulty (canonical values)
+      // TODO: Use centralized XP constants if available to avoid divergence
+      const xpRewards = { easy: 5, medium: 10, hard: 20 };
       const xpReward = xpRewards[difficulty];
 
       const { error } = await supabase
