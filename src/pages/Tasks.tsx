@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
+import { HabitsPageTour } from "@/components/HabitsPageTour";
 
 export default function Tasks() {
   const { user } = useAuth();
@@ -718,7 +718,7 @@ export default function Tasks() {
       </Drawer>
 
       <BottomNav />
-      
+      <HabitsPageTour />
     </div>
   );
 }
