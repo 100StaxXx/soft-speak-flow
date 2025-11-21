@@ -518,7 +518,7 @@ export const AppWalkthrough = () => {
   if (!user || !session) return null;
 
   // Interactive steps that allow user interaction (XP celebration, companion view, quest creation, final)
-  const interactiveStepIndices = [
+  const interactiveStepIndices: number[] = [
     STEP_INDEX.XP_CELEBRATION, 
     STEP_INDEX.COMPANION_VIEW, 
     STEP_INDEX.QUEST_CREATION, 
