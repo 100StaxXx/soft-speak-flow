@@ -33,6 +33,7 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState<number>(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
+  const [isWalkthroughReady, setIsWalkthroughReady] = useState(false);
 
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
@@ -120,12 +121,38 @@ export const AppWalkthrough = () => {
     setStepIndex(idx);
   }, [steps, waitForSelector]);
 
-  // Listen for onboarding completion event to start walkthrough
+  // Ensure walkthrough is ready before page components load
   useEffect(() => {
     if (!user || !session) {
       console.log('[AppWalkthrough] No user/session yet');
       return;
     }
+
+    const checkWalkthroughStatus = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
+      const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
+
+      // Signal that walkthrough initialization is complete (either ready to run or already done)
+      setIsWalkthroughReady(true);
+      
+      // Dispatch ready event for other components to listen to
+      window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
+        detail: { shouldRun: !isWalkthroughCompleted } 
+      }));
+    };
+
+    checkWalkthroughStatus();
+  }, [user, session]);
+
+  // Listen for onboarding completion event to start walkthrough
+  useEffect(() => {
+    if (!user || !session || !isWalkthroughReady) return;
 
     const handleOnboardingComplete = async () => {
       console.log('[AppWalkthrough] Onboarding complete event received');
@@ -142,18 +169,21 @@ export const AppWalkthrough = () => {
 
       if (!isWalkthroughCompleted) {
         console.log('[AppWalkthrough] Starting walkthrough after onboarding');
-        // Wait for navigation and DOM to settle
-        await new Promise(resolve => setTimeout(resolve, 800));
-        const found = await waitForSelector('[data-tour="checkin-mood"]', 3000);
+        // Wait for navigation and DOM to settle with longer timeout for safety
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        const found = await waitForSelector('[data-tour="checkin-mood"]', 5000);
         if (found) {
+          console.log('[AppWalkthrough] All components ready, starting tour');
           setRun(true);
+        } else {
+          console.warn('[AppWalkthrough] Failed to find initial tour element after timeout');
         }
       }
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete);
     return () => window.removeEventListener('onboarding-complete', handleOnboardingComplete);
-  }, [user, session, waitForSelector]);
+  }, [user, session, isWalkthroughReady, waitForSelector]);
 
   // Step 0: Listen for mood selection
   useEffect(() => {
