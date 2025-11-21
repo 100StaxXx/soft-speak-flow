@@ -6,6 +6,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useRef } from "react";
+import { getQuestXP } from "@/config/xpRewards";
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -49,8 +50,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw new Error('Maximum 3 tasks per day');
       }
 
-      const xpRewards = { easy: 5, medium: 15, hard: 25 };
-      const xpReward = xpRewards[difficulty];
+      const xpReward = getQuestXP(difficulty);
 
       const { error } = await supabase
         .from('daily_tasks')
