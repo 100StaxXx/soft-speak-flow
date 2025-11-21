@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
-  { id: "home-checkin", target: '[data-tour="morning-checkin"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'top', disableBeacon: true, spotlightClicks: true },
+  { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true },
   { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true },
   { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true },
   { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true } },
