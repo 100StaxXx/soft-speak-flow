@@ -263,12 +263,24 @@ export const useCompanion = () => {
       const nextStage = companion.current_stage + 1;
       const nextThreshold = EVOLUTION_THRESHOLDS[nextStage as keyof typeof EVOLUTION_THRESHOLDS];
       
+      console.log('[XP Award Debug]', {
+        currentStage: companion.current_stage,
+        currentXP: companion.current_xp,
+        xpAmount,
+        newXP,
+        currentThreshold,
+        nextStage,
+        nextThreshold,
+        willEvolve: nextThreshold && newXP >= nextThreshold
+      });
+      
       let shouldEvolve = false;
       let newStage = companion.current_stage;
       
       if (nextThreshold && newXP >= nextThreshold) {
         shouldEvolve = true;
         newStage = nextStage;
+        console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
       }
 
       // Record XP event
