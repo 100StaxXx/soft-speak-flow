@@ -214,10 +214,59 @@ You have the following rights regarding your personal information:
 - Correct inaccurate personal data
 - Modify your preferences and settings
 
-### 7.3 Deletion
-- Request deletion of your account and associated data
-- Use the account deletion feature in the app
-- Contact us to request data deletion
+### 7.3 Deletion and Data Deletion Requests
+You have the right to request deletion of your personal data and account. We provide multiple ways to delete your data:
+
+**Option 1: In-App Account Deletion**
+1. Open the Soft Speak Flow app
+2. Navigate to Profile → Account tab
+3. Scroll to the bottom of the page
+4. Tap "Delete Account" or contact support for assistance
+5. Confirm deletion when prompted
+6. Your account and associated data will be permanently deleted within 30 days
+
+**Option 2: Email Request**
+1. Send an email to: alilrevolution@gmail.com
+2. Use subject line: "Data Deletion Request"
+3. Include in your email:
+   - Your full name
+   - The email address associated with your account
+   - Clear statement: "I request deletion of my account and all associated personal data"
+   - Optional: Reason for deletion (helps us improve)
+4. We will respond within 30 days to confirm deletion
+5. We may request identity verification to protect your privacy
+
+**Option 3: Support Contact**
+1. Contact us via email at alilrevolution@gmail.com
+2. Our support team will guide you through the deletion process
+3. We will confirm receipt of your request within 3 business days
+4. Deletion will be completed within 30 days
+
+**What Gets Deleted:**
+- Your account information (email, profile data, preferences)
+- All wellness data (check-ins, moods, journal entries, reflections)
+- Quest and habit history
+- Companion information and customization
+- AI chat conversation history
+- Saved favorites and library items
+- Progress tracking and achievements
+
+**What We Retain (Legal Requirements):**
+- Transaction records (7 years for tax/legal compliance)
+- Aggregated, anonymized analytics data (cannot identify you)
+- Data required to prevent fraud or abuse
+- Data subject to legal holds or ongoing disputes
+
+**Timeline:**
+- In-app deletion: Immediate account deactivation, permanent deletion within 30 days
+- Email request: Response within 30 days, deletion completed upon confirmation
+- You cannot recover your account or data after deletion
+
+**Important Notes:**
+- Deletion is permanent and cannot be undone
+- Active subscriptions must be cancelled separately through your app store (Apple/Google)
+- We cannot delete data from your device backups (iCloud, Google Drive)
+- Some data may remain in backup systems for up to 90 days before final deletion
 
 ### 7.4 Opt-Out Rights
 - Opt out of promotional emails (unsubscribe link provided)

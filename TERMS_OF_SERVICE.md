@@ -16,25 +16,60 @@ Soft Speak Flow is a personal wellness and self-improvement application that pro
 - AI-powered mentor guidance and chat features
 - Progress tracking and achievement system
 
-## 3. Important Health Disclaimer
+## 3. Important Health Disclaimer and No Medical Advice
 
 **THE APP IS NOT A SUBSTITUTE FOR PROFESSIONAL MEDICAL ADVICE, DIAGNOSIS, OR TREATMENT.**
 
-- The App is designed for general wellness and motivational purposes only
-- The content provided is not medical, psychological, or therapeutic advice
-- If you are experiencing a mental health crisis, please contact emergency services or a mental health professional immediately
-- Crisis Resources:
-  - National Suicide Prevention Lifeline: 988 or 1-800-273-8255
-  - Crisis Text Line: Text HOME to 741741
-  - Emergency Services: 911 (US)
+### 3.1 No Medical Advice
+- The App is designed for general wellness, self-improvement, and motivational purposes only
+- All content, features, and communications (including AI-generated mentor guidance) are for informational and motivational purposes only
+- Nothing in the App constitutes medical, psychological, psychiatric, therapeutic, or professional health advice
+- We are not licensed medical or mental health professionals
+- The App does not provide diagnosis, treatment, or prevention of any disease or condition
+- Do not disregard, avoid, or delay obtaining medical or health-related advice from your healthcare provider because of anything you read or receive through this App
 
-By using this App, you acknowledge that it is not a replacement for professional mental health care.
+### 3.2 Mental Health Crisis Resources
+If you are experiencing a mental health crisis, suicidal thoughts, or any emergency, please contact emergency services or a mental health professional immediately:
+- **National Suicide Prevention Lifeline:** 988 or 1-800-273-8255 (24/7)
+- **Crisis Text Line:** Text HOME to 741741 (24/7)
+- **Emergency Services:** 911 (US) or your local emergency number
+- **SAMHSA National Helpline:** 1-800-662-4357 (24/7, free, confidential)
 
-## 4. Eligibility
+### 3.3 Acknowledgment
+By using this App, you acknowledge and agree that:
+- This App is not a replacement for professional mental health care
+- You will seek professional medical advice for any health concerns
+- You understand the limitations of wellness and motivational applications
+- You will not rely on this App for medical decision-making
 
-You must be at least 13 years of age to use this App. If you are between 13 and 18 years of age, you must have permission from a parent or legal guardian to use the App.
+## 4. Age Requirements and Eligibility
 
-Users under 13 are not permitted to use the App in compliance with the Children's Online Privacy Protection Act (COPPA).
+### 4.1 Minimum Age Requirement
+**You must be at least 13 years old to use this App.**
+
+- The App is not intended for children under the age of 13
+- We do not knowingly collect personal information from children under 13
+- If we discover that a user is under 13, we will immediately delete their account and all associated data
+- This complies with the Children's Online Privacy Protection Act (COPPA)
+
+### 4.2 Users Aged 13-17
+If you are between 13 and 17 years of age (a "Minor"):
+- You must have permission from a parent or legal guardian to use the App
+- Your parent or legal guardian must review and agree to these Terms on your behalf
+- Your parent or legal guardian is responsible for your use of the App
+- We may require parental consent verification at any time
+
+### 4.3 Parental Consent
+Parents and legal guardians:
+- By allowing your child to use this App, you accept these Terms on their behalf
+- You are responsible for monitoring your child's use of the App
+- You acknowledge the App's content and features are appropriate for your child
+- You may request deletion of your child's account at any time
+
+### 4.4 Age Verification
+- We may request proof of age at any time
+- Falsifying your age is a violation of these Terms and grounds for immediate termination
+- If you are a parent and believe your child under 13 is using the App, contact us immediately at alilrevolution@gmail.com
 
 ## 5. User Accounts
 
