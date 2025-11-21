@@ -9,6 +9,16 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+// Step index constants for clarity and maintainability
+const STEP_INDEX = {
+  CHECKIN_MOOD: 0,
+  CHECKIN_INTENTION: 1,
+  XP_CELEBRATION: 2,
+  COMPANION_VIEW: 3,
+  QUEST_CREATION: 4,
+  FINAL_CONGRATULATIONS: 5,
+} as const;
+
 const WALKTHROUGH_STEPS: Step[] = [
   // Step 0: HOME PAGE - Check-in mood
   {
@@ -66,7 +76,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 4: TASKS PAGE - Create quest instructions
   {
     target: '[data-tour="today-quests-header"]',
-    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Easy difficulty (5 XP), tap Add Quest, then tap 'Set as Main Quest' in the popup. This earns you 2x XP (10 total!) and triggers your companion's first evolution!",
+    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then tap 'Set as Main Quest' in the popup. This earns you 2x XP (20 total!) and triggers your companion's first evolution!",
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
@@ -111,7 +121,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 5: Final congratulations
   {
     target: 'body',
-    content: "🎉 Congratulations! You've completed your first day! You earned 15 XP and your companion evolved to Stage 1 (Cracking Awakening)! Continue completing quests (max 3/day) and building habits (max 2 active) to help them grow. Your journey has begun! 🚀",
+    content: "🎉 Congratulations! You've completed your first day! You earned 25 XP (5 from check-in + 20 from Main Quest) and your companion evolved to Stage 1 (Cracking Awakening)! Continue completing quests (max 3/day) and building habits (max 2 active) to help them grow. Your journey has begun! 🚀",
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
@@ -185,7 +195,7 @@ export const AppWalkthrough = () => {
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
-    if (index !== 5) return null;
+    if (index !== STEP_INDEX.FINAL_CONGRATULATIONS) return null;
     
     const handleFinish = () => {
       haptics.success();
@@ -283,12 +293,13 @@ export const AppWalkthrough = () => {
   }, [isMobile]);
 
   // Utility: wait for a selector to exist before advancing
+  // Returns true if element found, false if timeout
   const waitForSelector = useCallback((selector: string, timeout = 5000) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<boolean>((resolve) => {
       const start = Date.now();
       const check = () => {
-        if (document.querySelector(selector)) return resolve();
-        if (Date.now() - start > timeout) return resolve();
+        if (document.querySelector(selector)) return resolve(true);
+        if (Date.now() - start > timeout) return resolve(false);
         requestAnimationFrame(check);
       };
       check();
@@ -314,10 +325,10 @@ export const AppWalkthrough = () => {
       // Wait for element to exist
       const elementFound = await waitForSelector(target, 6000);
 
-      // If element still not found after timeout, log warning but continue
-      const element = document.querySelector(target);
-      if (!element) {
-        console.warn(`Tutorial element not found: ${target} for step ${idx}`);
+      // If element not found after timeout, log warning and fallback to body
+      if (!elementFound) {
+        console.warn(`Tutorial element not found after timeout: ${target} for step ${idx}. Falling back to body anchor.`);
+        // Element will still be used as target, Joyride will handle missing elements gracefully
       }
     }
 
@@ -361,9 +372,9 @@ export const AppWalkthrough = () => {
   // Listen for mood selection to advance from step 0 to step 1
   useEffect(() => {
     const handleMoodSelected = () => {
-      if (run && stepIndex === 0) {
+      if (run && stepIndex === STEP_INDEX.CHECKIN_MOOD) {
         haptics.light();
-        createTrackedTimeout(() => safeSetStep(1), 300);
+        createTrackedTimeout(() => safeSetStep(STEP_INDEX.CHECKIN_INTENTION), 300);
       }
     };
 
@@ -374,10 +385,10 @@ export const AppWalkthrough = () => {
   // Listen for check-in completion
   useEffect(() => {
     const handleCheckInComplete = () => {
-      if (run && stepIndex <= 1) {
+      if (run && stepIndex <= STEP_INDEX.CHECKIN_INTENTION) {
         haptics.success();
         setWaitingForAction(false);
-        createTrackedTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
+        createTrackedTimeout(() => safeSetStep(STEP_INDEX.XP_CELEBRATION), 500); // Go to XP celebration, then companion
       }
     };
 
@@ -388,7 +399,7 @@ export const AppWalkthrough = () => {
   // Listen for mission completion
   useEffect(() => {
     const handleTaskCompleted = () => {
-      if (run && stepIndex === 4) {
+      if (run && stepIndex === STEP_INDEX.QUEST_CREATION) {
         haptics.heavy();
         setWaitingForAction(false);
 
@@ -409,12 +420,12 @@ export const AppWalkthrough = () => {
   // Listen for evolution completion to show final step
   useEffect(() => {
     const handleEvolutionComplete = () => {
-      if (stepIndex === 4) {
+      if (stepIndex === STEP_INDEX.QUEST_CREATION) {
         // Evolution complete - now show final congratulations step
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
-        createTrackedTimeout(() => safeSetStep(5), 500);
+        createTrackedTimeout(() => safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS), 500);
       }
     };
 
@@ -427,17 +438,17 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (!run) return;
 
-    if (stepIndex === 2 && location.pathname === '/companion') {
+    if (stepIndex === STEP_INDEX.XP_CELEBRATION && location.pathname === '/companion') {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
       createTrackedTimeout(() => {
-        safeSetStep(3);
+        safeSetStep(STEP_INDEX.COMPANION_VIEW);
       }, 100);
-    } else if (stepIndex === 3 && location.pathname === '/tasks') {
+    } else if (stepIndex === STEP_INDEX.COMPANION_VIEW && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
       createTrackedTimeout(() => {
-        safeSetStep(4);
+        safeSetStep(STEP_INDEX.QUEST_CREATION);
       }, 100);
     }
   }, [location.pathname, stepIndex, run, safeSetStep, createTrackedTimeout]);
@@ -466,7 +477,7 @@ export const AppWalkthrough = () => {
 
     // Set waiting states for steps requiring user actions
     if (lifecycle === 'complete') {
-      if (index === 4) {
+      if (index === STEP_INDEX.QUEST_CREATION) {
         // Wait for quest completion (which triggers evolution)
         setWaitingForAction(true);
       }
@@ -506,6 +517,15 @@ export const AppWalkthrough = () => {
 
   if (!user || !session) return null;
 
+  // Interactive steps that allow user interaction (XP celebration, companion view, quest creation, final)
+  const interactiveStepIndices = [
+    STEP_INDEX.XP_CELEBRATION, 
+    STEP_INDEX.COMPANION_VIEW, 
+    STEP_INDEX.QUEST_CREATION, 
+    STEP_INDEX.FINAL_CONGRATULATIONS
+  ];
+  const isFinalStep = stepIndex === STEP_INDEX.FINAL_CONGRATULATIONS;
+
   return (
     <Joyride
       steps={steps}
@@ -515,13 +535,13 @@ export const AppWalkthrough = () => {
       continuous={true}
       showProgress={false}
       showSkipButton={false}
-      disableOverlayClose={stepIndex !== 5}
-      disableCloseOnEsc={stepIndex !== 5}
-      hideCloseButton={stepIndex !== 5}
+      disableOverlayClose={!isFinalStep}
+      disableCloseOnEsc={!isFinalStep}
+      hideCloseButton={!isFinalStep}
       disableScrolling
       scrollToFirstStep={false}
       spotlightPadding={0}
-      tooltipComponent={stepIndex === 5 ? CustomFinalTooltip : undefined}
+      tooltipComponent={isFinalStep ? CustomFinalTooltip : undefined}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
@@ -546,7 +566,7 @@ export const AppWalkthrough = () => {
           padding: '0.5rem 0',
         },
         buttonNext: {
-          display: stepIndex === 5 ? 'block' : 'none',
+          display: isFinalStep ? 'block' : 'none',
           backgroundColor: 'hsl(var(--primary))',
           padding: '0.75rem 2rem',
           fontSize: '1rem',
@@ -574,7 +594,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5}
+      disableOverlay={interactiveStepIndices.includes(stepIndex)}
       locale={{
         back: 'Back',
         close: '',
