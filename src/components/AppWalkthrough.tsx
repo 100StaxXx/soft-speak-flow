@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -66,7 +66,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 4: TASKS PAGE - Create quest instructions
   {
     target: '[data-tour="today-quests-header"]',
-    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (15 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (30 total!) - the one thing that moves your day forward!",
+    content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. This becomes your MAIN QUEST earning 2x XP (20 total!) - the one thing that moves your day forward!",
     placement: 'top',
     disableBeacon: true,
     spotlightClicks: false,
@@ -111,7 +111,7 @@ const WALKTHROUGH_STEPS: Step[] = [
   // Step 5: Final congratulations
   {
     target: 'body',
-    content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 30 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
+    content: "🎉 Congratulations! You've mastered the basics! Your first quest is now your MAIN QUEST (2x XP = 20 XP total!). You can add 2 more Side Quests if needed. Complete your Main Quest by tapping the checkbox to evolve your companion! 🚀",
     placement: "center",
     disableBeacon: true,
     locale: { last: 'Begin Adventure' },
@@ -130,6 +130,9 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [waitingForAction, setWaitingForAction] = useState(false);
+  
+  // Track scheduled timeouts for cleanup
+  const timeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
 
   // Custom tooltip for final step
   const CustomFinalTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
@@ -222,43 +225,50 @@ export const AppWalkthrough = () => {
   const steps = useMemo<Step[]>(() => {
     const base = [...WALKTHROUGH_STEPS];
     if (isMobile) {
-      // Adjust quest creation step (step 4)
-      base[4] = {
-        ...base[4],
-        target: '[data-tour="today-quests-header"]',
-        placement: 'top',
-        floaterProps: {
-          ...((base[4] as any).floaterProps || {}),
-          offset: 0,
-        },
-        styles: {
-          ...((base[4] as any).styles || {}),
-          tooltip: {
-            ...(((base[4] as any).styles?.tooltip) || {}),
-            marginTop: undefined,
-            marginBottom: '8px',
-            pointerEvents: 'none',
+      // Adjust quest creation step - find by target
+      const questStepIndex = base.findIndex(step => step.target === '[data-tour="today-quests-header"]');
+      if (questStepIndex !== -1) {
+        base[questStepIndex] = {
+          ...base[questStepIndex],
+          target: '[data-tour="today-quests-header"]',
+          placement: 'top',
+          floaterProps: {
+            ...((base[questStepIndex] as any).floaterProps || {}),
+            offset: 0,
           },
-        },
-      } as Step;
+          styles: {
+            ...((base[questStepIndex] as any).styles || {}),
+            tooltip: {
+              ...(((base[questStepIndex] as any).styles?.tooltip) || {}),
+              marginTop: undefined,
+              marginBottom: '8px',
+              pointerEvents: 'none',
+            },
+          },
+        } as Step;
+      }
 
-      // Adjust companion page step (step 3) - target XP bar below image
-      base[3] = {
-        ...base[3],
-        target: '[data-tour="companion-tooltip-anchor"]',
-        placement: 'top',
-      } as Step;
+      // Adjust companion page step - find by target
+      const companionStepIndex = base.findIndex(step => step.target === '[data-tour="companion-tooltip-anchor"]');
+      if (companionStepIndex !== -1) {
+        base[companionStepIndex] = {
+          ...base[companionStepIndex],
+          target: '[data-tour="companion-tooltip-anchor"]',
+          placement: 'top',
+        } as Step;
+      }
     }
     return base;
   }, [isMobile]);
 
   // Utility: wait for a selector to exist before advancing
-  const waitForSelector = useCallback((selector: string, timeout = 5000) => {
-    return new Promise<void>((resolve) => {
+  // Returns true if selector was found, false if timed out
+  const waitForSelector = useCallback((selector: string, timeout = 5000): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
       const start = Date.now();
       const check = () => {
-        if (document.querySelector(selector)) return resolve();
-        if (Date.now() - start > timeout) return resolve();
+        if (document.querySelector(selector)) return resolve(true);
+        if (Date.now() - start > timeout) return resolve(false);
         requestAnimationFrame(check);
       };
       check();
@@ -267,8 +277,13 @@ export const AppWalkthrough = () => {
 
   // Utility: safely set step after ensuring target exists
   const safeSetStep = useCallback(async (idx: number) => {
-    const step = steps[idx] as Step | undefined;
+    // Validate step index
+    if (idx < 0 || idx >= steps.length) {
+      console.warn(`Invalid tutorial step index ${idx}. Valid range: 0-${steps.length - 1}`);
+      return;
+    }
 
+    const step = steps[idx] as Step | undefined;
     if (!step) {
       console.warn(`Tutorial step ${idx} does not exist. Total steps: ${steps.length}`);
       return;
@@ -284,15 +299,44 @@ export const AppWalkthrough = () => {
       // Wait for element to exist
       const elementFound = await waitForSelector(target, 6000);
 
-      // If element still not found after timeout, log warning but continue
-      const element = document.querySelector(target);
-      if (!element) {
-        console.warn(`Tutorial element not found: ${target} for step ${idx}`);
+      // If element not found, log warning and fallback to body
+      if (!elementFound) {
+        console.warn(`Tutorial element not found after timeout: ${target} for step ${idx}. Falling back to body.`);
+        // Don't set invalid step - let Joyride handle the missing target gracefully
       }
     }
 
     setStepIndex(idx);
   }, [waitForSelector, steps]);
+
+  // Utility: Schedule a timeout and track it for cleanup
+  const scheduleTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeoutId = setTimeout(() => {
+      timeoutsRef.current.delete(timeoutId);
+      callback();
+    }, delay);
+    timeoutsRef.current.add(timeoutId);
+    return timeoutId;
+  }, []);
+
+  // Utility: Clear all pending timeouts
+  const clearAllTimeouts = useCallback(() => {
+    timeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
+    timeoutsRef.current.clear();
+  }, []);
+
+  // Clear timeouts when run state changes or on unmount
+  useEffect(() => {
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
+
+  useEffect(() => {
+    if (!run) {
+      clearAllTimeouts();
+    }
+  }, [run, clearAllTimeouts]);
 
   useEffect(() => {
     const checkWalkthroughStatus = async () => {
@@ -312,7 +356,7 @@ export const AppWalkthrough = () => {
         if (companion && location.pathname === '/') {
           // Wait for initial step target to be present, then start
           await waitForSelector(((steps[0] as Step).target as string) || 'body', 8000);
-          setTimeout(() => {
+          scheduleTimeout(() => {
             localStorage.setItem('appWalkthroughActive', 'true');
             setRun(true);
             // Emit initial tutorial step
@@ -325,7 +369,7 @@ export const AppWalkthrough = () => {
     };
 
     checkWalkthroughStatus();
-  }, [user, session, location.pathname, waitForSelector, steps]);
+  }, [user, session, location.pathname, waitForSelector, steps, scheduleTimeout]);
 
 
   // Listen for mood selection to advance from step 0 to step 1
@@ -333,13 +377,17 @@ export const AppWalkthrough = () => {
     const handleMoodSelected = () => {
       if (run && stepIndex === 0) {
         haptics.light();
-        setTimeout(() => safeSetStep(1), 300);
+        scheduleTimeout(() => {
+          if (run && stepIndex === 0) {
+            safeSetStep(1);
+          }
+        }, 300);
       }
     };
 
     window.addEventListener('mood-selected', handleMoodSelected);
     return () => window.removeEventListener('mood-selected', handleMoodSelected);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, scheduleTimeout]);
 
   // Listen for check-in completion
   useEffect(() => {
@@ -347,13 +395,17 @@ export const AppWalkthrough = () => {
       if (run && stepIndex <= 1) {
         haptics.success();
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(2), 500); // Go to XP celebration, then companion
+        scheduleTimeout(() => {
+          if (run && stepIndex <= 1) {
+            safeSetStep(2);
+          }
+        }, 500); // Go to XP celebration, then companion
       }
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, safeSetStep, scheduleTimeout]);
 
   // Listen for mission completion
   useEffect(() => {
@@ -384,13 +436,17 @@ export const AppWalkthrough = () => {
         haptics.success();
         setRun(true);
         setWaitingForAction(false);
-        setTimeout(() => safeSetStep(5), 500);
+        scheduleTimeout(() => {
+          if (stepIndex === 4) {
+            safeSetStep(5);
+          }
+        }, 500);
       }
     };
 
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     return () => window.removeEventListener('evolution-complete', handleEvolutionComplete);
-  }, [stepIndex, safeSetStep]);
+  }, [stepIndex, safeSetStep, scheduleTimeout]);
 
 
   // Listen for route changes to progress tutorial
@@ -400,17 +456,21 @@ export const AppWalkthrough = () => {
     if (stepIndex === 2 && location.pathname === '/companion') {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
-      setTimeout(() => {
-        safeSetStep(3);
+      scheduleTimeout(() => {
+        if (run && stepIndex === 2) {
+          safeSetStep(3);
+        }
       }, 100);
     } else if (stepIndex === 3 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
-      setTimeout(() => {
-        safeSetStep(4);
+      scheduleTimeout(() => {
+        if (run && stepIndex === 3) {
+          safeSetStep(4);
+        }
       }, 100);
     }
-  }, [location.pathname, stepIndex, run, safeSetStep]);
+  }, [location.pathname, stepIndex, run, safeSetStep, scheduleTimeout]);
 
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
@@ -493,6 +553,12 @@ export const AppWalkthrough = () => {
     };
   }, [run]);
 
+  // Compute which steps should have overlay disabled (interactive steps)
+  const interactiveSteps = useMemo(() => {
+    // Steps 2-5 are interactive (XP celebration, companion, tasks, final)
+    return [2, 3, 4, 5];
+  }, []);
+
   if (!user || !session) return null;
 
   return (
@@ -563,7 +629,7 @@ export const AppWalkthrough = () => {
           backgroundColor: 'transparent',
         },
       }}
-      disableOverlay={stepIndex === 2 || stepIndex === 3 || stepIndex === 4 || stepIndex === 5}
+      disableOverlay={interactiveSteps.includes(stepIndex)}
       locale={{
         back: 'Back',
         close: '',
