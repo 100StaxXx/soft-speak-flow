@@ -241,7 +241,7 @@ const Profile = () => {
                 <CardContent className="space-y-4">
                   {selectedMentor && (
                     <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-xl">
-                      {selectedMentor.avatar_url && <img src={selectedMentor.avatar_url} alt={selectedMentor.name} className="w-12 h-12 rounded-full object-cover" />}
+                      {selectedMentor.avatar_url && <img src={selectedMentor.avatar_url} alt={selectedMentor.name} className="w-12 h-12 rounded-full object-cover" loading="lazy" decoding="async" />}
                       <div className="flex-1">
                         <p className="font-semibold">{selectedMentor.name}</p>
                         <p className="text-sm text-muted-foreground">{selectedMentor.tone_description}</p>

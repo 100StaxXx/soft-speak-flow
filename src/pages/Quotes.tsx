@@ -260,11 +260,13 @@ const Quotes = () => {
                 <div className={`absolute inset-0 transition-all duration-1000 ${
                   imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
                 }`}>
-                  <img 
-                    src={quoteData.imageUrl} 
+                  <img
+                    src={quoteData.imageUrl}
                     alt="Quote"
                     className="w-full h-full object-cover"
                     onLoad={() => setImageLoaded(true)}
+                    loading="lazy"
+                    decoding="async"
                   />
                   
                   {/* Cinematic Gradient Overlays */}

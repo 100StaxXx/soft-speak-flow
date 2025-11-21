@@ -191,8 +191,8 @@ export const CompanionDisplay = () => {
                   </div>
                 </div>
               )}
-              <img 
-                src={companion.current_image_url || ""} 
+              <img
+                src={companion.current_image_url || ""}
                 alt={`${stageName} companion at stage ${companion.current_stage}`}
                 className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
                 onLoad={() => setImageLoaded(true)}
@@ -200,6 +200,8 @@ export const CompanionDisplay = () => {
                   setImageError(true);
                   setImageLoaded(false);
                 }}
+                loading="lazy"
+                decoding="async"
               />
             </div>
           </div>

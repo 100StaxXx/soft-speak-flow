@@ -191,10 +191,12 @@ const Index = () => {
         {/* Fixed Background Image */}
         {mentorImage && (
           <div className="fixed inset-0 z-0">
-            <img 
-              src={mentorImage} 
+            <img
+              src={mentorImage}
               alt="Mentor background"
               className="w-full h-full object-cover object-center"
+              loading="eager"
+              decoding="async"
             />
             <div className="absolute inset-0 bg-background/85" />
           </div>

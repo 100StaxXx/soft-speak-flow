@@ -100,10 +100,12 @@ export const HeroQuoteBanner = () => {
     <div className="relative w-full h-screen overflow-hidden">
       {/* Mentor Background Image - Dimmed */}
       <div className="absolute inset-0">
-        <img 
-          src={mentorImageUrl} 
+        <img
+          src={mentorImageUrl}
           alt={mentor.name}
           className="w-full h-full object-cover object-center"
+          loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-background/80" />
       </div>

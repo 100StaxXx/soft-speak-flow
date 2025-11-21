@@ -71,6 +71,8 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
                     src={evolution.image_url}
                     alt={`Stage ${evolution.stage}`}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
                 <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-bold">

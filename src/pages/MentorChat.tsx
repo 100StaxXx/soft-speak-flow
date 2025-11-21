@@ -62,10 +62,12 @@ export default function MentorChat() {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/30 blur-3xl rounded-full animate-pulse" />
-                <img 
-                  src={mentor.avatar_url} 
+                <img
+                  src={mentor.avatar_url}
                   alt={mentor.name}
                   className="relative w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-background shadow-glow-lg object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             </div>
