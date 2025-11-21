@@ -68,7 +68,7 @@ export default function Tasks() {
     completedCount,
     totalCount 
   } = useDailyTasks(selectedDate);
-  const [newTaskText, setNewTaskText] = useState(");
+  const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<{
@@ -88,7 +88,7 @@ export default function Tasks() {
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
-  const [newHabitTitle, setNewHabitTitle] = useState(");
+  const [newHabitTitle, setNewHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
@@ -580,8 +580,89 @@ export default function Tasks() {
                 </Button>
               </Card>
             ) : (
-              <> ... 
-              {/* Additional code omitted for brevity */} 
+              <>
+                {showTemplates ? (
+                  <HabitTemplates
+                    onSelect={(title, frequency) => {
+                      setNewHabitTitle(title);
+                      setSelectedDays(frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : []);
+                      setShowTemplates(false);
+                      setShowAddHabit(true);
+                    }}
+                    onCustom={() => {
+                      setShowTemplates(false);
+                      setShowAddHabit(true);
+                    }}
+                    existingHabits={habits}
+                  />
+                ) : (
+                  <>
+                    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h2 className="text-xl font-semibold">Your Habits</h2>
+                          <p className="text-sm text-muted-foreground">Track daily progress</p>
+                        </div>
+                        {habits.length < 5 && (
+                          <Button
+                            onClick={() => setShowAddHabit(true)}
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Habit
+                          </Button>
+                        )}
+                      </div>
+
+                      {habits.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Daily Progress
+                            </span>
+                            <span className="text-primary font-semibold">
+                              {completions.length}/{habits.length}
+                            </span>
+                          </div>
+                          <Progress value={habitProgress * 100} className="h-2" />
+                        </div>
+                      )}
+                    </Card>
+
+                    <div className="space-y-3">
+                      {habits.length === 0 ? (
+                        <EmptyState
+                          icon={CheckCircle2}
+                          title="No habits yet"
+                          description="Create your first habit to start building momentum"
+                          actionLabel="Create Habit"
+                          onAction={() => setShowAddHabit(true)}
+                        />
+                      ) : (
+                        habits.map(habit => {
+                          const isCompleted = completions.some(c => c.habit_id === habit.id);
+                          return (
+                            <HabitCard
+                              key={habit.id}
+                              id={habit.id}
+                              title={habit.title}
+                              currentStreak={habit.current_streak || 0}
+                              longestStreak={habit.longest_streak || 0}
+                              completedToday={isCompleted}
+                              difficulty={habit.difficulty}
+                              onComplete={() => toggleHabitMutation.mutate({ 
+                                habitId: habit.id, 
+                                isCompleted 
+                              })}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
             )}
 
             {habits.length === 5 && !showAddHabit && (
