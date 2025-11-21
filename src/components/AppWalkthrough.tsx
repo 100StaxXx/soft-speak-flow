@@ -378,9 +378,7 @@ export const AppWalkthrough = () => {
       if (run && stepIndex === 0) {
         haptics.light();
         scheduleTimeout(() => {
-          if (run && stepIndex === 0) {
-            safeSetStep(1);
-          }
+          safeSetStep(1);
         }, 300);
       }
     };
@@ -396,9 +394,7 @@ export const AppWalkthrough = () => {
         haptics.success();
         setWaitingForAction(false);
         scheduleTimeout(() => {
-          if (run && stepIndex <= 1) {
-            safeSetStep(2);
-          }
+          safeSetStep(2);
         }, 500); // Go to XP celebration, then companion
       }
     };
@@ -437,9 +433,7 @@ export const AppWalkthrough = () => {
         setRun(true);
         setWaitingForAction(false);
         scheduleTimeout(() => {
-          if (stepIndex === 4) {
-            safeSetStep(5);
-          }
+          safeSetStep(5);
         }, 500);
       }
     };
@@ -457,17 +451,13 @@ export const AppWalkthrough = () => {
       // User clicked Companion tab from XP celebration step
       haptics.medium();
       scheduleTimeout(() => {
-        if (run && stepIndex === 2) {
-          safeSetStep(3);
-        }
+        safeSetStep(3);
       }, 100);
     } else if (stepIndex === 3 && location.pathname === '/tasks') {
       // User clicked Quests tab from companion step
       haptics.medium();
       scheduleTimeout(() => {
-        if (run && stepIndex === 3) {
-          safeSetStep(4);
-        }
+        safeSetStep(4);
       }, 100);
     }
   }, [location.pathname, stepIndex, run, safeSetStep, scheduleTimeout]);
