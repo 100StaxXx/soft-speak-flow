@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, Target, Trophy } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, Target, Trophy, FileText, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
+import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -29,6 +30,7 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState("account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
+  const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | null>(null);
 
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
     queryKey: ["adaptive-push-settings", user?.id],
@@ -274,9 +276,43 @@ const Profile = () => {
                 </CardContent>
               </Card>
 
-              <Button 
-                onClick={handleSignOut} 
-                variant="outline" 
+              {/* Legal Documents */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Legal
+                  </CardTitle>
+                  <CardDescription>Review our legal agreements and policies</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => setViewingLegalDoc("terms")}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Terms of Service
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => setViewingLegalDoc("privacy")}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Privacy Policy
+                  </Button>
+                  <div className="pt-2 text-xs text-muted-foreground">
+                    <p>R-Evoltution LLC</p>
+                    <p>Contact: alilrevolution@gmail.com</p>
+                    <p className="mt-1">Last Updated: November 21, 2025</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
                 className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
                 disabled={isSigningOut}
               >
@@ -330,6 +366,15 @@ const Profile = () => {
         </div>
       </div>
       <BottomNav />
+
+      {/* Legal Document Viewer */}
+      {viewingLegalDoc && (
+        <LegalDocumentViewer
+          open={viewingLegalDoc !== null}
+          onOpenChange={(open) => !open && setViewingLegalDoc(null)}
+          documentType={viewingLegalDoc}
+        />
+      )}
     </PageTransition>
   );
 };

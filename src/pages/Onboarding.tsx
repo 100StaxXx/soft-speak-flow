@@ -6,6 +6,7 @@ import { MentorResult } from "@/components/MentorResult";
 import { MentorGrid } from "@/components/MentorGrid";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { NameInput } from "@/components/NameInput";
+import { LegalAcceptance } from "@/components/LegalAcceptance";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -39,7 +40,7 @@ interface MentorExplanation {
 }
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'name' | 'questionnaire' | 'result' | 'browse' | 'companion'>('name');
+  const [stage, setStage] = useState<'legal' | 'name' | 'questionnaire' | 'result' | 'browse' | 'companion'>('legal');
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
@@ -97,6 +98,14 @@ export default function Onboarding() {
     loadProgress();
   }, [user]);
 
+  // Restore onboarding progress - check if legal was already accepted
+  useEffect(() => {
+    const legalAccepted = localStorage.getItem('legal_accepted_at');
+    if (legalAccepted && stage === 'legal') {
+      setStage('name');
+    }
+  }, []);
+
   // Scroll to top when stage changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -107,6 +116,10 @@ export default function Onboarding() {
     // Small delay to ensure UI state updates
     await new Promise((r) => setTimeout(r, 100));
     return true;
+  };
+
+  const handleLegalAccept = () => {
+    setStage('name');
   };
 
   const handleNameSubmit = async (name: string) => {
@@ -457,6 +470,10 @@ export default function Onboarding() {
 
   return (
     <>
+      {stage === "legal" && (
+        <LegalAcceptance onAccept={handleLegalAccept} />
+      )}
+
       {stage === "name" && (
         <NameInput
           onComplete={handleNameSubmit}
