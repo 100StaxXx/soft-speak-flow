@@ -14,7 +14,7 @@ const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true, hideFooter: true },
   { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "top", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true }, hideFooter: true },
   { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. Once added, CHECK IT OFF to complete it and earn your XP! This triggers your companion's first evolution!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
-  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest was your MAIN QUEST (2x XP = 20 XP total!) and you just witnessed your companion evolve! You can add up to 3 more quests each day. Keep completing quests to grow your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Begin Adventure' }, hideBackButton: true, hideCloseButton: false },
+  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest was your MAIN QUEST (2x XP = 20 XP total!) and you just witnessed your companion evolve! You can add up to 3 more quests each day. Keep completing quests to grow your companion! 🚀", placement: "center", disableBeacon: true, locale: { last: 'Close' }, hideBackButton: true },
 ];
 
 const STEP_INDEX = {
@@ -387,7 +387,7 @@ export const AppWalkthrough = () => {
       continuous={false}
       showProgress={false}
       showSkipButton={false}
-      hideCloseButton={stepIndex !== STEP_INDEX.FINAL_CONGRATULATIONS}
+      hideCloseButton={true}
       disableOverlay={interactiveStepIndices.includes(stepIndex)}
       spotlightPadding={8}
       disableCloseOnEsc
