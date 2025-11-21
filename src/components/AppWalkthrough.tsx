@@ -169,30 +169,36 @@ export const AppWalkthrough = () => {
     return () => moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
   }, [stepIndex, run, safeSetStep]);
 
-  // Step 1: Listen for intention submission button click
+  // Step 1: Listen for intention submission
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.CHECKIN_INTENTION || !run) return;
 
-    const intentionField = document.querySelector('[data-tour="checkin-intention"]');
-    const submitButton = intentionField?.closest('form')?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    const checkForSubmit = () => {
+      const intentionField = document.querySelector('[data-tour="checkin-intention"]') as HTMLTextAreaElement | null;
+      if (!intentionField || !intentionField.value || intentionField.value.trim().length === 0) return;
 
-    const handleSubmitClick = () => {
-      console.log('[Tutorial] Intention submit clicked, advancing to XP celebration');
-      createTrackedTimeout(async () => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        await safeSetStep(STEP_INDEX.XP_CELEBRATION);
-      }, 1500);
+      const submitButton = intentionField.closest('form')?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+      if (!submitButton || submitButton.disabled) return;
+
+      const observer = new MutationObserver(() => {
+        if (submitButton.disabled) {
+          observer.disconnect();
+          createTrackedTimeout(async () => {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+            await safeSetStep(STEP_INDEX.XP_CELEBRATION);
+          }, 1500);
+        }
+      });
+      observer.observe(submitButton, { attributes: true });
     };
 
-    if (submitButton) {
-      submitButton.addEventListener('click', handleSubmitClick);
-      return () => submitButton.removeEventListener('click', handleSubmitClick);
-    }
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+    const intervalId = createTrackedInterval(checkForSubmit, 500);
+    return () => clearInterval(intervalId);
+  }, [stepIndex, run, safeSetStep, createTrackedInterval, createTrackedTimeout]);
 
   // Step 2: Listen for companion tab click
   useEffect(() => {
