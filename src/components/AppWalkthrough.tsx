@@ -123,13 +123,13 @@ export const AppWalkthrough = () => {
   // Initialize tutorial state from DB
   useEffect(() => {
     if (!user || !session) {
-      console.log('[Tutorial] Waiting for user and session...', { hasUser: !!user, hasSession: !!session });
+      console.log('[AppWalkthrough] No user/session yet');
       return;
     }
 
     const checkAndStartTutorial = async () => {
       try {
-        console.log('[Tutorial] Checking tutorial status for user:', user.id);
+        console.log('[AppWalkthrough] Fetching profile for user:', user.id);
 
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -138,31 +138,40 @@ export const AppWalkthrough = () => {
           .maybeSingle();
 
         if (error) {
-          console.error('[Tutorial] Error fetching profile:', error);
+          console.error('[AppWalkthrough] Profile fetch error:', error);
           return;
         }
 
-        console.log('[Tutorial] Profile data:', {
-          onboarding_data: profile?.onboarding_data,
-          onboarding_completed: profile?.onboarding_completed
+        if (!profile) {
+          console.error('[AppWalkthrough] No profile found');
+          return;
+        }
+
+        console.log('[AppWalkthrough] Raw profile data:', profile);
+
+        // Check if walkthrough is completed
+        const walkthroughData = profile.onboarding_data as { walkthrough_completed?: boolean } | null;
+        const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
+
+        console.log('[AppWalkthrough] Status check:', {
+          onboarding_completed: profile.onboarding_completed,
+          walkthrough_completed: isWalkthroughCompleted,
+          full_onboarding_data: walkthroughData
         });
 
-        const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
-        const isCompleted = walkthroughData?.walkthrough_completed ?? false;
-
-        console.log('[Tutorial] Walkthrough status:', { isCompleted, walkthroughData });
-
-        if (!isCompleted) {
-          console.log('[Tutorial] Starting tutorial!');
-          // Small delay to ensure all DOM elements are rendered
+        // Only run if onboarding is complete AND walkthrough is NOT complete
+        if (profile.onboarding_completed === true && !isWalkthroughCompleted) {
+          console.log('[AppWalkthrough] ✅ Starting walkthrough!');
           setTimeout(() => {
             setRun(true);
-          }, 500);
+          }, 800);
         } else {
-          console.log('[Tutorial] Tutorial already completed, skipping');
+          console.log('[AppWalkthrough] ❌ Not starting:', {
+            reason: !profile.onboarding_completed ? 'onboarding not complete' : 'walkthrough already done'
+          });
         }
       } catch (error) {
-        console.error('[Tutorial] Error checking tutorial status:', error);
+        console.error('[AppWalkthrough] Error:', error);
       }
     };
 
