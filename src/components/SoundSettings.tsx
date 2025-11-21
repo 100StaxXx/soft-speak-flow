@@ -10,7 +10,7 @@ import { soundManager } from "@/utils/soundEffects";
 export const SoundSettings = () => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
-  const [bgMusicVolume, setBgMusicVolume] = useState(0.3);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.025);
   const [bgMusicMuted, setBgMusicMuted] = useState(false);
 
   useEffect(() => {
