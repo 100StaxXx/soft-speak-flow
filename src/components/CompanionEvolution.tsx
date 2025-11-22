@@ -176,8 +176,13 @@ export const CompanionEvolution = ({
     };
   }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage]);
 
-  const handleDismiss = () => {
-    if (!canDismiss) return;
+  const handleDismiss = (e: React.MouseEvent) => {
+    // Prevent any interaction until timer allows it
+    if (!canDismiss) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     
     setAnimationStage(0);
     setCanDismiss(false);
@@ -213,9 +218,10 @@ export const CompanionEvolution = ({
         exit={{ opacity: 0 }}
         className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden ${canDismiss ? 'cursor-pointer' : ''}`}
         onClick={handleDismiss}
+        onTouchStart={(e) => !canDismiss && e.preventDefault()}
         style={{ 
           pointerEvents: 'auto', 
-          touchAction: 'none',
+          touchAction: canDismiss ? 'auto' : 'none',
           background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.95) 70%, black 100%)'
         }}
       >
