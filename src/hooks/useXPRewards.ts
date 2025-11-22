@@ -45,9 +45,13 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.HABIT_COMPLETE,
       });
       
-      // Update companion attributes sequentially to avoid race conditions
-      await updateMindFromHabit(companion.id);
-      await updateBodyFromActivity(companion.id);
+      // Update attributes in background without waiting
+      updateMindFromHabit(companion.id).catch(err => 
+        console.error('Mind update failed:', err)
+      );
+      updateBodyFromActivity(companion.id).catch(err => 
+        console.error('Body update failed:', err)
+      );
     } catch (error) {
       console.error('Error awarding habit completion:', error);
     }
@@ -99,9 +103,13 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update companion attributes sequentially
-      await updateSoulFromReflection(companion.id);
-      await updateBodyFromActivity(companion.id);
+      // Update attributes in background without waiting
+      updateSoulFromReflection(companion.id).catch(err => 
+        console.error('Soul update failed:', err)
+      );
+      updateBodyFromActivity(companion.id).catch(err => 
+        console.error('Body update failed:', err)
+      );
     } catch (error) {
       console.error('Error awarding check-in:', error);
     }
@@ -118,11 +126,11 @@ export const useXPRewards = () => {
         metadata: { milestone },
       });
       
-      // Update companion soul
-      await updateSoulFromStreak({
+      // Update soul in background without waiting
+      updateSoulFromStreak({
         companionId: companion.id,
         streakDays: milestone,
-      });
+      }).catch(err => console.error('Soul streak update failed:', err));
     } catch (error) {
       console.error('Error awarding streak milestone:', error);
     }
@@ -138,8 +146,10 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update companion soul
-      await updateSoulFromReflection(companion.id);
+      // Update soul in background without waiting
+      updateSoulFromReflection(companion.id).catch(err => 
+        console.error('Soul update failed:', err)
+      );
     } catch (error) {
       console.error('Error awarding reflection:', error);
     }
