@@ -9,7 +9,7 @@ const corsHeaders = {
 // XP thresholds for each evolution stage - MUST match useCompanion.ts
 const EVOLUTION_THRESHOLDS = {
   0: 0,       // Dormant Egg
-  1: 10,      // Cracking Awakening (Tutorial-optimized)
+  1: 15,      // Cracking Awakening (Check-in 5 XP + Main Quest 20 XP = 25 XP)
   2: 30,      // Newborn Emergence
   3: 60,      // Early Infant
   4: 100,     // Juvenile Form
