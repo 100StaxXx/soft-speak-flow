@@ -175,6 +175,48 @@ export type Database = {
           },
         ]
       }
+      ai_output_validation_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          input_data: Json
+          model_used: string
+          output_data: Json
+          response_time_ms: number | null
+          template_key: string
+          tokens_used: number | null
+          user_id: string | null
+          validation_errors: Json | null
+          validation_passed: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          input_data: Json
+          model_used: string
+          output_data: Json
+          response_time_ms?: number | null
+          template_key: string
+          tokens_used?: number | null
+          user_id?: string | null
+          validation_errors?: Json | null
+          validation_passed: boolean
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          input_data?: Json
+          model_used?: string
+          output_data?: Json
+          response_time_ms?: number | null
+          template_key?: string
+          tokens_used?: number | null
+          user_id?: string | null
+          validation_errors?: Json | null
+          validation_passed?: boolean
+        }
+        Relationships: []
+      }
       audio_clips: {
         Row: {
           audio_url: string
@@ -1504,6 +1546,51 @@ export type Database = {
           },
         ]
       }
+      prompt_templates: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          output_constraints: Json | null
+          system_prompt: string
+          template_key: string
+          template_name: string
+          updated_at: string | null
+          user_prompt_template: string
+          validation_rules: Json | null
+          variables: Json | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          output_constraints?: Json | null
+          system_prompt: string
+          template_key: string
+          template_name: string
+          updated_at?: string | null
+          user_prompt_template: string
+          validation_rules?: Json | null
+          variables?: Json | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          output_constraints?: Json | null
+          system_prompt?: string
+          template_key?: string
+          template_name?: string
+          updated_at?: string | null
+          user_prompt_template?: string
+          validation_rules?: Json | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -1642,6 +1729,45 @@ export type Database = {
           is_active?: boolean | null
           label?: string | null
           time_of_day?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_ai_preferences: {
+        Row: {
+          avoid_topics: string[] | null
+          created_at: string | null
+          detail_level: string | null
+          formality: string | null
+          id: string
+          preferred_length: string | null
+          response_style: string | null
+          tone_preference: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avoid_topics?: string[] | null
+          created_at?: string | null
+          detail_level?: string | null
+          formality?: string | null
+          id?: string
+          preferred_length?: string | null
+          response_style?: string | null
+          tone_preference?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avoid_topics?: string[] | null
+          created_at?: string | null
+          detail_level?: string | null
+          formality?: string | null
+          id?: string
+          preferred_length?: string | null
+          response_style?: string | null
+          tone_preference?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

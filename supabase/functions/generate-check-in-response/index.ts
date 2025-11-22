@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,8 +18,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const startTime = Date.now();
+
   try {
-    // Get authentication token
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -26,7 +29,6 @@ serve(async (req) => {
       )
     }
 
-    // Validate input
     const body = await req.json()
     const validation = CheckInSchema.safeParse(body);
     
@@ -46,7 +48,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Verify user authentication
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
@@ -54,7 +55,6 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    // Get check-in details and verify ownership
     const { data: checkIn, error: checkInError } = await supabase
       .from('daily_check_ins')
       .select('*')
@@ -66,12 +66,10 @@ serve(async (req) => {
       throw checkInError;
     }
     
-    // Verify the check-in belongs to the authenticated user
     if (checkIn.user_id !== user.id) {
       throw new Error('Unauthorized: You can only access your own check-ins')
     }
 
-    // Get user's selected mentor from profiles
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('selected_mentor_id')
@@ -83,7 +81,6 @@ serve(async (req) => {
       throw new Error('User profile or mentor not found')
     }
 
-    // Get mentor personality
     const { data: mentor, error: mentorError } = await supabase
       .from('mentors')
       .select('name, tone_description, slug')
@@ -95,9 +92,6 @@ serve(async (req) => {
       throw new Error('Mentor not found')
     }
 
-    if (!mentor) throw new Error('Mentor not found')
-
-    // Get today's pep talk theme
     const today = new Date().toISOString().split('T')[0]
     const { data: pepTalk } = await supabase
       .from('daily_pep_talks')
@@ -106,28 +100,30 @@ serve(async (req) => {
       .eq('mentor_slug', mentor.slug)
       .maybeSingle()
 
-    const pepTalkContext = pepTalk 
+    const dailyContext = pepTalk 
       ? `Today's pep talk theme: "${pepTalk.title}" (${pepTalk.topic_category}). Reference this theme if relevant to their intention.`
-      : ''
+      : '';
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
 
-    const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-A user just completed their morning check-in:
-- Mood: ${checkIn.mood}
-- Their focus for today: "${checkIn.intention}"
-
-${pepTalkContext}
-
-Respond with a brief, personalized message (2-3 sentences) that:
-1. Acknowledges their current mood
-2. Supports their intention for the day
-3. References today's pep talk theme if it connects to their intention
-4. Matches your distinctive voice
-
-Keep it authentic, direct, and energizing.`
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'check_in_response',
+      userId: user.id,
+      variables: {
+        mentorName: mentor.name,
+        mentorTone: mentor.tone_description,
+        userMood: checkIn.mood,
+        userIntention: checkIn.intention,
+        dailyContext,
+        maxSentences: 3,
+        personalityModifiers: '',
+        responseLength: 'concise'
+      }
+    });
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -137,7 +133,10 @@ Keep it authentic, direct, and energizing.`
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         max_tokens: 200,
       }),
     })
@@ -149,6 +148,32 @@ Keep it authentic, direct, and energizing.`
 
     const aiData = await response.json()
     const mentorResponse = aiData.choices?.[0]?.message?.content?.trim()
+
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(mentorResponse, {
+      userMood: checkIn.mood,
+      userIntention: checkIn.intention
+    });
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: user.id,
+        template_key: 'check_in_response',
+        input_data: { mood: checkIn.mood, intention: checkIn.intention },
+        output_data: { response: mentorResponse },
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors.length > 0 ? validationResult.errors : [],
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.warn('Validation warnings:', validator.getValidationSummary(validationResult));
+    }
 
     if (mentorResponse) {
       await supabase
