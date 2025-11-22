@@ -205,7 +205,7 @@ export const MorningCheckIn = () => {
 
           <Button 
             onClick={submitCheckIn} 
-            disabled={isSubmitting || !mood || !intention.trim()}
+            disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
             variant="cta"
             className="w-full h-12"
             size="lg"
