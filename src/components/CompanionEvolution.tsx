@@ -34,6 +34,8 @@ export const CompanionEvolution = ({
   useEffect(() => {
     if (!isEvolving) return;
 
+    let isMounted = true;
+
     pauseAmbientForEvent();
     playEvolutionStart();
 
@@ -52,7 +54,7 @@ export const CompanionEvolution = ({
     // Generate AI voice line
     const generateVoice = async () => {
       if (!mentorSlug || !userId) {
-        setIsLoadingVoice(false);
+        if (isMounted) setIsLoadingVoice(false);
         return;
       }
 
@@ -62,6 +64,7 @@ export const CompanionEvolution = ({
         });
 
         if (error) throw error;
+        if (!isMounted) return;
 
         if (data?.voiceLine) {
           setVoiceLine(data.voiceLine);
@@ -75,7 +78,7 @@ export const CompanionEvolution = ({
         setIsLoadingVoice(false);
       } catch (error) {
         console.error('Failed to generate evolution voice:', error);
-        setIsLoadingVoice(false);
+        if (isMounted) setIsLoadingVoice(false);
       }
     };
 
@@ -159,6 +162,7 @@ export const CompanionEvolution = ({
     ];
 
     return () => {
+      isMounted = false;
       timers.forEach(clearTimeout);
       if (audioRef.current) {
         audioRef.current.pause();
