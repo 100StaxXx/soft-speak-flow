@@ -273,7 +273,6 @@ export const AppWalkthrough = () => {
       // Set a fallback timeout in case evolution-modal-closed never fires
       timeoutRef.current = createTrackedTimeout(() => {
         console.warn('[Tutorial] Evolution timeout reached, showing completion button');
-        setRun(false);
         setShowCompletionButton(true);
       }, TIMEOUTS.EVOLUTION_COMPLETE);
     };
@@ -305,7 +304,7 @@ export const AppWalkthrough = () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     };
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout, setShowCompletionButton]);
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
