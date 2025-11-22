@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +24,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
 
   try {
     // Get authenticated user
@@ -88,23 +92,34 @@ Deno.serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are ${mentorName}, a motivational mentor with a ${mentorTone} style. 
-    
-Your role is to:
-- Provide powerful, actionable motivation
-- Give specific advice and guidance
-- Keep responses concise and impactful (2-4 sentences max)
-- Use the tone and style that matches your personality
-- Be direct, honest, and supportive
-- Challenge the user when needed
-- Celebrate their wins
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
-Remember: You're not just a chatbot - you're a real mentor helping someone become their best self.`;
+    // Build context history from conversation
+    const contextualInfo = conversationHistory && conversationHistory.length > 0
+      ? `Recent conversation context:\n${conversationHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n')}`
+      : '';
+
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'mentor_chat',
+      userId: user.id,
+      variables: {
+        mentorName,
+        mentorTone,
+        userMessage: message,
+        contextualInfo,
+        personalityAdjustments: '',
+        maxSentences: 4
+      }
+    });
 
     const messages = [
       { role: "system", content: systemPrompt },
       ...(conversationHistory || []),
-      { role: "user", content: message }
+      { role: "user", content: userPrompt }
     ];
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -142,6 +157,29 @@ Remember: You're not just a chatbot - you're a real mentor helping someone becom
 
     const data = await response.json();
     const assistantMessage = data.choices[0].message.content;
+
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(assistantMessage);
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: user.id,
+        template_key: 'mentor_chat',
+        input_data: { message, mentorName, mentorTone },
+        output_data: { response: assistantMessage },
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors.length > 0 ? validationResult.errors : [],
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.warn('Validation failed:', validator.getValidationSummary(validationResult));
+    }
 
     return new Response(
       JSON.stringify({ response: assistantMessage }),

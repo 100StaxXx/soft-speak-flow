@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,24 +15,7 @@ interface GeneratedMission {
   difficulty?: string;
 }
 
-const MISSION_GENERATION_PROMPT = `You are a mission generator for a personal growth app. Generate 3 daily missions that follow these strict rules:
-
-**CORE RULES:**
-- Missions must be simple, safe, and achievable in under 10 minutes
-- Missions should promote momentum, clarity, connection, or discipline
-- Do NOT include anything dangerous, expensive, medical, or emotionally heavy
-- Missions must be actionable TODAY, without needing extra items
-- Always keep it 1 sentence
-- Tone should feel like gentle guidance from a mentor
-
-**SAFETY FILTERS (NEVER INCLUDE):**
-🚫 Driving, intense exercise, mixing supplements
-🚫 Buying something, traveling far, booking services
-🚫 Confronting someone, serious emotional conversations
-🚫 Weight loss, trauma, grief, medical advice
-🚫 Anything requiring specific items (except universal ones like water, phone, notebook)
-
-**MISSION STRUCTURE:**
+const CATEGORY_GUIDELINES = `**MISSION STRUCTURE:**
 Include exactly 1 mission from each category:
 
 1. **Connection Mission** ("good human day" - kindness/gratitude)
@@ -49,29 +34,14 @@ Include exactly 1 mission from each category:
 3. **Identity Mission** (supports habits/discipline)
    - Complete all your habits today
    - Do something your future self will thank you for
-   - Give yourself a 2-minute discipline burst
-
-**XP ALLOCATION:**
-- Connection missions: 5-10 XP
-- Quick wins: 5-10 XP
-- Identity missions: 10-15 XP
-
-**OUTPUT FORMAT (JSON only, no markdown):**
-[
-  {
-    "mission": "exact mission text in one sentence",
-    "xp": number (5-15),
-    "category": "connection" | "quick_win" | "identity",
-    "difficulty": "easy" | "medium"
-  }
-]
-
-Generate 3 missions now - one from each category. Return ONLY the JSON array, no other text.`;
+   - Give yourself a 2-minute discipline burst`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
 
   try {
     const supabase = createClient(
@@ -105,13 +75,33 @@ serve(async (req) => {
 
     const streak = profile?.current_habit_streak || 0;
 
-    // Call Lovable AI to generate missions
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
     console.log(`Generating AI missions for user ${userId} (streak: ${streak})`);
+
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const userContext = streak > 0 
+      ? `Make them personal and encouraging, acknowledging their ${streak} day streak.`
+      : 'Make them encouraging to help build momentum.';
+
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'daily_missions',
+      userId,
+      variables: {
+        missionCount: 3,
+        userStreak: streak,
+        userContext,
+        categoryGuidelines: CATEGORY_GUIDELINES
+      }
+    });
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -122,14 +112,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          {
-            role: 'system',
-            content: MISSION_GENERATION_PROMPT
-          },
-          {
-            role: 'user',
-            content: `Generate 3 daily missions for a user with ${streak} day habit streak. Make them personal and encouraging.`
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
         temperature: 0.9,
       }),
@@ -149,7 +133,6 @@ serve(async (req) => {
     // Parse AI response
     let missions: GeneratedMission[];
     try {
-      // Remove markdown code blocks if present
       const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       missions = JSON.parse(cleanedText);
     } catch (parseError) {
@@ -157,9 +140,28 @@ serve(async (req) => {
       throw new Error('Invalid AI response format');
     }
 
-    if (!Array.isArray(missions) || missions.length !== 3) {
-      console.error('Invalid mission count:', missions);
-      throw new Error('AI did not generate exactly 3 missions');
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(missions);
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: userId,
+        template_key: 'daily_missions',
+        input_data: { streak, userContext },
+        output_data: { missions },
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors.length > 0 ? validationResult.errors : [],
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.error('Validation failed:', validator.getValidationSummary(validationResult));
+      throw new Error(`Mission validation failed: ${validationResult.errors.join(', ')}`);
     }
 
     console.log('Parsed missions:', missions);
@@ -173,7 +175,7 @@ serve(async (req) => {
       category: m.category || 'general',
       xp_reward: m.xp || 10,
       difficulty: m.difficulty || 'medium',
-      auto_complete: false, // AI-generated missions are manual completion
+      auto_complete: false,
       completed: false,
       progress_target: 1,
       progress_current: 0,

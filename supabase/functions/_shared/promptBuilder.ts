@@ -1,0 +1,175 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+interface PromptTemplate {
+  template_key: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  variables: string[];
+  validation_rules: Record<string, any>;
+  output_constraints: Record<string, any>;
+}
+
+interface UserPreferences {
+  tone_preference: string;
+  detail_level: string;
+  formality: string;
+  avoid_topics: string[];
+  preferred_length: string;
+  response_style: string;
+}
+
+interface PromptContext {
+  templateKey: string;
+  variables: Record<string, any>;
+  userId?: string;
+  mentorTone?: string;
+  mentorName?: string;
+}
+
+export class PromptBuilder {
+  private supabase: ReturnType<typeof createClient>;
+  private template: PromptTemplate | null = null;
+  private userPrefs: UserPreferences | null = null;
+
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
+
+  async loadTemplate(templateKey: string): Promise<void> {
+    const { data, error } = await this.supabase
+      .from('prompt_templates')
+      .select('*')
+      .eq('template_key', templateKey)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Template ${templateKey} not found`);
+    }
+
+    this.template = data as PromptTemplate;
+  }
+
+  async loadUserPreferences(userId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from('user_ai_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    // Use defaults if no preferences exist
+    this.userPrefs = data || {
+      tone_preference: 'balanced',
+      detail_level: 'medium',
+      formality: 'casual',
+      avoid_topics: [],
+      preferred_length: 'concise',
+      response_style: 'encouraging'
+    };
+  }
+
+  private replaceVariables(text: string, vars: Record<string, any>): string {
+    let result = text;
+    for (const [key, value] of Object.entries(vars)) {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      result = result.replace(regex, String(value ?? ''));
+    }
+    return result;
+  }
+
+  private applyPersonalization(text: string): string {
+    if (!this.userPrefs) return text;
+
+    // Apply tone adjustments
+    const toneMap: Record<string, string> = {
+      'gentle': 'Use softer language and more encouragement.',
+      'direct': 'Be straightforward and concise.',
+      'enthusiastic': 'Show high energy and excitement.',
+      'balanced': 'Maintain a balanced, supportive tone.'
+    };
+
+    // Apply detail level
+    const lengthMap: Record<string, number> = {
+      'brief': 2,
+      'concise': 3,
+      'detailed': 5
+    };
+
+    let enhanced = text;
+    
+    // Add personality modifiers based on preferences
+    const modifiers: string[] = [];
+    
+    if (this.userPrefs.tone_preference !== 'balanced') {
+      modifiers.push(toneMap[this.userPrefs.tone_preference] || '');
+    }
+    
+    if (this.userPrefs.detail_level === 'brief') {
+      modifiers.push('Keep your response extremely concise.');
+    } else if (this.userPrefs.detail_level === 'detailed') {
+      modifiers.push('Provide more context and examples.');
+    }
+
+    if (this.userPrefs.avoid_topics.length > 0) {
+      modifiers.push(`Avoid mentioning: ${this.userPrefs.avoid_topics.join(', ')}.`);
+    }
+
+    if (modifiers.length > 0) {
+      enhanced = enhanced.replace('{{personalityAdjustments}}', modifiers.join('\n'));
+      enhanced = enhanced.replace('{{personalityModifiers}}', modifiers.join(' '));
+    }
+
+    // Apply length preferences
+    const maxSentences = lengthMap[this.userPrefs.preferred_length] || 3;
+    enhanced = enhanced.replace('{{maxSentences}}', String(maxSentences));
+    enhanced = enhanced.replace('{{responseLength}}', this.userPrefs.preferred_length);
+
+    return enhanced;
+  }
+
+  async build(context: PromptContext): Promise<{ 
+    systemPrompt: string; 
+    userPrompt: string;
+    validationRules: Record<string, any>;
+    outputConstraints: Record<string, any>;
+  }> {
+    if (!this.template) {
+      await this.loadTemplate(context.templateKey);
+    }
+
+    if (context.userId) {
+      await this.loadUserPreferences(context.userId);
+    }
+
+    if (!this.template) {
+      throw new Error('Template not loaded');
+    }
+
+    // Build base prompts
+    let systemPrompt = this.replaceVariables(this.template.system_prompt, context.variables);
+    let userPrompt = this.replaceVariables(this.template.user_prompt_template, context.variables);
+
+    // Apply personalization
+    systemPrompt = this.applyPersonalization(systemPrompt);
+    userPrompt = this.applyPersonalization(userPrompt);
+
+    // Clean up any remaining placeholders
+    systemPrompt = systemPrompt.replace(/\{\{[^}]+\}\}/g, '');
+    userPrompt = userPrompt.replace(/\{\{[^}]+\}\}/g, '');
+
+    return {
+      systemPrompt,
+      userPrompt,
+      validationRules: this.template.validation_rules,
+      outputConstraints: this.template.output_constraints
+    };
+  }
+
+  getValidationRules(): Record<string, any> {
+    return this.template?.validation_rules || {};
+  }
+
+  getOutputConstraints(): Record<string, any> {
+    return this.template?.output_constraints || {};
+  }
+}
