@@ -406,18 +406,28 @@ export const AppWalkthrough = () => {
       
       {showCompletionButton && (
         <div className="fixed bottom-24 right-6 z-[10001] animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <Button
-            onClick={async () => {
-              setShowCompletionButton(false);
-              await handleWalkthroughComplete();
-            }}
-            size="lg"
-            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-bold text-lg px-8 py-6 rounded-2xl shadow-2xl hover:shadow-primary/50 transition-all duration-300 animate-pulse"
-          >
-            <span className="mr-2">🎉</span>
-            Complete Tutorial
-            <span className="ml-2">✨</span>
-          </Button>
+          <div className="flex flex-col items-end gap-3">
+            <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-2 border-primary/50 rounded-2xl p-6 max-w-sm shadow-2xl">
+              <p className="text-white text-lg font-medium leading-relaxed mb-1">
+                🎉 Congratulations!
+              </p>
+              <p className="text-white/90 text-base leading-relaxed">
+                Your companion has evolved to Stage 1! You've learned the basics—now your real journey begins. Complete quests, build habits, and watch your companion grow stronger alongside you.
+              </p>
+            </div>
+            <Button
+              onClick={async () => {
+                setShowCompletionButton(false);
+                await handleWalkthroughComplete();
+              }}
+              size="lg"
+              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-bold text-lg px-8 py-6 rounded-2xl shadow-2xl hover:shadow-primary/50 transition-all duration-300 animate-pulse"
+            >
+              <span className="mr-2">✨</span>
+              Start Your Journey
+              <span className="ml-2">🚀</span>
+            </Button>
+          </div>
         </div>
       )}
     </>
