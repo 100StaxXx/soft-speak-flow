@@ -26,9 +26,10 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
         scalar: isBigXP ? 1.2 : 1,
       });
 
+      let confettiTimeout: number | undefined;
       if (isBigXP) {
         // Second burst for big XP
-        setTimeout(() => {
+        confettiTimeout = window.setTimeout(() => {
           confetti({
             particleCount: 50,
             spread: 100,
@@ -40,7 +41,12 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
       }
 
       const timer = setTimeout(onComplete, 3000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (confettiTimeout !== undefined) {
+          clearTimeout(confettiTimeout);
+        }
+      };
     }
   }, [show, onComplete, xp]);
 
