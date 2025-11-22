@@ -195,9 +195,11 @@ export const CompanionEvolution = ({
     resumeAmbientAfterEvent();
     
     // Dispatch events immediately to ensure AppWalkthrough receives them
+    console.log('[CompanionEvolution] Dispatching evolution-modal-closed event');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
     window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
+    console.log('[CompanionEvolution] Events dispatched successfully');
     
     onComplete();
   };
