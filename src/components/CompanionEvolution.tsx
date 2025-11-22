@@ -199,14 +199,14 @@ export const CompanionEvolution = ({
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
     
-    // Delay the modal-closed event to allow modal to fully close with animations
-    setTimeout(() => {
-      console.log('[CompanionEvolution] Dispatching evolution-modal-closed event after delay');
-      window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
-      console.log('[CompanionEvolution] evolution-modal-closed event dispatched');
-    }, 3500); // 3.5 second delay for modal close animation
-    
+    // Don't dispatch evolution-modal-closed here - let onExitComplete handle it
     onComplete();
+  };
+
+  const handleExitComplete = () => {
+    // Dispatch after the exit animation actually completes
+    console.log('[CompanionEvolution] Exit animation complete, dispatching evolution-modal-closed');
+    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
   };
 
   if (!isEvolving) return null;
@@ -215,21 +215,23 @@ export const CompanionEvolution = ({
   const isStage1 = newStage === 1; // Stage 1 is hatchling emerging
 
   return (
-    <AnimatePresence>
-      <motion.div
-        ref={containerRef}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden ${canDismiss ? 'cursor-pointer' : ''}`}
-        onClick={handleDismiss}
-        onTouchStart={(e) => !canDismiss && e.preventDefault()}
-        style={{ 
-          pointerEvents: 'auto', 
-          touchAction: canDismiss ? 'auto' : 'none',
-          background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.95) 70%, black 100%)'
-        }}
-      >
+    <AnimatePresence onExitComplete={handleExitComplete}>
+      {isEvolving && (
+        <motion.div
+          ref={containerRef}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
+          className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden ${canDismiss ? 'cursor-pointer' : ''}`}
+          onClick={handleDismiss}
+          onTouchStart={(e) => !canDismiss && e.preventDefault()}
+          style={{ 
+            pointerEvents: 'auto', 
+            touchAction: canDismiss ? 'auto' : 'none',
+            background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.95) 70%, black 100%)'
+          }}
+        >
         {/* Animated background - darker edges */}
         <motion.div
           className="absolute inset-0"
@@ -514,7 +516,8 @@ export const CompanionEvolution = ({
             20%, 40%, 60%, 80% { transform: translateX(4px); }
           }
         `}</style>
-      </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };
