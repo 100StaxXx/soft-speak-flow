@@ -60,6 +60,10 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+### AI Model
+
+This Lovable project uses **Claude Sonnet 4.5** by Anthropic for AI-powered development. For more details, see [LOVABLE_AI_MODEL.md](./LOVABLE_AI_MODEL.md).
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and click on Share -> Publish.
