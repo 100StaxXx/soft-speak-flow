@@ -78,7 +78,11 @@ export const CompanionEvolution = ({
         setIsLoadingVoice(false);
       } catch (error) {
         console.error('Failed to generate evolution voice:', error);
-        if (isMounted) setIsLoadingVoice(false);
+        // Set fallback voice line so animation can complete
+        if (isMounted) {
+          setVoiceLine("Your companion has evolved to a new stage!");
+          setIsLoadingVoice(false);
+        }
       }
     };
 
