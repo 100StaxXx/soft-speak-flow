@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, Target, Trophy, FileText, Shield } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, Target, FileText, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
-import { AchievementsPanel } from "@/components/AchievementsPanel";
+
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
@@ -186,24 +186,13 @@ const Profile = () => {
                 <CardDescription>Track your active and completed challenges</CardDescription>
               </CardHeader>
             </Card>
-
-            <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => setActiveTab("achievements")} data-tour="achievements">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Achievements</CardTitle>
-                </div>
-                <CardDescription>View your earned badges and milestones</CardDescription>
-              </CardHeader>
-            </Card>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="preferences">Preferences</TabsTrigger>
-              <TabsTrigger value="achievements">Achievements</TabsTrigger>
             </TabsList>
 
             <TabsContent value="account" className="space-y-6">
@@ -357,10 +346,6 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground">More preferences coming soon...</p>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="achievements" className="space-y-6">
-              <AchievementsPanel />
             </TabsContent>
           </Tabs>
         </div>
