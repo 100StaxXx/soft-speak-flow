@@ -7,29 +7,29 @@ const corsHeaders = {
 };
 
 // XP thresholds for each evolution stage - MUST match useCompanion.ts
-// Stage 1 removed, all shifted down, max is now 20
+// Stage 1 now at 10 XP for faster first evolution
 const EVOLUTION_THRESHOLDS = {
   0: 0,      // Egg
-  1: 60,     // Hatchling (was stage 2)
-  2: 120,    // Guardian (was stage 3)
-  3: 250,    // Ascended (was stage 4)
-  4: 500,    // Mythic (was stage 5)
-  5: 1200,   // Titan (was stage 6)
-  6: 2500,   // (was stage 7)
-  7: 5000,   // (was stage 8)
-  8: 10000,  // (was stage 9)
-  9: 20000,  // (was stage 10)
-  10: 35000, // (was stage 11)
-  11: 50000, // (was stage 12)
-  12: 75000, // (was stage 13)
-  13: 100000, // (was stage 14)
-  14: 150000, // (was stage 15)
-  15: 200000, // (was stage 16)
-  16: 300000, // (was stage 17)
-  17: 450000, // (was stage 18)
-  18: 650000, // (was stage 19)
-  19: 1000000, // (was stage 20)
-  20: 1500000, // NEW Ultimate stage
+  1: 10,     // Hatchling - first evolution happens quickly!
+  2: 120,    // Guardian
+  3: 250,    // Ascended
+  4: 500,    // Mythic
+  5: 1200,   // Titan
+  6: 2500,
+  7: 5000,
+  8: 10000,
+  9: 20000,
+  10: 35000,
+  11: 50000,
+  12: 75000,
+  13: 100000,
+  14: 150000,
+  15: 200000,
+  16: 300000,
+  17: 450000,
+  18: 650000,
+  19: 1000000,
+  20: 1500000, // Ultimate stage
 } as const;
 
 const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
