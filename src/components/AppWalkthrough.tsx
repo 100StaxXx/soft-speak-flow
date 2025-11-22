@@ -217,7 +217,6 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
-    const navCompanion = document.querySelector('a[href="/companion"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
         window.scrollTo({ top: 0, behavior: 'instant' });
@@ -225,17 +224,22 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
+    const navCompanion = document.querySelector('a[href="/companion"]');
     if (navCompanion) {
       navCompanion.addEventListener('click', handleNavClick);
-      return () => navCompanion.removeEventListener('click', handleNavClick);
     }
+    
+    return () => {
+      if (navCompanion) {
+        navCompanion.removeEventListener('click', handleNavClick);
+      }
+    };
   }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   // Step 3: Listen for tasks/quests tab click
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
-    const navTasks = document.querySelector('a[href="/tasks"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
         window.scrollTo({ top: 0, behavior: 'instant' });
@@ -243,24 +247,31 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
+    const navTasks = document.querySelector('a[href="/tasks"]');
     if (navTasks) {
       navTasks.addEventListener('click', handleNavClick);
-      return () => navTasks.removeEventListener('click', handleNavClick);
     }
+    
+    return () => {
+      if (navTasks) {
+        navTasks.removeEventListener('click', handleNavClick);
+      }
+    };
   }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
   // Step 4: Listen for quest completion (checkbox click)
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
-    let evolutionTimeoutId: number | null = null;
+    // Declare timeout ref outside handlers so cleanup can access it
+    const timeoutRef = { current: null as number | null };
 
     const handleEvolutionLoadingStart = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
       setRun(false);
       
       // Set a fallback timeout in case evolution-modal-closed never fires
-      evolutionTimeoutId = createTrackedTimeout(() => {
+      timeoutRef.current = createTrackedTimeout(() => {
         console.warn('[Tutorial] Evolution timeout reached, showing completion button');
         setRun(false);
         setShowCompletionButton(true);
@@ -271,9 +282,9 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Evolution modal closed! Showing completion button.');
       
       // Clear the fallback timeout
-      if (evolutionTimeoutId !== null) {
-        clearTimeout(evolutionTimeoutId);
-        evolutionTimeoutId = null;
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
       
       // Show the manual completion button instead of auto-advancing
@@ -286,14 +297,15 @@ export const AppWalkthrough = () => {
     
     return () => {
       // Clean up timeout if component unmounts or step changes
-      if (evolutionTimeoutId !== null) {
-        clearTimeout(evolutionTimeoutId);
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
       
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     };
-  }, [stepIndex, safeSetStep, createTrackedTimeout]);
+  }, [stepIndex, run, safeSetStep, createTrackedTimeout, setShowCompletionButton]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
