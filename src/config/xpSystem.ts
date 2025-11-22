@@ -25,7 +25,7 @@
  * 
  * EVOLUTION THRESHOLDS (Stage 1 removed, all shifted down):
  * - Stage 0 (Egg): 0 XP
- * - Stage 1 (Hatchling): 15 XP (first quest!)
+ * - Stage 1 (Hatchling): 10 XP (first quest!)
  * - Stage 2 (Guardian): 120 XP
  * - Stage 3 (Ascended): 250 XP
  * - Stage 4 (Mythic): 500 XP
