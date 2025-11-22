@@ -300,6 +300,7 @@ export const AppWalkthrough = () => {
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
     setRun(false);
+    setShowCompletionButton(false); // Reset button state
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
