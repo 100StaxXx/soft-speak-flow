@@ -83,7 +83,6 @@ export const useDailyTasks = (selectedDate?: Date) => {
       window.dispatchEvent(new CustomEvent('task-added'));
     },
     onError: (error: Error) => {
-      addInProgress.current = false;
       toast({ title: "Failed to add task", description: error.message, variant: "destructive" });
     },
   });
@@ -93,12 +92,16 @@ export const useDailyTasks = (selectedDate?: Date) => {
       if (toggleInProgress.current) throw new Error('Please wait...');
       toggleInProgress.current = true;
 
-      const { data: existingTask } = await supabase.from('daily_tasks').select('completed_at').eq('id', taskId).maybeSingle();
-      const wasAlreadyCompleted = existingTask?.completed_at !== null;
+      try {
+        const { data: existingTask } = await supabase.from('daily_tasks').select('completed_at').eq('id', taskId).maybeSingle();
+        const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
-      const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
-      if (error) throw error;
-      return { taskId, completed, xpReward, wasAlreadyCompleted };
+        const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
+        if (error) throw error;
+        return { taskId, completed, xpReward, wasAlreadyCompleted };
+      } finally {
+        toggleInProgress.current = false;
+      }
     },
     onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -108,9 +111,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
-      toggleInProgress.current = false;
     },
-    onError: () => { toggleInProgress.current = false; },
+    onError: () => {
+      toast({ title: "Failed to toggle task", variant: "destructive" });
+    },
   });
 
   const deleteTask = useMutation({
