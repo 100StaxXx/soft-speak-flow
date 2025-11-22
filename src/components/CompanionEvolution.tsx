@@ -2,9 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
-import { Sparkles, Zap, Volume2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { playEvolutionStart, playEvolutionSuccess, playSparkle } from "@/utils/soundEffects";
+import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
 
 interface CompanionEvolutionProps {
@@ -24,19 +24,29 @@ export const CompanionEvolution = ({
   userId,
   onComplete 
 }: CompanionEvolutionProps) => {
-  const [stage, setStage] = useState(0);
+  const [animationStage, setAnimationStage] = useState(0);
   const [voiceLine, setVoiceLine] = useState<string>("");
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isEvolving) return;
 
-    // Pause ambient music for evolution
     pauseAmbientForEvent();
-
-    // Play evolution start sound
     playEvolutionStart();
+
+    // Screen shake effect
+    const shake = () => {
+      if (containerRef.current) {
+        containerRef.current.style.animation = 'shake 0.5s ease-in-out';
+        setTimeout(() => {
+          if (containerRef.current) {
+            containerRef.current.style.animation = '';
+          }
+        }, 500);
+      }
+    };
 
     // Generate AI voice line
     const generateVoice = async () => {
@@ -71,36 +81,55 @@ export const CompanionEvolution = ({
     generateVoice();
 
     const timers = [
+      // Stage 1: Prophetic text appears (0.5s)
       setTimeout(() => {
-        setStage(1);
-        haptics.medium();
-        playSparkle();
-        // First wave of confetti
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.7, x: 0.3 },
-          colors: ['#A76CFF', '#C084FC', '#E879F9'],
-        });
+        setAnimationStage(1);
+        haptics.light();
       }, 500),
+      
+      // Stage 2: Text fades, screen darkens (1.5s)
       setTimeout(() => {
-        setStage(2);
+        setAnimationStage(2);
+        haptics.medium();
+      }, 1500),
+      
+      // Stage 3: Egg fades in with rumble (2s)
+      setTimeout(() => {
+        setAnimationStage(3);
+        shake();
         haptics.heavy();
-        playSparkle();
+        // Deep bass rumble sound
+        playEvolutionStart();
+      }, 2000),
+      
+      // Stage 4: Egg fully visible with glow (2.5s)
+      setTimeout(() => {
+        setAnimationStage(4);
+      }, 2500),
+
+      // Stage 5: Show evolution title and confetti (4s)
+      setTimeout(() => {
+        setAnimationStage(5);
+        shake();
+        haptics.success();
+        playEvolutionSuccess();
+        
         // Play voice if available
         if (audioRef.current && !isLoadingVoice) {
           audioRef.current.play().catch(err => console.error('Audio play failed:', err));
         }
+
         // MASSIVE confetti burst
         confetti({
-          particleCount: 200,
-          spread: 120,
-          origin: { y: 0.6 },
+          particleCount: 250,
+          spread: 140,
+          origin: { y: 0.5 },
           colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
-          ticks: 500,
-          gravity: 0.6,
-          scalar: 1.8,
+          ticks: 600,
+          gravity: 0.5,
+          scalar: 2,
         });
+        
         // Side bursts
         setTimeout(() => {
           confetti({
@@ -116,51 +145,27 @@ export const CompanionEvolution = ({
             colors: ['#C084FC', '#FFD700'],
           });
         }, 200);
-      }, 1500),
+      }, 4000),
+
+      // Stage 6: Show voice line (5s)
       setTimeout(() => {
-        setStage(3);
-        haptics.success();
-        playEvolutionSuccess();
-        // Third massive burst
-        confetti({
-          particleCount: 250,
-          spread: 140,
-          origin: { y: 0.5 },
-          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
-          ticks: 600,
-          gravity: 0.5,
-          scalar: 2,
-        });
-      }, 2500),
+        setAnimationStage(6);
+      }, 5000),
+
+      // Close and cleanup (7s)
       setTimeout(() => {
-        setStage(4);
-        // Final sparkle burst
-        confetti({
-          particleCount: 50,
-          spread: 50,
-          origin: { y: 0.6 },
-          colors: ['#FFD700', '#FFA500'],
-          shapes: ['star'],
-          scalar: 1.2,
-        });
-      }, 3500),
-      setTimeout(() => {
-        setStage(0);
+        setAnimationStage(0);
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current = null;
         }
-        // Resume ambient music after evolution
         resumeAmbientAfterEvent();
         
-        // Dispatch event for walkthrough when user closes modal
         window.dispatchEvent(new CustomEvent('companion-evolved'));
-        
-        // Dispatch evolution-complete for tutorial on modal close
         window.dispatchEvent(new CustomEvent('evolution-complete'));
         
         onComplete();
-      }, 5500),
+      }, 7000),
     ];
 
     return () => {
@@ -169,29 +174,37 @@ export const CompanionEvolution = ({
         audioRef.current.pause();
         audioRef.current = null;
       }
-      // Make sure to resume ambient if component unmounts
       resumeAmbientAfterEvent();
     };
-  }, [isEvolving, isLoadingVoice, onComplete]);
+  }, [isEvolving, isLoadingVoice, onComplete, mentorSlug, userId, newStage]);
 
   if (!isEvolving) return null;
+
+  const isStage0or1 = newStage === 0 || newStage === 1;
 
   return (
     <AnimatePresence>
       <motion.div
+        ref={containerRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-primary/30 to-black flex items-center justify-center overflow-hidden"
-        style={{ pointerEvents: 'auto', touchAction: 'none' }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
+        style={{ 
+          pointerEvents: 'auto', 
+          touchAction: 'none',
+          background: 'radial-gradient(circle at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.95) 70%, black 100%)'
+        }}
       >
-        {/* Intense animated background glow */}
+        {/* Animated background - darker edges */}
         <motion.div
-          className="absolute inset-0 bg-gradient-to-br from-primary/40 via-accent/40 to-primary/40"
+          className="absolute inset-0"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(167, 108, 255, 0.15) 0%, transparent 60%)'
+          }}
           animate={{
-            scale: [1, 1.5, 1],
-            opacity: [0.4, 0.8, 0.4],
-            rotate: [0, 180, 360],
+            scale: [1, 1.3, 1],
+            opacity: animationStage >= 3 ? [0.15, 0.4, 0.15] : 0,
           }}
           transition={{
             duration: 3,
@@ -200,139 +213,214 @@ export const CompanionEvolution = ({
           }}
         />
 
-        {/* More particle effects */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(40)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-3 h-3 bg-primary/80 rounded-full"
-              style={{
-                boxShadow: "0 0 10px currentColor, 0 0 20px currentColor"
-              }}
-              initial={{
-                x: Math.random() * window.innerWidth,
-                y: window.innerHeight + 50,
-              }}
-              animate={{
-                y: -50,
-                x: Math.random() * window.innerWidth,
-                scale: [0, 1.5, 0],
-                opacity: [0, 1, 0],
-              }}
-              transition={{
-                duration: 1.5 + Math.random() * 1.5,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Radial light rays */}
-        <motion.div
-          className="absolute inset-0"
-          style={{
-            background: "radial-gradient(circle, rgba(167, 108, 255, 0.3) 0%, transparent 70%)"
-          }}
-          animate={{
-            scale: [1, 1.8, 1],
-            opacity: [0.3, 0.7, 0.3],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-
-        <div className="flex flex-col items-center gap-12 max-w-2xl text-center px-6 relative z-10">
-          {stage >= 1 && (
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 150, damping: 12 }}
-              className="relative"
-            >
-              {/* Dramatic corner effects */}
-              <Sparkles className="absolute -top-12 -left-12 w-16 h-16 text-primary animate-pulse" 
-                style={{ filter: "drop-shadow(0 0 10px currentColor)" }} />
-              <Sparkles className="absolute -top-12 -right-12 w-16 h-16 text-accent animate-pulse" 
-                style={{ filter: "drop-shadow(0 0 10px currentColor)" }} />
-              <Zap className="absolute -bottom-12 -left-12 w-16 h-16 text-primary animate-pulse" 
-                style={{ filter: "drop-shadow(0 0 10px currentColor)" }} />
-              <Zap className="absolute -bottom-12 -right-12 w-16 h-16 text-accent animate-pulse" 
-                style={{ filter: "drop-shadow(0 0 10px currentColor)" }} />
-              
-              {/* Rotating ring effect */}
+        {/* Particle system - rising embers matching companion color */}
+        {animationStage >= 3 && (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(50)].map((_, i) => (
               <motion.div
-                className="absolute inset-0 rounded-3xl border-4 border-primary/50"
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  width: Math.random() * 6 + 2,
+                  height: Math.random() * 6 + 2,
+                  background: 'radial-gradient(circle, rgba(167, 108, 255, 0.9), rgba(192, 132, 252, 0.6))',
+                  boxShadow: "0 0 20px rgba(167, 108, 255, 0.8)",
+                  left: `${Math.random() * 100}%`,
+                }}
+                initial={{
+                  y: window.innerHeight + 50,
+                  opacity: 0,
+                }}
                 animate={{
-                  rotate: [0, 360],
-                  scale: [1, 1.1, 1],
+                  y: -100,
+                  x: [0, Math.random() * 40 - 20, 0],
+                  opacity: [0, 1, 0],
+                  scale: [0.5, 1.5, 0.5],
                 }}
                 transition={{
-                  rotate: { duration: 4, repeat: Infinity, ease: "linear" },
-                  scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                  duration: 3 + Math.random() * 2,
+                  repeat: Infinity,
+                  delay: Math.random() * 2,
+                  ease: "easeOut"
                 }}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col items-center justify-center gap-8 max-w-4xl w-full px-6 relative z-10">
+          {/* Prophetic text overlay - Stage 1 */}
+          {animationStage === 1 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.2 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="text-center"
+            >
+              <h2 
+                className="text-4xl md:text-6xl font-black text-white tracking-wider"
                 style={{
-                  filter: "blur(2px)",
-                  boxShadow: "0 0 40px rgba(167, 108, 255, 0.8)"
+                  textShadow: "0 0 40px rgba(167, 108, 255, 0.9), 0 0 80px rgba(192, 132, 252, 0.6)"
+                }}
+              >
+                {isStage0or1 ? "A Vision of Your Destiny..." : "Evolution Awakens..."}
+              </h2>
+            </motion.div>
+          )}
+
+          {/* Egg container - Stages 3+ */}
+          {animationStage >= 3 && (
+            <motion.div
+              initial={{ opacity: 0, y: 100, scale: 0.5 }}
+              animate={{ 
+                opacity: 1, 
+                y: 0, 
+                scale: 1,
+              }}
+              transition={{ 
+                type: "spring",
+                stiffness: 100,
+                damping: 20,
+                mass: 1.5
+              }}
+              className="relative flex items-center justify-center"
+              style={{
+                width: '100%',
+                maxWidth: '800px',
+                height: '70vh',
+              }}
+            >
+              {/* Pulsing glow aura */}
+              <motion.div
+                className="absolute inset-0"
+                style={{
+                  background: 'radial-gradient(circle, rgba(167, 108, 255, 0.4) 0%, transparent 70%)',
+                  filter: 'blur(40px)',
+                }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.4, 0.8, 0.4],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
                 }}
               />
 
+              {/* Divine light beams for stage 1 cracks */}
+              {newStage === 1 && (
+                <>
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute"
+                      style={{
+                        width: '4px',
+                        height: '100%',
+                        background: 'linear-gradient(to bottom, rgba(255, 215, 0, 0.9), rgba(167, 108, 255, 0.4), transparent)',
+                        transformOrigin: 'center center',
+                        rotate: `${(i * 360) / 8}deg`,
+                        filter: 'blur(2px)',
+                        boxShadow: '0 0 20px rgba(255, 215, 0, 0.8)',
+                      }}
+                      initial={{ opacity: 0, scaleY: 0 }}
+                      animate={{ 
+                        opacity: [0, 1, 0.7, 1],
+                        scaleY: [0, 1.5, 1, 1.5],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        delay: i * 0.1,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* Corner sparkles for extra epicness */}
+              <Sparkles 
+                className="absolute -top-8 -left-8 w-16 h-16 text-primary animate-pulse" 
+                style={{ filter: "drop-shadow(0 0 20px currentColor)" }} 
+              />
+              <Sparkles 
+                className="absolute -top-8 -right-8 w-16 h-16 text-accent animate-pulse" 
+                style={{ filter: "drop-shadow(0 0 20px currentColor)", animationDelay: '0.3s' }} 
+              />
+              <Sparkles 
+                className="absolute -bottom-8 -left-8 w-16 h-16 text-accent animate-pulse" 
+                style={{ filter: "drop-shadow(0 0 20px currentColor)", animationDelay: '0.6s' }} 
+              />
+              <Sparkles 
+                className="absolute -bottom-8 -right-8 w-16 h-16 text-primary animate-pulse" 
+                style={{ filter: "drop-shadow(0 0 20px currentColor)", animationDelay: '0.9s' }} 
+              />
+
+              {/* The egg/companion image - MASSIVE */}
               <motion.div
-                className="w-64 h-64 rounded-3xl overflow-hidden border-8 border-primary shadow-2xl relative"
+                className="relative rounded-3xl overflow-hidden"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: '700px',
+                  boxShadow: '0 0 100px rgba(167, 108, 255, 0.8), 0 0 200px rgba(192, 132, 252, 0.6)',
+                  border: '6px solid rgba(167, 108, 255, 0.5)',
+                }}
                 animate={{
                   boxShadow: [
-                    "0 0 40px rgba(167, 108, 255, 0.6)",
-                    "0 0 100px rgba(167, 108, 255, 1), 0 0 150px rgba(192, 132, 252, 0.8)",
-                    "0 0 40px rgba(167, 108, 255, 0.6)",
+                    '0 0 100px rgba(167, 108, 255, 0.8)',
+                    '0 0 200px rgba(167, 108, 255, 1), 0 0 300px rgba(192, 132, 252, 0.8)',
+                    '0 0 100px rgba(167, 108, 255, 0.8)',
                   ],
-                  scale: [1, 1.05, 1],
                 }}
                 transition={{
-                  duration: 1.5,
+                  duration: 2,
                   repeat: Infinity,
+                  ease: "easeInOut"
                 }}
               >
-                {/* Animated shimmer overlay */}
+                {/* Shimmer overlay */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
                   animate={{
                     x: ["-100%", "100%"],
                   }}
                   transition={{
-                    duration: 2,
+                    duration: 3,
                     repeat: Infinity,
-                    ease: "linear"
+                    ease: "linear",
+                    repeatDelay: 1
                   }}
+                  style={{ zIndex: 10 }}
                 />
-                
-                {stage >= 2 && (
-                  <motion.img
-                    initial={{ scale: 0.3, opacity: 0, rotate: -20 }}
-                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    transition={{ 
-                      delay: 0.3,
-                      type: "spring",
-                      stiffness: 200,
-                      damping: 15
-                    }}
-                    src={newImageUrl}
-                    alt="Evolved companion"
-                    className="w-full h-full object-cover"
-                  />
-                )}
+
+                <motion.img
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ 
+                    delay: 0.3,
+                    type: "spring",
+                    stiffness: 100,
+                    damping: 15
+                  }}
+                  src={newImageUrl}
+                  alt="Evolved companion"
+                  className="w-full h-full object-cover"
+                />
               </motion.div>
             </motion.div>
           )}
 
-          {stage >= 3 && (
+          {/* Evolution announcement - Stage 5+ */}
+          {animationStage >= 5 && (
             <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              initial={{ opacity: 0, y: 50, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 150, damping: 15 }}
-              className="space-y-6"
+              className="text-center space-y-6"
             >
               <motion.h1
                 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary"
@@ -346,16 +434,16 @@ export const CompanionEvolution = ({
                 }}
                 style={{
                   backgroundSize: "200% 200%",
-                  textShadow: "0 0 30px rgba(167, 108, 255, 0.8), 0 0 60px rgba(192, 132, 252, 0.6)"
+                  textShadow: "0 0 40px rgba(167, 108, 255, 0.9), 0 0 80px rgba(192, 132, 252, 0.7)"
                 }}
               >
-                Evolution!
+                {isStage0or1 ? "Destiny Sealed!" : "Evolution!"}
               </motion.h1>
               
               <motion.p
                 className="text-3xl md:text-4xl font-bold text-white"
                 style={{
-                  textShadow: "0 0 20px rgba(255, 255, 255, 0.8)"
+                  textShadow: "0 0 30px rgba(255, 255, 255, 0.9)"
                 }}
                 animate={{
                   scale: [1, 1.05, 1],
@@ -365,25 +453,28 @@ export const CompanionEvolution = ({
                   repeat: Infinity,
                 }}
               >
-                Your Companion has Evolved!
+                {isStage0or1 
+                  ? "Your Champion Awaits Within" 
+                  : "Your Companion Has Evolved!"}
               </motion.p>
 
-              {stage >= 4 && voiceLine && (
+              {/* Voice line - Stage 6 */}
+              {animationStage >= 6 && voiceLine && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="max-w-lg mx-auto"
+                  transition={{ delay: 0.3 }}
+                  className="max-w-2xl mx-auto"
                 >
-                  <div className="relative p-8 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20 border-2 border-primary/50 backdrop-blur-sm"
+                  <div 
+                    className="relative p-8 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20 border-2 border-primary/50 backdrop-blur-sm"
                     style={{
-                      boxShadow: "0 0 40px rgba(167, 108, 255, 0.4)"
+                      boxShadow: "0 0 50px rgba(167, 108, 255, 0.5)"
                     }}
                   >
-                    <Volume2 className="absolute top-3 right-3 w-6 h-6 text-primary animate-pulse" />
                     <p className="text-xl md:text-2xl text-white font-medium italic leading-relaxed"
                       style={{
-                        textShadow: "0 0 10px rgba(255, 255, 255, 0.5)"
+                        textShadow: "0 0 15px rgba(255, 255, 255, 0.6)"
                       }}
                     >
                       "{voiceLine}"
@@ -394,6 +485,15 @@ export const CompanionEvolution = ({
             </motion.div>
           )}
         </div>
+
+        {/* Add shake animation to global styles */}
+        <style>{`
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+          }
+        `}</style>
       </motion.div>
     </AnimatePresence>
   );
