@@ -204,7 +204,7 @@ export const CompanionEvolution = ({
       console.log('[CompanionEvolution] Dispatching evolution-modal-closed event after delay');
       window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
       console.log('[CompanionEvolution] evolution-modal-closed event dispatched');
-    }, 1500); // 1.5 second delay for modal close animation
+    }, 3500); // 3.5 second delay for modal close animation
     
     onComplete();
   };
