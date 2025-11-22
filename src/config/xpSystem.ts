@@ -23,14 +23,14 @@
  * - Pep Talk Listened (80%+): 3 XP
  * - Streak Milestone: 15 XP
  * 
- * EVOLUTION THRESHOLDS:
+ * EVOLUTION THRESHOLDS (Stage 1 removed, all shifted down):
  * - Stage 0 (Egg): 0 XP
- * - Stage 1 (Sparkling Egg): 15 XP (Check-in + Quest completion)
- * - Stage 2 (Hatchling): 60 XP
- * - Stage 3 (Guardian): 120 XP
- * - Stage 4 (Ascended): 250 XP
- * - Stage 5 (Mythic): 500 XP
- * - Stage 6 (Titan): 1200 XP
+ * - Stage 1 (Hatchling): 60 XP
+ * - Stage 2 (Guardian): 120 XP
+ * - Stage 3 (Ascended): 250 XP
+ * - Stage 4 (Mythic): 500 XP
+ * - Stage 5 (Titan): 1200 XP
+ * ... continues to Stage 20 (Ultimate)
  * 
  * USAGE EXAMPLE:
  * ```tsx

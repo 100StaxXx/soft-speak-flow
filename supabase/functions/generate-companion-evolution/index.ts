@@ -7,28 +7,29 @@ const corsHeaders = {
 };
 
 // XP thresholds for each evolution stage - MUST match useCompanion.ts
+// Stage 1 removed, all shifted down, max is now 20
 const EVOLUTION_THRESHOLDS = {
-  0: 0,       // Dormant Egg
-  1: 15,      // Cracking Awakening (Check-in 5 XP + Main Quest 20 XP = 25 XP)
-  2: 30,      // Newborn Emergence
-  3: 60,      // Early Infant
-  4: 100,     // Juvenile Form
-  5: 150,     // Young Explorer
-  6: 210,     // Adolescent Guardian
-  7: 280,     // Initiate Protector
-  8: 360,     // Seasoned Guardian
-  9: 450,     // Mature Protector
-  10: 550,    // Veteran Form (achievable in 2-3 months)
-  11: 700,    // Elevated Form (endgame begins)
-  12: 900,    // Ascended Form
-  13: 1150,   // Ether-Born Avatar
-  14: 1450,   // Primordial Aspect
-  15: 1800,   // Colossus Form
-  16: 2250,   // Cosmic Guardian
-  17: 2800,   // Astral Overlord
-  18: 3500,   // Universal Sovereign
-  19: 4400,   // Mythic Apex
-  20: 5500,   // Origin of Creation (ultimate form)
+  0: 0,      // Egg
+  1: 60,     // Hatchling (was stage 2)
+  2: 120,    // Guardian (was stage 3)
+  3: 250,    // Ascended (was stage 4)
+  4: 500,    // Mythic (was stage 5)
+  5: 1200,   // Titan (was stage 6)
+  6: 2500,   // (was stage 7)
+  7: 5000,   // (was stage 8)
+  8: 10000,  // (was stage 9)
+  9: 20000,  // (was stage 10)
+  10: 35000, // (was stage 11)
+  11: 50000, // (was stage 12)
+  12: 75000, // (was stage 13)
+  13: 100000, // (was stage 14)
+  14: 150000, // (was stage 15)
+  15: 200000, // (was stage 16)
+  16: 300000, // (was stage 17)
+  17: 450000, // (was stage 18)
+  18: 650000, // (was stage 19)
+  19: 1000000, // (was stage 20)
+  20: 1500000, // NEW Ultimate stage
 } as const;
 
 const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
@@ -146,16 +147,14 @@ serve(async (req) => {
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    // Special handling for destiny silhouette stages (0 and 1)
+    // Stage 0 only shows destiny preview (no evolution from -1 to 0 since stage 1 was removed)
     let userPrompt: string;
     
-    if (nextStage === 0 || nextStage === 1) {
-      // Stages 0-1: Show the FULLY EVOLVED champion form sealed inside the egg
-      const crackDescription = nextStage === 1 
-        ? 'Major cracks spreading across the shell with intense beams of divine light breaking through. The shell fragments are beginning to separate, revealing glimpses of the majestic form within.'
-        : 'perfectly intact and pristine, sealing the potential within.';
+    if (nextStage === 0) {
+      // Stage 0: Show the FULLY EVOLVED champion form sealed inside the egg
+      const crackDescription = 'perfectly intact and pristine, sealing the potential within.';
       
-      console.log(`Creating stage ${nextStage} champion destiny preview`);
+      console.log(`Creating stage 0 champion destiny preview`);
       
       userPrompt = `A colossal, divine glowing egg containing the blurred silhouette of a FULLY EVOLVED, majestic ${companion.spirit_animal} champion. 
 
@@ -175,7 +174,6 @@ Visual requirements:
 - Low-angle camera looking UP at this colossal form within the egg
 - Divine light rays (Sistine Chapel-style) illuminating from within
 - Epic ${companion.favorite_color} particle effects and ${companion.core_element} energy swirling around
-${nextStage === 1 ? `- Dramatic light beams shooting through the cracks like divine revelation\n- ${companion.core_element} energy erupting from fissures` : ''}
 - Floating in a cosmic/divine realm with ethereal ${companion.favorite_color} nebula background
 
 Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
@@ -443,26 +441,26 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
 function getStageGuidance(stage: number): string {
   const guidance: Record<number, string> = {
     0: "Pristine mystical egg containing the champion's destiny",
-    1: "Cracking egg with divine champion silhouette breaking through",
-    2: "A tiny newborn creature, fragile but alive",
-    3: "Small infant form, gaining stability",
-    4: "Young creature, playful and growing",
-    5: "Juvenile with developing features",
-    6: "Adolescent with strengthening presence",
-    7: "Young adult, confident and capable",
-    8: "Mature guardian, powerful and poised",
-    9: "Seasoned protector, battle-tested",
-    10: "Veteran form, wise and formidable",
-    11: "Elevated being, touching ethereal power",
-    12: "Ascended form, radiating mastery",
-    13: "Legendary avatar, commanding presence",
-    14: "Mythic entity, transcendent power",
-    15: "Colossus form, immense presence",
-    16: "Cosmic guardian, stellar energy",
-    17: "Astral overlord, reality-bending",
-    18: "Universal sovereign, cosmic authority",
-    19: "Mythic apex, near-divine",
-    20: "Ultimate form, peak of evolution - divine manifestation"
+    1: "Tiny hatchling, newly emerged and fragile",
+    2: "Young guardian, gaining strength",
+    3: "Ascended form, radiating power",
+    4: "Mythic being, legendary presence",
+    5: "Titan form, immense and commanding",
+    6: "Stage 6 evolution, growing stronger",
+    7: "Stage 7 evolution, enhanced power",
+    8: "Stage 8 evolution, formidable presence",
+    9: "Stage 9 evolution, battle-hardened",
+    10: "Stage 10 evolution, veteran warrior",
+    11: "Stage 11 evolution, touching ethereal power",
+    12: "Stage 12 evolution, mastering cosmic forces",
+    13: "Stage 13 evolution, legendary status",
+    14: "Stage 14 evolution, mythic entity",
+    15: "Stage 15 evolution, colossal form",
+    16: "Stage 16 evolution, cosmic guardian",
+    17: "Stage 17 evolution, astral overlord",
+    18: "Stage 18 evolution, universal sovereign",
+    19: "Stage 19 evolution, near-divine apex",
+    20: "Ultimate form, peak of all evolution - absolute divine manifestation"
   };
 
   return guidance[stage] || "Continued evolution";
