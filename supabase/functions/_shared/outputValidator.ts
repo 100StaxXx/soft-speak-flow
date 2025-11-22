@@ -61,10 +61,10 @@ export class OutputValidator {
         }
 
         // XP range validation (for missions)
-        if (this.constraints.xpRange && Array.isArray(parsed)) {
+        if (this.constraints.xpRange && Array.isArray(this.constraints.xpRange) && Array.isArray(parsed)) {
           const [min, max] = this.constraints.xpRange;
           for (const item of parsed) {
-            if (item.xp < min || item.xp > max) {
+            if (item.xp !== undefined && (item.xp < min || item.xp > max)) {
               errors.push(`XP must be between ${min} and ${max}, got ${item.xp}`);
             }
           }
@@ -107,20 +107,24 @@ export class OutputValidator {
       }
 
       // Context-specific validation
-      if (this.rules.mustMentionMood && context.userMood) {
-        if (!text.toLowerCase().includes(context.userMood.toLowerCase())) {
+      if (this.rules.mustMentionMood && context?.userMood) {
+        const mood = String(context.userMood).toLowerCase();
+        if (mood && !text.toLowerCase().includes(mood)) {
           warnings.push('Should acknowledge user mood');
         }
       }
 
-      if (this.rules.mustMentionIntention && context.userIntention) {
-        // Check if any words from intention appear in response
-        const intentionWords = context.userIntention.toLowerCase().split(/\s+/);
-        const hasIntention = intentionWords.some((word: string) => 
-          word.length > 3 && text.toLowerCase().includes(word)
-        );
-        if (!hasIntention) {
-          warnings.push('Should reference user intention');
+      if (this.rules.mustMentionIntention && context?.userIntention) {
+        const intention = String(context.userIntention);
+        if (intention) {
+          // Check if any words from intention appear in response
+          const intentionWords = intention.toLowerCase().split(/\s+/);
+          const hasIntention = intentionWords.some((word: string) => 
+            word.length > 3 && text.toLowerCase().includes(word)
+          );
+          if (!hasIntention) {
+            warnings.push('Should reference user intention');
+          }
         }
       }
 
