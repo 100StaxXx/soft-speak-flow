@@ -261,13 +261,11 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
       setRun(false);
       
-      // Set a fallback timeout in case evolution-complete never fires
+      // Set a fallback timeout in case evolution-modal-closed never fires
       evolutionTimeoutId = createTrackedTimeout(() => {
-        console.warn('[Tutorial] Evolution timeout reached, proceeding to final step');
-        setRun(true);
-        createTrackedTimeout(() => {
-          safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
-        }, DELAYS.POST_EVOLUTION);
+        console.warn('[Tutorial] Evolution timeout reached, showing completion button');
+        setRun(false);
+        setShowCompletionButton(true);
       }, TIMEOUTS.EVOLUTION_COMPLETE);
     };
 
