@@ -307,7 +307,7 @@ const Admin = () => {
 
       // Play the audio
       const audio = new Audio(data.audioUrl);
-      audio.play();
+      audio.play().catch(err => console.error('Audio play failed:', err));
 
       audio.onended = () => {
         setPreviewingVoice(null);
