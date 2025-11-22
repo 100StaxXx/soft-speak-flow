@@ -250,13 +250,12 @@ export const useCompanion = () => {
       
       // CRITICAL: Ensure companion is loaded before awarding XP
       if (!companion) {
-        console.warn('Companion not loaded yet, retrying...');
-        // Refetch companion data
-        await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.warn('Companion not loaded yet, fetching...');
+        // Refetch companion data and wait for it to complete
+        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
         const freshCompanion = queryClient.getQueryData(["companion", user.id]) as Companion | null;
         if (!freshCompanion) {
-          throw new Error("No companion found after retry");
+          throw new Error("No companion found. Please create one first.");
         }
         // Use fresh companion for calculation
         const companionToUse = freshCompanion;
