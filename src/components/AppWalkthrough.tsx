@@ -272,6 +272,10 @@ export const AppWalkthrough = () => {
     const navTasks = document.querySelector('a[href="/tasks"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
+        // Ensure we scroll to top with multiple attempts for reliability on mobile
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        window.scrollTo({ top: 0, behavior: 'instant' });
         await safeSetStep(STEP_INDEX.QUEST_CREATION);
       }, DELAYS.POST_NAV_TASKS);
     };
