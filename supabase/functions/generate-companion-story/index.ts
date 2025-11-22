@@ -60,27 +60,27 @@ function getColorName(color: string): string {
 }
 
 const EVOLUTION_THEMES = [
-  "Fate sleeping",
-  "Awakening",
-  "New beginning",
-  "Fragility & courage",
-  "First trial",
-  "Journey begins",
-  "Guardian awakening",
-  "The oath",
-  "The world pushes back",
-  "Rise of protector",
-  "Scars of experience",
-  "Lift of hope",
-  "Ascension",
-  "Unity of souls",
-  "Primordial ancestry",
-  "Colossus awakening",
-  "Cosmic purpose",
-  "Astral power",
-  "Universal sovereignty",
-  "Mythic apex",
-  "Origin of Creation"
+  "Fate sleeping",              // Stage 0: Egg
+  "First awakening",            // Stage 1: Hatchling (was stage 2)
+  "Guardian rises",             // Stage 2: Guardian (was stage 3)
+  "Ascension begins",           // Stage 3: Ascended (was stage 4)
+  "Mythic power",               // Stage 4: Mythic (was stage 5)
+  "Titan emerges",              // Stage 5: Titan (was stage 6)
+  "Growing dominion",           // Stage 6
+  "Rising force",               // Stage 7
+  "Mastery claimed",            // Stage 8
+  "Battle-forged",              // Stage 9
+  "Veteran's wisdom",           // Stage 10
+  "Transcendent shift",         // Stage 11
+  "Cosmic awakening",           // Stage 12
+  "Legendary form",             // Stage 13
+  "Reality bends",              // Stage 14
+  "Colossus walks",             // Stage 15
+  "Stellar guardian",           // Stage 16
+  "Astral sovereign",           // Stage 17
+  "Universal force",            // Stage 18
+  "Divine threshold",           // Stage 19
+  "Ultimate existence"          // Stage 20: Ultimate (new)
 ];
 
 // Species anatomical traits for accuracy - ALL 66 ANIMALS SUPPORTED
