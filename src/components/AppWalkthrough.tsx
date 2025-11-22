@@ -390,7 +390,7 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous={false}
+      continuous={stepIndex === STEP_INDEX.FINAL_CONGRATULATIONS}
       showProgress={false}
       showSkipButton={false}
       hideCloseButton={stepIndex !== STEP_INDEX.FINAL_CONGRATULATIONS}
