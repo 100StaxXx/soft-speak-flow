@@ -70,8 +70,8 @@ const Companion = () => {
                 currentStage={companion?.current_stage || 0}
                 progressPercent={progressToNext}
               />
-              <XPBreakdown />
               <DailyMissions />
+              <XPBreakdown />
             </TabsContent>
 
             <TabsContent value="progress" className="space-y-6 mt-6">
