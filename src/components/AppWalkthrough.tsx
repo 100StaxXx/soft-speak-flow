@@ -392,7 +392,7 @@ export const AppWalkthrough = () => {
       continuous={stepIndex === STEP_INDEX.FINAL_CONGRATULATIONS}
       showProgress={false}
       showSkipButton={false}
-      hideCloseButton={true}
+      hideCloseButton={stepIndex !== STEP_INDEX.FINAL_CONGRATULATIONS}
       disableOverlay={interactiveStepIndices.includes(stepIndex)}
       spotlightPadding={8}
       disableCloseOnEsc
