@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         input_data: { message, mentorName, mentorTone },
         output_data: { response: assistantMessage },
         validation_passed: validationResult.isValid,
-        validation_errors: validationResult.errors.length > 0 ? validationResult.errors : [],
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
         model_used: 'google/gemini-2.5-flash',
         response_time_ms: responseTime
       });

@@ -164,8 +164,8 @@ export class PromptBuilder {
     return {
       systemPrompt,
       userPrompt,
-      validationRules: this.template.validation_rules,
-      outputConstraints: this.template.output_constraints
+      validationRules: this.template.validation_rules || {},
+      outputConstraints: this.template.output_constraints || {}
     };
   }
 

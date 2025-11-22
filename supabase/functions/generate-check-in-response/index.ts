@@ -166,7 +166,7 @@ serve(async (req) => {
         input_data: { mood: checkIn.mood, intention: checkIn.intention },
         output_data: { response: mentorResponse },
         validation_passed: validationResult.isValid,
-        validation_errors: validationResult.errors.length > 0 ? validationResult.errors : [],
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
         model_used: 'google/gemini-2.5-flash',
         response_time_ms: responseTime
       });
