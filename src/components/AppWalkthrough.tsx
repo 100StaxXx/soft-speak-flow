@@ -45,6 +45,7 @@ export const AppWalkthrough = () => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState<number>(0);
   const [isWalkthroughCompleted, setIsWalkthroughCompleted] = useState<boolean | null>(null);
+  const [showCompletionButton, setShowCompletionButton] = useState(false);
 
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
@@ -271,7 +272,7 @@ export const AppWalkthrough = () => {
     };
 
     const handleEvolutionModalClosed = () => {
-      console.log('[Tutorial] Evolution modal closed! Showing final congratulations step.');
+      console.log('[Tutorial] Evolution modal closed! Showing completion button.');
       
       // Clear the fallback timeout
       if (evolutionTimeoutId !== null) {
@@ -279,9 +280,9 @@ export const AppWalkthrough = () => {
         evolutionTimeoutId = null;
       }
       
-      // Re-enable the tour and advance to final step
-      setRun(true);
-      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
+      // Show the manual completion button instead of auto-advancing
+      setRun(false);
+      setShowCompletionButton(true);
     };
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
@@ -373,45 +374,64 @@ export const AppWalkthrough = () => {
   console.log('[Tutorial] Rendering Joyride with:', { run, stepIndex, stepsCount: steps.length });
 
   return (
-    <Joyride
-      steps={steps}
-      run={run}
-      stepIndex={stepIndex}
-      callback={handleJoyrideCallback}
-      continuous={false}
-      showProgress={false}
-      showSkipButton={false}
-      hideCloseButton={true}
-      disableOverlay={interactiveStepIndices.includes(stepIndex)}
-      spotlightPadding={8}
-      disableCloseOnEsc
-      disableScrolling={false}
-      tooltipComponent={CustomTooltip}
-      styles={{
-        options: {
-          zIndex: 10000,
-          primaryColor: 'hsl(var(--primary))',
-          textColor: 'hsl(var(--foreground))',
-          backgroundColor: 'hsl(var(--background))',
-          arrowColor: 'hsl(var(--background))',
-        },
-        tooltip: {
-          borderRadius: '1rem',
-          padding: '1.5rem',
-        },
-        buttonNext: {
-          backgroundColor: 'hsl(var(--primary))',
-          borderRadius: '0.5rem',
-          padding: '0.5rem 1rem',
-        },
-      }}
-      floaterProps={{
-        disableAnimation: false,
-        hideArrow: false,
-      }}
-      locale={{
-        last: 'Close',
-      }}
-    />
+    <>
+      <Joyride
+        steps={steps}
+        run={run}
+        stepIndex={stepIndex}
+        callback={handleJoyrideCallback}
+        continuous={false}
+        showProgress={false}
+        showSkipButton={false}
+        hideCloseButton={true}
+        disableOverlay={interactiveStepIndices.includes(stepIndex)}
+        spotlightPadding={8}
+        disableCloseOnEsc
+        disableScrolling={false}
+        tooltipComponent={CustomTooltip}
+        styles={{
+          options: {
+            zIndex: 10000,
+            primaryColor: 'hsl(var(--primary))',
+            textColor: 'hsl(var(--foreground))',
+            backgroundColor: 'hsl(var(--background))',
+            arrowColor: 'hsl(var(--background))',
+          },
+          tooltip: {
+            borderRadius: '1rem',
+            padding: '1.5rem',
+          },
+          buttonNext: {
+            backgroundColor: 'hsl(var(--primary))',
+            borderRadius: '0.5rem',
+            padding: '0.5rem 1rem',
+          },
+        }}
+        floaterProps={{
+          disableAnimation: false,
+          hideArrow: false,
+        }}
+        locale={{
+          last: 'Close',
+        }}
+      />
+      
+      {showCompletionButton && (
+        <div className="fixed bottom-24 right-6 z-[10001] animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Button
+            onClick={async () => {
+              setShowCompletionButton(false);
+              await handleWalkthroughComplete();
+            }}
+            size="lg"
+            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-bold text-lg px-8 py-6 rounded-2xl shadow-2xl hover:shadow-primary/50 transition-all duration-300 animate-pulse"
+          >
+            <span className="mr-2">🎉</span>
+            Complete Tutorial
+            <span className="ml-2">✨</span>
+          </Button>
+        </div>
+      )}
+    </>
   );
 };
