@@ -38,27 +38,27 @@ export const XP_REWARDS = {
 
 // 21-Stage Evolution System: Early stages fast, late stages exponential
 export const EVOLUTION_THRESHOLDS = {
-  0: 0,       // Dormant Egg
-  1: 15,      // Cracking Awakening (Check-in + Quest completion)
-  2: 30,      // Newborn Emergence
-  3: 60,      // Early Infant
-  4: 100,     // Juvenile Form
-  5: 150,     // Young Explorer
-  6: 210,     // Adolescent Guardian
-  7: 280,     // Initiate Protector
-  8: 360,     // Seasoned Guardian
-  9: 450,     // Mature Protector
-  10: 550,    // Veteran Form (achievable in 2-3 months)
-  11: 700,    // Elevated Form (endgame begins)
-  12: 900,    // Ascended Form
-  13: 1150,   // Ether-Born Avatar
-  14: 1450,   // Primordial Aspect
-  15: 1800,   // Colossus Form
-  16: 2250,   // Cosmic Guardian
-  17: 2800,   // Astral Overlord
-  18: 3500,   // Universal Sovereign
-  19: 4400,   // Mythic Apex
-  20: 5500,   // Origin of Creation (ultimate form)
+  0: 0,      // Egg
+  1: 60,     // Hatchling (was stage 2)
+  2: 120,    // Guardian (was stage 3)
+  3: 250,    // Ascended (was stage 4)
+  4: 500,    // Mythic (was stage 5)
+  5: 1200,   // Titan (was stage 6)
+  6: 2500,   // (was stage 7)
+  7: 5000,   // (was stage 8)
+  8: 10000,  // (was stage 9)
+  9: 20000,  // (was stage 10)
+  10: 35000, // (was stage 11)
+  11: 50000, // (was stage 12)
+  12: 75000, // (was stage 13)
+  13: 100000, // (was stage 14)
+  14: 150000, // (was stage 15)
+  15: 200000, // (was stage 16)
+  16: 300000, // (was stage 17)
+  17: 450000, // (was stage 18)
+  18: 650000, // (was stage 19)
+  19: 1000000, // (was stage 20)
+  20: 1500000, // NEW Ultimate stage
 };
 
 export const useCompanion = () => {
