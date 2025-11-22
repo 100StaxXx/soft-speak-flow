@@ -63,20 +63,28 @@ export const MorningCheckIn = () => {
       return;
     }
 
+    // Prevent duplicate submissions
+    if (existingCheckIn) {
+      toast({ 
+        title: "Already checked in", 
+        description: "You've already completed your check-in today",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const { data: checkIn, error } = await supabase
         .from('daily_check_ins')
-        .upsert({
+        .insert({
           user_id: user.id,
           check_in_type: 'morning',
           check_in_date: today,
           mood,
           intention: intention.trim(),
           completed_at: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id,check_in_date,check_in_type'
         })
         .select()
         .maybeSingle();
@@ -86,7 +94,7 @@ export const MorningCheckIn = () => {
         throw error;
       }
 
-      // Award XP for check-in
+      // Award XP only on successful INSERT (not update)
       awardCheckInComplete();
       
       // Check for first check-in achievement
