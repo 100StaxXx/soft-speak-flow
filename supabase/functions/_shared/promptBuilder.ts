@@ -110,19 +110,23 @@ export class PromptBuilder {
       modifiers.push('Provide more context and examples.');
     }
 
-    if (this.userPrefs.avoid_topics.length > 0) {
+    if (this.userPrefs.avoid_topics && this.userPrefs.avoid_topics.length > 0) {
       modifiers.push(`Avoid mentioning: ${this.userPrefs.avoid_topics.join(', ')}.`);
     }
 
     if (modifiers.length > 0) {
-      enhanced = enhanced.replace('{{personalityAdjustments}}', modifiers.join('\n'));
-      enhanced = enhanced.replace('{{personalityModifiers}}', modifiers.join(' '));
+      enhanced = enhanced.replace(/\{\{personalityAdjustments\}\}/g, modifiers.join('\n'));
+      enhanced = enhanced.replace(/\{\{personalityModifiers\}\}/g, modifiers.join(' '));
+    } else {
+      // Remove placeholders if no modifiers
+      enhanced = enhanced.replace(/\{\{personalityAdjustments\}\}/g, '');
+      enhanced = enhanced.replace(/\{\{personalityModifiers\}\}/g, '');
     }
 
     // Apply length preferences
     const maxSentences = lengthMap[this.userPrefs.preferred_length] || 3;
-    enhanced = enhanced.replace('{{maxSentences}}', String(maxSentences));
-    enhanced = enhanced.replace('{{responseLength}}', this.userPrefs.preferred_length);
+    enhanced = enhanced.replace(/\{\{maxSentences\}\}/g, String(maxSentences));
+    enhanced = enhanced.replace(/\{\{responseLength\}\}/g, this.userPrefs.preferred_length || 'concise');
 
     return enhanced;
   }
