@@ -36,7 +36,7 @@ export const useXPRewards = () => {
   });
 
   const awardHabitCompletion = async () => {
-    if (!companion) return;
+    if (!companion || awardXP.isPending) return;
     
     try {
       showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
@@ -116,7 +116,7 @@ export const useXPRewards = () => {
   };
 
   const awardStreakMilestone = async (milestone: number) => {
-    if (!companion) return;
+    if (!companion || awardXP.isPending) return;
     
     try {
       showXPToast(XP_REWARDS.STREAK_MILESTONE, `${milestone} Day Streak!`);
@@ -137,7 +137,7 @@ export const useXPRewards = () => {
   };
 
   const awardReflectionComplete = async () => {
-    if (!companion) return;
+    if (!companion || awardXP.isPending) return;
     
     try {
       showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
