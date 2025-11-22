@@ -137,7 +137,7 @@ export const ActivityTimeline = () => {
     }
     
     const audio = new Audio(url);
-    audio.play();
+    audio.play().catch(err => console.error('Audio play failed:', err));
     setPlayingAudio(activityId);
     audio.onended = () => setPlayingAudio(null);
     markAsRead(activityId);

@@ -218,7 +218,7 @@ export const TodaysPepTalk = () => {
     if (isPlaying) {
       audio.pause();
     } else {
-      audio.play();
+      audio.play().catch(err => console.error('Audio play failed:', err));
     }
     setIsPlaying(!isPlaying);
   };
