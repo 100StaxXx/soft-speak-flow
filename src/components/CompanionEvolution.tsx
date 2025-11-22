@@ -180,7 +180,8 @@ export const CompanionEvolution = ({
 
   if (!isEvolving) return null;
 
-  const isStage0or1 = newStage === 0; // Only stage 0 is egg now (stage 1 removed)
+  const isStage0 = newStage === 0; // Stage 0 is egg destiny preview
+  const isStage1 = newStage === 1; // Stage 1 is hatchling emerging
 
   return (
     <AnimatePresence>
@@ -264,7 +265,7 @@ export const CompanionEvolution = ({
                   textShadow: "0 0 40px rgba(167, 108, 255, 0.9), 0 0 80px rgba(192, 132, 252, 0.6)"
                 }}
               >
-                {isStage0or1 ? "A Vision of Your Destiny..." : "Evolution Awakens..."}
+                {isStage0 ? "A Vision of Your Destiny..." : isStage1 ? "Your Companion Emerges..." : "Evolution Awakens..."}
               </h2>
             </motion.div>
           )}
@@ -407,7 +408,7 @@ export const CompanionEvolution = ({
                   textShadow: "0 0 40px rgba(167, 108, 255, 0.9), 0 0 80px rgba(192, 132, 252, 0.7)"
                 }}
               >
-                {isStage0or1 ? "Destiny Sealed!" : "Evolution!"}
+                {isStage0 ? "Destiny Sealed!" : isStage1 ? "Born!" : "Evolution!"}
               </motion.h1>
               
               <motion.p
@@ -423,8 +424,10 @@ export const CompanionEvolution = ({
                   repeat: Infinity,
                 }}
               >
-                {isStage0or1 
+                {isStage0 
                   ? "Your Champion Awaits Within" 
+                  : isStage1
+                  ? "Your Companion Has Hatched!"
                   : "Your Companion Has Evolved!"}
               </motion.p>
 
