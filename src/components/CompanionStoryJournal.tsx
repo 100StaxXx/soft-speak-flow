@@ -7,27 +7,27 @@ import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock } from "lu
 import { Separator } from "./ui/separator";
 
 const STAGE_NAMES = [
-  "Dormant Egg",
-  "Cracking Awakening",
-  "Newborn Emergence",
-  "Early Infant",
-  "Juvenile Form",
-  "Young Explorer",
-  "Adolescent Guardian",
-  "Initiate Protector",
-  "Seasoned Guardian",
-  "Mature Protector",
-  "Veteran Form",
-  "Elevated Form",
-  "Ascended Form",
-  "Ether-Born Avatar",
-  "Primordial Aspect",
-  "Colossus Form",
-  "Cosmic Guardian",
-  "Astral Overlord",
-  "Universal Sovereign",
-  "Mythic Apex",
-  "Origin of Creation"
+  "Egg",
+  "Hatchling",
+  "Guardian",
+  "Ascended",
+  "Mythic",
+  "Titan",
+  "Stage 6",
+  "Stage 7",
+  "Stage 8",
+  "Stage 9",
+  "Stage 10",
+  "Stage 11",
+  "Stage 12",
+  "Stage 13",
+  "Stage 14",
+  "Stage 15",
+  "Stage 16",
+  "Stage 17",
+  "Stage 18",
+  "Stage 19",
+  "Ultimate"
 ];
 
 export const CompanionStoryJournal = () => {

@@ -180,7 +180,7 @@ export const CompanionEvolution = ({
 
   if (!isEvolving) return null;
 
-  const isStage0or1 = newStage === 0 || newStage === 1;
+  const isStage0or1 = newStage === 0; // Only stage 0 is egg now (stage 1 removed)
 
   return (
     <AnimatePresence>
@@ -309,37 +309,7 @@ export const CompanionEvolution = ({
                 }}
               />
 
-              {/* Divine light beams for stage 1 cracks */}
-              {newStage === 1 && (
-                <>
-                  {[...Array(8)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute"
-                      style={{
-                        width: '4px',
-                        height: '100%',
-                        background: 'linear-gradient(to bottom, rgba(255, 215, 0, 0.9), rgba(167, 108, 255, 0.4), transparent)',
-                        transformOrigin: 'center center',
-                        rotate: `${(i * 360) / 8}deg`,
-                        filter: 'blur(2px)',
-                        boxShadow: '0 0 20px rgba(255, 215, 0, 0.8)',
-                      }}
-                      initial={{ opacity: 0, scaleY: 0 }}
-                      animate={{ 
-                        opacity: [0, 1, 0.7, 1],
-                        scaleY: [0, 1.5, 1, 1.5],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        delay: i * 0.1,
-                        ease: "easeInOut"
-                      }}
-                    />
-                  ))}
-                </>
-              )}
+              {/* Stage 1 removed - no light beams */}
 
               {/* Corner sparkles for extra epicness */}
               <Sparkles 

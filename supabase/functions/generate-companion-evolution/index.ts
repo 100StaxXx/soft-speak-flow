@@ -178,7 +178,7 @@ Visual requirements:
 
 Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
 Mood: Legendary destiny sealed within, unstoppable potential, the champion king awaits
-Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance${nextStage === 1 ? ', explosive light from cracks' : ''}`;
+Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
 
     } else {
       // Stages 2+: ALWAYS use image analysis for strict color continuity
