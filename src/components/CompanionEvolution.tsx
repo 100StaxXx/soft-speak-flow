@@ -27,6 +27,7 @@ export const CompanionEvolution = ({
   const [animationStage, setAnimationStage] = useState(0);
   const [voiceLine, setVoiceLine] = useState<string>("");
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
+  const [canDismiss, setCanDismiss] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -150,22 +151,11 @@ export const CompanionEvolution = ({
       // Stage 6: Show voice line (5s)
       setTimeout(() => {
         setAnimationStage(6);
+        // Enable dismiss after voice line appears
+        setTimeout(() => {
+          setCanDismiss(true);
+        }, 1000);
       }, 5000),
-
-      // Close and cleanup (7s)
-      setTimeout(() => {
-        setAnimationStage(0);
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
-        resumeAmbientAfterEvent();
-        
-        window.dispatchEvent(new CustomEvent('companion-evolved'));
-        window.dispatchEvent(new CustomEvent('evolution-complete'));
-        
-        onComplete();
-      }, 7000),
     ];
 
     return () => {
@@ -176,7 +166,24 @@ export const CompanionEvolution = ({
       }
       resumeAmbientAfterEvent();
     };
-  }, [isEvolving, isLoadingVoice, onComplete, mentorSlug, userId, newStage]);
+  }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage]);
+
+  const handleDismiss = () => {
+    if (!canDismiss) return;
+    
+    setAnimationStage(0);
+    setCanDismiss(false);
+    
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    resumeAmbientAfterEvent();
+    window.dispatchEvent(new CustomEvent('companion-evolved'));
+    window.dispatchEvent(new CustomEvent('evolution-complete'));
+    onComplete();
+  };
 
   if (!isEvolving) return null;
 
@@ -190,7 +197,8 @@ export const CompanionEvolution = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
+        className={`fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden ${canDismiss ? 'cursor-pointer' : ''}`}
+        onClick={handleDismiss}
         style={{ 
           pointerEvents: 'auto', 
           touchAction: 'none',
@@ -455,6 +463,20 @@ export const CompanionEvolution = ({
                   </div>
                 </motion.div>
               )}
+            </motion.div>
+          )}
+
+          {/* Tap to continue indicator */}
+          {canDismiss && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
+            >
+              <p className="text-white/80 text-lg font-medium animate-pulse">
+                Tap anywhere to continue ✨
+              </p>
             </motion.div>
           )}
         </div>
