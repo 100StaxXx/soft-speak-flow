@@ -186,10 +186,14 @@ export default function Tasks() {
           const xpAmount = habit?.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
           
-          // Update companion attributes
+          // Update companion attributes in background without blocking
           if (companion) {
-            await updateMindFromHabit(companion.id);
-            await updateBodyFromActivity(companion.id);
+            updateMindFromHabit(companion.id).catch(err => 
+              console.error('Mind update failed:', err)
+            );
+            updateBodyFromActivity(companion.id).catch(err => 
+              console.error('Body update failed:', err)
+            );
           }
           
           // Check for streak achievements
