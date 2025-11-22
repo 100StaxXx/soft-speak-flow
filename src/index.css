@@ -17,9 +17,9 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* A Lil Push - Light Mode (Warm & Premium) */
+    /* A Lil Push - Enhanced Premium Design */
     
-    /* Core Brand Colors - Shared across themes */
+    /* Core Brand Colors - More Vibrant */
     --obsidian: 0 0% 5%;
     --midnight: 240 10% 10%;
     --charcoal: 240 8% 18%;
@@ -35,53 +35,53 @@ All colors MUST be HSL.
     /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
     
-    /* Light Mode Semantic Tokens */
-    --background: 30 20% 98%;        /* Warm cream white */
-    --foreground: 240 10% 15%;       /* Dark charcoal for text */
+    /* Semantic Tokens */
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 100%;               /* Pure white cards */
-    --card-foreground: 240 10% 15%;
+    --card: 240 8% 14%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 15%;
+    --popover: 240 8% 14%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 270 70% 55%;          /* Royal purple - unchanged */
+    --primary: 270 70% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 270 15% 95%;        /* Light purple tint */
-    --secondary-foreground: 270 60% 30%;
+    --secondary: 240 8% 18%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 30 15% 92%;             /* Warm light gray */
-    --muted-foreground: 240 5% 45%;
+    --muted: 240 6% 22%;
+    --muted-foreground: 240 5% 70%;
 
-    --accent: 280 80% 65%;           /* Accent purple - unchanged */
+    --accent: 280 80% 65%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 270 10% 88%;           /* Subtle purple-tinted border */
-    --input: 30 15% 96%;             /* Very light warm input bg */
+    --border: 240 10% 20%;
+    --input: 240 8% 18%;
     --ring: 270 70% 55%;
 
     --radius: 1.25rem;
     
-    /* Light Mode Gradients */
+    /* Enhanced Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--electric-purple)));
-    --gradient-secondary: linear-gradient(135deg, hsl(270 40% 90%), hsl(280 50% 94%));
-    --gradient-subtle: linear-gradient(180deg, hsl(30 20% 99%), hsl(30 20% 96%));
-    --gradient-depth: linear-gradient(135deg, hsl(270 30% 92%), hsl(30 20% 98%));
-    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.1), transparent);
-    --gradient-glow: linear-gradient(135deg, hsl(var(--neon-glow) / 0.15), hsl(var(--royal-purple) / 0.1));
-    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(270 20% 98%));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--accent-purple)));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--graphite)), hsl(var(--obsidian)));
+    --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--midnight)));
+    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.2), transparent);
+    --gradient-glow: linear-gradient(135deg, hsl(var(--neon-glow) / 0.3), hsl(var(--royal-purple) / 0.2));
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(var(--secondary)));
     
-    /* Light Mode Shadows */
-    --shadow-soft: 0 2px 12px hsl(270 20% 20% / 0.08);
-    --shadow-medium: 0 4px 20px hsl(270 20% 20% / 0.12);
-    --shadow-hard: 0 8px 32px hsl(270 20% 20% / 0.16);
-    --shadow-glow: 0 0 30px hsl(var(--royal-purple) / 0.2), 0 0 60px hsl(var(--royal-purple) / 0.1);
-    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.25), 0 0 80px hsl(var(--royal-purple) / 0.15);
-    --shadow-neon: 0 0 20px hsl(var(--neon-glow) / 0.3), 0 0 40px hsl(var(--neon-glow) / 0.15);
+    /* Enhanced Shadows */
+    --shadow-soft: 0 2px 12px hsl(0 0% 0% / 0.4);
+    --shadow-medium: 0 4px 20px hsl(0 0% 0% / 0.5);
+    --shadow-hard: 0 8px 32px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 30px hsl(var(--royal-purple) / 0.6), 0 0 60px hsl(var(--royal-purple) / 0.3);
+    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.7), 0 0 80px hsl(var(--royal-purple) / 0.4);
+    --shadow-neon: 0 0 20px hsl(var(--neon-glow) / 0.8), 0 0 40px hsl(var(--neon-glow) / 0.5);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -93,70 +93,51 @@ All colors MUST be HSL.
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
-    --space-lg: 1.75rem;
-    --space-xl: 2.5rem;
-    --space-2xl: 3.5rem;
-    --space-3xl: 5rem;
+    --space-lg: 1.75rem; /* +0.25rem */
+    --space-xl: 2.5rem;  /* +0.5rem */
+    --space-2xl: 3.5rem; /* +0.5rem */
+    --space-3xl: 5rem;   /* new */
     
     /* Mentor Personality Colors */
-    --mentor-warmth: 30 100% 60%;
-    --mentor-discipline: 270 80% 30%;
-    --mentor-energy: 20 100% 55%;
-    --mentor-calm: 180 50% 50%;
-    --mentor-wisdom: 280 60% 50%;
-    --mentor-fierce: 0 90% 45%;
-    --mentor-gentle: 150 40% 60%;
-    --mentor-bold: 340 80% 50%;
-    --mentor-serene: 200 60% 55%;
+    --mentor-warmth: 30 100% 60%;      /* warm orange */
+    --mentor-discipline: 270 80% 30%;   /* dark purple */
+    --mentor-energy: 20 100% 55%;      /* vibrant orange */
+    --mentor-calm: 180 50% 50%;        /* teal */
+    --mentor-wisdom: 280 60% 50%;      /* purple */
+    --mentor-fierce: 0 90% 45%;        /* red */
+    --mentor-gentle: 150 40% 60%;      /* soft green */
+    --mentor-bold: 340 80% 50%;        /* magenta */
+    --mentor-serene: 200 60% 55%;      /* blue */
   }
   
   .dark {
-    /* A Lil Push - Dark Mode (Deep & Premium) */
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
     
-    --background: 0 0% 5%;           /* True obsidian black */
-    --foreground: 0 0% 98%;
+    --card: 240 6% 15%;
+    --card-foreground: 0 0% 100%;
     
-    --card: 240 8% 14%;              /* Deep graphite cards */
-    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 15%;
+    --popover-foreground: 0 0% 100%;
     
-    --popover: 240 8% 14%;
-    --popover-foreground: 0 0% 98%;
-    
-    --primary: 270 70% 55%;          /* Royal purple - matches light */
+    --primary: 270 60% 50%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 240 8% 18%;         /* Dark charcoal */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 6% 20%;
+    --secondary-foreground: 0 0% 100%;
     
-    --muted: 240 6% 22%;
-    --muted-foreground: 240 5% 70%;
+    --muted: 240 6% 25%;
+    --muted-foreground: 240 5% 65%;
     
-    --accent: 280 80% 65%;           /* Accent purple - matches light */
+    --accent: 270 50% 35%;
     --accent-foreground: 0 0% 100%;
     
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
     
-    --border: 240 10% 20%;
-    --input: 240 8% 18%;
-    --ring: 270 70% 55%;
-    
-    /* Dark Mode Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--royal-purple)), hsl(var(--electric-purple)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--accent-purple)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--graphite)), hsl(var(--obsidian)));
-    --gradient-depth: linear-gradient(135deg, hsl(var(--deep-purple)), hsl(var(--midnight)));
-    --gradient-shimmer: linear-gradient(90deg, transparent, hsl(var(--royal-purple) / 0.2), transparent);
-    --gradient-glow: linear-gradient(135deg, hsl(var(--neon-glow) / 0.3), hsl(var(--royal-purple) / 0.2));
-    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(var(--secondary)));
-    
-    /* Dark Mode Shadows */
-    --shadow-soft: 0 2px 12px hsl(0 0% 0% / 0.4);
-    --shadow-medium: 0 4px 20px hsl(0 0% 0% / 0.5);
-    --shadow-hard: 0 8px 32px hsl(0 0% 0% / 0.6);
-    --shadow-glow: 0 0 30px hsl(var(--royal-purple) / 0.6), 0 0 60px hsl(var(--royal-purple) / 0.3);
-    --shadow-glow-lg: 0 0 40px hsl(var(--royal-purple) / 0.7), 0 0 80px hsl(var(--royal-purple) / 0.4);
-    --shadow-neon: 0 0 20px hsl(var(--neon-glow) / 0.8), 0 0 40px hsl(var(--neon-glow) / 0.5);
+    --border: 240 6% 25%;
+    --input: 240 6% 25%;
+    --ring: 270 60% 50%;
   }
 }
 
