@@ -278,7 +278,11 @@ export const AppWalkthrough = () => {
     };
 
     const handleEvolutionModalClosed = () => {
-      console.log('[Tutorial] Evolution modal closed! Showing completion button.');
+      console.log('[Tutorial] Evolution modal closed event received! Current state:', { 
+        stepIndex, 
+        run,
+        showCompletionButton 
+      });
       
       // Clear the fallback timeout
       if (timeoutRef.current !== null) {
@@ -289,6 +293,7 @@ export const AppWalkthrough = () => {
       // Show the manual completion button instead of auto-advancing
       setRun(false);
       setShowCompletionButton(true);
+      console.log('[Tutorial] Set showCompletionButton to true');
     };
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
