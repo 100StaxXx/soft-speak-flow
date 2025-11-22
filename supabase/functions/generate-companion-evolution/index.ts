@@ -147,7 +147,7 @@ serve(async (req) => {
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    // Stage 0 only shows destiny preview (no evolution from -1 to 0 since stage 1 was removed)
+    // Stage 0 = egg destiny preview, Stage 1 = hatchling emerging
     let userPrompt: string;
     
     if (nextStage === 0) {
@@ -179,6 +179,38 @@ Visual requirements:
 Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
 Mood: Legendary destiny sealed within, unstoppable potential, the champion king awaits
 Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
+
+    } else if (nextStage === 1) {
+      // Stage 1: Hatchling emerging from the egg - NEW LIFE!
+      console.log("Creating stage 1 hatchling emergence");
+      
+      userPrompt = `A tiny, adorable baby ${companion.spirit_animal} just hatching from a cracked egg. This is the moment of BIRTH.
+
+CRITICAL - First life stage requirements:
+- BABY/NEWBORN size - small, fragile, cute
+- Just emerged from broken eggshells (visible around it)
+- Wobbly, uncertain posture - first moments of life
+- Big curious eyes, innocent expression
+- Still has hints of egg glow on its body
+- Small wisps of ${companion.core_element} elemental energy starting to manifest
+
+Color and identity (MUST match):
+- Primary color: ${companion.favorite_color}
+- Animal type: ${companion.spirit_animal}
+- Element: ${companion.core_element}
+${companion.eye_color ? `- Eye color: ${companion.eye_color}` : ''}
+${companion.fur_color ? `- Fur/scale color: ${companion.fur_color}` : ''}
+
+Visual style:
+- Warm, soft lighting from broken egg
+- Scattered eggshell pieces around
+- Faint ${companion.favorite_color} glow particles from hatching
+- Gentle ${companion.core_element} energy wisps
+- Background: mystical nursery realm with soft ${companion.favorite_color} ambient light
+
+Mood: Wonder, new beginnings, innocent potential, first breath of life
+Style: Adorable but epic, soft but magical, Studio Ghibli meets fantasy art
+Camera: Eye-level with the tiny hatchling, showing its small scale and vulnerability`;
 
     } else {
       // Stages 2+: ALWAYS use image analysis for strict color continuity
