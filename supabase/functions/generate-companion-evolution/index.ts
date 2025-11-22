@@ -146,23 +146,41 @@ serve(async (req) => {
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    // Special handling for silhouette stages (0->1) and fresh baby start (1->2)
+    // Special handling for destiny silhouette stages (0 and 1)
     let userPrompt: string;
     
-    if (nextStage === 1) {
-      // Stage 0 -> 1: Silhouette of stage 20 inside cracking egg
-      console.log("Creating stage 1 silhouette (preview of stage 20)");
-      userPrompt = `Create a mystical egg with luminous cracks spreading across its surface, leaking ${companion.core_element} energy. 
-Through the larger cracks, a dark shadowy silhouette is visible - showing only the magnificent outline of a powerful, ultimate form of a ${companion.spirit_animal} creature (what it would look like at its final evolution stage 20). 
+    if (nextStage === 0 || nextStage === 1) {
+      // Stages 0-1: Show the FULLY EVOLVED champion form sealed inside the egg
+      const crackDescription = nextStage === 1 
+        ? 'Major cracks spreading across the shell with intense beams of divine light breaking through. The shell fragments are beginning to separate, revealing glimpses of the majestic form within.'
+        : 'perfectly intact and pristine, sealing the potential within.';
+      
+      console.log(`Creating stage ${nextStage} champion destiny preview`);
+      
+      userPrompt = `A colossal, divine glowing egg containing the blurred silhouette of a FULLY EVOLVED, majestic ${companion.spirit_animal} champion. 
 
-The silhouette must be:
-- Completely dark and featureless (just a shadow/outline)
-- Show the basic majestic shape and powerful presence of an ultimate ${companion.spirit_animal}
-- Maintain the ${companion.core_element} elemental theme in the aura
-- Use ${companion.favorite_color} in the energy emanating from the cracks
-- Be large and imposing in shadow form, curled within the egg but clearly powerful
+CRITICAL - The creature inside must appear:
+- ADULT and FULLY EVOLVED (not a baby)
+- Massive, powerful, commanding presence visible through the translucent egg
+- Heroic pose: standing tall, dominant, regal
+- Muscular, god-tier physique
+- If wings/features would exist on a mature ${companion.spirit_animal}: fully spread and majestic
+- Silhouette showing PEAK FORM - what this creature becomes at its ultimate destiny
 
-The egg itself should have the same mystical properties as stage 0, but now cracking with ${companion.core_element} light.`;
+The egg itself is ${crackDescription}
+
+Visual requirements:
+- Egg radiates powerful ${companion.favorite_color} divine glow with ${companion.core_element} elemental energy
+- The silhouette is intentionally blurred and out of focus - we see the EPIC SHAPE and MASSIVE SCALE but not fine details
+- Low-angle camera looking UP at this colossal form within the egg
+- Divine light rays (Sistine Chapel-style) illuminating from within
+- Epic ${companion.favorite_color} particle effects and ${companion.core_element} energy swirling around
+${nextStage === 1 ? `- Dramatic light beams shooting through the cracks like divine revelation\n- ${companion.core_element} energy erupting from fissures` : ''}
+- Floating in a cosmic/divine realm with ethereal ${companion.favorite_color} nebula background
+
+Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
+Mood: Legendary destiny sealed within, unstoppable potential, the champion king awaits
+Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance${nextStage === 1 ? ', explosive light from cracks' : ''}`;
 
     } else {
       // Stages 2+: ALWAYS use image analysis for strict color continuity
@@ -292,7 +310,7 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
     console.log("Generating evolution image...");
 
     // 6. Generate new evolution image with Nano Banana
-    // For stages 0->1 and 1->2, don't use the continuity system prompt
+    // For stages 0-1 (destiny preview) and stage 2 (first baby), don't use the continuity system prompt
     const shouldUseContinuityPrompt = nextStage > 2;
     
     const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -424,8 +442,8 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
 
 function getStageGuidance(stage: number): string {
   const guidance: Record<number, string> = {
-    0: "A small mystical egg with faint elemental glow",
-    1: "Egg cracking with energy leaking out",
+    0: "Pristine mystical egg containing the champion's destiny",
+    1: "Cracking egg with divine champion silhouette breaking through",
     2: "A tiny newborn creature, fragile but alive",
     3: "Small infant form, gaining stability",
     4: "Young creature, playful and growing",
