@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, Target, FileText, Shield } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -166,7 +166,7 @@ const Profile = () => {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="max-w-md">
             <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/library")} data-tour="library">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -174,16 +174,6 @@ const Profile = () => {
                   <CardTitle className="text-lg">Library</CardTitle>
                 </div>
                 <CardDescription>View your saved favorites and downloads</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/challenges")}>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Target className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Challenges</CardTitle>
-                </div>
-                <CardDescription>Track your active and completed challenges</CardDescription>
               </CardHeader>
             </Card>
           </div>
