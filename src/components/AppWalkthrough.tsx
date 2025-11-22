@@ -28,17 +28,14 @@ const STEP_INDEX = {
 
 const DELAYS = {
   POST_CHECKIN_CONFETTI: 1500,
-  POST_NAV_COMPANION: 1500,
-  POST_NAV_TASKS: 1500,
+  POST_NAV: 1000, // Reduced from separate 1500ms delays
   POST_EVOLUTION: 300,
-  ONBOARDING_WAIT: 1200,
-  INITIAL_ELEMENT_WAIT: 5000,
-  SCROLL_DELAY: 100,
-  SCROLL_FINAL_DELAY: 50,
+  SCROLL_DELAY: 50,
 } as const;
 
 const TIMEOUTS = {
   EVOLUTION_COMPLETE: 15000, // 15 seconds fallback if evolution doesn't complete
+  ELEMENT_WAIT: 6000, // Max time to wait for DOM elements
 } as const;
 
 export const AppWalkthrough = () => {
@@ -47,8 +44,7 @@ export const AppWalkthrough = () => {
 
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState<number>(0);
-  const [waitingForAction, setWaitingForAction] = useState(false);
-  const [isWalkthroughReady, setIsWalkthroughReady] = useState(false);
+  const [isWalkthroughCompleted, setIsWalkthroughCompleted] = useState<boolean | null>(null);
 
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
@@ -64,13 +60,6 @@ export const AppWalkthrough = () => {
     return id;
   }, []);
 
-  const createTrackedInterval = useCallback((cb: () => void, delay: number) => {
-    if (typeof window === 'undefined') return -1;
-    const id = window.setInterval(() => { try { cb(); } catch (e) { console.warn('tracked interval callback error', e); } }, delay) as unknown as number;
-    activeIntervals.current.add(id);
-    return id;
-  }, []);
-
   const clearAllTimers = useCallback(() => {
     activeTimeouts.current.forEach((id) => clearTimeout(id));
     activeTimeouts.current.clear();
@@ -81,7 +70,7 @@ export const AppWalkthrough = () => {
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
   // waitForSelector using MutationObserver for efficiency
-  const waitForSelector = useCallback((selector: string, timeout = 5000) => {
+  const waitForSelector = useCallback((selector: string, timeout = TIMEOUTS.ELEMENT_WAIT) => {
     if (typeof window === 'undefined') return Promise.resolve(false);
     if (!selector || selector === 'body') return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
@@ -126,28 +115,25 @@ export const AppWalkthrough = () => {
 
     const target = step.target as string | undefined;
     if (target && target !== 'body') {
-      const found = await waitForSelector(target, 6000);
+      const found = await waitForSelector(target, TIMEOUTS.ELEMENT_WAIT);
       if (!found) {
         console.warn(`Tutorial anchor not found for selector "${target}". Skipping to next step.`);
         return;
       }
     }
 
-    // Scroll to top when advancing to a new step, with slight delay to ensure DOM is ready
+    // Scroll to top when advancing to a new step
     await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_DELAY));
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     setStepIndex(idx);
   }, [steps, waitForSelector]);
 
-  // Ensure walkthrough is ready before page components load
+  // Check walkthrough status once on mount and set state
   useEffect(() => {
-    if (!user || !session) {
-      console.log('[AppWalkthrough] No user/session yet');
-      return;
-    }
+    if (!user || !session) return;
 
-    const checkWalkthroughStatus = async () => {
+    const checkStatus = async () => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('onboarding_data')
@@ -155,60 +141,44 @@ export const AppWalkthrough = () => {
         .maybeSingle();
 
       const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
-      const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
-
-      // Signal that walkthrough initialization is complete (either ready to run or already done)
-      setIsWalkthroughReady(true);
+      const completed = walkthroughData?.walkthrough_completed === true;
       
-      // Dispatch ready event for other components to listen to
+      setIsWalkthroughCompleted(completed);
+      
+      // Dispatch ready event for other components
       window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
-        detail: { shouldRun: !isWalkthroughCompleted } 
+        detail: { shouldRun: !completed } 
       }));
     };
 
-    checkWalkthroughStatus();
+    checkStatus();
   }, [user, session]);
 
   // Listen for onboarding completion event to start walkthrough
   useEffect(() => {
-    if (!user || !session || !isWalkthroughReady) return;
+    if (!user || !session || isWalkthroughCompleted === null) return;
+    if (isWalkthroughCompleted) return; // Already completed
 
     const handleOnboardingComplete = async () => {
-      console.log('[AppWalkthrough] Onboarding complete event received');
+      console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
       
-      // Check if walkthrough is already completed
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_data')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
-      const isWalkthroughCompleted = walkthroughData?.walkthrough_completed === true;
-
-      if (!isWalkthroughCompleted) {
-        console.log('[AppWalkthrough] Starting walkthrough after onboarding');
-        // Reset to step 0 before starting
-        setStepIndex(0);
-        // Wait for navigation and DOM to settle with longer timeout for safety
-        await new Promise(resolve => setTimeout(resolve, DELAYS.ONBOARDING_WAIT));
-        const found = await waitForSelector('[data-tour="checkin-mood"]', DELAYS.INITIAL_ELEMENT_WAIT);
-        if (found) {
-          console.log('[AppWalkthrough] All components ready, starting tour from step 0');
-          // Scroll to top before starting the walkthrough with slight delay
-          await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_DELAY));
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_FINAL_DELAY));
-          setRun(true);
-        } else {
-          console.warn('[AppWalkthrough] Failed to find initial tour element after timeout');
-        }
+      // Reset to step 0
+      setStepIndex(0);
+      
+      // Wait for DOM element to be ready (no arbitrary delays)
+      const found = await waitForSelector('[data-tour="checkin-mood"]', TIMEOUTS.ELEMENT_WAIT);
+      if (found) {
+        console.log('[AppWalkthrough] DOM ready, starting tour');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        setRun(true);
+      } else {
+        console.warn('[AppWalkthrough] Failed to find initial tour element');
       }
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete);
     return () => window.removeEventListener('onboarding-complete', handleOnboardingComplete);
-  }, [user, session, isWalkthroughReady, waitForSelector]);
+  }, [user, session, isWalkthroughCompleted, waitForSelector]);
 
   // Step 0: Listen for mood selection
   useEffect(() => {
@@ -251,12 +221,9 @@ export const AppWalkthrough = () => {
     const navCompanion = document.querySelector('a[href="/companion"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
-        // Ensure we scroll to top with multiple attempts for reliability on mobile
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        await new Promise(resolve => setTimeout(resolve, 100));
         window.scrollTo({ top: 0, behavior: 'instant' });
         await safeSetStep(STEP_INDEX.COMPANION_VIEW);
-      }, DELAYS.POST_NAV_COMPANION);
+      }, DELAYS.POST_NAV);
     };
 
     if (navCompanion) {
@@ -272,12 +239,9 @@ export const AppWalkthrough = () => {
     const navTasks = document.querySelector('a[href="/tasks"]');
     const handleNavClick = () => {
       createTrackedTimeout(async () => {
-        // Ensure we scroll to top with multiple attempts for reliability on mobile
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        await new Promise(resolve => setTimeout(resolve, 100));
         window.scrollTo({ top: 0, behavior: 'instant' });
         await safeSetStep(STEP_INDEX.QUEST_CREATION);
-      }, DELAYS.POST_NAV_TASKS);
+      }, DELAYS.POST_NAV);
     };
 
     if (navTasks) {
@@ -292,14 +256,8 @@ export const AppWalkthrough = () => {
 
     let evolutionTimeoutId: number | null = null;
 
-    const handleQuestCompleted = () => {
-      console.log('[Tutorial] Quest completed! Waiting for evolution to finish...');
-      // Don't advance yet - wait for evolution to complete
-    };
-
     const handleEvolutionLoadingStart = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
-      // Hide the tooltip as soon as the loading overlay appears
       setRun(false);
       
       // Set a fallback timeout in case evolution-complete never fires
@@ -328,7 +286,6 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_EVOLUTION);
     };
 
-    window.addEventListener('mission-completed', handleQuestCompleted);
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
     window.addEventListener('evolution-complete', handleEvolutionComplete);
     
@@ -338,7 +295,6 @@ export const AppWalkthrough = () => {
         clearTimeout(evolutionTimeoutId);
       }
       
-      window.removeEventListener('mission-completed', handleQuestCompleted);
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-complete', handleEvolutionComplete);
     };
