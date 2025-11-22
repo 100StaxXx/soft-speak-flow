@@ -72,7 +72,7 @@ export const GlobalEvolutionListener = () => {
             setIsEvolving(true);
             
             // Notify walkthrough that evolution is starting
-            window.dispatchEvent(new CustomEvent('companion-evolution-start'));
+            window.dispatchEvent(new CustomEvent('evolution-loading-start'));
 
             // Invalidate companion query to refresh data
             queryClient.invalidateQueries({ queryKey: ['companion'] });
