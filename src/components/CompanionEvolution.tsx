@@ -194,12 +194,17 @@ export const CompanionEvolution = ({
     
     resumeAmbientAfterEvent();
     
-    // Dispatch events immediately to ensure AppWalkthrough receives them
-    console.log('[CompanionEvolution] Dispatching evolution-modal-closed event');
+    // Dispatch other events immediately
+    console.log('[CompanionEvolution] Dispatching evolution events');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
-    window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
-    console.log('[CompanionEvolution] Events dispatched successfully');
+    
+    // Delay the modal-closed event to allow modal to fully close with animations
+    setTimeout(() => {
+      console.log('[CompanionEvolution] Dispatching evolution-modal-closed event after delay');
+      window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
+      console.log('[CompanionEvolution] evolution-modal-closed event dispatched');
+    }, 1500); // 1.5 second delay for modal close animation
     
     onComplete();
   };
