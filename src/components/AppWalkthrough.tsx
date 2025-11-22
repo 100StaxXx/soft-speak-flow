@@ -270,8 +270,8 @@ export const AppWalkthrough = () => {
       }, TIMEOUTS.EVOLUTION_COMPLETE);
     };
 
-    const handleEvolutionComplete = () => {
-      console.log('[Tutorial] Evolution complete! Showing final congratulations step.');
+    const handleEvolutionModalClosed = () => {
+      console.log('[Tutorial] Evolution modal closed! Showing final congratulations step.');
       
       // Clear the fallback timeout
       if (evolutionTimeoutId !== null) {
@@ -281,13 +281,11 @@ export const AppWalkthrough = () => {
       
       // Re-enable the tour and advance to final step
       setRun(true);
-      createTrackedTimeout(() => {
-        safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
-      }, DELAYS.POST_EVOLUTION);
+      safeSetStep(STEP_INDEX.FINAL_CONGRATULATIONS);
     };
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
-    window.addEventListener('evolution-complete', handleEvolutionComplete);
+    window.addEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     
     return () => {
       // Clean up timeout if component unmounts or step changes
@@ -296,7 +294,7 @@ export const AppWalkthrough = () => {
       }
       
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
-      window.removeEventListener('evolution-complete', handleEvolutionComplete);
+      window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     };
   }, [stepIndex, safeSetStep, createTrackedTimeout]);
 
