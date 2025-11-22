@@ -194,12 +194,10 @@ export const CompanionEvolution = ({
     
     resumeAmbientAfterEvent();
     
-    // Dispatch events asynchronously to avoid blocking
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new CustomEvent('companion-evolved'));
-      window.dispatchEvent(new CustomEvent('evolution-complete'));
-      window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
-    });
+    // Dispatch events immediately to ensure AppWalkthrough receives them
+    window.dispatchEvent(new CustomEvent('companion-evolved'));
+    window.dispatchEvent(new CustomEvent('evolution-complete'));
+    window.dispatchEvent(new CustomEvent('evolution-modal-closed')); // For AppWalkthrough
     
     onComplete();
   };
