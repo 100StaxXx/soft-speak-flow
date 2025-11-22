@@ -154,10 +154,10 @@ export const CompanionEvolution = ({
       // Stage 6: Show voice line (5s)
       setTimeout(() => {
         setAnimationStage(6);
-        // Enable dismiss after voice line appears
+        // Enable dismiss after 5.5s delay
         setTimeout(() => {
           setCanDismiss(true);
-        }, 1000);
+        }, 5500);
       }, 5000),
     ];
 
