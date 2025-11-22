@@ -308,8 +308,8 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
     console.log("Generating evolution image...");
 
     // 6. Generate new evolution image with Nano Banana
-    // For stages 0-1 (destiny preview) and stage 2 (first baby), don't use the continuity system prompt
-    const shouldUseContinuityPrompt = nextStage > 2;
+    // For stage 0 (destiny preview) and stage 1 (first hatchling), don't use the continuity system prompt
+    const shouldUseContinuityPrompt = nextStage > 1;
     
     const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
