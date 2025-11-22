@@ -94,7 +94,7 @@ serve(async (req) => {
 
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'daily_missions',
-      userId,
+      userId: userId,
       variables: {
         missionCount: 3,
         userStreak: streak,

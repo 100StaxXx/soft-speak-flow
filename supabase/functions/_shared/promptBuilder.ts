@@ -165,11 +165,5 @@ export class PromptBuilder {
     };
   }
 
-  getValidationRules(): Record<string, any> {
-    return this.template?.validation_rules || {};
-  }
-
-  getOutputConstraints(): Record<string, any> {
-    return this.template?.output_constraints || {};
-  }
+  // These methods are not needed - validation rules and constraints are returned by build()
 }
