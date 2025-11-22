@@ -104,8 +104,7 @@ export const GlobalEvolutionListener = () => {
         // Hide overlay after evolution animation completes
         setIsEvolvingLoading(false);
         
-        // Notify walkthrough that evolution modal has closed
-        window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
+        // Note: evolution-modal-closed event is fired by CompanionEvolution component
       }}
     />
   );
