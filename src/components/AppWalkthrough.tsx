@@ -14,7 +14,7 @@ const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true, hideFooter: true },
   { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "bottom", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true }, hideFooter: true },
   { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. Once added, CHECK IT OFF to complete it and earn your XP! This triggers your companion's first evolution!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
-  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest was your MAIN QUEST (2x XP = 20 XP total!) and you just witnessed your companion evolve! You can add up to 3 more quests each day. Keep completing quests to grow your companion! 🚀", placement: "center", disableBeacon: true, hideBackButton: true },
+  { id: "final-congrats", target: 'body', content: "🎉 Congratulations! You've mastered the basics! Your first quest was your MAIN QUEST (2x XP = 20 XP total!) and you just witnessed your companion evolve! You can add up to 3 more quests each day. Keep completing quests to grow your companion! 🚀", placement: "center", disableBeacon: true, hideBackButton: true, hideFooter: true },
 ];
 
 const STEP_INDEX = {
@@ -344,34 +344,68 @@ export const AppWalkthrough = () => {
     };
   }, [stepIndex, safeSetStep, createTrackedTimeout]);
 
+  const handleWalkthroughComplete = useCallback(async () => {
+    console.log('[Tutorial] Tutorial completed');
+    setRun(false);
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const existingData = (profile?.onboarding_data as any) || {};
+
+      await supabase
+        .from('profiles')
+        .update({
+          onboarding_data: {
+            ...existingData,
+            walkthrough_completed: true
+          }
+        })
+        .eq('id', user.id);
+      console.log('[Tutorial] Saved walkthrough_completed to database');
+    }
+    // Reload the page to start fresh
+    window.location.reload();
+  }, [user]);
+
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
     const { status } = data;
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      console.log('[Tutorial] Tutorial completed or skipped');
-      setRun(false);
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('onboarding_data')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const existingData = (profile?.onboarding_data as any) || {};
-
-        await supabase
-          .from('profiles')
-          .update({
-            onboarding_data: {
-              ...existingData,
-              walkthrough_completed: true
-            }
-          })
-          .eq('id', user.id);
-        console.log('[Tutorial] Saved walkthrough_completed to database');
-      }
+      await handleWalkthroughComplete();
     }
-  }, [user]);
+  }, [handleWalkthroughComplete]);
+
+  const CustomTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
+    const isFinalStep = index === STEP_INDEX.FINAL_CONGRATULATIONS;
+    
+    if (isFinalStep) {
+      return (
+        <Card {...tooltipProps} className="max-w-md p-8 bg-background border-2 border-primary shadow-2xl">
+          <div className="text-center space-y-6">
+            <div className="text-4xl animate-bounce">🎉</div>
+            <p className="text-lg leading-relaxed">{step.content as string}</p>
+            <Button 
+              onClick={handleWalkthroughComplete}
+              className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-bold text-lg py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 animate-pulse"
+            >
+              ✨ Good Luck on Your Journey! ✨
+            </Button>
+          </div>
+        </Card>
+      );
+    }
+
+    // Default tooltip for other steps
+    return (
+      <Card {...tooltipProps} className="max-w-md p-6">
+        <p className="text-base">{step.content as string}</p>
+      </Card>
+    );
+  }, [handleWalkthroughComplete]);
 
   const interactiveStepIndices: number[] = [
     STEP_INDEX.XP_CELEBRATION,
@@ -389,7 +423,7 @@ export const AppWalkthrough = () => {
       run={run}
       stepIndex={stepIndex}
       callback={handleJoyrideCallback}
-      continuous={stepIndex === STEP_INDEX.FINAL_CONGRATULATIONS}
+      continuous={false}
       showProgress={false}
       showSkipButton={false}
       hideCloseButton={true}
@@ -397,6 +431,7 @@ export const AppWalkthrough = () => {
       spotlightPadding={8}
       disableCloseOnEsc
       disableScrolling={false}
+      tooltipComponent={CustomTooltip}
       styles={{
         options: {
           zIndex: 10000,
