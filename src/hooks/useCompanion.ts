@@ -39,7 +39,7 @@ export const XP_REWARDS = {
 // 21-Stage Evolution System: Early stages fast, late stages exponential
 export const EVOLUTION_THRESHOLDS = {
   0: 0,      // Egg
-  1: 5,      // Hatchling (first quest completes this!)
+  1: 15,     // Hatchling (first quest completes this!)
   2: 120,    // Guardian (was stage 3)
   3: 250,    // Ascended (was stage 4)
   4: 500,    // Mythic (was stage 5)
