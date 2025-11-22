@@ -206,7 +206,7 @@ export const CompanionDisplay = () => {
             </div>
           </div>
 
-          <div className="space-y-3" data-tour="companion-tooltip-anchor">
+          <div className="space-y-3">
             <div className="flex justify-center mb-3">
               <CompanionBadge 
                 element={companion.core_element} 

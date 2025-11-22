@@ -31,11 +31,13 @@ const Companion = () => {
                 <h1 className="font-heading font-black text-xl">Companion</h1>
               </div>
               {companion && (
-                <CompanionBadge 
-                  element={companion.core_element}
-                  stage={companion.current_stage}
-                  showStage={true}
-                />
+                <div data-tour="companion-tooltip-anchor">
+                  <CompanionBadge 
+                    element={companion.core_element}
+                    stage={companion.current_stage}
+                    showStage={true}
+                  />
+                </div>
               )}
             </div>
           </header>
