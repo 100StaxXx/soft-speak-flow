@@ -410,13 +410,13 @@ export const AppWalkthrough = () => {
       />
       
       {showCompletionButton && (
-        <div className="fixed bottom-24 right-6 z-[10001] animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex flex-col items-end gap-3">
-            <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-2 border-primary/50 rounded-2xl p-6 max-w-sm shadow-2xl">
-              <p className="text-white text-lg font-medium leading-relaxed mb-1">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-4 max-w-md mx-4">
+            <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-2 border-primary/50 rounded-2xl p-8 shadow-2xl">
+              <p className="text-white text-2xl font-bold text-center mb-2">
                 🎉 Congratulations!
               </p>
-              <p className="text-white/90 text-base leading-relaxed">
+              <p className="text-white/90 text-lg text-center leading-relaxed">
                 Your companion has evolved to Stage 1! You've learned the basics—now your real journey begins. Complete quests, build habits, and watch your companion grow stronger alongside you.
               </p>
             </div>
