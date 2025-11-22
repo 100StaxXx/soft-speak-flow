@@ -253,7 +253,7 @@ export const AppWalkthrough = () => {
 
   // Step 4: Listen for quest completion (checkbox click)
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION) return;
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
     let evolutionTimeoutId: number | null = null;
 
