@@ -376,8 +376,7 @@ export const AppWalkthrough = () => {
   const interactiveStepIndices: number[] = [
     STEP_INDEX.XP_CELEBRATION,
     STEP_INDEX.COMPANION_VIEW,
-    STEP_INDEX.QUEST_CREATION,
-    STEP_INDEX.FINAL_CONGRATULATIONS
+    STEP_INDEX.QUEST_CREATION
   ];
 
   if (!user) return null;
