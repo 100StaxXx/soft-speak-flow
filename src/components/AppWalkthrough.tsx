@@ -7,6 +7,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { OnboardingData } from "@/types/profile";
 import { TutorialModal } from "./TutorialModal";
 import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
 
 interface TutorialStep {
   id: string;
@@ -228,6 +229,39 @@ export const AppWalkthrough = () => {
       // Listener is automatically removed by { once: true }
     };
   }, [user, session, isWalkthroughCompleted]);
+
+  // Scroll lock and bottom nav control during check-in step (Step 0)
+  useEffect(() => {
+    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
+      // Restore defaults when not on check-in step
+      document.body.style.overflow = 'auto';
+      const bottomNav = document.querySelector('nav[role="navigation"]');
+      if (bottomNav) {
+        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
+        (bottomNav as HTMLElement).style.opacity = '1';
+      }
+      return;
+    }
+
+    // Lock scroll during check-in
+    document.body.style.overflow = 'hidden';
+    
+    // Disable bottom navigation during check-in
+    const bottomNav = document.querySelector('nav[role="navigation"]');
+    if (bottomNav) {
+      (bottomNav as HTMLElement).style.pointerEvents = 'none';
+      (bottomNav as HTMLElement).style.opacity = '0.3';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+      const bottomNav = document.querySelector('nav[role="navigation"]');
+      if (bottomNav) {
+        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
+        (bottomNav as HTMLElement).style.opacity = '1';
+      }
+    };
+  }, [stepIndex, run]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
@@ -457,6 +491,18 @@ export const AppWalkthrough = () => {
 
   return (
     <>
+      {/* Full-screen overlay - stronger blocking during check-in */}
+      {run && (
+        <div 
+          className={cn(
+            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300",
+            stepIndex === STEP_INDEX.HOME_CHECKIN 
+              ? "bg-black/80 pointer-events-auto" 
+              : "bg-black/40 pointer-events-none"
+          )}
+        />
+      )}
+
       {/* Tutorial Modal */}
       {showModal && currentStep && (
         <TutorialModal
