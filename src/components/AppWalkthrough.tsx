@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,8 +123,8 @@ export const AppWalkthrough = () => {
 
   const currentStep = WALKTHROUGH_STEPS[stepIndex];
   
-  // Get mentor slug with improved validation
-  const getMentorSlug = () => {
+  // Get mentor slug with improved validation - memoized to prevent changes during walkthrough
+  const mentorSlug = useMemo(() => {
     if (!profile?.selected_mentor_id) return 'atlas';
     
     const mentorId = profile.selected_mentor_id.toLowerCase();
@@ -139,9 +139,7 @@ export const AppWalkthrough = () => {
     
     // Otherwise default to atlas
     return 'atlas';
-  };
-  
-  const mentorSlug = getMentorSlug();
+  }, [profile?.selected_mentor_id]);
 
   const advanceStep = useCallback(() => {
     setStepIndex((prevIndex) => {
