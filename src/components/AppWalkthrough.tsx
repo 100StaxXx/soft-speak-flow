@@ -414,10 +414,7 @@ export const AppWalkthrough = () => {
               </div>
             </div>
             <Button
-              onClick={async () => {
-                setShowCompletionButton(false);
-                await handleWalkthroughComplete();
-              }}
+              onClick={handleWalkthroughComplete}
               size="lg"
               className="text-xl px-12 py-8 font-bold shadow-2xl hover:shadow-3xl transition-all"
             >
