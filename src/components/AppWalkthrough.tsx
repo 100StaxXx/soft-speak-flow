@@ -276,7 +276,6 @@ export const AppWalkthrough = () => {
       const handleNavClick = () => {
         if (hasAdvanced) return;
         hasAdvanced = true;
-        setShowModal(false);
         createTrackedTimeout(() => {
           window.scrollTo({ top: 0, behavior: 'instant' });
           advanceStep();
@@ -309,7 +308,6 @@ export const AppWalkthrough = () => {
       const handleNavClick = () => {
         if (hasAdvanced) return;
         hasAdvanced = true;
-        setShowModal(false);
         createTrackedTimeout(() => {
           window.scrollTo({ top: 0, behavior: 'instant' });
           advanceStep();
