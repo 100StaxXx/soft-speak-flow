@@ -31,6 +31,7 @@ export const TutorialModal = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hasUserPaused, setHasUserPaused] = useState(false);
+  const [hasAudioEnded, setHasAudioEnded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Generate and play TTS when step changes
@@ -117,6 +118,7 @@ export const TutorialModal = ({
       }
       setIsPlaying(false);
       setHasUserPaused(false);
+      setHasAudioEnded(false);
     };
   }, [step.id, step.content, mentorSlug]);
 
@@ -135,15 +137,15 @@ export const TutorialModal = ({
     }
   }, [audioUrl, isMuted]);
 
-  // Handle unmuting - only restart if user didn't manually pause
+  // Handle unmuting - only restart if user didn't manually pause and audio hasn't ended
   useEffect(() => {
-    if (!isMuted && audioUrl && audioRef.current && !isPlaying && !hasUserPaused) {
+    if (!isMuted && audioUrl && audioRef.current && !isPlaying && !hasUserPaused && !hasAudioEnded) {
       audioRef.current.currentTime = 0;
       audioRef.current.play()
         .then(() => setIsPlaying(true))
         .catch(console.error);
     }
-  }, [isMuted, audioUrl, hasUserPaused, isPlaying]);
+  }, [isMuted, audioUrl, hasUserPaused, isPlaying, hasAudioEnded]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
@@ -153,6 +155,11 @@ export const TutorialModal = ({
       setIsPlaying(false);
       setHasUserPaused(true);
     } else {
+      // If audio has ended, restart from beginning
+      if (hasAudioEnded) {
+        audioRef.current.currentTime = 0;
+        setHasAudioEnded(false);
+      }
       audioRef.current.play().catch(console.error);
       setIsPlaying(true);
       setHasUserPaused(false);
@@ -259,7 +266,10 @@ export const TutorialModal = ({
         <audio
           ref={audioRef}
           src={audioUrl}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={() => {
+            setIsPlaying(false);
+            setHasAudioEnded(true);
+          }}
           onError={(e) => console.error('Audio playback error:', e)}
         />
       )}
