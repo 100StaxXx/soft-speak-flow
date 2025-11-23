@@ -216,24 +216,34 @@ export const AppWalkthrough = () => {
 
   // Step 0: Listen for mood selection
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) return;
+    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run || !showModal) return;
 
     const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
+    let hasAdvanced = false;
+    
     const handleMoodClick = () => {
+      if (hasAdvanced) return;
+      hasAdvanced = true;
       console.log('[Tutorial] Mood selected, advancing to intention step');
       setShowModal(false);
       setTimeout(() => advanceStep(), 300);
     };
 
-    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
-    return () => moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
-  }, [stepIndex, run, advanceStep]);
+    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick, { once: true }));
+    return () => {
+      moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
+    };
+  }, [stepIndex, run, showModal, advanceStep]);
 
   // Step 1: Listen for intention submission
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.CHECKIN_INTENTION || !run) return;
 
+    let hasAdvanced = false;
+    
     const handleCheckInComplete = () => {
+      if (hasAdvanced) return;
+      hasAdvanced = true;
       console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
       setShowModal(false);
       createTrackedTimeout(() => {
@@ -254,7 +264,11 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
+    let hasAdvanced = false;
+    
     const handleNavClick = () => {
+      if (hasAdvanced) return;
+      hasAdvanced = true;
       setShowModal(false);
       createTrackedTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'instant' });
@@ -264,7 +278,7 @@ export const AppWalkthrough = () => {
 
     const navCompanion = document.querySelector('a[href="/companion"]');
     if (navCompanion) {
-      navCompanion.addEventListener('click', handleNavClick);
+      navCompanion.addEventListener('click', handleNavClick, { once: true });
     }
     
     return () => {
@@ -278,7 +292,11 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
+    let hasAdvanced = false;
+    
     const handleNavClick = () => {
+      if (hasAdvanced) return;
+      hasAdvanced = true;
       setShowModal(false);
       createTrackedTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'instant' });
@@ -288,7 +306,7 @@ export const AppWalkthrough = () => {
 
     const navTasks = document.querySelector('a[href="/tasks"]');
     if (navTasks) {
-      navTasks.addEventListener('click', handleNavClick);
+      navTasks.addEventListener('click', handleNavClick, { once: true });
     }
     
     return () => {
