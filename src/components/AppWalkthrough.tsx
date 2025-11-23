@@ -245,7 +245,7 @@ export const AppWalkthrough = () => {
     };
   }, [showModal, showCompletionButton, stepIndex, run]);
 
-  // Bottom nav control only during check-in step (Step 0)
+  // Bottom nav control and check-in elevation only during check-in step (Step 0)
   // Note: BottomNav.tsx handles navigation blocking during other tutorial steps via React state
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
@@ -254,6 +254,12 @@ export const AppWalkthrough = () => {
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
         (bottomNav as HTMLElement).style.opacity = '1';
+      }
+      // Reset check-in z-index
+      const checkInSection = document.querySelector('[data-checkin-section]');
+      if (checkInSection) {
+        (checkInSection as HTMLElement).style.position = '';
+        (checkInSection as HTMLElement).style.zIndex = '';
       }
       return;
     }
@@ -265,11 +271,24 @@ export const AppWalkthrough = () => {
       (bottomNav as HTMLElement).style.opacity = '0.3';
     }
 
+    // Elevate check-in section above overlay
+    const checkInSection = document.querySelector('[data-checkin-section]');
+    if (checkInSection) {
+      (checkInSection as HTMLElement).style.position = 'relative';
+      (checkInSection as HTMLElement).style.zIndex = '9999';
+    }
+
     return () => {
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
         (bottomNav as HTMLElement).style.opacity = '1';
+      }
+      // Reset check-in z-index on cleanup
+      const checkInSection = document.querySelector('[data-checkin-section]');
+      if (checkInSection) {
+        (checkInSection as HTMLElement).style.position = '';
+        (checkInSection as HTMLElement).style.zIndex = '';
       }
     };
   }, [stepIndex, run]);
