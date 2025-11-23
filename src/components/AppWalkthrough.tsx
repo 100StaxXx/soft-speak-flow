@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -352,7 +352,12 @@ export const AppWalkthrough = () => {
 
         if (error) {
           console.error('[Tutorial] Failed to save walkthrough completion:', error);
-          // Keep button visible so user can retry
+          const { toast } = await import('@/hooks/use-toast');
+          toast({
+            title: "Save Failed",
+            description: "Failed to save progress. Please try again.",
+            variant: "destructive"
+          });
           return;
         }
 
@@ -365,7 +370,12 @@ export const AppWalkthrough = () => {
         window.location.reload();
       } catch (error) {
         console.error('[Tutorial] Error during walkthrough completion:', error);
-        // Keep button visible so user can retry
+        const { toast } = await import('@/hooks/use-toast');
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive"
+        });
       }
     } else {
       // No user - still hide button and reload as fallback
