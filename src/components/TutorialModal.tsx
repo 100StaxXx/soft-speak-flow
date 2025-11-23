@@ -139,10 +139,11 @@ export const TutorialModal = ({
   useEffect(() => {
     if (!isMuted && audioUrl && audioRef.current && !isPlaying && !hasUserPaused) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(console.error);
     }
-  }, [isMuted, audioUrl, hasUserPaused]);
+  }, [isMuted, audioUrl, hasUserPaused, isPlaying]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;

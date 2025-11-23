@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
@@ -30,20 +31,19 @@ serve(async (req) => {
       const category = categories[Math.floor(Math.random() * categories.length)];
       const totalDays = Math.floor(Math.random() * 10) + 5; // 5-14 days
 
-      const systemPrompt = `You are a challenge designer for A Lil Push app. Create actionable, motivational challenges.
+      // Build personalized prompt using template system
+      const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
       
-Tone: Direct, supportive, empowering. Not overly soft. Think practical self-improvement.`;
-
-      const userPrompt = `Create a ${totalDays}-day challenge in the "${category}" category.
-      
-Requirements:
-- Title should be compelling and clear (e.g., "7-Day Discipline Reset", "5-Day Confidence Spark")
-- Description should be 2-3 sentences explaining what the challenge achieves
-- Create ${totalDays} daily tasks, each with a title and description
-- Tasks should be simple, achievable, and build progressively
-- Each task should take 5-30 minutes max
-
-Return the challenge structure.`;
+      const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+        templateKey: 'weekly_challenges',
+        variables: {
+          category,
+          totalDays,
+          exampleTitle1: `${totalDays}-Day ${category.charAt(0).toUpperCase() + category.slice(1)} Reset`,
+          exampleTitle2: `${Math.ceil(totalDays / 2)}-Day ${category.charAt(0).toUpperCase() + category.slice(1)} Spark`,
+          maxTaskDuration: '30 minutes'
+        }
+      });
 
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -98,15 +98,7 @@ Return the challenge structure.`;
       const toolCall = aiData.choices[0].message.tool_calls?.[0];
       const challengeData = JSON.parse(toolCall.function.arguments);
 
-      // Validate output structure
-      const validationRules = {
-        required_fields: ['title', 'description', 'tasks'],
-        max_length: { title: 100, description: 500 }
-      };
-      const outputConstraints = {
-        min_tasks: totalDays,
-        max_tasks: totalDays
-      };
+      // Validate output structure using rules from PromptBuilder
       const validator = new OutputValidator(validationRules, outputConstraints);
       const validationResult = validator.validate(challengeData);
 
@@ -153,7 +145,7 @@ Return the challenge structure.`;
 
       generated.push(challenge);
 
-      // Log generation metrics
+      // Log generation metrics with validation results
       const responseTime = Date.now() - startTime;
       await supabase
         .from('ai_output_validation_log')
@@ -161,10 +153,15 @@ Return the challenge structure.`;
           template_key: 'weekly_challenges',
           input_data: { category, totalDays },
           output_data: { challenge: challengeData },
-          validation_passed: true,
+          validation_passed: validationResult.isValid,
+          validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
           model_used: 'google/gemini-2.5-flash',
           response_time_ms: responseTime
         });
+      
+      if (!validationResult.isValid) {
+        console.warn(`Challenge ${i + 1} validation warnings:`, validator.getValidationSummary(validationResult));
+      }
     }
 
     return new Response(
