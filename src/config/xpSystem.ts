@@ -23,15 +23,29 @@
  * - Pep Talk Listened (80%+): 3 XP
  * - Streak Milestone: 15 XP
  * 
- * EVOLUTION THRESHOLDS (Stage 1 removed, all shifted down):
+ * EVOLUTION THRESHOLDS (21-Stage System):
  * - Stage 0 (Egg): 0 XP
  * - Stage 1 (Hatchling): 10 XP (first quest!)
- * - Stage 2 (Guardian): 120 XP
- * - Stage 3 (Ascended): 250 XP
- * - Stage 4 (Mythic): 500 XP
- * - Stage 5 (Titan): 1200 XP
- * ... continues to Stage 20 (Ultimate)
- * 
+ * - Stage 2 (Sproutling): 120 XP
+ * - Stage 3 (Cub): 250 XP
+ * - Stage 4 (Juvenile): 500 XP
+ * - Stage 5 (Apprentice): 1200 XP
+ * - Stage 6 (Scout): 2500 XP
+ * - Stage 7 (Fledgling): 5000 XP
+ * - Stage 8 (Warrior): 10000 XP
+ * - Stage 9 (Guardian): 20000 XP
+ * - Stage 10 (Champion): 35000 XP
+ * - Stage 11 (Ascended): 50000 XP
+ * - Stage 12 (Vanguard): 75000 XP
+ * - Stage 13 (Titan): 100000 XP
+ * - Stage 14 (Mythic): 150000 XP
+ * - Stage 15 (Prime): 200000 XP
+ * - Stage 16 (Regal): 300000 XP
+ * - Stage 17 (Eternal): 450000 XP
+ * - Stage 18 (Transcendent): 650000 XP
+ * - Stage 19 (Apex): 1000000 XP
+ * - Stage 20 (Ultimate): 1500000 XP
+ *
  * USAGE EXAMPLE:
  * ```tsx
  * import { useXPRewards } from "@/hooks/useXPRewards";
