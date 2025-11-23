@@ -203,14 +203,18 @@ export const AppWalkthrough = () => {
     if (!user || !session || isWalkthroughCompleted === null) return;
     if (isWalkthroughCompleted) return;
 
+    let hasStarted = false;
+    
     const handleOnboardingComplete = () => {
+      if (hasStarted) return;
+      hasStarted = true;
       console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
       setStepIndex(0);
       setShowModal(true);
       setRun(true);
     };
 
-    window.addEventListener('onboarding-complete', handleOnboardingComplete);
+    window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
     return () => {
       window.removeEventListener('onboarding-complete', handleOnboardingComplete);
     };
@@ -329,7 +333,11 @@ export const AppWalkthrough = () => {
       return;
     }
 
+    let hasHandledLoading = false;
+    
     const handleEvolutionLoadingStart = () => {
+      if (hasHandledLoading) return;
+      hasHandledLoading = true;
       console.log('[Tutorial] Evolution loading started, hiding modal.');
       setShowModal(false);
       setRun(false);
@@ -342,7 +350,7 @@ export const AppWalkthrough = () => {
       setShowCompletionButton(true);
     });
 
-    window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
+    window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart, { once: true });
     
     return () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
@@ -350,7 +358,11 @@ export const AppWalkthrough = () => {
     };
   }, [stepIndex, setOnEvolutionComplete]);
 
+  const [isSaving, setIsSaving] = useState(false);
+  
   const handleWalkthroughComplete = useCallback(async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     console.log('[Tutorial] Tutorial completed');
     setRun(false);
     
@@ -376,6 +388,7 @@ export const AppWalkthrough = () => {
 
         if (error) {
           console.error('[Tutorial] Failed to save walkthrough completion:', error);
+          setIsSaving(false);
           const { toast } = await import('@/hooks/use-toast');
           toast({
             title: "Save Failed",
@@ -394,6 +407,7 @@ export const AppWalkthrough = () => {
         window.location.reload();
       } catch (error) {
         console.error('[Tutorial] Error during walkthrough completion:', error);
+        setIsSaving(false);
         const { toast } = await import('@/hooks/use-toast');
         toast({
           title: "Error",
@@ -406,7 +420,7 @@ export const AppWalkthrough = () => {
       setShowCompletionButton(false);
       window.location.reload();
     }
-  }, [user]);
+  }, [user, isSaving]);
 
   if (!user) return null;
 
@@ -440,9 +454,10 @@ export const AppWalkthrough = () => {
             <Button
               onClick={handleWalkthroughComplete}
               size="lg"
+              disabled={isSaving}
               className="text-xl px-12 py-8 font-bold shadow-2xl hover:shadow-3xl transition-all"
             >
-              Start Your Journey
+              {isSaving ? 'Saving...' : 'Start Your Journey'}
             </Button>
           </div>
         </div>
