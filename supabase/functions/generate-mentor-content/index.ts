@@ -1,18 +1,41 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const MentorContentSchema = z.object({
+  contentType: z.enum(['quote', 'lesson']),
+  mentorId: z.string().uuid(),
+  count: z.number().int().min(1).max(10).default(1)
+});
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
-    const { contentType, mentorId, count = 1 } = await req.json();
+    const body = await req.json();
+    const validation = MentorContentSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { contentType, mentorId, count } = validation.data;
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -118,6 +141,17 @@ Remember: NO em-dashes, use regular hyphens only.`;
     // Remove any em-dashes that might have been generated despite instructions
     const cleanedContent = generatedContent.replace(/—/g, '-');
 
+    // Validate output
+    const validationRules = contentType === 'quote' 
+      ? { max_length: { text: 150 }, forbidden_chars: ['—', '–'] }
+      : { required_fields: ['title', 'description', 'content'], max_length: { title: 60 } };
+    const validator = new OutputValidator(validationRules, {});
+    const validationResult = validator.validate(cleanedContent);
+
+    if (!validationResult.isValid) {
+      console.warn('Content validation warnings:', validator.getValidationSummary(validationResult));
+    }
+
     let result;
     if (contentType === "quote") {
       const quotes = cleanedContent.split('||').map((q: string) => q.trim());
@@ -163,6 +197,20 @@ Remember: NO em-dashes, use regular hyphens only.`;
 
       result = { lesson: insertedLesson };
     }
+
+    // Log generation metrics
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        template_key: `mentor_content_${contentType}`,
+        input_data: { contentType, mentorId, count },
+        output_data: result,
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
