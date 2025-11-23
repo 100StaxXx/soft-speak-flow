@@ -137,6 +137,16 @@ export default {
             transform: "translateY(0)",
           },
         },
+        "bounce-slow": {
+          "0%, 100%": {
+            transform: "translateY(-5%)",
+            animationTimingFunction: "cubic-bezier(0.8, 0, 1, 1)",
+          },
+          "50%": {
+            transform: "translateY(0)",
+            animationTimingFunction: "cubic-bezier(0, 0, 0.2, 1)",
+          },
+        },
         "breathe": {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.03)" },
@@ -150,6 +160,7 @@ export default {
         "shimmer": "shimmer 2s linear infinite",
         "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         "bounce-subtle": "bounce-subtle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "bounce-slow": "bounce-slow 1.5s ease-in-out infinite",
         "breathe": "breathe 4s ease-in-out infinite",
       },
       perspective: {
