@@ -21,15 +21,8 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     id: "home-checkin",
     title: "Welcome to Your Journey!",
     content: "Let's start with your morning check-in. This helps you reflect on your current state and set intentions for the day.",
-    action: "Select how you're feeling right now by clicking a mood button below.",
+    action: "Click 'Got It' to begin your check-in. Select a mood and enter your daily intention.",
     illustration: "👋",
-  },
-  {
-    id: "checkin-intention",
-    title: "Set Your Daily Intention",
-    content: "What's your main focus for today? Setting an intention gives your day direction and purpose.",
-    action: "Enter your intention in the text field and submit the form.",
-    illustration: "💭",
   },
   {
     id: "xp-celebration",
@@ -56,10 +49,9 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
 
 const STEP_INDEX = {
   HOME_CHECKIN: 0,
-  CHECKIN_INTENTION: 1,
-  XP_CELEBRATION: 2,
-  COMPANION_VIEW: 3,
-  QUEST_CREATION: 4,
+  XP_CELEBRATION: 1,
+  COMPANION_VIEW: 2,
+  QUEST_CREATION: 3,
 } as const;
 
 const DELAYS = {
@@ -237,40 +229,9 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Step 0: Listen for mood selection
+  // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run || !showModal) return;
-
-    try {
-      const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
-      
-      if (moodButtons.length === 0) {
-        console.warn('[Tutorial] Mood buttons not found - data-tour="checkin-mood" may be missing');
-        return;
-      }
-      
-      let hasAdvanced = false;
-      
-      const handleMoodClick = () => {
-        if (hasAdvanced) return;
-        hasAdvanced = true;
-        console.log('[Tutorial] Mood selected, advancing to intention step');
-        setShowModal(false);
-        createTrackedTimeout(() => advanceStep(), 300);
-      };
-
-      moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
-      return () => {
-        moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
-      };
-    } catch (error) {
-      console.error('[Tutorial] Error setting up mood selection listener:', error);
-    }
-  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
-
-  // Step 1: Listen for intention submission
-  useEffect(() => {
-    if (stepIndex !== STEP_INDEX.CHECKIN_INTENTION || !run) return;
+    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) return;
 
     try {
       let hasAdvanced = false;
@@ -279,18 +240,18 @@ export const AppWalkthrough = () => {
         if (hasAdvanced) return;
         hasAdvanced = true;
         console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
-        setShowModal(false);
         createTrackedTimeout(() => {
           confetti({
             particleCount: 100,
             spread: 70,
             origin: { y: 0.6 }
           });
+          setShowModal(true);
           advanceStep();
         }, DELAYS.POST_CHECKIN_CONFETTI);
       };
 
-      window.addEventListener('checkin-complete', handleCheckInComplete);
+      window.addEventListener('checkin-complete', handleCheckInComplete, { once: true });
       return () => {
         window.removeEventListener('checkin-complete', handleCheckInComplete);
       };
@@ -299,9 +260,9 @@ export const AppWalkthrough = () => {
     }
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
-  // Step 2: Listen for companion tab click
+  // Step 1: Listen for companion tab click
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run || !showModal) return;
+    if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
     try {
       let hasAdvanced = false;
@@ -330,11 +291,11 @@ export const AppWalkthrough = () => {
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
     }
-  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
+  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
-  // Step 3: Listen for tasks/quests tab click
+  // Step 2: Listen for tasks/quests tab click
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run || !showModal) return;
+    if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
     try {
       let hasAdvanced = false;
@@ -363,9 +324,9 @@ export const AppWalkthrough = () => {
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
     }
-  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
+  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
-  // Step 4: Set callback for when evolution completes
+  // Step 3: Set callback for when evolution completes
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION) {
       setOnEvolutionComplete(null);
