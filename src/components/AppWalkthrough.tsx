@@ -64,9 +64,7 @@ const STEP_INDEX = {
 
 const DELAYS = {
   POST_CHECKIN_CONFETTI: 1500,
-  POST_NAV: 1000, // Reduced from separate 1500ms delays
-  POST_EVOLUTION: 300,
-  SCROLL_DELAY: 50,
+  POST_NAV: 1000, // Delay after navigation tab click
 } as const;
 
 const TIMEOUTS = {
@@ -146,16 +144,19 @@ export const AppWalkthrough = () => {
   const mentorSlug = getMentorSlug();
 
   const advanceStep = useCallback(() => {
-    if (stepIndex < WALKTHROUGH_STEPS.length - 1) {
-      const newStepIndex = stepIndex + 1;
-      setStepIndex(newStepIndex);
-      setShowModal(true);
-      // Dispatch event for other components to track tutorial progress
-      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-        detail: { step: newStepIndex } 
-      }));
-    }
-  }, [stepIndex]);
+    setStepIndex((prevIndex) => {
+      if (prevIndex < WALKTHROUGH_STEPS.length - 1) {
+        const newStepIndex = prevIndex + 1;
+        setShowModal(true);
+        // Dispatch event for other components to track tutorial progress
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+          detail: { step: newStepIndex } 
+        }));
+        return newStepIndex;
+      }
+      return prevIndex;
+    });
+  }, []);
 
   // Check walkthrough status once on mount and set state
   useEffect(() => {
@@ -248,32 +249,36 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.CHECKIN_INTENTION || !run) return;
 
-    let hasAdvanced = false;
-    
-    const handleCheckInComplete = () => {
-      if (hasAdvanced) return;
-      hasAdvanced = true;
-      console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
-      setShowModal(false);
-      createTrackedTimeout(() => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        advanceStep();
-      }, DELAYS.POST_CHECKIN_CONFETTI);
-    };
+    try {
+      let hasAdvanced = false;
+      
+      const handleCheckInComplete = () => {
+        if (hasAdvanced) return;
+        hasAdvanced = true;
+        console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
+        setShowModal(false);
+        createTrackedTimeout(() => {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+          advanceStep();
+        }, DELAYS.POST_CHECKIN_CONFETTI);
+      };
 
-    window.addEventListener('checkin-complete', handleCheckInComplete);
-    return () => {
-      window.removeEventListener('checkin-complete', handleCheckInComplete);
-    };
+      window.addEventListener('checkin-complete', handleCheckInComplete);
+      return () => {
+        window.removeEventListener('checkin-complete', handleCheckInComplete);
+      };
+    } catch (error) {
+      console.error('[Tutorial] Error setting up check-in completion listener:', error);
+    }
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 2: Listen for companion tab click
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
+    if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run || !showModal) return;
 
     try {
       let hasAdvanced = false;
@@ -302,11 +307,11 @@ export const AppWalkthrough = () => {
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
     }
-  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
+  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
 
   // Step 3: Listen for tasks/quests tab click
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
+    if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run || !showModal) return;
 
     try {
       let hasAdvanced = false;
@@ -335,7 +340,7 @@ export const AppWalkthrough = () => {
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
     }
-  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
+  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
 
   // Step 4: Set callback for when evolution completes
   useEffect(() => {
