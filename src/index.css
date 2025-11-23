@@ -157,11 +157,19 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
+    body {
+      @apply bg-background text-foreground;
+      font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    html.walkthrough-scroll-locked,
+    body.walkthrough-scroll-locked {
+      overflow: hidden;
+      height: 100%;
+      touch-action: none;
+      overscroll-behavior: none;
+    }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Bebas Neue', 'Oswald', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

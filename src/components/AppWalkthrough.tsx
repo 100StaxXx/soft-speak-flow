@@ -64,6 +64,8 @@ const TIMEOUTS = {
   EVOLUTION_FALLBACK_DELAY: 500, // Small delay before fallback timer
 } as const;
 
+const SCROLL_LOCK_CLASS = 'walkthrough-scroll-locked';
+
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
   const { profile } = useProfile();
@@ -231,14 +233,22 @@ export const AppWalkthrough = () => {
 
   // Lock scrolling during entire walkthrough
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const html = document.documentElement;
+    const body = document.body;
+
     if (run) {
-      document.body.style.overflow = 'hidden';
+      html.classList.add(SCROLL_LOCK_CLASS);
+      body.classList.add(SCROLL_LOCK_CLASS);
     } else {
-      document.body.style.overflow = 'auto';
+      html.classList.remove(SCROLL_LOCK_CLASS);
+      body.classList.remove(SCROLL_LOCK_CLASS);
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
+      html.classList.remove(SCROLL_LOCK_CLASS);
+      body.classList.remove(SCROLL_LOCK_CLASS);
     };
   }, [run]);
 
