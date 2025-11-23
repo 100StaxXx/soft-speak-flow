@@ -14,6 +14,9 @@ const ActivityCommentSchema = z.object({
   userReply: z.string().max(500).optional()
 });
 
+const MAX_RECENT_ACTIVITIES = 5;
+const MAX_ACTIVITY_CONTEXT_CHARS = 400;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -74,10 +77,13 @@ serve(async (req) => {
       .select('activity_type, activity_data, created_at')
       .eq('user_id', activity.user_id)
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(MAX_RECENT_ACTIVITIES);
 
     const contextSummary = recentActivities
-      ?.map(a => `${a.activity_type}: ${JSON.stringify(a.activity_data)}`)
+      ?.map(a => {
+        const serialized = JSON.stringify(a.activity_data || {}).slice(0, MAX_ACTIVITY_CONTEXT_CHARS);
+        return `${a.activity_type}: ${serialized}`;
+      })
       .join('\n') || 'No recent activity'
 
     // Get today's pep talk for cross-referencing
@@ -106,7 +112,7 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
 
-    const activityDescription = `${activity.activity_type}: ${JSON.stringify(activity.activity_data)}`
+      const activityDescription = `${activity.activity_type}: ${JSON.stringify(activity.activity_data || {}).slice(0, MAX_ACTIVITY_CONTEXT_CHARS)}`
     
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
@@ -12,6 +13,62 @@ const MentorContentSchema = z.object({
   contentType: z.enum(['quote', 'lesson']),
   mentorId: z.string().uuid(),
   count: z.number().int().min(1).max(10).default(1)
+});
+
+type MentorRecord = {
+  name: string;
+  tone_description: string;
+  style?: string | null;
+  target_user_type?: string | null;
+  themes?: string[] | null;
+};
+
+const quoteValidationDefaults = {
+  maxLength: 600,
+  forbiddenPhrases: ['—', '–']
+};
+
+const lessonValidationDefaults = {
+  minLength: 150,
+  maxLength: 2000
+};
+
+const buildQuoteFallbackPrompt = (mentor: MentorRecord, count: number) => ({
+  systemPrompt: `You are ${mentor.name}, a motivational mentor. Your tone is ${mentor.tone_description}. 
+Your style is ${mentor.style || 'supportive'}. You speak to ${mentor.target_user_type || 'people seeking growth'}.
+
+CRITICAL RULES:
+- Do NOT use em-dashes (—) or long dashes in any text
+- Use only regular hyphens (-) if needed
+- Keep quotes concise and powerful (under 150 characters)
+- Match the mentor's personality and themes: ${mentor.themes?.join(', ') || 'general motivation'}
+- Return ONLY the quote text, nothing else
+- Do not include quotation marks or attribution`,
+  userPrompt: `Generate ${count} powerful, inspiring quote${count > 1 ? 's' : ''} that ${mentor.name} would say. 
+Each quote should be unique and reflect their ${mentor.tone_description} tone.
+${count > 1 ? 'Separate multiple quotes with ||' : ''}`,
+  validationRules: quoteValidationDefaults,
+  outputConstraints: {}
+});
+
+const buildLessonFallbackPrompt = (mentor: MentorRecord) => ({
+  systemPrompt: `You are ${mentor.name}, a motivational mentor creating daily lessons. Your tone is ${mentor.tone_description}.
+Your teaching style is ${mentor.style || 'supportive and actionable'}.
+
+CRITICAL RULES:
+- Do NOT use em-dashes (—) or long dashes in any text
+- Use only regular hyphens (-) if needed
+- Create practical, actionable lessons
+- Match the mentor's personality and themes: ${mentor.themes?.join(', ') || 'personal growth'}
+- Return in this exact format: TITLE||DESCRIPTION||CONTENT
+- Title should be catchy and under 60 characters
+- Description should be one sentence summarizing the lesson
+- Content should be 3-4 paragraphs of practical guidance`,
+  userPrompt: `Create an inspiring daily lesson that ${mentor.name} would teach. 
+Focus on one key concept that helps people grow and take action today.
+Remember: NO em-dashes, use regular hyphens only.`,
+  validationRules: lessonValidationDefaults,
+  outputConstraints: {}
 });
 
 serve(async (req) => {
@@ -60,44 +117,39 @@ serve(async (req) => {
 
     console.log(`Generating ${contentType} for mentor: ${mentor.name}`);
 
-    let systemPrompt = "";
-    let userPrompt = "";
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
+    const templateKey = contentType === "quote" ? "mentor_content_quote" : "mentor_content_lesson";
+    const fallbackPrompt = contentType === "quote"
+      ? buildQuoteFallbackPrompt(mentor as MentorRecord, count)
+      : buildLessonFallbackPrompt(mentor as MentorRecord);
 
-    if (contentType === "quote") {
-      systemPrompt = `You are ${mentor.name}, a motivational mentor. Your tone is ${mentor.tone_description}. 
-Your style is ${mentor.style || 'supportive'}. You speak to ${mentor.target_user_type || 'people seeking growth'}.
+    let promptConfig;
+    try {
+      const variables = contentType === "quote"
+        ? {
+            mentorName: mentor.name,
+            mentorTone: mentor.tone_description,
+            mentorStyle: mentor.style || 'supportive',
+            targetAudience: mentor.target_user_type || 'people seeking growth',
+            mentorThemes: mentor.themes?.join(', ') || 'motivation',
+            quoteCount: count,
+            separator: '||'
+          }
+        : {
+            mentorName: mentor.name,
+            mentorTone: mentor.tone_description,
+            mentorStyle: mentor.style || 'supportive and actionable',
+            mentorThemes: mentor.themes?.join(', ') || 'personal growth',
+            formatHint: 'TITLE||DESCRIPTION||CONTENT'
+          };
 
-CRITICAL RULES:
-- Do NOT use em-dashes (—) or long dashes in any text
-- Use only regular hyphens (-) if needed
-- Keep quotes concise and powerful (under 150 characters)
-- Match the mentor's personality and themes: ${mentor.themes?.join(', ') || 'general motivation'}
-- Return ONLY the quote text, nothing else
-- Do not include quotation marks
-- Do not include attribution or author name`;
-
-      userPrompt = `Generate ${count} powerful, inspiring quote${count > 1 ? 's' : ''} that ${mentor.name} would say. 
-Each quote should be unique and reflect their ${mentor.tone_description} tone.
-${count > 1 ? 'Separate multiple quotes with ||' : ''}`;
-    } else if (contentType === "lesson") {
-      systemPrompt = `You are ${mentor.name}, a motivational mentor creating daily lessons. Your tone is ${mentor.tone_description}.
-Your teaching style is ${mentor.style || 'supportive and actionable'}.
-
-CRITICAL RULES:
-- Do NOT use em-dashes (—) or long dashes in any text
-- Use only regular hyphens (-) if needed
-- Create practical, actionable lessons
-- Match the mentor's personality and themes: ${mentor.themes?.join(', ') || 'personal growth'}
-- Return in this exact format: TITLE||DESCRIPTION||CONTENT
-- Title should be catchy and under 60 characters
-- Description should be one sentence summarizing the lesson
-- Content should be 3-4 paragraphs of practical guidance`;
-
-      userPrompt = `Create an inspiring daily lesson that ${mentor.name} would teach. 
-Focus on one key concept that helps people grow and take action today.
-Remember: NO em-dashes, use regular hyphens only.`;
-    } else {
-      throw new Error("Invalid content type. Use 'quote' or 'lesson'");
+      promptConfig = await promptBuilder.build({
+        templateKey,
+        variables
+      });
+    } catch (error) {
+      console.warn(`Falling back to inline prompt for ${templateKey}`, error);
+      promptConfig = fallbackPrompt;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -109,8 +161,8 @@ Remember: NO em-dashes, use regular hyphens only.`;
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+            { role: "system", content: promptConfig.systemPrompt },
+            { role: "user", content: promptConfig.userPrompt }
         ],
       }),
     });
@@ -142,10 +194,8 @@ Remember: NO em-dashes, use regular hyphens only.`;
     const cleanedContent = generatedContent.replace(/—/g, '-');
 
     // Validate output
-    const validationRules = contentType === 'quote' 
-      ? { max_length: { text: 150 }, forbidden_chars: ['—', '–'] }
-      : { required_fields: ['title', 'description', 'content'], max_length: { title: 60 } };
-    const validator = new OutputValidator(validationRules, {});
+      const validationRules = promptConfig.validationRules || (contentType === 'quote' ? quoteValidationDefaults : lessonValidationDefaults);
+      const validator = new OutputValidator(validationRules, promptConfig.outputConstraints || {});
     const validationResult = validator.validate(cleanedContent);
 
     if (!validationResult.isValid) {

@@ -19,6 +19,9 @@ const WeeklyInsightsSchema = z.object({
   })
 });
 
+const MAX_WEEKLY_ACTIVITY_CONTEXT = 8;
+const MAX_ACTIVITY_SUMMARY_CHARS = 400;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -71,8 +74,11 @@ serve(async (req) => {
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-    const activitiesSummary = weeklyData.activities.slice(0, 10)
-      .map((a: any) => `${a.type}: ${JSON.stringify(a.data)}`)
+    const activitiesSummary = weeklyData.activities.slice(0, MAX_WEEKLY_ACTIVITY_CONTEXT)
+      .map((a: any) => {
+        const serialized = JSON.stringify(a.data || {}).slice(0, MAX_ACTIVITY_SUMMARY_CHARS);
+        return `${a.type}: ${serialized}`;
+      })
       .join('\n');
 
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({

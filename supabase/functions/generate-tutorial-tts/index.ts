@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,22 +57,16 @@ serve(async (req) => {
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('OpenAI TTS error:', error);
-      throw new Error(`Failed to generate speech: ${error}`);
-    }
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('OpenAI TTS error:', error);
+        throw new Error(`Failed to generate speech: ${error}`);
+      }
 
-    // Convert audio buffer to base64 (chunk to avoid stack overflow)
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let binary = '';
-    const chunkSize = 0x8000; // Process in 32KB chunks
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    const base64Audio = btoa(binary);
+      // Convert audio buffer to base64 using std encoder to avoid stack overflows
+      const arrayBuffer = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64Audio = encodeBase64(uint8Array);
 
     return new Response(
       JSON.stringify({ 

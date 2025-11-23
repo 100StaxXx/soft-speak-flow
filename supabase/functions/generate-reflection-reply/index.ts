@@ -15,6 +15,8 @@ const ReflectionReplySchema = z.object({
   note: z.string().max(1000).optional()
 });
 
+const MAX_REFLECTION_NOTE_CHARS = 600;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -74,12 +76,14 @@ serve(async (req) => {
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
+    const trimmedNote = note ? note.slice(0, MAX_REFLECTION_NOTE_CHARS) : undefined;
+
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'reflection_reply',
       userId: user.id,
       variables: {
         userMood: mood,
-        userNote: note || 'No additional note provided',
+        userNote: trimmedNote || 'No additional note provided',
         maxSentences: 3,
         personalityModifiers: '',
         responseLength: 'brief'

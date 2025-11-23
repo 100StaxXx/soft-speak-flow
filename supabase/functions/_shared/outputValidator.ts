@@ -70,6 +70,19 @@ export class OutputValidator {
           }
         }
 
+        // Nested array length validation (e.g., tasks arrays inside objects)
+        if (this.constraints.requiredArrayLengths && typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          const requirements = this.constraints.requiredArrayLengths as Record<string, number>;
+          for (const [field, expectedLength] of Object.entries(requirements)) {
+            const value = (parsed as Record<string, any>)[field];
+            if (Array.isArray(value) && typeof expectedLength === 'number') {
+              if (value.length !== expectedLength) {
+                errors.push(`Field "${field}" must contain ${expectedLength} items (received ${value.length})`);
+              }
+            }
+          }
+        }
+
       } catch (e) {
         errors.push('Invalid JSON format');
       }
