@@ -54,7 +54,7 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     id: "tasks-create-quest",
     title: "Create Your First Quest",
     content: "Quests are your daily goals. Completing them earns XP and helps your companion evolve. Let's create your very first quest!",
-    action: "Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
+    action: "Type a quest name, select Medium difficulty (15 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
     illustration: "✍️",
     requiresAction: true,
   },
@@ -135,8 +135,15 @@ export const AppWalkthrough = () => {
 
   const advanceStep = useCallback(() => {
     if (stepIndex < WALKTHROUGH_STEPS.length - 1) {
-      setStepIndex(stepIndex + 1);
+      const newStepIndex = stepIndex + 1;
+      setStepIndex(newStepIndex);
       setShowModal(true);
+      // Dispatch tutorial step change event for other components
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: newStepIndex } 
+      }));
+      // Set localStorage flag for components that check it
+      localStorage.setItem('appWalkthroughActive', 'true');
     }
   }, [stepIndex]);
 
@@ -156,6 +163,14 @@ export const AppWalkthrough = () => {
       
       setIsWalkthroughCompleted(completed);
       
+      // If walkthrough is completed, ensure localStorage is cleared
+      if (completed) {
+        localStorage.removeItem('appWalkthroughActive');
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+          detail: { step: null } 
+        }));
+      }
+      
       // Dispatch ready event for other components
       window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
         detail: { shouldRun: !completed } 
@@ -164,6 +179,16 @@ export const AppWalkthrough = () => {
 
     checkStatus();
   }, [user, session]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Only clear if walkthrough is not completed (to avoid clearing during normal completion flow)
+      if (!isWalkthroughCompleted) {
+        clearAllTimers();
+      }
+    };
+  }, [isWalkthroughCompleted, clearAllTimers]);
 
   // Listen for onboarding completion event to start walkthrough
   useEffect(() => {
@@ -179,6 +204,12 @@ export const AppWalkthrough = () => {
       setStepIndex(0);
       setShowModal(true);
       setRun(true);
+      // Dispatch initial tutorial step change event
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: 0 } 
+      }));
+      // Set localStorage flag for components that check it
+      localStorage.setItem('appWalkthroughActive', 'true');
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
@@ -291,7 +322,7 @@ export const AppWalkthrough = () => {
     };
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
-  // Step 4: Set callback for when evolution completes
+    // Step 4: Set callback for when evolution completes
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION) {
       setOnEvolutionComplete(null);
@@ -299,6 +330,7 @@ export const AppWalkthrough = () => {
     }
 
     let hasHandledLoading = false;
+    let hasHandledCompletion = false;
     
     const handleEvolutionLoadingStart = () => {
       if (hasHandledLoading) return;
@@ -309,16 +341,39 @@ export const AppWalkthrough = () => {
     };
 
     setOnEvolutionComplete(() => () => {
+      if (hasHandledCompletion) return;
+      hasHandledCompletion = true;
       console.log('[Tutorial] Evolution completion callback triggered!');
       setRun(false);
       setShowModal(false);
       setShowCompletionButton(true);
+      // Clear tutorial state
+      localStorage.removeItem('appWalkthroughActive');
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
     });
 
+    // Also listen for evolution-complete event as a fallback
+    const handleEvolutionComplete = () => {
+      if (hasHandledCompletion) return;
+      hasHandledCompletion = true;
+      console.log('[Tutorial] Evolution complete event received!');
+      setRun(false);
+      setShowModal(false);
+      setShowCompletionButton(true);
+      localStorage.removeItem('appWalkthroughActive');
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
+    };
+
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart, { once: true });
+    window.addEventListener('evolution-complete', handleEvolutionComplete, { once: true });
     
     return () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
+      window.removeEventListener('evolution-complete', handleEvolutionComplete);
       setOnEvolutionComplete(null);
     };
   }, [stepIndex, setOnEvolutionComplete]);
@@ -330,6 +385,12 @@ export const AppWalkthrough = () => {
     setIsSaving(true);
     console.log('[Tutorial] Tutorial completed');
     setRun(false);
+    
+    // Clear tutorial state
+    localStorage.removeItem('appWalkthroughActive');
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+      detail: { step: null } 
+    }));
     
     if (user) {
       try {
@@ -383,6 +444,10 @@ export const AppWalkthrough = () => {
     } else {
       // No user - still hide button and reload as fallback
       setShowCompletionButton(false);
+      localStorage.removeItem('appWalkthroughActive');
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: null } 
+      }));
       window.location.reload();
     }
   }, [user, isSaving]);
