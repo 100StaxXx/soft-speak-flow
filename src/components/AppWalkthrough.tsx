@@ -210,7 +210,7 @@ export const AppWalkthrough = () => {
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
     return () => {
-      window.removeEventListener('onboarding-complete', handleOnboardingComplete);
+      // Listener is automatically removed by { once: true }
     };
   }, [user, session, isWalkthroughCompleted]);
 
@@ -302,7 +302,7 @@ export const AppWalkthrough = () => {
       navCompanion.addEventListener('click', handleNavClick, { once: true });
       
       return () => {
-        navCompanion.removeEventListener('click', handleNavClick);
+        // Listener is automatically removed by { once: true }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
@@ -335,7 +335,7 @@ export const AppWalkthrough = () => {
       navTasks.addEventListener('click', handleNavClick, { once: true });
       
       return () => {
-        navTasks.removeEventListener('click', handleNavClick);
+        // Listener is automatically removed by { once: true }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
@@ -389,7 +389,7 @@ export const AppWalkthrough = () => {
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart, { once: true });
     
     return () => {
-      window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
+      // Listener is automatically removed by { once: true }
       setOnEvolutionComplete(null);
       
       // Clean up fallback timeout on unmount
