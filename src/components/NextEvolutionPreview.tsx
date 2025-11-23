@@ -25,10 +25,10 @@ export const NextEvolutionPreview = ({
   nextEvolutionXP,
   progressPercent,
 }: NextEvolutionPreviewProps) => {
-  const nextStage = Math.min(currentStage + 1, 20);
+  const nextStage = Math.min(currentStage + 1, 20); // Max stage is 20 in 21-stage system (0-20)
   const nextStageName = getStageName(nextStage);
   const xpNeeded = nextEvolutionXP - currentXP;
-  const isMaxStage = currentStage >= 20;
+  const isMaxStage = currentStage >= 20; // Stage 20 is Ultimate (final form)
 
   if (isMaxStage) {
     return (

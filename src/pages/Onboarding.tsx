@@ -116,25 +116,12 @@ export default function Onboarding() {
 
   const handleLegalAccept = async () => {
     if (user) {
-      try {
-        // Store legal acceptance in database
-        const acceptedAt = new Date().toISOString();
-        const acceptedVersion = '2025-11-21';
-        
-        await supabase
-          .from('profiles')
-          .update({
-            legal_accepted_at: acceptedAt,
-            legal_accepted_version: acceptedVersion,
-          })
-          .eq('id', user.id);
-          
-        // Also keep in localStorage for quick checks
-        localStorage.setItem('legal_accepted_at', acceptedAt);
-        localStorage.setItem('legal_accepted_version', acceptedVersion);
-      } catch (error) {
-        console.error('Error saving legal acceptance:', error);
-      }
+      // Store legal acceptance in localStorage for quick checks
+      const acceptedAt = new Date().toISOString();
+      const acceptedVersion = '2025-11-21';
+      
+      localStorage.setItem('legal_accepted_at', acceptedAt);
+      localStorage.setItem('legal_accepted_version', acceptedVersion);
     }
     setStage('name');
   };
@@ -161,8 +148,6 @@ export default function Onboarding() {
             ...existingData,
             userName: name,
           },
-          // Update timezone if not already set
-          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         })
         .eq("id", user.id);
 

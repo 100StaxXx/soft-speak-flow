@@ -52,15 +52,15 @@ serve(async (req) => {
     const randomHex = crypto.randomUUID().split('-')[0].toUpperCase();
     const cardId = `ALP-${species.toUpperCase()}-${user.id.split('-')[0].toUpperCase()}-E${stage}-${randomHex}`;
 
-    // Determine rarity based on stage
+    // Determine rarity based on stage (21-stage system: 0-20)
     let rarity = 'Common';
-    if (stage >= 18) rarity = 'Origin';
-    else if (stage >= 15) rarity = 'Primal';
-    else if (stage >= 12) rarity = 'Celestial';
-    else if (stage >= 9) rarity = 'Mythic';
-    else if (stage >= 6) rarity = 'Legendary';
-    else if (stage >= 3) rarity = 'Epic';
-    else if (stage >= 1) rarity = 'Rare';
+    if (stage >= 19) rarity = 'Origin';       // Stage 19-20: Apex, Ultimate
+    else if (stage >= 16) rarity = 'Primal';  // Stage 16-18: Regal, Eternal, Transcendent
+    else if (stage >= 13) rarity = 'Celestial'; // Stage 13-15: Titan, Mythic, Prime
+    else if (stage >= 10) rarity = 'Mythic';  // Stage 10-12: Champion, Ascended, Vanguard
+    else if (stage >= 7) rarity = 'Legendary'; // Stage 7-9: Fledgling, Warrior, Guardian
+    else if (stage >= 4) rarity = 'Epic';      // Stage 4-6: Juvenile, Apprentice, Scout
+    else if (stage >= 1) rarity = 'Rare';      // Stage 1-3: Hatchling, Sproutling, Cub
 
     // Generate stats based on stage and Mind/Body/Soul attributes
     const baseStatValue = 10 + (stage * 5);
