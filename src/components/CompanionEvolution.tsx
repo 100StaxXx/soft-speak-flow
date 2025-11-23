@@ -169,13 +169,24 @@ export const CompanionEvolution = ({
     return () => {
       isMounted = false;
       timers.forEach(clearTimeout);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      cleanupAudio(); // Use centralized cleanup
       resumeAmbientAfterEvent();
     };
-  }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage]);
+  }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage, cleanupAudio]);
+
+  const cleanupAudio = useCallback(() => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = ''; // Clear source to release resources
+      } catch (error) {
+        console.error('Error cleaning up audio:', error);
+      } finally {
+        audioRef.current = null;
+      }
+    }
+  }, []);
 
   const handleDismiss = (e: React.MouseEvent) => {
     // Prevent any interaction until timer allows it
@@ -188,10 +199,7 @@ export const CompanionEvolution = ({
     setAnimationStage(0);
     setCanDismiss(false);
     
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    cleanupAudio();
     
     resumeAmbientAfterEvent();
     
@@ -207,6 +215,7 @@ export const CompanionEvolution = ({
 
   const handleContinue = () => {
     console.log('[CompanionEvolution] Continue button clicked, dispatching evolution-modal-closed');
+    cleanupAudio(); // Ensure audio is cleaned up
     window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
     setShowContinueButton(false);
     onComplete();

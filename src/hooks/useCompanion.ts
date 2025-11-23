@@ -248,34 +248,41 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("No user found");
       
-      // CRITICAL: Ensure companion is loaded before awarding XP
-      if (!companion) {
-        console.warn('Companion not loaded yet, fetching...');
-        // Refetch companion data and wait for it to complete
-        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-        const freshCompanion = queryClient.getQueryData(["companion", user.id]) as Companion | null;
-        if (!freshCompanion) {
-          throw new Error("No companion found. Please create one first.");
+      // Prevent duplicate XP awards - check FIRST before any async operations
+      if (xpInProgress.current) {
+        console.warn('XP award already in progress, skipping duplicate');
+        // Return current state without throwing
+        const currentCompanion = companion || queryClient.getQueryData(["companion", user.id]) as Companion | null;
+        if (currentCompanion) {
+          return { shouldEvolve: false, newStage: currentCompanion.current_stage, newXP: currentCompanion.current_xp };
         }
-        // Use fresh companion for calculation
-        const companionToUse = freshCompanion;
+        throw new Error("Cannot award XP: operation in progress and no companion data available");
+      }
+      
+      // Set flag immediately to prevent race
+      xpInProgress.current = true;
+      
+      try {
+        // CRITICAL: Ensure companion is loaded before awarding XP
+        let companionToUse = companion;
         
-        // Prevent duplicate XP awards
-        if (xpInProgress.current) {
-          console.warn('XP award already in progress, skipping duplicate');
-          return { shouldEvolve: false, newStage: companionToUse.current_stage, newXP: companionToUse.current_xp };
+        if (!companionToUse) {
+          console.warn('Companion not loaded yet, fetching...');
+          // Refetch companion data and wait for it to complete
+          await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+          companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+          
+          if (!companionToUse) {
+            throw new Error("No companion found. Please create one first.");
+          }
         }
         
         return await performXPAward(companionToUse, xpAmount, eventType, metadata, user);
+      } catch (error) {
+        // Reset flag on error so user can retry
+        xpInProgress.current = false;
+        throw error;
       }
-      
-      // Prevent duplicate XP awards
-      if (xpInProgress.current) {
-        console.warn('XP award already in progress, skipping duplicate');
-        return { shouldEvolve: false, newStage: companion.current_stage, newXP: companion.current_xp };
-      }
-      
-      return await performXPAward(companion, xpAmount, eventType, metadata, user);
     },
     onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
       xpInProgress.current = false;
@@ -461,22 +468,25 @@ export const useCompanion = () => {
         .maybeSingle();
 
       if (!existingStory) {
-        // Generate story chapter in the background
-        supabase.functions.invoke("generate-companion-story", {
-          body: {
-            companionId: companion.id,
-            stage: newStage,
-            tonePreference: "heroic",
-            themeIntensity: "moderate",
-          },
-        }).then(() => {
-          console.log(`Stage ${newStage} story generation started`);
-          queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-          queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-        }).catch((error) => {
-          console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
-          // Don't throw - story generation is not critical to evolution
-        });
+        // Generate story chapter in the background - properly handled promise
+        (async () => {
+          try {
+            await supabase.functions.invoke("generate-companion-story", {
+              body: {
+                companionId: companion.id,
+                stage: newStage,
+                tonePreference: "heroic",
+                themeIntensity: "moderate",
+              },
+            });
+            console.log(`Stage ${newStage} story generation started`);
+            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+          } catch (error) {
+            console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
+            // Don't throw - story generation is not critical to evolution
+          }
+        })();
       }
 
           return evolutionData.image_url;

@@ -93,6 +93,7 @@ export const CompanionDisplay = () => {
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageKey, setImageKey] = useState(0); // Force image reload
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -182,9 +183,10 @@ export const CompanionDisplay = () => {
                       onClick={() => {
                         setImageError(false);
                         setImageLoaded(false);
+                        setImageKey(prev => prev + 1); // Force image reload with new key
                       }}
                       className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
-                      aria-label="Try again"
+                      aria-label="Retry loading image"
                     >
                       Try again
                     </button>
@@ -192,10 +194,14 @@ export const CompanionDisplay = () => {
                 </div>
               )}
               <img
+                key={imageKey}
                 src={companion.current_image_url || ""}
                 alt={`${stageName} companion at stage ${companion.current_stage}`}
                 className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
-                onLoad={() => setImageLoaded(true)}
+                onLoad={() => {
+                  setImageLoaded(true);
+                  setImageError(false); // Clear error on successful load
+                }}
                 onError={() => {
                   setImageError(true);
                   setImageLoaded(false);
