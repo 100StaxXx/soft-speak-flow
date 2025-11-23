@@ -491,14 +491,14 @@ export const AppWalkthrough = () => {
 
   return (
     <>
-      {/* Full-screen overlay - stronger blocking during check-in */}
+      {/* Full-screen overlay - visible during check-in but allows clicks through */}
       {run && (
         <div 
           className={cn(
-            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300",
+            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300 pointer-events-none",
             stepIndex === STEP_INDEX.HOME_CHECKIN 
-              ? "bg-black/80 pointer-events-auto" 
-              : "bg-black/40 pointer-events-none"
+              ? "bg-black/80" 
+              : "bg-black/40"
           )}
         />
       )}
