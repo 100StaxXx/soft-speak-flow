@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Flame, Zap, Droplet, Wind, Leaf, Mountain, Star } from "lucide-react";
+import { getStageName } from "@/config/companionStages";
 
 interface CompanionBadgeProps {
   element: string;
@@ -30,11 +31,10 @@ const elementColors: Record<string, string> = {
   spirit: "bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-indigo-300 border-indigo-500/30"
 };
 
-const stageLabels = ["Seedling", "Growing", "Awakening", "Evolved", "Transcendent"];
-
 export const CompanionBadge = ({ element, stage = 1, showStage = true, className = "" }: CompanionBadgeProps) => {
   const Icon = elementIcons[element.toLowerCase()] || Sparkles;
   const colorClass = elementColors[element.toLowerCase()] || elementColors.spirit;
+  const stageName = getStageName(stage);
   
   return (
     <Badge 
@@ -43,10 +43,10 @@ export const CompanionBadge = ({ element, stage = 1, showStage = true, className
     >
       <Icon className="h-3 w-3" />
       <span className="text-xs font-semibold capitalize">{element}</span>
-      {showStage && stage && (
+      {showStage && stage !== undefined && (
         <>
           <span className="text-xs opacity-50">•</span>
-          <span className="text-xs font-medium">{stageLabels[stage - 1] || `Stage ${stage}`}</span>
+          <span className="text-xs font-medium">{stageName}</span>
         </>
       )}
     </Badge>
