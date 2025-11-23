@@ -117,7 +117,6 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
                 <SelectItem 
                   key={animal} 
                   value={animal}
-                  className="cursor-pointer"
                 >
                   {animal}
                 </SelectItem>

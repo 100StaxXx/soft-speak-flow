@@ -17,9 +17,13 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between rounded-lg border border-input bg-secondary/50 px-4 py-2 text-sm font-medium text-foreground ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 transition-all",
+      "flex h-11 w-full items-center justify-between rounded-lg border border-input bg-secondary/50 px-4 py-2 text-sm font-medium text-foreground ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 transition-all touch-manipulation active:scale-[0.98]",
       className,
     )}
+    style={{
+      WebkitTapHighlightColor: 'transparent',
+      touchAction: 'manipulation',
+    }}
     {...props}
   >
     {children}
@@ -71,6 +75,9 @@ const SelectContent = React.forwardRef<
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className,
       )}
+      style={{
+        touchAction: 'pan-y',
+      }}
       position={position}
       {...props}
     >
@@ -105,9 +112,13 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground",
+      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-3 pl-8 pr-2 text-sm outline-none min-h-[44px] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground active:bg-accent/80 touch-manipulation",
       className,
     )}
+    style={{
+      WebkitTapHighlightColor: 'transparent',
+      touchAction: 'manipulation',
+    }}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
