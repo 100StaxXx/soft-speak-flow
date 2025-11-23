@@ -29,29 +29,25 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
 /**
  * Ensures a profile exists for a user, creating one if needed
  * Automatically detects and stores the user's timezone
+ * Uses upsert to handle race conditions gracefully
  */
 export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id, timezone")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (!existing) {
-    // Profile doesn't exist, create it with timezone
-    const timezone = detectTimezone();
-    
-    await supabase.from("profiles").insert({
-      id: userId,
-      email: email ?? null,
-      timezone: timezone,
-    });
-  } else if (!existing.timezone) {
-    // Profile exists but timezone not set, update it
-    const timezone = detectTimezone();
-    
-    await supabase.from("profiles").update({
-      timezone: timezone,
-    }).eq("id", userId);
+  const timezone = detectTimezone();
+  
+  // Use upsert to handle race conditions (handles both insert and update)
+  const { error } = await supabase.from("profiles").upsert({
+    id: userId,
+    email: email ?? null,
+    timezone: timezone,
+  }, {
+    onConflict: 'id',
+    // Don't overwrite existing email if it's already set
+    ignoreDuplicates: false,
+  });
+  
+  // Only throw on real errors (ignore duplicate key conflicts)
+  if (error && !error.message.includes('duplicate')) {
+    console.error('Error ensuring profile:', error);
+    throw error;
   }
 };
