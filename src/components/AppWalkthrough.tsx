@@ -7,7 +7,6 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { OnboardingData } from "@/types/profile";
 import { TutorialModal } from "./TutorialModal";
 import { Button } from "./ui/button";
-import { cn } from "@/lib/utils";
 
 interface TutorialStep {
   id: string;
@@ -229,69 +228,6 @@ export const AppWalkthrough = () => {
       // Listener is automatically removed by { once: true }
     };
   }, [user, session, isWalkthroughCompleted]);
-
-  // Scroll lock whenever modal is showing, during check-in, or showing completion modal
-  useEffect(() => {
-    // Lock scroll if any walkthrough UI is active
-    if (showModal || showCompletionButton || (run && stepIndex === STEP_INDEX.HOME_CHECKIN)) {
-      document.body.style.overflow = 'hidden';
-    } else if (!run && !showModal && !showCompletionButton) {
-      // Only restore scroll when walkthrough is completely inactive
-      document.body.style.overflow = 'auto';
-    }
-
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, [showModal, showCompletionButton, stepIndex, run]);
-
-  // Bottom nav control and check-in elevation only during check-in step (Step 0)
-  // Note: BottomNav.tsx handles navigation blocking during other tutorial steps via React state
-  useEffect(() => {
-    if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
-      // Restore bottom nav when not on check-in step
-      const bottomNav = document.querySelector('nav[role="navigation"]');
-      if (bottomNav) {
-        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
-        (bottomNav as HTMLElement).style.opacity = '1';
-      }
-      // Reset check-in z-index
-      const checkInSection = document.querySelector('[data-checkin-section]');
-      if (checkInSection) {
-        (checkInSection as HTMLElement).style.position = '';
-        (checkInSection as HTMLElement).style.zIndex = '';
-      }
-      return;
-    }
-
-    // Disable bottom navigation during check-in
-    const bottomNav = document.querySelector('nav[role="navigation"]');
-    if (bottomNav) {
-      (bottomNav as HTMLElement).style.pointerEvents = 'none';
-      (bottomNav as HTMLElement).style.opacity = '0.3';
-    }
-
-    // Elevate check-in section above overlay
-    const checkInSection = document.querySelector('[data-checkin-section]');
-    if (checkInSection) {
-      (checkInSection as HTMLElement).style.position = 'relative';
-      (checkInSection as HTMLElement).style.zIndex = '9999';
-    }
-
-    return () => {
-      const bottomNav = document.querySelector('nav[role="navigation"]');
-      if (bottomNav) {
-        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
-        (bottomNav as HTMLElement).style.opacity = '1';
-      }
-      // Reset check-in z-index on cleanup
-      const checkInSection = document.querySelector('[data-checkin-section]');
-      if (checkInSection) {
-        (checkInSection as HTMLElement).style.position = '';
-        (checkInSection as HTMLElement).style.zIndex = '';
-      }
-    };
-  }, [stepIndex, run]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
@@ -521,18 +457,6 @@ export const AppWalkthrough = () => {
 
   return (
     <>
-      {/* Full-screen overlay - visible during check-in but allows clicks through */}
-      {run && (
-        <div 
-          className={cn(
-            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300 pointer-events-none",
-            stepIndex === STEP_INDEX.HOME_CHECKIN 
-              ? "bg-black/80" 
-              : "bg-black/40"
-          )}
-        />
-      )}
-
       {/* Tutorial Modal */}
       {showModal && currentStep && (
         <TutorialModal
@@ -543,7 +467,7 @@ export const AppWalkthrough = () => {
           onAction={() => setShowModal(false)}
         />
       )}
-      {/* Completion Modal - z-index 10001 to ensure it appears above CompanionEvolution (z-9999) */}
+      {/* Completion Modal */}
       {showCompletionButton && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">

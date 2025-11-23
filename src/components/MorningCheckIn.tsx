@@ -180,7 +180,7 @@ export const MorningCheckIn = () => {
   }
 
   return (
-    <Card data-tour="morning-checkin" data-checkin-section className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
+    <Card data-tour="morning-checkin" className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
