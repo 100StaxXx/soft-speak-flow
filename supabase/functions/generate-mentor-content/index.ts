@@ -143,8 +143,8 @@ Remember: NO em-dashes, use regular hyphens only.`;
 
     // Validate output
     const validationRules = contentType === 'quote' 
-      ? { max_length: { text: 150 }, forbidden_chars: ['—', '–'] }
-      : { required_fields: ['title', 'description', 'content'], max_length: { title: 60 } };
+      ? { maxLength: 150, forbiddenPhrases: ['—', '–'] }
+      : { requiredFields: ['title', 'description', 'content'] };
     const validator = new OutputValidator(validationRules, {});
     const validationResult = validator.validate(cleanedContent);
 
