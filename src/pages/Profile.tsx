@@ -101,7 +101,11 @@ const Profile = () => {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ selected_mentor_id: mentorId })
+        .update({ 
+          selected_mentor_id: mentorId,
+          // Also ensure timezone is set if not already
+          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        })
         .eq("id", user.id);
       if (error) throw error;
       toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });

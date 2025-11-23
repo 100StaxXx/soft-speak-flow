@@ -12,11 +12,16 @@ import { IntroScreen } from "@/components/IntroScreen";
 
 const authSchema = z.object({
   email: z.string()
+    .trim()
+    .toLowerCase()
     .email("Invalid email address")
-    .max(255, "Email too long"),
+    .min(3, "Email too short")
+    .max(255, "Email too long")
+    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .max(100, "Password too long")
+    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character")
 });
 
 
@@ -47,14 +52,20 @@ const Auth = () => {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Defer additional Supabase calls to avoid deadlocks in the callback
-        setTimeout(async () => {
+        // Use a promise queue to handle profile creation properly
+        try {
+          // Add a small delay to let the auth state settle
+          await new Promise(resolve => setTimeout(resolve, 100));
           await ensureProfile(session.user.id, session.user.email);
           const path = await getAuthRedirectPath(session.user.id);
           navigate(path);
-        }, 0);
+        } catch (error) {
+          console.error('Error in auth state change:', error);
+          // Still navigate even if profile creation fails
+          navigate('/onboarding');
+        }
       }
     });
 
@@ -65,7 +76,9 @@ const Auth = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const result = authSchema.safeParse({ email, password });
+    // Sanitize inputs before validation
+    const sanitizedEmail = email.trim().toLowerCase();
+    const result = authSchema.safeParse({ email: sanitizedEmail, password });
     if (!result.success) {
       toast({
         title: "Validation Error",
@@ -80,21 +93,38 @@ const Auth = () => {
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: sanitizedEmail,
           password,
         });
 
         if (error) throw error;
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: sanitizedEmail,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+            }
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          // Special handling for email already registered
+          if (error.message.includes('already registered')) {
+            throw new Error('This email is already registered. Please sign in instead.');
+          }
+          throw error;
+        }
+        
+        // For sign-up, show success message
+        if (!isLogin) {
+          toast({
+            title: "Check your email",
+            description: "We've sent you a confirmation link to complete your registration.",
+          });
+        }
       }
     } catch (error: any) {
       toast({
@@ -108,6 +138,11 @@ const Auth = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    // Note: Apple OAuth requires additional setup in Supabase dashboard:
+    // 1. Apple Developer account with Sign in with Apple configured
+    // 2. Service ID, Key ID, Team ID, and Private Key configured in Supabase
+    // 3. Redirect URLs properly configured
+    // Google OAuth should work if configured in Supabase dashboard
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -209,6 +244,7 @@ const Auth = () => {
                 variant="outline"
                 onClick={() => handleOAuthSignIn('apple')}
                 className="bg-obsidian/50 border-royal-purple/30 text-pure-white hover:bg-royal-purple/10 hover:border-royal-purple"
+                title="Apple Sign-In requires configuration in Supabase dashboard"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
