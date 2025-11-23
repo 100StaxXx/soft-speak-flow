@@ -129,7 +129,7 @@ export const useCompanion = () => {
 
       if (!imageData?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
 
-      // Create companion record with color specifications
+      // Create companion record with color specifications and initial attributes
       const { data: companionData, error: createError } = await supabase
         .from("user_companion")
         .insert({
@@ -143,6 +143,9 @@ export const useCompanion = () => {
           current_image_url: imageData.imageUrl,
           eye_color: eyeColor,
           fur_color: furColor,
+          body: 100,  // Physical energy starts at full
+          mind: 0,    // Mental focus starts at 0, grows with habits
+          soul: 0,    // Inner balance starts at 0, grows with reflections
         })
         .select()
         .maybeSingle();
@@ -405,8 +408,8 @@ export const useCompanion = () => {
 
         const existingStages = new Set(existingCards?.map(c => c.evolution_stage) || []);
 
-        // Generate cards for missing stages (stages 1 through newStage)
-        for (let stage = 1; stage <= newStage; stage++) {
+        // Generate cards for missing stages (stages 0 through newStage)
+        for (let stage = 0; stage <= newStage; stage++) {
           if (!existingStages.has(stage)) {
             console.log(`Generating card for stage ${stage}`);
             

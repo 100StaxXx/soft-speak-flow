@@ -6,30 +6,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// XP thresholds for each evolution stage - MUST match useCompanion.ts
+// XP thresholds for each evolution stage - MUST match xpSystem.ts and companionStages.ts
 // Stage 1 now at 10 XP for faster first evolution
 const EVOLUTION_THRESHOLDS = {
-  0: 0,      // Egg
-  1: 10,     // Hatchling - first evolution happens quickly!
-  2: 120,    // Guardian
-  3: 250,    // Ascended
-  4: 500,    // Mythic
-  5: 1200,   // Titan
-  6: 2500,
-  7: 5000,
-  8: 10000,
-  9: 20000,
-  10: 35000,
-  11: 50000,
-  12: 75000,
-  13: 100000,
-  14: 150000,
-  15: 200000,
-  16: 300000,
-  17: 450000,
-  18: 650000,
-  19: 1000000,
-  20: 1500000, // Ultimate stage
+  0: 0,       // Egg
+  1: 10,      // Hatchling - first evolution happens quickly!
+  2: 120,     // Sproutling
+  3: 250,     // Cub
+  4: 500,     // Juvenile
+  5: 1200,    // Apprentice
+  6: 2500,    // Scout
+  7: 5000,    // Fledgling
+  8: 10000,   // Warrior
+  9: 20000,   // Guardian
+  10: 35000,  // Champion
+  11: 50000,  // Ascended
+  12: 75000,  // Vanguard
+  13: 100000, // Titan
+  14: 150000, // Mythic
+  15: 200000, // Prime
+  16: 300000, // Regal
+  17: 450000, // Eternal
+  18: 650000, // Transcendent
+  19: 1000000, // Apex
+  20: 1500000, // Ultimate
 } as const;
 
 const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
@@ -147,38 +147,17 @@ serve(async (req) => {
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
 
-    // Stage 0 = egg destiny preview, Stage 1 = hatchling emerging
+    // NOTE: Stage 0 is created during companion initialization, not evolution
+    // This function only handles stage 1+ (companions start at stage 0 and evolve upward)
+    // The nextStage === 0 case below is defensive code that should never execute
     let userPrompt: string;
     
     if (nextStage === 0) {
-      // Stage 0: Show the FULLY EVOLVED champion form sealed inside the egg
-      const crackDescription = 'perfectly intact and pristine, sealing the potential within.';
-      
-      console.log(`Creating stage 0 champion destiny preview`);
-      
-      userPrompt = `A colossal, divine glowing egg containing the blurred silhouette of a FULLY EVOLVED, majestic ${companion.spirit_animal} champion. 
-
-CRITICAL - The creature inside must appear:
-- ADULT and FULLY EVOLVED (not a baby)
-- Massive, powerful, commanding presence visible through the translucent egg
-- Heroic pose: standing tall, dominant, regal
-- Muscular, god-tier physique
-- If wings/features would exist on a mature ${companion.spirit_animal}: fully spread and majestic
-- Silhouette showing PEAK FORM - what this creature becomes at its ultimate destiny
-
-The egg itself is ${crackDescription}
-
-Visual requirements:
-- Egg radiates powerful ${companion.favorite_color} divine glow with ${companion.core_element} elemental energy
-- The silhouette is intentionally blurred and out of focus - we see the EPIC SHAPE and MASSIVE SCALE but not fine details
-- Low-angle camera looking UP at this colossal form within the egg
-- Divine light rays (Sistine Chapel-style) illuminating from within
-- Epic ${companion.favorite_color} particle effects and ${companion.core_element} energy swirling around
-- Floating in a cosmic/divine realm with ethereal ${companion.favorite_color} nebula background
-
-Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
-Mood: Legendary destiny sealed within, unstoppable potential, the champion king awaits
-Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
+      // UNREACHABLE: Companions start at stage 0, so nextStage can't be 0
+      // This would require currentStage === -1, which is impossible
+      // Keeping for defensive programming and edge case handling
+      console.error("Unexpected: Attempting to evolve to stage 0. This should not happen.");
+      throw new Error("Invalid evolution state: Cannot evolve to stage 0");
 
     } else if (nextStage === 1) {
       // Stage 1: Hatchling emerging from the egg - NEW LIFE!
