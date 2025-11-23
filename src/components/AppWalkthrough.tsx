@@ -234,17 +234,33 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
       // Restore defaults when not on check-in step
-      document.body.style.overflow = 'auto';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
-        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
-        (bottomNav as HTMLElement).style.opacity = '1';
+        (bottomNav as HTMLElement).style.pointerEvents = '';
+        (bottomNav as HTMLElement).style.opacity = '';
       }
       return;
     }
 
-    // Lock scroll during check-in
+    // Save current scroll position and lock scroll more aggressively
+    const scrollY = window.scrollY;
+    const originalStyles = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+    
+    // Aggressive scroll prevention for all devices
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
     
     // Disable bottom navigation during check-in
     const bottomNav = document.querySelector('nav[role="navigation"]');
@@ -254,11 +270,19 @@ export const AppWalkthrough = () => {
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
-      const bottomNav = document.querySelector('nav[role="navigation"]');
-      if (bottomNav) {
-        (bottomNav as HTMLElement).style.pointerEvents = 'auto';
-        (bottomNav as HTMLElement).style.opacity = '1';
+      // Restore original styles
+      document.body.style.overflow = originalStyles.overflow;
+      document.body.style.position = originalStyles.position;
+      document.body.style.top = originalStyles.top;
+      document.body.style.width = originalStyles.width;
+      
+      // Restore scroll position
+      window.scrollTo(0, scrollY);
+      
+      const nav = document.querySelector('nav[role="navigation"]');
+      if (nav) {
+        (nav as HTMLElement).style.pointerEvents = '';
+        (nav as HTMLElement).style.opacity = '';
       }
     };
   }, [stepIndex, run]);
@@ -491,15 +515,22 @@ export const AppWalkthrough = () => {
 
   return (
     <>
-      {/* Full-screen overlay - visible during check-in but allows clicks through */}
+      {/* Full-screen overlay - blocks interactions during check-in */}
       {run && (
         <div 
           className={cn(
-            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300 pointer-events-none",
+            "fixed inset-0 backdrop-blur-sm z-[9998] transition-all duration-300",
             stepIndex === STEP_INDEX.HOME_CHECKIN 
-              ? "bg-black/80" 
-              : "bg-black/40"
+              ? "bg-black/80 pointer-events-auto" // Block clicks during check-in
+              : "bg-black/40 pointer-events-none"  // Allow clicks during other steps
           )}
+          onClick={(e) => {
+            // Prevent any click events from propagating during check-in
+            if (stepIndex === STEP_INDEX.HOME_CHECKIN) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
         />
       )}
 

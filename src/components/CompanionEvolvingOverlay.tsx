@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import { Z_INDEX } from "@/config/zIndex";
 
 interface CompanionEvolvingOverlayProps {
   isVisible: boolean;
@@ -13,8 +14,12 @@ export const CompanionEvolvingOverlay = ({ isVisible }: CompanionEvolvingOverlay
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[9998] bg-gradient-to-br from-black via-primary/30 to-black flex items-center justify-center"
-      style={{ pointerEvents: 'auto', touchAction: 'none' }}
+      className="fixed inset-0 bg-gradient-to-br from-black via-primary/30 to-black flex items-center justify-center"
+      style={{ 
+        zIndex: Z_INDEX.EVOLUTION_OVERLAY,
+        pointerEvents: 'auto', 
+        touchAction: 'none' 
+      }}
     >
       {/* Animated background glow */}
       <motion.div
