@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
@@ -33,6 +33,20 @@ export const CompanionEvolution = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const emergencyTimeoutRef = useRef<number | null>(null);
+
+  const cleanupAudio = useCallback(() => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = ''; // Clear source to release resources
+      } catch (error) {
+        console.error('Error cleaning up audio:', error);
+      } finally {
+        audioRef.current = null;
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!isEvolving) return;
@@ -187,20 +201,6 @@ export const CompanionEvolution = ({
       resumeAmbientAfterEvent();
     };
   }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage, cleanupAudio]);
-
-  const cleanupAudio = useCallback(() => {
-    if (audioRef.current) {
-      try {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.src = ''; // Clear source to release resources
-      } catch (error) {
-        console.error('Error cleaning up audio:', error);
-      } finally {
-        audioRef.current = null;
-      }
-    }
-  }, []);
 
   const handleDismiss = (e: React.MouseEvent) => {
     // Prevent any interaction until timer allows it

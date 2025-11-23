@@ -373,44 +373,32 @@ export default function Onboarding() {
       }
       
       console.log("Marking onboarding as complete...");
-      // Use SQL function to atomically merge onboarding_data
-      // This prevents race conditions from concurrent updates
-      const { data: updatedProfile, error: completeError } = await supabase.rpc('update_profile_onboarding_complete', {
-        profile_id: user!.id
-      });
-      
-      // Fallback: If RPC function doesn't exist, use standard update
-      // (accepting potential race condition as unlikely in this flow)
-      if (completeError && completeError.message?.includes('function') && completeError.message?.includes('does not exist')) {
-        console.warn('RPC function not found, using fallback update');
-        const { data: currentProfile } = await supabase
-          .from('profiles')
-          .select('onboarding_data')
-          .eq('id', user!.id)
-          .maybeSingle();
+      // Use standard update with atomic read-modify-write
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('onboarding_data')
+        .eq('id', user!.id)
+        .maybeSingle();
 
-        const currentOnboardingData = (currentProfile?.onboarding_data as OnboardingData) || {};
+      const currentOnboardingData = (currentProfile?.onboarding_data as OnboardingData) || {};
 
-        const { data: fallbackProfile, error: fallbackError } = await supabase
-          .from('profiles')
-          .update({
-            onboarding_completed: true,
-            onboarding_step: 'complete',
-            onboarding_data: currentOnboardingData
-          })
-          .eq('id', user!.id)
-          .select()
-          .single();
-        
-        if (fallbackError) throw fallbackError;
-        // Use fallbackProfile for updatedProfile
-        if (!fallbackProfile) throw new Error('Failed to complete onboarding');
-      }
+      const { data: updatedProfile, error: completeError } = await supabase
+        .from('profiles')
+        .update({
+          onboarding_completed: true,
+          onboarding_step: 'complete',
+          onboarding_data: currentOnboardingData as any
+        })
+        .eq('id', user!.id)
+        .select()
+        .single();
       
-      if (completeError && !(completeError.message?.includes('function') && completeError.message?.includes('does not exist'))) {
+      if (completeError) {
         console.error("Error completing onboarding:", completeError);
         throw completeError;
       }
+      
+      if (!updatedProfile) throw new Error('Failed to complete onboarding');
       
       console.log("Onboarding marked complete");
       
