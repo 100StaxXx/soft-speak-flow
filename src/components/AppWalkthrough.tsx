@@ -385,6 +385,7 @@ export const AppWalkthrough = () => {
           currentStep={stepIndex}
           totalSteps={WALKTHROUGH_STEPS.length}
           mentorSlug={mentorSlug}
+          onAction={() => setShowModal(false)}
         />
       )}
       {/* Completion Modal */}

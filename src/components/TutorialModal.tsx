@@ -188,18 +188,16 @@ export const TutorialModal = ({
             </p>
           </div>
 
-          {/* Action Button (if provided) */}
-          {onAction && (
-            <div className="flex justify-center pt-4">
-              <Button
-                onClick={onAction}
-                size="lg"
-                className="text-lg px-8 py-6 font-bold shadow-lg hover:shadow-xl transition-all"
-              >
-                Continue
-              </Button>
-            </div>
-          )}
+          {/* Got It Button - Always show to let users dismiss and perform action */}
+          <div className="flex justify-center pt-4">
+            <Button
+              onClick={onAction}
+              size="lg"
+              className="text-lg px-8 py-6 font-bold shadow-lg hover:shadow-xl transition-all"
+            >
+              Got It
+            </Button>
+          </div>
         </div>
       </Card>
 
