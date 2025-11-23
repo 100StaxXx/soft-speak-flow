@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -95,6 +98,23 @@ Return the challenge structure.`;
       const toolCall = aiData.choices[0].message.tool_calls?.[0];
       const challengeData = JSON.parse(toolCall.function.arguments);
 
+      // Validate output structure
+      const validationRules = {
+        required_fields: ['title', 'description', 'tasks'],
+        max_length: { title: 100, description: 500 }
+      };
+      const outputConstraints = {
+        min_tasks: totalDays,
+        max_tasks: totalDays
+      };
+      const validator = new OutputValidator(validationRules, outputConstraints);
+      const validationResult = validator.validate(challengeData);
+
+      if (!validationResult.isValid) {
+        console.error(`Challenge ${i + 1} validation failed:`, validationResult.errors);
+        continue;
+      }
+
       // Insert challenge
       const { data: challenge, error: challengeError } = await supabase
         .from('challenges')
@@ -132,6 +152,19 @@ Return the challenge structure.`;
       }
 
       generated.push(challenge);
+
+      // Log generation metrics
+      const responseTime = Date.now() - startTime;
+      await supabase
+        .from('ai_output_validation_log')
+        .insert({
+          template_key: 'weekly_challenges',
+          input_data: { category, totalDays },
+          output_data: { challenge: challengeData },
+          validation_passed: true,
+          model_used: 'google/gemini-2.5-flash',
+          response_time_ms: responseTime
+        });
     }
 
     return new Response(

@@ -1,18 +1,41 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const ActivityCommentSchema = z.object({
+  activityId: z.string().uuid(),
+  userReply: z.string().max(500).optional()
+});
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const startTime = Date.now();
+
   try {
-    const { activityId, userReply } = await req.json()
+    const body = await req.json();
+    const validation = ActivityCommentSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { activityId, userReply } = validation.data;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -85,36 +108,31 @@ serve(async (req) => {
 
     const activityDescription = `${activity.activity_type}: ${JSON.stringify(activity.activity_data)}`
     
-    let prompt: string;
-    
-    if (userReply) {
-      // User is replying to an existing comment - have a conversation
-      prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-Earlier, you commented on this user activity:
-${activityDescription}
-Your previous comment: "${activity.mentor_comment}"
+    const templateKey = userReply ? 'activity_comment_reply' : 'activity_comment_initial';
+    const pepTalkContext = todaysPepTalk 
+      ? `Today's theme is "${todaysPepTalk.title}" focusing on ${todaysPepTalk.topic_category}. If this activity relates to today's theme, naturally weave that connection into your comment.`
+      : 'No specific theme today.';
 
-The user just replied to you:
-"${userReply}"
-
-Respond to their reply in 1-2 sentences. Be authentic, supportive, and continue the conversation naturally in your distinctive voice.`
-    } else {
-      // Initial comment generation with cross-referencing
-      const pepTalkContext = todaysPepTalk 
-        ? `\n\nToday's theme is "${todaysPepTalk.title}" focusing on ${todaysPepTalk.topic_category}. If this activity relates to today's theme, naturally weave that connection into your comment.`
-        : ''
-      
-      prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
-
-A user just completed this activity:
-${activityDescription}
-
-Recent activity context:
-${contextSummary}${pepTalkContext}${milestoneContext}
-
-Provide a brief, encouraging comment (1-2 sentences max) acknowledging this action in your distinctive voice. Be specific to what they did. Keep it authentic and personal.`
-    }
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey,
+      userId: activity.user_id,
+      variables: {
+        mentorName: mentor.name,
+        mentorTone: mentor.tone_description,
+        activityDescription,
+        recentContext: contextSummary,
+        pepTalkContext,
+        milestoneContext,
+        userReply: userReply || '',
+        previousComment: activity.mentor_comment || '',
+        maxSentences: 2,
+        personalityModifiers: '',
+        responseLength: 'brief'
+      }
+    });
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -124,7 +142,10 @@ Provide a brief, encouraging comment (1-2 sentences max) acknowledging this acti
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         max_tokens: 150,
       }),
     })
@@ -136,6 +157,32 @@ Provide a brief, encouraging comment (1-2 sentences max) acknowledging this acti
 
     const aiData = await response.json()
     const comment = aiData.choices?.[0]?.message?.content?.trim()
+
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(comment, {
+      activityType: activity.activity_type,
+      hasReply: !!userReply
+    });
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: activity.user_id,
+        template_key: templateKey,
+        input_data: { activityId, userReply, activityType: activity.activity_type },
+        output_data: { comment },
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.warn('Validation warnings:', validator.getValidationSummary(validationResult));
+    }
 
     if (comment) {
       if (userReply) {

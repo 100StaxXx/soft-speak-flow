@@ -1,18 +1,46 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const WeeklyInsightsSchema = z.object({
+  userId: z.string().uuid(),
+  weeklyData: z.object({
+    habitCount: z.number().int().min(0),
+    checkInCount: z.number().int().min(0),
+    moodCount: z.number().int().min(0),
+    activities: z.array(z.any()).max(100)
+  })
+});
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const startTime = Date.now();
+
   try {
-    const { userId, weeklyData } = await req.json()
+    const body = await req.json();
+    const validation = WeeklyInsightsSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validation.error.errors 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { userId, weeklyData } = validation.data;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -40,22 +68,28 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
 
-    const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-Review this user's weekly performance:
-- Habits completed: ${weeklyData.habitCount}
-- Daily check-ins: ${weeklyData.checkInCount}
-- Mood logs: ${weeklyData.moodCount}
+    const activitiesSummary = weeklyData.activities.slice(0, 10)
+      .map((a: any) => `${a.type}: ${JSON.stringify(a.data)}`)
+      .join('\n');
 
-Recent activities summary:
-${weeklyData.activities.slice(0, 10).map((a: any) => `${a.type}: ${JSON.stringify(a.data)}`).join('\n')}
-
-Generate a brief weekly insight (2-3 sentences max) that:
-1. Celebrates their wins this week
-2. Identifies one pattern or growth area
-3. Provides one actionable focus for next week
-
-Stay true to your personality and be specific to their actual activities.`
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'weekly_insights',
+      userId,
+      variables: {
+        mentorName: mentor.name,
+        mentorTone: mentor.tone_description,
+        habitCount: weeklyData.habitCount,
+        checkInCount: weeklyData.checkInCount,
+        moodCount: weeklyData.moodCount,
+        activitiesSummary,
+        maxSentences: 3,
+        personalityModifiers: '',
+        responseLength: 'brief'
+      }
+    });
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -65,7 +99,10 @@ Stay true to your personality and be specific to their actual activities.`
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         max_tokens: 200,
       }),
     })
@@ -80,6 +117,29 @@ Stay true to your personality and be specific to their actual activities.`
 
     if (!insight) {
       throw new Error('No insight generated')
+    }
+
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(insight);
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: userId,
+        template_key: 'weekly_insights',
+        input_data: { weeklyData },
+        output_data: { insight },
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.warn('Validation warnings:', validator.getValidationSummary(validationResult));
     }
 
     return new Response(JSON.stringify({ success: true, insight }), {
