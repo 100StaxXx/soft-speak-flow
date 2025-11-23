@@ -261,7 +261,7 @@ export const AppWalkthrough = () => {
 
   // Step 4: Listen for quest completion (checkbox click)
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION) return;
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
     // Declare timeout ref outside handlers so cleanup can access it
     const timeoutRef = { current: null as number | null };
@@ -291,6 +291,7 @@ export const AppWalkthrough = () => {
       }
       
       // Show the manual completion button instead of auto-advancing
+      // Make absolutely sure run stays false
       setRun(false);
       setShowCompletionButton(true);
       console.log('[Tutorial] Set showCompletionButton to true');
@@ -309,7 +310,7 @@ export const AppWalkthrough = () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     };
-  }, [stepIndex, createTrackedTimeout]);
+  }, [stepIndex, run, createTrackedTimeout]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
