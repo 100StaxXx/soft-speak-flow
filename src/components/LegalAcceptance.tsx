@@ -4,25 +4,69 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LegalDocumentViewer } from "./LegalDocumentViewer";
 import { Shield, FileText, Lock } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface LegalAcceptanceProps {
   onAccept: () => void;
 }
+
+const LEGAL_VERSION = '2025-11-23'; // Current version date
 
 export const LegalAcceptance = ({ onAccept }: LegalAcceptanceProps) => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [age13Confirmed, setAge13Confirmed] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<"terms" | "privacy" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const canProceed = termsAccepted && privacyAccepted && age13Confirmed;
 
-  const handleAccept = () => {
-    if (canProceed) {
-      // Store acceptance timestamp
-      localStorage.setItem('legal_accepted_at', new Date().toISOString());
-      localStorage.setItem('legal_accepted_version', '2025-11-21');
+  const handleAccept = async () => {
+    if (!canProceed || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const now = new Date().toISOString();
+      
+      // Store in database (primary storage)
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            terms_accepted_at: now,
+            terms_accepted_version: LEGAL_VERSION,
+            privacy_accepted_at: now,
+            privacy_accepted_version: LEGAL_VERSION,
+            age_confirmed: true,
+            age_confirmed_at: now,
+          })
+          .eq('id', user.id);
+        
+        if (error) {
+          console.error('Error storing legal acceptance:', error);
+          throw error;
+        }
+      }
+      
+      // Also store in localStorage as backup/cache
+      localStorage.setItem('legal_accepted_at', now);
+      localStorage.setItem('legal_accepted_version', LEGAL_VERSION);
+      
       onAccept();
+    } catch (error: any) {
+      console.error('Failed to save legal acceptance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save legal acceptance. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -143,11 +187,11 @@ export const LegalAcceptance = ({ onAccept }: LegalAcceptanceProps) => {
             {/* Continue Button */}
             <Button
               onClick={handleAccept}
-              disabled={!canProceed}
+              disabled={!canProceed || isSubmitting}
               className="w-full"
               size="lg"
             >
-              Accept and Continue
+              {isSubmitting ? "Saving..." : "Accept and Continue"}
             </Button>
 
             {!canProceed && (

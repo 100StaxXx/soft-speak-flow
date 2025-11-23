@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { detectTimezone } from "./timezone";
 
 /**
  * Centralized auth redirect logic
@@ -27,18 +28,30 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
 
 /**
  * Ensures a profile exists for a user, creating one if needed
+ * Automatically detects and stores the user's timezone
  */
 export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
   const { data: existing } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, timezone")
     .eq("id", userId)
     .maybeSingle();
 
   if (!existing) {
+    // Profile doesn't exist, create it with timezone
+    const timezone = detectTimezone();
+    
     await supabase.from("profiles").insert({
       id: userId,
       email: email ?? null,
+      timezone: timezone,
     });
+  } else if (!existing.timezone) {
+    // Profile exists but timezone not set, update it
+    const timezone = detectTimezone();
+    
+    await supabase.from("profiles").update({
+      timezone: timezone,
+    }).eq("id", userId);
   }
 };

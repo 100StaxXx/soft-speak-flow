@@ -1500,6 +1500,12 @@ export type Database = {
           preferences: Json | null
           selected_mentor_id: string | null
           timezone: string | null
+          terms_accepted_at: string | null
+          terms_accepted_version: string | null
+          privacy_accepted_at: string | null
+          privacy_accepted_version: string | null
+          age_confirmed: boolean | null
+          age_confirmed_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1521,6 +1527,12 @@ export type Database = {
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null
+          terms_accepted_at?: string | null
+          terms_accepted_version?: string | null
+          privacy_accepted_at?: string | null
+          privacy_accepted_version?: string | null
+          age_confirmed?: boolean | null
+          age_confirmed_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1542,6 +1554,12 @@ export type Database = {
           preferences?: Json | null
           selected_mentor_id?: string | null
           timezone?: string | null
+          terms_accepted_at?: string | null
+          terms_accepted_version?: string | null
+          privacy_accepted_at?: string | null
+          privacy_accepted_version?: string | null
+          age_confirmed?: boolean | null
+          age_confirmed_at?: string | null
           updated_at?: string | null
         }
         Relationships: [

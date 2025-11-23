@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-
+import { detectTimezone } from "@/utils/timezone";
 import { ProfilePreferences } from "@/types/profile";
 
 interface Profile {
@@ -45,11 +45,14 @@ export const useProfile = () => {
 
       if (!data) {
         // Auto-create profile on first login if missing
+        const timezone = detectTimezone();
+        
         const { data: inserted, error: insertError } = await supabase
           .from("profiles")
           .insert({
             id: user.id,
             email: user.email ?? null,
+            timezone: timezone,
           })
           .select("*")
           .maybeSingle();
@@ -62,6 +65,23 @@ export const useProfile = () => {
         if (!inserted) throw new Error("Failed to create profile");
         
         return inserted;
+      }
+
+      // Check if timezone needs to be set for existing profile
+      if (!data.timezone) {
+        const timezone = detectTimezone();
+        
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ timezone: timezone })
+          .eq("id", user.id);
+        
+        if (updateError) {
+          console.error("Error updating timezone:", updateError);
+        } else {
+          // Return updated data
+          data.timezone = timezone;
+        }
       }
 
       return data;

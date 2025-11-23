@@ -27,7 +27,7 @@ export default function PrivacyPolicy() {
             </div>
             <div className="space-y-1">
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Last Updated: November 21, 2025
+                Last Updated: November 23, 2025
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 R-Evoltution LLC • alilrevolution@gmail.com
