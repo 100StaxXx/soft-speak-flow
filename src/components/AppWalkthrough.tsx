@@ -229,6 +229,19 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
+  // Lock scrolling during entire walkthrough
+  useEffect(() => {
+    if (run) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [run]);
+
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) return;
