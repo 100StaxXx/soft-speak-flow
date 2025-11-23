@@ -195,10 +195,14 @@ export const CompanionEvolution = ({
     
     resumeAmbientAfterEvent();
     
-    // Dispatch other events immediately
-    console.log('[CompanionEvolution] Dispatching evolution events');
+    // Dispatch all events including evolution-modal-closed
+    console.log('[CompanionEvolution] Dispatching evolution events and closing modal');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
+    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
+    
+    // Call onComplete to clear loading state
+    onComplete();
   };
 
   const handleContinue = () => {
