@@ -10,7 +10,7 @@ export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
-  const { setIsEvolvingLoading } = useEvolution();
+  const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
@@ -104,7 +104,10 @@ export const GlobalEvolutionListener = () => {
         // Hide overlay after evolution animation completes
         setIsEvolvingLoading(false);
         
-        // Note: evolution-modal-closed event is fired by CompanionEvolution component
+        // Call the walkthrough callback if one was set
+        if (onEvolutionComplete) {
+          onEvolutionComplete();
+        }
       }}
     />
   );

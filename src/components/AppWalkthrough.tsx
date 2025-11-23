@@ -7,6 +7,7 @@ import { haptics } from "@/utils/haptics";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
+import { useEvolution } from "@/contexts/EvolutionContext";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true, hideFooter: true },
@@ -39,6 +40,7 @@ const TIMEOUTS = {
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
   const isMobile = useIsMobile();
+  const { setOnEvolutionComplete } = useEvolution();
 
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState<number>(0);
@@ -259,37 +261,39 @@ export const AppWalkthrough = () => {
     };
   }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
 
-  // Step 4: Listen for quest completion (checkbox click)
+  // Step 4: Set callback for when evolution completes
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) {
+      setOnEvolutionComplete(null);
+      return;
+    }
 
     const handleEvolutionLoadingStart = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
       setRun(false);
     };
 
-    const handleEvolutionModalClosed = () => {
-      console.log('[Tutorial] Evolution modal closed event received! Current state:', { 
+    // Set the callback that will be triggered when evolution completes
+    setOnEvolutionComplete(() => () => {
+      console.log('[Tutorial] Evolution completion callback triggered! Current state:', { 
         stepIndex, 
         run,
         showCompletionButton 
       });
       
       // Show the manual completion button instead of auto-advancing
-      // Make absolutely sure run stays false
       setRun(false);
       setShowCompletionButton(true);
       console.log('[Tutorial] Set showCompletionButton to true');
-    };
+    });
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
-    window.addEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     
     return () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
-      window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
+      setOnEvolutionComplete(null);
     };
-  }, [stepIndex, run]);
+  }, [stepIndex, run, setOnEvolutionComplete]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
