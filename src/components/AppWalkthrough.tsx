@@ -246,13 +246,15 @@ export const AppWalkthrough = () => {
             spread: 70,
             origin: { y: 0.6 }
           });
-          setShowModal(true);
+          // advanceStep() will set showModal to true, so we don't need to set it here
           advanceStep();
         }, DELAYS.POST_CHECKIN_CONFETTI);
       };
 
       window.addEventListener('checkin-complete', handleCheckInComplete, { once: true });
       return () => {
+        // Listener is automatically removed by { once: true }, but we remove it here
+        // as a safety measure in case the component unmounts before the event fires
         window.removeEventListener('checkin-complete', handleCheckInComplete);
       };
     } catch (error) {
@@ -266,26 +268,51 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navCompanion = document.querySelector('a[href="/companion"]');
+      let retryCount = 0;
+      const retryTimeoutIds: number[] = [];
+      const maxRetries = 10;
+      const retryDelay = 100;
+      let isMounted = true;
       
-      if (!navCompanion) {
-        console.warn('[Tutorial] Companion navigation link not found');
-        return;
-      }
-      
-      const handleNavClick = () => {
-        if (hasAdvanced) return;
-        hasAdvanced = true;
-        createTrackedTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          advanceStep();
-        }, DELAYS.POST_NAV);
-      };
+      const setupListener = () => {
+        if (!isMounted) return; // Don't proceed if component unmounted
+        
+        const navCompanion = document.querySelector('a[href="/companion"]');
+        
+        if (!navCompanion) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const timeoutId = createTrackedTimeout(() => {
+              if (isMounted) setupListener();
+            }, retryDelay) as number;
+            retryTimeoutIds.push(timeoutId);
+            return;
+          }
+          console.warn('[Tutorial] Companion navigation link not found after retries');
+          return;
+        }
+        
+        const handleNavClick = () => {
+          if (hasAdvanced || !isMounted) return;
+          hasAdvanced = true;
+          createTrackedTimeout(() => {
+            if (isMounted) {
+              window.scrollTo({ top: 0, behavior: 'instant' });
+              advanceStep();
+            }
+          }, DELAYS.POST_NAV);
+        };
 
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
+        navCompanion.addEventListener('click', handleNavClick, { once: true });
+      };
+      
+      setupListener();
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        isMounted = false;
+        // Clean up all retry timeouts
+        retryTimeoutIds.forEach(id => clearTimeout(id));
+        // Listener is automatically removed by { once: true } when it fires
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
@@ -298,26 +325,51 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navTasks = document.querySelector('a[href="/tasks"]');
+      let retryCount = 0;
+      const retryTimeoutIds: number[] = [];
+      const maxRetries = 10;
+      const retryDelay = 100;
+      let isMounted = true;
       
-      if (!navTasks) {
-        console.warn('[Tutorial] Tasks navigation link not found');
-        return;
-      }
-      
-      const handleNavClick = () => {
-        if (hasAdvanced) return;
-        hasAdvanced = true;
-        createTrackedTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          advanceStep();
-        }, DELAYS.POST_NAV);
-      };
+      const setupListener = () => {
+        if (!isMounted) return; // Don't proceed if component unmounted
+        
+        const navTasks = document.querySelector('a[href="/tasks"]');
+        
+        if (!navTasks) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const timeoutId = createTrackedTimeout(() => {
+              if (isMounted) setupListener();
+            }, retryDelay) as number;
+            retryTimeoutIds.push(timeoutId);
+            return;
+          }
+          console.warn('[Tutorial] Tasks navigation link not found after retries');
+          return;
+        }
+        
+        const handleNavClick = () => {
+          if (hasAdvanced || !isMounted) return;
+          hasAdvanced = true;
+          createTrackedTimeout(() => {
+            if (isMounted) {
+              window.scrollTo({ top: 0, behavior: 'instant' });
+              advanceStep();
+            }
+          }, DELAYS.POST_NAV);
+        };
 
-      navTasks.addEventListener('click', handleNavClick, { once: true });
+        navTasks.addEventListener('click', handleNavClick, { once: true });
+      };
+      
+      setupListener();
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        isMounted = false;
+        // Clean up all retry timeouts
+        retryTimeoutIds.forEach(id => clearTimeout(id));
+        // Listener is automatically removed by { once: true } when it fires
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
