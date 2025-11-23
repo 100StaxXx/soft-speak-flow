@@ -77,7 +77,6 @@ const DELAYS = {
 
 const TIMEOUTS = {
   EVOLUTION_COMPLETE: 15000, // 15 seconds fallback if evolution doesn't complete
-  ELEMENT_WAIT: 6000, // Max time to wait for DOM elements
 } as const;
 
 export const AppWalkthrough = () => {
@@ -112,55 +111,23 @@ export const AppWalkthrough = () => {
     activeIntervals.current.clear();
   }, []);
 
-  useEffect(() => () => clearAllTimers(), [clearAllTimers]);
-
-  // waitForSelector using MutationObserver for efficiency
-  const waitForSelector = useCallback((selector: string, timeout = TIMEOUTS.ELEMENT_WAIT) => {
-    if (typeof window === 'undefined') return Promise.resolve(false);
-    if (!selector || selector === 'body') return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => {
-      if (document.querySelector(selector)) return resolve(true);
-      
-      const observer = new MutationObserver(() => {
-        if (document.querySelector(selector)) {
-          observer.disconnect();
-          // Clear timeout when element found
-          if (timeoutId) clearTimeout(timeoutId);
-          activeTimeouts.current.delete(timeoutId);
-          resolve(true);
-        }
-      });
-      
-      observer.observe(document.body, { childList: true, subtree: true });
-      
-      const timeoutId = window.setTimeout(() => {
-        observer.disconnect(); // Ensure observer is disconnected on timeout
-        activeTimeouts.current.delete(timeoutId);
-        resolve(false);
-      }, timeout) as unknown as number;
-      
-      activeTimeouts.current.add(timeoutId);
-    });
-  }, []);
-
   const currentStep = WALKTHROUGH_STEPS[stepIndex];
   
-  // Get mentor slug from profile, with better loading state handling
+  // Get mentor slug with improved validation
   const getMentorSlug = () => {
-    if (!profile) return 'atlas'; // Default while loading
+    if (!profile?.selected_mentor_id) return 'atlas';
     
-    // Try to get from selected_mentor_id
-    if (profile.selected_mentor_id) {
-      // Extract slug from mentor ID if it's a full ID
-      const mentorId = profile.selected_mentor_id;
-      // If it's already a slug (lowercase, no UUID), use it
-      if (mentorId && !mentorId.includes('-') && mentorId.length < 20) {
-        return mentorId;
-      }
-      // Otherwise it might be a UUID, default to atlas
-      return 'atlas';
+    const mentorId = profile.selected_mentor_id.toLowerCase();
+    
+    // Known mentor slugs
+    const validSlugs = ['atlas', 'darius', 'eli', 'kai', 'lumi', 'nova', 'sienna', 'solace', 'stryker'];
+    
+    // If it's a known slug, use it
+    if (validSlugs.includes(mentorId)) {
+      return mentorId;
     }
     
+    // Otherwise default to atlas
     return 'atlas';
   };
   

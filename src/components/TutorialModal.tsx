@@ -70,12 +70,24 @@ export const TutorialModal = ({
           const audioDataUrl = `data:audio/mp3;base64,${data.audioContent}`;
           setAudioUrl(audioDataUrl);
           
-          // Cache the audio
+          // Cache the audio with error handling
           try {
             localStorage.setItem(cacheKey, audioDataUrl);
             console.log(`[TutorialModal] Cached audio for step: ${step.id}`);
           } catch (e) {
-            console.warn('[TutorialModal] Failed to cache audio (localStorage full?):', e);
+            // localStorage might be full, try to clear old tutorial audio
+            console.warn('[TutorialModal] Failed to cache audio, attempting to clear old cache:', e);
+            try {
+              Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('tutorial-audio-') && key !== cacheKey) {
+                  localStorage.removeItem(key);
+                }
+              });
+              // Retry caching after cleanup
+              localStorage.setItem(cacheKey, audioDataUrl);
+            } catch (retryError) {
+              console.warn('[TutorialModal] Still unable to cache after cleanup:', retryError);
+            }
           }
         } else {
           console.warn('[TutorialModal] No audioContent in response');
@@ -99,13 +111,18 @@ export const TutorialModal = ({
     };
   }, [step.id, step.content, mentorSlug]);
 
-  // Auto-play when audio is ready (unless muted)
+  // Auto-play when audio is ready (unless muted) with browser policy handling
   useEffect(() => {
     if (audioUrl && audioRef.current && !isMuted) {
-      // Reset audio to start before playing (in case it was paused mid-way)
+      // Reset audio to start before playing
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch((error) => {
+          // Browser might block autoplay - this is expected behavior
+          console.log('[TutorialModal] Autoplay prevented by browser policy:', error);
+          setIsPlaying(false);
+        });
     }
   }, [audioUrl, isMuted]);
 
