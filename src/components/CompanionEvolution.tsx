@@ -29,8 +29,10 @@ export const CompanionEvolution = ({
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
   const [canDismiss, setCanDismiss] = useState(false);
   const [showContinueButton, setShowContinueButton] = useState(false);
+  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const emergencyTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isEvolving) return;
@@ -88,6 +90,14 @@ export const CompanionEvolution = ({
     };
 
     generateVoice();
+
+    // Emergency timeout - if modal hasn't been dismissed after 20 seconds, show emergency exit
+    emergencyTimeoutRef.current = window.setTimeout(() => {
+      if (isMounted) {
+        console.warn('Evolution modal timeout reached, showing emergency exit');
+        setShowEmergencyExit(true);
+      }
+    }, 20000);
 
     const timers = [
       // Stage 1: Prophetic text appears (0.5s)
@@ -169,13 +179,28 @@ export const CompanionEvolution = ({
     return () => {
       isMounted = false;
       timers.forEach(clearTimeout);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (emergencyTimeoutRef.current) {
+        clearTimeout(emergencyTimeoutRef.current);
+        emergencyTimeoutRef.current = null;
       }
+      cleanupAudio(); // Use centralized cleanup
       resumeAmbientAfterEvent();
     };
-  }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage]);
+  }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage, cleanupAudio]);
+
+  const cleanupAudio = useCallback(() => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = ''; // Clear source to release resources
+      } catch (error) {
+        console.error('Error cleaning up audio:', error);
+      } finally {
+        audioRef.current = null;
+      }
+    }
+  }, []);
 
   const handleDismiss = (e: React.MouseEvent) => {
     // Prevent any interaction until timer allows it
@@ -188,10 +213,7 @@ export const CompanionEvolution = ({
     setAnimationStage(0);
     setCanDismiss(false);
     
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    cleanupAudio();
     
     resumeAmbientAfterEvent();
     
@@ -207,8 +229,29 @@ export const CompanionEvolution = ({
 
   const handleContinue = () => {
     console.log('[CompanionEvolution] Continue button clicked, dispatching evolution-modal-closed');
+    cleanupAudio(); // Ensure audio is cleaned up
+    if (emergencyTimeoutRef.current) {
+      clearTimeout(emergencyTimeoutRef.current);
+      emergencyTimeoutRef.current = null;
+    }
     window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
     setShowContinueButton(false);
+    setShowEmergencyExit(false);
+    onComplete();
+  };
+
+  const handleEmergencyExit = () => {
+    console.log('[CompanionEvolution] Emergency exit triggered');
+    cleanupAudio();
+    if (emergencyTimeoutRef.current) {
+      clearTimeout(emergencyTimeoutRef.current);
+      emergencyTimeoutRef.current = null;
+    }
+    setAnimationStage(0);
+    setCanDismiss(false);
+    setShowEmergencyExit(false);
+    resumeAmbientAfterEvent();
+    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
     onComplete();
   };
 
@@ -503,7 +546,7 @@ export const CompanionEvolution = ({
           )}
 
           {/* Tap to continue indicator */}
-          {canDismiss && !showContinueButton && (
+          {canDismiss && !showContinueButton && !showEmergencyExit && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -513,6 +556,26 @@ export const CompanionEvolution = ({
               <p className="text-white/80 text-lg font-medium animate-pulse">
                 Tap anywhere to continue ✨
               </p>
+            </motion.div>
+          )}
+
+          {/* Emergency exit button - appears after timeout */}
+          {showEmergencyExit && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="absolute top-4 right-4 z-[10002]"
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEmergencyExit();
+                }}
+                className="bg-destructive/90 hover:bg-destructive text-destructive-foreground font-bold px-4 py-2 rounded-lg shadow-lg"
+                aria-label="Close evolution modal"
+              >
+                ✕ Close
+              </button>
             </motion.div>
           )}
 

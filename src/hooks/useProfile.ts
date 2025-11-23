@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
+import { ProfilePreferences } from "@/types/profile";
+
 interface Profile {
   id: string;
   email: string | null;
   is_premium: boolean;
-  preferences: any;
+  preferences: ProfilePreferences | null;
   selected_mentor_id: string | null;
   created_at: string;
   updated_at: string;

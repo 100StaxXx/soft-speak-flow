@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
 import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
+import { EVOLUTION_THRESHOLDS } from "@/config/xpSystem";
 
 export interface Companion {
   id: string;
@@ -34,31 +35,6 @@ export const XP_REWARDS = {
   PEP_TALK_LISTEN: 3,
   CHECK_IN: 5,
   STREAK_MILESTONE: 15,
-};
-
-// 21-Stage Evolution System: Early stages fast, late stages exponential
-export const EVOLUTION_THRESHOLDS = {
-  0: 0,      // Egg
-  1: 10,     // Hatchling (first quest completes this!)
-  2: 120,    // Guardian (was stage 3)
-  3: 250,    // Ascended (was stage 4)
-  4: 500,    // Mythic (was stage 5)
-  5: 1200,   // Titan (was stage 6)
-  6: 2500,   // (was stage 7)
-  7: 5000,   // (was stage 8)
-  8: 10000,  // (was stage 9)
-  9: 20000,  // (was stage 10)
-  10: 35000, // (was stage 11)
-  11: 50000, // (was stage 12)
-  12: 75000, // (was stage 13)
-  13: 100000, // (was stage 14)
-  14: 150000, // (was stage 15)
-  15: 200000, // (was stage 16)
-  16: 300000, // (was stage 17)
-  17: 450000, // (was stage 18)
-  18: 650000, // (was stage 19)
-  19: 1000000, // (was stage 20)
-  20: 1500000, // NEW Ultimate stage
 };
 
 export const useCompanion = () => {
@@ -248,34 +224,41 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("No user found");
       
-      // CRITICAL: Ensure companion is loaded before awarding XP
-      if (!companion) {
-        console.warn('Companion not loaded yet, fetching...');
-        // Refetch companion data and wait for it to complete
-        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-        const freshCompanion = queryClient.getQueryData(["companion", user.id]) as Companion | null;
-        if (!freshCompanion) {
-          throw new Error("No companion found. Please create one first.");
+      // Prevent duplicate XP awards - check FIRST before any async operations
+      if (xpInProgress.current) {
+        console.warn('XP award already in progress, skipping duplicate');
+        // Return current state without throwing
+        const currentCompanion = companion || queryClient.getQueryData(["companion", user.id]) as Companion | null;
+        if (currentCompanion) {
+          return { shouldEvolve: false, newStage: currentCompanion.current_stage, newXP: currentCompanion.current_xp };
         }
-        // Use fresh companion for calculation
-        const companionToUse = freshCompanion;
+        throw new Error("Cannot award XP: operation in progress and no companion data available");
+      }
+      
+      // Set flag immediately to prevent race
+      xpInProgress.current = true;
+      
+      try {
+        // CRITICAL: Ensure companion is loaded before awarding XP
+        let companionToUse = companion;
         
-        // Prevent duplicate XP awards
-        if (xpInProgress.current) {
-          console.warn('XP award already in progress, skipping duplicate');
-          return { shouldEvolve: false, newStage: companionToUse.current_stage, newXP: companionToUse.current_xp };
+        if (!companionToUse) {
+          console.warn('Companion not loaded yet, fetching...');
+          // Refetch companion data and wait for it to complete
+          await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+          companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+          
+          if (!companionToUse) {
+            throw new Error("No companion found. Please create one first.");
+          }
         }
         
         return await performXPAward(companionToUse, xpAmount, eventType, metadata, user);
+      } catch (error) {
+        // Reset flag on error so user can retry
+        xpInProgress.current = false;
+        throw error;
       }
-      
-      // Prevent duplicate XP awards
-      if (xpInProgress.current) {
-        console.warn('XP award already in progress, skipping duplicate');
-        return { shouldEvolve: false, newStage: companion.current_stage, newXP: companion.current_xp };
-      }
-      
-      return await performXPAward(companion, xpAmount, eventType, metadata, user);
     },
     onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
       xpInProgress.current = false;
@@ -364,12 +347,17 @@ export const useCompanion = () => {
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
-      if (evolutionInProgress.current && evolutionPromise.current) {
-        console.log('Evolution already in progress, waiting for completion');
-        await evolutionPromise.current;
+      if (evolutionInProgress.current) {
+        console.log('Evolution already in progress, rejecting duplicate request');
+        if (evolutionPromise.current) {
+          // Wait for existing evolution to complete
+          await evolutionPromise.current;
+        }
+        // Return null to indicate this call was skipped
         return null;
       }
 
+      // Set flag immediately before any async operations
       evolutionInProgress.current = true;
 
       // Create a promise to track this evolution
@@ -461,22 +449,25 @@ export const useCompanion = () => {
         .maybeSingle();
 
       if (!existingStory) {
-        // Generate story chapter in the background
-        supabase.functions.invoke("generate-companion-story", {
-          body: {
-            companionId: companion.id,
-            stage: newStage,
-            tonePreference: "heroic",
-            themeIntensity: "moderate",
-          },
-        }).then(() => {
-          console.log(`Stage ${newStage} story generation started`);
-          queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-          queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-        }).catch((error) => {
-          console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
-          // Don't throw - story generation is not critical to evolution
-        });
+        // Generate story chapter in the background - properly handled promise
+        (async () => {
+          try {
+            await supabase.functions.invoke("generate-companion-story", {
+              body: {
+                companionId: companion.id,
+                stage: newStage,
+                tonePreference: "heroic",
+                themeIntensity: "moderate",
+              },
+            });
+            console.log(`Stage ${newStage} story generation started`);
+            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+          } catch (error) {
+            console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
+            // Don't throw - story generation is not critical to evolution
+          }
+        })();
       }
 
           return evolutionData.image_url;

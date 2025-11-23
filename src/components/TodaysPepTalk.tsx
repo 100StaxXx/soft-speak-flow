@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonPepTalk } from "@/components/SkeletonCard";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -49,6 +49,7 @@ export const TodaysPepTalk = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const seekDebounceRef = useRef<number | null>(null);
 
   // Track walkthrough state
   useEffect(() => {
@@ -92,9 +93,20 @@ export const TodaysPepTalk = () => {
         .maybeSingle();
 
       if (data) {
-        const transcript = Array.isArray(data.transcript) 
-          ? (data.transcript as unknown as CaptionWord[]) 
-          : [];
+        // Validate and sanitize transcript data
+        let transcript: CaptionWord[] = [];
+        if (Array.isArray(data.transcript)) {
+          // Validate each word object has required fields
+          transcript = (data.transcript as unknown as CaptionWord[]).filter(
+            (word): word is CaptionWord => 
+              word && 
+              typeof word === 'object' &&
+              typeof word.word === 'string' &&
+              typeof word.start === 'number' &&
+              typeof word.end === 'number'
+          );
+        }
+        
         setPepTalk({ 
           ...data, 
           mentor_name: mentor.name,
@@ -114,18 +126,33 @@ export const TodaysPepTalk = () => {
         const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
           body: { id: pepTalk.id }
         });
-        if (!error && data?.script) {
-          setPepTalk((prev: any) => {
-            if (!prev) return prev;
-            const shouldUpdate = data.script !== prev.script || JSON.stringify(data.transcript) !== JSON.stringify(prev.transcript);
-            return shouldUpdate ? { 
-              ...prev, 
-              script: data.script,
-              transcript: data.transcript || []
-            } : prev;
-          });
-        }
-      } catch (_) {
+      if (!error && data?.script) {
+        setPepTalk((prev: any) => {
+          if (!prev) return prev;
+          
+          // Validate transcript from sync response
+          let validatedTranscript: CaptionWord[] = [];
+          if (Array.isArray(data.transcript)) {
+            validatedTranscript = (data.transcript as unknown as CaptionWord[]).filter(
+              (word): word is CaptionWord => 
+                word && 
+                typeof word === 'object' &&
+                typeof word.word === 'string' &&
+                typeof word.start === 'number' &&
+                typeof word.end === 'number'
+            );
+          }
+          
+          const shouldUpdate = data.script !== prev.script || JSON.stringify(validatedTranscript) !== JSON.stringify(prev.transcript);
+          return shouldUpdate ? { 
+            ...prev, 
+            script: data.script,
+            transcript: validatedTranscript
+          } : prev;
+        });
+      }
+      } catch (error) {
+        console.error('Transcript sync failed:', error);
         // silent fail; avoid blocking UI if sync fails
       }
     };
@@ -193,6 +220,15 @@ export const TodaysPepTalk = () => {
     };
   }, [pepTalk?.transcript, activeWordIndex, hasAwardedXP, duration, awardPepTalkListened, pepTalk?.id, profile?.id]);
 
+  // Cleanup seek debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (seekDebounceRef.current) {
+        clearTimeout(seekDebounceRef.current);
+      }
+    };
+  }, []);
+
   // Auto-scroll to active word
   useEffect(() => {
     if (activeWordRef.current && transcriptRef.current && showFullTranscript) {
@@ -223,12 +259,24 @@ export const TodaysPepTalk = () => {
     setIsPlaying(!isPlaying);
   };
 
-  const handleSeek = (value: number[]) => {
+  const handleSeek = useCallback((value: number[]) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.currentTime = value[0];
+    
+    // Update UI immediately for responsiveness
     setCurrentTime(value[0]);
-  };
+    
+    // Debounce actual audio seek to prevent excessive operations
+    if (seekDebounceRef.current) {
+      clearTimeout(seekDebounceRef.current);
+    }
+    
+    seekDebounceRef.current = window.setTimeout(() => {
+      if (audio) {
+        audio.currentTime = value[0];
+      }
+    }, 100);
+  }, []);
 
   const skipTime = (seconds: number) => {
     const audio = audioRef.current;

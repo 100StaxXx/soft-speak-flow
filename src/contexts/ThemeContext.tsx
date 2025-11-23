@@ -39,33 +39,37 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
   useEffect(() => {
     const applyTheme = async () => {
       if (!mentorId) {
-        // Reset to default theme
+        // Reset to default theme without transition
         setCurrentTheme(null);
         applyDefaultTheme();
         return;
       }
 
       try {
-        setIsTransitioning(true);
-
+        // Fetch theme data BEFORE showing transition
         const { data: mentor } = await supabase
           .from("mentors")
           .select("theme_config")
           .eq("id", mentorId)
           .maybeSingle();
 
+        // Only show transition if we actually have a theme to apply
         if (mentor?.theme_config) {
+          setIsTransitioning(true);
+          
           const theme = mentor.theme_config as unknown as MentorTheme;
           setCurrentTheme(theme);
           applyThemeToDOM(theme);
+          
+          // Transition duration
+          setTimeout(() => setIsTransitioning(false), 300);
         } else {
+          // No theme config, apply default without transition
           applyDefaultTheme();
         }
-
-        // Transition duration
-        setTimeout(() => setIsTransitioning(false), 300);
       } catch (error) {
         console.error("Error applying theme:", error);
+        applyDefaultTheme();
         setIsTransitioning(false);
       }
     };

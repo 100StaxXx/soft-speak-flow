@@ -46,12 +46,14 @@ export const useXPRewards = () => {
       });
       
       // Update attributes in background without waiting
-      updateMindFromHabit(companion.id).catch(err => 
-        console.error('Mind update failed:', err)
-      );
-      updateBodyFromActivity(companion.id).catch(err => 
-        console.error('Body update failed:', err)
-      );
+      updateMindFromHabit(companion.id).catch(err => {
+        console.error('Mind update failed:', err);
+        // Non-critical - don't show toast to avoid spam
+      });
+      updateBodyFromActivity(companion.id).catch(err => {
+        console.error('Body update failed:', err);
+        // Non-critical - don't show toast to avoid spam
+      });
     } catch (error) {
       console.error('Error awarding habit completion:', error);
     }
@@ -104,12 +106,14 @@ export const useXPRewards = () => {
       });
       
       // Update attributes in background without waiting
-      updateSoulFromReflection(companion.id).catch(err => 
-        console.error('Soul update failed:', err)
-      );
-      updateBodyFromActivity(companion.id).catch(err => 
-        console.error('Body update failed:', err)
-      );
+      updateSoulFromReflection(companion.id).catch(err => {
+        console.error('Soul update failed:', err);
+        // Non-critical - don't show toast to avoid spam
+      });
+      updateBodyFromActivity(companion.id).catch(err => {
+        console.error('Body update failed:', err);
+        // Non-critical - don't show toast to avoid spam
+      });
     } catch (error) {
       console.error('Error awarding check-in:', error);
     }

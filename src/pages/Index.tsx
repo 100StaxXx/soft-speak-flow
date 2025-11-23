@@ -14,6 +14,7 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { safeLocalStorage } from "@/utils/storage";
 import dariusImage from "@/assets/darius-sage.png";
 import novaImage from "@/assets/nova-sage.png";
 import lumiImage from "@/assets/lumi-sage.png";
@@ -31,7 +32,7 @@ const Index = () => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const [showIntro, setShowIntro] = useState(() => {
-    return !localStorage.getItem('hasSeenIntro');
+    return !safeLocalStorage.getItem('hasSeenIntro');
   });
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -60,56 +61,64 @@ const Index = () => {
     const fetchMentorData = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const { data: mentorData } = await supabase
-        .from("mentors")
-        .select("avatar_url, slug")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-
-      if (mentorData) {
-        const imageUrl = mentorData.avatar_url || mentorImages[mentorData.slug] || mentorImages['darius'];
-        setMentorImage(imageUrl);
-
-        // Get today's pep talk to find related quote
-        const today = new Date().toISOString().split("T")[0];
-        const { data: dailyPepTalk } = await supabase
-          .from("daily_pep_talks")
-          .select("emotional_triggers, topic_category")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentorData.slug)
+      try {
+        const { data: mentorData } = await supabase
+          .from("mentors")
+          .select("avatar_url, slug")
+          .eq("id", profile.selected_mentor_id)
           .maybeSingle();
 
-        if (dailyPepTalk) {
-          // Try to fetch a quote that matches category first, then fall back to any quote
-          let { data: quotes } = await supabase
-            .from("quotes")
-            .select("text, author")
-            .eq("category", dailyPepTalk.topic_category)
-            .limit(10);
+        if (mentorData) {
+          const imageUrl = mentorData.avatar_url || mentorImages[mentorData.slug] || mentorImages['darius'];
+          setMentorImage(imageUrl);
 
-          // If no category match, get any quotes
-          if (!quotes || quotes.length === 0) {
-            const { data: allQuotes } = await supabase
+          // Get today's pep talk to find related quote
+          const today = new Date().toISOString().split("T")[0];
+          const { data: dailyPepTalk } = await supabase
+            .from("daily_pep_talks")
+            .select("emotional_triggers, topic_category")
+            .eq("for_date", today)
+            .eq("mentor_slug", mentorData.slug)
+            .maybeSingle();
+
+          if (dailyPepTalk) {
+            // Try to fetch a quote that matches category first, then fall back to any quote
+            let { data: quotes } = await supabase
               .from("quotes")
               .select("text, author")
-              .limit(20);
-            quotes = allQuotes;
-          }
+              .eq("category", dailyPepTalk.topic_category)
+              .limit(10);
 
-          // Pick a random quote
-          if (quotes && quotes.length > 0) {
-            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-            setTodaysQuote(randomQuote);
+            // If no category match, get any quotes
+            if (!quotes || quotes.length === 0) {
+              const { data: allQuotes } = await supabase
+                .from("quotes")
+                .select("text, author")
+                .limit(20);
+              quotes = allQuotes;
+            }
+
+            // Pick a random quote
+            if (quotes && quotes.length > 0) {
+              const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+              setTodaysQuote(randomQuote);
+            }
           }
         }
+      } catch (error) {
+        console.error('Error fetching mentor data:', error);
+        // Non-critical error - continue without quote
       }
     };
 
-    fetchMentorData();
+    // Properly handle async function in useEffect
+    fetchMentorData().catch(error => {
+      console.error('Unhandled error in fetchMentorData:', error);
+    });
   }, [profile?.selected_mentor_id]);
 
   useEffect(() => {
-    localStorage.setItem('hasSeenIntro', 'true');
+    safeLocalStorage.setItem('hasSeenIntro', 'true');
   }, []);
 
   useEffect(() => {
@@ -145,7 +154,7 @@ const Index = () => {
     if (!user || !isReady) return;
     
     // Check localStorage first to avoid race conditions with profile updates
-    const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
+    const onboardingComplete = safeLocalStorage.getItem('onboardingComplete') === 'true';
     
     if (profile && !onboardingComplete) {
       // If onboarding is not complete or user has no mentor, redirect to onboarding
@@ -169,6 +178,31 @@ const Index = () => {
           <p className="text-muted-foreground">
             {isTransitioning ? "Switching mentor..." : "Loading..."}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if critical data failed to load
+  if (!profileLoading && !companionLoading && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="h-12 w-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold mb-2">Unable to Load Profile</h2>
+            <p className="text-muted-foreground mb-4">
+              We couldn't load your profile data. Please check your connection and try again.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
