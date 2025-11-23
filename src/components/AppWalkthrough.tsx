@@ -232,14 +232,35 @@ export const AppWalkthrough = () => {
   // Lock scrolling during entire walkthrough
   useEffect(() => {
     if (run) {
+      // Prevent scrolling on both html and body
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none'; // Disable touch actions like scrolling
 
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
+      // Prevent touchmove to ensure scrolling is disabled on mobile devices
+      // We use passive: false to allow preventDefault()
+      const preventDefault = (e: Event) => {
+        const target = e.target as HTMLElement;
+        // Allow scrolling if inside the tutorial modal
+        if (target.closest('.tutorial-modal-content')) {
+          return;
+        }
+        e.preventDefault();
+      };
+      
+      document.addEventListener('touchmove', preventDefault, { passive: false });
+
+      return () => {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+        document.body.style.touchAction = '';
+        document.removeEventListener('touchmove', preventDefault);
+      };
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
   }, [run]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
