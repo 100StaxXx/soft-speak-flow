@@ -18,6 +18,7 @@ interface TutorialModalProps {
   totalSteps: number;
   mentorSlug: string;
   onAction?: () => void;
+  onSkip?: () => void;
 }
 
 export const TutorialModal = ({
@@ -26,6 +27,7 @@ export const TutorialModal = ({
   totalSteps,
   mentorSlug,
   onAction,
+  onSkip,
 }: TutorialModalProps) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -41,6 +43,24 @@ export const TutorialModal = ({
         
         // Check if audio is cached in localStorage
         const cacheKey = `tutorial-audio-${mentorSlug}-${step.id}`;
+        
+        // Clean up old tutorial audio if storage is getting full
+        try {
+          const storageKeys = Object.keys(localStorage);
+          const tutorialKeys = storageKeys.filter(key => key.startsWith('tutorial-audio-'));
+          
+          // If we have more than 5 cached audio files, remove the oldest ones
+          if (tutorialKeys.length > 5) {
+            console.log('[TutorialModal] Cleaning up old tutorial audio cache');
+            // Remove all but the most recent 3
+            tutorialKeys.slice(0, tutorialKeys.length - 3).forEach(key => {
+              localStorage.removeItem(key);
+            });
+          }
+        } catch (e) {
+          console.warn('[TutorialModal] Error cleaning up audio cache:', e);
+        }
+        
         const cachedAudio = localStorage.getItem(cacheKey);
 
         if (cachedAudio) {
@@ -162,7 +182,7 @@ export const TutorialModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
       <Card className="max-w-2xl w-full mx-4 p-0 overflow-hidden border-4 border-primary shadow-2xl">
         {/* Progress Bar */}
         <div className="h-2 bg-muted">
@@ -231,8 +251,18 @@ export const TutorialModal = ({
             </p>
           </div>
 
-          {/* Got It Button - Always show to let users dismiss and perform action */}
-          <div className="flex justify-center pt-4">
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-4 pt-4">
+            {onSkip && currentStep === 0 && (
+              <Button
+                onClick={onSkip}
+                variant="ghost"
+                size="lg"
+                className="text-lg px-6 py-6"
+              >
+                Skip Tutorial
+              </Button>
+            )}
             <Button
               onClick={onAction}
               size="lg"

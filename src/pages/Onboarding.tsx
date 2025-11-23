@@ -431,10 +431,12 @@ export default function Onboarding() {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("Navigating to home...");
-      // Dispatch event to trigger walkthrough
-      window.dispatchEvent(new CustomEvent('onboarding-complete'));
-      // Navigate directly to home
+      // Navigate first to ensure components are mounted
       navigate("/", { replace: true });
+      // Dispatch event after a short delay to ensure AppWalkthrough is mounted
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('onboarding-complete'));
+      }, 100);
     } catch (error: unknown) {
       console.error("Error in onboarding:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create companion. Please try again.";

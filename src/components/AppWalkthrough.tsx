@@ -7,6 +7,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { OnboardingData } from "@/types/profile";
 import { TutorialModal } from "./TutorialModal";
 import { Button } from "./ui/button";
+import { Card } from "./ui/card";
 
 interface TutorialStep {
   id: string;
@@ -54,7 +55,7 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     id: "tasks-create-quest",
     title: "Create Your First Quest",
     content: "Quests are your daily goals. Completing them earns XP and helps your companion evolve. Let's create your very first quest!",
-    action: "Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
+    action: "Type any quest (e.g., 'Start my journey'), select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
     illustration: "✍️",
     requiresAction: true,
   },
@@ -89,6 +90,7 @@ export const AppWalkthrough = () => {
   const [isWalkthroughCompleted, setIsWalkthroughCompleted] = useState<boolean | null>(null);
   const [showCompletionButton, setShowCompletionButton] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
@@ -192,6 +194,11 @@ export const AppWalkthrough = () => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run || !showModal) return;
 
     const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
+    if (moodButtons.length === 0) {
+      console.warn('[Tutorial] Mood buttons not found, waiting...');
+      return;
+    }
+    
     let hasAdvanced = false;
     
     const handleMoodClick = () => {
@@ -242,6 +249,11 @@ export const AppWalkthrough = () => {
     let hasAdvanced = false;
     const navCompanion = document.querySelector('a[href="/companion"]');
     
+    if (!navCompanion) {
+      console.warn('[Tutorial] Companion nav tab not found, waiting...');
+      return;
+    }
+    
     const handleNavClick = () => {
       if (hasAdvanced) return;
       hasAdvanced = true;
@@ -252,14 +264,10 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
-    if (navCompanion) {
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
-    }
+    navCompanion.addEventListener('click', handleNavClick, { once: true });
     
     return () => {
-      if (navCompanion) {
-        navCompanion.removeEventListener('click', handleNavClick);
-      }
+      navCompanion.removeEventListener('click', handleNavClick);
     };
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
@@ -270,6 +278,11 @@ export const AppWalkthrough = () => {
     let hasAdvanced = false;
     const navTasks = document.querySelector('a[href="/tasks"]');
     
+    if (!navTasks) {
+      console.warn('[Tutorial] Tasks nav tab not found, waiting...');
+      return;
+    }
+    
     const handleNavClick = () => {
       if (hasAdvanced) return;
       hasAdvanced = true;
@@ -280,14 +293,10 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
-    if (navTasks) {
-      navTasks.addEventListener('click', handleNavClick, { once: true });
-    }
+    navTasks.addEventListener('click', handleNavClick, { once: true });
     
     return () => {
-      if (navTasks) {
-        navTasks.removeEventListener('click', handleNavClick);
-      }
+      navTasks.removeEventListener('click', handleNavClick);
     };
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
@@ -308,22 +317,73 @@ export const AppWalkthrough = () => {
       setRun(false);
     };
 
-    setOnEvolutionComplete(() => () => {
+    // Create a stable callback function
+    const evolutionCompleteCallback = () => {
       console.log('[Tutorial] Evolution completion callback triggered!');
       setRun(false);
       setShowModal(false);
       setShowCompletionButton(true);
-    });
+    };
+
+    // Set the callback using a function that returns the callback
+    setOnEvolutionComplete(() => evolutionCompleteCallback);
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart, { once: true });
+    
+    // Add timeout fallback in case evolution doesn't complete
+    const timeoutId = createTrackedTimeout(() => {
+      console.log('[Tutorial] Evolution timeout reached, showing completion button');
+      setRun(false);
+      setShowModal(false);
+      setShowCompletionButton(true);
+    }, TIMEOUTS.EVOLUTION_COMPLETE);
     
     return () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       setOnEvolutionComplete(null);
+      if (timeoutId !== -1) {
+        clearTimeout(timeoutId);
+        activeTimeouts.current.delete(timeoutId);
+      }
     };
-  }, [stepIndex, setOnEvolutionComplete]);
+  }, [stepIndex, setOnEvolutionComplete, createTrackedTimeout]);
 
   const [isSaving, setIsSaving] = useState(false);
+  
+  const handleSkipTutorial = useCallback(async () => {
+    console.log('[Tutorial] Skipping tutorial');
+    clearAllTimers();
+    setRun(false);
+    setShowModal(false);
+    setShowSkipConfirm(false);
+    
+    if (user) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const existingData = (profile?.onboarding_data as OnboardingData) || {};
+
+        await supabase
+          .from('profiles')
+          .update({
+            onboarding_data: {
+              ...existingData,
+              walkthrough_completed: true,
+              walkthrough_skipped: true
+            }
+          })
+          .eq('id', user.id);
+
+        console.log('[Tutorial] Tutorial marked as skipped');
+      } catch (error) {
+        console.error('[Tutorial] Error skipping tutorial:', error);
+      }
+    }
+  }, [user, clearAllTimers]);
   
   const handleWalkthroughComplete = useCallback(async () => {
     if (isSaving) return;
@@ -399,11 +459,37 @@ export const AppWalkthrough = () => {
           totalSteps={WALKTHROUGH_STEPS.length}
           mentorSlug={mentorSlug}
           onAction={() => setShowModal(false)}
+          onSkip={() => setShowSkipConfirm(true)}
         />
+      )}
+      {/* Skip Confirmation Dialog */}
+      {showSkipConfirm && (
+        <div className="fixed inset-0 z-[9002] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <Card className="max-w-md w-full mx-4 p-6 space-y-4">
+            <h3 className="text-xl font-bold">Skip Tutorial?</h3>
+            <p className="text-muted-foreground">
+              Are you sure you want to skip the tutorial? You can always access help from the menu later.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setShowSkipConfirm(false)}
+              >
+                Continue Tutorial
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleSkipTutorial}
+              >
+                Skip Tutorial
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
       {/* Completion Modal */}
       {showCompletionButton && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[9001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">
             <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-4 border-primary/50 rounded-3xl p-12 shadow-2xl">
               <div className="text-center space-y-4">
