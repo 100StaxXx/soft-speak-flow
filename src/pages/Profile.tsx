@@ -286,7 +286,7 @@ const Profile = () => {
                     Privacy Policy
                   </Button>
                   <div className="pt-2 text-xs text-muted-foreground">
-                    <p>R-Evoltution LLC</p>
+                    <p>R-Evolution LLC</p>
                     <p>Contact: alilrevolution@gmail.com</p>
                     <p className="mt-1">Last Updated: November 21, 2025</p>
                   </div>
