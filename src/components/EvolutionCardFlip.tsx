@@ -23,11 +23,14 @@ interface Props {
 }
 
 const RARITY_COLORS: Record<string, string> = {
-  common: "from-gray-400 to-gray-600",
-  uncommon: "from-green-400 to-green-600",
-  rare: "from-blue-400 to-blue-600",
-  epic: "from-purple-400 to-purple-600",
-  legendary: "from-amber-400 to-amber-600",
+  Common: "from-gray-400 to-gray-600",
+  Rare: "from-blue-400 to-blue-600",
+  Epic: "from-purple-400 to-purple-600",
+  Legendary: "from-amber-400 to-amber-600",
+  Mythic: "from-pink-500 to-rose-600",
+  Celestial: "from-cyan-400 to-blue-500",
+  Primal: "from-emerald-400 to-teal-600",
+  Origin: "from-violet-500 to-fuchsia-600",
 };
 
 const ELEMENT_SYMBOLS: Record<string, string> = {
