@@ -263,7 +263,7 @@ export const AppWalkthrough = () => {
 
   // Step 4: Set callback for when evolution completes
   useEffect(() => {
-    if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) {
+    if (stepIndex !== STEP_INDEX.QUEST_CREATION) {
       setOnEvolutionComplete(null);
       return;
     }
@@ -274,6 +274,7 @@ export const AppWalkthrough = () => {
     };
 
     // Set the callback that will be triggered when evolution completes
+    // Important: Don't check 'run' here because it gets set to false during evolution
     setOnEvolutionComplete(() => () => {
       console.log('[Tutorial] Evolution completion callback triggered! Current state:', { 
         stepIndex, 
@@ -293,7 +294,7 @@ export const AppWalkthrough = () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       setOnEvolutionComplete(null);
     };
-  }, [stepIndex, run, setOnEvolutionComplete]);
+  }, [stepIndex, setOnEvolutionComplete]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
