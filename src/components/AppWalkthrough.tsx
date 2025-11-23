@@ -273,6 +273,7 @@ export const AppWalkthrough = () => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
     let hasAdvanced = false;
+    const navCompanion = document.querySelector('a[href="/companion"]');
     
     const handleNavClick = () => {
       if (hasAdvanced) return;
@@ -284,13 +285,11 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
-    const navCompanion = document.querySelector('a[href="/companion"]');
     if (navCompanion) {
-      navCompanion.addEventListener('click', handleNavClick);
+      navCompanion.addEventListener('click', handleNavClick, { once: true });
     }
     
     return () => {
-      const navCompanion = document.querySelector('a[href="/companion"]');
       if (navCompanion) {
         navCompanion.removeEventListener('click', handleNavClick);
       }
@@ -302,6 +301,7 @@ export const AppWalkthrough = () => {
     if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
     let hasAdvanced = false;
+    const navTasks = document.querySelector('a[href="/tasks"]');
     
     const handleNavClick = () => {
       if (hasAdvanced) return;
@@ -313,13 +313,11 @@ export const AppWalkthrough = () => {
       }, DELAYS.POST_NAV);
     };
 
-    const navTasks = document.querySelector('a[href="/tasks"]');
     if (navTasks) {
-      navTasks.addEventListener('click', handleNavClick);
+      navTasks.addEventListener('click', handleNavClick, { once: true });
     }
     
     return () => {
-      const navTasks = document.querySelector('a[href="/tasks"]');
       if (navTasks) {
         navTasks.removeEventListener('click', handleNavClick);
       }

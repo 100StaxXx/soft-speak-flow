@@ -30,6 +30,7 @@ export const TutorialModal = ({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasUserPaused, setHasUserPaused] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Generate and play TTS when step changes
@@ -94,6 +95,7 @@ export const TutorialModal = ({
         audioRef.current.currentTime = 0;
       }
       setIsPlaying(false);
+      setHasUserPaused(false);
     };
   }, [step.id, step.content, mentorSlug]);
 
@@ -107,14 +109,14 @@ export const TutorialModal = ({
     }
   }, [audioUrl, isMuted]);
 
-  // Handle unmuting - restart current audio if it was paused
+  // Handle unmuting - only restart if user didn't manually pause
   useEffect(() => {
-    if (!isMuted && audioUrl && audioRef.current && !isPlaying) {
+    if (!isMuted && audioUrl && audioRef.current && !isPlaying && !hasUserPaused) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(console.error);
       setIsPlaying(true);
     }
-  }, [isMuted, audioUrl, isPlaying]);
+  }, [isMuted, audioUrl, hasUserPaused]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
@@ -122,20 +124,24 @@ export const TutorialModal = ({
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      setHasUserPaused(true);
     } else {
       audioRef.current.play().catch(console.error);
       setIsPlaying(true);
+      setHasUserPaused(false);
     }
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    if (audioRef.current) {
-      if (!isMuted) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    
+    if (newMutedState && audioRef.current) {
+      // Muting - pause audio
+      audioRef.current.pause();
+      setIsPlaying(false);
     }
+    // Unmuting is handled by the useEffect above
   };
 
   return (
