@@ -10,6 +10,7 @@ import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { useState, useEffect } from "react";
+import { getStageName } from "@/config/companionStages";
 
 // Convert hex color to color name
 const getColorName = (hexColor: string): string => {
@@ -61,30 +62,6 @@ const getColorName = (hexColor: string): string => {
   }
 };
 
-const STAGE_NAMES = {
-  0: "Egg",
-  1: "Hatchling",
-  2: "Guardian",
-  3: "Ascended",
-  4: "Mythic",
-  5: "Titan",
-  6: "Stage 6",
-  7: "Stage 7",
-  8: "Stage 8",
-  9: "Stage 9",
-  10: "Stage 10",
-  11: "Stage 11",
-  12: "Stage 12",
-  13: "Stage 13",
-  14: "Stage 14",
-  15: "Stage 15",
-  16: "Stage 16",
-  17: "Stage 17",
-  18: "Stage 18",
-  19: "Stage 19",
-  20: "Ultimate",
-};
-
 export const CompanionDisplay = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -117,7 +94,7 @@ export const CompanionDisplay = () => {
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
-  const stageName = STAGE_NAMES[companion.current_stage as keyof typeof STAGE_NAMES] || "Unknown";
+  const stageName = getStageName(companion.current_stage);
 
   return (
     <>
@@ -158,7 +135,7 @@ export const CompanionDisplay = () => {
           </div>
 
           {/* Companion Image */}
-          <div className="flex justify-center py-8 relative group">
+          <div className="flex justify-center py-8 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
             {/* Body-based glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`}
@@ -171,22 +148,24 @@ export const CompanionDisplay = () => {
             <div className="relative">
               <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} aria-hidden="true" />
               {!imageLoaded && !imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-label="Loading companion image">
-                  <Sparkles className="h-12 w-12 text-primary/50 animate-spin" />
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading companion image">
+                  <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Loading companion image</span>
                 </div>
               )}
               {imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30" role="alert">
+                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30" role="alert" aria-live="assertive">
                   <div className="text-center p-4">
-                    <p className="text-sm text-muted-foreground mb-2">Image unavailable</p>
+                    <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
                     <button 
                       onClick={() => {
                         setImageError(false);
                         setImageLoaded(false);
                         setImageKey(prev => prev + 1); // Force image reload with new key
                       }}
-                      className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
-                      aria-label="Retry loading image"
+                      className="text-xs text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+                      aria-label="Retry loading companion image"
+                      aria-describedby="image-error-message"
                     >
                       Try again
                     </button>

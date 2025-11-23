@@ -53,9 +53,13 @@ export const useDailyTasks = (selectedDate?: Date) => {
           .eq('user_id', user!.id)
           .eq('task_date', customDate || taskDate);
 
-        if (countError) throw countError;
+        if (countError) {
+          addInProgress.current = false; // Reset on error
+          throw countError;
+        }
 
         if (existingTasks && existingTasks.length >= 4) {
+          addInProgress.current = false; // Reset on error
           throw new Error('Maximum 4 tasks per day');
         }
 
@@ -72,9 +76,17 @@ export const useDailyTasks = (selectedDate?: Date) => {
             is_main_quest: isMainQuest ?? false,
           });
 
-        if (error) throw error;
-      } finally {
+        if (error) {
+          addInProgress.current = false; // Reset on error
+          throw error;
+        }
+        
+        // Success - reset flag
         addInProgress.current = false;
+      } catch (error) {
+        // Ensure flag is always reset
+        addInProgress.current = false;
+        throw error;
       }
     },
     onSuccess: () => {
@@ -97,10 +109,17 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
         const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
-        if (error) throw error;
+        if (error) {
+          toggleInProgress.current = false; // Reset on error
+          throw error;
+        }
+        
+        toggleInProgress.current = false; // Reset on success
         return { taskId, completed, xpReward, wasAlreadyCompleted };
-      } finally {
+      } catch (error) {
+        // Ensure flag is always reset
         toggleInProgress.current = false;
+        throw error;
       }
     },
     onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {

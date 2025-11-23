@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
 import { useEvolution } from "@/contexts/EvolutionContext";
+import { OnboardingData } from "@/types/profile";
 
 const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
   { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true, hideFooter: true },
@@ -76,18 +77,26 @@ export const AppWalkthrough = () => {
     if (!selector || selector === 'body') return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       if (document.querySelector(selector)) return resolve(true);
+      
       const observer = new MutationObserver(() => {
         if (document.querySelector(selector)) {
           observer.disconnect();
+          // Clear timeout when element found
+          if (timeoutId) clearTimeout(timeoutId);
+          activeTimeouts.current.delete(timeoutId);
           resolve(true);
         }
       });
+      
       observer.observe(document.body, { childList: true, subtree: true });
-      const t = window.setTimeout(() => {
-        observer.disconnect();
+      
+      const timeoutId = window.setTimeout(() => {
+        observer.disconnect(); // Ensure observer is disconnected on timeout
+        activeTimeouts.current.delete(timeoutId);
         resolve(false);
-      }, timeout);
-      activeTimeouts.current.add(t as unknown as number);
+      }, timeout) as unknown as number;
+      
+      activeTimeouts.current.add(timeoutId);
     });
   }, []);
 
@@ -141,7 +150,7 @@ export const AppWalkthrough = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      const walkthroughData = profile?.onboarding_data as { walkthrough_completed?: boolean } | null;
+      const walkthroughData = profile?.onboarding_data as OnboardingData | null;
       const completed = walkthroughData?.walkthrough_completed === true;
       
       setIsWalkthroughCompleted(completed);
@@ -299,29 +308,49 @@ export const AppWalkthrough = () => {
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
     setRun(false);
-    setShowCompletionButton(false); // Reset button state
+    
     if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_data')
-        .eq('id', user.id)
-        .maybeSingle();
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      const existingData = (profile?.onboarding_data as any) || {};
+        const existingData = (profile?.onboarding_data as OnboardingData) || {};
 
-      await supabase
-        .from('profiles')
-        .update({
-          onboarding_data: {
-            ...existingData,
-            walkthrough_completed: true
-          }
-        })
-        .eq('id', user.id);
-      console.log('[Tutorial] Saved walkthrough_completed to database');
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            onboarding_data: {
+              ...existingData,
+              walkthrough_completed: true
+            }
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('[Tutorial] Failed to save walkthrough completion:', error);
+          // Keep button visible so user can retry
+          return;
+        }
+
+        console.log('[Tutorial] Saved walkthrough_completed to database');
+        
+        // Only hide button after successful save
+        setShowCompletionButton(false);
+        
+        // Reload the page to start fresh
+        window.location.reload();
+      } catch (error) {
+        console.error('[Tutorial] Error during walkthrough completion:', error);
+        // Keep button visible so user can retry
+      }
+    } else {
+      // No user - still hide button and reload as fallback
+      setShowCompletionButton(false);
+      window.location.reload();
     }
-    // Reload the page to start fresh
-    window.location.reload();
   }, [user]);
 
   const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {

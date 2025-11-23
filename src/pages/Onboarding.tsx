@@ -14,6 +14,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { retryWithBackoff } from "@/utils/retry";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
+import { OnboardingData } from "@/types/profile";
 
 interface Mentor {
   id: string;
@@ -64,12 +65,7 @@ export default function Onboarding() {
         .maybeSingle();
       
       if (profile?.onboarding_step && profile.onboarding_step !== 'complete') {
-        const savedData = profile.onboarding_data as { 
-          mentorId?: string;
-          mentorName?: string;
-          explanation?: MentorExplanation;
-          userName?: string;
-        } | null;
+        const savedData = profile.onboarding_data as OnboardingData | null;
         
         if (profile.onboarding_step === 'mentor_reveal' && savedData?.mentorId) {
           // Fetch the mentor from database
@@ -134,7 +130,7 @@ export default function Onboarding() {
         .eq("id", user.id)
         .maybeSingle();
 
-      const existingData = (profile?.onboarding_data as any) || {};
+      const existingData = (profile?.onboarding_data as OnboardingData) || {};
 
       const { error } = await supabase
         .from("profiles")
@@ -220,7 +216,7 @@ export default function Onboarding() {
         .eq("id", currentUser.id)
         .maybeSingle();
 
-      const existingData = (existingProfile?.onboarding_data as any) || {};
+      const existingData = (existingProfile?.onboarding_data as OnboardingData) || {};
 
       // Save progress - preserve existing data like userName
       await supabase
@@ -377,32 +373,46 @@ export default function Onboarding() {
       }
       
       console.log("Marking onboarding as complete...");
-      // Keep ALL existing onboarding_data (userName, walkthrough_completed, etc.) when marking onboarding as complete
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('onboarding_data')
-        .eq('id', user!.id)
-        .maybeSingle();
+      // Use SQL function to atomically merge onboarding_data
+      // This prevents race conditions from concurrent updates
+      const { data: updatedProfile, error: completeError } = await supabase.rpc('update_profile_onboarding_complete', {
+        profile_id: user!.id
+      });
+      
+      // Fallback: If RPC function doesn't exist, use standard update
+      // (accepting potential race condition as unlikely in this flow)
+      if (completeError && completeError.message?.includes('function') && completeError.message?.includes('does not exist')) {
+        console.warn('RPC function not found, using fallback update');
+        const { data: currentProfile } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user!.id)
+          .maybeSingle();
 
-      const currentOnboardingData = (currentProfile?.onboarding_data as any) || {};
+        const currentOnboardingData = (currentProfile?.onboarding_data as OnboardingData) || {};
 
-      const { data: updatedProfile, error: completeError } = await supabase
-        .from('profiles')
-        .update({
-          onboarding_completed: true,
-          onboarding_step: 'complete',
-          onboarding_data: currentOnboardingData
-        })
-        .eq('id', user!.id)
-        .select()
-        .single();
+        const { data: fallbackProfile, error: fallbackError } = await supabase
+          .from('profiles')
+          .update({
+            onboarding_completed: true,
+            onboarding_step: 'complete',
+            onboarding_data: currentOnboardingData
+          })
+          .eq('id', user!.id)
+          .select()
+          .single();
         
-      if (completeError) {
+        if (fallbackError) throw fallbackError;
+        // Use fallbackProfile for updatedProfile
+        if (!fallbackProfile) throw new Error('Failed to complete onboarding');
+      }
+      
+      if (completeError && !(completeError.message?.includes('function') && completeError.message?.includes('does not exist'))) {
         console.error("Error completing onboarding:", completeError);
         throw completeError;
       }
       
-      console.log("Onboarding marked complete:", updatedProfile);
+      console.log("Onboarding marked complete");
       
       // CRITICAL: Invalidate profile cache to force refetch with new data
       await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });

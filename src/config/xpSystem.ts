@@ -62,6 +62,31 @@
  * - awardQuoteShared() - When user shares a quote
  */
 
+// 21-Stage Evolution System: Early stages fast, late stages exponential
+export const EVOLUTION_THRESHOLDS: Record<number, number> = {
+  0: 0,      // Egg
+  1: 10,     // Hatchling (first quest completes this!)
+  2: 120,    // Guardian (was stage 3)
+  3: 250,    // Ascended (was stage 4)
+  4: 500,    // Mythic (was stage 5)
+  5: 1200,   // Titan (was stage 6)
+  6: 2500,   // (was stage 7)
+  7: 5000,   // (was stage 8)
+  8: 10000,  // (was stage 9)
+  9: 20000,  // (was stage 10)
+  10: 35000, // (was stage 11)
+  11: 50000, // (was stage 12)
+  12: 75000, // (was stage 13)
+  13: 100000, // (was stage 14)
+  14: 150000, // (was stage 15)
+  15: 200000, // (was stage 16)
+  16: 300000, // (was stage 17)
+  17: 450000, // (was stage 18)
+  18: 650000, // (was stage 19)
+  19: 1000000, // (was stage 20)
+  20: 1500000, // NEW Ultimate stage
+};
+
 export const XP_SYSTEM_DOCS = {
   note: "See useXPRewards hook for implementation",
 } as const;
