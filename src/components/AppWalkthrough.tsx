@@ -322,9 +322,8 @@ export const AppWalkthrough = () => {
     };
 
     // Small delay to ensure DOM is ready after modal dismissal
-    const timeoutId = setTimeout(scrollTargetIntoView, 300);
-    return () => clearTimeout(timeoutId);
-  }, [stepIndex, showModal, run]);
+    createTrackedTimeout(scrollTargetIntoView, 300);
+  }, [stepIndex, showModal, run, createTrackedTimeout]);
 
   // Step 1: Listen for companion tab click
   useEffect(() => {
