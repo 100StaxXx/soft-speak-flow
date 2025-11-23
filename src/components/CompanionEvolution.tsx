@@ -512,8 +512,8 @@ export const CompanionEvolution = ({
             </motion.div>
           )}
 
-          {/* Continue button - shown after user dismisses */}
-          {showContinueButton && (
+          {/* Continue button - shown after user dismisses and modal closes */}
+          {showContinueButton && !isEvolving && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
