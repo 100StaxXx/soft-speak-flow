@@ -54,7 +54,7 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     id: "tasks-create-quest",
     title: "Create Your First Quest",
     content: "Quests are your daily goals. Completing them earns XP and helps your companion evolve. Let's create your very first quest!",
-    action: "Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
+    action: "Type 'Start my Journey', select Medium difficulty (15 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
     illustration: "✍️",
     requiresAction: true,
   },
@@ -186,6 +186,27 @@ export const AppWalkthrough = () => {
       window.removeEventListener('onboarding-complete', handleOnboardingComplete);
     };
   }, [user, session, isWalkthroughCompleted]);
+
+  // Broadcast tutorial step changes and handle status requests
+  useEffect(() => {
+    const broadcastStatus = () => {
+      const payload = run ? stepIndex : null;
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: payload } 
+      }));
+    };
+
+    broadcastStatus();
+
+    const handleRequestStatus = () => {
+      broadcastStatus();
+    };
+
+    window.addEventListener('request-tutorial-status', handleRequestStatus);
+    return () => {
+      window.removeEventListener('request-tutorial-status', handleRequestStatus);
+    };
+  }, [run, stepIndex]);
 
   // Step 0: Listen for mood selection
   useEffect(() => {

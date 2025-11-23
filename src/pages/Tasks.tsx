@@ -451,7 +451,7 @@ export default function Tasks() {
                       >
                         <Flame className="h-4 w-4" />
                         <span className="hidden sm:inline">Medium</span>
-                        <span className="sm:hidden">10</span>
+                        <span className="sm:hidden">15</span>
                       </Button>
                       <Button
                         variant={taskDifficulty === 'hard' ? 'default' : 'outline'}
@@ -461,7 +461,7 @@ export default function Tasks() {
                       >
                         <Mountain className="h-4 w-4" />
                         <span className="hidden sm:inline">Hard</span>
-                        <span className="sm:hidden">20</span>
+                        <span className="sm:hidden">25</span>
                       </Button>
                     </div>
 

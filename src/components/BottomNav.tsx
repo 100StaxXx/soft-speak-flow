@@ -19,6 +19,10 @@ export const BottomNav = () => {
     };
     
     window.addEventListener('tutorial-step-change' as any, handleTutorialStep);
+    
+    // Request initial status in case we mounted after the walkthrough started
+    window.dispatchEvent(new CustomEvent('request-tutorial-status'));
+    
     return () => window.removeEventListener('tutorial-step-change' as any, handleTutorialStep);
   }, []);
 
