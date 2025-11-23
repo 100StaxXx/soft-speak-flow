@@ -36,12 +36,30 @@ export const BottomNav = () => {
     },
   });
 
+  // Check if any modal is currently showing (tutorial or other modals)
+  const [isModalShowing, setIsModalShowing] = useState(false);
+  
+  useEffect(() => {
+    const checkModalState = () => {
+      // Check if tutorial modal is showing
+      const tutorialModal = document.querySelector('[class*="z-\\[10000\\]"]');
+      setIsModalShowing(!!tutorialModal);
+    };
+    
+    // Check on mount and when tutorial step changes
+    checkModalState();
+    
+    // Also check periodically in case modal state changes
+    const interval = setInterval(checkModalState, 100);
+    return () => clearInterval(interval);
+  }, [tutorialStep]);
+  
   // Determine if navigation should be blocked
   const isTutorialActive = tutorialStep !== null;
   const canClickCompanion = tutorialStep === 1; // Step 1: XP Celebration - Click Companion tab
   const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Companion intro + Quest creation
-  const shouldHighlightCompanion = canClickCompanion;
-  const shouldHighlightQuests = canClickQuests;
+  const shouldHighlightCompanion = canClickCompanion && !isModalShowing;
+  const shouldHighlightQuests = canClickQuests && !isModalShowing;
   
   // Remove console logs for production
   
