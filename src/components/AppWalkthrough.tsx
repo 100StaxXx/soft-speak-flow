@@ -230,11 +230,26 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Scroll lock and bottom nav control during check-in step (Step 0)
+  // Scroll lock whenever modal is showing, during check-in, or showing completion modal
+  useEffect(() => {
+    // Lock scroll if any walkthrough UI is active
+    if (showModal || showCompletionButton || (run && stepIndex === STEP_INDEX.HOME_CHECKIN)) {
+      document.body.style.overflow = 'hidden';
+    } else if (!run && !showModal && !showCompletionButton) {
+      // Only restore scroll when walkthrough is completely inactive
+      document.body.style.overflow = 'auto';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [showModal, showCompletionButton, stepIndex, run]);
+
+  // Bottom nav control only during check-in step (Step 0)
+  // Note: BottomNav.tsx handles navigation blocking during other tutorial steps via React state
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
-      // Restore defaults when not on check-in step
-      document.body.style.overflow = 'auto';
+      // Restore bottom nav when not on check-in step
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
@@ -243,9 +258,6 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    // Lock scroll during check-in
-    document.body.style.overflow = 'hidden';
-    
     // Disable bottom navigation during check-in
     const bottomNav = document.querySelector('nav[role="navigation"]');
     if (bottomNav) {
@@ -254,7 +266,6 @@ export const AppWalkthrough = () => {
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
@@ -513,7 +524,7 @@ export const AppWalkthrough = () => {
           onAction={() => setShowModal(false)}
         />
       )}
-      {/* Completion Modal */}
+      {/* Completion Modal - z-index 10001 to ensure it appears above CompanionEvolution (z-9999) */}
       {showCompletionButton && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">
