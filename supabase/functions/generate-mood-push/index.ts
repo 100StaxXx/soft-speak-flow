@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,22 +24,33 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
-    const { mood } = await req.json();
+    const { mood, userId } = await req.json();
     
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
     
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const mapping = moodMapping[mood] || moodMapping['Unmotivated'];
     
-    const systemPrompt = `You are a motivational coach for A Lil Push app. Create content for someone feeling "${mood}".
-    
-Generate a response with:
-1. A powerful, short quote (1 sentence max)
-2. A mini pep talk (2-4 sentences) that's grounded, actionable, and encouraging
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-Tone: Strong, direct, supportive. Not overly soft. Think David Goggins meets a good friend.`;
-
-    const userPrompt = `The user is feeling: ${mood}. Give them a lil push.`;
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'mood_push',
+      userId: userId,
+      variables: {
+        userMood: mood,
+        moodCategory: mapping.category,
+        sentenceCountMin: 2,
+        sentenceCountMax: 4,
+        personalityModifiers: '',
+        responseLength: 'concise'
+      }
+    });
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -83,6 +97,29 @@ Tone: Strong, direct, supportive. Not overly soft. Think David Goggins meets a g
     const aiData = await aiResponse.json();
     const toolCall = aiData.choices[0].message.tool_calls?.[0];
     const result = JSON.parse(toolCall.function.arguments);
+
+    // Validate output
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(result);
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: userId || null,
+        template_key: 'mood_push',
+        input_data: { mood, category: mapping.category },
+        output_data: result,
+        validation_passed: validationResult.isValid,
+        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (!validationResult.isValid) {
+      console.warn('Validation warnings:', validator.getValidationSummary(validationResult));
+    }
 
     return new Response(
       JSON.stringify({

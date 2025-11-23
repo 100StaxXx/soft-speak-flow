@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,12 +36,23 @@ serve(async (req) => {
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
 
     let nudgesGenerated = 0
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
     for (const profile of profiles) {
+      const startTime = Date.now();
       try {
         // Get today's date
         const today = new Date().toISOString().split('T')[0]
         const currentHour = new Date().getHours()
+
+        // Get mentor info once per user
+        const { data: mentor } = await supabase
+          .from('mentors')
+          .select('name, tone_description')
+          .eq('id', profile.selected_mentor_id)
+          .single()
+
+        if (!mentor) continue;
 
         // Check morning check-in (only nudge after 10am if not completed)
         if (currentHour >= 10 && currentHour < 12) {
@@ -52,43 +65,64 @@ serve(async (req) => {
             .maybeSingle()
 
           if (!checkIn) {
-            // No morning check-in yet
-            const { data: mentor } = await supabase
-              .from('mentors')
-              .select('name, tone_description')
-              .eq('id', profile.selected_mentor_id)
-              .single()
+            // No morning check-in yet - use PromptBuilder
+            const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+              templateKey: 'nudge_check_in',
+              userId: profile.id,
+              variables: {
+                mentorName: mentor.name,
+                mentorTone: mentor.tone_description,
+                timeContext: 'mid-morning',
+                maxSentences: 1,
+                personalityModifiers: '',
+                responseLength: 'brief'
+              }
+            });
 
-            if (mentor) {
-              const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${lovableApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 100,
+              }),
+            })
 
-The user hasn't completed their morning check-in yet (it's now mid-morning). Generate a brief, friendly nudge (1 sentence max) to encourage them to check in. Stay true to your personality.`
+            if (response.ok) {
+              const aiData = await response.json()
+              const message = aiData.choices?.[0]?.message?.content?.trim()
 
-              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${lovableApiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: 'google/gemini-2.5-flash',
-                  messages: [{ role: 'user', content: prompt }],
-                  max_tokens: 100,
-                }),
-              })
+              // Validate output
+              const validator = new OutputValidator(validationRules, outputConstraints);
+              const validationResult = validator.validate(message);
 
-              if (response.ok) {
-                const aiData = await response.json()
-                const message = aiData.choices?.[0]?.message?.content?.trim()
+              // Log validation
+              const responseTime = Date.now() - startTime;
+              await supabase.from('ai_output_validation_log').insert({
+                user_id: profile.id,
+                template_key: 'nudge_check_in',
+                input_data: { timeContext: 'mid-morning' },
+                output_data: { message },
+                validation_passed: validationResult.isValid,
+                validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+                model_used: 'google/gemini-2.5-flash',
+                response_time_ms: responseTime
+              });
 
-                if (message) {
-                  await supabase.from('mentor_nudges').insert({
-                    user_id: profile.id,
-                    nudge_type: 'check_in',
-                    message: message,
-                  })
-                  nudgesGenerated++
-                }
+              if (message && validationResult.isValid) {
+                await supabase.from('mentor_nudges').insert({
+                  user_id: profile.id,
+                  nudge_type: 'check_in',
+                  message: message,
+                })
+                nudgesGenerated++
               }
             }
           }
@@ -113,42 +147,64 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
               .limit(1)
 
             if (habits && habits.length > 0) {
-              const { data: mentor } = await supabase
-                .from('mentors')
-                .select('name, tone_description')
-                .eq('id', profile.selected_mentor_id)
-                .single()
+              // Use PromptBuilder for habit reminder nudge
+              const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+                templateKey: 'nudge_habit_reminder',
+                userId: profile.id,
+                variables: {
+                  mentorName: mentor.name,
+                  mentorTone: mentor.tone_description,
+                  timeContext: 'evening',
+                  maxSentences: 1,
+                  personalityModifiers: '',
+                  responseLength: 'brief'
+                }
+              });
 
-              if (mentor) {
-                const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${lovableApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'google/gemini-2.5-flash',
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                  ],
+                  max_tokens: 100,
+                }),
+              })
 
-The user has active habits but hasn't completed any today (it's evening now). Generate a brief nudge (1 sentence max) to encourage them before the day ends. Stay true to your personality.`
+              if (response.ok) {
+                const aiData = await response.json()
+                const message = aiData.choices?.[0]?.message?.content?.trim()
 
-                const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${lovableApiKey}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    model: 'google/gemini-2.5-flash',
-                    messages: [{ role: 'user', content: prompt }],
-                    max_tokens: 100,
-                  }),
-                })
+                // Validate output
+                const validator = new OutputValidator(validationRules, outputConstraints);
+                const validationResult = validator.validate(message);
 
-                if (response.ok) {
-                  const aiData = await response.json()
-                  const message = aiData.choices?.[0]?.message?.content?.trim()
+                // Log validation
+                const responseTime = Date.now() - startTime;
+                await supabase.from('ai_output_validation_log').insert({
+                  user_id: profile.id,
+                  template_key: 'nudge_habit_reminder',
+                  input_data: { timeContext: 'evening' },
+                  output_data: { message },
+                  validation_passed: validationResult.isValid,
+                  validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+                  model_used: 'google/gemini-2.5-flash',
+                  response_time_ms: responseTime
+                });
 
-                  if (message) {
-                    await supabase.from('mentor_nudges').insert({
-                      user_id: profile.id,
-                      nudge_type: 'habit_reminder',
-                      message: message,
-                    })
-                    nudgesGenerated++
-                  }
+                if (message && validationResult.isValid) {
+                  await supabase.from('mentor_nudges').insert({
+                    user_id: profile.id,
+                    nudge_type: 'habit_reminder',
+                    message: message,
+                  })
+                  nudgesGenerated++
                 }
               }
             }
@@ -170,42 +226,64 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
           const lastActivity = recentActivity ? new Date(recentActivity.created_at) : null
           
           if (!lastActivity || lastActivity < sixHoursAgo) {
-            const { data: mentor } = await supabase
-              .from('mentors')
-              .select('name, tone_description')
-              .eq('id', profile.selected_mentor_id)
-              .single()
+            // Use PromptBuilder for encouragement nudge
+            const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+              templateKey: 'nudge_encouragement',
+              userId: profile.id,
+              variables: {
+                mentorName: mentor.name,
+                mentorTone: mentor.tone_description,
+                activityContext: 'quiet today',
+                maxSentences: 1,
+                personalityModifiers: '',
+                responseLength: 'brief'
+              }
+            });
 
-            if (mentor) {
-              const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
+            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${lovableApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 100,
+              }),
+            })
 
-The user has been quiet today. Generate a brief, unexpected check-in message (1 sentence max) to let them know you're thinking of them. Make it feel like a genuine surprise, not a scheduled reminder. Stay true to your personality.`
+            if (response.ok) {
+              const aiData = await response.json()
+              const message = aiData.choices?.[0]?.message?.content?.trim()
 
-              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${lovableApiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: 'google/gemini-2.5-flash',
-                  messages: [{ role: 'user', content: prompt }],
-                  max_tokens: 100,
-                }),
-              })
+              // Validate output
+              const validator = new OutputValidator(validationRules, outputConstraints);
+              const validationResult = validator.validate(message);
 
-              if (response.ok) {
-                const aiData = await response.json()
-                const message = aiData.choices?.[0]?.message?.content?.trim()
+              // Log validation
+              const responseTime = Date.now() - startTime;
+              await supabase.from('ai_output_validation_log').insert({
+                user_id: profile.id,
+                template_key: 'nudge_encouragement',
+                input_data: { activityContext: 'quiet today' },
+                output_data: { message },
+                validation_passed: validationResult.isValid,
+                validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+                model_used: 'google/gemini-2.5-flash',
+                response_time_ms: responseTime
+              });
 
-                if (message) {
-                  await supabase.from('mentor_nudges').insert({
-                    user_id: profile.id,
-                    nudge_type: 'encouragement',
-                    message: message,
-                  })
-                  nudgesGenerated++
-                }
+              if (message && validationResult.isValid) {
+                await supabase.from('mentor_nudges').insert({
+                  user_id: profile.id,
+                  nudge_type: 'encouragement',
+                  message: message,
+                })
+                nudgesGenerated++
               }
             }
           }

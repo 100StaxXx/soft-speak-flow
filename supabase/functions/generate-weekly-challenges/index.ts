@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
@@ -26,24 +27,25 @@ serve(async (req) => {
     const challengesToGenerate = 4;
     const generated = [];
 
+    // Build PromptBuilder once for reuse
+    const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
+
     for (let i = 0; i < challengesToGenerate; i++) {
       const category = categories[Math.floor(Math.random() * categories.length)];
       const totalDays = Math.floor(Math.random() * 10) + 5; // 5-14 days
 
-      const systemPrompt = `You are a challenge designer for A Lil Push app. Create actionable, motivational challenges.
-      
-Tone: Direct, supportive, empowering. Not overly soft. Think practical self-improvement.`;
-
-      const userPrompt = `Create a ${totalDays}-day challenge in the "${category}" category.
-      
-Requirements:
-- Title should be compelling and clear (e.g., "7-Day Discipline Reset", "5-Day Confidence Spark")
-- Description should be 2-3 sentences explaining what the challenge achieves
-- Create ${totalDays} daily tasks, each with a title and description
-- Tasks should be simple, achievable, and build progressively
-- Each task should take 5-30 minutes max
-
-Return the challenge structure.`;
+      // Use PromptBuilder template system
+      const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+        templateKey: 'weekly_challenges',
+        variables: {
+          totalDays,
+          category,
+          taskCount: totalDays,
+          durationRange: '5-14',
+          personalityModifiers: '',
+          responseLength: 'detailed'
+        }
+      });
 
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -98,20 +100,26 @@ Return the challenge structure.`;
       const toolCall = aiData.choices[0].message.tool_calls?.[0];
       const challengeData = JSON.parse(toolCall.function.arguments);
 
-      // Validate output structure
-      const validationRules = {
-        required_fields: ['title', 'description', 'tasks'],
-        max_length: { title: 100, description: 500 }
-      };
-      const outputConstraints = {
-        min_tasks: totalDays,
-        max_tasks: totalDays
-      };
+      // Validate output using PromptBuilder rules
       const validator = new OutputValidator(validationRules, outputConstraints);
       const validationResult = validator.validate(challengeData);
 
+      // Log validation results
+      const responseTime = Date.now() - startTime;
+      await supabase
+        .from('ai_output_validation_log')
+        .insert({
+          template_key: 'weekly_challenges',
+          input_data: { category, totalDays, iteration: i + 1 },
+          output_data: { challenge: challengeData },
+          validation_passed: validationResult.isValid,
+          validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+          model_used: 'google/gemini-2.5-flash',
+          response_time_ms: responseTime
+        });
+
       if (!validationResult.isValid) {
-        console.error(`Challenge ${i + 1} validation failed:`, validationResult.errors);
+        console.error(`Challenge ${i + 1} validation failed:`, validator.getValidationSummary(validationResult));
         continue;
       }
 
@@ -152,19 +160,6 @@ Return the challenge structure.`;
       }
 
       generated.push(challenge);
-
-      // Log generation metrics
-      const responseTime = Date.now() - startTime;
-      await supabase
-        .from('ai_output_validation_log')
-        .insert({
-          template_key: 'weekly_challenges',
-          input_data: { category, totalDays },
-          output_data: { challenge: challengeData },
-          validation_passed: true,
-          model_used: 'google/gemini-2.5-flash',
-          response_time_ms: responseTime
-        });
     }
 
     return new Response(
