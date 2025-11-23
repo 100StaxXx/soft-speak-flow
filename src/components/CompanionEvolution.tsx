@@ -199,9 +199,6 @@ export const CompanionEvolution = ({
     console.log('[CompanionEvolution] Dispatching evolution events');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
-    
-    // Show continue button instead of auto-dispatching evolution-modal-closed
-    setShowContinueButton(true);
   };
 
   const handleContinue = () => {
@@ -212,8 +209,9 @@ export const CompanionEvolution = ({
   };
 
   const handleExitComplete = () => {
-    // Don't auto-dispatch evolution-modal-closed - let user control when walkthrough continues
-    console.log('[CompanionEvolution] Exit animation complete');
+    // Show continue button after exit animation completes
+    console.log('[CompanionEvolution] Exit animation complete, showing continue button');
+    setShowContinueButton(true);
   };
 
   if (!isEvolving) return null;
