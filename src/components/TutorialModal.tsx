@@ -179,7 +179,12 @@ export const TutorialModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+    <div 
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300"
+      style={{ touchAction: 'none', overflow: 'hidden' }}
+      onTouchMove={(e) => e.preventDefault()}
+      onWheel={(e) => e.preventDefault()}
+    >
       <Card className="max-w-2xl w-full mx-4 p-0 overflow-hidden border-4 border-primary shadow-2xl">
         {/* Progress Bar */}
         <div className="h-2 bg-muted">

@@ -232,13 +232,44 @@ export const AppWalkthrough = () => {
   // Lock scrolling during entire walkthrough
   useEffect(() => {
     if (run) {
+      // Prevent scrolling on body and html
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Prevent touch scrolling on mobile
+      document.body.style.touchAction = 'none';
+      
+      // Lock body position to prevent any scroll behavior
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
     } else {
+      // Restore scrolling
       document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.body.style.touchAction = 'auto';
+      
+      // Restore body position and scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      
+      // Restore the scroll position
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
 
     return () => {
+      // Cleanup: restore all styles
       document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.body.style.touchAction = 'auto';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
     };
   }, [run]);
 
@@ -482,7 +513,12 @@ export const AppWalkthrough = () => {
       )}
       {/* Completion Modal */}
       {showCompletionButton && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+        <div 
+          className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500"
+          style={{ touchAction: 'none', overflow: 'hidden' }}
+          onTouchMove={(e) => e.preventDefault()}
+          onWheel={(e) => e.preventDefault()}
+        >
           <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">
             <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-4 border-primary/50 rounded-3xl p-12 shadow-2xl">
               <div className="text-center space-y-4">
