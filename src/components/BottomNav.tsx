@@ -108,7 +108,7 @@ export const BottomNav = () => {
           className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${
             shouldHighlightCompanion ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
           } ${
-            isTutorialActive && !canClickCompanion ? 'opacity-50' : ''
+            isTutorialActive && !canClickCompanion ? 'pointer-events-none opacity-50' : ''
           }`}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="companion-tab"
@@ -136,7 +136,7 @@ export const BottomNav = () => {
           className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
             shouldHighlightQuests ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
           } ${
-            isTutorialActive && !canClickQuests ? 'opacity-50' : ''
+            isTutorialActive && !canClickQuests ? 'pointer-events-none opacity-50' : ''
           }`}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
