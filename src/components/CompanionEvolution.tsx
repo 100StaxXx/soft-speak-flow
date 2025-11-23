@@ -28,6 +28,7 @@ export const CompanionEvolution = ({
   const [voiceLine, setVoiceLine] = useState<string>("");
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
   const [canDismiss, setCanDismiss] = useState(false);
+  const [showContinueButton, setShowContinueButton] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -199,12 +200,14 @@ export const CompanionEvolution = ({
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
     
-    // Dispatch modal closed immediately on dismiss - user has full control over timing
-    setTimeout(() => {
-      console.log('[CompanionEvolution] Dispatching evolution-modal-closed');
-      window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
-    }, 800); // Small delay to ensure modal visually closes first
-    
+    // Show continue button instead of auto-dispatching evolution-modal-closed
+    setShowContinueButton(true);
+  };
+
+  const handleContinue = () => {
+    console.log('[CompanionEvolution] Continue button clicked, dispatching evolution-modal-closed');
+    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
+    setShowContinueButton(false);
     onComplete();
   };
 
@@ -498,7 +501,7 @@ export const CompanionEvolution = ({
           )}
 
           {/* Tap to continue indicator */}
-          {canDismiss && (
+          {canDismiss && !showContinueButton && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -508,6 +511,28 @@ export const CompanionEvolution = ({
               <p className="text-white/80 text-lg font-medium animate-pulse">
                 Tap anywhere to continue ✨
               </p>
+            </motion.div>
+          )}
+
+          {/* Continue button - shown after user dismisses */}
+          {showContinueButton && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleContinue();
+                }}
+                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-bold text-xl px-12 py-4 rounded-full shadow-2xl hover:shadow-primary/50 transition-all duration-300 animate-pulse border-2 border-white/20"
+              >
+                <span className="mr-2">✨</span>
+                Continue Your Journey
+                <span className="ml-2">🚀</span>
+              </button>
             </motion.div>
           )}
         </div>
