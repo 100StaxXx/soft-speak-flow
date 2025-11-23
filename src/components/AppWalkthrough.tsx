@@ -229,18 +229,44 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Lock scrolling during entire walkthrough
+  // Lock scrolling during entire walkthrough (including all modals)
   useEffect(() => {
-    if (run) {
+    // Prevent scrolling when any walkthrough element is active
+    const shouldLockScroll = run || showModal || showCompletionButton;
+    
+    if (shouldLockScroll) {
+      // Store current scroll position
+      const scrollY = window.scrollY;
+      
+      // Prevent scrolling on body
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
     } else {
-      document.body.style.overflow = 'auto';
+      // Get the scroll position before we locked it
+      const scrollY = document.body.style.top;
+      
+      // Reset styles
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      
+      // Restore scroll position if we had one
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
+      // Cleanup on unmount
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
     };
-  }, [run]);
+  }, [run, showModal, showCompletionButton]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
