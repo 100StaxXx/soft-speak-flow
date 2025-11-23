@@ -88,6 +88,19 @@ serve(async (req) => {
                  stage >= 5 ? 'fierce, loyal, determined' :
                  'curious, cute, eager';
 
+    // Stage 20 Special: Generate personalized ultimate title
+    let finalCreatureName = existingName;
+    let skipAI = false;
+    
+    if (stage === 20 && !existingName) {
+      // Generate ultimate personalized title for Stage 20 first evolution
+      const powerTitles = ['Sovereign', 'Apex', 'Colossus', 'Warlord', 'Primeborn', 'Overlord', 'Sentinel', 'Emperor', 'Archon', 'Omega'];
+      const randomTitle = powerTitles[Math.floor(Math.random() * powerTitles.length)];
+      finalCreatureName = `${element} ${randomTitle} ${species}`;
+      skipAI = true; // Use the generated title, no AI needed
+      console.log('Generated Stage 20 ultimate title:', finalCreatureName);
+    }
+
     let aiPrompt;
     
     if (existingName) {
@@ -148,7 +161,19 @@ Generate a card with these exact fields in JSON:
 Make it LEGENDARY. This is the birth of a companion.`;
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    let cardData;
+    
+    if (skipAI) {
+      // For Stage 20 ultimate form, use pre-generated title
+      cardData = {
+        creature_name: finalCreatureName,
+        traits: ['Ultimate Power', 'Legendary Presence', 'Peak Evolution', 'Unstoppable Force', 'Eternal Bond'],
+        story_text: `At the pinnacle of evolution, ${finalCreatureName} stands as the ultimate manifestation of power and bond. This legendary ${species} has transcended all limits, becoming a force of nature itself. The ${element.toLowerCase()} energy that flows through them is unmatched, a testament to the countless battles fought and lessons learned throughout their journey.\n\nTheir bond with their companion has reached its absolute peak, creating a connection that goes beyond the physical realm. Every action, every thought, perfectly synchronized. They are no longer just partners—they are one.\n\nThe world trembles at the mere presence of ${finalCreatureName}, not out of fear, but in awe of what dedication and perseverance can achieve. This is the ultimate form—the peak of all possibilities.`,
+        lore_seed: `Legends speak of ${finalCreatureName} as the harbinger of a new era, where the boundaries between companion and master dissolve into pure unity.`
+      };
+      console.log('Using pre-generated Stage 20 card data');
+    } else {
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -167,19 +192,19 @@ Make it LEGENDARY. This is the birth of a companion.`;
       throw new Error(`AI generation failed: ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData.choices[0].message.content;
-    
-    // Parse JSON from AI response
-    let cardData;
-    try {
-      // Extract JSON if wrapped in markdown code blocks
-      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || content.match(/(\{[\s\S]*\})/);
-      const jsonString = jsonMatch ? jsonMatch[1] : content;
-      cardData = JSON.parse(jsonString);
-    } catch (e) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('AI response was not valid JSON');
+      const aiData = await aiResponse.json();
+      const content = aiData.choices[0].message.content;
+      
+      // Parse JSON from AI response
+      try {
+        // Extract JSON if wrapped in markdown code blocks
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || content.match(/(\{[\s\S]*\})/);
+        const jsonString = jsonMatch ? jsonMatch[1] : content;
+        cardData = JSON.parse(jsonString);
+      } catch (e) {
+        console.error('Failed to parse AI response:', content);
+        throw new Error('AI response was not valid JSON');
+      }
     }
 
     // Calculate bond level based on user attributes
