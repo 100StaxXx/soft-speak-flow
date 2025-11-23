@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -63,91 +63,135 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   const [selectedAnimal, setSelectedAnimal] = useState<string>("");
   const [selectedElement, setSelectedElement] = useState<string>("");
   const [selectedTone, setSelectedTone] = useState<string>("epic_adventure");
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const coarseQuery = window.matchMedia("(pointer: coarse)");
+    const hoverNoneQuery = window.matchMedia("(hover: none)");
+    const updateIsTouch = () => {
+      setIsTouchDevice(coarseQuery.matches || hoverNoneQuery.matches);
+    };
+
+    updateIsTouch();
+    coarseQuery.addEventListener("change", updateIsTouch);
+    hoverNoneQuery.addEventListener("change", updateIsTouch);
+
+    return () => {
+      coarseQuery.removeEventListener("change", updateIsTouch);
+      hoverNoneQuery.removeEventListener("change", updateIsTouch);
+    };
+  }, []);
 
   const isComplete = selectedColor && selectedAnimal && selectedElement && selectedTone;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center">
-      <Card className="max-w-2xl w-full p-8 space-y-8 shadow-glow animate-scale-in">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-            Let's create your companion.
-          </h1>
-          <div className="space-y-2 max-w-md mx-auto">
-            <p className="text-lg font-medium text-foreground">
-              This companion grows as you do.
-            </p>
-            <p className="text-muted-foreground">
-              Your habits, your challenges, your consistency — they all evolve it.
-            </p>
-          </div>
-        </div>
-
-        {/* Color Selection with Color Wheel */}
-        <div className="space-y-4">
-          <Label className="text-lg font-semibold">Favorite color</Label>
-          <div className="flex justify-center">
-            <label className="cursor-pointer group">
-              <div className="relative w-32 h-32 rounded-full border-4 border-primary/20 shadow-glow transition-all hover:scale-105 overflow-hidden"
-                style={{ backgroundColor: selectedColor }}>
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
-                <input
-                  type="color"
-                  value={selectedColor}
-                  onChange={(e) => setSelectedColor(e.target.value)}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-              </div>
-              <p className="text-center mt-2 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                Click to change
+        <Card className="max-w-2xl w-full p-8 space-y-8 shadow-glow animate-scale-in">
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+              Let's create your companion.
+            </h1>
+            <div className="space-y-2 max-w-md mx-auto">
+              <p className="text-lg font-medium text-foreground">
+                This companion grows as you do.
               </p>
-            </label>
+              <p className="text-muted-foreground">
+                Your habits, your challenges, your consistency — they all evolve it.
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Animal Selection with Dropdown */}
-        <div className="space-y-4">
-          <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
-          <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
-            <SelectTrigger className="w-full h-14 text-base">
-              <SelectValue placeholder="Choose your spirit creature..." />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {ANIMALS.map((animal) => (
-                <SelectItem 
-                  key={animal} 
-                  value={animal}
-                  className="cursor-pointer"
+          {/* Color Selection with Color Wheel */}
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold">Favorite color</Label>
+            <div className="flex justify-center">
+              <label className="cursor-pointer group">
+                <div
+                  className="relative w-32 h-32 rounded-full border-4 border-primary/20 shadow-glow transition-all hover:scale-105 overflow-hidden"
+                  style={{ backgroundColor: selectedColor }}
                 >
-                  {animal}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Element Selection */}
-        <div className="space-y-4">
-          <Label className="text-lg font-semibold">Element</Label>
-          <div className="grid grid-cols-4 gap-3">
-            {ELEMENTS.map((element) => (
-              <button
-                key={element.name}
-                onClick={() => setSelectedElement(element.name)}
-                className={`
-                  p-3 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center min-h-[100px]
-                  ${selectedElement === element.name
-                    ? "border-primary bg-primary/10 scale-105 shadow-lg"
-                    : "border-border hover:border-primary/50 hover:scale-105"
-                  }
-                `}
-              >
-                <div className={`text-3xl mb-1 ${element.color}`}>{element.emoji}</div>
-                <div className="text-xs font-medium text-center leading-tight">{element.name}</div>
-              </button>
-            ))}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+                  <input
+                    type="color"
+                    value={selectedColor}
+                    onChange={(e) => setSelectedColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
+                <p className="text-center mt-2 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  Click to change
+                </p>
+              </label>
+            </div>
           </div>
-        </div>
+
+          {/* Animal Selection with Dropdown */}
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
+            {isTouchDevice ? (
+              <div className="relative">
+                <select
+                  value={selectedAnimal}
+                  onChange={(event) => setSelectedAnimal(event.target.value)}
+                  className="h-14 w-full appearance-none rounded-lg border border-input bg-secondary/50 px-4 text-base font-medium text-foreground shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="" disabled>
+                    Choose your spirit creature...
+                  </option>
+                  {ANIMALS.map((animal) => (
+                    <option key={animal} value={animal}>
+                      {animal}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              </div>
+            ) : (
+              <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
+                <SelectTrigger className="w-full h-14 text-base">
+                  <SelectValue placeholder="Choose your spirit creature..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {ANIMALS.map((animal) => (
+                    <SelectItem
+                      key={animal}
+                      value={animal}
+                      className="cursor-pointer"
+                    >
+                      {animal}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Element Selection */}
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold">Element</Label>
+            <div className="grid grid-cols-4 gap-3">
+              {ELEMENTS.map((element) => (
+                <button
+                  key={element.name}
+                  onClick={() => setSelectedElement(element.name)}
+                  className={`
+                    p-3 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center min-h-[100px]
+                    ${selectedElement === element.name
+                      ? "border-primary bg-primary/10 scale-105 shadow-lg"
+                      : "border-border hover:border-primary/50 hover:scale-105"
+                    }
+                  `}
+                >
+                  <div className={`text-3xl mb-1 ${element.color}`}>{element.emoji}</div>
+                  <div className="text-xs font-medium text-center leading-tight">{element.name}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
         {/* Story Tone Selection */}
         <div className="space-y-4">
