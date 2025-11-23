@@ -158,13 +158,12 @@ export const AppWalkthrough = () => {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('onboarding_data')
+          .select('onboarding_data, onboarding_completed')
           .eq('id', user.id)
           .maybeSingle();
 
         if (error) {
           console.error('[AppWalkthrough] Error fetching walkthrough status:', error);
-          // Default to not completed on error
           if (isMounted) {
             setIsWalkthroughCompleted(false);
           }
@@ -173,15 +172,24 @@ export const AppWalkthrough = () => {
 
         const walkthroughData = profile?.onboarding_data as OnboardingData | null;
         const completed = walkthroughData?.walkthrough_completed === true;
+        const onboardingCompleted = profile?.onboarding_completed === true;
         
-        // Only update state if component is still mounted
         if (isMounted) {
           setIsWalkthroughCompleted(completed);
           
-          // Dispatch ready event for other components
           window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
             detail: { shouldRun: !completed } 
           }));
+
+          // If onboarding is done but walkthrough isn't, and we haven't started yet
+          if (onboardingCompleted && !completed && !run) {
+             // We need to trigger the start. 
+             // However, we want to respect the event listener if it's about to fire.
+             // But if we are mounting fresh, the event won't fire.
+             // Let's rely on the fact that if this check runs, we are likely reloading or visiting later.
+             console.log('[AppWalkthrough] Onboarding complete but walkthrough pending, starting...');
+             startWalkthrough();
+          }
         }
       } catch (error) {
         console.error('[AppWalkthrough] Unexpected error checking walkthrough status:', error);
@@ -198,6 +206,17 @@ export const AppWalkthrough = () => {
     };
   }, [user, session]);
 
+  const startWalkthrough = useCallback(() => {
+    console.log('[AppWalkthrough] Starting walkthrough');
+    localStorage.setItem('appWalkthroughActive', 'true');
+    setStepIndex(0);
+    setShowModal(true);
+    setRun(true);
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+      detail: { step: 0 } 
+    }));
+  }, []);
+
   // Listen for onboarding completion event to start walkthrough
   useEffect(() => {
     if (!user || !session || isWalkthroughCompleted === null) return;
@@ -206,28 +225,24 @@ export const AppWalkthrough = () => {
     let hasStarted = false;
     
     const handleOnboardingComplete = () => {
-      if (hasStarted) return;
+      if (hasStarted || run) return;
       hasStarted = true;
-      console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
-      
-      // Set localStorage flag to indicate walkthrough is active
-      localStorage.setItem('appWalkthroughActive', 'true');
-      
-      setStepIndex(0);
-      setShowModal(true);
-      setRun(true);
-      
-      // Dispatch initial step event
-      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
-        detail: { step: 0 } 
-      }));
+      console.log('[AppWalkthrough] Onboarding complete event received');
+      startWalkthrough();
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
     return () => {
       // Listener is automatically removed by { once: true }
     };
-  }, [user, session, isWalkthroughCompleted]);
+  }, [user, session, isWalkthroughCompleted, run, startWalkthrough]);
+
+  // Dispatch modal state changes
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('tutorial-modal-change', { 
+      detail: { isOpen: showModal } 
+    }));
+  }, [showModal]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
@@ -266,7 +281,7 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navCompanion = document.querySelector('a[href="/companion"]');
+      const navCompanion = document.getElementById('nav-companion');
       
       if (!navCompanion) {
         console.warn('[Tutorial] Companion navigation link not found');
@@ -298,7 +313,7 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navTasks = document.querySelector('a[href="/tasks"]');
+      const navTasks = document.getElementById('nav-tasks');
       
       if (!navTasks) {
         console.warn('[Tutorial] Tasks navigation link not found');
