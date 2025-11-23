@@ -50,12 +50,12 @@ export const BottomNav = () => {
   const handleNavClick = (e: React.MouseEvent, route: string) => {
     if (!isTutorialActive) return;
     
-    // Allow Companion click on step 2
+    // Allow Companion click on step 1 (XP Celebration)
     if (route === '/companion' && canClickCompanion) {
       return;
     }
     
-    // Allow Quests click on steps 3-4
+    // Allow Quests click on steps 2-3 (Companion intro, Quest creation)
     if (route === '/tasks' && canClickQuests) {
       return;
     }
