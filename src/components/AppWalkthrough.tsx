@@ -263,18 +263,9 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.QUEST_CREATION || !run) return;
 
-    // Declare timeout ref outside handlers so cleanup can access it
-    const timeoutRef = { current: null as number | null };
-
     const handleEvolutionLoadingStart = () => {
       console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
       setRun(false);
-      
-      // Set a fallback timeout in case evolution-modal-closed never fires
-      timeoutRef.current = createTrackedTimeout(() => {
-        console.warn('[Tutorial] Evolution timeout reached, showing completion button');
-        setShowCompletionButton(true);
-      }, TIMEOUTS.EVOLUTION_COMPLETE);
     };
 
     const handleEvolutionModalClosed = () => {
@@ -283,12 +274,6 @@ export const AppWalkthrough = () => {
         run,
         showCompletionButton 
       });
-      
-      // Clear the fallback timeout
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       
       // Show the manual completion button instead of auto-advancing
       // Make absolutely sure run stays false
@@ -301,16 +286,10 @@ export const AppWalkthrough = () => {
     window.addEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     
     return () => {
-      // Clean up timeout if component unmounts or step changes
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       window.removeEventListener('evolution-modal-closed', handleEvolutionModalClosed);
     };
-  }, [stepIndex, run, createTrackedTimeout]);
+  }, [stepIndex, run]);
 
   const handleWalkthroughComplete = useCallback(async () => {
     console.log('[Tutorial] Tutorial completed');
