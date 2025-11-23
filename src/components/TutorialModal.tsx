@@ -35,6 +35,8 @@ export const TutorialModal = ({
 
   // Generate and play TTS when step changes
   useEffect(() => {
+    let isMounted = true;
+
     const generateTTS = async () => {
       try {
         console.log(`[TutorialModal] Generating TTS for step: ${step.id}, mentor: ${mentorSlug}`);
@@ -45,7 +47,9 @@ export const TutorialModal = ({
 
         if (cachedAudio) {
           console.log(`[TutorialModal] Using cached audio for step: ${step.id}`);
-          setAudioUrl(cachedAudio);
+          if (isMounted) {
+            setAudioUrl(cachedAudio);
+          }
           return;
         }
 
@@ -68,7 +72,11 @@ export const TutorialModal = ({
         if (data?.audioContent) {
           console.log(`[TutorialModal] Successfully generated TTS for step: ${step.id}`);
           const audioDataUrl = `data:audio/mp3;base64,${data.audioContent}`;
-          setAudioUrl(audioDataUrl);
+          
+          // Only update state if component is still mounted
+          if (isMounted) {
+            setAudioUrl(audioDataUrl);
+          }
           
           // Cache the audio with error handling
           try {
@@ -102,6 +110,7 @@ export const TutorialModal = ({
     
     // Cleanup: pause and reset audio when component unmounts or step changes
     return () => {
+      isMounted = false;
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;

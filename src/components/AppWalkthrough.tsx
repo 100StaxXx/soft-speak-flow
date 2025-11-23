@@ -160,25 +160,50 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (!user || !session) return;
 
-    const checkStatus = async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_data')
-        .eq('id', user.id)
-        .maybeSingle();
+    let isMounted = true;
 
-      const walkthroughData = profile?.onboarding_data as OnboardingData | null;
-      const completed = walkthroughData?.walkthrough_completed === true;
-      
-      setIsWalkthroughCompleted(completed);
-      
-      // Dispatch ready event for other components
-      window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
-        detail: { shouldRun: !completed } 
-      }));
+    const checkStatus = async () => {
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('onboarding_data')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('[AppWalkthrough] Error fetching walkthrough status:', error);
+          // Default to not completed on error
+          if (isMounted) {
+            setIsWalkthroughCompleted(false);
+          }
+          return;
+        }
+
+        const walkthroughData = profile?.onboarding_data as OnboardingData | null;
+        const completed = walkthroughData?.walkthrough_completed === true;
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setIsWalkthroughCompleted(completed);
+          
+          // Dispatch ready event for other components
+          window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
+            detail: { shouldRun: !completed } 
+          }));
+        }
+      } catch (error) {
+        console.error('[AppWalkthrough] Unexpected error checking walkthrough status:', error);
+        if (isMounted) {
+          setIsWalkthroughCompleted(false);
+        }
+      }
     };
 
     checkStatus();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user, session]);
 
   // Listen for onboarding completion event to start walkthrough
