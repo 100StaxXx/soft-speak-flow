@@ -126,7 +126,7 @@ export const DailyContentWidget = () => {
             <Button 
               onClick={() => navigate("/library")}
               size="sm"
-              disabled={Boolean(localStorage.getItem('appWalkthroughActive'))}
+              disabled={Boolean(localStorage.getItem('appWalkthroughActive'))} // Standardized walkthrough check
               className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="h-3 w-3 mr-2" />

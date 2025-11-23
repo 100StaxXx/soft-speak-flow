@@ -108,6 +108,9 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     }
     onComplete();
     
+    // Set flag for immediate detection by AppWalkthrough
+    localStorage.setItem('onboardingJustCompleted', Date.now().toString());
+    
     // Wait for dialog to close and page to settle before dispatching event
     setTimeout(() => {
       console.log('[OnboardingFlow] Dispatching onboarding-complete event');

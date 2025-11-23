@@ -103,7 +103,7 @@ export const AppWalkthrough = () => {
       
       // If walkthrough is still active on unmount, clean up localStorage
       // This handles cases where user navigates away during tutorial
-      if (run && localStorage.getItem('appWalkthroughActive')) {
+      if (run && Boolean(localStorage.getItem('appWalkthroughActive'))) {
         console.log('[Tutorial] Cleaning up walkthrough state on unmount');
         localStorage.removeItem('appWalkthroughActive');
         window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
@@ -213,6 +213,9 @@ export const AppWalkthrough = () => {
       // Set localStorage flag to indicate walkthrough is active
       localStorage.setItem('appWalkthroughActive', 'true');
       
+      // Clear the "just completed" flag
+      localStorage.removeItem('onboardingJustCompleted');
+      
       setStepIndex(0);
       setShowModal(true);
       setRun(true);
@@ -222,6 +225,17 @@ export const AppWalkthrough = () => {
         detail: { step: 0 } 
       }));
     };
+
+    // Check if onboarding just completed (within last 3 seconds) - handles race condition
+    const onboardingCompletedFlag = localStorage.getItem('onboardingJustCompleted');
+    if (onboardingCompletedFlag) {
+      const timestamp = parseInt(onboardingCompletedFlag, 10);
+      if (!isNaN(timestamp) && Date.now() - timestamp < 3000) {
+        console.log('[AppWalkthrough] Detected recent onboarding completion, starting walkthrough immediately');
+        handleOnboardingComplete();
+        return;
+      }
+    }
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
     return () => {

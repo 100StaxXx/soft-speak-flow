@@ -51,10 +51,11 @@ export const TodaysPepTalk = () => {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
 
-  // Track walkthrough state
+  // Track walkthrough state - standardized check
   useEffect(() => {
     const checkWalkthrough = () => {
-      setIsWalkthroughActive(Boolean(localStorage.getItem('appWalkthroughActive')));
+      const isActive = Boolean(localStorage.getItem('appWalkthroughActive'));
+      setIsWalkthroughActive(isActive);
     };
 
     checkWalkthrough();
