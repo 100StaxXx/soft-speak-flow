@@ -335,7 +335,7 @@ export const AppWalkthrough = () => {
   const CustomTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
     // Default tooltip for all steps (no special final step since we use manual button)
     return (
-      <Card {...tooltipProps} className="max-w-md p-6">
+      <Card {...tooltipProps} className="max-w-md p-6 border-4 border-purple-500 animate-pulse opacity-100 bg-background">
         <p className="text-base">{step.content as string}</p>
       </Card>
     );
@@ -378,6 +378,7 @@ export const AppWalkthrough = () => {
           tooltip: {
             borderRadius: '1rem',
             padding: '1.5rem',
+            opacity: 1,
           },
           buttonNext: {
             backgroundColor: 'hsl(var(--primary))',
