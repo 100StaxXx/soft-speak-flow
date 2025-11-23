@@ -78,6 +78,8 @@ export const AppWalkthrough = () => {
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
   const activeIntervals = useRef<Set<number>>(new Set());
+  const scrollPositionRef = useRef(0);
+  const isScrollLockedRef = useRef(false);
 
   const createTrackedTimeout = useCallback((cb: () => void, delay: number) => {
     if (typeof window === 'undefined') return -1;
@@ -94,6 +96,10 @@ export const AppWalkthrough = () => {
     activeTimeouts.current.clear();
     activeIntervals.current.forEach((id) => clearInterval(id));
     activeIntervals.current.clear();
+  }, []);
+  
+  const preventScroll = useCallback((event: Event) => {
+    event.preventDefault();
   }, []);
 
   // Cleanup on unmount - clear timers and localStorage if walkthrough is still active
@@ -231,16 +237,45 @@ export const AppWalkthrough = () => {
 
   // Lock scrolling during entire walkthrough
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const html = document.documentElement;
+    const body = document.body;
+    if (!html || !body) return;
+
+    const unlockScroll = () => {
+      if (!isScrollLockedRef.current) return;
+      html.style.overflow = '';
+      body.style.overflow = '';
+      body.style.position = '';
+      body.style.top = '';
+      body.style.width = '';
+      window.removeEventListener('wheel', preventScroll);
+      window.removeEventListener('touchmove', preventScroll);
+      window.scrollTo({ top: scrollPositionRef.current, left: 0 });
+      isScrollLockedRef.current = false;
+    };
+
     if (run) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
+      scrollPositionRef.current = window.scrollY || window.pageYOffset;
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollPositionRef.current}px`;
+      body.style.width = '100%';
+      window.addEventListener('wheel', preventScroll, { passive: false });
+      window.addEventListener('touchmove', preventScroll, { passive: false });
+      isScrollLockedRef.current = true;
+
+      return () => {
+        unlockScroll();
+      };
     }
 
+    unlockScroll();
     return () => {
-      document.body.style.overflow = 'auto';
+      unlockScroll();
     };
-  }, [run]);
+  }, [run, preventScroll]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
