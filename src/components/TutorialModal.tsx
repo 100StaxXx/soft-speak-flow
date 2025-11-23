@@ -86,6 +86,15 @@ export const TutorialModal = ({
     };
 
     generateTTS();
+    
+    // Cleanup: pause and reset audio when component unmounts or step changes
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+    };
   }, [step.id, step.content, mentorSlug]);
 
   // Auto-play when audio is ready (unless muted)
@@ -105,7 +114,7 @@ export const TutorialModal = ({
       audioRef.current.play().catch(console.error);
       setIsPlaying(true);
     }
-  }, [isMuted]);
+  }, [isMuted, audioUrl, isPlaying]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
