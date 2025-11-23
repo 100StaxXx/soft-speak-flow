@@ -229,18 +229,53 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Lock scrolling during entire walkthrough
+  // Lock scrolling during entire walkthrough and completion screen
   useEffect(() => {
-    if (run) {
+    if (run || showCompletionButton) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+      
+      // Apply scroll lock with multiple techniques for better cross-browser support
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = `-${scrollX}px`;
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      
+      // Prevent touch scrolling on mobile
+      const preventScroll = (e: TouchEvent) => {
+        e.preventDefault();
+      };
+      
+      document.body.addEventListener('touchmove', preventScroll, { passive: false });
+      
+      return () => {
+        // Remove touch event listener
+        document.body.removeEventListener('touchmove', preventScroll);
+        
+        // Restore scroll and body styles
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        
+        // Restore scroll position
+        window.scrollTo(scrollX, scrollY);
+      };
     } else {
-      document.body.style.overflow = 'auto';
+      // Ensure styles are cleared when not running
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
     }
-
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, [run]);
+  }, [run, showCompletionButton]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
