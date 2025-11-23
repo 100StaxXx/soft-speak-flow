@@ -27,18 +27,26 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
 
 /**
  * Ensures a profile exists for a user, creating one if needed
+ * Also updates timezone to match user's current device
  */
 export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
   const { data: existing } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, timezone")
     .eq("id", userId)
     .maybeSingle();
+
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   if (!existing) {
     await supabase.from("profiles").insert({
       id: userId,
       email: email ?? null,
+      timezone: userTimezone,
     });
+  } else if (existing.timezone !== userTimezone) {
+    await supabase.from("profiles").update({
+      timezone: userTimezone
+    }).eq("id", userId);
   }
 };

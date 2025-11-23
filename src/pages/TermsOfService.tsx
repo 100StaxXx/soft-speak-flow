@@ -30,7 +30,7 @@ export default function TermsOfService() {
                 Last Updated: November 21, 2025
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                R-Evoltution LLC • alilrevolution@gmail.com
+                R-Evolution LLC • alilrevolution@gmail.com
               </p>
             </div>
           </CardHeader>
@@ -85,7 +85,7 @@ export default function TermsOfService() {
                 6. Intellectual Property
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                All content, features, and functionality of Soft Speak Flow, including but not limited to text, graphics, logos, and software, are owned by R-Evoltution LLC or our licensors and are protected by copyright, trademark, and other intellectual property laws.
+                All content, features, and functionality of Soft Speak Flow, including but not limited to text, graphics, logos, and software, are owned by R-Evolution LLC or our licensors and are protected by copyright, trademark, and other intellectual property laws.
               </p>
             </section>
 
@@ -127,7 +127,7 @@ export default function TermsOfService() {
                 9. Limitation of Liability
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                To the maximum extent permitted by law, R-Evoltution LLC and its creators shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use or inability to use the service.
+                To the maximum extent permitted by law, R-Evolution LLC and its creators shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use or inability to use the service.
               </p>
             </section>
 
@@ -167,13 +167,13 @@ export default function TermsOfService() {
                   If you have questions about these Terms of Service, please contact us:
                 </p>
                 <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-1">
-                  <p className="text-sm font-medium">R-Evoltution LLC</p>
+                  <p className="text-sm font-medium">R-Evolution LLC</p>
                   <p className="text-sm text-muted-foreground">
                     Email:{" "}
                     <a
                       href="mailto:alilrevolution@gmail.com"
                       className="text-primary hover:underline"
-                      aria-label="Email R-Evoltution LLC support"
+                      aria-label="Email R-Evolution LLC support"
                     >
                       alilrevolution@gmail.com
                     </a>
