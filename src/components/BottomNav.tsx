@@ -38,8 +38,10 @@ export const BottomNav = () => {
 
   // Determine if navigation should be blocked
   const isTutorialActive = tutorialStep !== null;
-  const canClickCompanion = tutorialStep === 2; // Step 2 only: XP Celebration - Click Companion tab
-  const canClickQuests = tutorialStep === 3 || tutorialStep === 4; // Steps 3-4: Companion intro + Quest creation
+  const canClickCompanion = tutorialStep === 1; // Step 1: XP Celebration - Click Companion tab
+  const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Companion intro + Quest creation
+  const shouldHighlightCompanion = canClickCompanion;
+  const shouldHighlightQuests = canClickQuests;
   
   // Remove console logs for production
   
@@ -101,7 +103,11 @@ export const BottomNav = () => {
         <NavLink
           to="/companion"
           onClick={(e) => handleNavClick(e, '/companion')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${isTutorialActive && !canClickCompanion ? 'pointer-events-none opacity-50' : ''}`}
+          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${
+            isTutorialActive && !canClickCompanion ? 'pointer-events-none opacity-50' : ''
+          } ${
+            shouldHighlightCompanion ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
+          }`}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="companion-tab"
         >
@@ -125,7 +131,11 @@ export const BottomNav = () => {
         <NavLink
           to="/tasks"
           onClick={(e) => handleNavClick(e, '/tasks')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${isTutorialActive && !canClickQuests ? 'pointer-events-none opacity-50' : ''}`}
+          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
+            isTutorialActive && !canClickQuests ? 'pointer-events-none opacity-50' : ''
+          } ${
+            shouldHighlightQuests ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
+          }`}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
         >
