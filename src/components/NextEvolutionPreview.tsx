@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { AttributeTooltip } from "./AttributeTooltip";
-import { STAGE_NAMES } from "@/config/companionStages";
+import { getStageName } from "@/config/companionStages";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -26,7 +26,7 @@ export const NextEvolutionPreview = ({
   progressPercent,
 }: NextEvolutionPreviewProps) => {
   const nextStage = Math.min(currentStage + 1, 20);
-  const nextStageName = STAGE_NAMES[nextStage as keyof typeof STAGE_NAMES];
+  const nextStageName = getStageName(nextStage);
   const xpNeeded = nextEvolutionXP - currentXP;
   const isMaxStage = currentStage >= 20;
 
