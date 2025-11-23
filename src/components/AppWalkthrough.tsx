@@ -292,6 +292,40 @@ export const AppWalkthrough = () => {
     }
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
+  // Auto-scroll target elements into view when modal is dismissed
+  useEffect(() => {
+    if (showModal || !run) return;
+
+    const scrollTargetIntoView = () => {
+      let targetSelector: string | null = null;
+
+      switch (stepIndex) {
+        case STEP_INDEX.XP_CELEBRATION:
+          targetSelector = 'a[href="/companion"]';
+          break;
+        case STEP_INDEX.COMPANION_VIEW:
+          targetSelector = 'a[href="/tasks"]';
+          break;
+        case STEP_INDEX.QUEST_CREATION:
+          // Scroll to the main content area of tasks page
+          targetSelector = 'main';
+          break;
+      }
+
+      if (targetSelector) {
+        const element = document.querySelector(targetSelector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          console.log('[Tutorial] Scrolled target element into view:', targetSelector);
+        }
+      }
+    };
+
+    // Small delay to ensure DOM is ready after modal dismissal
+    const timeoutId = setTimeout(scrollTargetIntoView, 300);
+    return () => clearTimeout(timeoutId);
+  }, [stepIndex, showModal, run]);
+
   // Step 1: Listen for companion tab click
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
