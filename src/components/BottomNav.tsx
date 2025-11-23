@@ -41,9 +41,46 @@ export const BottomNav = () => {
   const canClickCompanion = tutorialStep === 1; // Step 1: XP Celebration - Click Companion tab
   const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Companion intro + Quest creation
   
+  // Check if tutorial modal is visible (z-index 10000)
+  // Highlights should only show when modal is dismissed and user can interact
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  
+  useEffect(() => {
+    if (!isTutorialActive) {
+      setIsModalVisible(false);
+      return;
+    }
+    
+    // Check for modal visibility using a MutationObserver for reliability
+    const checkModal = () => {
+      // Check for TutorialModal (z-[10000]) or completion modal (z-[10001])
+      const modal = document.querySelector('[class*="z-[10000]"], [class*="z-[10001]"]') ||
+        Array.from(document.querySelectorAll('.fixed.inset-0')).find(el => {
+          const zIndex = window.getComputedStyle(el).zIndex;
+          return zIndex === '10000' || zIndex === '10001';
+        });
+      setIsModalVisible(modal !== null);
+    };
+    
+    // Check immediately
+    checkModal();
+    
+    // Set up observer to watch for modal changes
+    const observer = new MutationObserver(checkModal);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Also check periodically as fallback
+    const interval = setInterval(checkModal, 100);
+    
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, [isTutorialActive]);
+  
   // Highlights should only show when the user can interact (no modal blocking)
-  const shouldHighlightCompanion = canClickCompanion;
-  const shouldHighlightQuests = canClickQuests;
+  const shouldHighlightCompanion = canClickCompanion && !isModalVisible;
+  const shouldHighlightQuests = canClickQuests && !isModalVisible;
   
   // Remove console logs for production
   

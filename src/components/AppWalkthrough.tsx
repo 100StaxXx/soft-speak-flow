@@ -198,16 +198,39 @@ export const AppWalkthrough = () => {
     };
   }, [user, session]);
 
-  // Listen for onboarding completion event to start walkthrough
+  // Ref to track walkthrough completion status for event handler
+  const walkthroughCompletedRef = useRef<boolean | null>(null);
+  
+  // Keep ref in sync with state
   useEffect(() => {
-    if (!user || !session || isWalkthroughCompleted === null) return;
-    if (isWalkthroughCompleted) return;
+    walkthroughCompletedRef.current = isWalkthroughCompleted;
+  }, [isWalkthroughCompleted]);
+
+  // Listen for onboarding completion event to start walkthrough
+  // Set up listener early to avoid missing events due to timing
+  useEffect(() => {
+    if (!user || !session) return;
 
     let hasStarted = false;
+    let checkIntervalId: number | null = null;
+    let fallbackTimeoutId: number | null = null;
     
-    const handleOnboardingComplete = () => {
+    const startWalkthrough = () => {
       if (hasStarted) return;
       hasStarted = true;
+      
+      // Clear any pending timers
+      if (checkIntervalId !== null) {
+        clearInterval(checkIntervalId);
+        activeIntervals.current.delete(checkIntervalId);
+        checkIntervalId = null;
+      }
+      if (fallbackTimeoutId !== null) {
+        clearTimeout(fallbackTimeoutId);
+        activeTimeouts.current.delete(fallbackTimeoutId);
+        fallbackTimeoutId = null;
+      }
+      
       console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
       
       // Set localStorage flag to indicate walkthrough is active
@@ -222,12 +245,51 @@ export const AppWalkthrough = () => {
         detail: { step: 0 } 
       }));
     };
+    
+    const handleOnboardingComplete = () => {
+      // Only proceed if walkthrough hasn't been completed
+      if (walkthroughCompletedRef.current === true) return;
+      if (hasStarted) return;
+      
+      // Wait for walkthrough status check to complete before starting
+      if (walkthroughCompletedRef.current === null) {
+        // If status is still being checked, poll using ref to get latest value
+        checkIntervalId = window.setInterval(() => {
+          if (walkthroughCompletedRef.current !== null) {
+            if (walkthroughCompletedRef.current === false && !hasStarted) {
+              startWalkthrough();
+            }
+          }
+        }, 100);
+        activeIntervals.current.add(checkIntervalId);
+        
+        // Fallback timeout - if check takes too long, start anyway
+        fallbackTimeoutId = createTrackedTimeout(() => {
+          if (!hasStarted && walkthroughCompletedRef.current !== true) {
+            startWalkthrough();
+          }
+        }, 2000);
+        return;
+      }
+      
+      if (walkthroughCompletedRef.current === false) {
+        startWalkthrough();
+      }
+    };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
     return () => {
-      // Listener is automatically removed by { once: true }
+      window.removeEventListener('onboarding-complete', handleOnboardingComplete);
+      if (checkIntervalId !== null) {
+        clearInterval(checkIntervalId);
+        activeIntervals.current.delete(checkIntervalId);
+      }
+      if (fallbackTimeoutId !== null) {
+        clearTimeout(fallbackTimeoutId);
+        activeTimeouts.current.delete(fallbackTimeoutId);
+      }
     };
-  }, [user, session, isWalkthroughCompleted]);
+  }, [user, session, createTrackedTimeout]);
 
   // Step 0: Listen for check-in completion (user dismissed modal and completed check-in)
   useEffect(() => {
@@ -266,26 +328,54 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navCompanion = document.querySelector('a[href="/companion"]');
+      let retryCount = 0;
+      const maxRetries = 10;
+      let cleanupFn: (() => void) | null = null;
+      let activeTimeoutId: number | null = null;
       
-      if (!navCompanion) {
-        console.warn('[Tutorial] Companion navigation link not found');
-        return;
-      }
-      
-      const handleNavClick = () => {
-        if (hasAdvanced) return;
-        hasAdvanced = true;
-        createTrackedTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          advanceStep();
-        }, DELAYS.POST_NAV);
-      };
+      const setupListener = () => {
+        // Try multiple selectors to find the navigation element
+        const navCompanion = document.querySelector('a[href="/companion"]') ||
+          document.querySelector('[data-tour="companion-tab"]') ||
+          document.querySelector('nav a[href*="companion"]');
+        
+        if (!navCompanion) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            // Retry after a short delay if element not found
+            activeTimeoutId = createTrackedTimeout(setupListener, 100);
+            return;
+          }
+          console.warn('[Tutorial] Companion navigation link not found after retries');
+          return;
+        }
+        
+        const handleNavClick = () => {
+          if (hasAdvanced) return;
+          hasAdvanced = true;
+          createTrackedTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            advanceStep();
+          }, DELAYS.POST_NAV);
+        };
 
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
+        navCompanion.addEventListener('click', handleNavClick, { once: true });
+        
+        cleanupFn = () => {
+          navCompanion.removeEventListener('click', handleNavClick);
+        };
+      };
+      
+      // Initial setup with a small delay to ensure DOM is ready
+      activeTimeoutId = createTrackedTimeout(setupListener, 100);
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        if (activeTimeoutId !== null) {
+          clearTimeout(activeTimeoutId);
+        }
+        if (cleanupFn) {
+          cleanupFn();
+        }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
@@ -298,26 +388,54 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navTasks = document.querySelector('a[href="/tasks"]');
+      let retryCount = 0;
+      const maxRetries = 10;
+      let cleanupFn: (() => void) | null = null;
+      let activeTimeoutId: number | null = null;
       
-      if (!navTasks) {
-        console.warn('[Tutorial] Tasks navigation link not found');
-        return;
-      }
-      
-      const handleNavClick = () => {
-        if (hasAdvanced) return;
-        hasAdvanced = true;
-        createTrackedTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          advanceStep();
-        }, DELAYS.POST_NAV);
-      };
+      const setupListener = () => {
+        // Try multiple selectors to find the navigation element
+        const navTasks = document.querySelector('a[href="/tasks"]') ||
+          document.querySelector('[data-tour="tasks-tab"]') ||
+          document.querySelector('nav a[href*="tasks"]');
+        
+        if (!navTasks) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            // Retry after a short delay if element not found
+            activeTimeoutId = createTrackedTimeout(setupListener, 100);
+            return;
+          }
+          console.warn('[Tutorial] Tasks navigation link not found after retries');
+          return;
+        }
+        
+        const handleNavClick = () => {
+          if (hasAdvanced) return;
+          hasAdvanced = true;
+          createTrackedTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            advanceStep();
+          }, DELAYS.POST_NAV);
+        };
 
-      navTasks.addEventListener('click', handleNavClick, { once: true });
+        navTasks.addEventListener('click', handleNavClick, { once: true });
+        
+        cleanupFn = () => {
+          navTasks.removeEventListener('click', handleNavClick);
+        };
+      };
+      
+      // Initial setup with a small delay to ensure DOM is ready
+      activeTimeoutId = createTrackedTimeout(setupListener, 100);
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        if (activeTimeoutId !== null) {
+          clearTimeout(activeTimeoutId);
+        }
+        if (cleanupFn) {
+          cleanupFn();
+        }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
