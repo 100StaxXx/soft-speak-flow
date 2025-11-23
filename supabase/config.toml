@@ -1,5 +1,8 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.generate-tutorial-tts]
+verify_jwt = false
+
 [functions.generate-daily-mentor-pep-talks]
 verify_jwt = false
 

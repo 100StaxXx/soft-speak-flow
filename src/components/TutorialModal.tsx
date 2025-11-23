@@ -36,15 +36,20 @@ export const TutorialModal = ({
   useEffect(() => {
     const generateTTS = async () => {
       try {
+        console.log(`[TutorialModal] Generating TTS for step: ${step.id}, mentor: ${mentorSlug}`);
+        
         // Check if audio is cached in localStorage
         const cacheKey = `tutorial-audio-${mentorSlug}-${step.id}`;
         const cachedAudio = localStorage.getItem(cacheKey);
 
         if (cachedAudio) {
+          console.log(`[TutorialModal] Using cached audio for step: ${step.id}`);
           setAudioUrl(cachedAudio);
           return;
         }
 
+        console.log(`[TutorialModal] Calling edge function to generate TTS...`);
+        
         // Generate new audio
         const { data, error } = await supabase.functions.invoke('generate-tutorial-tts', {
           body: {
@@ -54,21 +59,29 @@ export const TutorialModal = ({
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('[TutorialModal] Edge function error:', error);
+          throw error;
+        }
 
         if (data?.audioContent) {
+          console.log(`[TutorialModal] Successfully generated TTS for step: ${step.id}`);
           const audioDataUrl = `data:audio/mp3;base64,${data.audioContent}`;
           setAudioUrl(audioDataUrl);
           
           // Cache the audio
           try {
             localStorage.setItem(cacheKey, audioDataUrl);
+            console.log(`[TutorialModal] Cached audio for step: ${step.id}`);
           } catch (e) {
-            console.warn('Failed to cache audio:', e);
+            console.warn('[TutorialModal] Failed to cache audio (localStorage full?):', e);
           }
+        } else {
+          console.warn('[TutorialModal] No audioContent in response');
         }
       } catch (error) {
-        console.error('Failed to generate tutorial TTS:', error);
+        console.error('[TutorialModal] Failed to generate tutorial TTS:', error);
+        // Continue without audio rather than blocking the tutorial
       }
     };
 

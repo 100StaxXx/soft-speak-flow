@@ -144,7 +144,27 @@ export const AppWalkthrough = () => {
   }, []);
 
   const currentStep = WALKTHROUGH_STEPS[stepIndex];
-  const mentorSlug = profile?.selected_mentor_id || 'atlas';
+  
+  // Get mentor slug from profile, with better loading state handling
+  const getMentorSlug = () => {
+    if (!profile) return 'atlas'; // Default while loading
+    
+    // Try to get from selected_mentor_id
+    if (profile.selected_mentor_id) {
+      // Extract slug from mentor ID if it's a full ID
+      const mentorId = profile.selected_mentor_id;
+      // If it's already a slug (lowercase, no UUID), use it
+      if (mentorId && !mentorId.includes('-') && mentorId.length < 20) {
+        return mentorId;
+      }
+      // Otherwise it might be a UUID, default to atlas
+      return 'atlas';
+    }
+    
+    return 'atlas';
+  };
+  
+  const mentorSlug = getMentorSlug();
 
   const advanceStep = useCallback(() => {
     if (stepIndex < WALKTHROUGH_STEPS.length - 1) {
