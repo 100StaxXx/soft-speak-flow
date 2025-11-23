@@ -61,26 +61,26 @@ function getColorName(color: string): string {
 
 const EVOLUTION_THEMES = [
   "Fate sleeping",              // Stage 0: Egg
-  "First awakening",            // Stage 1: Hatchling (was stage 2)
-  "Guardian rises",             // Stage 2: Guardian (was stage 3)
-  "Ascension begins",           // Stage 3: Ascended (was stage 4)
-  "Mythic power",               // Stage 4: Mythic (was stage 5)
-  "Titan emerges",              // Stage 5: Titan (was stage 6)
-  "Growing dominion",           // Stage 6
-  "Rising force",               // Stage 7
-  "Mastery claimed",            // Stage 8
-  "Battle-forged",              // Stage 9
-  "Veteran's wisdom",           // Stage 10
-  "Transcendent shift",         // Stage 11
-  "Cosmic awakening",           // Stage 12
-  "Legendary form",             // Stage 13
-  "Reality bends",              // Stage 14
-  "Colossus walks",             // Stage 15
-  "Stellar guardian",           // Stage 16
-  "Astral sovereign",           // Stage 17
-  "Universal force",            // Stage 18
-  "Divine threshold",           // Stage 19
-  "Ultimate existence"          // Stage 20: Ultimate (new)
+  "First awakening",            // Stage 1: Hatchling
+  "Tender growth",              // Stage 2: Sproutling
+  "Young courage",              // Stage 3: Cub
+  "Coming of age",              // Stage 4: Juvenile
+  "Training begins",            // Stage 5: Apprentice
+  "Swift explorer",             // Stage 6: Scout
+  "Wings unfurled",             // Stage 7: Fledgling
+  "Battle-forged",              // Stage 8: Warrior
+  "Sacred protector",           // Stage 9: Guardian
+  "Glory earned",               // Stage 10: Champion
+  "Transcendent shift",         // Stage 11: Ascended
+  "Vanguard rises",             // Stage 12: Vanguard
+  "Colossal might",             // Stage 13: Titan
+  "Mythic power",               // Stage 14: Mythic
+  "Apex mastery",               // Stage 15: Prime
+  "Royal majesty",              // Stage 16: Regal
+  "Timeless sovereign",         // Stage 17: Eternal
+  "Reality transcends",         // Stage 18: Transcendent
+  "Apex achieved",              // Stage 19: Apex
+  "Ultimate existence"          // Stage 20: Ultimate
 ];
 
 // Species anatomical traits for accuracy - ALL 66 ANIMALS SUPPORTED
