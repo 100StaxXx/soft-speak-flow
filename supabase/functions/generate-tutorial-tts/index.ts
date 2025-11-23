@@ -66,7 +66,7 @@ serve(async (req) => {
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     let binary = '';
-    const chunkSize = 0x8000; // Process in 32KB chunks
+    const chunkSize = 4096; // Process in 4KB chunks (reduced from 32KB to avoid stack overflow)
     for (let i = 0; i < uint8Array.length; i += chunkSize) {
       const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
       binary += String.fromCharCode.apply(null, Array.from(chunk));
