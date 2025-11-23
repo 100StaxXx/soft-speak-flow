@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Sparkles } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface NameInputProps {
   onComplete: (name: string) => void;
@@ -12,12 +13,52 @@ interface NameInputProps {
 
 export const NameInput = ({ onComplete, isLoading }: NameInputProps) => {
   const [name, setName] = useState<string>("");
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onComplete(name.trim());
+    
+    const trimmedName = name.trim();
+    
+    // Validate name
+    if (!trimmedName) {
+      toast({
+        title: "Name required",
+        description: "Please enter your name",
+        variant: "destructive",
+      });
+      return;
     }
+    
+    if (trimmedName.length < 2) {
+      toast({
+        title: "Name too short",
+        description: "Name must be at least 2 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (trimmedName.length > 50) {
+      toast({
+        title: "Name too long",
+        description: "Name must be less than 50 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check for invalid characters (allow letters, spaces, hyphens, apostrophes)
+    if (!/^[a-zA-Z\s\-']+$/.test(trimmedName)) {
+      toast({
+        title: "Invalid characters",
+        description: "Name can only contain letters, spaces, hyphens, and apostrophes",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    onComplete(trimmedName);
   };
 
   return (

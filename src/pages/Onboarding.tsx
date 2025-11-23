@@ -114,7 +114,28 @@ export default function Onboarding() {
     return true;
   };
 
-  const handleLegalAccept = () => {
+  const handleLegalAccept = async () => {
+    if (user) {
+      try {
+        // Store legal acceptance in database
+        const acceptedAt = new Date().toISOString();
+        const acceptedVersion = '2025-11-21';
+        
+        await supabase
+          .from('profiles')
+          .update({
+            legal_accepted_at: acceptedAt,
+            legal_accepted_version: acceptedVersion,
+          })
+          .eq('id', user.id);
+          
+        // Also keep in localStorage for quick checks
+        localStorage.setItem('legal_accepted_at', acceptedAt);
+        localStorage.setItem('legal_accepted_version', acceptedVersion);
+      } catch (error) {
+        console.error('Error saving legal acceptance:', error);
+      }
+    }
     setStage('name');
   };
 
@@ -140,6 +161,8 @@ export default function Onboarding() {
             ...existingData,
             userName: name,
           },
+          // Update timezone if not already set
+          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         })
         .eq("id", user.id);
 
@@ -237,14 +260,25 @@ export default function Onboarding() {
         })
         .eq("id", currentUser.id);
 
-      // Save questionnaire responses
+      // Save questionnaire responses (delete existing first to avoid duplicates)
+      await supabase
+        .from('questionnaire_responses')
+        .delete()
+        .eq('user_id', currentUser.id);
+        
       const responses = Object.entries(completedAnswers).map(([questionId, optionId]) => ({
         user_id: currentUser.id,
         question_id: questionId,
         answer_tags: [optionId]
       }));
 
-      await supabase.from('questionnaire_responses').insert(responses);
+      const { error: responseError } = await supabase
+        .from('questionnaire_responses')
+        .insert(responses);
+        
+      if (responseError) {
+        console.error('Error saving questionnaire responses:', responseError);
+      }
     } catch (error) {
       console.error('Error processing questionnaire:', error);
       toast({
@@ -277,8 +311,8 @@ export default function Onboarding() {
       const { data, error } = await supabase
         .from('profiles')
         .update({
-          selected_mentor_id: recommendedMentor.id,
-          updated_at: new Date().toISOString()
+          selected_mentor_id: recommendedMentor.id
+          // updated_at is handled by database trigger
         })
         .eq('id', user.id)
         .select()
@@ -448,8 +482,8 @@ export default function Onboarding() {
       const { error } = await supabase
         .from('profiles')
         .update({
-          selected_mentor_id: mentorId,
-          updated_at: new Date().toISOString()
+          selected_mentor_id: mentorId
+          // updated_at is handled by database trigger
         })
         .eq('id', user.id);
 

@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, AlertCircle } from "lucide-react";
+import { Bell, AlertCircle, MapPin } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -217,6 +217,22 @@ export const PushNotificationSettings = () => {
             </div>
           )}
         </div>
+
+        {/* Timezone Display */}
+        {profile?.timezone && (
+          <div className="space-y-3 pt-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-muted-foreground text-sm">Timezone</Label>
+              </div>
+              <span className="text-sm text-foreground">{profile.timezone}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              All notification times are shown in your local timezone
+            </p>
+          </div>
+        )}
 
         {/* Daily Quote */}
         <div className="space-y-3 pt-4 border-t border-border">

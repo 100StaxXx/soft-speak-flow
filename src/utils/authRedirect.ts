@@ -39,7 +39,11 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   if (!existing) {
-    await supabase.from("profiles").insert({
+    // Detect user's timezone
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    
+    // Use upsert to handle race conditions
+    const { error } = await supabase.from("profiles").upsert({
       id: userId,
       email: email ?? null,
       timezone: userTimezone,
@@ -48,5 +52,17 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
     await supabase.from("profiles").update({
       timezone: userTimezone
     }).eq("id", userId);
+      timezone: timezone,
+      // Store legal acceptance from localStorage if present
+      legal_accepted_at: localStorage.getItem('legal_accepted_at'),
+      legal_accepted_version: localStorage.getItem('legal_accepted_version'),
+    }, {
+      onConflict: 'id'
+    });
+    
+    if (error && !error.message.includes('duplicate')) {
+      console.error('Error creating profile:', error);
+      throw error;
+    }
   }
 };
