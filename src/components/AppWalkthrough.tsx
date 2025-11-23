@@ -232,13 +232,25 @@ export const AppWalkthrough = () => {
   // Lock scrolling during entire walkthrough
   useEffect(() => {
     if (run) {
+      console.log('[Tutorial] Locking scroll - walkthrough active');
+      // Lock both body and html to prevent all scrolling
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
     } else {
-      document.body.style.overflow = 'auto';
+      console.log('[Tutorial] Unlocking scroll - walkthrough inactive');
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
   }, [run]);
 
