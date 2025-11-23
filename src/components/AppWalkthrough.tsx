@@ -230,25 +230,20 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Scroll lock whenever modal is showing or during check-in
+  // Scroll lock whenever modal is showing, during check-in, or showing completion modal
   useEffect(() => {
-    if (!run && !showModal) {
-      // Restore scroll when walkthrough is not active
-      document.body.style.overflow = 'auto';
-      return;
-    }
-
-    // Lock scroll during any modal step or check-in
-    if (showModal || stepIndex === STEP_INDEX.HOME_CHECKIN) {
+    // Lock scroll if any walkthrough UI is active
+    if (showModal || showCompletionButton || (run && stepIndex === STEP_INDEX.HOME_CHECKIN)) {
       document.body.style.overflow = 'hidden';
-    } else {
+    } else if (!run && !showModal && !showCompletionButton) {
+      // Only restore scroll when walkthrough is completely inactive
       document.body.style.overflow = 'auto';
     }
 
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [showModal, stepIndex, run]);
+  }, [showModal, showCompletionButton, stepIndex, run]);
 
   // Bottom nav control only during check-in step (Step 0)
   // Note: BottomNav.tsx handles navigation blocking during other tutorial steps via React state
@@ -529,7 +524,7 @@ export const AppWalkthrough = () => {
           onAction={() => setShowModal(false)}
         />
       )}
-      {/* Completion Modal */}
+      {/* Completion Modal - z-index 10001 to ensure it appears above CompanionEvolution (z-9999) */}
       {showCompletionButton && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">
