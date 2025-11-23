@@ -14,7 +14,6 @@ interface TutorialStep {
   content: string;
   action: string;
   illustration: string;
-  requiresAction: boolean;
 }
 
 const WALKTHROUGH_STEPS: TutorialStep[] = [
@@ -24,7 +23,6 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     content: "Let's start with your morning check-in. This helps you reflect on your current state and set intentions for the day.",
     action: "Select how you're feeling right now by clicking a mood button below.",
     illustration: "👋",
-    requiresAction: true,
   },
   {
     id: "checkin-intention",
@@ -32,7 +30,6 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     content: "What's your main focus for today? Setting an intention gives your day direction and purpose.",
     action: "Enter your intention in the text field and submit the form.",
     illustration: "💭",
-    requiresAction: true,
   },
   {
     id: "xp-celebration",
@@ -40,7 +37,6 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     content: "Nice! You just earned +5 XP for completing your check-in. XP helps your companion grow and evolve.",
     action: "Tap the Companion tab at the bottom to meet your companion.",
     illustration: "🎉",
-    requiresAction: true,
   },
   {
     id: "companion-intro",
@@ -48,15 +44,13 @@ const WALKTHROUGH_STEPS: TutorialStep[] = [
     content: "This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Your companion is a reflection of your personal growth.",
     action: "Tap the Quests tab at the bottom to create your first quest.",
     illustration: "✨",
-    requiresAction: true,
   },
   {
     id: "tasks-create-quest",
     title: "Create Your First Quest",
     content: "Quests are your daily goals. Completing them earns XP and helps your companion evolve. Let's create your very first quest!",
-    action: "Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
+    action: "Create a quest with any name and difficulty, then complete it to trigger your companion's first evolution!",
     illustration: "✍️",
-    requiresAction: true,
   },
 ];
 
@@ -77,6 +71,7 @@ const DELAYS = {
 
 const TIMEOUTS = {
   EVOLUTION_COMPLETE: 15000, // 15 seconds fallback if evolution doesn't complete
+  EVOLUTION_FALLBACK_DELAY: 500, // Small delay before fallback timer
 } as const;
 
 export const AppWalkthrough = () => {
@@ -111,6 +106,23 @@ export const AppWalkthrough = () => {
     activeIntervals.current.clear();
   }, []);
 
+  // Cleanup on unmount - clear timers and localStorage if walkthrough is still active
+  useEffect(() => {
+    return () => {
+      clearAllTimers();
+      
+      // If walkthrough is still active on unmount, clean up localStorage
+      // This handles cases where user navigates away during tutorial
+      if (run && localStorage.getItem('appWalkthroughActive')) {
+        console.log('[Tutorial] Cleaning up walkthrough state on unmount');
+        localStorage.removeItem('appWalkthroughActive');
+        window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+          detail: { step: null } 
+        }));
+      }
+    };
+  }, [run, clearAllTimers]);
+
   const currentStep = WALKTHROUGH_STEPS[stepIndex];
   
   // Get mentor slug with improved validation
@@ -135,8 +147,13 @@ export const AppWalkthrough = () => {
 
   const advanceStep = useCallback(() => {
     if (stepIndex < WALKTHROUGH_STEPS.length - 1) {
-      setStepIndex(stepIndex + 1);
+      const newStepIndex = stepIndex + 1;
+      setStepIndex(newStepIndex);
       setShowModal(true);
+      // Dispatch event for other components to track tutorial progress
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: newStepIndex } 
+      }));
     }
   }, [stepIndex]);
 
@@ -176,9 +193,18 @@ export const AppWalkthrough = () => {
       if (hasStarted) return;
       hasStarted = true;
       console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
+      
+      // Set localStorage flag to indicate walkthrough is active
+      localStorage.setItem('appWalkthroughActive', 'true');
+      
       setStepIndex(0);
       setShowModal(true);
       setRun(true);
+      
+      // Dispatch initial step event
+      window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+        detail: { step: 0 } 
+      }));
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
@@ -191,21 +217,31 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run || !showModal) return;
 
-    const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
-    let hasAdvanced = false;
-    
-    const handleMoodClick = () => {
-      if (hasAdvanced) return;
-      hasAdvanced = true;
-      console.log('[Tutorial] Mood selected, advancing to intention step');
-      setShowModal(false);
-      createTrackedTimeout(() => advanceStep(), 300);
-    };
+    try {
+      const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
+      
+      if (moodButtons.length === 0) {
+        console.warn('[Tutorial] Mood buttons not found - data-tour="checkin-mood" may be missing');
+        return;
+      }
+      
+      let hasAdvanced = false;
+      
+      const handleMoodClick = () => {
+        if (hasAdvanced) return;
+        hasAdvanced = true;
+        console.log('[Tutorial] Mood selected, advancing to intention step');
+        setShowModal(false);
+        createTrackedTimeout(() => advanceStep(), 300);
+      };
 
-    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
-    return () => {
-      moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
-    };
+      moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
+      return () => {
+        moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
+      };
+    } catch (error) {
+      console.error('[Tutorial] Error setting up mood selection listener:', error);
+    }
   }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
 
   // Step 1: Listen for intention submission
@@ -239,56 +275,66 @@ export const AppWalkthrough = () => {
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
-    let hasAdvanced = false;
-    const navCompanion = document.querySelector('a[href="/companion"]');
-    
-    const handleNavClick = () => {
-      if (hasAdvanced) return;
-      hasAdvanced = true;
-      setShowModal(false);
-      createTrackedTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        advanceStep();
-      }, DELAYS.POST_NAV);
-    };
-
-    if (navCompanion) {
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
-    }
-    
-    return () => {
-      if (navCompanion) {
-        navCompanion.removeEventListener('click', handleNavClick);
+    try {
+      let hasAdvanced = false;
+      const navCompanion = document.querySelector('a[href="/companion"]');
+      
+      if (!navCompanion) {
+        console.warn('[Tutorial] Companion navigation link not found');
+        return;
       }
-    };
+      
+      const handleNavClick = () => {
+        if (hasAdvanced) return;
+        hasAdvanced = true;
+        setShowModal(false);
+        createTrackedTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          advanceStep();
+        }, DELAYS.POST_NAV);
+      };
+
+      navCompanion.addEventListener('click', handleNavClick, { once: true });
+      
+      return () => {
+        navCompanion.removeEventListener('click', handleNavClick);
+      };
+    } catch (error) {
+      console.error('[Tutorial] Error setting up companion nav listener:', error);
+    }
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 3: Listen for tasks/quests tab click
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
-    let hasAdvanced = false;
-    const navTasks = document.querySelector('a[href="/tasks"]');
-    
-    const handleNavClick = () => {
-      if (hasAdvanced) return;
-      hasAdvanced = true;
-      setShowModal(false);
-      createTrackedTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        advanceStep();
-      }, DELAYS.POST_NAV);
-    };
-
-    if (navTasks) {
-      navTasks.addEventListener('click', handleNavClick, { once: true });
-    }
-    
-    return () => {
-      if (navTasks) {
-        navTasks.removeEventListener('click', handleNavClick);
+    try {
+      let hasAdvanced = false;
+      const navTasks = document.querySelector('a[href="/tasks"]');
+      
+      if (!navTasks) {
+        console.warn('[Tutorial] Tasks navigation link not found');
+        return;
       }
-    };
+      
+      const handleNavClick = () => {
+        if (hasAdvanced) return;
+        hasAdvanced = true;
+        setShowModal(false);
+        createTrackedTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          advanceStep();
+        }, DELAYS.POST_NAV);
+      };
+
+      navTasks.addEventListener('click', handleNavClick, { once: true });
+      
+      return () => {
+        navTasks.removeEventListener('click', handleNavClick);
+      };
+    } catch (error) {
+      console.error('[Tutorial] Error setting up tasks nav listener:', error);
+    }
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 4: Set callback for when evolution completes
@@ -299,6 +345,8 @@ export const AppWalkthrough = () => {
     }
 
     let hasHandledLoading = false;
+    let hasCompleted = false;
+    let fallbackTimeoutId: number | null = null;
     
     const handleEvolutionLoadingStart = () => {
       if (hasHandledLoading) return;
@@ -306,10 +354,28 @@ export const AppWalkthrough = () => {
       console.log('[Tutorial] Evolution loading started, hiding modal.');
       setShowModal(false);
       setRun(false);
+      
+      // Set fallback timeout in case evolution never completes
+      fallbackTimeoutId = createTrackedTimeout(() => {
+        if (!hasCompleted) {
+          console.warn('[Tutorial] Evolution timeout - showing completion button as fallback');
+          setRun(false);
+          setShowModal(false);
+          setShowCompletionButton(true);
+        }
+      }, TIMEOUTS.EVOLUTION_COMPLETE) as number;
     };
 
     setOnEvolutionComplete(() => () => {
+      if (hasCompleted) return;
+      hasCompleted = true;
       console.log('[Tutorial] Evolution completion callback triggered!');
+      
+      // Clear fallback timeout if evolution completed successfully
+      if (fallbackTimeoutId) {
+        clearTimeout(fallbackTimeoutId);
+      }
+      
       setRun(false);
       setShowModal(false);
       setShowCompletionButton(true);
@@ -320,8 +386,13 @@ export const AppWalkthrough = () => {
     return () => {
       window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       setOnEvolutionComplete(null);
+      
+      // Clean up fallback timeout on unmount
+      if (fallbackTimeoutId) {
+        clearTimeout(fallbackTimeoutId);
+      }
     };
-  }, [stepIndex, setOnEvolutionComplete]);
+  }, [stepIndex, setOnEvolutionComplete, createTrackedTimeout]);
 
   const [isSaving, setIsSaving] = useState(false);
   
@@ -330,6 +401,14 @@ export const AppWalkthrough = () => {
     setIsSaving(true);
     console.log('[Tutorial] Tutorial completed');
     setRun(false);
+    
+    // Clear localStorage flag
+    localStorage.removeItem('appWalkthroughActive');
+    
+    // Clear tutorial step event
+    window.dispatchEvent(new CustomEvent('tutorial-step-change', { 
+      detail: { step: null } 
+    }));
     
     if (user) {
       try {
