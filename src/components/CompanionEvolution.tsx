@@ -199,14 +199,18 @@ export const CompanionEvolution = ({
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
     
-    // Don't dispatch evolution-modal-closed here - let onExitComplete handle it
+    // Dispatch modal closed immediately on dismiss - user has full control over timing
+    setTimeout(() => {
+      console.log('[CompanionEvolution] Dispatching evolution-modal-closed');
+      window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
+    }, 800); // Small delay to ensure modal visually closes first
+    
     onComplete();
   };
 
   const handleExitComplete = () => {
-    // Dispatch after the exit animation actually completes
-    console.log('[CompanionEvolution] Exit animation complete, dispatching evolution-modal-closed');
-    window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
+    // Don't auto-dispatch evolution-modal-closed - let user control when walkthrough continues
+    console.log('[CompanionEvolution] Exit animation complete');
   };
 
   if (!isEvolving) return null;
