@@ -38,8 +38,8 @@ export const BottomNav = () => {
 
   // Determine if navigation should be blocked
   const isTutorialActive = tutorialStep !== null;
-  const canClickCompanion = tutorialStep === 1; // Step 1: XP Celebration - Click Companion tab
-  const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Companion intro + Quest creation
+  const canClickCompanion = tutorialStep === 1; // Step index 1 (XP Celebration): User should click Companion tab
+  const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Step indices 2-3 (Companion intro + Quest creation): User should click Quests tab
   
   // Highlights should only show when the user can interact (no modal blocking)
   const shouldHighlightCompanion = canClickCompanion;
@@ -50,12 +50,12 @@ export const BottomNav = () => {
   const handleNavClick = (e: React.MouseEvent, route: string) => {
     if (!isTutorialActive) return;
     
-    // Allow Companion click on step 2
+    // Allow Companion click on step index 1 (XP_CELEBRATION)
     if (route === '/companion' && canClickCompanion) {
       return;
     }
     
-    // Allow Quests click on steps 3-4
+    // Allow Quests click on step indices 2-3 (COMPANION_VIEW and QUEST_CREATION)
     if (route === '/tasks' && canClickQuests) {
       return;
     }

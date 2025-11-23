@@ -177,11 +177,6 @@ export const AppWalkthrough = () => {
         // Only update state if component is still mounted
         if (isMounted) {
           setIsWalkthroughCompleted(completed);
-          
-          // Dispatch ready event for other components
-          window.dispatchEvent(new CustomEvent('walkthrough-ready', { 
-            detail: { shouldRun: !completed } 
-          }));
         }
       } catch (error) {
         console.error('[AppWalkthrough] Unexpected error checking walkthrough status:', error);
