@@ -5,30 +5,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock } from "lucide-react";
 import { Separator } from "./ui/separator";
-
-const STAGE_NAMES = [
-  "Egg",
-  "Hatchling",
-  "Guardian",
-  "Ascended",
-  "Mythic",
-  "Titan",
-  "Stage 6",
-  "Stage 7",
-  "Stage 8",
-  "Stage 9",
-  "Stage 10",
-  "Stage 11",
-  "Stage 12",
-  "Stage 13",
-  "Stage 14",
-  "Stage 15",
-  "Stage 16",
-  "Stage 17",
-  "Stage 18",
-  "Stage 19",
-  "Ultimate"
-];
+import { getStageName } from "@/config/companionStages";
 
 export const CompanionStoryJournal = () => {
   const { companion } = useCompanion();
@@ -101,7 +78,7 @@ export const CompanionStoryJournal = () => {
             <p className="text-sm text-muted-foreground">
               {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}
             </p>
-            <p className="font-semibold">{STAGE_NAMES[viewingStage]}</p>
+            <p className="font-semibold">{getStageName(viewingStage)}</p>
           </div>
 
           <Button
