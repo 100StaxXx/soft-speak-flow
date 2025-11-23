@@ -211,7 +211,9 @@ export const AppWalkthrough = () => {
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete);
-    return () => window.removeEventListener('onboarding-complete', handleOnboardingComplete);
+    return () => {
+      window.removeEventListener('onboarding-complete', handleOnboardingComplete);
+    };
   }, [user, session, isWalkthroughCompleted]);
 
   // Step 0: Listen for mood selection
@@ -226,14 +228,14 @@ export const AppWalkthrough = () => {
       hasAdvanced = true;
       console.log('[Tutorial] Mood selected, advancing to intention step');
       setShowModal(false);
-      setTimeout(() => advanceStep(), 300);
+      createTrackedTimeout(() => advanceStep(), 300);
     };
 
-    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick, { once: true }));
+    moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
     return () => {
       moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
     };
-  }, [stepIndex, run, showModal, advanceStep]);
+  }, [stepIndex, run, showModal, advanceStep, createTrackedTimeout]);
 
   // Step 1: Listen for intention submission
   useEffect(() => {
@@ -257,7 +259,9 @@ export const AppWalkthrough = () => {
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
-    return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
+    return () => {
+      window.removeEventListener('checkin-complete', handleCheckInComplete);
+    };
   }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 2: Listen for companion tab click
@@ -278,10 +282,11 @@ export const AppWalkthrough = () => {
 
     const navCompanion = document.querySelector('a[href="/companion"]');
     if (navCompanion) {
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
+      navCompanion.addEventListener('click', handleNavClick);
     }
     
     return () => {
+      const navCompanion = document.querySelector('a[href="/companion"]');
       if (navCompanion) {
         navCompanion.removeEventListener('click', handleNavClick);
       }
@@ -306,10 +311,11 @@ export const AppWalkthrough = () => {
 
     const navTasks = document.querySelector('a[href="/tasks"]');
     if (navTasks) {
-      navTasks.addEventListener('click', handleNavClick, { once: true });
+      navTasks.addEventListener('click', handleNavClick);
     }
     
     return () => {
+      const navTasks = document.querySelector('a[href="/tasks"]');
       if (navTasks) {
         navTasks.removeEventListener('click', handleNavClick);
       }
