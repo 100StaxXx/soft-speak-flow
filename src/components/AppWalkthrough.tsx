@@ -64,6 +64,8 @@ const TIMEOUTS = {
   EVOLUTION_FALLBACK_DELAY: 500, // Small delay before fallback timer
 } as const;
 
+const SCROLL_LOCK_CLASS = 'walkthrough-scroll-locked';
+
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
   const { profile } = useProfile();
@@ -231,6 +233,11 @@ export const AppWalkthrough = () => {
 
   // Lock scrolling during entire walkthrough
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const html = document.documentElement;
+    const body = document.body;
+
     if (run) {
       console.log('[Tutorial] Locking scroll - walkthrough active');
       // Lock both body and html to prevent all scrolling
