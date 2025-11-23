@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { AttributeTooltip } from "./AttributeTooltip";
+import { STAGE_NAMES } from "@/config/companionStages";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -9,30 +10,6 @@ interface NextEvolutionPreviewProps {
   nextEvolutionXP: number;
   progressPercent: number;
 }
-
-const STAGE_NAMES = {
-  0: "Egg",
-  1: "Hatchling",
-  2: "Guardian",
-  3: "Ascended",
-  4: "Mythic",
-  5: "Titan",
-  6: "Stage 6",
-  7: "Stage 7",
-  8: "Stage 8",
-  9: "Stage 9",
-  10: "Stage 10",
-  11: "Stage 11",
-  12: "Stage 12",
-  13: "Stage 13",
-  14: "Stage 14",
-  15: "Stage 15",
-  16: "Stage 16",
-  17: "Stage 17",
-  18: "Stage 18",
-  19: "Stage 19",
-  20: "Ultimate",
-};
 
 const XP_TIPS = [
   { action: "Complete a habit", xp: "5-20 XP", icon: "✓" },
