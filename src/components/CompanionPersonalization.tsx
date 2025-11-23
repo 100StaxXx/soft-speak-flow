@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -63,6 +63,33 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   const [selectedAnimal, setSelectedAnimal] = useState<string>("");
   const [selectedElement, setSelectedElement] = useState<string>("");
   const [selectedTone, setSelectedTone] = useState<string>("epic_adventure");
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(pointer: coarse)");
+    const updateTouchState = () => {
+      const hasPointerMedia = mediaQuery.matches;
+      const hasTouchPoints = typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
+      const hasTouchEvent = "ontouchstart" in window;
+      setIsTouchDevice(hasPointerMedia || hasTouchPoints || hasTouchEvent);
+    };
+
+    updateTouchState();
+
+    const handler = (event: MediaQueryListEvent) => {
+      setIsTouchDevice(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    } else {
+      mediaQuery.addListener(handler);
+      return () => mediaQuery.removeListener(handler);
+    }
+  }, []);
 
   const isComplete = selectedColor && selectedAnimal && selectedElement && selectedTone;
 
@@ -108,22 +135,43 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         {/* Animal Selection with Dropdown */}
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Favorite animal or mythic creature</Label>
-          <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
-            <SelectTrigger className="w-full h-14 text-base">
-              <SelectValue placeholder="Choose your spirit creature..." />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {ANIMALS.map((animal) => (
-                <SelectItem 
-                  key={animal} 
-                  value={animal}
-                  className="cursor-pointer"
-                >
-                  {animal}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isTouchDevice ? (
+            <div className="relative">
+              <select
+                value={selectedAnimal}
+                onChange={(event) => setSelectedAnimal(event.target.value)}
+                aria-label="Choose your spirit creature"
+                className={`w-full h-14 appearance-none rounded-lg border border-input bg-secondary/50 px-4 pr-12 text-base font-medium text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:border-primary transition-all`}
+              >
+                <option value="" disabled>
+                  Choose your spirit creature...
+                </option>
+                {ANIMALS.map((animal) => (
+                  <option key={animal} value={animal}>
+                    {animal}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          ) : (
+            <Select value={selectedAnimal} onValueChange={setSelectedAnimal}>
+              <SelectTrigger className="w-full h-14 text-base">
+                <SelectValue placeholder="Choose your spirit creature..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {ANIMALS.map((animal) => (
+                  <SelectItem 
+                    key={animal} 
+                    value={animal}
+                    className="cursor-pointer"
+                  >
+                    {animal}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Element Selection */}
