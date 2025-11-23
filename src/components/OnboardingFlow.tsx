@@ -108,11 +108,8 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     }
     onComplete();
     
-    // Wait for dialog to close and page to settle before dispatching event
-    setTimeout(() => {
-      console.log('[OnboardingFlow] Dispatching onboarding-complete event');
-      window.dispatchEvent(new CustomEvent('onboarding-complete'));
-    }, 500);
+    // Note: onboarding-complete event is now dispatched from Onboarding.tsx
+    // after companion creation, ensuring AppWalkthrough is mounted and ready
   };
 
   const slide = slides[currentSlide];

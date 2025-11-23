@@ -223,9 +223,11 @@ export const AppWalkthrough = () => {
       }));
     };
 
-    window.addEventListener('onboarding-complete', handleOnboardingComplete, { once: true });
+    window.addEventListener('onboarding-complete', handleOnboardingComplete);
+    
     return () => {
-      // Listener is automatically removed by { once: true }
+      // Always clean up listener to prevent memory leaks
+      window.removeEventListener('onboarding-complete', handleOnboardingComplete);
     };
   }, [user, session, isWalkthroughCompleted]);
 
@@ -241,17 +243,22 @@ export const AppWalkthrough = () => {
         hasAdvanced = true;
         console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
         createTrackedTimeout(() => {
-          confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 }
-          });
+          try {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          } catch (confettiError) {
+            console.warn('[Tutorial] Confetti animation failed:', confettiError);
+            // Continue without confetti
+          }
           setShowModal(true);
           advanceStep();
         }, DELAYS.POST_CHECKIN_CONFETTI);
       };
 
-      window.addEventListener('checkin-complete', handleCheckInComplete, { once: true });
+      window.addEventListener('checkin-complete', handleCheckInComplete);
       return () => {
         window.removeEventListener('checkin-complete', handleCheckInComplete);
       };
@@ -266,11 +273,14 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navCompanion = document.querySelector('a[href="/companion"]');
+      // Use data attribute for more reliable selection
+      const navCompanion = document.querySelector('[data-tour="companion-tab"]') as HTMLElement;
       
       if (!navCompanion) {
         console.warn('[Tutorial] Companion navigation link not found');
-        return;
+        // Fallback to href selector
+        const fallbackNav = document.querySelector('a[href="/companion"]') as HTMLElement;
+        if (!fallbackNav) return;
       }
       
       const handleNavClick = () => {
@@ -282,10 +292,15 @@ export const AppWalkthrough = () => {
         }, DELAYS.POST_NAV);
       };
 
-      navCompanion.addEventListener('click', handleNavClick, { once: true });
+      const targetElement = navCompanion || document.querySelector('a[href="/companion"]');
+      if (targetElement) {
+        targetElement.addEventListener('click', handleNavClick);
+      }
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        if (targetElement) {
+          targetElement.removeEventListener('click', handleNavClick);
+        }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up companion nav listener:', error);
@@ -298,11 +313,14 @@ export const AppWalkthrough = () => {
 
     try {
       let hasAdvanced = false;
-      const navTasks = document.querySelector('a[href="/tasks"]');
+      // Use data attribute for more reliable selection
+      const navTasks = document.querySelector('[data-tour="tasks-tab"]') as HTMLElement;
       
       if (!navTasks) {
         console.warn('[Tutorial] Tasks navigation link not found');
-        return;
+        // Fallback to href selector
+        const fallbackNav = document.querySelector('a[href="/tasks"]') as HTMLElement;
+        if (!fallbackNav) return;
       }
       
       const handleNavClick = () => {
@@ -314,10 +332,15 @@ export const AppWalkthrough = () => {
         }, DELAYS.POST_NAV);
       };
 
-      navTasks.addEventListener('click', handleNavClick, { once: true });
+      const targetElement = navTasks || document.querySelector('a[href="/tasks"]');
+      if (targetElement) {
+        targetElement.addEventListener('click', handleNavClick);
+      }
       
       return () => {
-        // Listener is automatically removed by { once: true }
+        if (targetElement) {
+          targetElement.removeEventListener('click', handleNavClick);
+        }
       };
     } catch (error) {
       console.error('[Tutorial] Error setting up tasks nav listener:', error);
@@ -368,10 +391,11 @@ export const AppWalkthrough = () => {
       setShowCompletionButton(true);
     });
 
-    window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart, { once: true });
+    window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
     
     return () => {
-      // Listener is automatically removed by { once: true }
+      // Always clean up listener to prevent memory leaks
+      window.removeEventListener('evolution-loading-start', handleEvolutionLoadingStart);
       setOnEvolutionComplete(null);
       
       // Clean up fallback timeout on unmount
