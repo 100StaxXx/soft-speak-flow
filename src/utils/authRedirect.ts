@@ -39,23 +39,11 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   if (!existing) {
-    // Detect user's timezone
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    
-    // Use upsert to handle race conditions
+    // Create new profile with user's timezone
     const { error } = await supabase.from("profiles").upsert({
       id: userId,
       email: email ?? null,
       timezone: userTimezone,
-    });
-  } else if (existing.timezone !== userTimezone) {
-    await supabase.from("profiles").update({
-      timezone: userTimezone
-    }).eq("id", userId);
-      timezone: timezone,
-      // Store legal acceptance from localStorage if present
-      legal_accepted_at: localStorage.getItem('legal_accepted_at'),
-      legal_accepted_version: localStorage.getItem('legal_accepted_version'),
     }, {
       onConflict: 'id'
     });
@@ -64,5 +52,10 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
       console.error('Error creating profile:', error);
       throw error;
     }
+  } else if (existing.timezone !== userTimezone) {
+    // Update timezone if it's different
+    await supabase.from("profiles").update({
+      timezone: userTimezone
+    }).eq("id", userId);
   }
 };
