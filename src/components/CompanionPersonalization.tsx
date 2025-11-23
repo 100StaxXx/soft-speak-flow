@@ -112,12 +112,12 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
             <SelectTrigger className="w-full h-14 text-base">
               <SelectValue placeholder="Choose your spirit creature..." />
             </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
+            <SelectContent className="max-h-[300px]" position="popper" sideOffset={4}>
               {ANIMALS.map((animal) => (
                 <SelectItem 
                   key={animal} 
                   value={animal}
-                  className="cursor-pointer"
+                  className="py-3 text-base"
                 >
                   {animal}
                 </SelectItem>

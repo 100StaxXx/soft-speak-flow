@@ -573,3 +573,11 @@ All colors MUST be HSL.
 
 }
 
+@layer utilities {
+  /* Touch-friendly interactions for mobile devices */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
