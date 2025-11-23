@@ -1,21 +1,63 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Joyride, { Step, CallBackProps, STATUS, TooltipRenderProps } from "react-joyride";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { haptics } from "@/utils/haptics";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import confetti from "canvas-confetti";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { OnboardingData } from "@/types/profile";
+import { TutorialModal } from "./TutorialModal";
+import { Button } from "./ui/button";
 
-const WALKTHROUGH_STEPS: (Step & { id?: string })[] = [
-  { id: "home-checkin", target: '[data-tour="checkin-mood"]', content: "👋 Welcome! Let's start with your morning check-in. Select how you're feeling right now.", placement: 'bottom', disableBeacon: true, spotlightClicks: true, hideFooter: true },
-  { id: "checkin-intention", target: '[data-tour="checkin-intention"]', content: "💭 Now, what's your main focus for today? Enter your intention here.", placement: "top", disableBeacon: true, spotlightClicks: true, hideFooter: true },
-  { id: "xp-celebration", target: 'body', content: "🎉 Nice! You just earned +5 XP! Now let's meet your companion! Tap the Companion tab at the bottom.", placement: "center", disableBeacon: true, hideFooter: true },
-  { id: "companion-intro", target: '[data-tour="companion-tooltip-anchor"]', content: "✨ This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Now tap the Quests tab to create your first quest.", placement: "bottom", disableBeacon: true, spotlightClicks: true, floaterProps: { hideArrow: true }, hideFooter: true },
-  { id: "tasks-create-quest", target: '[data-tour="today-quests-header"]', content: "✍️ Perfect! Now create a quest: Type 'Start my Journey', select Medium difficulty (10 XP), then tap Add Quest. Once added, CHECK IT OFF to complete it and earn your XP! This triggers your companion's first evolution!", placement: 'top', disableBeacon: true, spotlightClicks: false, floaterProps: { disableAnimation: true, hideArrow: false, offset: 20 }, styles: { options: { zIndex: 100000 }, tooltip: { minWidth: '300px', maxWidth: '85vw', padding: '1.5rem', borderRadius: '1.25rem', border: '3px solid hsl(var(--primary))', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', marginTop: '-120px', pointerEvents: 'none' }, tooltipContent: { fontSize: '1rem', lineHeight: '1.6', padding: '0.5rem 0', textAlign: 'left', pointerEvents: 'none' } }, hideFooter: true },
+interface TutorialStep {
+  id: string;
+  title: string;
+  content: string;
+  action: string;
+  illustration: string;
+  requiresAction: boolean;
+}
+
+const WALKTHROUGH_STEPS: TutorialStep[] = [
+  {
+    id: "home-checkin",
+    title: "Welcome to Your Journey!",
+    content: "Let's start with your morning check-in. This helps you reflect on your current state and set intentions for the day.",
+    action: "Select how you're feeling right now by clicking a mood button below.",
+    illustration: "👋",
+    requiresAction: true,
+  },
+  {
+    id: "checkin-intention",
+    title: "Set Your Daily Intention",
+    content: "What's your main focus for today? Setting an intention gives your day direction and purpose.",
+    action: "Enter your intention in the text field and submit the form.",
+    illustration: "💭",
+    requiresAction: true,
+  },
+  {
+    id: "xp-celebration",
+    title: "You Earned XP!",
+    content: "Nice! You just earned +5 XP for completing your check-in. XP helps your companion grow and evolve.",
+    action: "Tap the Companion tab at the bottom to meet your companion.",
+    illustration: "🎉",
+    requiresAction: true,
+  },
+  {
+    id: "companion-intro",
+    title: "Meet Your Companion",
+    content: "This is your companion! They'll grow and evolve as you earn XP by completing quests and building habits. Your companion is a reflection of your personal growth.",
+    action: "Tap the Quests tab at the bottom to create your first quest.",
+    illustration: "✨",
+    requiresAction: true,
+  },
+  {
+    id: "tasks-create-quest",
+    title: "Create Your First Quest",
+    content: "Quests are your daily goals. Completing them earns XP and helps your companion evolve. Let's create your very first quest!",
+    action: "Type 'Start my Journey', select Medium difficulty (10 XP), tap Add Quest, then CHECK IT OFF to trigger your companion's first evolution!",
+    illustration: "✍️",
+    requiresAction: true,
+  },
 ];
 
 const STEP_INDEX = {
@@ -40,13 +82,14 @@ const TIMEOUTS = {
 
 export const AppWalkthrough = () => {
   const { user, session } = useAuth();
-  const isMobile = useIsMobile();
+  const { profile } = useProfile();
   const { setOnEvolutionComplete } = useEvolution();
 
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState<number>(0);
   const [isWalkthroughCompleted, setIsWalkthroughCompleted] = useState<boolean | null>(null);
   const [showCompletionButton, setShowCompletionButton] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   // Track and clear timeouts & intervals so scheduled actions don't fire after unmount or pause
   const activeTimeouts = useRef<Set<number>>(new Set());
@@ -100,44 +143,15 @@ export const AppWalkthrough = () => {
     });
   }, []);
 
-  const steps = useMemo(() => {
-    const base = [...WALKTHROUGH_STEPS];
-    if (isMobile) {
-      const taskIdx = base.findIndex((s) => (s as any).target === '[data-tour="today-quests-header"]');
-      if (taskIdx !== -1) {
-        base[taskIdx] = { ...base[taskIdx], target: '[data-tour="today-quests-header"]', placement: 'top' } as Step & { id?: string };
-      }
-      const companionIdx = base.findIndex((s) => (s as any).target === '[data-tour="companion-tooltip-anchor"]');
-      if (companionIdx !== -1) base[companionIdx] = { ...base[companionIdx], target: '[data-tour="companion-tooltip-anchor"]', placement: 'bottom' } as Step & { id?: string };
+  const currentStep = WALKTHROUGH_STEPS[stepIndex];
+  const mentorSlug = profile?.selected_mentor_id || 'atlas';
+
+  const advanceStep = useCallback(() => {
+    if (stepIndex < WALKTHROUGH_STEPS.length - 1) {
+      setStepIndex(stepIndex + 1);
+      setShowModal(true);
     }
-    return base;
-  }, [isMobile]);
-
-  // safeSetStep will fallback to body if anchor not found
-  const safeSetStep = useCallback(async (idx: number) => {
-    const step = steps[idx] as Step | undefined;
-    if (!step) {
-      console.warn(`Tutorial step ${idx} does not exist. Steps length=${steps.length}`);
-      return;
-    }
-
-    window.dispatchEvent(new CustomEvent('tutorial-step-change', { detail: { step: idx } }));
-
-    const target = step.target as string | undefined;
-    if (target && target !== 'body') {
-      const found = await waitForSelector(target, TIMEOUTS.ELEMENT_WAIT);
-      if (!found) {
-        console.warn(`Tutorial anchor not found for selector "${target}". Skipping to next step.`);
-        return;
-      }
-    }
-
-    // Scroll to top when advancing to a new step
-    await new Promise(resolve => setTimeout(resolve, DELAYS.SCROLL_DELAY));
-    window.scrollTo({ top: 0, behavior: 'instant' });
-
-    setStepIndex(idx);
-  }, [steps, waitForSelector]);
+  }, [stepIndex]);
 
   // Check walkthrough status once on mount and set state
   useEffect(() => {
@@ -167,28 +181,18 @@ export const AppWalkthrough = () => {
   // Listen for onboarding completion event to start walkthrough
   useEffect(() => {
     if (!user || !session || isWalkthroughCompleted === null) return;
-    if (isWalkthroughCompleted) return; // Already completed
+    if (isWalkthroughCompleted) return;
 
-    const handleOnboardingComplete = async () => {
+    const handleOnboardingComplete = () => {
       console.log('[AppWalkthrough] Onboarding complete, starting walkthrough');
-      
-      // Reset to step 0
       setStepIndex(0);
-      
-      // Wait for DOM element to be ready (no arbitrary delays)
-      const found = await waitForSelector('[data-tour="checkin-mood"]', TIMEOUTS.ELEMENT_WAIT);
-      if (found) {
-        console.log('[AppWalkthrough] DOM ready, starting tour');
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        setRun(true);
-      } else {
-        console.warn('[AppWalkthrough] Failed to find initial tour element');
-      }
+      setShowModal(true);
+      setRun(true);
     };
 
     window.addEventListener('onboarding-complete', handleOnboardingComplete);
     return () => window.removeEventListener('onboarding-complete', handleOnboardingComplete);
-  }, [user, session, isWalkthroughCompleted, waitForSelector]);
+  }, [user, session, isWalkthroughCompleted]);
 
   // Step 0: Listen for mood selection
   useEffect(() => {
@@ -197,12 +201,13 @@ export const AppWalkthrough = () => {
     const moodButtons = document.querySelectorAll('[data-tour="checkin-mood"] button');
     const handleMoodClick = () => {
       console.log('[Tutorial] Mood selected, advancing to intention step');
-      safeSetStep(STEP_INDEX.CHECKIN_INTENTION);
+      setShowModal(false);
+      setTimeout(() => advanceStep(), 300);
     };
 
     moodButtons.forEach(btn => btn.addEventListener('click', handleMoodClick));
     return () => moodButtons.forEach(btn => btn.removeEventListener('click', handleMoodClick));
-  }, [stepIndex, run, safeSetStep]);
+  }, [stepIndex, run, advanceStep]);
 
   // Step 1: Listen for intention submission
   useEffect(() => {
@@ -210,28 +215,30 @@ export const AppWalkthrough = () => {
 
     const handleCheckInComplete = () => {
       console.log('[Tutorial] Check-in completed, advancing to XP celebration step');
-      createTrackedTimeout(async () => {
+      setShowModal(false);
+      createTrackedTimeout(() => {
         confetti({
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 }
         });
-        await safeSetStep(STEP_INDEX.XP_CELEBRATION);
+        advanceStep();
       }, DELAYS.POST_CHECKIN_CONFETTI);
     };
 
     window.addEventListener('checkin-complete', handleCheckInComplete);
     return () => window.removeEventListener('checkin-complete', handleCheckInComplete);
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 2: Listen for companion tab click
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.XP_CELEBRATION || !run) return;
 
     const handleNavClick = () => {
-      createTrackedTimeout(async () => {
+      setShowModal(false);
+      createTrackedTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'instant' });
-        await safeSetStep(STEP_INDEX.COMPANION_VIEW);
+        advanceStep();
       }, DELAYS.POST_NAV);
     };
 
@@ -245,16 +252,17 @@ export const AppWalkthrough = () => {
         navCompanion.removeEventListener('click', handleNavClick);
       }
     };
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 3: Listen for tasks/quests tab click
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.COMPANION_VIEW || !run) return;
 
     const handleNavClick = () => {
-      createTrackedTimeout(async () => {
+      setShowModal(false);
+      createTrackedTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'instant' });
-        await safeSetStep(STEP_INDEX.QUEST_CREATION);
+        advanceStep();
       }, DELAYS.POST_NAV);
     };
 
@@ -268,7 +276,7 @@ export const AppWalkthrough = () => {
         navTasks.removeEventListener('click', handleNavClick);
       }
     };
-  }, [stepIndex, run, safeSetStep, createTrackedTimeout]);
+  }, [stepIndex, run, advanceStep, createTrackedTimeout]);
 
   // Step 4: Set callback for when evolution completes
   useEffect(() => {
@@ -278,23 +286,16 @@ export const AppWalkthrough = () => {
     }
 
     const handleEvolutionLoadingStart = () => {
-      console.log('[Tutorial] Evolution loading started, hiding quest tooltip immediately.');
+      console.log('[Tutorial] Evolution loading started, hiding modal.');
+      setShowModal(false);
       setRun(false);
     };
 
-    // Set the callback that will be triggered when evolution completes
-    // Important: Don't check 'run' here because it gets set to false during evolution
     setOnEvolutionComplete(() => () => {
-      console.log('[Tutorial] Evolution completion callback triggered! Current state:', { 
-        stepIndex, 
-        run,
-        showCompletionButton 
-      });
-      
-      // Show the manual completion button instead of auto-advancing
+      console.log('[Tutorial] Evolution completion callback triggered!');
       setRun(false);
+      setShowModal(false);
       setShowCompletionButton(true);
-      console.log('[Tutorial] Set showCompletionButton to true');
     });
 
     window.addEventListener('evolution-loading-start', handleEvolutionLoadingStart);
@@ -353,90 +354,33 @@ export const AppWalkthrough = () => {
     }
   }, [user]);
 
-  const handleJoyrideCallback = useCallback(async (data: CallBackProps) => {
-    const { status } = data;
-
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      await handleWalkthroughComplete();
-    }
-  }, [handleWalkthroughComplete]);
-
-  const CustomTooltip = useCallback(({ continuous, index, step, backProps, closeProps, primaryProps, tooltipProps }: TooltipRenderProps) => {
-    // Default tooltip for all steps (no special final step since we use manual button)
-    return (
-      <div className="relative">
-        <div className="absolute inset-0 border-4 border-purple-500 rounded-2xl animate-pulse pointer-events-none" />
-        <Card {...tooltipProps} className="max-w-md p-6 opacity-100 bg-background relative">
-          <p className="text-base">{step.content as string}</p>
-        </Card>
-      </div>
-    );
-  }, []);
-
-  const interactiveStepIndices: number[] = [
-    STEP_INDEX.XP_CELEBRATION,
-    STEP_INDEX.COMPANION_VIEW,
-    STEP_INDEX.QUEST_CREATION,
-  ];
-
   if (!user) return null;
-
-  console.log('[Tutorial] Rendering Joyride with:', { run, stepIndex, stepsCount: steps.length });
 
   return (
     <>
-      <Joyride
-        steps={steps}
-        run={run}
-        stepIndex={stepIndex}
-        callback={handleJoyrideCallback}
-        continuous={false}
-        showProgress={false}
-        showSkipButton={false}
-        hideCloseButton={true}
-        disableOverlay={interactiveStepIndices.includes(stepIndex)}
-        spotlightPadding={8}
-        disableCloseOnEsc
-        disableScrolling={false}
-        tooltipComponent={CustomTooltip}
-        styles={{
-          options: {
-            zIndex: 10000,
-            primaryColor: 'hsl(var(--primary))',
-            textColor: 'hsl(var(--foreground))',
-            backgroundColor: 'hsl(var(--background))',
-            arrowColor: 'hsl(var(--background))',
-          },
-          tooltip: {
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            opacity: 1,
-          },
-          buttonNext: {
-            backgroundColor: 'hsl(var(--primary))',
-            borderRadius: '0.5rem',
-            padding: '0.5rem 1rem',
-          },
-        }}
-        floaterProps={{
-          disableAnimation: false,
-          hideArrow: false,
-        }}
-        locale={{
-          last: 'Close',
-        }}
-      />
-      
+      {/* Tutorial Modal */}
+      {showModal && currentStep && (
+        <TutorialModal
+          step={currentStep}
+          currentStep={stepIndex}
+          totalSteps={WALKTHROUGH_STEPS.length}
+          mentorSlug={mentorSlug}
+        />
+      )}
+      {/* Completion Modal */}
       {showCompletionButton && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-500">
-          <div className="flex flex-col items-center gap-4 max-w-md mx-4">
-            <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-2 border-primary/50 rounded-2xl p-8 shadow-2xl">
-              <p className="text-white text-2xl font-bold text-center mb-2">
-                🎉 Congratulations!
-              </p>
-              <p className="text-white/90 text-lg text-center leading-relaxed">
-                Your companion has evolved to Stage 1! You've learned the basics—now your real journey begins. Complete quests, build habits, and watch your companion grow stronger alongside you.
-              </p>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-6 max-w-2xl mx-4">
+            <div className="bg-gradient-to-r from-primary/20 to-accent/20 backdrop-blur-sm border-4 border-primary/50 rounded-3xl p-12 shadow-2xl">
+              <div className="text-center space-y-4">
+                <div className="text-9xl animate-bounce-slow mb-4">🎉</div>
+                <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Congratulations!
+                </h2>
+                <p className="text-2xl leading-relaxed text-foreground">
+                  Your companion has evolved to Stage 1! You've learned the basics—now your real journey begins. Complete quests, build habits, and watch your companion grow stronger alongside you.
+                </p>
+              </div>
             </div>
             <Button
               onClick={async () => {
@@ -444,11 +388,9 @@ export const AppWalkthrough = () => {
                 await handleWalkthroughComplete();
               }}
               size="lg"
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-bold text-lg px-8 py-6 rounded-2xl shadow-2xl hover:shadow-primary/50 transition-all duration-300 animate-pulse"
+              className="text-xl px-12 py-8 font-bold shadow-2xl hover:shadow-3xl transition-all"
             >
-              <span className="mr-2">✨</span>
               Start Your Journey
-              <span className="ml-2">🚀</span>
             </Button>
           </div>
         </div>
