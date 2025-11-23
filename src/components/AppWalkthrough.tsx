@@ -230,11 +230,31 @@ export const AppWalkthrough = () => {
     };
   }, [user, session, isWalkthroughCompleted]);
 
-  // Scroll lock and bottom nav control during check-in step (Step 0)
+  // Scroll lock whenever modal is showing or during check-in
+  useEffect(() => {
+    if (!run && !showModal) {
+      // Restore scroll when walkthrough is not active
+      document.body.style.overflow = 'auto';
+      return;
+    }
+
+    // Lock scroll during any modal step or check-in
+    if (showModal || stepIndex === STEP_INDEX.HOME_CHECKIN) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [showModal, stepIndex, run]);
+
+  // Bottom nav control only during check-in step (Step 0)
+  // Note: BottomNav.tsx handles navigation blocking during other tutorial steps via React state
   useEffect(() => {
     if (stepIndex !== STEP_INDEX.HOME_CHECKIN || !run) {
-      // Restore defaults when not on check-in step
-      document.body.style.overflow = 'auto';
+      // Restore bottom nav when not on check-in step
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
@@ -243,9 +263,6 @@ export const AppWalkthrough = () => {
       return;
     }
 
-    // Lock scroll during check-in
-    document.body.style.overflow = 'hidden';
-    
     // Disable bottom navigation during check-in
     const bottomNav = document.querySelector('nav[role="navigation"]');
     if (bottomNav) {
@@ -254,7 +271,6 @@ export const AppWalkthrough = () => {
     }
 
     return () => {
-      document.body.style.overflow = 'auto';
       const bottomNav = document.querySelector('nav[role="navigation"]');
       if (bottomNav) {
         (bottomNav as HTMLElement).style.pointerEvents = 'auto';
