@@ -91,10 +91,21 @@ export const TutorialModal = ({
   // Auto-play when audio is ready (unless muted)
   useEffect(() => {
     if (audioUrl && audioRef.current && !isMuted) {
+      // Reset audio to start before playing (in case it was paused mid-way)
+      audioRef.current.currentTime = 0;
       audioRef.current.play().catch(console.error);
       setIsPlaying(true);
     }
   }, [audioUrl, isMuted]);
+
+  // Handle unmuting - restart current audio if it was paused
+  useEffect(() => {
+    if (!isMuted && audioUrl && audioRef.current && !isPlaying) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(console.error);
+      setIsPlaying(true);
+    }
+  }, [isMuted]);
 
   const toggleAudio = () => {
     if (!audioRef.current) return;
