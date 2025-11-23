@@ -239,16 +239,25 @@ export const AppWalkthrough = () => {
     const body = document.body;
 
     if (run) {
-      html.classList.add(SCROLL_LOCK_CLASS);
-      body.classList.add(SCROLL_LOCK_CLASS);
+      console.log('[Tutorial] Locking scroll - walkthrough active');
+      // Lock both body and html to prevent all scrolling
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
     } else {
-      html.classList.remove(SCROLL_LOCK_CLASS);
-      body.classList.remove(SCROLL_LOCK_CLASS);
+      console.log('[Tutorial] Unlocking scroll - walkthrough inactive');
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     }
 
     return () => {
-      html.classList.remove(SCROLL_LOCK_CLASS);
-      body.classList.remove(SCROLL_LOCK_CLASS);
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
   }, [run]);
 
