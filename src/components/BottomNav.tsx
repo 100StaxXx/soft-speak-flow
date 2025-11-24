@@ -1,4 +1,4 @@
-import { ListChecks, Search, Sparkles, User, Swords } from "lucide-react";
+import { Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
-import { useEffect, useState } from "react";
 
 export const BottomNav = () => {
   const { profile } = useProfile();

@@ -147,6 +147,12 @@ export default function Tasks() {
       setShowTemplates(true);
       toast({ title: "Habit created successfully!" });
       haptics.success();
+      
+      // Mark that user created first habit to trigger tutorial
+      const hadNoHabits = habits.length === 0;
+      if (hadNoHabits) {
+        localStorage.setItem('userHasCreatedFirstHabit', 'true');
+      }
     },
   });
 
