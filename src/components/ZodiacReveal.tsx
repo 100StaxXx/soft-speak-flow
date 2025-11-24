@@ -3,7 +3,33 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { getZodiacInfo, type ZodiacSign } from "@/utils/zodiacCalculator";
-import { ZodiacSymbols } from "@/assets/zodiac-symbols";
+import ariesImg from "@/assets/zodiac-aries.png";
+import taurusImg from "@/assets/zodiac-taurus.png";
+import geminiImg from "@/assets/zodiac-gemini.png";
+import cancerImg from "@/assets/zodiac-cancer.png";
+import leoImg from "@/assets/zodiac-leo.png";
+import virgoImg from "@/assets/zodiac-virgo.png";
+import libraImg from "@/assets/zodiac-libra.png";
+import scorpioImg from "@/assets/zodiac-scorpio.png";
+import sagittariusImg from "@/assets/zodiac-sagittarius.png";
+import capricornImg from "@/assets/zodiac-capricorn.png";
+import aquariusImg from "@/assets/zodiac-aquarius.png";
+import piscesImg from "@/assets/zodiac-pisces.png";
+
+const zodiacImages: Record<ZodiacSign, string> = {
+  aries: ariesImg,
+  taurus: taurusImg,
+  gemini: geminiImg,
+  cancer: cancerImg,
+  leo: leoImg,
+  virgo: virgoImg,
+  libra: libraImg,
+  scorpio: scorpioImg,
+  sagittarius: sagittariusImg,
+  capricorn: capricornImg,
+  aquarius: aquariusImg,
+  pisces: piscesImg,
+};
 
 interface ZodiacRevealProps {
   zodiacSign: ZodiacSign;
@@ -126,17 +152,16 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
             exit={{ opacity: 0 }}
             className="text-center z-10"
           >
-            {/* Mystical circle with creature image */}
+            {/* Mystical circle with image */}
             <motion.div
               initial={{ scale: 0, rotate: -90 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ duration: 1.8, ease: "easeOut" }}
-              className="relative mb-6"
+              className="relative mb-6 mx-auto w-80 h-80"
             >
               {/* Outer glowing ring */}
               <motion.div
                 className="absolute inset-0 rounded-full border-2 border-yellow-400/40"
-                style={{ width: '280px', height: '280px', margin: '0 auto' }}
                 animate={{
                   scale: [1, 1.1, 1],
                   opacity: [0.4, 0.8, 0.4],
@@ -148,13 +173,10 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
               />
               
               {/* Middle ring with particles */}
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ width: '280px', height: '280px', margin: '0 auto' }}
-              >
+              <div className="absolute inset-0 rounded-full">
                 {[...Array(12)].map((_, i) => {
                   const angle = (i * 360) / 12;
-                  const radius = 140;
+                  const radius = 160;
                   const x = radius * Math.cos((angle * Math.PI) / 180);
                   const y = radius * Math.sin((angle * Math.PI) / 180);
                   
@@ -180,12 +202,12 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                     />
                   );
                 })}
-              </motion.div>
+              </div>
 
-              {/* Central zodiac symbol */}
-              <div className="relative mx-auto" style={{ width: '280px', height: '280px' }}>
+              {/* Central image with glow */}
+              <div className="absolute inset-8 rounded-full overflow-hidden">
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-indigo-600/20 rounded-full blur-2xl"
+                  className="absolute inset-0 bg-gradient-to-br from-purple-600/30 to-indigo-600/30 blur-2xl"
                   animate={{
                     scale: [1, 1.3, 1],
                     opacity: [0.3, 0.6, 0.3],
@@ -196,18 +218,11 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                   }}
                 />
                 
-                <motion.div
-                  className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] p-8"
-                  animate={{
-                    rotate: [0, 5, -5, 0],
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                  }}
-                >
-                  {ZodiacSymbols[zodiacSign]}
-                </motion.div>
+                <img 
+                  src={zodiacImages[zodiacSign]} 
+                  alt={zodiacInfo.symbol}
+                  className="relative w-full h-full object-cover opacity-90"
+                />
               </div>
 
               {/* Sparkle effects around the circle */}
@@ -260,8 +275,8 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
             exit={{ opacity: 0, scale: 1.2 }}
             className="text-center z-10 max-w-2xl px-4"
           >
-            {/* Zodiac symbol with cosmic frame */}
-            <div className="relative mb-8 mx-auto" style={{ maxWidth: '320px' }}>
+            {/* Large Image Display */}
+            <div className="relative mb-8 mx-auto max-w-sm">
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -269,10 +284,10 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
               >
                 {/* Glowing aura */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-purple-500/30 to-yellow-500/30 rounded-3xl blur-3xl"
+                  className="absolute inset-0 bg-gradient-to-br from-purple-500/40 to-yellow-500/40 rounded-full blur-3xl"
                   animate={{
                     scale: [1, 1.2, 1],
-                    opacity: [0.3, 0.6, 0.3],
+                    opacity: [0.4, 0.7, 0.4],
                   }}
                   transition={{
                     duration: 3,
@@ -280,19 +295,12 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                   }}
                 />
                 
-                <div className="relative bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-2xl p-12 backdrop-blur-sm border border-yellow-400/30 flex items-center justify-center">
-                  <motion.div
-                    className="w-40 h-40 text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
-                    animate={{
-                      scale: [1, 1.1, 1],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                    }}
-                  >
-                    {ZodiacSymbols[zodiacSign]}
-                  </motion.div>
+                <div className="relative w-80 h-80 mx-auto rounded-full overflow-hidden border-4 border-yellow-400/50 shadow-[0_0_60px_rgba(234,179,8,0.4)]">
+                  <img 
+                    src={zodiacImages[zodiacSign]} 
+                    alt={zodiacInfo.symbol}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </motion.div>
             </div>
@@ -339,13 +347,12 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
             animate={{ opacity: 1, y: 0 }}
             className="text-center z-10 max-w-2xl px-4"
           >
-            {/* Smaller zodiac icon/image */}
+            {/* Smaller image with glow ring */}
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ duration: 1, ease: "easeOut" }}
-              className="mx-auto mb-6 relative"
-              style={{ width: '140px', height: '140px' }}
+              className="mx-auto mb-6 relative w-40 h-40"
             >
               {/* Rotating glow ring */}
               <motion.div
@@ -362,8 +369,12 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
               
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-yellow-600/20 rounded-full blur-xl" />
               
-              <div className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] relative z-10 p-8">
-                {ZodiacSymbols[zodiacSign]}
+              <div className="absolute inset-4 rounded-full overflow-hidden border-2 border-purple-400/50">
+                <img 
+                  src={zodiacImages[zodiacSign]} 
+                  alt={zodiacInfo.symbol}
+                  className="w-full h-full object-cover"
+                />
               </div>
             </motion.div>
 
