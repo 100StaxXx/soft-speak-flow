@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
 import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
-import { EVOLUTION_THRESHOLDS } from "@/config/xpSystem";
+import { useEvolutionThresholds } from "./useEvolutionThresholds";
 
 export interface Companion {
   id: string;
@@ -42,6 +42,7 @@ export const useCompanion = () => {
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
+  const { getThreshold, shouldEvolve } = useEvolutionThresholds();
 
   // Prevent duplicate evolution/XP requests during lag
   const evolutionInProgress = useRef(false);
@@ -298,28 +299,24 @@ export const useCompanion = () => {
     xpInProgress.current = true;
 
     const newXP = companionData.current_xp + xpAmount;
-    
-    // Check if evolution is needed
-    const currentThreshold = EVOLUTION_THRESHOLDS[companionData.current_stage as keyof typeof EVOLUTION_THRESHOLDS];
     const nextStage = companionData.current_stage + 1;
-    const nextThreshold = EVOLUTION_THRESHOLDS[nextStage as keyof typeof EVOLUTION_THRESHOLDS];
+    const nextThreshold = getThreshold(nextStage);
     
     console.log('[XP Award Debug]', {
       currentStage: companionData.current_stage,
       currentXP: companionData.current_xp,
       xpAmount,
       newXP,
-      currentThreshold,
       nextStage,
       nextThreshold,
       willEvolve: nextThreshold && newXP >= nextThreshold
     });
     
-    let shouldEvolve = false;
+    // Check if evolution is needed using centralized logic
+    const shouldEvolveNow = shouldEvolve(companionData.current_stage, newXP);
     let newStage = companionData.current_stage;
     
-    if (nextThreshold && newXP >= nextThreshold) {
-      shouldEvolve = true;
+    if (shouldEvolveNow) {
       newStage = nextStage;
       console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
     }
@@ -336,7 +333,7 @@ export const useCompanion = () => {
 
     if (updateError) throw updateError;
 
-    return { shouldEvolve, newStage, newXP };
+    return { shouldEvolve: shouldEvolveNow, newStage, newXP };
   };
 
 
@@ -505,8 +502,8 @@ export const useCompanion = () => {
   // Memoize calculated values to prevent unnecessary recalculations
   const nextEvolutionXP = useMemo(() => {
     if (!companion) return null;
-    return EVOLUTION_THRESHOLDS[(companion.current_stage + 1) as keyof typeof EVOLUTION_THRESHOLDS];
-  }, [companion?.current_stage]);
+    return getThreshold(companion.current_stage + 1);
+  }, [companion?.current_stage, getThreshold]);
 
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;

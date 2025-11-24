@@ -8,9 +8,11 @@ import { EmptyMissions } from "@/components/EmptyMissions";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MissionErrorFallback } from "@/components/ErrorFallback";
 
 
-export const DailyMissions = () => {
+const DailyMissionsContent = () => {
   const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
   
   // Enable auto-completion detection
@@ -154,3 +156,9 @@ export const DailyMissions = () => {
     </Card>
   );
 };
+
+export const DailyMissions = () => (
+  <ErrorBoundary fallback={<MissionErrorFallback />}>
+    <DailyMissionsContent />
+  </ErrorBoundary>
+);

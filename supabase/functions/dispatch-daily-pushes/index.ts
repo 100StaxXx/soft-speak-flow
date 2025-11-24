@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendToMultipleSubscriptions, PushSubscription, PushNotificationPayload } from "../_shared/webPush.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,19 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Load VAPID keys for Web Push
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@alilpush.com';
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      console.error('VAPID keys not configured');
+      return new Response(
+        JSON.stringify({ error: 'Push notification system not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const now = new Date().toISOString();
 
@@ -59,38 +73,95 @@ serve(async (req) => {
 
     for (const push of pendingPushes) {
       try {
-        // Here you would integrate with your notification system
-        // For now, we'll just mark as delivered and log
-        
         const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
         
         console.log(`Dispatching push ${push.id} to user ${push.user_id}`);
         console.log(`Pep talk: ${pepTalk?.title}`);
 
-        // Mark as delivered
-        const { error: updateError } = await supabase
-          .from('user_daily_pushes')
-          .update({ delivered_at: new Date().toISOString() })
-          .eq('id', push.id);
+        // Get user's push subscriptions
+        const { data: subscriptions, error: subError } = await supabase
+          .from('push_subscriptions')
+          .select('*')
+          .eq('user_id', push.user_id);
 
-        if (updateError) {
-          console.error(`Error updating push ${push.id}:`, updateError);
-          errors.push({ pushId: push.id, error: updateError.message });
+        if (subError) {
+          console.error(`Error fetching subscriptions for user ${push.user_id}:`, subError);
+          errors.push({ pushId: push.id, error: subError.message });
           continue;
         }
 
-        // TODO: Integrate with push notification service
-        // await sendPushNotification(push.user_id, {
-        //   title: push.daily_pep_talks?.title,
-        //   body: push.daily_pep_talks?.summary,
-        //   data: {
-        //     type: 'daily_pep_talk',
-        //     audio_url: push.daily_pep_talks?.audio_url
-        //   }
-        // });
+        if (!subscriptions || subscriptions.length === 0) {
+          console.log(`No push subscriptions for user ${push.user_id}`);
+          // Mark as delivered anyway (user has no devices registered)
+          await supabase
+            .from('user_daily_pushes')
+            .update({ delivered_at: new Date().toISOString() })
+            .eq('id', push.id);
+          dispatched++;
+          continue;
+        }
 
-        dispatched++;
-        console.log(`✓ Dispatched push ${push.id}`);
+        // Prepare notification payload
+        const payload: PushNotificationPayload = {
+          title: pepTalk?.title || 'Your Daily Pep Talk',
+          body: pepTalk?.summary || 'A new message from your mentor',
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: `pep-talk-${push.daily_pep_talk_id}`,
+          data: {
+            type: 'daily_pep_talk',
+            pep_talk_id: push.daily_pep_talk_id,
+            audio_url: pepTalk?.audio_url,
+            url: '/pep-talks'
+          }
+        };
+
+        // Send to all user's devices
+        const pushSubscriptions: PushSubscription[] = subscriptions.map(sub => ({
+          endpoint: sub.endpoint,
+          keys: sub.keys as { p256dh: string; auth: string }
+        }));
+
+        const results = await sendToMultipleSubscriptions(
+          pushSubscriptions,
+          payload,
+          {
+            publicKey: vapidPublicKey,
+            privateKey: vapidPrivateKey,
+            subject: vapidSubject
+          }
+        );
+
+        // Remove expired subscriptions
+        const expiredSubs = results
+          .filter(r => r.result.error === 'SUBSCRIPTION_EXPIRED')
+          .map(r => r.subscription.endpoint);
+
+        if (expiredSubs.length > 0) {
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .in('endpoint', expiredSubs);
+          console.log(`Removed ${expiredSubs.length} expired subscriptions`);
+        }
+
+        // Check if at least one notification was sent successfully
+        const successCount = results.filter(r => r.result.success).length;
+        
+        if (successCount > 0) {
+          // Mark as delivered
+          await supabase
+            .from('user_daily_pushes')
+            .update({ delivered_at: new Date().toISOString() })
+            .eq('id', push.id);
+          dispatched++;
+          console.log(`✓ Dispatched push ${push.id} to ${successCount}/${results.length} devices`);
+        } else {
+          errors.push({ 
+            pushId: push.id, 
+            error: `Failed to send to all ${results.length} devices` 
+          });
+        }
 
       } catch (error: any) {
         console.error(`Error dispatching push ${push.id}:`, error);

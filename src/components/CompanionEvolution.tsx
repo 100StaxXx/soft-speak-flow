@@ -6,6 +6,8 @@ import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { EvolutionErrorFallback } from "@/components/ErrorFallback";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -16,7 +18,7 @@ interface CompanionEvolutionProps {
   onComplete: () => void;
 }
 
-export const CompanionEvolution = ({ 
+const CompanionEvolutionContent = ({ 
   isEvolving, 
   newStage, 
   newImageUrl,
@@ -615,3 +617,9 @@ export const CompanionEvolution = ({
     </AnimatePresence>
   );
 };
+
+export const CompanionEvolution = (props: CompanionEvolutionProps) => (
+  <ErrorBoundary fallback={<EvolutionErrorFallback onClose={props.onComplete} />}>
+    <CompanionEvolutionContent {...props} />
+  </ErrorBoundary>
+);

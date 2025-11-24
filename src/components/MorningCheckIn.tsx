@@ -12,8 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CheckInErrorFallback } from "@/components/ErrorFallback";
 
-export const MorningCheckIn = () => {
+const MorningCheckInContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const personality = useMentorPersonality();
@@ -217,3 +219,9 @@ export const MorningCheckIn = () => {
     </Card>
   );
 };
+
+export const MorningCheckIn = () => (
+  <ErrorBoundary fallback={<CheckInErrorFallback />}>
+    <MorningCheckInContent />
+  </ErrorBoundary>
+);

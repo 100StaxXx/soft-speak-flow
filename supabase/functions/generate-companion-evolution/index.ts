@@ -1,36 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// XP thresholds for each evolution stage - MUST match useCompanion.ts
-// Stage 1 now at 10 XP for faster first evolution
-const EVOLUTION_THRESHOLDS = {
-  0: 0,      // Egg
-  1: 10,     // Hatchling - first evolution happens quickly!
-  2: 120,    // Guardian
-  3: 250,    // Ascended
-  4: 500,    // Mythic
-  5: 1200,   // Titan
-  6: 2500,
-  7: 5000,
-  8: 10000,
-  9: 20000,
-  10: 35000,
-  11: 50000,
-  12: 75000,
-  13: 100000,
-  14: 150000,
-  15: 200000,
-  16: 300000,
-  17: 450000,
-  18: 650000,
-  19: 1000000,
-  20: 1500000, // Ultimate stage
-} as const;
+// Evolution thresholds are now loaded from database (single source of truth)
+// No more hardcoded values!
 
 const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
 Your TOP PRIORITY is absolute visual continuity with the previous evolution.
@@ -108,6 +86,12 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Rate limiting check - evolution is expensive
+    const rateLimit = await checkRateLimit(supabase, userId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
+    }
+
     console.log("Fetching companion for user:", userId);
 
     // 1. Load current companion
@@ -127,8 +111,20 @@ serve(async (req) => {
 
     console.log("Current stage:", currentStage, "XP:", currentXP);
 
-    // 2. Determine if evolution is needed
-    const maxStage = 20;
+    // 2. Load evolution thresholds from database
+    const { data: thresholds, error: thresholdsError } = await supabase
+      .from("evolution_thresholds")
+      .select("*")
+      .order("stage", { ascending: true });
+
+    if (thresholdsError || !thresholds) {
+      console.error("Failed to load evolution thresholds:", thresholdsError);
+      throw new Error("Evolution thresholds not available");
+    }
+
+    const maxStage = thresholds[thresholds.length - 1].stage;
+    
+    // 3. Determine if evolution is needed
     if (currentStage >= maxStage) {
       return new Response(
         JSON.stringify({ evolved: false, message: "Max stage reached", current_stage: currentStage, xp: currentXP }),
@@ -136,7 +132,12 @@ serve(async (req) => {
       );
     }
 
-    const nextThreshold = EVOLUTION_THRESHOLDS[currentStage + 1 as keyof typeof EVOLUTION_THRESHOLDS];
+    const nextThresholdData = thresholds.find(t => t.stage === currentStage + 1);
+    if (!nextThresholdData) {
+      throw new Error(`No threshold found for stage ${currentStage + 1}`);
+    }
+
+    const nextThreshold = nextThresholdData.xp_required;
     
     if (currentXP < nextThreshold) {
       return new Response(

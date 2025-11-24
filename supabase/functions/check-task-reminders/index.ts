@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { sendToMultipleSubscriptions, PushSubscription, PushNotificationPayload } from "../_shared/webPush.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,19 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Load VAPID keys
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@alilpush.com';
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      console.error('VAPID keys not configured');
+      return new Response(
+        JSON.stringify({ error: 'Push notification system not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     console.log('Checking for tasks needing reminders...');
     
@@ -86,41 +100,53 @@ Deno.serve(async (req) => {
                               companion?.spirit_animal === 'Lion' ? '🦁' :
                               companion?.spirit_animal === 'Fox' ? '🦊' : '⚔️';
         
-        const notification = {
+        const payload: PushNotificationPayload = {
           title: `Quest Starting Soon! ${companionEmoji}`,
-          body: `${task.task_text}\n+${task.xp_reward} XP`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
+          body: `${task.task_text} (+${task.xp_reward} XP)`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
           tag: `task-${task.id}`,
           data: {
             taskId: task.id,
-            url: '/tasks',
-            actions: [
-              { action: 'complete', title: 'Complete Now' },
-              { action: 'snooze', title: 'Snooze 5min' },
-              { action: 'open', title: 'Open App' }
-            ]
-          }
+            type: 'task_reminder',
+            url: '/tasks'
+          },
+          actions: [
+            { action: 'open', title: 'View Task' },
+            { action: 'snooze', title: 'Snooze 5min' }
+          ]
         };
         
         // Send to all user's devices
-        for (const subscription of subscriptions) {
-          try {
-            // Use Web Push protocol to send notification
-            const pushSubscription = {
-              endpoint: subscription.endpoint,
-              keys: subscription.keys
-            };
-            
-            // This should use a proper web push library in production
-            // For now, we'll log that a reminder should be sent
-            console.log(`Would send reminder to ${subscription.endpoint}`);
-            
-            console.log(`Reminder prepared for endpoint`);
-          } catch (notifError) {
-            console.error(`Failed to send to ${subscription.endpoint}:`, notifError);
+        const pushSubscriptions: PushSubscription[] = subscriptions.map(sub => ({
+          endpoint: sub.endpoint,
+          keys: sub.keys as { p256dh: string; auth: string }
+        }));
+
+        const results = await sendToMultipleSubscriptions(
+          pushSubscriptions,
+          payload,
+          {
+            publicKey: vapidPublicKey,
+            privateKey: vapidPrivateKey,
+            subject: vapidSubject
           }
+        );
+
+        // Remove expired subscriptions
+        const expiredSubs = results
+          .filter(r => r.result.error === 'SUBSCRIPTION_EXPIRED')
+          .map(r => r.subscription.endpoint);
+
+        if (expiredSubs.length > 0) {
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .in('endpoint', expiredSubs);
         }
+
+        const successCount = results.filter(r => r.result.success).length;
+        console.log(`Sent reminder to ${successCount}/${results.length} devices for task ${task.id}`);
         
         // Mark reminder as sent
         await supabase
