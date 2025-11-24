@@ -53,17 +53,15 @@ const Auth = () => {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only redirect on actual sign-in events, not on token refresh or other events
       if (event === 'SIGNED_IN' && session) {
-        // Use a promise queue to handle profile creation properly
         try {
-          // Add a small delay to let the auth state settle
           await new Promise(resolve => setTimeout(resolve, 100));
           await ensureProfile(session.user.id, session.user.email);
           const path = await getAuthRedirectPath(session.user.id);
           navigate(path);
         } catch (error) {
           console.error('Error in auth state change:', error);
-          // Still navigate even if profile creation fails
           navigate('/onboarding');
         }
       }
