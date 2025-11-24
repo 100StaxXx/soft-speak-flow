@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Sparkles, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
+import { getStageName } from "@/config/companionStages";
 
 interface CompanionEvolutionHistoryProps {
   companionId: string;
@@ -13,14 +14,36 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
   const { data: evolutions, isLoading } = useQuery({
     queryKey: ["companion-evolutions", companionId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get companion creation info for Stage 0
+      const { data: companion, error: companionError } = await supabase
+        .from("user_companion")
+        .select("created_at, current_image_url")
+        .eq("id", companionId)
+        .single();
+
+      if (companionError) throw companionError;
+
+      // Get evolution history
+      const { data: evolutionData, error } = await supabase
         .from("companion_evolutions")
         .select("*")
         .eq("companion_id", companionId)
         .order("evolved_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+
+      // Create Stage 0 entry from companion creation
+      const stage0Entry = {
+        id: `${companionId}-stage-0`,
+        companion_id: companionId,
+        stage: 0,
+        image_url: companion.current_image_url,
+        evolved_at: companion.created_at,
+        xp_at_evolution: 0,
+      };
+
+      // Combine Stage 0 with evolutions, sorted by stage descending
+      return [stage0Entry, ...(evolutionData || [])];
     },
   });
 
@@ -69,14 +92,14 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
                 {evolution.image_url && (
                   <img
                     src={evolution.image_url}
-                    alt={`Stage ${evolution.stage}`}
+                    alt={`${getStageName(evolution.stage)}`}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     loading="lazy"
                     decoding="async"
                   />
                 )}
                 <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-bold">
-                  Stage {evolution.stage}
+                  {getStageName(evolution.stage)}
                 </div>
               </div>
               
