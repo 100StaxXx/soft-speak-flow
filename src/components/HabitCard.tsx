@@ -126,7 +126,6 @@ export const HabitCard = memo(({
                 completedToday && "bg-primary/20 text-primary hover:bg-primary/30"
               )}
               aria-label={completedToday ? `${title} completed for today` : `Mark ${title} as complete`}
-              data-tour="first-habit-checkbox"
             >
               <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
             </Button>

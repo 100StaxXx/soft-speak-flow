@@ -645,22 +645,23 @@ export default function Tasks() {
                           onAction={() => setShowAddHabit(true)}
                         />
                       ) : (
-                        habits.map(habit => {
+                        habits.map((habit, index) => {
                           const isCompleted = completions.some(c => c.habit_id === habit.id);
                           return (
-                            <HabitCard
-                              key={habit.id}
-                              id={habit.id}
-                              title={habit.title}
-                              currentStreak={habit.current_streak || 0}
-                              longestStreak={habit.longest_streak || 0}
-                              completedToday={isCompleted}
-                              difficulty={habit.difficulty}
-                              onComplete={() => toggleHabitMutation.mutate({ 
-                                habitId: habit.id, 
-                                isCompleted 
-                              })}
-                            />
+                            <div key={habit.id} data-tour={index === 0 ? "first-habit-checkbox" : undefined}>
+                              <HabitCard
+                                id={habit.id}
+                                title={habit.title}
+                                currentStreak={habit.current_streak || 0}
+                                longestStreak={habit.longest_streak || 0}
+                                completedToday={isCompleted}
+                                difficulty={habit.difficulty}
+                                onComplete={() => toggleHabitMutation.mutate({ 
+                                  habitId: habit.id, 
+                                  isCompleted 
+                                })}
+                              />
+                            </div>
                           );
                         })
                       )}
