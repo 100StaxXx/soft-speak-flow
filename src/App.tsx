@@ -43,6 +43,7 @@ const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
+const BattleArena = lazy(() => import("./pages/BattleArena"));
 
 
 const queryClient = new QueryClient({
@@ -119,6 +120,7 @@ const AppContent = memo(() => {
           <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
           <Route path="/join/:code" element={<JoinEpic />} />
           <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
+          <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
