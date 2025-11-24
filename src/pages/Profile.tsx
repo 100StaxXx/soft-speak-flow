@@ -201,22 +201,11 @@ const Profile = () => {
                       <Label>Email</Label>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
                     </div>
-                    {profile?.is_premium && (
-                      <div className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent text-primary-foreground px-3 py-1 rounded-full">
-                        <Crown className="h-4 w-4" />
-                        <span className="text-sm font-medium">Premium</span>
-                      </div>
-                    )}
                   </div>
-                  {!profile?.is_premium && (
-                    <Button onClick={() => navigate("/premium")} variant="outline" className="w-full">
-                      <Crown className="h-4 w-4 mr-2" />Upgrade to Premium
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
 
-              {profile?.is_premium && <SubscriptionManagement />}
+              <SubscriptionManagement />
 
               <Card>
                 <CardHeader>
