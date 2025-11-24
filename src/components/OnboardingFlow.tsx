@@ -67,13 +67,21 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
       const nextSlide = currentSlide + 1;
       setCurrentSlide(nextSlide);
       
-      // Save progress
+      // Save progress - preserve existing onboarding_data
       if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("onboarding_data")
+          .eq("id", user.id)
+          .maybeSingle();
+        
+        const existingData = (data?.onboarding_data as any) || {};
+        
         await supabase
           .from("profiles")
           .update({ 
             onboarding_step: 'intro',
-            onboarding_data: { currentSlide: nextSlide }
+            onboarding_data: { ...existingData, currentSlide: nextSlide }
           })
           .eq("id", user.id);
       }
