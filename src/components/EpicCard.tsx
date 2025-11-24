@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState } from "react";
 import { EpicLeaderboard } from "./EpicLeaderboard";
-import { EpicActivityFeed } from "./EpicActivityFeed";
 
 // Discord channel URL - update this with your actual Discord channel
 const DISCORD_CHANNEL_URL = "https://discord.com/channels/yourserver/yourchannel";
@@ -203,9 +202,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
 
         {/* Community Features for Shared Epics */}
         {epic.is_public && (
-          <div className="space-y-3 mt-4 pt-4 border-t border-border">
+          <div className="mt-4 pt-4 border-t border-border">
             <EpicLeaderboard epicId={epic.id} />
-            <EpicActivityFeed epicId={epic.id} />
           </div>
         )}
 
