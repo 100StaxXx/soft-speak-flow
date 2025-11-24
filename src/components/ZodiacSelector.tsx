@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
+import { ZodiacSymbols } from "@/assets/zodiac-symbols";
 
 interface ZodiacSelectorProps {
   onComplete: (zodiacSign: ZodiacSign) => void;
@@ -107,10 +108,10 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
 
               <div className="relative z-10 flex flex-col items-center gap-2">
                 {/* Zodiac Symbol */}
-                <div className={`text-5xl md:text-7xl transition-all duration-300 ${
-                  selectedZodiac === zodiac.sign ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]' : 'text-white/90'
+                <div className={`w-16 h-16 md:w-24 md:h-24 transition-all duration-300 ${
+                  selectedZodiac === zodiac.sign ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.9)] scale-110' : 'text-white/90'
                 }`}>
-                  {zodiac.symbol}
+                  {ZodiacSymbols[zodiac.sign]}
                 </div>
                 
                 {/* Sign name */}

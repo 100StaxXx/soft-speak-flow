@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { getZodiacInfo, type ZodiacSign } from "@/utils/zodiacCalculator";
+import { ZodiacSymbols } from "@/assets/zodiac-symbols";
 
 interface ZodiacRevealProps {
   zodiacSign: ZodiacSign;
@@ -196,7 +197,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                 />
                 
                 <motion.div
-                  className="w-full h-full flex items-center justify-center text-9xl text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]"
+                  className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] p-8"
                   animate={{
                     rotate: [0, 5, -5, 0],
                   }}
@@ -205,7 +206,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                     repeat: Infinity,
                   }}
                 >
-                  {zodiacInfo.symbol}
+                  {ZodiacSymbols[zodiacSign]}
                 </motion.div>
               </div>
 
@@ -281,7 +282,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                 
                 <div className="relative bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-2xl p-12 backdrop-blur-sm border border-yellow-400/30 flex items-center justify-center">
                   <motion.div
-                    className="text-9xl text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+                    className="w-40 h-40 text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
                     animate={{
                       scale: [1, 1.1, 1],
                     }}
@@ -290,7 +291,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                       repeat: Infinity,
                     }}
                   >
-                    {zodiacInfo.symbol}
+                    {ZodiacSymbols[zodiacSign]}
                   </motion.div>
                 </div>
               </motion.div>
@@ -361,8 +362,8 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
               
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-yellow-600/20 rounded-full blur-xl" />
               
-              <div className="w-full h-full flex items-center justify-center text-7xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] relative z-10">
-                {zodiacInfo.symbol}
+              <div className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] relative z-10 p-8">
+                {ZodiacSymbols[zodiacSign]}
               </div>
             </motion.div>
 
