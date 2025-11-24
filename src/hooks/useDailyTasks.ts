@@ -48,7 +48,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
       recurrencePattern,
       recurrenceDays,
       reminderEnabled,
-      reminderMinutesBefore
+      reminderMinutesBefore,
+      category
     }: { 
       taskText: string; 
       difficulty: 'easy' | 'medium' | 'hard'; 
@@ -60,6 +61,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
       recurrenceDays?: number[] | null;
       reminderEnabled?: boolean;
       reminderMinutesBefore?: number;
+      category?: string;
     }) => {
       // Prevent duplicate submissions
       if (addInProgress.current) {
@@ -86,6 +88,23 @@ export const useDailyTasks = (selectedDate?: Date) => {
         }
 
         const xpReward = getQuestXP(difficulty);
+
+        // Auto-detect category based on keywords
+        let detectedCategory = category || 'general';
+        const text = taskText.toLowerCase();
+        
+        const categoryKeywords = {
+          body: ['gym', 'run', 'exercise', 'workout', 'walk', 'yoga', 'stretch', 'fitness', 'sports'],
+          soul: ['meditate', 'journal', 'breathe', 'gratitude', 'reflect', 'pray', 'mindful', 'relax', 'rest'],
+          mind: ['read', 'learn', 'study', 'plan', 'organize', 'think', 'write', 'research', 'course']
+        };
+
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+          if (keywords.some(keyword => text.includes(keyword))) {
+            detectedCategory = cat;
+            break;
+          }
+        }
 
         const { error } = await supabase
           .from('daily_tasks')
