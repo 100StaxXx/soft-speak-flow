@@ -1,23 +1,38 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     console.log('Checking for tasks needing reminders...');
     
+    // Get current date and time for comparison
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
     // Find tasks that need reminders sent
+    // We need to find tasks where scheduled_time today is coming up
     const { data: tasks, error } = await supabase
       .from('daily_tasks')
-      .select('*, user_id')
+      .select('*')
       .eq('reminder_enabled', true)
       .eq('reminder_sent', false)
       .eq('completed', false)
-      .not('scheduled_time', 'is', null)
-      .lte('scheduled_time', new Date(Date.now() + 60 * 60 * 1000).toISOString()); // Next hour
+      .eq('task_date', today)
+      .not('scheduled_time', 'is', null);
     
     if (error) {
       console.error('Error fetching tasks:', error);
@@ -26,14 +41,17 @@ Deno.serve(async () => {
     
     console.log(`Found ${tasks?.length || 0} tasks to check`);
     
-    const now = new Date();
+    
     const tasksToRemind = tasks?.filter(task => {
       if (!task.scheduled_time || !task.reminder_minutes_before) return false;
       
-      const scheduledTime = new Date(task.scheduled_time);
-      const reminderTime = new Date(scheduledTime.getTime() - task.reminder_minutes_before * 60 * 1000);
+      // Combine task_date and scheduled_time to get full datetime
+      const scheduledDateTime = new Date(`${task.task_date}T${task.scheduled_time}`);
+      const reminderTime = new Date(scheduledDateTime.getTime() - task.reminder_minutes_before * 60 * 1000);
       
-      return now >= reminderTime;
+      // Check if it's time to send reminder (within 1 minute window)
+      const timeDiff = reminderTime.getTime() - now.getTime();
+      return timeDiff >= -30000 && timeDiff <= 30000; // 30 second window on either side
     }) || [];
     
     console.log(`Sending reminders for ${tasksToRemind.length} tasks`);
@@ -57,7 +75,7 @@ Deno.serve(async () => {
           .from('user_companion')
           .select('spirit_animal')
           .eq('user_id', task.user_id)
-          .single();
+          .maybeSingle();
         
         const companionEmoji = companion?.spirit_animal === 'Wolf' ? '🐺' :
                               companion?.spirit_animal === 'Tiger' ? '🐯' :
@@ -131,14 +149,14 @@ Deno.serve(async () => {
         checked: tasks?.length || 0,
         reminded: tasksToRemind.length 
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in check-task-reminders:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
