@@ -1,4 +1,4 @@
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight, Clock, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -27,12 +27,15 @@ interface CalendarMonthViewProps {
 export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick }: CalendarMonthViewProps) => {
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfMonth(monthEnd);
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   const getTasksForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     return tasks.filter(task => {
-      const taskDate = new Date(task.task_date || selectedDate);
-      return isSameDay(taskDate, date);
+      // task_date is already in 'yyyy-MM-dd' format from database
+      return task.task_date === dateStr;
     });
   };
 
