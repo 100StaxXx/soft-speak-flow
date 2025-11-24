@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.generate-companion-evolution]
 verify_jwt = false
+
+[functions.generate-zodiac-images]
+verify_jwt = false
