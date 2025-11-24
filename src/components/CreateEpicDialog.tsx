@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Target, Zap, Plus, Trash2 } from "lucide-react";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { EpicHabitForm } from "@/components/EpicHabitForm";
+import { EpicHabitList } from "@/components/EpicHabitList";
 
 interface NewHabit {
   title: string;
@@ -47,10 +49,10 @@ export const CreateEpicDialog = ({
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [currentHabitDays, setCurrentHabitDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
-  const addHabit = () => {
+  const addHabit = useCallback(() => {
     if (!currentHabitTitle.trim() || newHabits.length >= 2) return;
     
-    setNewHabits([...newHabits, {
+    setNewHabits(prev => [...prev, {
       title: currentHabitTitle.trim(),
       difficulty: currentHabitDifficulty,
       frequency: currentHabitDays.length === 7 ? 'daily' : 'custom',
@@ -60,13 +62,13 @@ export const CreateEpicDialog = ({
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  };
+  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, newHabits.length]);
 
-  const removeHabit = (index: number) => {
-    setNewHabits(newHabits.filter((_, i) => i !== index));
-  };
+  const removeHabit = useCallback((index: number) => {
+    setNewHabits(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (!title.trim() || newHabits.length === 0) return;
 
     onCreateEpic({
@@ -84,9 +86,9 @@ export const CreateEpicDialog = ({
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  };
+  }, [title, description, targetDays, newHabits, onCreateEpic]);
 
-  const calculateXPReward = () => targetDays * 10;
+  const calculateXPReward = useCallback(() => targetDays * 10, [targetDays]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,62 +161,20 @@ export const CreateEpicDialog = ({
           <div className="space-y-3">
             <Label>Epic Habits (Required)</Label>
             
-            {/* Existing habits list */}
-            {newHabits.length > 0 && (
-              <div className="space-y-2">
-                {newHabits.map((habit, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{habit.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {habit.frequency === 'daily' ? 'Daily' : 'Custom days'}
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeHabit(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <EpicHabitList habits={newHabits} onRemove={removeHabit} />
             
             {/* Add new habit form */}
             {newHabits.length < 2 && (
-              <div className="border rounded-lg p-3 space-y-3">
-                <Input
-                  placeholder="Habit name (e.g., Morning run)"
-                  value={currentHabitTitle}
-                  onChange={(e) => setCurrentHabitTitle(e.target.value)}
-                  maxLength={60}
-                />
-                
-                <HabitDifficultySelector
-                  value={currentHabitDifficulty}
-                  onChange={setCurrentHabitDifficulty}
-                />
-                
-                <FrequencyPicker
-                  selectedDays={currentHabitDays}
-                  onDaysChange={setCurrentHabitDays}
-                />
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addHabit}
-                  disabled={!currentHabitTitle.trim()}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Habit {newHabits.length > 0 && `(${2 - newHabits.length} remaining)`}
-                </Button>
-              </div>
+              <EpicHabitForm
+                habitTitle={currentHabitTitle}
+                difficulty={currentHabitDifficulty}
+                selectedDays={currentHabitDays}
+                habitCount={newHabits.length}
+                onTitleChange={setCurrentHabitTitle}
+                onDifficultyChange={setCurrentHabitDifficulty}
+                onDaysChange={setCurrentHabitDays}
+                onAddHabit={addHabit}
+              />
             )}
             
             <p className="text-xs text-muted-foreground">
