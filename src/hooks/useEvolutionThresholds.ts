@@ -24,7 +24,7 @@ export const useEvolutionThresholds = () => {
       return data as EvolutionThreshold[];
     },
     staleTime: Infinity, // Never refetch - thresholds rarely change
-    cacheTime: Infinity, // Keep in cache forever
+    gcTime: Infinity, // Keep in cache forever (renamed from cacheTime in React Query v5)
   });
 
   // Create lookup map for quick access

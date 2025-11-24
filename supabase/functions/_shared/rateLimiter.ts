@@ -16,7 +16,7 @@ export interface RateLimitResult {
  * Tracks usage in ai_output_validation_log table
  */
 export async function checkRateLimit(
-  supabase: SupabaseClient,
+  supabase: any,
   userId: string,
   functionName: string,
   config: RateLimitConfig
