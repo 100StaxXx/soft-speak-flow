@@ -7,6 +7,8 @@ import { MentorGrid } from "@/components/MentorGrid";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { NameInput } from "@/components/NameInput";
 import { LegalAcceptance } from "@/components/LegalAcceptance";
+import { BirthdateInput } from "@/components/BirthdateInput";
+import { ZodiacReveal } from "@/components/ZodiacReveal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +17,7 @@ import { retryWithBackoff } from "@/utils/retry";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 import { OnboardingData } from "@/types/profile";
+import { calculateZodiacSign, type ZodiacSign } from "@/utils/zodiacCalculator";
 
 interface Mentor {
   id: string;
@@ -41,12 +44,14 @@ interface MentorExplanation {
 }
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'legal' | 'name' | 'questionnaire' | 'result' | 'browse' | 'companion'>('legal');
+  const [stage, setStage] = useState<'legal' | 'name' | 'birthdate' | 'questionnaire' | 'result' | 'zodiac' | 'browse' | 'companion'>('legal');
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
+  const [birthdate, setBirthdate] = useState<Date | null>(null);
+  const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const { user } = useAuth();
   const { createCompanion } = useCompanion();
   const navigate = useNavigate();
@@ -149,7 +154,7 @@ export default function Onboarding() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          onboarding_step: 'questionnaire',
+          onboarding_step: 'birthdate',
           onboarding_data: {
             ...existingData,
             userName: name,
@@ -164,10 +169,58 @@ export default function Onboarding() {
         description: `Nice to meet you, ${name}!`,
       });
 
-      setStage('questionnaire');
+      setStage('birthdate');
     } catch (error: unknown) {
       console.error("Error saving name:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to save name";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleBirthdateSubmit = async (selectedDate: Date) => {
+    if (!user) return;
+
+    try {
+      setSelecting(true);
+      setBirthdate(selectedDate);
+      
+      const calculatedZodiac = calculateZodiacSign(selectedDate);
+      setZodiacSign(calculatedZodiac);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const existingData = (profile?.onboarding_data as OnboardingData) || {};
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          birthdate: selectedDate.toISOString().split('T')[0],
+          zodiac_sign: calculatedZodiac,
+          onboarding_step: 'questionnaire',
+          onboarding_data: {
+            ...existingData,
+            birthdate: selectedDate.toISOString(),
+            zodiacSign: calculatedZodiac,
+          },
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      setStage('questionnaire');
+    } catch (error: unknown) {
+      console.error("Error saving birthdate:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save birthdate";
       toast({
         title: "Error",
         description: errorMessage,
@@ -326,14 +379,18 @@ export default function Onboarding() {
         description: `${recommendedMentor.name} is now your guide.`,
       });
 
-      // Move to companion creation
+      // Move to zodiac reveal if we have zodiac data
       await waitForProfileUpdate();
-      setStage('companion');
+      if (zodiacSign) {
+        setStage('zodiac');
+      } else {
+        setStage('companion');
+      }
       
       // Save progress
       const { error: progressError } = await supabase
         .from("profiles")
-        .update({ onboarding_step: 'companion' })
+        .update({ onboarding_step: zodiacSign ? 'zodiac' : 'companion' })
         .eq("id", user.id);
         
       if (progressError) {
@@ -349,6 +406,22 @@ export default function Onboarding() {
       });
     } finally {
       setSelecting(false);
+    }
+  };
+
+  const handleZodiacComplete = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: 'companion' })
+        .eq("id", user.id);
+      
+      setStage('companion');
+    } catch (error) {
+      console.error("Error saving zodiac progress:", error);
+      setStage('companion'); // Continue anyway
     }
   };
 
@@ -511,6 +584,10 @@ export default function Onboarding() {
         />
       )}
 
+      {stage === "birthdate" && (
+        <BirthdateInput onComplete={handleBirthdateSubmit} />
+      )}
+
       {stage === "questionnaire" && (
         <EnhancedQuestionnaire onComplete={handleQuestionnaireComplete} />
       )}
@@ -522,6 +599,14 @@ export default function Onboarding() {
           onConfirm={handleConfirmMentor}
           onSeeAll={handleSeeAllMentors}
           isConfirming={selecting}
+        />
+      )}
+
+      {stage === "zodiac" && zodiacSign && recommendedMentor && (
+        <ZodiacReveal 
+          zodiacSign={zodiacSign} 
+          mentorName={recommendedMentor.name}
+          onComplete={handleZodiacComplete}
         />
       )}
 
