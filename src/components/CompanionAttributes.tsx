@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Brain, Dumbbell, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -23,17 +24,20 @@ const ATTRIBUTE_INFO = {
   body: {
     icon: Dumbbell,
     label: "Body",
-    color: "text-orange-500",
+    color: "text-category-body",
+    progressColor: "bg-category-body"
   },
   mind: {
     icon: Brain,
     label: "Mind",
-    color: "text-purple-500",
+    color: "text-category-mind",
+    progressColor: "bg-category-mind"
   },
   soul: {
     icon: Sparkles,
     label: "Soul",
-    color: "text-blue-500",
+    color: "text-category-soul",
+    progressColor: "bg-category-soul"
   },
 };
 
@@ -72,10 +76,16 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
                     </div>
                     <span className="text-muted-foreground font-mono">{value}/100</span>
                   </div>
-                  <Progress 
-                    value={value} 
-                    className="h-1.5"
-                  />
+                  <div className="relative">
+                    <Progress 
+                      value={value} 
+                      className="h-1.5"
+                    />
+                    <div 
+                      className={cn("absolute inset-0 rounded-full", info.progressColor)}
+                      style={{ width: `${value}%` }}
+                    />
+                  </div>
                 </button>
               );
             })}

@@ -10,12 +10,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Target, Zap, Plus, Trash2 } from "lucide-react";
+import { Target, Zap, Plus, Trash2, Swords, Sparkles, Leaf, Sun } from "lucide-react";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+
+const themeConfig: Record<EpicTheme, { icon: typeof Target; label: string; colors: string; gradient: string }> = {
+  heroic: {
+    icon: Target,
+    label: "Heroic",
+    colors: "from-epic-heroic to-purple-500",
+    gradient: "bg-gradient-to-r from-epic-heroic/20 to-purple-500/20 border-epic-heroic/40"
+  },
+  warrior: {
+    icon: Swords,
+    label: "Warrior",
+    colors: "from-epic-warrior to-orange-500",
+    gradient: "bg-gradient-to-r from-epic-warrior/20 to-orange-500/20 border-epic-warrior/40"
+  },
+  mystic: {
+    icon: Sparkles,
+    label: "Mystic",
+    colors: "from-epic-mystic to-blue-500",
+    gradient: "bg-gradient-to-r from-epic-mystic/20 to-blue-500/20 border-epic-mystic/40"
+  },
+  nature: {
+    icon: Leaf,
+    label: "Nature",
+    colors: "from-epic-nature to-emerald-500",
+    gradient: "bg-gradient-to-r from-epic-nature/20 to-emerald-500/20 border-epic-nature/40"
+  },
+  solar: {
+    icon: Sun,
+    label: "Solar",
+    colors: "from-epic-solar to-amber-500",
+    gradient: "bg-gradient-to-r from-epic-solar/20 to-amber-500/20 border-epic-solar/40"
+  }
+};
 
 interface NewHabit {
   title: string;
@@ -33,6 +69,7 @@ interface CreateEpicDialogProps {
     target_days: number;
     habits: NewHabit[];
     is_public?: boolean;
+    theme_color?: EpicTheme;
   }) => void;
   isCreating: boolean;
 }
@@ -47,6 +84,7 @@ export const CreateEpicDialog = ({
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
   const [isPublic, setIsPublic] = useState(false);
+  const [themeColor, setThemeColor] = useState<EpicTheme>('heroic');
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -80,6 +118,7 @@ export const CreateEpicDialog = ({
       target_days: targetDays,
       habits: newHabits,
       is_public: isPublic,
+      theme_color: themeColor,
     });
 
     // Reset form
@@ -87,11 +126,12 @@ export const CreateEpicDialog = ({
     setDescription("");
     setTargetDays(30);
     setIsPublic(false);
+    setThemeColor('heroic');
     setNewHabits([]);
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  }, [title, description, targetDays, newHabits, onCreateEpic]);
+  }, [title, description, targetDays, newHabits, themeColor, isPublic, onCreateEpic]);
 
   const calculateXPReward = useCallback(() => targetDays * 10, [targetDays]);
 
@@ -160,6 +200,38 @@ export const CreateEpicDialog = ({
               onChange={(e) => setTargetDays(parseInt(e.target.value) || 30)}
               className="mt-2"
             />
+          </div>
+
+          {/* Epic Theme Selector */}
+          <div className="space-y-2">
+            <Label>Epic Theme</Label>
+            <div className="grid grid-cols-5 gap-2">
+              {(Object.keys(themeConfig) as EpicTheme[]).map((theme) => {
+                const config = themeConfig[theme];
+                const Icon = config.icon;
+                return (
+                  <Button
+                    key={theme}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setThemeColor(theme)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 h-auto py-3 transition-all",
+                      themeColor === theme 
+                        ? `${config.gradient} border-2 shadow-lg` 
+                        : "hover:bg-muted"
+                    )}
+                  >
+                    <Icon className={cn(
+                      "h-5 w-5",
+                      themeColor === theme && `bg-gradient-to-r ${config.colors} bg-clip-text text-transparent`
+                    )} />
+                    <span className="text-xs">{config.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Share Epic Toggle */}
