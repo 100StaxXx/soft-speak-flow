@@ -12,6 +12,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
@@ -88,6 +89,7 @@ const EvolutionAwareContent = memo(() => {
     <>
       <GlobalEvolutionListener />
       <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
+      <SubscriptionGate />
     </>
   );
 });
