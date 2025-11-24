@@ -4,6 +4,8 @@ import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { SchedulePowerUps } from "@/components/SchedulePowerUps";
+import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +85,14 @@ export default function Tasks() {
   
   // Get all tasks for calendar views
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, calendarView);
+  
+  // Celebration states
+  const [showCelebration, setShowCelebration] = useState<{
+    show: boolean;
+    type: "perfect_week" | "power_hour" | "deep_work" | "conflict_free";
+  }>({ show: false, type: "perfect_week" });
+  
+
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -388,6 +398,23 @@ export default function Tasks() {
     }
   };
 
+  // Helper to check task conflicts
+  const checkTaskConflicts = (task: any, allTasks: any[]) => {
+    for (const other of allTasks) {
+      if (task.id === other.id || !task.scheduled_time || !other.scheduled_time) continue;
+      if (task.task_date !== other.task_date) continue;
+      
+      const t1Start = new Date(`2000-01-01 ${task.scheduled_time}`);
+      const t1End = new Date(t1Start.getTime() + ((task.estimated_duration || 0) * 60000));
+      const t2Start = new Date(`2000-01-01 ${other.scheduled_time}`);
+      const t2End = new Date(t2Start.getTime() + ((other.estimated_duration || 0) * 60000));
+      
+      if (t1Start < t2End && t2Start < t1End) return true;
+    }
+    return false;
+  };
+
+
   return (
     <div className="min-h-screen bg-background pb-20 relative">
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
@@ -400,6 +427,13 @@ export default function Tasks() {
           </div>
         </div>
       )}
+      
+      {/* Schedule Celebration */}
+      <ScheduleCelebration 
+        trigger={showCelebration.show}
+        type={showCelebration.type}
+        onComplete={() => setShowCelebration({ ...showCelebration, show: false })}
+      />
       
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <BrandTagline />
@@ -562,17 +596,34 @@ export default function Tasks() {
                     if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
                       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+                      
                       toast({
                         title: "Quest rescheduled",
                         description: newTime 
                           ? `Moved to ${format(newDate, 'MMM d')} at ${newTime}`
                           : `Moved to ${format(newDate, 'MMM d')}`
                       });
+                      
+                      // Check for celebration triggers
+                      setTimeout(() => {
+                        const allTasks = allCalendarTasks;
+                        const scheduledTasks = allTasks.filter((t: any) => t.scheduled_time && t.estimated_duration);
+                        
+                        // Check for perfect week
+                        if (scheduledTasks.length >= 5 && scheduledTasks.every((t: any) => !checkTaskConflicts(t, scheduledTasks))) {
+                          setShowCelebration({ show: true, type: "perfect_week" });
+                        }
+                      }, 500);
                     }
                   }}
                 />
               )}
             </Card>
+
+            {/* Schedule Power-Ups */}
+            {calendarView === "list" && (
+              <SchedulePowerUps tasks={tasks} />
+            )}
 
             {/* Time Conflict Detector */}
             {calendarView === "list" && (

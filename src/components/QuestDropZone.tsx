@@ -1,0 +1,77 @@
+import { useState } from "react";
+import { Plus, Sparkles, Target } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface QuestDropZoneProps {
+  isOver?: boolean;
+  canDrop?: boolean;
+  hasConflict?: boolean;
+  onDrop: (e: React.DragEvent) => void;
+  children?: React.ReactNode;
+  time?: string;
+}
+
+export const QuestDropZone = ({ 
+  isOver, 
+  canDrop, 
+  hasConflict, 
+  onDrop, 
+  children,
+  time 
+}: QuestDropZoneProps) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        onDrop(e);
+      }}
+      className={cn(
+        "min-h-[80px] border rounded-lg p-2 transition-all duration-300 relative overflow-hidden",
+        isDragOver && !hasConflict && "border-primary bg-primary/10 shadow-glow scale-105",
+        isDragOver && hasConflict && "border-destructive bg-destructive/10 shadow-destructive/50",
+        !isDragOver && hasConflict && "border-destructive/50 bg-destructive/5",
+        !isDragOver && !hasConflict && "border-border hover:border-primary/30"
+      )}
+    >
+      {/* Background animation on drag over */}
+      {isDragOver && !hasConflict && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-pulse" />
+      )}
+
+      {/* Drop hint */}
+      {isDragOver && !children && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2 text-primary animate-bounce">
+            <Plus className="h-6 w-6" />
+            <span className="text-xs font-medium">Drop quest here</span>
+          </div>
+        </div>
+      )}
+
+      {/* Sparkle effect on successful drop zone */}
+      {isDragOver && !hasConflict && (
+        <>
+          <Sparkles className="absolute top-2 left-2 h-4 w-4 text-primary animate-pulse" />
+          <Sparkles className="absolute bottom-2 right-2 h-4 w-4 text-primary animate-pulse" style={{ animationDelay: '300ms' }} />
+        </>
+      )}
+
+      {/* Conflict warning */}
+      {hasConflict && !isDragOver && (
+        <div className="absolute top-1 right-1 bg-destructive/20 rounded-full p-1">
+          <Target className="h-3 w-3 text-destructive" />
+        </div>
+      )}
+
+      {children}
+    </div>
+  );
+};
