@@ -1482,6 +1482,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          birthdate: string | null
           created_at: string | null
           current_habit_streak: number | null
           daily_push_enabled: boolean | null
@@ -1501,8 +1502,10 @@ export type Database = {
           selected_mentor_id: string | null
           timezone: string | null
           updated_at: string | null
+          zodiac_sign: string | null
         }
         Insert: {
+          birthdate?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
@@ -1522,8 +1525,10 @@ export type Database = {
           selected_mentor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
+          zodiac_sign?: string | null
         }
         Update: {
+          birthdate?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
@@ -1543,6 +1548,7 @@ export type Database = {
           selected_mentor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
+          zodiac_sign?: string | null
         }
         Relationships: [
           {

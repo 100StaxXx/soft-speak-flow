@@ -8,6 +8,8 @@ export interface OnboardingData {
   mentorName?: string;
   walkthrough_completed?: boolean;
   quests_tutorial_seen?: boolean;
+  birthdate?: string;
+  zodiacSign?: string;
   explanation?: {
     title: string;
     subtitle: string;
