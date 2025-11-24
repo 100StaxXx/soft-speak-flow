@@ -429,7 +429,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
                   className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-bold px-10 py-6 text-lg rounded-full shadow-[0_0_30px_rgba(168,85,247,0.5)] hover:shadow-[0_0_40px_rgba(168,85,247,0.7)] transition-all duration-300 group border border-purple-400/30"
                 >
                   <Sparkles className="w-5 h-5 mr-2 group-hover:rotate-12 transition-transform" />
-                  Begin Your Journey
+                  Create Your Spirit Animal
                 </Button>
               </motion.div>
             )}
