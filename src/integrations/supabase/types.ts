@@ -1310,6 +1310,24 @@ export type Database = {
         }
         Relationships: []
       }
+      evolution_thresholds: {
+        Row: {
+          stage: number
+          stage_name: string
+          xp_required: number
+        }
+        Insert: {
+          stage: number
+          stage_name: string
+          xp_required: number
+        }
+        Update: {
+          stage?: number
+          stage_name?: string
+          xp_required?: number
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           content_id: string
@@ -2756,6 +2774,10 @@ export type Database = {
       }
     }
     Functions: {
+      get_next_evolution_threshold: {
+        Args: { current_stage: number }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2764,6 +2786,10 @@ export type Database = {
         Returns: boolean
       }
       is_service_role: { Args: never; Returns: boolean }
+      should_evolve: {
+        Args: { current_stage: number; current_xp: number }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
