@@ -157,6 +157,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { data: existingTask } = await supabase.from('daily_tasks').select('completed_at').eq('id', taskId).maybeSingle();
         const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
+        // Prevent unchecking completed tasks to avoid XP farming
+        if (wasAlreadyCompleted && !completed) {
+          toggleInProgress.current = false;
+          throw new Error('Cannot uncheck completed tasks');
+        }
+
         const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
         if (error) {
           toggleInProgress.current = false;
