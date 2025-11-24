@@ -3,6 +3,7 @@ import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Z
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
+import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +67,7 @@ export default function Tasks() {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   
-  // Tasks state
+  // Tasks state - use regular hook for list view single-day tasks
   const { 
     tasks, 
     addTask, 
@@ -79,6 +80,9 @@ export default function Tasks() {
     completedCount,
     totalCount 
   } = useDailyTasks(selectedDate);
+  
+  // Get all tasks for calendar views
+  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, calendarView);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -534,7 +538,7 @@ export default function Tasks() {
                 <CalendarMonthView
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
-                  tasks={tasks}
+                  tasks={allCalendarTasks}
                   onTaskClick={(task) => {
                     setCalendarView("list");
                   }}
@@ -545,7 +549,7 @@ export default function Tasks() {
                 <CalendarWeekView
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
-                  tasks={tasks}
+                  tasks={allCalendarTasks}
                   onTaskDrop={async (taskId, newDate, newTime) => {
                     const { error } = await supabase
                       .from('daily_tasks')
@@ -557,6 +561,7 @@ export default function Tasks() {
 
                     if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+                      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
                       toast({
                         title: "Quest rescheduled",
                         description: newTime 

@@ -30,18 +30,18 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const getTasksForDateTime = (date: Date, hour: number) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!task.scheduled_time) return false;
-      const taskDate = new Date(task.task_date || selectedDate);
       const taskHour = parseInt(task.scheduled_time.split(':')[0]);
-      return isSameDay(taskDate, date) && taskHour === hour;
+      return task.task_date === dateStr && taskHour === hour;
     });
   };
 
   const getUnscheduledTasksForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     return tasks.filter(task => {
-      const taskDate = new Date(task.task_date || selectedDate);
-      return isSameDay(taskDate, date) && !task.scheduled_time;
+      return task.task_date === dateStr && !task.scheduled_time;
     });
   };
 

@@ -1,0 +1,51 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
+
+export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "week") => {
+  const { user } = useAuth();
+
+  const getDateRange = () => {
+    if (view === "month") {
+      const monthStart = startOfMonth(selectedDate);
+      const monthEnd = endOfMonth(selectedDate);
+      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      return { start: calendarStart, end: calendarEnd };
+    } else if (view === "week") {
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      return { start: weekStart, end: weekEnd };
+    } else {
+      // For list view, just get the week
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      return { start: weekStart, end: weekEnd };
+    }
+  };
+
+  const { start, end } = getDateRange();
+  const startDate = format(start, 'yyyy-MM-dd');
+  const endDate = format(end, 'yyyy-MM-dd');
+
+  const { data: tasks = [], isLoading } = useQuery({
+    queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('daily_tasks')
+        .select('*')
+        .eq('user_id', user!.id)
+        .gte('task_date', startDate)
+        .lte('task_date', endDate)
+        .order('scheduled_time', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  return { tasks, isLoading };
+};
