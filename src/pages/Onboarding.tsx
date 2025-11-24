@@ -480,9 +480,6 @@ export default function Onboarding() {
         description: chosenMentor ? `${chosenMentor.name} is now your guide!` : "Your mentor has been selected!",
       });
 
-      // Mark onboarding complete for walkthrough trigger
-      localStorage.setItem('onboardingComplete', 'true');
-
       // Move to companion creation
       await waitForProfileUpdate();
       setStage('companion');
