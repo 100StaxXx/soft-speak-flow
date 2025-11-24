@@ -90,14 +90,14 @@ export const CreateEpicDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
             Create Legendary Epic
           </DialogTitle>
           <DialogDescription>
-            Embark on an epic journey! Link your habits to track progress toward this legendary goal.
+            Create an epic and add habits to track your progress.
           </DialogDescription>
         </DialogHeader>
 
