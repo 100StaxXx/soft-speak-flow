@@ -184,6 +184,11 @@ Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
       // Stage 1: Hatchling emerging from the egg - NEW LIFE!
       console.log("Creating stage 1 hatchling emergence");
       
+      // Special handling for aquatic creatures to prevent legs
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
+      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is a baby aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs.' : '';
+      
       userPrompt = `A tiny, adorable baby ${companion.spirit_animal} just hatching from a cracked egg. This is the moment of BIRTH.
 
 CRITICAL - First life stage requirements:
@@ -192,7 +197,7 @@ CRITICAL - First life stage requirements:
 - Wobbly, uncertain posture - first moments of life
 - Big curious eyes, innocent expression
 - Still has hints of egg glow on its body
-- Small wisps of ${companion.core_element} elemental energy starting to manifest
+- Small wisps of ${companion.core_element} elemental energy starting to manifest${aquaticNote}
 
 Color and identity (MUST match):
 - Primary color: ${companion.favorite_color}
@@ -302,6 +307,11 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       }
 
       // 5. Build evolution prompt with ultra-strict continuity
+      // Special handling for aquatic creatures to prevent legs
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
+      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.' : '';
+      
       userPrompt = `Here is the previous evolution of this companion.
 
 PREVIOUS STAGE ANALYSIS:
@@ -312,7 +322,7 @@ COMPANION CORE IDENTITY (MUST PRESERVE):
 - Animal type: ${companion.spirit_animal}
 - Element: ${companion.core_element}
 ${companion.eye_color ? `- Eye color: ${companion.eye_color}` : ''}
-${companion.fur_color ? `- Fur/scale color: ${companion.fur_color}` : ''}
+${companion.fur_color ? `- Fur/scale color: ${companion.fur_color}` : ''}${aquaticNote}
 
 Current stage: ${currentStage}
 Next stage: ${nextStage}
