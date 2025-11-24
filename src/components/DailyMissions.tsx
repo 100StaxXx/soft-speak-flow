@@ -8,7 +8,7 @@ import { EmptyMissions } from "@/components/EmptyMissions";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
-import { RestDayButton } from "./RestDayButton";
+
 
 export const DailyMissions = () => {
   const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
@@ -62,14 +62,11 @@ export const DailyMissions = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {allComplete && (
-              <div className="text-[10px] sm:text-xs font-bold text-green-500 animate-pulse">
-                All Done! 🎉
-              </div>
-            )}
-            <RestDayButton />
-          </div>
+          {allComplete && (
+            <div className="text-[10px] sm:text-xs font-bold text-green-500 animate-pulse">
+              All Done! 🎉
+            </div>
+          )}
         </div>
 
         <Progress value={progress} className="h-2" />
