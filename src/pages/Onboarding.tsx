@@ -427,9 +427,9 @@ export default function Onboarding() {
       // Wait longer to ensure database update propagates
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      console.log("Navigating to home...");
-      // Navigate directly to home
-      navigate("/", { replace: true });
+      console.log("Navigating to quests...");
+      // Navigate to quests page to start with tasks
+      navigate("/tasks", { replace: true });
     } catch (error: unknown) {
       console.error("Error in onboarding:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create companion. Please try again.";
