@@ -93,7 +93,7 @@ export default function Tasks() {
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(true);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
@@ -111,6 +111,15 @@ export default function Tasks() {
     },
     enabled: !!user,
   });
+
+  // Set showTemplates based on whether user has habits
+  useEffect(() => {
+    if (habits.length === 0) {
+      setShowTemplates(true);
+    } else {
+      setShowTemplates(false);
+    }
+  }, [habits.length]);
 
   const { data: completions = [] } = useQuery({
     queryKey: ['habit-completions', user?.id],
