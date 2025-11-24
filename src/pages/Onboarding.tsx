@@ -7,7 +7,7 @@ import { MentorGrid } from "@/components/MentorGrid";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { NameInput } from "@/components/NameInput";
 import { LegalAcceptance } from "@/components/LegalAcceptance";
-import { BirthdateInput } from "@/components/BirthdateInput";
+import { ZodiacSelector } from "@/components/ZodiacSelector";
 import { ZodiacReveal } from "@/components/ZodiacReveal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,7 @@ import { retryWithBackoff } from "@/utils/retry";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 import { OnboardingData } from "@/types/profile";
-import { calculateZodiacSign, type ZodiacSign } from "@/utils/zodiacCalculator";
+import { type ZodiacSign } from "@/utils/zodiacCalculator";
 
 interface Mentor {
   id: string;
@@ -44,13 +44,12 @@ interface MentorExplanation {
 }
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'legal' | 'name' | 'birthdate' | 'questionnaire' | 'result' | 'zodiac' | 'browse' | 'companion'>('legal');
+  const [stage, setStage] = useState<'legal' | 'name' | 'zodiac-select' | 'questionnaire' | 'result' | 'zodiac-reveal' | 'browse' | 'companion'>('legal');
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
-  const [birthdate, setBirthdate] = useState<Date | null>(null);
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const { user } = useAuth();
   const { createCompanion } = useCompanion();
@@ -154,7 +153,7 @@ export default function Onboarding() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          onboarding_step: 'birthdate',
+          onboarding_step: 'zodiac-select',
           onboarding_data: {
             ...existingData,
             userName: name,
@@ -169,7 +168,7 @@ export default function Onboarding() {
         description: `Nice to meet you, ${name}!`,
       });
 
-      setStage('birthdate');
+      setStage('zodiac-select');
     } catch (error: unknown) {
       console.error("Error saving name:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to save name";
@@ -183,15 +182,12 @@ export default function Onboarding() {
     }
   };
 
-  const handleBirthdateSubmit = async (selectedDate: Date) => {
+  const handleZodiacSelect = async (selectedZodiac: ZodiacSign) => {
     if (!user) return;
 
     try {
       setSelecting(true);
-      setBirthdate(selectedDate);
-      
-      const calculatedZodiac = calculateZodiacSign(selectedDate);
-      setZodiacSign(calculatedZodiac);
+      setZodiacSign(selectedZodiac);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -204,13 +200,11 @@ export default function Onboarding() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          birthdate: selectedDate.toISOString().split('T')[0],
-          zodiac_sign: calculatedZodiac,
+          zodiac_sign: selectedZodiac,
           onboarding_step: 'questionnaire',
           onboarding_data: {
             ...existingData,
-            birthdate: selectedDate.toISOString(),
-            zodiacSign: calculatedZodiac,
+            zodiacSign: selectedZodiac,
           },
         })
         .eq("id", user.id);
@@ -219,8 +213,8 @@ export default function Onboarding() {
 
       setStage('questionnaire');
     } catch (error: unknown) {
-      console.error("Error saving birthdate:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to save birthdate";
+      console.error("Error saving zodiac sign:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save zodiac sign";
       toast({
         title: "Error",
         description: errorMessage,
@@ -382,7 +376,7 @@ export default function Onboarding() {
       // Move to zodiac reveal if we have zodiac data
       await waitForProfileUpdate();
       if (zodiacSign) {
-        setStage('zodiac');
+        setStage('zodiac-reveal');
       } else {
         setStage('companion');
       }
@@ -390,7 +384,7 @@ export default function Onboarding() {
       // Save progress
       const { error: progressError } = await supabase
         .from("profiles")
-        .update({ onboarding_step: zodiacSign ? 'zodiac' : 'companion' })
+        .update({ onboarding_step: zodiacSign ? 'zodiac-reveal' : 'companion' })
         .eq("id", user.id);
         
       if (progressError) {
@@ -584,8 +578,8 @@ export default function Onboarding() {
         />
       )}
 
-      {stage === "birthdate" && (
-        <BirthdateInput onComplete={handleBirthdateSubmit} />
+      {stage === "zodiac-select" && (
+        <ZodiacSelector onComplete={handleZodiacSelect} />
       )}
 
       {stage === "questionnaire" && (
@@ -602,7 +596,7 @@ export default function Onboarding() {
         />
       )}
 
-      {stage === "zodiac" && zodiacSign && recommendedMentor && (
+      {stage === "zodiac-reveal" && zodiacSign && recommendedMentor && (
         <ZodiacReveal 
           zodiacSign={zodiacSign} 
           mentorName={recommendedMentor.name}
