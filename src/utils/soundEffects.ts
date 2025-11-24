@@ -267,3 +267,17 @@ export const playNotification = () => soundManager.playNotification();
 export const playStreakMilestone = () => soundManager.playStreakMilestone();
 export const playAmbientNature = () => soundManager.playAmbientNature();
 export const playCalming = () => soundManager.playCalming();
+
+// Generic sound aliases for UI
+export const playSound = (type: 'complete' | 'error' | 'pop' | 'success') => {
+  switch (type) {
+    case 'complete':
+      return soundManager.playHabitComplete();
+    case 'error':
+      return soundManager.playButtonClick();
+    case 'pop':
+      return soundManager.playSparkle();
+    case 'success':
+      return soundManager.playMissionComplete();
+  }
+};

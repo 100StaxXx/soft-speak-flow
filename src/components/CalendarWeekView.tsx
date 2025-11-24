@@ -1,9 +1,13 @@
 import { format, addDays, startOfWeek, isSameDay, addWeeks, subWeeks } from "date-fns";
-import { ChevronLeft, ChevronRight, Clock, Target, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Card } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { QuestDragCard } from "./QuestDragCard";
+import { QuestDropZone } from "./QuestDropZone";
+import { useState } from "react";
+import { playSound } from "@/utils/soundEffects";
 
 interface Task {
   id: string;
@@ -25,6 +29,7 @@ interface CalendarWeekViewProps {
 }
 
 export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop }: CalendarWeekViewProps) => {
+  const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -133,52 +138,42 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                   const hasConflict = checkTimeConflict(day, hour);
 
                   return (
-                    <div
+                    <QuestDropZone
                       key={hour}
-                      className={cn(
-                        "h-20 border rounded p-1 transition-all",
-                        hasConflict && "border-destructive bg-destructive/5"
-                      )}
-                      onDragOver={(e) => e.preventDefault()}
+                      hasConflict={hasConflict}
                       onDrop={(e) => {
                         e.preventDefault();
                         const taskId = e.dataTransfer.getData('taskId');
                         const time = format(new Date().setHours(hour, 0), 'HH:mm');
-                        onTaskDrop(taskId, day, time);
+                        
+                        if (!hasConflict) {
+                          playSound('complete');
+                          onTaskDrop(taskId, day, time);
+                        } else {
+                          playSound('error');
+                        }
+                        setDraggedTask(null);
                       }}
                     >
                       {hourTasks.map(task => (
-                        <div
+                        <QuestDragCard
                           key={task.id}
-                          draggable
+                          task={task}
+                          isDragging={draggedTask === task.id}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('taskId', task.id);
+                            setDraggedTask(task.id);
+                            playSound('pop');
                           }}
-                          className={cn(
-                            "text-xs p-1 rounded mb-1 cursor-move transition-all hover:scale-105",
-                            task.completed && "opacity-50 line-through",
-                            task.is_main_quest && "border-l-4 border-l-amber-500 bg-amber-500/10",
-                            !task.is_main_quest && task.difficulty && difficultyColors[task.difficulty as keyof typeof difficultyColors]
-                          )}
-                        >
-                          <div className="flex items-start gap-1">
-                            {task.is_main_quest && <Target className="h-3 w-3 text-amber-500 flex-shrink-0" />}
-                            <span className="truncate flex-1">{task.task_text}</span>
-                            {task.estimated_duration && (
-                              <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                                {task.estimated_duration}m
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        />
                       ))}
-                      {hasConflict && (
-                        <div className="flex items-center gap-1 text-[10px] text-destructive">
+                      {hasConflict && hourTasks.length > 1 && (
+                        <div className="flex items-center gap-1 text-[10px] text-destructive mt-1 animate-pulse">
                           <AlertTriangle className="h-3 w-3" />
-                          Conflict
+                          Resolve conflict for +10 XP
                         </div>
                       )}
-                    </div>
+                    </QuestDropZone>
                   );
                 })}
               </div>
