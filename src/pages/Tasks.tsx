@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays } from "lucide-react";
+import { CalendarMonthView } from "@/components/CalendarMonthView";
+import { CalendarWeekView } from "@/components/CalendarWeekView";
+import { TimeConflictDetector } from "@/components/TimeConflictDetector";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +62,7 @@ export default function Tasks() {
   
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarView, setCalendarView] = useState<"list" | "month" | "week">("list");
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   
@@ -417,78 +421,158 @@ export default function Tasks() {
           </TabsList>
 
           <TabsContent value="quests" className="space-y-4 mt-4">
-            {/* Week Calendar Navigation */}
-            <Card data-tour="week-calendar" className="p-4 bg-gradient-to-br from-primary/5 to-accent/5">
+            {/* Calendar with View Switcher */}
+            <Card data-tour="week-calendar" className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 space-y-4">
               <div className="flex items-center justify-between mb-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedDate(addDays(selectedDate, -7))}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
+                <h2 className="font-semibold text-lg">Calendar</h2>
+                <div className="flex gap-2">
+                  <Button
+                    variant={calendarView === "list" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCalendarView("list")}
+                    className="gap-2"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    <span className="hidden sm:inline">List</span>
+                  </Button>
+                  <Button
+                    variant={calendarView === "week" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCalendarView("week")}
+                    className="gap-2"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    <span className="hidden sm:inline">Week</span>
+                  </Button>
+                  <Button
+                    variant={calendarView === "month" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCalendarView("month")}
+                    className="gap-2"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Month</span>
+                  </Button>
+                </div>
+              </div>
+
+              {calendarView === "list" && (
+                <>
+                  <div className="flex items-center justify-between">
                     <Button
                       variant="ghost"
-                      className="font-semibold text-sm hover:bg-accent/50 h-8 gap-2"
+                      size="sm"
+                      onClick={() => setSelectedDate(addDays(selectedDate, -7))}
+                      className="h-8 w-8 p-0"
                     >
-                      <CalendarIcon className="h-4 w-4" />
-                      {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+                      <ChevronLeft className="h-4 w-4" />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedDate(addDays(selectedDate, 7))}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-7 gap-2">
-                {weekDays.map((day) => {
-                  const isSelected = isSameDay(day, selectedDate);
-                  const isToday = isSameDay(day, new Date());
-                  return (
-                    <button
-                      key={day.toISOString()}
-                      onClick={() => setSelectedDate(day)}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
-                        isSelected 
-                          ? "bg-primary text-primary-foreground shadow-glow" 
-                          : "hover:bg-accent",
-                        isToday && !isSelected && "ring-2 ring-primary/30"
-                      )}
+                    
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="font-semibold text-sm hover:bg-accent/50 h-8 gap-2"
+                        >
+                          <CalendarIcon className="h-4 w-4" />
+                          {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="center">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedDate(addDays(selectedDate, 7))}
+                      className="h-8 w-8 p-0"
                     >
-                      <span className="text-xs font-medium mb-1">
-                        {format(day, 'EEE')}
-                      </span>
-                      <span className={cn(
-                        "text-lg font-bold",
-                        isSelected && "text-primary-foreground"
-                      )}>
-                        {format(day, 'd')}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {weekDays.map((day) => {
+                      const isSelected = isSameDay(day, selectedDate);
+                      const isToday = isSameDay(day, new Date());
+                      return (
+                        <button
+                          key={day.toISOString()}
+                          onClick={() => setSelectedDate(day)}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+                            isSelected 
+                              ? "bg-primary text-primary-foreground shadow-glow" 
+                              : "hover:bg-accent",
+                            isToday && !isSelected && "ring-2 ring-primary/30"
+                          )}
+                        >
+                          <span className="text-xs font-medium mb-1">
+                            {format(day, 'EEE')}
+                          </span>
+                          <span className={cn(
+                            "text-lg font-bold",
+                            isSelected && "text-primary-foreground"
+                          )}>
+                            {format(day, 'd')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {calendarView === "month" && (
+                <CalendarMonthView
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  tasks={tasks}
+                  onTaskClick={(task) => {
+                    setCalendarView("list");
+                  }}
+                />
+              )}
+
+              {calendarView === "week" && (
+                <CalendarWeekView
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  tasks={tasks}
+                  onTaskDrop={async (taskId, newDate, newTime) => {
+                    const { error } = await supabase
+                      .from('daily_tasks')
+                      .update({
+                        task_date: format(newDate, 'yyyy-MM-dd'),
+                        scheduled_time: newTime
+                      })
+                      .eq('id', taskId);
+
+                    if (!error) {
+                      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+                      toast({
+                        title: "Quest rescheduled",
+                        description: newTime 
+                          ? `Moved to ${format(newDate, 'MMM d')} at ${newTime}`
+                          : `Moved to ${format(newDate, 'MMM d')}`
+                      });
+                    }
+                  }}
+                />
+              )}
             </Card>
+
+            {/* Time Conflict Detector */}
+            {calendarView === "list" && (
+              <TimeConflictDetector tasks={tasks} />
+            )}
 
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
