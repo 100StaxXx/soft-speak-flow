@@ -141,6 +141,7 @@ export const useCompanion = () => {
           current_stage: 0,
           current_xp: 0,
           current_image_url: imageData.imageUrl,
+          initial_image_url: imageData.imageUrl, // Store the initial Stage 0 image
           eye_color: eyeColor,
           fur_color: furColor,
         })
