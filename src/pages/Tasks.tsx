@@ -337,12 +337,14 @@ export default function Tasks() {
         quests_tutorial_seen: true,
       };
       
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ onboarding_data: updatedData })
         .eq('id', user.id);
       
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      if (!error) {
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+      }
     }
   };
 

@@ -22,6 +22,7 @@ interface Profile {
   current_habit_streak: number | null;
   longest_habit_streak: number | null;
   onboarding_completed: boolean | null;
+  onboarding_data: Record<string, unknown> | null;
 }
 
 export const useProfile = () => {
