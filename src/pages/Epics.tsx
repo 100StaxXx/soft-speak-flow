@@ -175,12 +175,6 @@ const Epics = () => {
           onCreateEpic={handleCreateEpic}
           isCreating={isCreating}
         />
-        
-        {/* Join Epic Dialog */}
-        <JoinEpicDialog
-          open={joinDialogOpen}
-          onOpenChange={setJoinDialogOpen}
-        />
       </div>
 
       <BottomNav />
