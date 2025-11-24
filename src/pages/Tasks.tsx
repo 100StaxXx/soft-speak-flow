@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
@@ -50,6 +51,9 @@ export default function Tasks() {
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
+  
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
   
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -280,8 +284,71 @@ export default function Tasks() {
     ? completions.length / habits.length 
     : 0;
 
+  // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
+  useEffect(() => {
+    if (!user || !profile) return;
+    
+    const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
+    const tutorialSeen = onboardingData?.quests_tutorial_seen;
+    
+    if (!tutorialSeen) {
+      // Show tutorial
+      setShowTutorial(true);
+      
+      // Auto-generate "Join R-Evolution" quest
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if this quest already exists
+      supabase
+        .from('daily_tasks')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('task_text', 'Join R-Evolution')
+        .maybeSingle()
+        .then(({ data: existingQuest }) => {
+          if (!existingQuest) {
+            // Create the welcome quest
+            supabase
+              .from('daily_tasks')
+              .insert({
+                user_id: user.id,
+                task_text: 'Join R-Evolution',
+                difficulty: 'easy',
+                xp_reward: 5,
+                task_date: today,
+                is_main_quest: false,
+              })
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+              });
+          }
+        });
+    }
+  }, [user, profile, queryClient]);
+
+  const handleTutorialClose = async () => {
+    setShowTutorial(false);
+    
+    // Mark tutorial as seen
+    if (user && profile) {
+      const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
+      const updatedData = {
+        ...onboardingData,
+        quests_tutorial_seen: true,
+      };
+      
+      await supabase
+        .from('profiles')
+        .update({ onboarding_data: updatedData })
+        .eq('id', user.id);
+      
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 relative">
+      <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
       {/* Loading Overlay */}
       {isAdding && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
