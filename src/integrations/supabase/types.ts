@@ -1054,6 +1054,7 @@ export type Database = {
           description: string | null
           end_date: string | null
           id: string
+          invite_code: string | null
           is_public: boolean | null
           progress_percentage: number | null
           start_date: string
@@ -1070,6 +1071,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          invite_code?: string | null
           is_public?: boolean | null
           progress_percentage?: number | null
           start_date?: string
@@ -1086,6 +1088,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          invite_code?: string | null
           is_public?: boolean | null
           progress_percentage?: number | null
           start_date?: string

@@ -65,6 +65,9 @@ export const useEpics = () => {
 
       if (habitError) throw habitError;
 
+      // Generate unique invite code
+      const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
       // Create the epic
       const { data: epic, error: epicError } = await supabase
         .from("epics")
@@ -75,6 +78,7 @@ export const useEpics = () => {
           target_days: epicData.target_days,
           is_public: epicData.is_public || false,
           xp_reward: Math.floor(epicData.target_days * 10),
+          invite_code: inviteCode,
         })
         .select()
         .single();
