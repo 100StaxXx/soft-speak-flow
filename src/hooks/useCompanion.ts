@@ -323,14 +323,9 @@ export const useCompanion = () => {
       console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
     }
 
-    // Record XP event
-    await supabase.from("xp_events").insert({
-      user_id: currentUser!.id,
-      companion_id: companionData.id,
-      event_type: eventType,
-      xp_earned: xpAmount,
-      event_metadata: metadata,
-    });
+    // XP events are logged server-side via triggers/functions
+    // Client-side insert removed due to RLS policy restrictions
+
 
     // Update companion XP
     const { error: updateError } = await supabase
