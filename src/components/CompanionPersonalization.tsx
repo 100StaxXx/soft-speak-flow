@@ -153,7 +153,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
         <div className="space-y-4">
           <Label className="text-lg font-semibold">Story tone</Label>
           <p className="text-sm text-muted-foreground">
-            Choose how your companion's story unfolds
+            Choose how your story unfolds
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {STORY_TONES.map((tone) => (
