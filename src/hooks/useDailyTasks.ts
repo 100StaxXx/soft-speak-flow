@@ -170,11 +170,37 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw error;
       }
     },
-    onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
+    onSuccess: async ({ taskId, completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
         console.log('[useDailyTasks] Quest completed, awarding XP:', xpReward);
-        await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        
+        // Check if this task is part of a guild epic and award bonus XP
+        const { data: epicHabits } = await supabase
+          .from('epic_habits')
+          .select('epic_id, epics!inner(is_public, status)')
+          .eq('epics.status', 'active')
+          .eq('epics.is_public', true);
+
+        let bonusXP = 0;
+        if (epicHabits && epicHabits.length > 0) {
+          // Check if user is a member of any of these guild epics
+          const { data: memberships } = await supabase
+            .from('epic_members')
+            .select('epic_id')
+            .eq('user_id', user!.id)
+            .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
+
+          if (memberships && memberships.length > 0) {
+            bonusXP = Math.floor(xpReward * 0.2); // 20% bonus for guild participation
+            await awardCustomXP(xpReward + bonusXP, 'task_complete', `Task Complete! +${bonusXP} Guild Bonus 🎯`);
+          } else {
+            await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+          }
+        } else {
+          await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        }
+        
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -24,17 +25,99 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
 
     setIsLoading(true);
     
-    // Extract code from full URL if pasted
-    let code = inviteCode.trim();
-    if (code.includes("/join/")) {
-      code = code.split("/join/")[1];
-    }
+    try {
+      // Clean up the code (remove prefix if present)
+      const code = inviteCode.trim().toUpperCase().replace('EPIC-', '');
+      const fullCode = `EPIC-${code}`;
 
-    // Navigate to join page
-    navigate(`/join/${code}`);
-    onOpenChange(false);
-    setIsLoading(false);
-    setInviteCode("");
+      // Look up the epic by invite code
+      const { data: epic, error: epicError } = await supabase
+        .from('epics')
+        .select('*, epic_habits(habit_id, habits(*))')
+        .eq('invite_code', fullCode)
+        .eq('is_public', true)
+        .maybeSingle();
+
+      if (epicError) throw epicError;
+      if (!epic) {
+        toast.error("Epic not found. Check the code and try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if already a member
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        toast.error("Please sign in to join guilds");
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: existingMember } = await supabase
+        .from('epic_members')
+        .select('id')
+        .eq('epic_id', epic.id)
+        .eq('user_id', user.user.id)
+        .maybeSingle();
+
+      if (existingMember) {
+        toast.error("You're already in this guild!");
+        setIsLoading(false);
+        return;
+      }
+
+      // Join the epic
+      const { error: memberError } = await supabase
+        .from('epic_members')
+        .insert({
+          epic_id: epic.id,
+          user_id: user.user.id,
+        });
+
+      if (memberError) throw memberError;
+
+      // Copy habits to user's account
+      if (epic.epic_habits && epic.epic_habits.length > 0) {
+        const habitsToCreate = epic.epic_habits.map((eh: any) => ({
+          user_id: user.user.id,
+          title: eh.habits.title,
+          difficulty: eh.habits.difficulty,
+          frequency: eh.habits.frequency,
+          custom_days: eh.habits.custom_days,
+        }));
+
+        const { data: newHabits, error: habitsError } = await supabase
+          .from('habits')
+          .insert(habitsToCreate)
+          .select();
+
+        if (habitsError) throw habitsError;
+
+        // Link new habits back to the epic
+        const habitLinks = newHabits.map((habit: any) => ({
+          epic_id: epic.id,
+          habit_id: habit.id,
+        }));
+
+        const { error: linkError } = await supabase
+          .from('epic_habits')
+          .insert(habitLinks);
+
+        if (linkError) throw linkError;
+      }
+
+      toast.success(`Joined "${epic.title}" guild! 🎯`);
+      onOpenChange(false);
+      setInviteCode("");
+      
+      // Refresh epics list
+      navigate('/epics');
+    } catch (error) {
+      console.error('Error joining epic:', error);
+      toast.error("Failed to join guild. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

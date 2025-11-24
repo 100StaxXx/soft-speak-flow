@@ -52,17 +52,19 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     return "text-muted-foreground";
   };
 
-  const handleShareEpic = () => {
+  const handleShareEpic = async () => {
     if (!epic.invite_code) return;
     
-    const inviteLink = `${window.location.origin}/join/${epic.invite_code}`;
-    navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    toast.success("Invite link copied! 🔗", {
-      description: "Share this link with friends to invite them to your epic!",
-    });
-    
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(epic.invite_code);
+      setCopied(true);
+      toast.success("Invite code copied!", {
+        description: "Share this code with others to invite them to your guild",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error("Failed to copy code");
+    }
   };
 
   return (
