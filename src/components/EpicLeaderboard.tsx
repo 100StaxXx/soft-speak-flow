@@ -112,24 +112,12 @@ export const EpicLeaderboard = ({ epicId }: EpicLeaderboardProps) => {
   };
 
   if (isLoading) {
-    return (
-      <Card className="p-4">
-        <div className="flex items-center justify-center py-8">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-        </div>
-      </Card>
-    );
+    return null;
   }
 
-  if (members.length === 0) {
-    return (
-      <Card className="p-4">
-        <div className="text-center py-8 text-muted-foreground">
-          <Trophy className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No members yet. Be the first to join!</p>
-        </div>
-      </Card>
-    );
+  // Hide leaderboard if only 1 or 0 members (just the creator or empty)
+  if (members.length <= 1) {
+    return null;
   }
 
   return (
