@@ -53,16 +53,22 @@ export default function Onboarding() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Restore onboarding progress on mount
+  // Restore onboarding progress on mount and redirect if already completed
   useEffect(() => {
     const loadProgress = async () => {
       if (!user) return;
       
       const { data: profile } = await supabase
         .from("profiles")
-        .select("onboarding_step, onboarding_data")
+        .select("onboarding_step, onboarding_data, onboarding_completed")
         .eq("id", user.id)
         .maybeSingle();
+      
+      // If onboarding is already completed, redirect to tasks
+      if (profile?.onboarding_completed) {
+        navigate("/tasks", { replace: true });
+        return;
+      }
       
       if (profile?.onboarding_step && profile.onboarding_step !== 'complete') {
         const savedData = profile.onboarding_data as OnboardingData | null;
@@ -92,7 +98,7 @@ export default function Onboarding() {
       }
     };
     loadProgress();
-  }, [user]);
+  }, [user, navigate]);
 
   // Restore onboarding progress - check if legal was already accepted
   useEffect(() => {
