@@ -54,18 +54,58 @@ export const HabitCard = memo(({
     }
   }, [id, queryClient]);
 
-  const getStreakMessage = useCallback(() => {
-    if (currentStreak === 0) return "Start your streak today";
-    if (currentStreak === 1) return "Day 1. Keep going.";
-    if (currentStreak < 7) return "Building momentum...";
-    if (currentStreak < 21) return "Habit forming...";
-    if (currentStreak < 66) return "Almost automatic...";
-    return "Discipline locked in.";
+  const getStreakTier = useCallback(() => {
+    if (currentStreak === 0) return { color: "text-muted-foreground", message: "Start your streak today", badge: null };
+    if (currentStreak < 7) return { color: "text-muted-foreground", message: "Building momentum...", badge: null };
+    if (currentStreak < 14) return { color: "text-streak-building", message: "Building momentum", badge: "Building" };
+    if (currentStreak < 30) return { color: "text-streak-strong", message: "Strong consistency", badge: "Strong" };
+    if (currentStreak < 60) return { color: "text-streak-elite", message: "Elite level", badge: "Elite" };
+    return { color: "text-streak-legendary", message: "Legendary streak", badge: "Legendary" };
   }, [currentStreak]);
+
+  const getDifficultyConfig = useCallback(() => {
+    switch (difficulty) {
+      case 'easy':
+        return { 
+          icon: Zap, 
+          label: "Easy",
+          borderColor: "border-emerald-500/30",
+          bgColor: "bg-emerald-500/5",
+          textColor: "text-emerald-400",
+          flameColor: "text-emerald-400"
+        };
+      case 'hard':
+        return { 
+          icon: Mountain, 
+          label: "Hard",
+          borderColor: "border-rose-500/30",
+          bgColor: "bg-rose-500/5",
+          textColor: "text-rose-400",
+          flameColor: "text-rose-400"
+        };
+      default: // medium
+        return { 
+          icon: Flame, 
+          label: "Medium",
+          borderColor: "border-amber-500/30",
+          bgColor: "bg-amber-500/5",
+          textColor: "text-amber-400",
+          flameColor: "text-amber-400"
+        };
+    }
+  }, [difficulty]);
+
+  const streakTier = getStreakTier();
+  const difficultyConfig = getDifficultyConfig();
+  const DifficultyIcon = difficultyConfig.icon;
 
   return (
     <Card 
-      className="p-5 md:p-6 bg-gradient-to-br from-card via-card to-secondary/80 border-primary/30 hover:border-primary/60 transition-all duration-500 hover:shadow-glow-lg relative overflow-hidden group animate-scale-in"
+      className={cn(
+        "p-5 md:p-6 bg-gradient-to-br from-card via-card to-secondary/80 transition-all duration-500 relative overflow-hidden group animate-scale-in",
+        difficultyConfig.borderColor,
+        "hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
+      )}
       role="article"
       aria-label={`Habit: ${title}`}
     >
@@ -77,34 +117,51 @@ export const HabitCard = memo(({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-lg md:text-xl font-heading font-black text-foreground break-words">{title}</h3>
-              <Badge variant="secondary" className="text-xs">
-                {difficulty === 'easy' && <><Zap className="h-3 w-3 mr-1" /> Easy</>}
-                {difficulty === 'medium' && <><Flame className="h-3 w-3 mr-1" /> Medium</>}
-                {difficulty === 'hard' && <><Mountain className="h-3 w-3 mr-1" /> Hard</>}
+              <Badge 
+                className={cn(
+                  "text-xs border",
+                  difficultyConfig.bgColor,
+                  difficultyConfig.borderColor,
+                  difficultyConfig.textColor
+                )}
+              >
+                <DifficultyIcon className="h-3 w-3 mr-1" />
+                {difficultyConfig.label}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">{getStreakMessage()}</p>
+            <p className="text-xs text-muted-foreground mb-4">{streakTier.message}</p>
             
             <div className="space-y-3">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
                   currentStreak > 0 
-                    ? "bg-primary/10 border-primary/30" 
+                    ? cn(difficultyConfig.bgColor, difficultyConfig.borderColor)
                     : "bg-secondary border-border"
                 )}>
                   <Flame className={cn(
                     "w-6 h-6 flex-shrink-0",
-                    currentStreak > 0 ? "text-primary" : "text-muted-foreground"
+                    currentStreak > 0 ? difficultyConfig.flameColor : "text-muted-foreground"
                   )} />
                   <div className="flex flex-col">
                     <span className={cn(
                       "text-2xl font-heading font-black leading-none",
-                      currentStreak > 0 ? "text-primary" : "text-muted-foreground"
+                      currentStreak > 0 ? streakTier.color : "text-muted-foreground"
                     )}>{currentStreak}</span>
                     <span className="text-xs text-muted-foreground">day streak</span>
                   </div>
                 </div>
+                {streakTier.badge && (
+                  <Badge 
+                    className={cn(
+                      "text-xs font-semibold border",
+                      streakTier.color
+                    )}
+                    variant="outline"
+                  >
+                    {streakTier.badge}
+                  </Badge>
+                )}
                 {longestStreak > 0 && (
                   <div className="flex flex-col">
                     <span className="text-sm font-bold text-foreground">{longestStreak}</span>
