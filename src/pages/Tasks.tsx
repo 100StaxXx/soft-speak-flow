@@ -358,8 +358,22 @@ export default function Tasks() {
   useEffect(() => {
     if (!user || !profile) return;
     
+    // Check localStorage first for immediate feedback
+    const tutorialDismissed = localStorage.getItem(`tutorial_dismissed_${user.id}`);
+    if (tutorialDismissed === 'true') {
+      if (showTutorial) setShowTutorial(false);
+      return;
+    }
+    
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
+    
+    // If database says tutorial was seen, mark localStorage and close
+    if (tutorialSeen) {
+      localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+      if (showTutorial) setShowTutorial(false);
+      return;
+    }
     
     // Only show tutorial once when not seen
     if (!tutorialSeen && !showTutorial) {
@@ -394,16 +408,17 @@ export default function Tasks() {
           }
         });
     }
-    
-    // If tutorial was already seen but state is still true, close it
-    if (tutorialSeen && showTutorial) {
-      setShowTutorial(false);
-    }
   }, [user, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
-    // Mark tutorial as seen in database FIRST
-    if (user && profile) {
+    if (!user) return;
+    
+    // Immediately mark as dismissed in localStorage to prevent re-showing
+    localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+    setShowTutorial(false);
+    
+    // Then update database in background
+    if (profile) {
       const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
       const updatedData = {
         ...onboardingData,
@@ -415,15 +430,9 @@ export default function Tasks() {
         .update({ onboarding_data: updatedData })
         .eq('id', user.id);
       
-      // Invalidate profile to refresh cached data immediately
-      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-      
-      // Small delay to ensure cache is updated before closing modal
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Invalidate profile cache
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
     }
-    
-    // THEN close the modal
-    setShowTutorial(false);
   };
 
   // Helper to check task conflicts
