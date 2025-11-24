@@ -12,7 +12,6 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
-import { DailyMissions } from "@/components/DailyMissions";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { safeLocalStorage } from "@/utils/storage";
 import dariusImage from "@/assets/darius-sage.png";
@@ -246,10 +245,6 @@ const Index = () => {
             
             <ErrorBoundary>
               <MorningCheckIn />
-            </ErrorBoundary>
-
-            <ErrorBoundary>
-              <DailyMissions />
             </ErrorBoundary>
           
             <ErrorBoundary>
