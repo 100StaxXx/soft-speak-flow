@@ -100,6 +100,8 @@ export default function Tasks() {
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<{
     text: string;
