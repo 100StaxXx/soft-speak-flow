@@ -3,18 +3,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
 const zodiacPrompts = [
-  { sign: "aries", prompt: "A majestic white ram with elegant curved horns in a mystical cosmic style, white line art on dark purple background, ethereal and glowing" },
-  { sign: "taurus", prompt: "A powerful white bull with strong horns in a mystical cosmic style, white line art on dark purple background, ethereal and glowing" },
-  { sign: "gemini", prompt: "Two ethereal white figures representing twins in a mystical cosmic style, white line art on dark purple background, graceful and flowing" },
-  { sign: "cancer", prompt: "An elegant white crab with delicate claws in a mystical cosmic style, white line art on dark purple background, ethereal and glowing" },
-  { sign: "leo", prompt: "A regal white lion with a magnificent mane in a mystical cosmic style, white line art on dark purple background, powerful and glowing" },
-  { sign: "virgo", prompt: "A graceful white maiden figure in a mystical cosmic style, white line art on dark purple background, elegant and ethereal" },
-  { sign: "libra", prompt: "Balanced white scales in a mystical cosmic style, white line art on dark purple background, harmonious and glowing" },
-  { sign: "scorpio", prompt: "A striking white scorpion with curved tail in a mystical cosmic style, white line art on dark purple background, mysterious and glowing" },
-  { sign: "sagittarius", prompt: "A white centaur archer figure in a mystical cosmic style, white line art on dark purple background, dynamic and ethereal" },
-  { sign: "capricorn", prompt: "A mystical white sea-goat with horns in a mystical cosmic style, white line art on dark purple background, wise and glowing" },
-  { sign: "aquarius", prompt: "A white water bearer figure pouring celestial water in a mystical cosmic style, white line art on dark purple background, flowing and ethereal" },
-  { sign: "pisces", prompt: "Two white fish swimming in opposite directions in a mystical cosmic style, white line art on dark purple background, graceful and glowing" }
+  { sign: "aries", prompt: "A white ram with curved horns in a dynamic leaping pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "taurus", prompt: "A white bull in a strong walking pose with prominent horns, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "gemini", prompt: "Two white figures representing twins standing side by side holding wheat stalks, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "cancer", prompt: "A white crab with detailed claws in natural pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "leo", prompt: "A white lion with flowing mane in regal walking pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "virgo", prompt: "A white maiden figure in flowing robes holding wheat stalks with wings, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "libra", prompt: "A white figure kneeling while holding balanced scales, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "scorpio", prompt: "A white scorpion with detailed segmented tail curved upward, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "sagittarius", prompt: "A white centaur archer drawing a bow, half-human half-horse, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "capricorn", prompt: "A white sea-goat with horns and fish tail, mystical hybrid creature, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "aquarius", prompt: "A white water bearer figure pouring water from a vessel, kneeling pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
+  { sign: "pisces", prompt: "Two white fish swimming in opposite circular directions forming yin-yang, white line art illustration on dark purple starry background, simple elegant silhouette style" }
 ];
 
 serve(async (req) => {
