@@ -15,7 +15,10 @@ interface QuestsTutorialModalProps {
 
 export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps) {
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      // Only allow closing via the button, not by clicking outside or ESC
+      if (!isOpen) return;
+    }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
