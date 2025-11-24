@@ -56,15 +56,15 @@ export const SubscriptionGate = () => {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow animate-pulse">
-              <Crown className="h-8 w-8 text-primary-foreground" />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow">
+              <Sparkles className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
           <DialogTitle className="text-center text-2xl">
-            Unlock Full Evolution
+            Your Companion Has Evolved! 🎉
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-2">
-            Your companion has evolved! Continue their journey with a premium subscription.
+            Welcome to R-Evolution! You have <span className="font-semibold text-foreground">7 days of full access</span> to explore everything.
           </DialogDescription>
         </DialogHeader>
 
@@ -72,24 +72,24 @@ export const SubscriptionGate = () => {
           {/* Features */}
           <div className="space-y-3">
             {[
-              { icon: Sparkles, text: "Continue evolution through all 21 stages" },
-              { icon: Crown, text: "Unlock Battle Arena & Pet Mode" },
-              { icon: Lock, text: "Full access to Quests, Epics, and Challenges" },
+              { icon: Sparkles, text: "All 21 evolution stages unlocked" },
+              { icon: Crown, text: "Battle Arena, Pet Mode & all game features" },
+              { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-3 text-sm">
                 <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
-                <span className="text-muted-foreground">{feature.text}</span>
+                <span className="text-foreground">{feature.text}</span>
               </div>
             ))}
           </div>
 
           {/* Trial Info */}
-          <div className="bg-accent/10 rounded-lg p-4 text-center">
+          <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/20">
             <p className="text-sm font-semibold text-foreground mb-1">
-              🎉 7-Day Free Trial
+              What happens after 7 days?
             </p>
             <p className="text-xs text-muted-foreground">
-              Then $9.99/month • Full access • Cancel anytime
+              Just $9.99/month to keep your companion and all features • Cancel anytime
             </p>
           </div>
 
@@ -99,18 +99,22 @@ export const SubscriptionGate = () => {
               setShowPaywall(false);
               navigate("/premium");
             }}
-            className="w-full py-6 text-lg font-bold bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            Start Free Trial →
+            Set Up Payment (No Charge Now)
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setShowPaywall(false)}
-            className="w-full text-sm text-muted-foreground"
+            className="w-full text-sm text-muted-foreground hover:text-foreground"
           >
-            Maybe later
+            I'll explore for now
           </Button>
+
+          <p className="text-xs text-center text-muted-foreground">
+            Enjoy your companion! We'll remind you before the 7 days are up.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
