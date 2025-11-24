@@ -17,35 +17,11 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    let mounted = true;
-
-    const checkAuthAndProfile = async () => {
-      // Wait for auth to load
-      if (authLoading) return;
-
-      // Redirect to auth if not logged in
-      if (!user) {
-        if (mounted) navigate("/auth");
-        return;
-      }
-
-      // Only redirect to onboarding if we're sure there's no mentor
-      // Wait for profile to load before checking
-      if (profileLoading) return;
-      
-      // Only redirect if profile exists but onboarding is incomplete
-      // Don't redirect if onboarding_completed is true (prevents loops)
-      if (requireMentor && profile && !profile.selected_mentor_id && !profile.onboarding_completed) {
-        if (mounted) navigate("/onboarding");
-      }
-    };
-
-    checkAuthAndProfile();
-
-    return () => {
-      mounted = false;
-    };
-  }, [user, profile, authLoading, profileLoading, requireMentor, navigate]);
+    // Redirect to auth if not logged in
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   // Animate progress bar while loading
   useEffect(() => {
@@ -62,8 +38,8 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
     }
   }, [authLoading, profileLoading]);
 
-  // Show loading or nothing while checking auth
-  if (authLoading || profileLoading) {
+  // Show loading while checking auth
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -79,18 +55,6 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
   // Don't render children until auth is confirmed
   if (!user) return null;
-  if (requireMentor && profile && !profile.selected_mentor_id && !profile.onboarding_completed) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-full max-w-md px-8 space-y-4">
-          <div className="text-center space-y-2">
-            <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-            <p className="text-foreground">Setting up your profile...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return <>{children}</>;
 };
