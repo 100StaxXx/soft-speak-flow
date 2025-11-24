@@ -98,7 +98,13 @@ The egg itself glows softly with ${element} energy (${elementEffect}), with fain
 Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra detailed 8K quality, professional fantasy concept art`;
     } else {
       const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
-      fullPrompt = `Ultra high quality digital art, photorealistic fantasy creature:\n\n${basePrompt}\n\nCRITICAL: MUST be anatomically accurate ${spiritAnimal}. Maintain EXACT ${spiritAnimal} silhouette, proportions, and features.\n\nCOLORS: Primary ${favoriteColor}, Eyes ${eyeColor || favoriteColor}, Fur/Feathers/Scales ${furColor || favoriteColor}, Element ${elementEffect}\n\nSTYLE: Hyper-detailed textures, cinematic lighting, ethereal magical atmosphere, depth of field\n\nStage ${stage}: ${stageInfo.name}\n${element} element creature\nPerfect ${spiritAnimal} anatomy\n\nUltra detailed, 8K quality, professional concept art`;
+      
+      // Special handling for aquatic creatures to prevent legs
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
+      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: NO LEGS OR LIMBS. This is a purely aquatic creature with fins, tail, and streamlined body only. Absolutely no legs, arms, or terrestrial limbs of any kind.' : '';
+      
+      fullPrompt = `Ultra high quality digital art, photorealistic fantasy creature:\n\n${basePrompt}\n\nCRITICAL: MUST be anatomically accurate ${spiritAnimal}. Maintain EXACT ${spiritAnimal} silhouette, proportions, and features.${aquaticNote}\n\nCOLORS: Primary ${favoriteColor}, Eyes ${eyeColor || favoriteColor}, Fur/Feathers/Scales ${furColor || favoriteColor}, Element ${elementEffect}\n\nSTYLE: Hyper-detailed textures, cinematic lighting, ethereal magical atmosphere, depth of field\n\nStage ${stage}: ${stageInfo.name}\n${element} element creature\nPerfect ${spiritAnimal} anatomy\n\nUltra detailed, 8K quality, professional concept art`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
