@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
@@ -30,6 +30,9 @@ import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
+import { EpicCard } from "@/components/EpicCard";
+import { CreateEpicDialog } from "@/components/CreateEpicDialog";
+import { useEpics } from "@/hooks/useEpics";
 import { Sliders } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -59,6 +62,7 @@ export default function Tasks() {
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
+  const { activeEpics, completedEpics, isLoading: epicsLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -129,6 +133,9 @@ export default function Tasks() {
   const [newHabitTitle, setNewHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+
+  // Epics state
+  const [createEpicDialogOpen, setCreateEpicDialogOpen] = useState(false);
 
   // Fetch habits
   const { data: habits = [] } = useQuery({
@@ -462,9 +469,9 @@ export default function Tasks() {
               <Swords className="h-4 w-4" />
               Daily Quests
             </TabsTrigger>
-            <TabsTrigger value="habits" className="gap-2" data-tour="habits-tab">
-              <CheckCircle2 className="h-4 w-4" />
-              Habits
+            <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
+              <Trophy className="h-4 w-4" />
+              Epics
             </TabsTrigger>
           </TabsList>
 
@@ -820,133 +827,72 @@ export default function Tasks() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="habits" className="space-y-4 mt-6">
-            {showAddHabit ? (
-              <Card className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Create New Habit</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setShowAddHabit(false)}>
-                    Cancel
-                  </Button>
-                </div>
+          <TabsContent value="epics" className="space-y-4 mt-6">
+            {/* Create Epic Button */}
+            <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
+              <Button
+                onClick={() => setCreateEpicDialogOpen(true)}
+                className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Epic
+              </Button>
+            </Card>
 
-                <Input
-                  placeholder="Habit name..."
-                  value={newHabitTitle}
-                  onChange={(e) => setNewHabitTitle(e.target.value)}
-                />
-
-                <HabitDifficultySelector
-                  value={habitDifficulty}
-                  onChange={setHabitDifficulty}
-                />
-
-                <FrequencyPicker
-                  selectedDays={selectedDays}
-                  onDaysChange={setSelectedDays}
-                />
-
-                <Button 
-                  onClick={handleAddHabit} 
-                  className="w-full"
-                  disabled={addHabitMutation.isPending || !newHabitTitle.trim()}
-                >
-                  Create Habit
-                </Button>
-              </Card>
+            {/* Active Epics */}
+            {epicsLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : activeEpics.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                title="No Active Epics"
+                description="Create your first epic quest and link your habits to track legendary progress!"
+                actionLabel="Create Epic"
+                onAction={() => setCreateEpicDialogOpen(true)}
+              />
             ) : (
-              <>
-                {showTemplates ? (
-                  <HabitTemplates
-                    onSelect={(title, frequency) => {
-                      setNewHabitTitle(title);
-                      setSelectedDays(frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : []);
-                      setShowTemplates(false);
-                      setShowAddHabit(true);
-                    }}
-                    onCustom={() => {
-                      setShowTemplates(false);
-                      setShowAddHabit(true);
-                    }}
-                    existingHabits={habits}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  Active Epics
+                </h3>
+                {activeEpics.map((epic) => (
+                  <EpicCard
+                    key={epic.id}
+                    epic={epic}
+                    onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
+                    onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
                   />
-                ) : (
-                  <>
-                    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h2 className="text-xl font-semibold">Your Habits</h2>
-                          <p className="text-sm text-muted-foreground">Track daily progress</p>
-                        </div>
-                        {habits.length < 2 && (
-                          <Button
-                            onClick={() => setShowAddHabit(true)}
-                            size="sm"
-                            className="gap-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Add Habit
-                          </Button>
-                        )}
-                      </div>
-
-                      {habits.length > 0 && (
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              Daily Progress
-                            </span>
-                            <span className="text-primary font-semibold">
-                              {completions.length}/{habits.length}
-                            </span>
-                          </div>
-                          <Progress value={habitProgress * 100} className="h-2" />
-                        </div>
-                      )}
-                    </Card>
-
-                    <div className="space-y-3">
-                      {habits.length === 0 ? (
-                        <EmptyState
-                          icon={CheckCircle2}
-                          title="No habits yet"
-                          description="Create your first habit to start building momentum"
-                          actionLabel="Create Habit"
-                          onAction={() => setShowAddHabit(true)}
-                        />
-                      ) : (
-                        habits.map((habit, index) => {
-                          const isCompleted = completions.some(c => c.habit_id === habit.id);
-                          return (
-                            <HabitCard
-                              key={habit.id}
-                              id={habit.id}
-                              title={habit.title}
-                              currentStreak={habit.current_streak || 0}
-                              longestStreak={habit.longest_streak || 0}
-                              completedToday={isCompleted}
-                              difficulty={habit.difficulty}
-                              onComplete={() => toggleHabitMutation.mutate({ 
-                                habitId: habit.id, 
-                                isCompleted 
-                              })}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
+                ))}
+              </div>
             )}
 
-            {habits.length === 5 && !showAddHabit && (
-              <Card className="p-4 bg-accent/20 border-accent">
-                <p className="text-sm text-center text-muted-foreground">
-                  You've reached the maximum of 5 habits. Focus on consistency!
-                </p>
-              </Card>
+            {/* Completed Epics */}
+            {completedEpics.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Legendary Epics
+                </h3>
+                {completedEpics.map((epic) => (
+                  <EpicCard key={epic.id} epic={epic} />
+                ))}
+              </div>
             )}
+
+            {/* Create Epic Dialog */}
+            <CreateEpicDialog
+              open={createEpicDialogOpen}
+              onOpenChange={setCreateEpicDialogOpen}
+              onCreateEpic={(data) => {
+                createEpic(data);
+                setCreateEpicDialogOpen(false);
+              }}
+              availableHabits={habits}
+              isCreating={isCreating}
+            />
           </TabsContent>
         </Tabs>
       </div>
