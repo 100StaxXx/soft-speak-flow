@@ -170,7 +170,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     .from("payment_history")
     .insert({
       user_id: subscription.user_id,
-      subscription_id: subscription.user_id,
+      subscription_id: subscriptionId,
       stripe_payment_intent_id: invoice.payment_intent as string,
       stripe_invoice_id: invoice.id,
       amount: invoice.amount_paid,
@@ -202,7 +202,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     .from("payment_history")
     .insert({
       user_id: subscription.user_id,
-      subscription_id: subscription.user_id,
+      subscription_id: subscriptionId,
       stripe_payment_intent_id: invoice.payment_intent as string,
       stripe_invoice_id: invoice.id,
       amount: invoice.amount_due,

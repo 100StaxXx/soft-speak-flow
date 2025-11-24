@@ -5,6 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Quote, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { format } from "date-fns";
 
 interface Quote {
   id: string;
@@ -23,7 +24,7 @@ export const QuoteOfTheDay = () => {
     const fetchTodaysQuote = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
       const { data: mentor } = await supabase
