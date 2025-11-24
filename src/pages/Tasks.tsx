@@ -137,8 +137,11 @@ export default function Tasks() {
       });
       
       if (error) throw error;
+      
+      // Return whether this was the first habit BEFORE invalidating queries
+      return { wasFirstHabit: habits.length === 0 };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       setNewHabitTitle("");
       setHabitDifficulty("medium");
@@ -149,8 +152,7 @@ export default function Tasks() {
       haptics.success();
       
       // Mark that user created first habit to trigger tutorial
-      const hadNoHabits = habits.length === 0;
-      if (hadNoHabits) {
+      if (result?.wasFirstHabit) {
         localStorage.setItem('userHasCreatedFirstHabit', 'true');
         // Dispatch custom event to trigger tour in same window
         window.dispatchEvent(new CustomEvent('firstHabitCreated'));

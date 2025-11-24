@@ -76,6 +76,7 @@ export const HabitsPageTour = () => {
       showProgress
       showSkipButton
       disableOverlayClose
+      disableScrolling={false}
       styles={{
         options: {
           primaryColor: 'hsl(var(--primary))',
@@ -102,6 +103,7 @@ export const HabitsPageTour = () => {
         },
       }}
       disableOverlay
+      spotlightClicks
       locale={{
         last: 'Got it!',
         skip: 'Skip',
