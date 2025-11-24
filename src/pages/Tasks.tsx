@@ -464,7 +464,7 @@ export default function Tasks() {
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 3 quests per day</p>
+                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {completedCount}/{totalCount}
