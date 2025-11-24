@@ -8,9 +8,14 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("selected_mentor_id")
+      .select("selected_mentor_id, onboarding_completed")
       .eq("id", userId)
       .maybeSingle();
+
+    // If onboarding is completed, always go to tasks
+    if (profile?.onboarding_completed) {
+      return "/tasks";
+    }
 
     // No profile or no mentor selected -> onboarding
     if (!profile || !profile.selected_mentor_id) {
