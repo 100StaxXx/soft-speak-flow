@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.generate-zodiac-images]
 verify_jwt = false
+
+[functions.check-task-reminders]
+verify_jwt = false

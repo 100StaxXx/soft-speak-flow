@@ -100,6 +100,8 @@ export default function Tasks() {
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<{
     text: string;
@@ -109,6 +111,8 @@ export default function Tasks() {
     estimatedDuration: number | null;
     recurrencePattern: string | null;
     recurrenceDays: number[];
+    reminderEnabled: boolean;
+    reminderMinutesBefore: number;
   } | null>(null);
   
   // Calculate total XP for the day
@@ -271,6 +275,8 @@ export default function Tasks() {
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
+      reminderEnabled,
+      reminderMinutesBefore,
     });
     
     // If no main quest exists, ask user BEFORE creating the task
@@ -295,6 +301,8 @@ export default function Tasks() {
         estimatedDuration: pendingTaskData.estimatedDuration,
         recurrencePattern: pendingTaskData.recurrencePattern,
         recurrenceDays: pendingTaskData.recurrenceDays,
+        reminderEnabled: pendingTaskData.reminderEnabled,
+        reminderMinutesBefore: pendingTaskData.reminderMinutesBefore,
       });
       
       // Clear form
@@ -304,6 +312,8 @@ export default function Tasks() {
       setEstimatedDuration(null);
       setRecurrencePattern(null);
       setRecurrenceDays([]);
+      setReminderEnabled(false);
+      setReminderMinutesBefore(15);
       setShowAdvanced(false);
       setPendingTaskData(null);
     } catch (error) {
@@ -723,10 +733,14 @@ export default function Tasks() {
                         estimatedDuration={estimatedDuration}
                         recurrencePattern={recurrencePattern}
                         recurrenceDays={recurrenceDays}
+                        reminderEnabled={reminderEnabled}
+                        reminderMinutesBefore={reminderMinutesBefore}
                         onScheduledTimeChange={setScheduledTime}
                         onEstimatedDurationChange={setEstimatedDuration}
                         onRecurrencePatternChange={setRecurrencePattern}
                         onRecurrenceDaysChange={setRecurrenceDays}
+                        onReminderEnabledChange={setReminderEnabled}
+                        onReminderMinutesBeforeChange={setReminderMinutesBefore}
                       />
                     )}
 
