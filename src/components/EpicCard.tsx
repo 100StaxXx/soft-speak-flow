@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trophy, Flame, Target, Calendar, Zap, ExternalLink, Share2, Check } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, ExternalLink, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -120,12 +120,22 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
               </p>
             )}
           </div>
-          <Badge
-            variant={isCompleted ? "default" : "secondary"}
-            className="ml-2"
-          >
-            {isCompleted ? "Legendary" : isActive ? "Active" : "Abandoned"}
-          </Badge>
+          <div className="flex items-center gap-2 ml-2">
+            <Badge
+              variant={isCompleted ? "default" : "secondary"}
+            >
+              {isCompleted ? "Legendary" : isActive ? "Active" : "Abandoned"}
+            </Badge>
+            {isActive && (
+              <button
+                onClick={onAbandon}
+                className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
+                title="Abandon epic"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Progress Bar with Milestones */}
@@ -208,23 +218,15 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         )}
 
         {/* Action Buttons */}
-        {isActive && (
+        {isActive && epic.progress_percentage >= 100 && (
           <div className="mt-4">
-            {epic.progress_percentage >= 100 && (
-              <Button
-                onClick={onComplete}
-                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                Complete Epic
-              </Button>
-            )}
-            <button
-              onClick={onAbandon}
-              className="w-full mt-2 text-[10px] text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors py-1"
+            <Button
+              onClick={onComplete}
+              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
             >
-              abandon
-            </button>
+              <Trophy className="w-4 h-4 mr-2" />
+              Complete Epic
+            </Button>
           </div>
         )}
       </Card>
