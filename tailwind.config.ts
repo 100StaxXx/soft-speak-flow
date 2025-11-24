@@ -59,6 +59,28 @@ export default {
         'accent-purple': 'hsl(var(--accent-purple))',
         'electric-purple': 'hsl(var(--electric-purple))',
         'neon-glow': 'hsl(var(--neon-glow))',
+        
+        // Quest Category Colors
+        'category-mind': 'hsl(var(--category-mind))',
+        'category-body': 'hsl(var(--category-body))',
+        'category-soul': 'hsl(var(--category-soul))',
+        
+        // Epic Theme Colors
+        'epic-heroic': 'hsl(var(--epic-heroic))',
+        'epic-warrior': 'hsl(var(--epic-warrior))',
+        'epic-mystic': 'hsl(var(--epic-mystic))',
+        'epic-nature': 'hsl(var(--epic-nature))',
+        'epic-solar': 'hsl(var(--epic-solar))',
+        
+        // Streak Milestone Colors
+        'streak-building': 'hsl(var(--streak-building))',
+        'streak-strong': 'hsl(var(--streak-strong))',
+        'streak-elite': 'hsl(var(--streak-elite))',
+        'streak-legendary': 'hsl(var(--streak-legendary))',
+        
+        // Evolution Stage Tiers
+        'stage-tier-2': 'hsl(var(--stage-tier-2))',
+        'stage-tier-3': 'hsl(var(--stage-tier-3))',
       },
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],

@@ -7,6 +7,7 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
+import { format } from "date-fns";
 
 const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
 
@@ -21,7 +22,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
-  const taskDate = selectedDate ? formatDate(selectedDate) : formatDate(new Date());
+  const taskDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['daily-tasks', user?.id, taskDate],
@@ -50,7 +51,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
       recurrencePattern,
       recurrenceDays,
       reminderEnabled,
-      reminderMinutesBefore
+      reminderMinutesBefore,
+      category
     }: { 
       taskText: string; 
       difficulty: 'easy' | 'medium' | 'hard'; 
@@ -62,6 +64,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
       recurrenceDays?: number[] | null;
       reminderEnabled?: boolean;
       reminderMinutesBefore?: number;
+      category?: string;
     }) => {
       // Prevent duplicate submissions
       if (addInProgress.current) {
@@ -88,6 +91,23 @@ export const useDailyTasks = (selectedDate?: Date) => {
         }
 
         const xpReward = getQuestXP(difficulty);
+
+        // Auto-detect category based on keywords
+        let detectedCategory = category || 'general';
+        const text = taskText.toLowerCase();
+        
+        const categoryKeywords = {
+          body: ['gym', 'run', 'exercise', 'workout', 'walk', 'yoga', 'stretch', 'fitness', 'sports'],
+          soul: ['meditate', 'journal', 'breathe', 'gratitude', 'reflect', 'pray', 'mindful', 'relax', 'rest'],
+          mind: ['read', 'learn', 'study', 'plan', 'organize', 'think', 'write', 'research', 'course']
+        };
+
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+          if (keywords.some(keyword => text.includes(keyword))) {
+            detectedCategory = cat;
+            break;
+          }
+        }
 
         const { error } = await supabase
           .from('daily_tasks')
@@ -140,6 +160,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { data: existingTask } = await supabase.from('daily_tasks').select('completed_at').eq('id', taskId).maybeSingle();
         const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
+        // Prevent unchecking completed tasks to avoid XP farming
+        if (wasAlreadyCompleted && !completed) {
+          toggleInProgress.current = false;
+          throw new Error('Cannot uncheck completed tasks');
+        }
+
         const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
         if (error) {
           toggleInProgress.current = false;
@@ -153,11 +179,37 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw error;
       }
     },
-    onSuccess: async ({ completed, xpReward, wasAlreadyCompleted }) => {
+    onSuccess: async ({ taskId, completed, xpReward, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
         console.log('[useDailyTasks] Quest completed, awarding XP:', xpReward);
-        await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        
+        // Check if this task is part of a guild epic and award bonus XP
+        const { data: epicHabits } = await supabase
+          .from('epic_habits')
+          .select('epic_id, epics!inner(is_public, status)')
+          .eq('epics.status', 'active')
+          .eq('epics.is_public', true);
+
+        let bonusXP = 0;
+        if (epicHabits && epicHabits.length > 0) {
+          // Check if user is a member of any of these guild epics
+          const { data: memberships } = await supabase
+            .from('epic_members')
+            .select('epic_id')
+            .eq('user_id', user!.id)
+            .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
+
+          if (memberships && memberships.length > 0) {
+            bonusXP = Math.floor(xpReward * 0.2); // 20% bonus for guild participation
+            await awardCustomXP(xpReward + bonusXP, 'task_complete', `Task Complete! +${bonusXP} Guild Bonus 🎯`);
+          } else {
+            await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+          }
+        } else {
+          await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        }
+        
         if (companion) await updateBodyFromActivity(companion.id);
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }

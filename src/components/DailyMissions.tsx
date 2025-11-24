@@ -9,6 +9,7 @@ import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
 
+
 export const DailyMissions = () => {
   const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
   

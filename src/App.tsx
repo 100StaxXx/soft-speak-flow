@@ -12,6 +12,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
@@ -39,6 +40,10 @@ const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
+const Epics = lazy(() => import("./pages/Epics"));
+const SharedEpics = lazy(() => import("./pages/SharedEpics"));
+const JoinEpic = lazy(() => import("./pages/JoinEpic"));
+const BattleArena = lazy(() => import("./pages/BattleArena"));
 
 
 const queryClient = new QueryClient({
@@ -85,6 +90,7 @@ const EvolutionAwareContent = memo(() => {
     <>
       <GlobalEvolutionListener />
       <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
+      <SubscriptionGate />
     </>
   );
 });
@@ -111,6 +117,10 @@ const AppContent = memo(() => {
           <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+          <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+          <Route path="/join/:code" element={<JoinEpic />} />
+          <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
+          <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />

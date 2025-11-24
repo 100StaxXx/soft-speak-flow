@@ -269,6 +269,174 @@ export type Database = {
           },
         ]
       }
+      battle_matches: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          current_round: number | null
+          id: string
+          max_rounds: number | null
+          started_at: string | null
+          status: string
+          winner_user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_round?: number | null
+          id?: string
+          max_rounds?: number | null
+          started_at?: string | null
+          status?: string
+          winner_user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_round?: number | null
+          id?: string
+          max_rounds?: number | null
+          started_at?: string | null
+          status?: string
+          winner_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_matches_winner_user_id_fkey"
+            columns: ["winner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_participants: {
+        Row: {
+          cards_used: string[]
+          created_at: string | null
+          eliminated_at: string | null
+          energy: number | null
+          id: string
+          match_id: string
+          placement: number | null
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          cards_used: string[]
+          created_at?: string | null
+          eliminated_at?: string | null
+          energy?: number | null
+          id?: string
+          match_id: string
+          placement?: number | null
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          cards_used?: string[]
+          created_at?: string | null
+          eliminated_at?: string | null
+          energy?: number | null
+          id?: string
+          match_id?: string
+          placement?: number | null
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_participants_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "battle_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rankings: {
+        Row: {
+          id: string
+          rank_points: number | null
+          second_place: number | null
+          third_place: number | null
+          total_matches: number | null
+          total_xp_earned: number | null
+          updated_at: string | null
+          user_id: string
+          wins: number | null
+        }
+        Insert: {
+          id?: string
+          rank_points?: number | null
+          second_place?: number | null
+          third_place?: number | null
+          total_matches?: number | null
+          total_xp_earned?: number | null
+          updated_at?: string | null
+          user_id: string
+          wins?: number | null
+        }
+        Update: {
+          id?: string
+          rank_points?: number | null
+          second_place?: number | null
+          third_place?: number | null
+          total_matches?: number | null
+          total_xp_earned?: number | null
+          updated_at?: string | null
+          user_id?: string
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rankings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rounds: {
+        Row: {
+          created_at: string | null
+          id: string
+          match_id: string
+          player_actions: Json
+          round_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          match_id: string
+          player_actions: Json
+          round_number: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          match_id?: string
+          player_actions?: Json
+          round_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rounds_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "battle_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_progress: {
         Row: {
           completed: boolean | null
@@ -800,6 +968,7 @@ export type Database = {
       }
       daily_tasks: {
         Row: {
+          category: string | null
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
@@ -821,6 +990,7 @@ export type Database = {
           xp_reward: number
         }
         Insert: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -842,6 +1012,7 @@ export type Database = {
           xp_reward?: number
         }
         Update: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -893,6 +1064,249 @@ export type Database = {
           created_at?: string | null
           id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      epic_activity_feed: {
+        Row: {
+          activity_data: Json | null
+          activity_type: string
+          created_at: string
+          epic_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_data?: Json | null
+          activity_type: string
+          created_at?: string
+          epic_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_data?: Json | null
+          activity_type?: string
+          created_at?: string
+          epic_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_activity_feed_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_discord_events: {
+        Row: {
+          epic_id: string
+          event_data: Json
+          event_type: string
+          id: string
+          posted_at: string
+          webhook_response: string | null
+        }
+        Insert: {
+          epic_id: string
+          event_data?: Json
+          event_type: string
+          id?: string
+          posted_at?: string
+          webhook_response?: string | null
+        }
+        Update: {
+          epic_id?: string
+          event_data?: Json
+          event_type?: string
+          id?: string
+          posted_at?: string
+          webhook_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_discord_events_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_habits: {
+        Row: {
+          created_at: string | null
+          epic_id: string
+          habit_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          epic_id: string
+          habit_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          epic_id?: string
+          habit_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_habits_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epic_habits_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_members: {
+        Row: {
+          epic_id: string
+          id: string
+          joined_at: string
+          last_activity_at: string | null
+          total_contribution: number
+          user_id: string
+        }
+        Insert: {
+          epic_id: string
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          total_contribution?: number
+          user_id: string
+        }
+        Update: {
+          epic_id?: string
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          total_contribution?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_members_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epic_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_progress_log: {
+        Row: {
+          created_at: string | null
+          date: string
+          epic_id: string
+          habits_completed: number | null
+          habits_total: number | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          epic_id: string
+          habits_completed?: number | null
+          habits_total?: number | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          epic_id?: string
+          habits_completed?: number | null
+          habits_total?: number | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_progress_log_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epics: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          invite_code: string | null
+          is_public: boolean | null
+          progress_percentage: number | null
+          start_date: string
+          status: string
+          target_days: number
+          theme_color: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          invite_code?: string | null
+          is_public?: boolean | null
+          progress_percentage?: number | null
+          start_date?: string
+          status?: string
+          target_days?: number
+          theme_color?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          invite_code?: string | null
+          is_public?: boolean | null
+          progress_percentage?: number | null
+          start_date?: string
+          status?: string
+          target_days?: number
+          theme_color?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          xp_reward?: number
         }
         Relationships: []
       }
@@ -1911,13 +2325,16 @@ export type Database = {
           core_element: string
           created_at: string
           current_image_url: string | null
+          current_mood: string | null
           current_stage: number
           current_xp: number
           eye_color: string | null
           favorite_color: string
           fur_color: string | null
           id: string
+          initial_image_url: string | null
           last_energy_update: string | null
+          last_mood_update: string | null
           mind: number | null
           soul: number | null
           spirit_animal: string
@@ -1930,13 +2347,16 @@ export type Database = {
           core_element: string
           created_at?: string
           current_image_url?: string | null
+          current_mood?: string | null
           current_stage?: number
           current_xp?: number
           eye_color?: string | null
           favorite_color: string
           fur_color?: string | null
           id?: string
+          initial_image_url?: string | null
           last_energy_update?: string | null
+          last_mood_update?: string | null
           mind?: number | null
           soul?: number | null
           spirit_animal: string
@@ -1949,13 +2369,16 @@ export type Database = {
           core_element?: string
           created_at?: string
           current_image_url?: string | null
+          current_mood?: string | null
           current_stage?: number
           current_xp?: number
           eye_color?: string | null
           favorite_color?: string
           fur_color?: string | null
           id?: string
+          initial_image_url?: string | null
           last_energy_update?: string | null
+          last_mood_update?: string | null
           mind?: number | null
           soul?: number | null
           spirit_animal?: string
@@ -2340,6 +2763,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_service_role: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

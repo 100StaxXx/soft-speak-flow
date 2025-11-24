@@ -36,10 +36,18 @@ export const CompanionBadge = ({ element, stage = 1, showStage = true, className
   const colorClass = elementColors[element.toLowerCase()] || elementColors.spirit;
   const stageName = getStageName(stage);
   
+  // Get stage tier overlay
+  const getStageOverlay = () => {
+    if (stage >= 16) return "bg-gradient-to-r from-stage-tier-4-start/10 via-stage-tier-4-mid/10 to-stage-tier-4-end/10"; // Prismatic
+    if (stage >= 11) return "bg-gradient-to-r from-stage-tier-3/10"; // Gold shimmer
+    if (stage >= 6) return "bg-gradient-to-r from-stage-tier-2/10"; // Silver shimmer
+    return ""; // Base tier
+  };
+  
   return (
     <Badge 
       variant="outline" 
-      className={`px-3 py-1 ${colorClass} ${className} flex items-center gap-2`}
+      className={`px-3 py-1 ${colorClass} ${getStageOverlay()} ${className} flex items-center gap-2`}
     >
       <Icon className="h-3 w-3" />
       <span className="text-xs font-semibold capitalize">{element}</span>

@@ -46,6 +46,31 @@ All colors MUST be HSL.
     /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
     
+    /* Quest Category Colors - Mind/Body/Soul */
+    --category-mind: 270 80% 60%;      /* purple-indigo */
+    --category-body: 20 90% 55%;       /* orange-red */
+    --category-soul: 200 80% 55%;      /* blue-cyan */
+    
+    /* Epic Theme Colors */
+    --epic-heroic: 270 70% 55%;        /* purple (default) */
+    --epic-warrior: 0 85% 60%;         /* red-orange */
+    --epic-mystic: 230 70% 55%;        /* indigo-blue */
+    --epic-nature: 145 70% 50%;        /* green-emerald */
+    --epic-solar: 45 95% 55%;          /* gold-yellow */
+    
+    /* Streak Milestone Colors */
+    --streak-building: 142 76% 50%;    /* green (7-13 days) */
+    --streak-strong: 217 91% 60%;      /* blue (14-29 days) */
+    --streak-elite: 270 80% 60%;       /* purple (30-59 days) */
+    --streak-legendary: 45 100% 55%;   /* gold (60+ days) */
+    
+    /* Evolution Stage Tier Overlays */
+    --stage-tier-2: 0 0% 75%;          /* silver shimmer (6-10) */
+    --stage-tier-3: 45 100% 60%;       /* gold shimmer (11-15) */
+    --stage-tier-4-start: 270 80% 60%; /* prismatic start (16-20) */
+    --stage-tier-4-mid: 330 80% 60%;   /* prismatic mid */
+    --stage-tier-4-end: 190 80% 60%;   /* prismatic end */
+    
     /* Semantic Tokens */
     --background: 0 0% 5%;
     --foreground: 0 0% 98%;

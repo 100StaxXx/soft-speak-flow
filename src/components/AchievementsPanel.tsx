@@ -17,6 +17,9 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
   const { data: achievements, isLoading } = useQuery({
     queryKey: ["achievements", user?.id],
     enabled: !!user,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
     queryFn: async () => {
       const { data, error } = await supabase
         .from("achievements")

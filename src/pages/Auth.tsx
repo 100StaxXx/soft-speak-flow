@@ -35,9 +35,12 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Show intro after component mounts
-    const introTimer = setTimeout(() => setShowIntro(true), 100);
-    return () => clearTimeout(introTimer);
+    // Only show intro if user hasn't seen it before
+    const hasSeenIntro = localStorage.getItem('has_seen_intro');
+    if (!hasSeenIntro) {
+      const introTimer = setTimeout(() => setShowIntro(true), 100);
+      return () => clearTimeout(introTimer);
+    }
   }, []);
 
   useEffect(() => {
@@ -160,7 +163,10 @@ const Auth = () => {
   };
 
   if (showIntro) {
-    return <IntroScreen onComplete={() => setShowIntro(false)} />;
+    return <IntroScreen onComplete={() => {
+      localStorage.setItem('has_seen_intro', 'true');
+      setShowIntro(false);
+    }} />;
   }
 
   const scrollToForm = () => {

@@ -5,6 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, Play, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 interface DailyPepTalk {
   id: string;
@@ -25,7 +26,7 @@ export const TodaysPush = () => {
     const fetchTodaysPepTalk = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const today = new Date().toLocaleDateString("en-CA");
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
       const { data: mentor } = await supabase

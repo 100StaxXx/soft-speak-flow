@@ -100,10 +100,10 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     if (!lovableApiKey) {
-      return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -426,8 +426,10 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
     const newImageUrl = urlData.publicUrl;
     console.log("Image uploaded:", newImageUrl);
 
-    // 8. Save evolution to database
-    const { data: evolutionRecord, error: evolutionError } = await supabase
+    // 8. Save evolution to database using service role client (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    
+    const { data: evolutionRecord, error: evolutionError } = await supabaseAdmin
       .from("companion_evolutions")
       .insert({
         companion_id: companion.id,

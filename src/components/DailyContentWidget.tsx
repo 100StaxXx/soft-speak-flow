@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, Quote, Play, Sparkles, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 interface DailyContent {
   pepTalk?: any;
@@ -21,10 +22,11 @@ export const DailyContentWidget = () => {
     const fetchDailyContent = async () => {
       if (!profile?.selected_mentor_id) {
         setLoading(false);
+        setContent({});
         return;
       }
 
-      const today = new Date().toLocaleDateString("en-CA");
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
       const { data: mentor } = await supabase

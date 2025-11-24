@@ -6,7 +6,7 @@ import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Moon } from "lucide-react";
+import { ArrowLeft, Moon, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
 import { BottomNav } from "@/components/BottomNav";
@@ -134,7 +134,7 @@ export default function Reflection() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-heading font-black flex-1 text-center">Daily Reflection</h1>
+            <h1 className="text-2xl font-heading font-black flex-1 text-center">Gratitude Journal</h1>
             <Button variant="outline" size="sm" onClick={() => navigate('/mood-history')}>
               View History
             </Button>
@@ -142,16 +142,16 @@ export default function Reflection() {
 
           <Card className="p-6 space-y-6">
             <div className="flex items-center gap-3">
-              <Moon className="w-8 h-8 text-primary" />
+              <Heart className="w-8 h-8 text-primary" />
               <div>
-                <h2 className="text-xl font-heading font-black">Reflection Complete</h2>
-                <p className="text-sm text-muted-foreground">You checked in today</p>
+                <h2 className="text-xl font-heading font-black">Gratitude Complete</h2>
+                <p className="text-sm text-muted-foreground">You logged gratitude today</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground mb-2">How was your day?</p>
+                <p className="text-sm text-muted-foreground mb-2">What brought you joy?</p>
                 <div className="p-4 rounded-xl bg-muted/50">
                   <p className="text-lg font-medium capitalize">{todayReflection.mood.replace('_', ' ')}</p>
                 </div>
@@ -196,7 +196,7 @@ export default function Reflection() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-heading font-black flex-1 text-center">Daily Reflection</h1>
+          <h1 className="text-2xl font-heading font-black flex-1 text-center">Gratitude Journal</h1>
           <Button variant="outline" size="sm" onClick={() => navigate('/mood-history')}>
             View History
           </Button>
@@ -204,10 +204,10 @@ export default function Reflection() {
 
         <Card className="p-6 space-y-6">
           <div className="flex items-center gap-3">
-            <Moon className="w-8 h-8 text-primary" />
+            <Heart className="w-8 h-8 text-primary" />
             <div>
-              <h2 className="text-xl font-heading font-black">Daily Reflection</h2>
-              <p className="text-sm text-muted-foreground">Take a moment to reflect</p>
+              <h2 className="text-xl font-heading font-black">Daily Gratitude</h2>
+              <p className="text-sm text-muted-foreground">What are you grateful for?</p>
             </div>
           </div>
 
@@ -219,12 +219,12 @@ export default function Reflection() {
 
             <div>
               <p className="text-sm text-muted-foreground mb-2">
-                Any thoughts? (Optional)
+                Share your gratitude (Optional)
               </p>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="What's on your mind..."
+                placeholder="What are you grateful for today? What brought you joy?"
                 className="min-h-[120px] resize-none"
               />
             </div>
@@ -235,7 +235,7 @@ export default function Reflection() {
               className="w-full"
               size="lg"
             >
-              {isSubmitting ? "Saving..." : "Complete Reflection"}
+              {isSubmitting ? "Saving..." : "Log Gratitude"}
             </Button>
           </div>
         </Card>

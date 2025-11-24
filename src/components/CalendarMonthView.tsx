@@ -52,9 +52,9 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
     
     for (let i = 0; i < scheduledTasks.length; i++) {
       for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = toReferenceTime(scheduledTasks[i].scheduled_time!);
+        const task1Start = new Date(`2000-01-01T${scheduledTasks[i].scheduled_time}:00`);
         const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2Start = toReferenceTime(scheduledTasks[j].scheduled_time!);
+        const task2Start = new Date(`2000-01-01T${scheduledTasks[j].scheduled_time}:00`);
         const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
         
         if (task1Start < task2End && task2Start < task1End) {

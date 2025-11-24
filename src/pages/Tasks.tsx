@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
@@ -30,6 +30,10 @@ import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
+import { EpicCard } from "@/components/EpicCard";
+import { CreateEpicDialog } from "@/components/CreateEpicDialog";
+import { JoinEpicDialog } from "@/components/JoinEpicDialog";
+import { useEpics } from "@/hooks/useEpics";
 import { Sliders } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -67,6 +71,7 @@ export default function Tasks() {
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
+  const { activeEpics, completedEpics, isLoading: epicsLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -138,6 +143,10 @@ export default function Tasks() {
   const [habitDifficulty, setHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
+  // Epics state
+  const [createEpicDialogOpen, setCreateEpicDialogOpen] = useState(false);
+  const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
+
   // Fetch habits
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
@@ -164,7 +173,7 @@ export default function Tasks() {
   const { data: completions = [] } = useQuery({
     queryKey: ['habit-completions', user?.id],
     queryFn: async () => {
-      const today = getLocalDateString();
+      const today = format(new Date(), 'yyyy-MM-dd');
       const { data } = await supabase
         .from('habit_completions')
         .select('*')
@@ -207,7 +216,7 @@ export default function Tasks() {
   // Toggle habit completion
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
-      const today = getLocalDateString();
+      const today = format(new Date(), 'yyyy-MM-dd');
       
       if (isCompleted) {
         // Unchecking - remove completion record but DON'T remove XP
@@ -271,7 +280,7 @@ export default function Tasks() {
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
     
-    const taskDate = getLocalDateString(selectedDate);
+    const taskDate = format(selectedDate, 'yyyy-MM-dd');
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     // Store task data temporarily
@@ -357,15 +366,29 @@ export default function Tasks() {
   useEffect(() => {
     if (!user || !profile) return;
     
+    // Check localStorage first for immediate feedback
+    const tutorialDismissed = localStorage.getItem(`tutorial_dismissed_${user.id}`);
+    if (tutorialDismissed === 'true') {
+      if (showTutorial) setShowTutorial(false);
+      return;
+    }
+    
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
     
-    if (!tutorialSeen) {
-      // Show tutorial
+    // If database says tutorial was seen, mark localStorage and close
+    if (tutorialSeen) {
+      localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+      if (showTutorial) setShowTutorial(false);
+      return;
+    }
+    
+    // Only show tutorial once when not seen
+    if (!tutorialSeen && !showTutorial) {
       setShowTutorial(true);
       
       // Auto-generate "Join R-Evolution" quest
-      const today = getLocalDateString();
+      const today = format(new Date(), 'yyyy-MM-dd');
       
       // Check if this quest already exists
       supabase
@@ -393,13 +416,17 @@ export default function Tasks() {
           }
         });
     }
-  }, [user, profile, queryClient]);
+  }, [user, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
+    if (!user) return;
+    
+    // Immediately mark as dismissed in localStorage to prevent re-showing
+    localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
     setShowTutorial(false);
     
-    // Mark tutorial as seen in database
-    if (user && profile) {
+    // Then update database in background
+    if (profile) {
       const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
       const updatedData = {
         ...onboardingData,
@@ -411,7 +438,7 @@ export default function Tasks() {
         .update({ onboarding_data: updatedData })
         .eq('id', user.id);
       
-      // Invalidate profile to refresh cached data immediately
+      // Invalidate profile cache
       queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
     }
   };
@@ -422,9 +449,9 @@ export default function Tasks() {
       if (task.id === other.id || !task.scheduled_time || !other.scheduled_time) continue;
       if (task.task_date !== other.task_date) continue;
       
-      const t1Start = toReferenceTime(task.scheduled_time);
+      const t1Start = new Date(`2000-01-01T${task.scheduled_time}:00`);
       const t1End = new Date(t1Start.getTime() + ((task.estimated_duration || 0) * 60000));
-      const t2Start = toReferenceTime(other.scheduled_time);
+      const t2Start = new Date(`2000-01-01T${other.scheduled_time}:00`);
       const t2End = new Date(t2Start.getTime() + ((other.estimated_duration || 0) * 60000));
       
       if (t1Start < t2End && t2Start < t1End) return true;
@@ -459,7 +486,7 @@ export default function Tasks() {
         <div className="flex items-center gap-3">
           <Target className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Quests & Habits</h1>
+            <h1 className="text-3xl font-bold">Quests & Epics</h1>
             <p className="text-muted-foreground">Build your daily momentum</p>
           </div>
         </div>
@@ -470,9 +497,9 @@ export default function Tasks() {
               <Swords className="h-4 w-4" />
               Daily Quests
             </TabsTrigger>
-            <TabsTrigger value="habits" className="gap-2" data-tour="habits-tab">
-              <CheckCircle2 className="h-4 w-4" />
-              Habits
+            <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
+              <Trophy className="h-4 w-4" />
+              Epics
             </TabsTrigger>
           </TabsList>
 
@@ -680,6 +707,67 @@ export default function Tasks() {
                 </div>
               )}
 
+              {/* Quest List */}
+              <div className="space-y-6">
+                {tasks.length === 0 ? (
+                  <EmptyState 
+                    icon={Target}
+                    title="No quests yet"
+                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
+                  />
+                ) : (() => {
+                  const mainQuest = tasks.find(t => t.is_main_quest);
+                  const sideQuests = tasks.filter(t => !t.is_main_quest);
+                  
+                  return (
+                    <>
+                      {/* Main Quest Section */}
+                      {mainQuest && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-xl">⚔️</div>
+                            <h3 className="font-semibold text-foreground">Main Quest</h3>
+                            <div className="ml-auto">
+                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                                2x XP
+                              </span>
+                            </div>
+                          </div>
+                          <TaskCard
+                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
+                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                            onDelete={() => deleteTask(mainQuest.id)}
+                            isMainQuest={true}
+                          />
+                        </div>
+                      )}
+
+                      {/* Side Quests */}
+                      {sideQuests.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-lg">📜</div>
+                            <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {sideQuests.map((task) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
+                                onDelete={() => deleteTask(task.id)}
+                                onSetMainQuest={() => setMainQuest(task.id)}
+                                showPromoteButton={!mainQuest}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
               {canAddMore && (
                 <Card className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
@@ -764,197 +852,83 @@ export default function Tasks() {
                   </div>
                 </Card>
               )}
-
-              {/* Quest List */}
-              <div className="space-y-6">
-                {tasks.length === 0 ? (
-                  <EmptyState 
-                    icon={Target}
-                    title="No quests yet"
-                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
-                  />
-                ) : (() => {
-                  const mainQuest = tasks.find(t => t.is_main_quest);
-                  const sideQuests = tasks.filter(t => !t.is_main_quest);
-                  
-                  return (
-                    <>
-                      {/* Main Quest Section */}
-                      {mainQuest && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="text-xl">⚔️</div>
-                            <h3 className="font-semibold text-foreground">Main Quest</h3>
-                            <div className="ml-auto">
-                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                                2x XP
-                              </span>
-                            </div>
-                          </div>
-                          <TaskCard
-                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
-                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
-                            onDelete={() => deleteTask(mainQuest.id)}
-                            isMainQuest={true}
-                          />
-                        </div>
-                      )}
-
-                      {/* Side Quests */}
-                      {sideQuests.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="text-lg">📜</div>
-                            <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
-                          </div>
-                          <div className="space-y-3">
-                            {sideQuests.map((task) => (
-                              <TaskCard
-                                key={task.id}
-                                task={task}
-                                onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
-                                onDelete={() => deleteTask(task.id)}
-                                onSetMainQuest={() => setMainQuest(task.id)}
-                                showPromoteButton={!mainQuest}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
             </Card>
           </TabsContent>
 
-          <TabsContent value="habits" className="space-y-4 mt-6">
-            {showAddHabit ? (
-              <Card className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Create New Habit</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setShowAddHabit(false)}>
-                    Cancel
-                  </Button>
-                </div>
-
-                <Input
-                  placeholder="Habit name..."
-                  value={newHabitTitle}
-                  onChange={(e) => setNewHabitTitle(e.target.value)}
-                />
-
-                <HabitDifficultySelector
-                  value={habitDifficulty}
-                  onChange={setHabitDifficulty}
-                />
-
-                <FrequencyPicker
-                  selectedDays={selectedDays}
-                  onDaysChange={setSelectedDays}
-                />
-
-                <Button 
-                  onClick={handleAddHabit} 
-                  className="w-full"
-                  disabled={addHabitMutation.isPending || !newHabitTitle.trim()}
+          <TabsContent value="epics" className="space-y-4 mt-6">
+            {/* Create Epic and Join Guild Buttons */}
+            <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setCreateEpicDialogOpen(true)}
+                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-base font-bold"
                 >
-                  Create Habit
+                  <Castle className="h-5 w-5 mr-2" />
+                  Create Epic
                 </Button>
-              </Card>
+                <Button
+                  onClick={() => setJoinEpicDialogOpen(true)}
+                  variant="outline"
+                  className="h-auto py-3 px-4"
+                >
+                  <Users className="w-5 h-5" />
+                </Button>
+              </div>
+            </Card>
+
+            {/* Active Epics */}
+            {epicsLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : activeEpics.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                title="No Active Epics"
+                description="Create your first epic quest and link your habits to track legendary progress!"
+                actionLabel="Create Epic"
+                onAction={() => setCreateEpicDialogOpen(true)}
+              />
             ) : (
-              <>
-                {showTemplates ? (
-                  <HabitTemplates
-                    onSelect={(title, frequency) => {
-                      setNewHabitTitle(title);
-                      setSelectedDays(frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : []);
-                      setShowTemplates(false);
-                      setShowAddHabit(true);
-                    }}
-                    onCustom={() => {
-                      setShowTemplates(false);
-                      setShowAddHabit(true);
-                    }}
-                    existingHabits={habits}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  Active Epics
+                </h3>
+                {activeEpics.map((epic) => (
+                  <EpicCard
+                    key={epic.id}
+                    epic={epic}
+                    onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
+                    onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
                   />
-                ) : (
-                  <>
-                    <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h2 className="text-xl font-semibold">Your Habits</h2>
-                          <p className="text-sm text-muted-foreground">Track daily progress</p>
-                        </div>
-                        {habits.length < 2 && (
-                          <Button
-                            onClick={() => setShowAddHabit(true)}
-                            size="sm"
-                            className="gap-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Add Habit
-                          </Button>
-                        )}
-                      </div>
-
-                      {habits.length > 0 && (
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              Daily Progress
-                            </span>
-                            <span className="text-primary font-semibold">
-                              {completions.length}/{habits.length}
-                            </span>
-                          </div>
-                          <Progress value={habitProgress * 100} className="h-2" />
-                        </div>
-                      )}
-                    </Card>
-
-                    <div className="space-y-3">
-                      {habits.length === 0 ? (
-                        <EmptyState
-                          icon={CheckCircle2}
-                          title="No habits yet"
-                          description="Create your first habit to start building momentum"
-                          actionLabel="Create Habit"
-                          onAction={() => setShowAddHabit(true)}
-                        />
-                      ) : (
-                        habits.map((habit, index) => {
-                          const isCompleted = completions.some(c => c.habit_id === habit.id);
-                          return (
-                            <HabitCard
-                              key={habit.id}
-                              id={habit.id}
-                              title={habit.title}
-                              currentStreak={habit.current_streak || 0}
-                              longestStreak={habit.longest_streak || 0}
-                              completedToday={isCompleted}
-                              difficulty={habit.difficulty}
-                              onComplete={() => toggleHabitMutation.mutate({ 
-                                habitId: habit.id, 
-                                isCompleted 
-                              })}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
+                ))}
+              </div>
             )}
 
-            {habits.length === 5 && !showAddHabit && (
-              <Card className="p-4 bg-accent/20 border-accent">
-                <p className="text-sm text-center text-muted-foreground">
-                  You've reached the maximum of 5 habits. Focus on consistency!
-                </p>
-              </Card>
+            {/* Completed Epics */}
+            {completedEpics.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Legendary Epics
+                </h3>
+                {completedEpics.map((epic) => (
+                  <EpicCard key={epic.id} epic={epic} />
+                ))}
+              </div>
             )}
+
+            {/* Create Epic Dialog */}
+            <CreateEpicDialog
+              open={createEpicDialogOpen}
+              onOpenChange={setCreateEpicDialogOpen}
+              onCreateEpic={(data) => {
+                createEpic(data);
+                setCreateEpicDialogOpen(false);
+              }}
+              isCreating={isCreating}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -998,6 +972,12 @@ export default function Tasks() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Join Epic Dialog */}
+      <JoinEpicDialog
+        open={joinEpicDialogOpen}
+        onOpenChange={setJoinEpicDialogOpen}
+      />
 
       <BottomNav />
     </div>
