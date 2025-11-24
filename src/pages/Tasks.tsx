@@ -458,7 +458,7 @@ export default function Tasks() {
         <div className="flex items-center gap-3">
           <Target className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Quests & Habits</h1>
+            <h1 className="text-3xl font-bold">Quests & Epics</h1>
             <p className="text-muted-foreground">Build your daily momentum</p>
           </div>
         </div>
