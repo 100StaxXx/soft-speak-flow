@@ -1,50 +1,48 @@
-import { Crown, Check, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { useProfile } from "@/hooks/useProfile";
-import { useSubscription } from "@/hooks/useSubscription";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Crown, Sparkles, Zap, Bell, Download, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/useSubscription";
+import { supabase } from "@/integrations/supabase/client";
 
-const Premium = () => {
+export default function Premium() {
   const navigate = useNavigate();
-  const { profile } = useProfile();
-  const { subscription, isTrialing, trialDaysRemaining } = useSubscription();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const { isActive, isTrialing, trialDaysRemaining } = useSubscription();
+  const [subscribing, setSubscribing] = useState(false);
 
-  const handleSubscribe = async (plan: "monthly" | "yearly" = "monthly") => {
+  const handleSubscribe = async () => {
+    setSubscribing(true);
     try {
-      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('create-subscription-checkout');
 
-      const { data, error } = await supabase.functions.invoke("create-subscription-checkout", {
-        body: { plan },
-      });
+      if (error) {
+        throw error;
+      }
 
-      if (error) throw error;
-
-      if (data.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = data.url;
+      if (data?.url) {
+        window.open(data.url, '_blank');
       }
     } catch (error: any) {
-      console.error("Subscription error:", error);
+      console.error('Subscription error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create checkout session. Please try again.",
+        description: error.message || "Failed to create checkout session",
         variant: "destructive",
       });
-      setIsLoading(false);
+    } finally {
+      setSubscribing(false);
     }
   };
 
-  if (profile?.is_premium) {
+  // Show premium user view
+  if (isActive) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-soft">
+          <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-glow">
             <Crown className="h-12 w-12 text-primary-foreground" />
           </div>
           <h1 className="font-display text-4xl text-foreground mb-4">
@@ -79,118 +77,124 @@ const Premium = () => {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian px-6 py-16">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-16 space-y-6">
-          <div className="h-1 w-24 bg-royal-gold mx-auto mb-8" />
-          <h1 className="text-6xl font-black text-pure-white uppercase tracking-tight animate-velocity-fade-in">
-            Unlock Your Potential
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent mb-4 shadow-glow animate-pulse">
+            <Crown className="h-10 w-10 text-primary-foreground" />
+          </div>
+          <h1 className="font-display text-5xl text-foreground">
+            Start Your Free Trial
           </h1>
-          <p className="text-xl text-steel max-w-2xl mx-auto">
-            Get unlimited access to all mentors, exclusive content, and personalized experiences.
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            7 days free, then $9.99/month. Full access from day one.
           </p>
         </div>
 
-        <Card className="mb-8 bg-graphite border-2 border-royal-gold/30 shadow-glow">
-          <CardHeader className="text-center">
-            <div className="inline-flex items-center gap-2 bg-royal-gold/10 text-royal-gold px-4 py-2 rounded-lg mx-auto mb-4">
-              <Crown className="h-5 w-5" fill="currentColor" />
-              <span className="font-black uppercase tracking-wide">Premium</span>
+        {/* Pricing Card */}
+        <Card className="border-2 border-primary/20 shadow-2xl bg-card/80 backdrop-blur">
+          <CardHeader className="text-center pb-8">
+            <div className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-accent/20 text-accent font-semibold text-sm mb-4 mx-auto">
+              🎉 7-Day Free Trial
             </div>
-            <CardTitle className="text-4xl font-black text-pure-white uppercase">
-              Premium Access
-            </CardTitle>
-            <CardDescription className="text-steel text-xl mt-4">
-              $9.99/month • 7-day free trial
-            </CardDescription>
+            <div className="space-y-2">
+              <CardTitle className="text-3xl font-bold text-foreground">R-Evolution Premium</CardTitle>
+              <div className="flex items-baseline justify-center gap-2">
+                <span className="text-5xl font-bold text-foreground">$9.99</span>
+                <span className="text-xl text-muted-foreground">/month</span>
+              </div>
+              <CardDescription className="text-base">
+                After 7-day free trial • Cancel anytime
+              </CardDescription>
+            </div>
           </CardHeader>
+
           <CardContent className="space-y-6">
-            <div className="grid gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
+            {/* Features List */}
+            <div className="space-y-4">
+              {[
+                {
+                  icon: Sparkles,
+                  title: "Full Companion Evolution",
+                  description: "Watch your companion grow through all 21 evolution stages"
+                },
+                {
+                  icon: Crown,
+                  title: "Unlimited Quests & Epics",
+                  description: "Create unlimited daily quests and join shared epics with friends"
+                },
+                {
+                  icon: Zap,
+                  title: "AI Mentor Chat",
+                  description: "Unlimited personalized guidance from your chosen mentor"
+                },
+                {
+                  icon: Bell,
+                  title: "Smart Quest Reminders",
+                  description: "Never miss a quest with intelligent notifications"
+                },
+                {
+                  icon: Download,
+                  title: "All Premium Features",
+                  description: "Battle Arena, Pet Mode, Weekly Challenges, and more"
+                }
+              ].map((feature, index) => (
+                <div key={index} className="flex items-start gap-3 group hover:bg-primary/5 p-3 rounded-lg transition-colors">
+                  <div className="mt-1 p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    <feature.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {feature.description}
+                    </p>
+                  </div>
+                  <Check className="h-5 w-5 text-primary ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div>
-                  <p className="font-bold text-pure-white text-lg">Unlimited Content</p>
-                  <p className="text-steel">Access all pep talks, lessons, and quotes</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
-                </div>
-                <div>
-                  <p className="font-bold text-pure-white text-lg">All Mentors</p>
-                  <p className="text-steel">Switch between any mentor anytime</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
-                </div>
-                <div>
-                  <p className="font-bold text-pure-white text-lg">AI Mentor Chat</p>
-                  <p className="text-steel">Unlimited conversations with your mentor</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
-                </div>
-                <div>
-                  <p className="font-bold text-pure-white text-lg">Daily Reminders</p>
-                  <p className="text-steel">Custom push notifications for your schedule</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded bg-royal-gold/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-5 w-5 text-royal-gold" strokeWidth={3} />
-                </div>
-                <div>
-                  <p className="font-bold text-pure-white text-lg">Offline Access</p>
-                  <p className="text-steel">Download content for on-the-go motivation</p>
-                </div>
-              </div>
+              ))}
             </div>
 
+            {/* Trial Terms */}
+            <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-semibold text-foreground">How it works:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>✓ Start your 7-day free trial with full access</li>
+                <li>✓ Payment method required (you won't be charged during trial)</li>
+                <li>✓ After 7 days, you'll be charged $9.99/month</li>
+                <li>✓ Cancel anytime during trial - no charge</li>
+              </ul>
+            </div>
+
+            {/* CTA Button */}
             <Button
-              onClick={() => handleSubscribe("monthly")}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-royal-gold to-gold-accent hover:opacity-90 text-obsidian font-black uppercase tracking-wide py-7 rounded-2xl shadow-glow transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100"
+              onClick={handleSubscribe}
+              disabled={subscribing}
+              className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
+              size="lg"
             >
-              {isLoading ? (
+              {subscribing ? (
                 <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Processing...
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground mr-2" />
+                  Opening Checkout...
                 </>
               ) : (
-                "Start 7-Day Free Trial"
+                "Start 7-Day Free Trial →"
               )}
             </Button>
 
-            <p className="text-xs text-steel text-center mt-4">
-              Then $9.99/month • Cancel anytime during trial • No charge until trial ends
-            </p>
-
-            <div className="flex items-center justify-center gap-2 text-xs text-steel">
-              <span>💳 Card</span>
-              <span>•</span>
-              <span>🍎 Apple Pay</span>
-              <span>•</span>
-              <span>🔵 Google Pay</span>
-            </div>
-
-            <p className="text-xs text-steel text-center">
-              Secure payment powered by Stripe
+            <p className="text-xs text-center text-muted-foreground">
+              Secure payment • Cancel anytime • No hidden fees
             </p>
           </CardContent>
         </Card>
 
+        {/* Back Button */}
         <div className="text-center">
           <Button 
             variant="ghost" 
             onClick={() => navigate(-1)}
-            className="text-steel hover:text-pure-white uppercase tracking-wide font-semibold"
+            className="text-muted-foreground hover:text-foreground"
           >
             Maybe later
           </Button>
@@ -198,6 +202,4 @@ const Premium = () => {
       </div>
     </div>
   );
-};
-
-export default Premium;
+}

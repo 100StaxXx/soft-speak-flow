@@ -1,226 +1,126 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Crown, Calendar, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useSubscription, cancelSubscription, resumeSubscription } from "@/hooks/useSubscription";
-import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
 
 export function SubscriptionManagement() {
-  const {
-    subscription,
-    isActive,
-    isTrialing,
-    isPastDue,
-    trialDaysRemaining,
-    nextBillingDate,
-    planPrice,
-    plan,
-    willCancelAt,
-    refetch,
-  } = useSubscription();
-
+  const { subscription, isLoading, isActive, isCancelled, nextBillingDate, planPrice, plan } = useSubscription();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
-  const handleCancel = async () => {
-    if (!subscription?.stripe_subscription_id) return;
-
+  const handleManageSubscription = async () => {
+    setOpeningPortal(true);
     try {
-      setIsLoading(true);
-      await cancelSubscription(subscription.stripe_subscription_id);
-
-      toast({
-        title: "Subscription Cancelled",
-        description: "Your subscription will end at the end of the current billing period.",
-      });
-
-      refetch();
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
     } catch (error: any) {
+      console.error("Error opening customer portal:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to cancel subscription",
+        description: error.message || "Failed to open subscription management",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setOpeningPortal(false);
     }
   };
 
-  const handleResume = async () => {
-    if (!subscription?.stripe_subscription_id) return;
-
-    try {
-      setIsLoading(true);
-      await resumeSubscription(subscription.stripe_subscription_id);
-
-      toast({
-        title: "Subscription Resumed",
-        description: "Your subscription will continue automatically.",
-      });
-
-      refetch();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to resume subscription",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!subscription) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No Active Subscription</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">
+            You don't have an active subscription.
+          </p>
+          <Button onClick={() => window.location.href = '/premium'}>
+            View Premium Plans
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="border-primary/20">
+    <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Crown className="h-5 w-5 text-primary" />
-          <CardTitle>Premium Subscription</CardTitle>
-        </div>
-        <CardDescription>Manage your subscription</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Status Badge */}
-        <div className="flex items-center gap-2">
-          {isActive ? (
-            <div className="flex items-center gap-2 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1 rounded-full text-sm font-medium">
+        <CardTitle className="flex items-center gap-2">
+          Subscription Details
+          {isActive && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-600 text-sm font-normal">
               <CheckCircle2 className="h-4 w-4" />
               Active
-            </div>
-          ) : isPastDue ? (
-            <div className="flex items-center gap-2 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-3 py-1 rounded-full text-sm font-medium">
-              <AlertCircle className="h-4 w-4" />
-              Past Due
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 bg-muted px-3 py-1 rounded-full text-sm font-medium">
+            </span>
+          )}
+          {isCancelled && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/10 text-red-600 text-sm font-normal">
+              <XCircle className="h-4 w-4" />
               Cancelled
-            </div>
+            </span>
           )}
-
-          {isTrialing && (
-            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
-              {trialDaysRemaining} days trial remaining
-            </div>
-          )}
-        </div>
-
-        {/* Plan Details */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Plan</p>
-              <p className="text-sm text-muted-foreground capitalize">
-                {plan} - {planPrice}
-              </p>
-            </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Plan</span>
+            <span className="font-medium capitalize">{plan || 'Monthly'}</span>
           </div>
-
-          {nextBillingDate && !willCancelAt && (
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">
-                  {isTrialing ? "Trial ends" : "Next billing date"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {nextBillingDate.toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {willCancelAt && (
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <div>
-                <p className="text-sm font-medium">Subscription ending</p>
-                <p className="text-sm text-muted-foreground">
-                  {willCancelAt.toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Price</span>
+            <span className="font-medium">{planPrice}</span>
+          </div>
+          
+          {nextBillingDate && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Next Billing Date</span>
+              <span className="font-medium">
+                {nextBillingDate.toLocaleDateString()}
+              </span>
             </div>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="pt-4 space-y-2">
-          {willCancelAt ? (
-            <Button
-              onClick={handleResume}
-              disabled={isLoading}
-              className="w-full"
-              variant="default"
-            >
-              Resume Subscription
-            </Button>
-          ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                  disabled={isLoading}
-                >
-                  Cancel Subscription
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel subscription?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    You'll lose access to premium features at the end of your current billing period
-                    on{" "}
-                    {nextBillingDate?.toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                    . You can resume anytime before then.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleCancel}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Cancel Subscription
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-
-          {isPastDue && (
-            <p className="text-xs text-destructive text-center">
-              Please update your payment method to continue your subscription
-            </p>
-          )}
+        <div className="pt-4 border-t">
+          <Button 
+            onClick={handleManageSubscription}
+            disabled={openingPortal}
+            className="w-full"
+            variant="outline"
+          >
+            {openingPortal ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Opening Portal...
+              </>
+            ) : (
+              "Manage Subscription"
+            )}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Cancel, update payment method, or view billing history
+          </p>
         </div>
       </CardContent>
     </Card>
