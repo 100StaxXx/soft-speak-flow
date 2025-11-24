@@ -402,9 +402,7 @@ export default function Tasks() {
   }, [user, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
-    setShowTutorial(false);
-    
-    // Mark tutorial as seen in database
+    // Mark tutorial as seen in database FIRST
     if (user && profile) {
       const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
       const updatedData = {
@@ -418,8 +416,14 @@ export default function Tasks() {
         .eq('id', user.id);
       
       // Invalidate profile to refresh cached data immediately
-      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      
+      // Small delay to ensure cache is updated before closing modal
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
+    
+    // THEN close the modal
+    setShowTutorial(false);
   };
 
   // Helper to check task conflicts
