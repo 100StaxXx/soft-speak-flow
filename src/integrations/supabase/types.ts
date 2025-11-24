@@ -811,6 +811,9 @@ export type Database = {
           parent_template_id: string | null
           recurrence_days: number[] | null
           recurrence_pattern: string | null
+          reminder_enabled: boolean | null
+          reminder_minutes_before: number | null
+          reminder_sent: boolean | null
           scheduled_time: string | null
           task_date: string
           task_text: string
@@ -829,6 +832,9 @@ export type Database = {
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent?: boolean | null
           scheduled_time?: string | null
           task_date?: string
           task_text: string
@@ -847,6 +853,9 @@ export type Database = {
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent?: boolean | null
           scheduled_time?: string | null
           task_date?: string
           task_text?: string
@@ -1772,6 +1781,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      task_reminders_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          notification_status: string | null
+          reminder_sent_at: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notification_status?: string | null
+          reminder_sent_at?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notification_status?: string | null
+          reminder_sent_at?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reminders_log_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_ai_preferences: {
         Row: {
