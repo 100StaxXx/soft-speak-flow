@@ -148,7 +148,7 @@ export default function Tasks() {
       setHabitDifficulty("medium");
       setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
       setShowAddHabit(false);
-      setShowTemplates(true);
+      // Don't show templates again - stay on the habit checking page
       toast({ title: "Habit created successfully!" });
       haptics.success();
     },
