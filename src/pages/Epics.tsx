@@ -9,11 +9,13 @@ import { useEpics } from "@/hooks/useEpics";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Target, Trophy, Plus, Sparkles } from "lucide-react";
+import { Target, Trophy, Plus, Sparkles, Users } from "lucide-react";
 import { motion } from "framer-motion";
+import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 
 const Epics = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const { user } = useAuth();
   const {
     activeEpics,
@@ -60,11 +62,28 @@ const Epics = () => {
           </p>
         </motion.div>
 
-        {/* Create Epic Button */}
+        {/* Join Epic Button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
+          className="mb-4"
+        >
+          <Button
+            onClick={() => setJoinDialogOpen(true)}
+            variant="outline"
+            className="w-full h-12"
+          >
+            <Users className="w-5 h-5 mr-2" />
+            Join Epic
+          </Button>
+        </motion.div>
+
+        {/* Create Epic Button */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.15 }}
           className="mb-6"
         >
           <Button
@@ -155,6 +174,12 @@ const Epics = () => {
           onOpenChange={setCreateDialogOpen}
           onCreateEpic={handleCreateEpic}
           isCreating={isCreating}
+        />
+        
+        {/* Join Epic Dialog */}
+        <JoinEpicDialog
+          open={joinDialogOpen}
+          onOpenChange={setJoinDialogOpen}
         />
       </div>
 
