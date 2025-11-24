@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
-import { IntroScreen } from "@/components/IntroScreen";
 import { BottomNav } from "@/components/BottomNav";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
@@ -31,9 +30,6 @@ const Index = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
-  const [showIntro, setShowIntro] = useState(() => {
-    return !safeLocalStorage.getItem('hasSeenIntro');
-  });
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -118,10 +114,6 @@ const Index = () => {
   }, [profile?.selected_mentor_id]);
 
   useEffect(() => {
-    safeLocalStorage.setItem('hasSeenIntro', 'true');
-  }, []);
-
-  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
@@ -160,11 +152,6 @@ const Index = () => {
       }
     }
   }, [user, isReady, profile, navigate]);
-
-  // Show intro first, before any checks
-  if (showIntro) {
-    return <IntroScreen onComplete={() => setShowIntro(false)} />;
-  }
 
   // Show loading state while critical data loads
   if (isTransitioning || !isReady) {
