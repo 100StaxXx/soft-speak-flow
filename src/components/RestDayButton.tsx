@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useCompanion } from "@/hooks/useCompanion";
+import { format } from "date-fns";
 
 export const RestDayButton = () => {
   const { user } = useAuth();
@@ -15,7 +16,7 @@ export const RestDayButton = () => {
     mutationFn: async () => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       // Check if already took rest today
       const { data: existing } = await supabase

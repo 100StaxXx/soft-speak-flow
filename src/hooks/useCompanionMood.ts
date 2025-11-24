@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useEffect } from "react";
+import { format } from "date-fns";
 
 export const useCompanionMood = () => {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export const useCompanionMood = () => {
 
     const updateCompanionMood = async () => {
       // Get today's check-in
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
       const { data: checkIn } = await supabase
         .from('daily_check_ins')
         .select('mood')
