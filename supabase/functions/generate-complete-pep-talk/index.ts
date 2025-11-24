@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,8 @@ serve(async (req) => {
 
   try {
     const { 
-      mentorSlug, 
+      mentorSlug,
+      userId,
       topic_category, 
       intensity, 
       emotionalTriggers,
@@ -37,6 +39,14 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Rate limiting check (if userId provided)
+    if (userId) {
+      const rateLimit = await checkRateLimit(supabase, userId, 'pep-talk-generation', RATE_LIMITS['pep-talk-generation']);
+      if (!rateLimit.allowed) {
+        return createRateLimitResponse(rateLimit, corsHeaders);
+      }
+    }
 
     // Fetch mentor data
     const { data: mentor, error: mentorError } = await supabase

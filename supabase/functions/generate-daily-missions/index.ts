@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,6 +51,20 @@ serve(async (req) => {
     );
 
     const { userId, forceRegenerate = false } = await req.json();
+    
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'userId is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting check
+    const rateLimit = await checkRateLimit(supabase, userId, 'daily-missions', RATE_LIMITS['daily-missions']);
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
+    }
+
     const today = new Date().toISOString().split('T')[0];
 
     // Check if missions already exist for today
