@@ -6,6 +6,8 @@ import { Trophy, Flame, Target, Calendar, Zap, ExternalLink, Share2, Check } fro
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState } from "react";
+import { EpicLeaderboard } from "./EpicLeaderboard";
+import { EpicActivityFeed } from "./EpicActivityFeed";
 
 // Discord channel URL - update this with your actual Discord channel
 const DISCORD_CHANNEL_URL = "https://discord.com/channels/yourserver/yourchannel";
@@ -199,9 +201,17 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         )}
 
+        {/* Community Features for Shared Epics */}
+        {epic.is_public && (
+          <div className="space-y-3 mt-4 pt-4 border-t border-border">
+            <EpicLeaderboard epicId={epic.id} />
+            <EpicActivityFeed epicId={epic.id} />
+          </div>
+        )}
+
         {/* Action Buttons */}
         {isActive && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-4">
             {epic.progress_percentage >= 100 && (
               <Button
                 onClick={onComplete}
