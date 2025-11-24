@@ -599,7 +599,8 @@ export default function Tasks() {
                       .from('daily_tasks')
                       .update({
                         task_date: format(newDate, 'yyyy-MM-dd'),
-                        scheduled_time: newTime
+                        scheduled_time: newTime,
+                        reminder_sent: false // Reset reminder flag when rescheduling
                       })
                       .eq('id', taskId);
 

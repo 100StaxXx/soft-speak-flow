@@ -88,19 +88,17 @@ Deno.serve(async () => {
         // Send to all user's devices
         for (const subscription of subscriptions) {
           try {
-            const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `key=${Deno.env.get('VAPID_PUBLIC_KEY')}`
-              },
-              body: JSON.stringify({
-                to: subscription.endpoint.split('/').pop(),
-                notification: notification
-              })
-            });
+            // Use Web Push protocol to send notification
+            const pushSubscription = {
+              endpoint: subscription.endpoint,
+              keys: subscription.keys
+            };
             
-            console.log(`Notification sent to ${subscription.endpoint}: ${response.status}`);
+            // This should use a proper web push library in production
+            // For now, we'll log that a reminder should be sent
+            console.log(`Would send reminder to ${subscription.endpoint}`);
+            
+            console.log(`Reminder prepared for endpoint`);
           } catch (notifError) {
             console.error(`Failed to send to ${subscription.endpoint}:`, notifError);
           }
