@@ -19,7 +19,9 @@ export const useMissionAutoComplete = () => {
   const { awardCustomXP } = useXPRewards();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA');
+  const todayStartMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
   useEffect(() => {
     if (!user || !activities || activities.length === 0) return;
@@ -45,9 +47,8 @@ export const useMissionAutoComplete = () => {
         if (!missions || missions.length === 0 || !mounted) return;
 
         // Get today's activities
-        const todayStart = new Date(today).getTime();
         const todayActivities = activities.filter(a => 
-          new Date(a.created_at).getTime() >= todayStart
+          new Date(a.created_at).getTime() >= todayStartMs
         );
 
         for (const mission of missions) {
@@ -144,5 +145,5 @@ export const useMissionAutoComplete = () => {
     return () => {
       mounted = false;
     };
-  }, [activities, user, today, awardCustomXP, toast, queryClient]);
+  }, [activities, user, today, todayStartMs, awardCustomXP, toast, queryClient]);
 };

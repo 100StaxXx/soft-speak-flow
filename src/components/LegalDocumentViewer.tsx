@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,7 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (open) {
-      loadDocument();
-    }
-  }, [open, documentType]);
-
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     setLoading(true);
     try {
       const filename = documentType === "terms" ? "TERMS_OF_SERVICE.md" : "PRIVACY_POLICY.md";
@@ -33,7 +27,13 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentType]);
+
+  useEffect(() => {
+    if (open) {
+      loadDocument();
+    }
+  }, [open, loadDocument]);
 
   const title = documentType === "terms" ? "Terms of Service" : "Privacy Policy";
 
@@ -82,7 +82,7 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
 
                 // Links
                 if (line.includes('[') && line.includes('](')) {
-                  const linkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
+                  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
                   const parts = [];
                   let lastIndex = 0;
                   let match;

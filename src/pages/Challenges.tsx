@@ -77,11 +77,13 @@ export default function Challenges() {
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + totalDays);
 
+      const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
+
       const { error } = await supabase.from("user_challenges").insert({
         user_id: user.id,
         challenge_id: challengeId,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
         current_day: 1,
         status: "active",
       });

@@ -12,7 +12,7 @@ export const useDailyMissions = () => {
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
 
   const { data: missions, isLoading } = useQuery({
     queryKey: ['daily-missions', today, user?.id],

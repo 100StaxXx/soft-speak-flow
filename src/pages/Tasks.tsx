@@ -54,6 +54,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 
+const getLocalDateString = (date: Date = new Date()) => format(date, "yyyy-MM-dd");
+const toReferenceTime = (time: string) => {
+  const [hours, minutes = "0"] = time.split(":");
+  const h = Number(hours) || 0;
+  const m = Number(minutes) || 0;
+  return new Date(2000, 0, 1, h, m, 0, 0);
+};
+
 export default function Tasks() {
   const { user } = useAuth();
   const { toast } = useToast();

@@ -8,7 +8,9 @@ import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 export const XPBreakdown = () => {
   const { user } = useAuth();
   const { currentStreak = 0, multiplier = 1, nextMilestone } = useStreakMultiplier();
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA');
+  const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
   const { data: todayXP } = useQuery({
     queryKey: ['xp-breakdown', today, user?.id],
@@ -19,7 +21,7 @@ export const XPBreakdown = () => {
         .from('xp_events')
         .select('*')
         .eq('user_id', user.id)
-        .gte('created_at', new Date(today).toISOString())
+        .gte('created_at', startOfTodayIso)
         .order('created_at', { ascending: false });
 
       if (!data) return { total: 0, byType: {} };

@@ -8,29 +8,50 @@ import { logger } from "./logger";
 export interface AppError {
   message: string;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
-export const handleError = (error: any, context?: string): AppError => {
-  logger.error(`Error${context ? ` in ${context}` : ''}:`, error);
+type ErrorDetails = {
+  message?: string;
+  code?: string;
+  status?: number;
+  name?: string;
+};
 
-  let errorMessage = "An unexpected error occurred";
-  let errorCode = "UNKNOWN_ERROR";
-
-  // Supabase errors
-  if (error?.message) {
-    errorMessage = error.message;
-    errorCode = error.code || "SUPABASE_ERROR";
+const extractErrorDetails = (error: unknown): ErrorDetails => {
+  if (typeof error === "string") {
+    return { message: error };
   }
 
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return {
+      message: typeof record.message === "string" ? record.message : undefined,
+      code: typeof record.code === "string" ? record.code : undefined,
+      status: typeof record.status === "number" ? record.status : undefined,
+      name: typeof record.name === "string" ? record.name : undefined,
+    };
+  }
+
+  return {};
+};
+
+export const handleError = (error: unknown, context?: string): AppError => {
+  logger.error(`Error${context ? ` in ${context}` : ''}:`, error);
+
+  const details = extractErrorDetails(error);
+
+  let errorMessage = details.message || "An unexpected error occurred";
+  let errorCode = details.code || "UNKNOWN_ERROR";
+
   // Network errors
-  if (error?.name === "NetworkError" || !navigator.onLine) {
+  if (details.name === "NetworkError" || !navigator.onLine) {
     errorMessage = "Network connection lost. Please check your internet.";
     errorCode = "NETWORK_ERROR";
   }
 
   // Auth errors
-  if (error?.status === 401) {
+  if (details.status === 401) {
     errorMessage = "Authentication failed. Please log in again.";
     errorCode = "AUTH_ERROR";
   }
@@ -42,16 +63,17 @@ export const handleError = (error: any, context?: string): AppError => {
   };
 };
 
-export const showErrorToast = (error: any, context?: string) => {
+export const showErrorToast = (error: unknown, context?: string) => {
   const appError = handleError(error, context);
   toast.error(appError.message);
 };
 
-export const isNetworkError = (error: any): boolean => {
-  return (
-    error?.name === "NetworkError" ||
-    error?.message?.includes("network") ||
-    !navigator.onLine
+export const isNetworkError = (error: unknown): boolean => {
+  const details = extractErrorDetails(error);
+  return Boolean(
+    details.name === "NetworkError" ||
+      details.message?.toLowerCase().includes("network") ||
+      !navigator.onLine
   );
 };
 

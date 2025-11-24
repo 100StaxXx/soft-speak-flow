@@ -22,7 +22,10 @@ export const QuoteOfTheDay = () => {
 
   useEffect(() => {
     const fetchTodaysQuote = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!profile?.selected_mentor_id) {
+        setLoading(false);
+        return;
+      }
 
       const today = format(new Date(), 'yyyy-MM-dd');
 

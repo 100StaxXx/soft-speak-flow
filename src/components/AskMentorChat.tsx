@@ -171,14 +171,16 @@ export const AskMentorChat = ({
     const checkDailyLimit = async () => {
       if (!user) return;
 
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       const { count } = await supabase
         .from('mentor_chats')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('role', 'user')
-        .gte('created_at', `${today}T00:00:00`)
-        .lte('created_at', `${today}T23:59:59`);
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString());
       
       setDailyMessageCount(count || 0);
     };

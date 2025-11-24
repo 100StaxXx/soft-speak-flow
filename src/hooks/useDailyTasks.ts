@@ -9,6 +9,8 @@ import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
 
+const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
+
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
   const { toast } = useToast();
