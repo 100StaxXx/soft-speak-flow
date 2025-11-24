@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Lock } from "lucide-react";
@@ -10,22 +11,45 @@ export const SubscriptionGate = () => {
   const navigate = useNavigate();
   const { companion } = useCompanion();
   const { isActive } = useSubscription();
+  const { isEvolvingLoading, setOnEvolutionComplete } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
   const [hasShownPaywall, setHasShownPaywall] = useState(false);
+  const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
 
   useEffect(() => {
     // Don't show if already subscribed
     if (isActive) {
       setShowPaywall(false);
+      setShouldShowAfterEvolution(false);
       return;
     }
 
-    // Show paywall after first evolution (stage 1) - only once per session
-    if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
-      setShowPaywall(true);
-      setHasShownPaywall(true);
+    // Queue paywall to show after evolution completes if companion is at stage 1+
+    if (companion && companion.current_stage >= 1 && !hasShownPaywall && !isEvolvingLoading) {
+      // If evolution is currently happening, queue it for after
+      if (isEvolvingLoading) {
+        setShouldShowAfterEvolution(true);
+      } else {
+        // Evolution already done, show immediately
+        setShowPaywall(true);
+        setHasShownPaywall(true);
+      }
     }
-  }, [companion, isActive, hasShownPaywall]);
+  }, [companion, isActive, hasShownPaywall, isEvolvingLoading]);
+
+  // Listen for evolution completion
+  useEffect(() => {
+    if (shouldShowAfterEvolution && !isEvolvingLoading) {
+      // Small delay to let evolution modal fully dismiss
+      const timer = setTimeout(() => {
+        setShowPaywall(true);
+        setHasShownPaywall(true);
+        setShouldShowAfterEvolution(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowAfterEvolution, isEvolvingLoading]);
 
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
