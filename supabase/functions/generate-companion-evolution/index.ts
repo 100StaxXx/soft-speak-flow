@@ -238,7 +238,7 @@ Camera: Eye-level with the tiny hatchling, showing its small scale and vulnerabi
 
       console.log("Previous image URL:", previousImageUrl);
 
-      let previousFeatures: any = {};
+      const previousFeatures: Record<string, unknown> = {};
 
       // 4a. Extract features from previous image using vision AI
       if (previousImageUrl) {

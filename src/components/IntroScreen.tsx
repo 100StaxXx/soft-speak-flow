@@ -8,10 +8,8 @@ export const IntroScreen = ({ onComplete }: IntroScreenProps) => {
   const [show, setShow] = useState(true);
 
   useEffect(() => {
-    let timer1: NodeJS.Timeout;
-    let timer2: NodeJS.Timeout;
-    
-    timer1 = setTimeout(() => {
+    let timer2: NodeJS.Timeout | undefined;
+    const timer1 = setTimeout(() => {
       setShow(false);
       timer2 = setTimeout(onComplete, 1500);
     }, 4000);

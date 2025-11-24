@@ -5,8 +5,8 @@ interface PromptTemplate {
   system_prompt: string;
   user_prompt_template: string;
   variables: string[];
-  validation_rules: Record<string, any>;
-  output_constraints: Record<string, any>;
+  validation_rules: Record<string, unknown>;
+  output_constraints: Record<string, unknown>;
 }
 
 interface UserPreferences {
@@ -20,7 +20,7 @@ interface UserPreferences {
 
 interface PromptContext {
   templateKey: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   userId?: string;
   mentorTone?: string;
   mentorName?: string;
@@ -68,7 +68,7 @@ export class PromptBuilder {
     };
   }
 
-  private replaceVariables(text: string, vars: Record<string, any>): string {
+  private replaceVariables(text: string, vars: Record<string, unknown>): string {
     let result = text;
     for (const [key, value] of Object.entries(vars)) {
       const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
@@ -134,8 +134,8 @@ export class PromptBuilder {
   async build(context: PromptContext): Promise<{ 
     systemPrompt: string; 
     userPrompt: string;
-    validationRules: Record<string, any>;
-    outputConstraints: Record<string, any>;
+    validationRules: Record<string, unknown>;
+    outputConstraints: Record<string, unknown>;
   }> {
     if (!this.template) {
       await this.loadTemplate(context.templateKey);

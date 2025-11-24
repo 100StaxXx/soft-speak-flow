@@ -17,23 +17,36 @@ interface ValidationResult {
   warnings: string[];
 }
 
+interface ValidationConstraints {
+  exactCount?: number;
+  xpRange?: [number, number];
+  toneMarkers?: string[];
+  [key: string]: unknown;
+}
+
+interface ValidationContext {
+  userMood?: string;
+  userIntention?: string;
+  [key: string]: unknown;
+}
+
 export class OutputValidator {
   private rules: ValidationRule;
-  private constraints: Record<string, any>;
+  private constraints: ValidationConstraints;
 
-  constructor(rules: ValidationRule, constraints: Record<string, any> = {}) {
+  constructor(rules: ValidationRule, constraints: ValidationConstraints = {}) {
     this.rules = rules;
     this.constraints = constraints;
   }
 
-  validate(output: string | any, context: Record<string, any> = {}): ValidationResult {
+  validate(output: unknown, context: ValidationContext = {}): ValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     // JSON format validation
     if (this.rules.outputFormat === 'json') {
       try {
-        const parsed = typeof output === 'string' ? JSON.parse(output) : output;
+        const parsed: unknown = typeof output === 'string' ? JSON.parse(output) : output;
         
         // Array length validation
         if (this.rules.arrayLength && Array.isArray(parsed)) {
@@ -44,7 +57,7 @@ export class OutputValidator {
 
         // Required fields validation
         if (this.rules.requiredFields && Array.isArray(parsed)) {
-          for (const item of parsed) {
+          for (const item of parsed as Array<Record<string, unknown>>) {
             for (const field of this.rules.requiredFields) {
               if (!(field in item)) {
                 errors.push(`Missing required field: ${field}`);
@@ -54,18 +67,23 @@ export class OutputValidator {
         }
 
         // Constraint validation for arrays
-        if (this.constraints.exactCount && Array.isArray(parsed)) {
+        if (typeof this.constraints.exactCount === 'number' && Array.isArray(parsed)) {
           if (parsed.length !== this.constraints.exactCount) {
             errors.push(`Must have exactly ${this.constraints.exactCount} items`);
           }
         }
 
         // XP range validation (for missions)
-        if (this.constraints.xpRange && Array.isArray(this.constraints.xpRange) && Array.isArray(parsed)) {
-          const [min, max] = this.constraints.xpRange;
-          for (const item of parsed) {
-            if (item.xp !== undefined && (item.xp < min || item.xp > max)) {
-              errors.push(`XP must be between ${min} and ${max}, got ${item.xp}`);
+        if (
+          this.constraints.xpRange &&
+          Array.isArray(this.constraints.xpRange) &&
+          Array.isArray(parsed)
+        ) {
+          const [min, max] = this.constraints.xpRange as [number, number];
+          for (const item of parsed as Array<Record<string, unknown>>) {
+            const xp = typeof item.xp === 'number' ? item.xp : undefined;
+            if (typeof xp === 'number' && (xp < min || xp > max)) {
+              errors.push(`XP must be between ${min} and ${max}, got ${xp}`);
             }
           }
         }
@@ -130,8 +148,7 @@ export class OutputValidator {
 
       // Tone validation (check for tone markers)
       if (this.rules.requiredTone && this.constraints.toneMarkers) {
-        const markers = this.constraints.toneMarkers as string[];
-        const lowerText = text.toLowerCase();
+        const markers = this.constraints.toneMarkers ?? [];
         const hasAnyMarker = markers.some(marker => {
           // Simple heuristic: check for action words, questions, etc.
           if (marker === 'actionable') {
