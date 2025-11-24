@@ -314,7 +314,7 @@ export default function Tasks() {
                 user_id: user.id,
                 task_text: 'Join R-Evolution',
                 difficulty: 'easy',
-                xp_reward: 5,
+                xp_reward: 10,
                 task_date: today,
                 is_main_quest: false,
               })
