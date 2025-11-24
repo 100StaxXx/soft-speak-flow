@@ -896,6 +896,41 @@ export type Database = {
         }
         Relationships: []
       }
+      epic_discord_events: {
+        Row: {
+          epic_id: string
+          event_data: Json
+          event_type: string
+          id: string
+          posted_at: string
+          webhook_response: string | null
+        }
+        Insert: {
+          epic_id: string
+          event_data?: Json
+          event_type: string
+          id?: string
+          posted_at?: string
+          webhook_response?: string | null
+        }
+        Update: {
+          epic_id?: string
+          event_data?: Json
+          event_type?: string
+          id?: string
+          posted_at?: string
+          webhook_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_discord_events_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epic_habits: {
         Row: {
           created_at: string | null
@@ -928,6 +963,48 @@ export type Database = {
             columns: ["habit_id"]
             isOneToOne: false
             referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_members: {
+        Row: {
+          epic_id: string
+          id: string
+          joined_at: string
+          last_activity_at: string | null
+          total_contribution: number
+          user_id: string
+        }
+        Insert: {
+          epic_id: string
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          total_contribution?: number
+          user_id: string
+        }
+        Update: {
+          epic_id?: string
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          total_contribution?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_members_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epic_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
