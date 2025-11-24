@@ -896,6 +896,41 @@ export type Database = {
         }
         Relationships: []
       }
+      epic_activity_feed: {
+        Row: {
+          activity_data: Json | null
+          activity_type: string
+          created_at: string
+          epic_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_data?: Json | null
+          activity_type: string
+          created_at?: string
+          epic_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_data?: Json | null
+          activity_type?: string
+          created_at?: string
+          epic_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_activity_feed_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epic_discord_events: {
         Row: {
           epic_id: string
