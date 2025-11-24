@@ -263,17 +263,13 @@ const Index = () => {
               <MorningCheckIn />
             </ErrorBoundary>
           
-            <div data-tour="todays-pep-talk">
-              <ErrorBoundary>
-                <TodaysPepTalk />
-              </ErrorBoundary>
-            </div>
+            <ErrorBoundary>
+              <TodaysPepTalk />
+            </ErrorBoundary>
             
-            <div data-tour="ask-mentor">
-              <ErrorBoundary>
-                <MentorQuickChat />
-              </ErrorBoundary>
-            </div>
+            <ErrorBoundary>
+              <MentorQuickChat />
+            </ErrorBoundary>
           </div>
         </div>
       </PageTransition>
