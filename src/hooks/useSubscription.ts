@@ -1,52 +1,49 @@
 import { useAuth } from "./useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Subscription {
-  id: string;
-  stripe_subscription_id: string;
-  plan: "monthly" | "yearly";
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
-  trial_ends_at: string | null;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at: string | null;
-  cancelled_at: string | null;
+  plan: "monthly" | "yearly";
+  trial_ends_at?: string | null;
+  current_period_end?: string | null;
 }
 
 export function useSubscription() {
   const { user } = useAuth();
 
-  // Temporary: subscriptions table not yet migrated
-  // TODO: Uncomment when subscriptions table is created
-  /*
-  const { data: subscription, isLoading, error, refetch } = useQuery({
+  const { data: subscriptionData, isLoading, error, refetch } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke("check-subscription");
 
       if (error) throw error;
-      return data as Subscription | null;
+      return data as {
+        subscribed: boolean;
+        status?: string;
+        is_trialing?: boolean;
+        trial_end?: string;
+        subscription_end?: string;
+        plan?: string;
+      } | null;
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute
+    refetchInterval: 1 * 60 * 1000, // Refetch every minute
   });
-  */
 
-  const subscription = null;
-  const isLoading = false;
-  const error = null;
-  const refetch = async () => {};
+  const subscription = subscriptionData ? {
+    status: subscriptionData.status as "active" | "cancelled" | "past_due" | "trialing" | "incomplete",
+    plan: subscriptionData.plan as "monthly" | "yearly",
+    trial_ends_at: subscriptionData.trial_end,
+    current_period_end: subscriptionData.subscription_end,
+  } : null;
 
   // Helper functions
-  const isActive = subscription?.status === "active" || subscription?.status === "trialing";
-  const isTrialing = subscription?.status === "trialing";
+  const isActive = subscriptionData?.subscribed || false;
+  const isTrialing = subscriptionData?.is_trialing || false;
   const isPastDue = subscription?.status === "past_due";
   const isCancelled = subscription?.status === "cancelled";
 
@@ -91,15 +88,13 @@ export function useSubscription() {
     nextBillingDate,
     planPrice,
     plan: subscription?.plan,
-    // Cancel info
-    willCancelAt: subscription?.cancel_at ? new Date(subscription.cancel_at) : null,
   };
 }
 
-export async function cancelSubscription(subscriptionId: string) {
-  throw new Error("Subscriptions not yet implemented");
+export async function cancelSubscription() {
+  throw new Error("Use Stripe Customer Portal to manage subscription");
 }
 
-export async function resumeSubscription(subscriptionId: string) {
-  throw new Error("Subscriptions not yet implemented");
+export async function resumeSubscription() {
+  throw new Error("Use Stripe Customer Portal to manage subscription");
 }
