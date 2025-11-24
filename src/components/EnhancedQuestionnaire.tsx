@@ -6,9 +6,10 @@ import { ChevronLeft } from "lucide-react";
 
 interface EnhancedQuestionnaireProps {
   onComplete: (answers: Record<string, string>) => void;
+  onBack?: () => void;
 }
 
-export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps) => {
+export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionnaireProps) => {
   const [currentStep, setCurrentStep] = useState<'welcome' | number>('welcome');
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
@@ -47,7 +48,18 @@ export const EnhancedQuestionnaire = ({ onComplete }: EnhancedQuestionnaireProps
 
   if (currentStep === 'welcome') {
     return (
-      <div className="min-h-screen bg-obsidian flex items-center justify-center p-6">
+      <div className="min-h-screen bg-obsidian flex items-center justify-center p-6 relative">
+        {/* Back button to zodiac selection */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-6 left-6 flex items-center gap-2 text-steel hover:text-pure-white transition-colors duration-200 group"
+          >
+            <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-200" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+        )}
+        
         <div className="max-w-2xl w-full text-center space-y-12 animate-fade-in">
           <div className="space-y-6">
             <div className="h-1 w-32 bg-royal-purple mx-auto animate-scale-in" />

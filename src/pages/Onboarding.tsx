@@ -583,7 +583,10 @@ export default function Onboarding() {
       )}
 
       {stage === "questionnaire" && (
-        <EnhancedQuestionnaire onComplete={handleQuestionnaireComplete} />
+        <EnhancedQuestionnaire 
+          onComplete={handleQuestionnaireComplete}
+          onBack={() => setStage('zodiac-select')}
+        />
       )}
 
       {stage === "result" && recommendedMentor && explanation && (
