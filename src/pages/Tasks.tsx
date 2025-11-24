@@ -356,7 +356,7 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
   useEffect(() => {
-    if (!user || !profile) return;
+    if (!user || !profile || showTutorial) return; // Don't re-trigger if already shown
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
@@ -394,7 +394,7 @@ export default function Tasks() {
           }
         });
     }
-  }, [user, profile, queryClient]);
+  }, [user, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
     setShowTutorial(false);
