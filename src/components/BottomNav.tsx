@@ -11,16 +11,6 @@ import { useEffect, useState } from "react";
 export const BottomNav = () => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
-  const [tutorialStep, setTutorialStep] = useState<number | null>(null);
-
-  useEffect(() => {
-    const handleTutorialStep = (e: CustomEvent) => {
-      setTutorialStep(e.detail.step);
-    };
-    
-    window.addEventListener('tutorial-step-change' as any, handleTutorialStep);
-    return () => window.removeEventListener('tutorial-step-change' as any, handleTutorialStep);
-  }, []);
 
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
@@ -36,35 +26,6 @@ export const BottomNav = () => {
     },
   });
 
-  // Determine if navigation should be blocked
-  const isTutorialActive = tutorialStep !== null;
-  const canClickCompanion = tutorialStep === 1; // Step 1: XP Celebration - Click Companion tab
-  const canClickQuests = tutorialStep === 2 || tutorialStep === 3; // Steps 2-3: Companion intro + Quest creation
-  
-  // Highlights should only show when the user can interact (no modal blocking)
-  const shouldHighlightCompanion = canClickCompanion;
-  const shouldHighlightQuests = canClickQuests;
-  
-  // Remove console logs for production
-  
-  const handleNavClick = (e: React.MouseEvent, route: string) => {
-    if (!isTutorialActive) return;
-    
-    // Allow Companion click on step 1 (XP Celebration)
-    if (route === '/companion' && canClickCompanion) {
-      return;
-    }
-    
-    // Allow Quests click on steps 2-3 (Companion intro, Quest creation)
-    if (route === '/tasks' && canClickQuests) {
-      return;
-    }
-    
-    // Block all other navigation during tutorial
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
   return (
     <>
       <nav
@@ -77,8 +38,7 @@ export const BottomNav = () => {
         <NavLink
           to="/"
           end
-          onClick={(e) => handleNavClick(e, '/')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${isTutorialActive ? 'pointer-events-none opacity-50' : ''}`}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
@@ -104,12 +64,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/companion"
-          onClick={(e) => handleNavClick(e, '/companion')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative ${
-            shouldHighlightCompanion ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
-          } ${
-            isTutorialActive && !canClickCompanion ? 'pointer-events-none opacity-50' : ''
-          }`}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="companion-tab"
         >
@@ -132,12 +87,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/tasks"
-          onClick={(e) => handleNavClick(e, '/tasks')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
-            shouldHighlightQuests ? 'ring-4 ring-primary/50 animate-pulse bg-primary/10 shadow-glow' : ''
-          } ${
-            isTutorialActive && !canClickQuests ? 'pointer-events-none opacity-50' : ''
-          }`}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
         >
@@ -153,8 +103,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/search"
-          onClick={(e) => handleNavClick(e, '/search')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${isTutorialActive ? 'pointer-events-none opacity-50' : ''}`}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
@@ -169,8 +118,7 @@ export const BottomNav = () => {
 
         <NavLink
           to="/profile"
-          onClick={(e) => handleNavClick(e, '/profile')}
-          className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${isTutorialActive ? 'pointer-events-none opacity-50' : ''}`}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (

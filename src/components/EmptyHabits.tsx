@@ -38,7 +38,11 @@ export const EmptyHabits = ({ onAddHabit }: EmptyHabitsProps) => {
         </div>
 
         <Button 
-          onClick={onAddHabit}
+          onClick={() => {
+            onAddHabit();
+            // Mark that user has created their first habit for tutorial
+            localStorage.setItem('userHasCreatedFirstHabit', 'true');
+          }}
           className="gap-2 w-full sm:w-auto"
           size="lg"
         >
