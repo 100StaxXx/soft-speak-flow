@@ -93,9 +93,6 @@ export const MorningCheckIn = () => {
         await checkFirstTimeAchievements('checkin');
       }
 
-      // Dispatch event for walkthrough
-      window.dispatchEvent(new CustomEvent('checkin-complete'));
-
       // Generate mentor response in background
       supabase.functions.invoke('generate-check-in-response', {
         body: { checkInId: checkIn.id }
