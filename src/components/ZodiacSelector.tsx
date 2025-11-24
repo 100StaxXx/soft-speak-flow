@@ -54,12 +54,10 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
 
   const handleSelect = (sign: ZodiacSign) => {
     setSelectedZodiac(sign);
-  };
-
-  const handleContinue = () => {
-    if (selectedZodiac) {
-      onComplete(selectedZodiac);
-    }
+    // Auto-progress after selection
+    setTimeout(() => {
+      onComplete(sign);
+    }, 600); // Small delay for visual feedback
   };
 
   return (
@@ -186,21 +184,6 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
           ))}
         </div>
 
-        {selectedZodiac && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <Button
-              onClick={handleContinue}
-              size="lg"
-              className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-purple-950 font-bold px-10 py-6 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Continue Your Journey ✨
-            </Button>
-          </motion.div>
-        )}
       </div>
     </div>
   );
