@@ -21,7 +21,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
     const checkAuthAndProfile = async () => {
       // Wait for auth to load
-      if (authLoading || profileLoading) return;
+      if (authLoading) return;
 
       // Redirect to auth if not logged in
       if (!user) {
@@ -29,23 +29,12 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
         return;
       }
 
-      // Redirect to onboarding if mentor required and profile missing or not selected
+      // Only redirect to onboarding if we're sure there's no mentor
+      // Wait for profile to load before checking
+      if (profileLoading) return;
+      
       if (requireMentor && (!profile || !profile.selected_mentor_id)) {
-        // Double-check server state to avoid stale client redirect
-        try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('selected_mentor_id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (mounted && !data?.selected_mentor_id) {
-            navigate("/onboarding");
-          }
-        } catch (error) {
-          console.error("Error checking profile:", error);
-          if (mounted) navigate("/onboarding");
-        }
+        if (mounted) navigate("/onboarding");
       }
     };
 
