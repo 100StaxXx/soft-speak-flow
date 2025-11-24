@@ -153,10 +153,7 @@ const Index = () => {
   useEffect(() => {
     if (!user || !isReady) return;
     
-    // Check localStorage first to avoid race conditions with profile updates
-    const onboardingComplete = safeLocalStorage.getItem('onboardingComplete') === 'true';
-    
-    if (profile && !onboardingComplete) {
+    if (profile) {
       // If onboarding is not complete or user has no mentor, redirect to onboarding
       if (!profile.onboarding_completed || !profile.selected_mentor_id) {
         navigate("/onboarding");

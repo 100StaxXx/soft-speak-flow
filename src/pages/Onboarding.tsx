@@ -424,9 +424,6 @@ export default function Onboarding() {
       // CRITICAL: Invalidate profile cache to force refetch with new data
       await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });
       
-      // Set flag in localStorage for immediate check
-      localStorage.setItem('onboardingComplete', 'true');
-      
       // Wait longer to ensure database update propagates
       await new Promise(resolve => setTimeout(resolve, 500));
       
