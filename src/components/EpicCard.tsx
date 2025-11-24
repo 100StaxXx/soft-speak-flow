@@ -7,6 +7,25 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState } from "react";
 import { EpicLeaderboard } from "./EpicLeaderboard";
+import { cn } from "@/lib/utils";
+
+type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+
+const themeGradients: Record<EpicTheme, string> = {
+  heroic: "from-epic-heroic/20 to-purple-500/20",
+  warrior: "from-epic-warrior/20 to-orange-500/20",
+  mystic: "from-epic-mystic/20 to-blue-500/20",
+  nature: "from-epic-nature/20 to-emerald-500/20",
+  solar: "from-epic-solar/20 to-amber-500/20"
+};
+
+const themeBorders: Record<EpicTheme, string> = {
+  heroic: "border-epic-heroic/20 hover:border-epic-heroic/40",
+  warrior: "border-epic-warrior/20 hover:border-epic-warrior/40",
+  mystic: "border-epic-mystic/20 hover:border-epic-mystic/40",
+  nature: "border-epic-nature/20 hover:border-epic-nature/40",
+  solar: "border-epic-solar/20 hover:border-epic-solar/40"
+};
 
 interface Epic {
   id: string;
@@ -20,6 +39,7 @@ interface Epic {
   progress_percentage: number;
   is_public?: boolean;
   invite_code?: string;
+  theme_color?: string;
   epic_habits?: Array<{
     habit_id: string;
     habits: {
@@ -43,6 +63,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   );
   const isCompleted = epic.status === "completed";
   const isActive = epic.status === "active";
+  const theme = (epic.theme_color || 'heroic') as EpicTheme;
+  const themeGradient = themeGradients[theme];
+  const themeBorder = themeBorders[theme];
 
   const getMilestoneColor = (progress: number) => {
     if (progress >= 100) return "text-yellow-400";
@@ -73,7 +96,11 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="p-6 bg-gradient-to-br from-background to-secondary/20 border-2 border-primary/20 hover:border-primary/40 transition-all">
+      <Card className={cn(
+        "p-6 bg-gradient-to-br border-2 transition-all",
+        `from-background to-secondary/20 ${themeBorder}`,
+        `bg-gradient-to-br ${themeGradient}`
+      )}>
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">

@@ -800,6 +800,7 @@ export type Database = {
       }
       daily_tasks: {
         Row: {
+          category: string | null
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
@@ -821,6 +822,7 @@ export type Database = {
           xp_reward: number
         }
         Insert: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -842,6 +844,7 @@ export type Database = {
           xp_reward?: number
         }
         Update: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
@@ -1095,6 +1098,7 @@ export type Database = {
           start_date: string
           status: string
           target_days: number
+          theme_color: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -1112,6 +1116,7 @@ export type Database = {
           start_date?: string
           status?: string
           target_days?: number
+          theme_color?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -1129,6 +1134,7 @@ export type Database = {
           start_date?: string
           status?: string
           target_days?: number
+          theme_color?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
