@@ -7,6 +7,7 @@ export interface OnboardingData {
   mentorId?: string;
   mentorName?: string;
   walkthrough_completed?: boolean;
+  quests_tutorial_seen?: boolean;
   explanation?: {
     title: string;
     subtitle: string;
