@@ -17,8 +17,8 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
       return "/onboarding";
     }
 
-    // Has mentor -> home
-    return "/";
+    // Has mentor -> quests page
+    return "/tasks";
   } catch (error) {
     console.error("Error checking profile:", error);
     return "/onboarding";
