@@ -39,9 +39,30 @@ export const useEpics = () => {
       title: string;
       description?: string;
       target_days: number;
-      habit_ids: string[];
+      habits: Array<{
+        title: string;
+        difficulty: string;
+        frequency: string;
+        custom_days: number[];
+      }>;
     }) => {
       if (!user) throw new Error("Not authenticated");
+
+      // Create habits first
+      const { data: createdHabits, error: habitError } = await supabase
+        .from("habits")
+        .insert(
+          epicData.habits.map(habit => ({
+            user_id: user.id,
+            title: habit.title,
+            difficulty: habit.difficulty,
+            frequency: habit.frequency,
+            custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
+          }))
+        )
+        .select();
+
+      if (habitError) throw habitError;
 
       // Create the epic
       const { data: epic, error: epicError } = await supabase
@@ -51,7 +72,7 @@ export const useEpics = () => {
           title: epicData.title,
           description: epicData.description,
           target_days: epicData.target_days,
-          xp_reward: Math.floor(epicData.target_days * 10), // 10 XP per day
+          xp_reward: Math.floor(epicData.target_days * 10),
         })
         .select()
         .single();
@@ -59,23 +80,22 @@ export const useEpics = () => {
       if (epicError) throw epicError;
 
       // Link habits to epic
-      if (epicData.habit_ids.length > 0) {
-        const { error: linkError } = await supabase
-          .from("epic_habits")
-          .insert(
-            epicData.habit_ids.map((habit_id) => ({
-              epic_id: epic.id,
-              habit_id,
-            }))
-          );
+      const { error: linkError } = await supabase
+        .from("epic_habits")
+        .insert(
+          createdHabits.map((habit) => ({
+            epic_id: epic.id,
+            habit_id: habit.id,
+          }))
+        );
 
-        if (linkError) throw linkError;
-      }
+      if (linkError) throw linkError;
 
       return epic;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
       toast.success("Epic quest created! 🎯", {
         description: "Your companion is excited for this legendary journey!",
       });

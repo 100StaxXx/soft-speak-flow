@@ -24,26 +24,16 @@ const Epics = () => {
     updateEpicStatus,
   } = useEpics();
 
-  // Fetch user's habits for linking
-  const { data: habits = [] } = useQuery({
-    queryKey: ["habits", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data } = await supabase
-        .from("habits")
-        .select("id, title, difficulty")
-        .eq("user_id", user.id)
-        .eq("is_active", true);
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
   const handleCreateEpic = (data: {
     title: string;
     description?: string;
     target_days: number;
-    habit_ids: string[];
+    habits: Array<{
+      title: string;
+      difficulty: string;
+      frequency: string;
+      custom_days: number[];
+    }>;
   }) => {
     createEpic(data);
     setCreateDialogOpen(false);
@@ -164,7 +154,6 @@ const Epics = () => {
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onCreateEpic={handleCreateEpic}
-          availableHabits={habits}
           isCreating={isCreating}
         />
       </div>

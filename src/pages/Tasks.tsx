@@ -890,7 +890,6 @@ export default function Tasks() {
                 createEpic(data);
                 setCreateEpicDialogOpen(false);
               }}
-              availableHabits={habits}
               isCreating={isCreating}
             />
           </TabsContent>

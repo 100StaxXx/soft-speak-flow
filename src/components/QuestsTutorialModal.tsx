@@ -39,13 +39,19 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Complete them to earn XP and grow your companion
+                  Complete them to earn XP
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Mark one as your Main Quest for double XP!
+                  Main Quest = double XP
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-foreground">
+                  Create Epics for long-term goals
                 </p>
               </div>
             </div>
