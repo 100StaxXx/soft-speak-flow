@@ -811,6 +811,9 @@ export type Database = {
           parent_template_id: string | null
           recurrence_days: number[] | null
           recurrence_pattern: string | null
+          reminder_enabled: boolean | null
+          reminder_minutes_before: number | null
+          reminder_sent: boolean | null
           scheduled_time: string | null
           task_date: string
           task_text: string
@@ -829,6 +832,9 @@ export type Database = {
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent?: boolean | null
           scheduled_time?: string | null
           task_date?: string
           task_text: string
@@ -847,6 +853,9 @@ export type Database = {
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent?: boolean | null
           scheduled_time?: string | null
           task_date?: string
           task_text?: string
