@@ -28,7 +28,6 @@ interface HabitCardProps {
   completedToday: boolean;
   difficulty?: string;
   onComplete: () => void;
-  isFirstHabit?: boolean;
 }
 
 export const HabitCard = memo(({
@@ -39,7 +38,6 @@ export const HabitCard = memo(({
   completedToday,
   difficulty = "medium",
   onComplete,
-  isFirstHabit = false,
 }: HabitCardProps) => {
   const queryClient = useQueryClient();
   const [showActions, setShowActions] = useState(false);
@@ -128,7 +126,6 @@ export const HabitCard = memo(({
                 completedToday && "bg-primary/20 text-primary hover:bg-primary/30"
               )}
               aria-label={completedToday ? `${title} completed for today` : `Mark ${title} as complete`}
-              data-tour={isFirstHabit ? "first-habit-checkbox" : undefined}
             >
               <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
             </Button>
