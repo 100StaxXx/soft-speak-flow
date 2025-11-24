@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { SearchBar } from "./SearchBar";
 import { Card } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -14,6 +15,7 @@ import { Skeleton } from "./ui/skeleton";
 export const GlobalSearch = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: quotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["search-quotes", searchQuery],
@@ -60,23 +62,41 @@ export const GlobalSearch = () => {
     },
   });
 
-  const isLoading = quotesLoading || pepTalksLoading || challengesLoading;
-  const hasResults = (quotes && quotes.length > 0) || (pepTalks && pepTalks.length > 0) || (challenges && challenges.length > 0);
+  const { data: tasks, isLoading: tasksLoading } = useQuery({
+    queryKey: ['search-tasks', searchQuery, user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('daily_tasks')
+        .select('*')
+        .eq('user_id', user!.id)
+        .ilike('task_text', `%${searchQuery}%`)
+        .order('task_date', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: searchQuery.length >= 2 && !!user,
+  });
+
+  const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading;
+  const hasResults = (quotes && quotes.length > 0) || (pepTalks && pepTalks.length > 0) || (challenges && challenges.length > 0) || (tasks && tasks.length > 0);
 
   return (
     <div className="space-y-4">
       <SearchBar
         onSearch={setSearchQuery}
-        placeholder="Search quotes, pep talks, challenges..."
+        placeholder="Search quotes, pep talks, challenges, quests..."
       />
 
       {searchQuery.length >= 2 && (
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="w-full grid grid-cols-4">
+          <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="pep-talks">Pep Talks</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
+            <TabsTrigger value="quests">Quests</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4 mt-4">
@@ -148,6 +168,54 @@ export const GlobalSearch = () => {
                     </div>
                   </div>
                 )}
+
+                {tasks && tasks.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold">Quests</h3>
+                      <Badge variant="secondary">{tasks.length}</Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {tasks.map((task) => (
+                        <Card
+                          key={task.id}
+                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          onClick={() => navigate("/tasks")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <h4 className="font-semibold mb-1">{task.task_text}</h4>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{new Date(task.task_date).toLocaleDateString()}</span>
+                                {task.scheduled_time && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{task.scheduled_time}</span>
+                                  </>
+                                )}
+                                {task.estimated_duration && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{task.estimated_duration}min</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {task.is_main_quest && (
+                                <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                              )}
+                              {task.completed && (
+                                <Badge className="text-xs bg-success/10 text-success">Completed</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -199,6 +267,53 @@ export const GlobalSearch = () => {
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No challenges found</p>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="quests" className="space-y-3 mt-4">
+            {tasksLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : tasks && tasks.length > 0 ? (
+              tasks.map((task) => (
+                <Card
+                  key={task.id}
+                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate("/tasks")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h4 className="font-semibold mb-1">{task.task_text}</h4>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{new Date(task.task_date).toLocaleDateString()}</span>
+                        {task.scheduled_time && (
+                          <>
+                            <span>•</span>
+                            <span>{task.scheduled_time}</span>
+                          </>
+                        )}
+                        {task.estimated_duration && (
+                          <>
+                            <span>•</span>
+                            <span>{task.estimated_duration}min</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {task.is_main_quest && (
+                        <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                      )}
+                      {task.completed && (
+                        <Badge className="text-xs bg-success/10 text-success">Completed</Badge>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No quests found</p>
               </Card>
             )}
           </TabsContent>
