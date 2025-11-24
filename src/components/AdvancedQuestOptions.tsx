@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Clock, Calendar, Repeat, ChevronDown } from "lucide-react";
 import { FrequencyPicker } from "./FrequencyPicker";
+import { ReminderSettings } from "./ReminderSettings";
 import { cn } from "@/lib/utils";
 
 interface AdvancedQuestOptionsProps {
@@ -8,10 +9,14 @@ interface AdvancedQuestOptionsProps {
   estimatedDuration: number | null;
   recurrencePattern: string | null;
   recurrenceDays: number[];
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
   onScheduledTimeChange: (time: string | null) => void;
   onEstimatedDurationChange: (duration: number | null) => void;
   onRecurrencePatternChange: (pattern: string | null) => void;
   onRecurrenceDaysChange: (days: number[]) => void;
+  onReminderEnabledChange: (enabled: boolean) => void;
+  onReminderMinutesChange: (minutes: number) => void;
 }
 
 const DURATION_OPTIONS = [
@@ -35,10 +40,14 @@ export const AdvancedQuestOptions = ({
   estimatedDuration,
   recurrencePattern,
   recurrenceDays,
+  reminderEnabled,
+  reminderMinutesBefore,
   onScheduledTimeChange,
   onEstimatedDurationChange,
   onRecurrencePatternChange,
   onRecurrenceDaysChange,
+  onReminderEnabledChange,
+  onReminderMinutesChange,
 }: AdvancedQuestOptionsProps) => {
   const [showDurationMenu, setShowDurationMenu] = useState(false);
   const [showRecurrenceMenu, setShowRecurrenceMenu] = useState(false);
@@ -162,6 +171,16 @@ export const AdvancedQuestOptions = ({
         <FrequencyPicker 
           selectedDays={recurrenceDays}
           onDaysChange={onRecurrenceDaysChange}
+        />
+      )}
+
+      {/* Smart Reminders */}
+      {scheduledTime && (
+        <ReminderSettings
+          enabled={reminderEnabled}
+          minutesBefore={reminderMinutesBefore}
+          onEnabledChange={onReminderEnabledChange}
+          onMinutesChange={onReminderMinutesChange}
         />
       )}
     </div>

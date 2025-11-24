@@ -46,7 +46,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
       scheduledTime,
       estimatedDuration,
       recurrencePattern,
-      recurrenceDays
+      recurrenceDays,
+      reminderEnabled,
+      reminderMinutesBefore
     }: { 
       taskText: string; 
       difficulty: 'easy' | 'medium' | 'hard'; 
@@ -56,6 +58,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
       estimatedDuration?: number | null;
       recurrencePattern?: string | null;
       recurrenceDays?: number[] | null;
+      reminderEnabled?: boolean;
+      reminderMinutesBefore?: number;
     }) => {
       // Prevent duplicate submissions
       if (addInProgress.current) {
@@ -97,6 +101,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
             recurrence_pattern: recurrencePattern || null,
             recurrence_days: recurrenceDays || null,
             is_recurring: !!recurrencePattern,
+            reminder_enabled: reminderEnabled ?? false,
+            reminder_minutes_before: reminderMinutesBefore ?? 15,
+            reminder_sent: false,
           });
 
         if (error) {
