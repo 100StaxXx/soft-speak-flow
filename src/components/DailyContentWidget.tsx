@@ -19,9 +19,12 @@ export const DailyContentWidget = () => {
 
   useEffect(() => {
     const fetchDailyContent = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!profile?.selected_mentor_id) {
+        setLoading(false);
+        return;
+      }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA");
 
       // Get mentor details
       const { data: mentor } = await supabase

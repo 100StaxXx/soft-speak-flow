@@ -73,7 +73,7 @@ const Index = () => {
           setMentorImage(imageUrl);
 
           // Get today's pep talk to find related quote
-          const today = new Date().toISOString().split("T")[0];
+          const today = new Date().toLocaleDateString("en-CA");
           const { data: dailyPepTalk } = await supabase
             .from("daily_pep_talks")
             .select("emotional_triggers, topic_category")

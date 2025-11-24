@@ -35,7 +35,7 @@ export default function Reflection() {
 
   const loadTodayReflection = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       const { data, error } = await supabase
         .from('user_reflections')
         .select('*')
@@ -62,7 +62,7 @@ export default function Reflection() {
 
     setIsSubmitting(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       
       const { data: reflection, error } = await supabase
         .from('user_reflections')

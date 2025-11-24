@@ -72,7 +72,7 @@ export const getRandomQuote = async () => {
  * Get quote of the day (deterministic based on current date)
  */
 export const getQuoteOfTheDay = async () => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA");
   const seed = today.split("-").reduce((acc, val) => acc + parseInt(val), 0);
 
   const { data, error } = await supabase

@@ -25,6 +25,13 @@ interface CalendarMonthViewProps {
 }
 
 export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick }: CalendarMonthViewProps) => {
+  const toReferenceTime = (time: string) => {
+    const [hours, minutes = "0"] = time.split(":");
+    const h = Number(hours) || 0;
+    const m = Number(minutes) || 0;
+    return new Date(2000, 0, 1, h, m, 0, 0);
+  };
+
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -45,9 +52,9 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
     
     for (let i = 0; i < scheduledTasks.length; i++) {
       for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = new Date(`2000-01-01 ${scheduledTasks[i].scheduled_time}`);
+        const task1Start = toReferenceTime(scheduledTasks[i].scheduled_time!);
         const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2Start = new Date(`2000-01-01 ${scheduledTasks[j].scheduled_time}`);
+        const task2Start = toReferenceTime(scheduledTasks[j].scheduled_time!);
         const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
         
         if (task1Start < task2End && task2Start < task1End) {

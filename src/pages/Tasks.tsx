@@ -50,6 +50,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 
+const getLocalDateString = (date: Date = new Date()) => format(date, "yyyy-MM-dd");
+const toReferenceTime = (time: string) => {
+  const [hours, minutes = "0"] = time.split(":");
+  const h = Number(hours) || 0;
+  const m = Number(minutes) || 0;
+  return new Date(2000, 0, 1, h, m, 0, 0);
+};
+
 export default function Tasks() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -156,7 +164,7 @@ export default function Tasks() {
   const { data: completions = [] } = useQuery({
     queryKey: ['habit-completions', user?.id],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString();
       const { data } = await supabase
         .from('habit_completions')
         .select('*')
@@ -199,7 +207,7 @@ export default function Tasks() {
   // Toggle habit completion
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString();
       
       if (isCompleted) {
         // Unchecking - remove completion record but DON'T remove XP
@@ -263,7 +271,7 @@ export default function Tasks() {
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
     
-    const taskDate = selectedDate.toISOString().split('T')[0];
+    const taskDate = getLocalDateString(selectedDate);
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     // Store task data temporarily
@@ -357,7 +365,7 @@ export default function Tasks() {
       setShowTutorial(true);
       
       // Auto-generate "Join R-Evolution" quest
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString();
       
       // Check if this quest already exists
       supabase
@@ -414,9 +422,9 @@ export default function Tasks() {
       if (task.id === other.id || !task.scheduled_time || !other.scheduled_time) continue;
       if (task.task_date !== other.task_date) continue;
       
-      const t1Start = new Date(`2000-01-01 ${task.scheduled_time}`);
+      const t1Start = toReferenceTime(task.scheduled_time);
       const t1End = new Date(t1Start.getTime() + ((task.estimated_duration || 0) * 60000));
-      const t2Start = new Date(`2000-01-01 ${other.scheduled_time}`);
+      const t2Start = toReferenceTime(other.scheduled_time);
       const t2End = new Date(t2Start.getTime() + ((other.estimated_duration || 0) * 60000));
       
       if (t1Start < t2End && t2Start < t1End) return true;

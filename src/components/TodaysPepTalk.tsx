@@ -70,9 +70,12 @@ export const TodaysPepTalk = () => {
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!profile?.selected_mentor_id) {
+        setLoading(false);
+        return;
+      }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA");
 
       const { data: mentor } = await supabase
         .from("mentors")

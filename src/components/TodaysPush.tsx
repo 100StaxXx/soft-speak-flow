@@ -25,7 +25,7 @@ export const TodaysPush = () => {
     const fetchTodaysPepTalk = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA");
 
       // Get mentor details
       const { data: mentor } = await supabase

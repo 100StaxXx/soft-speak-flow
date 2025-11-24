@@ -8,6 +8,8 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 
+const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
+
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -19,7 +21,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
-  const taskDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  const taskDate = selectedDate ? formatDate(selectedDate) : formatDate(new Date());
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['daily-tasks', user?.id, taskDate],

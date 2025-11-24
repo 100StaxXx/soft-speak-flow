@@ -24,7 +24,7 @@ export const MorningCheckIn = () => {
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
 
   const { data: existingCheckIn } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],

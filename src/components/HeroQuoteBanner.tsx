@@ -46,9 +46,12 @@ export const HeroQuoteBanner = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!profile?.selected_mentor_id) {
+        setLoading(false);
+        return;
+      }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA");
 
       // Get mentor details
       const { data: mentorData } = await supabase
