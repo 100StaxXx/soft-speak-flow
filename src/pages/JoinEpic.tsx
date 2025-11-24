@@ -30,8 +30,7 @@ const JoinEpic = () => {
           epic_habits(
             habit_id,
             habits(id, title, difficulty)
-          ),
-          epic_members(count)
+          )
         `)
         .eq("invite_code", code)
         .eq("is_public", true)
@@ -39,7 +38,14 @@ const JoinEpic = () => {
 
       if (error) throw error;
       if (!data) throw new Error("Epic not found");
-      return data;
+      
+      // Get member count separately
+      const { count } = await supabase
+        .from("epic_members")
+        .select("*", { count: 'exact', head: true })
+        .eq("epic_id", data.id);
+      
+      return { ...data, member_count: count || 0 };
     },
     enabled: !!code,
   });
@@ -162,7 +168,7 @@ const JoinEpic = () => {
     );
   }
 
-  const memberCount = epic.epic_members?.[0]?.count || 0;
+  const memberCount = epic?.member_count || 0;
 
   return (
     <PageTransition>
