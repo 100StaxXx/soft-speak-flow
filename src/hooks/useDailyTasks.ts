@@ -38,7 +38,25 @@ export const useDailyTasks = (selectedDate?: Date) => {
   });
 
   const addTask = useMutation({
-    mutationFn: async ({ taskText, difficulty, taskDate: customDate, isMainQuest }: { taskText: string; difficulty: 'easy' | 'medium' | 'hard'; taskDate?: string; isMainQuest?: boolean; }) => {
+    mutationFn: async ({ 
+      taskText, 
+      difficulty, 
+      taskDate: customDate, 
+      isMainQuest,
+      scheduledTime,
+      estimatedDuration,
+      recurrencePattern,
+      recurrenceDays
+    }: { 
+      taskText: string; 
+      difficulty: 'easy' | 'medium' | 'hard'; 
+      taskDate?: string; 
+      isMainQuest?: boolean;
+      scheduledTime?: string | null;
+      estimatedDuration?: number | null;
+      recurrencePattern?: string | null;
+      recurrenceDays?: number[] | null;
+    }) => {
       // Prevent duplicate submissions
       if (addInProgress.current) {
         throw new Error('Please wait...');
@@ -74,6 +92,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
             xp_reward: xpReward,
             task_date: customDate || taskDate,
             is_main_quest: isMainQuest ?? false,
+            scheduled_time: scheduledTime || null,
+            estimated_duration: estimatedDuration || null,
+            recurrence_pattern: recurrencePattern || null,
+            recurrence_days: recurrenceDays || null,
+            is_recurring: !!recurrencePattern,
           });
 
         if (error) {

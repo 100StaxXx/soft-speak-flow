@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ interface TaskCardProps {
     difficulty?: string;
     xp_reward: number;
     is_main_quest?: boolean;
+    scheduled_time?: string | null;
+    estimated_duration?: number | null;
+    recurrence_pattern?: string | null;
   };
   onToggle: () => void;
   onDelete: () => void;
@@ -43,17 +46,40 @@ export const TaskCard = ({
     hard: "◆◆◆",
   };
 
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const getRecurrenceLabel = (pattern: string) => {
+    const labels: Record<string, string> = {
+      daily: "Daily",
+      weekly: "Weekly",
+      custom: "Custom",
+    };
+    return labels[pattern] || pattern;
+  };
+
   useEffect(() => {
     if (task.completed && !justCompleted) {
       setJustCompleted(true);
       setShowXP(true);
       const timer = setTimeout(() => {
         setShowXP(false);
-        setJustCompleted(false); // Reset so animation can play again
+        setJustCompleted(false);
       }, 2000);
       return () => clearTimeout(timer);
     } else if (!task.completed && justCompleted) {
-      // Reset when task is uncompleted
       setJustCompleted(false);
     }
   }, [task.completed, justCompleted]);
@@ -147,7 +173,7 @@ export const TaskCard = ({
               </p>
             </div>
           
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
               {task.difficulty && (
                 <span className={cn("text-xs", difficultyColors[task.difficulty as keyof typeof difficultyColors])}>
                   {difficultyIcons[task.difficulty as keyof typeof difficultyIcons]}
@@ -159,6 +185,27 @@ export const TaskCard = ({
               )}>
                 +{task.xp_reward} XP
               </span>
+              
+              {task.scheduled_time && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  {formatTime(task.scheduled_time)}
+                </div>
+              )}
+              
+              {task.estimated_duration && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  {formatDuration(task.estimated_duration)}
+                </div>
+              )}
+              
+              {task.recurrence_pattern && (
+                <div className="flex items-center gap-1 text-xs text-primary/80">
+                  <Repeat className="w-3 h-3" />
+                  {getRecurrenceLabel(task.recurrence_pattern)}
+                </div>
+              )}
             </div>
           </div>
 

@@ -804,8 +804,14 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           difficulty: string | null
+          estimated_duration: number | null
           id: string
           is_main_quest: boolean | null
+          is_recurring: boolean | null
+          parent_template_id: string | null
+          recurrence_days: number[] | null
+          recurrence_pattern: string | null
+          scheduled_time: string | null
           task_date: string
           task_text: string
           user_id: string
@@ -816,8 +822,14 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           difficulty?: string | null
+          estimated_duration?: number | null
           id?: string
           is_main_quest?: boolean | null
+          is_recurring?: boolean | null
+          parent_template_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_pattern?: string | null
+          scheduled_time?: string | null
           task_date?: string
           task_text: string
           user_id: string
@@ -828,14 +840,28 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           difficulty?: string | null
+          estimated_duration?: number | null
           id?: string
           is_main_quest?: boolean | null
+          is_recurring?: boolean | null
+          parent_template_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_pattern?: string | null
+          scheduled_time?: string | null
           task_date?: string
           task_text?: string
           user_id?: string
           xp_reward?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "daily_tasks_parent_template_id_fkey"
+            columns: ["parent_template_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       downloads: {
         Row: {
