@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 import dariusImage from "@/assets/darius-sage.png";
 import novaImage from "@/assets/nova-sage.png";
 import lumiImage from "@/assets/lumi-sage.png";
@@ -48,7 +49,7 @@ export const HeroQuoteBanner = () => {
     const fetchData = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
       const { data: mentorData } = await supabase

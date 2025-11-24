@@ -74,9 +74,9 @@ export const SchedulePowerUps = ({ tasks, className }: SchedulePowerUpsProps) =>
   const checkConflicts = (tasks: Task[]) => {
     for (let i = 0; i < tasks.length; i++) {
       for (let j = i + 1; j < tasks.length; j++) {
-        const t1Start = new Date(`2000-01-01 ${tasks[i].scheduled_time}`);
+        const t1Start = new Date(`2000-01-01T${tasks[i].scheduled_time}:00`);
         const t1End = new Date(t1Start.getTime() + (tasks[i].estimated_duration! * 60000));
-        const t2Start = new Date(`2000-01-01 ${tasks[j].scheduled_time}`);
+        const t2Start = new Date(`2000-01-01T${tasks[j].scheduled_time}:00`);
         const t2End = new Date(t2Start.getTime() + (tasks[j].estimated_duration! * 60000));
         
         if (t1Start < t2End && t2Start < t1End) return true;

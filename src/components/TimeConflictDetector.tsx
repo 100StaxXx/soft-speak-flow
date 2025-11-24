@@ -31,9 +31,9 @@ export const TimeConflictDetector = ({ tasks, className }: TimeConflictDetectorP
         const task1 = scheduledTasks[i];
         const task2 = scheduledTasks[j];
 
-        const task1Start = new Date(`2000-01-01 ${task1.scheduled_time}`);
+        const task1Start = new Date(`2000-01-01T${task1.scheduled_time}:00`);
         const task1End = new Date(task1Start.getTime() + (task1.estimated_duration! * 60000));
-        const task2Start = new Date(`2000-01-01 ${task2.scheduled_time}`);
+        const task2Start = new Date(`2000-01-01T${task2.scheduled_time}:00`);
         const task2End = new Date(task2Start.getTime() + (task2.estimated_duration! * 60000));
 
         if (task1Start < task2End && task2Start < task1End) {

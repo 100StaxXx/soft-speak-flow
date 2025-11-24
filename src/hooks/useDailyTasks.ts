@@ -7,6 +7,7 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
+import { format } from "date-fns";
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -19,7 +20,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
-  const taskDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  const taskDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['daily-tasks', user?.id, taskDate],

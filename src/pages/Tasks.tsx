@@ -165,7 +165,7 @@ export default function Tasks() {
   const { data: completions = [] } = useQuery({
     queryKey: ['habit-completions', user?.id],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
       const { data } = await supabase
         .from('habit_completions')
         .select('*')
@@ -208,7 +208,7 @@ export default function Tasks() {
   // Toggle habit completion
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
       
       if (isCompleted) {
         // Unchecking - remove completion record but DON'T remove XP
@@ -272,7 +272,7 @@ export default function Tasks() {
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
     
-    const taskDate = selectedDate.toISOString().split('T')[0];
+    const taskDate = format(selectedDate, 'yyyy-MM-dd');
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     // Store task data temporarily
@@ -380,7 +380,7 @@ export default function Tasks() {
       setShowTutorial(true);
       
       // Auto-generate "Join R-Evolution" quest
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
       
       // Check if this quest already exists
       supabase
@@ -441,9 +441,9 @@ export default function Tasks() {
       if (task.id === other.id || !task.scheduled_time || !other.scheduled_time) continue;
       if (task.task_date !== other.task_date) continue;
       
-      const t1Start = new Date(`2000-01-01 ${task.scheduled_time}`);
+      const t1Start = new Date(`2000-01-01T${task.scheduled_time}:00`);
       const t1End = new Date(t1Start.getTime() + ((task.estimated_duration || 0) * 60000));
-      const t2Start = new Date(`2000-01-01 ${other.scheduled_time}`);
+      const t2Start = new Date(`2000-01-01T${other.scheduled_time}:00`);
       const t2End = new Date(t2Start.getTime() + ((other.estimated_duration || 0) * 60000));
       
       if (t1Start < t2End && t2Start < t1End) return true;
