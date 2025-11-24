@@ -19,16 +19,29 @@ export const HabitsPageTour = () => {
   useEffect(() => {
     // Only run if user is logged in and hasn't seen the habits tour
     if (user) {
-      const hasSeenHabitsTour = localStorage.getItem('hasSeenHabitsTour');
-      const hasHabits = localStorage.getItem('userHasCreatedFirstHabit');
+      const checkAndRunTour = () => {
+        const hasSeenHabitsTour = localStorage.getItem('hasSeenHabitsTour');
+        const hasHabits = localStorage.getItem('userHasCreatedFirstHabit');
+        
+        if (!hasSeenHabitsTour && hasHabits === 'true') {
+          // Small delay to ensure DOM is ready
+          const timer = setTimeout(() => {
+            setRun(true);
+          }, 500);
+          return () => clearTimeout(timer);
+        }
+      };
       
-      if (!hasSeenHabitsTour && hasHabits === 'true') {
-        // Small delay to ensure DOM is ready
-        const timer = setTimeout(() => {
-          setRun(true);
-        }, 500);
-        return () => clearTimeout(timer);
-      }
+      // Check initially
+      checkAndRunTour();
+      
+      // Listen for storage changes to trigger tour when flag is set
+      const handleStorageChange = () => {
+        checkAndRunTour();
+      };
+      
+      window.addEventListener('storage', handleStorageChange);
+      return () => window.removeEventListener('storage', handleStorageChange);
     }
   }, [user]);
 
