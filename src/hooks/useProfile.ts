@@ -68,7 +68,8 @@ export const useProfile = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes - profile data doesn't change often
+    staleTime: 30 * 1000, // 30 seconds - reduced to catch tutorial updates faster
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   return { profile: profile ?? null, loading };
