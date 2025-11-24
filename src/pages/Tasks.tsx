@@ -152,6 +152,8 @@ export default function Tasks() {
       const hadNoHabits = habits.length === 0;
       if (hadNoHabits) {
         localStorage.setItem('userHasCreatedFirstHabit', 'true');
+        // Dispatch custom event to trigger tour in same window
+        window.dispatchEvent(new CustomEvent('firstHabitCreated'));
       }
     },
   });
@@ -654,20 +656,20 @@ export default function Tasks() {
                         habits.map((habit, index) => {
                           const isCompleted = completions.some(c => c.habit_id === habit.id);
                           return (
-                            <div key={habit.id} data-tour={index === 0 ? "first-habit-checkbox" : undefined}>
-                              <HabitCard
-                                id={habit.id}
-                                title={habit.title}
-                                currentStreak={habit.current_streak || 0}
-                                longestStreak={habit.longest_streak || 0}
-                                completedToday={isCompleted}
-                                difficulty={habit.difficulty}
-                                onComplete={() => toggleHabitMutation.mutate({ 
-                                  habitId: habit.id, 
-                                  isCompleted 
-                                })}
-                              />
-                            </div>
+                            <HabitCard
+                              key={habit.id}
+                              id={habit.id}
+                              title={habit.title}
+                              currentStreak={habit.current_streak || 0}
+                              longestStreak={habit.longest_streak || 0}
+                              completedToday={isCompleted}
+                              difficulty={habit.difficulty}
+                              onComplete={() => toggleHabitMutation.mutate({ 
+                                habitId: habit.id, 
+                                isCompleted 
+                              })}
+                              isFirstHabit={index === 0}
+                            />
                           );
                         })
                       )}

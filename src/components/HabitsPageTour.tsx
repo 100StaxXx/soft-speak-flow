@@ -17,32 +17,36 @@ export const HabitsPageTour = () => {
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
-    // Only run if user is logged in and hasn't seen the habits tour
-    if (user) {
-      const checkAndRunTour = () => {
-        const hasSeenHabitsTour = localStorage.getItem('hasSeenHabitsTour');
-        const hasHabits = localStorage.getItem('userHasCreatedFirstHabit');
-        
-        if (!hasSeenHabitsTour && hasHabits === 'true') {
-          // Small delay to ensure DOM is ready
-          const timer = setTimeout(() => {
-            setRun(true);
-          }, 500);
-          return () => clearTimeout(timer);
-        }
-      };
+    if (!user) return;
+    
+    let timeoutId: NodeJS.Timeout | undefined;
+    
+    const checkAndRunTour = () => {
+      const hasSeenHabitsTour = localStorage.getItem('hasSeenHabitsTour');
+      const hasHabits = localStorage.getItem('userHasCreatedFirstHabit');
       
-      // Check initially
+      if (!hasSeenHabitsTour && hasHabits === 'true') {
+        // Small delay to ensure DOM is ready
+        timeoutId = setTimeout(() => {
+          setRun(true);
+        }, 500);
+      }
+    };
+    
+    // Check initially
+    checkAndRunTour();
+    
+    // Listen for custom event since storage event doesn't work in same window
+    const handleHabitCreated = () => {
       checkAndRunTour();
-      
-      // Listen for storage changes to trigger tour when flag is set
-      const handleStorageChange = () => {
-        checkAndRunTour();
-      };
-      
-      window.addEventListener('storage', handleStorageChange);
-      return () => window.removeEventListener('storage', handleStorageChange);
-    }
+    };
+    
+    window.addEventListener('firstHabitCreated', handleHabitCreated);
+    
+    return () => {
+      window.removeEventListener('firstHabitCreated', handleHabitCreated);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [user]);
 
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
