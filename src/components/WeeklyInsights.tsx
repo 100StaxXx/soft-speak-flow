@@ -77,6 +77,9 @@ export const WeeklyInsights = () => {
       };
     },
     enabled: !!user,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
   });
 
 
