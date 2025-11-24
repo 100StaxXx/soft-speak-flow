@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { HabitsPageTour } from "@/components/HabitsPageTour";
+
 
 export default function Tasks() {
   const { user } = useAuth();
@@ -137,11 +137,8 @@ export default function Tasks() {
       });
       
       if (error) throw error;
-      
-      // Return whether this was the first habit BEFORE invalidating queries
-      return { wasFirstHabit: habits.length === 0 };
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       setNewHabitTitle("");
       setHabitDifficulty("medium");
@@ -150,13 +147,6 @@ export default function Tasks() {
       setShowTemplates(true);
       toast({ title: "Habit created successfully!" });
       haptics.success();
-      
-      // Mark that user created first habit to trigger tutorial
-      if (result?.wasFirstHabit) {
-        localStorage.setItem('userHasCreatedFirstHabit', 'true');
-        // Dispatch custom event to trigger tour in same window
-        window.dispatchEvent(new CustomEvent('firstHabitCreated'));
-      }
     },
   });
 
@@ -670,7 +660,6 @@ export default function Tasks() {
                                 habitId: habit.id, 
                                 isCompleted 
                               })}
-                              isFirstHabit={index === 0}
                             />
                           );
                         })
@@ -733,7 +722,6 @@ export default function Tasks() {
       </Drawer>
 
       <BottomNav />
-      <HabitsPageTour />
     </div>
   );
 }

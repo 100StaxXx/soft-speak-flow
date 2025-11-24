@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
-import { MentorChatTour } from "@/components/MentorChatTour";
+
 
 export default function MentorChat() {
   const { user } = useAuth();
@@ -40,9 +40,7 @@ export default function MentorChat() {
   }
 
   return (
-    <>
-      <MentorChatTour />
-      <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24">
         {/* Hero Banner - Pokemon TCG Pocket Style */}
         <div className="relative h-48 md:h-64 overflow-hidden">
           {/* Animated gradient background */}
@@ -100,6 +98,5 @@ export default function MentorChat() {
         </div>
         <BottomNav />
       </div>
-    </>
   );
 }
