@@ -209,24 +209,22 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
 
         {/* Action Buttons */}
         {isActive && (
-          <div className="flex gap-2 mt-4">
+          <div className="mt-4">
             {epic.progress_percentage >= 100 && (
               <Button
                 onClick={onComplete}
-                className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
               >
                 <Trophy className="w-4 h-4 mr-2" />
                 Complete Epic
               </Button>
             )}
-            <Button
+            <button
               onClick={onAbandon}
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
+              className="w-full mt-2 text-[10px] text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors py-1"
             >
-              Abandon
-            </Button>
+              abandon
+            </button>
           </div>
         )}
       </Card>
