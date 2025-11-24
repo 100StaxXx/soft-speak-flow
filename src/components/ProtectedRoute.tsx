@@ -33,7 +33,9 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
       // Wait for profile to load before checking
       if (profileLoading) return;
       
-      if (requireMentor && (!profile || !profile.selected_mentor_id)) {
+      // Only redirect if profile exists but onboarding is incomplete
+      // Don't redirect if onboarding_completed is true (prevents loops)
+      if (requireMentor && profile && !profile.selected_mentor_id && !profile.onboarding_completed) {
         if (mounted) navigate("/onboarding");
       }
     };
@@ -77,7 +79,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
   // Don't render children until auth is confirmed
   if (!user) return null;
-  if (requireMentor && (!profile || !profile.selected_mentor_id)) {
+  if (requireMentor && profile && !profile.selected_mentor_id && !profile.onboarding_completed) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
