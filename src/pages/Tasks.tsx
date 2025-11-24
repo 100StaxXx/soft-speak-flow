@@ -681,6 +681,67 @@ export default function Tasks() {
                 </div>
               )}
 
+              {/* Quest List */}
+              <div className="space-y-6">
+                {tasks.length === 0 ? (
+                  <EmptyState 
+                    icon={Target}
+                    title="No quests yet"
+                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
+                  />
+                ) : (() => {
+                  const mainQuest = tasks.find(t => t.is_main_quest);
+                  const sideQuests = tasks.filter(t => !t.is_main_quest);
+                  
+                  return (
+                    <>
+                      {/* Main Quest Section */}
+                      {mainQuest && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-xl">⚔️</div>
+                            <h3 className="font-semibold text-foreground">Main Quest</h3>
+                            <div className="ml-auto">
+                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                                2x XP
+                              </span>
+                            </div>
+                          </div>
+                          <TaskCard
+                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
+                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                            onDelete={() => deleteTask(mainQuest.id)}
+                            isMainQuest={true}
+                          />
+                        </div>
+                      )}
+
+                      {/* Side Quests */}
+                      {sideQuests.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-lg">📜</div>
+                            <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {sideQuests.map((task) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
+                                onDelete={() => deleteTask(task.id)}
+                                onSetMainQuest={() => setMainQuest(task.id)}
+                                showPromoteButton={!mainQuest}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
               {canAddMore && (
                 <Card className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
@@ -765,67 +826,6 @@ export default function Tasks() {
                   </div>
                 </Card>
               )}
-
-              {/* Quest List */}
-              <div className="space-y-6">
-                {tasks.length === 0 ? (
-                  <EmptyState 
-                    icon={Target}
-                    title="No quests yet"
-                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
-                  />
-                ) : (() => {
-                  const mainQuest = tasks.find(t => t.is_main_quest);
-                  const sideQuests = tasks.filter(t => !t.is_main_quest);
-                  
-                  return (
-                    <>
-                      {/* Main Quest Section */}
-                      {mainQuest && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="text-xl">⚔️</div>
-                            <h3 className="font-semibold text-foreground">Main Quest</h3>
-                            <div className="ml-auto">
-                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                                2x XP
-                              </span>
-                            </div>
-                          </div>
-                          <TaskCard
-                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
-                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
-                            onDelete={() => deleteTask(mainQuest.id)}
-                            isMainQuest={true}
-                          />
-                        </div>
-                      )}
-
-                      {/* Side Quests */}
-                      {sideQuests.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="text-lg">📜</div>
-                            <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
-                          </div>
-                          <div className="space-y-3">
-                            {sideQuests.map((task) => (
-                              <TaskCard
-                                key={task.id}
-                                task={task}
-                                onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
-                                onDelete={() => deleteTask(task.id)}
-                                onSetMainQuest={() => setMainQuest(task.id)}
-                                showPromoteButton={!mainQuest}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
             </Card>
           </TabsContent>
 
