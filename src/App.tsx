@@ -40,8 +40,6 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 
-// Import AppWalkthrough eagerly since it needs to persist across all pages
-import { AppWalkthrough } from "@/components/AppWalkthrough";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,7 +85,6 @@ const EvolutionAwareContent = memo(() => {
     <>
       <GlobalEvolutionListener />
       <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
-      <AppWalkthrough />
     </>
   );
 });
