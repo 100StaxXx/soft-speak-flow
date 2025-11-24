@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Flame } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,11 @@ interface LeaderboardMember {
   joined_at: string;
   profiles?: {
     email?: string;
+  };
+  companion?: {
+    current_image_url?: string;
+    current_stage: number;
+    spirit_animal: string;
   };
 }
 
@@ -58,18 +63,29 @@ export const EpicLeaderboard = ({ epicId }: EpicLeaderboardProps) => {
 
       if (error) throw error;
       
-      // Fetch user emails separately
+      // Fetch user profiles and companions separately
       if (membersData && membersData.length > 0) {
         const userIds = membersData.map(m => m.user_id);
+        
+        // Fetch profiles
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, email")
           .in("id", userIds);
         
+        // Fetch companions
+        const { data: companions } = await supabase
+          .from("user_companion")
+          .select("user_id, current_image_url, current_stage, spirit_animal")
+          .in("user_id", userIds);
+        
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const companionMap = new Map(companions?.map(c => [c.user_id, c]) || []);
+        
         const enrichedMembers = membersData.map(member => ({
           ...member,
-          profiles: profileMap.get(member.user_id)
+          profiles: profileMap.get(member.user_id),
+          companion: companionMap.get(member.user_id)
         }));
         
         setMembers(enrichedMembers);
@@ -149,11 +165,28 @@ export const EpicLeaderboard = ({ epicId }: EpicLeaderboardProps) => {
               )}
             </div>
 
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                {getInitials(member.profiles?.email)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-10 w-10 border-2 border-primary/20">
+                {member.companion?.current_image_url ? (
+                  <AvatarImage 
+                    src={member.companion.current_image_url} 
+                    alt={member.companion.spirit_animal || "Companion"}
+                    className="object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                  {getInitials(member.profiles?.email)}
+                </AvatarFallback>
+              </Avatar>
+
+              {member.companion && (
+                <div className="text-xs">
+                  <p className="font-medium text-muted-foreground">
+                    Stage {member.companion.current_stage}
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
