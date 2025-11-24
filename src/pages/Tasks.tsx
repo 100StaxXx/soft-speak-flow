@@ -835,9 +835,9 @@ export default function Tasks() {
               <div className="flex gap-3">
                 <Button
                   onClick={() => setCreateEpicDialogOpen(true)}
-                  className="flex-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-base font-bold"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Mountain className="h-5 w-5 mr-2" />
                   Create Epic
                 </Button>
                 <Button
