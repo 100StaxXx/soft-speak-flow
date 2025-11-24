@@ -23,6 +23,8 @@ import { HabitCard } from "@/components/HabitCard";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
+import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
+import { Sliders } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -75,11 +77,20 @@ export default function Tasks() {
   } = useDailyTasks(selectedDate);
   const [newTaskText, setNewTaskText] = useState("");
   const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
+  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
+  const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<{
     text: string;
     difficulty: "easy" | "medium" | "hard";
     date: string;
+    scheduledTime: string | null;
+    estimatedDuration: number | null;
+    recurrencePattern: string | null;
+    recurrenceDays: number[];
   } | null>(null);
   
   // Calculate total XP for the day
@@ -238,6 +249,10 @@ export default function Tasks() {
       text: newTaskText,
       difficulty: taskDifficulty,
       date: taskDate,
+      scheduledTime,
+      estimatedDuration,
+      recurrencePattern,
+      recurrenceDays,
     });
     
     // If no main quest exists, ask user BEFORE creating the task
@@ -258,11 +273,20 @@ export default function Tasks() {
         difficulty: pendingTaskData.difficulty,
         taskDate: pendingTaskData.date,
         isMainQuest: isMainQuest,
+        scheduledTime: pendingTaskData.scheduledTime,
+        estimatedDuration: pendingTaskData.estimatedDuration,
+        recurrencePattern: pendingTaskData.recurrencePattern,
+        recurrenceDays: pendingTaskData.recurrenceDays,
       });
       
       // Clear form
       setNewTaskText("");
       setTaskDifficulty("medium");
+      setScheduledTime(null);
+      setEstimatedDuration(null);
+      setRecurrencePattern(null);
+      setRecurrenceDays([]);
+      setShowAdvanced(false);
       setPendingTaskData(null);
     } catch (error) {
       console.error('Failed to add task:', error);
@@ -499,13 +523,24 @@ export default function Tasks() {
 
               {canAddMore && (
                 <Card className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Add New Quest</p>
+                    <button
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      {showAdvanced ? "Hide" : "Advanced"}
+                    </button>
+                  </div>
+                  
                   <div className="space-y-3">
                     <Input
                       data-tour="add-task-input"
                       placeholder="Add a quest..."
                       value={newTaskText}
                       onChange={(e) => setNewTaskText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                      onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleAddTask()}
                       disabled={isAdding}
                     />
                     
@@ -542,23 +577,26 @@ export default function Tasks() {
                       </Button>
                     </div>
 
+                    {showAdvanced && (
+                      <AdvancedQuestOptions
+                        scheduledTime={scheduledTime}
+                        estimatedDuration={estimatedDuration}
+                        recurrencePattern={recurrencePattern}
+                        recurrenceDays={recurrenceDays}
+                        onScheduledTimeChange={setScheduledTime}
+                        onEstimatedDurationChange={setEstimatedDuration}
+                        onRecurrencePatternChange={setRecurrencePattern}
+                        onRecurrenceDaysChange={setRecurrenceDays}
+                      />
+                    )}
+
                     <Button 
                       data-tour="add-task-button"
                       onClick={handleAddTask}
                       disabled={isAdding || !newTaskText.trim()}
                       className="w-full"
                     >
-                      {isAdding ? (
-                        <>
-                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Quest
-                        </>
-                      )}
+                      {isAdding ? "Adding..." : "Add Quest"}
                     </Button>
                   </div>
                 </Card>
