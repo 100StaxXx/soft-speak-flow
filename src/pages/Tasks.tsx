@@ -52,7 +52,8 @@ export default function Tasks() {
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
   
-  // Tutorial state
+  // Tutorial state - use ref to prevent re-showing after user closes
+  const tutorialDismissed = useRef(false);
   const [showTutorial, setShowTutorial] = useState(false);
   
   // Calendar state for quest scheduling
@@ -295,7 +296,7 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
   useEffect(() => {
-    if (!user || !profile) return;
+    if (!user || !profile || tutorialDismissed.current) return;
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
@@ -336,6 +337,7 @@ export default function Tasks() {
   }, [user, profile, queryClient]);
 
   const handleTutorialClose = async () => {
+    tutorialDismissed.current = true;
     setShowTutorial(false);
     
     // Mark tutorial as seen
