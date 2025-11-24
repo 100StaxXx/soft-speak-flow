@@ -54,6 +54,7 @@ export default function Tasks() {
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialDismissed, setTutorialDismissed] = useState(false);
   
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -286,7 +287,7 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
   useEffect(() => {
-    if (!user || !profile) return;
+    if (!user || !profile || tutorialDismissed) return;
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
@@ -324,10 +325,11 @@ export default function Tasks() {
           }
         });
     }
-  }, [user, profile, queryClient]);
+  }, [user, profile, queryClient, tutorialDismissed]);
 
   const handleTutorialClose = async () => {
     setShowTutorial(false);
+    setTutorialDismissed(true);
     
     // Mark tutorial as seen
     if (user && profile) {
@@ -337,14 +339,12 @@ export default function Tasks() {
         quests_tutorial_seen: true,
       };
       
-      const { error } = await supabase
+      await supabase
         .from('profiles')
         .update({ onboarding_data: updatedData })
         .eq('id', user.id);
       
-      if (!error) {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-      }
+      // Don't invalidate profile to prevent re-triggering the effect
     }
   };
 
