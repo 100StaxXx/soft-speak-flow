@@ -834,19 +834,19 @@ export default function Tasks() {
             <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
               <div className="flex gap-3">
                 <Button
-                  onClick={() => setJoinEpicDialogOpen(true)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Join Guild
-                </Button>
-                <Button
                   onClick={() => setCreateEpicDialogOpen(true)}
                   className="flex-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Epic
+                </Button>
+                <Button
+                  onClick={() => setJoinEpicDialogOpen(true)}
+                  variant="outline"
+                  size="icon"
+                  className="h-full px-4"
+                >
+                  <Users className="w-5 h-5" />
                 </Button>
               </div>
             </Card>
