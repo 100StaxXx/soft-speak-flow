@@ -677,7 +677,7 @@ export default function Tasks() {
                           <h2 className="text-xl font-semibold">Your Habits</h2>
                           <p className="text-sm text-muted-foreground">Track daily progress</p>
                         </div>
-                        {habits.length < 5 && (
+                        {habits.length < 2 && (
                           <Button
                             onClick={() => setShowAddHabit(true)}
                             size="sm"
