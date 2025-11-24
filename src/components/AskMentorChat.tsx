@@ -262,7 +262,7 @@ export const AskMentorChat = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" data-tour="chat-history">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && showSuggestions && (
           <div className="space-y-4">
             <p className="text-muted-foreground text-center">
@@ -310,7 +310,7 @@ export const AskMentorChat = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t" data-tour="chat-input">
+      <form onSubmit={handleSubmit} className="p-4 border-t">
         <div className="flex gap-2 items-center">
           <Input
             value={input}
