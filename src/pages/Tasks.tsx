@@ -52,8 +52,7 @@ export default function Tasks() {
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
   
-  // Tutorial state - use ref to prevent re-showing after user closes
-  const tutorialDismissed = useRef(false);
+  // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
   
   // Calendar state for quest scheduling
@@ -296,7 +295,7 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
   useEffect(() => {
-    if (!user || !profile || tutorialDismissed.current) return;
+    if (!user || !profile) return;
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
@@ -337,10 +336,9 @@ export default function Tasks() {
   }, [user, profile, queryClient]);
 
   const handleTutorialClose = async () => {
-    tutorialDismissed.current = true;
     setShowTutorial(false);
     
-    // Mark tutorial as seen
+    // Mark tutorial as seen in database
     if (user && profile) {
       const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
       const updatedData = {
@@ -353,7 +351,7 @@ export default function Tasks() {
         .update({ onboarding_data: updatedData })
         .eq('id', user.id);
       
-      // Invalidate profile to update the cached data
+      // Invalidate profile to refresh cached data immediately
       queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
     }
   };
