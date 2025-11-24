@@ -419,8 +419,10 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
     const newImageUrl = urlData.publicUrl;
     console.log("Image uploaded:", newImageUrl);
 
-    // 8. Save evolution to database
-    const { data: evolutionRecord, error: evolutionError } = await supabase
+    // 8. Save evolution to database using service role client (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    
+    const { data: evolutionRecord, error: evolutionError } = await supabaseAdmin
       .from("companion_evolutions")
       .insert({
         companion_id: companion.id,

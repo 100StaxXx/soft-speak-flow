@@ -2332,6 +2332,7 @@ export type Database = {
           favorite_color: string
           fur_color: string | null
           id: string
+          initial_image_url: string | null
           last_energy_update: string | null
           last_mood_update: string | null
           mind: number | null
@@ -2353,6 +2354,7 @@ export type Database = {
           favorite_color: string
           fur_color?: string | null
           id?: string
+          initial_image_url?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
@@ -2374,6 +2376,7 @@ export type Database = {
           favorite_color?: string
           fur_color?: string | null
           id?: string
+          initial_image_url?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
