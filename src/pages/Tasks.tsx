@@ -843,8 +843,7 @@ export default function Tasks() {
                 <Button
                   onClick={() => setJoinEpicDialogOpen(true)}
                   variant="outline"
-                  size="icon"
-                  className="h-full px-4"
+                  className="h-auto py-3 px-4"
                 >
                   <Users className="w-5 h-5" />
                 </Button>
