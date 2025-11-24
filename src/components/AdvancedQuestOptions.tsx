@@ -107,55 +107,56 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
         </div>
       </div>
 
-      {/* Reminder Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-muted-foreground" />
-            <Label className="text-sm font-medium">Reminder</Label>
+      {/* Reminder Section - Only show if scheduled time is set */}
+      {props.scheduledTime && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Reminder</Label>
+            </div>
+            <Switch
+              checked={props.reminderEnabled}
+              onCheckedChange={props.onReminderEnabledChange}
+            />
           </div>
-          <Switch
-            checked={props.reminderEnabled}
-            onCheckedChange={props.onReminderEnabledChange}
-            disabled={!props.scheduledTime}
-          />
-        </div>
         
-        {props.reminderEnabled && props.scheduledTime && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowReminderOptions(!showReminderOptions)}
-              className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
-            >
-              <span>
-                {reminderOptions.find(opt => opt.value === props.reminderMinutesBefore)?.label || "Select time"}
-              </span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            </button>
-            
-            {showReminderOptions && (
-              <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {reminderOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      props.onReminderMinutesBeforeChange(option.value);
-                      setShowReminderOptions(false);
-                    }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                      props.reminderMinutesBefore === option.value ? 'bg-accent' : ''
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          {props.reminderEnabled && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowReminderOptions(!showReminderOptions)}
+                className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+              >
+                <span>
+                  {reminderOptions.find(opt => opt.value === props.reminderMinutesBefore)?.label || "Select time"}
+                </span>
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              </button>
+              
+              {showReminderOptions && (
+                <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {reminderOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        props.onReminderMinutesBeforeChange(option.value);
+                        setShowReminderOptions(false);
+                      }}
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
+                        props.reminderMinutesBefore === option.value ? 'bg-accent' : ''
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recurrence Section */}
       <div className="space-y-3">
