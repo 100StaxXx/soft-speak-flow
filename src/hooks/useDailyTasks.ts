@@ -110,14 +110,13 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
         const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
         if (error) {
-          toggleInProgress.current = false; // Reset on error
+          toggleInProgress.current = false;
           throw error;
         }
         
-        toggleInProgress.current = false; // Reset on success
+        toggleInProgress.current = false;
         return { taskId, completed, xpReward, wasAlreadyCompleted };
       } catch (error) {
-        // Ensure flag is always reset
         toggleInProgress.current = false;
         throw error;
       }
@@ -131,9 +130,17 @@ export const useDailyTasks = (selectedDate?: Date) => {
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
     },
-    onError: () => {
-      toast({ title: "Failed to toggle task", variant: "destructive" });
+    onError: (error: Error) => {
+      const errorMessage = error.message === 'Please wait...' 
+        ? 'Please wait for the previous action to complete'
+        : error.message.includes('Failed to fetch') || error.message.includes('Load failed')
+        ? 'Network error. Please check your connection and try again.'
+        : error.message;
+      
+      toast({ title: "Failed to toggle task", description: errorMessage, variant: "destructive" });
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const deleteTask = useMutation({
