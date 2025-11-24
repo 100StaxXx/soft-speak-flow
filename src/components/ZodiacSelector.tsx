@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
 
 interface ZodiacSelectorProps {
   onComplete: (zodiacSign: ZodiacSign) => void;
@@ -26,35 +24,6 @@ const zodiacSigns = [
 
 export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
   const [selectedZodiac, setSelectedZodiac] = useState<ZodiacSign | null>(null);
-  const [zodiacImages, setZodiacImages] = useState<Record<string, string>>({});
-  const [loadingImages, setLoadingImages] = useState(true);
-
-  useEffect(() => {
-    const generateImages = async () => {
-      try {
-        const images: Record<string, string> = {};
-        
-        // Generate images for all zodiac signs
-        for (const zodiac of zodiacSigns) {
-          const { data, error } = await supabase.functions.invoke('generate-zodiac-images', {
-            body: { zodiacSign: zodiac.sign }
-          });
-          
-          if (data?.imageUrl) {
-            images[zodiac.sign] = data.imageUrl;
-          }
-        }
-        
-        setZodiacImages(images);
-      } catch (error) {
-        console.error('Error generating zodiac images:', error);
-      } finally {
-        setLoadingImages(false);
-      }
-    };
-
-    generateImages();
-  }, []);
 
   const handleSelect = (sign: ZodiacSign) => {
     setSelectedZodiac(sign);
@@ -65,17 +34,6 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
       onComplete(selectedZodiac);
     }
   };
-
-  if (loadingImages) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-yellow-400 animate-spin mx-auto mb-4" />
-          <p className="text-white text-lg">Awakening the celestial guardians...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 relative overflow-hidden flex items-center justify-center p-4 md:p-8">
@@ -148,22 +106,12 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
               )}
 
               <div className="relative z-10 flex flex-col items-center gap-2">
-                {/* Creature Image */}
-                {zodiacImages[zodiac.sign] ? (
-                  <img 
-                    src={zodiacImages[zodiac.sign]} 
-                    alt={zodiac.name}
-                    className={`w-20 h-20 md:w-28 md:h-28 object-contain transition-all duration-300 ${
-                      selectedZodiac === zodiac.sign ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.9)]' : 'opacity-90'
-                    }`}
-                  />
-                ) : (
-                  <div className={`text-5xl md:text-7xl transition-all duration-300 ${
-                    selectedZodiac === zodiac.sign ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]' : 'text-white/90'
-                  }`}>
-                    {zodiac.symbol}
-                  </div>
-                )}
+                {/* Zodiac Symbol */}
+                <div className={`text-5xl md:text-7xl transition-all duration-300 ${
+                  selectedZodiac === zodiac.sign ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]' : 'text-white/90'
+                }`}>
+                  {zodiac.symbol}
+                </div>
                 
                 {/* Sign name */}
                 <h3 className={`text-lg md:text-xl font-bold transition-colors duration-300 ${
