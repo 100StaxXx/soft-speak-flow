@@ -896,6 +896,128 @@ export type Database = {
         }
         Relationships: []
       }
+      epic_habits: {
+        Row: {
+          created_at: string | null
+          epic_id: string
+          habit_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          epic_id: string
+          habit_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          epic_id?: string
+          habit_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_habits_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epic_habits_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_progress_log: {
+        Row: {
+          created_at: string | null
+          date: string
+          epic_id: string
+          habits_completed: number | null
+          habits_total: number | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          epic_id: string
+          habits_completed?: number | null
+          habits_total?: number | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          epic_id?: string
+          habits_completed?: number | null
+          habits_total?: number | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_progress_log_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epics: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          progress_percentage: number | null
+          start_date: string
+          status: string
+          target_days: number
+          title: string
+          updated_at: string | null
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          progress_percentage?: number | null
+          start_date?: string
+          status?: string
+          target_days?: number
+          title: string
+          updated_at?: string | null
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          progress_percentage?: number | null
+          start_date?: string
+          status?: string
+          target_days?: number
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           content_id: string
