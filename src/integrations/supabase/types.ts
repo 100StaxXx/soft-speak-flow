@@ -269,6 +269,174 @@ export type Database = {
           },
         ]
       }
+      battle_matches: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          current_round: number | null
+          id: string
+          max_rounds: number | null
+          started_at: string | null
+          status: string
+          winner_user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_round?: number | null
+          id?: string
+          max_rounds?: number | null
+          started_at?: string | null
+          status?: string
+          winner_user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          current_round?: number | null
+          id?: string
+          max_rounds?: number | null
+          started_at?: string | null
+          status?: string
+          winner_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_matches_winner_user_id_fkey"
+            columns: ["winner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_participants: {
+        Row: {
+          cards_used: string[]
+          created_at: string | null
+          eliminated_at: string | null
+          energy: number | null
+          id: string
+          match_id: string
+          placement: number | null
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          cards_used: string[]
+          created_at?: string | null
+          eliminated_at?: string | null
+          energy?: number | null
+          id?: string
+          match_id: string
+          placement?: number | null
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          cards_used?: string[]
+          created_at?: string | null
+          eliminated_at?: string | null
+          energy?: number | null
+          id?: string
+          match_id?: string
+          placement?: number | null
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_participants_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "battle_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rankings: {
+        Row: {
+          id: string
+          rank_points: number | null
+          second_place: number | null
+          third_place: number | null
+          total_matches: number | null
+          total_xp_earned: number | null
+          updated_at: string | null
+          user_id: string
+          wins: number | null
+        }
+        Insert: {
+          id?: string
+          rank_points?: number | null
+          second_place?: number | null
+          third_place?: number | null
+          total_matches?: number | null
+          total_xp_earned?: number | null
+          updated_at?: string | null
+          user_id: string
+          wins?: number | null
+        }
+        Update: {
+          id?: string
+          rank_points?: number | null
+          second_place?: number | null
+          third_place?: number | null
+          total_matches?: number | null
+          total_xp_earned?: number | null
+          updated_at?: string | null
+          user_id?: string
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rankings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rounds: {
+        Row: {
+          created_at: string | null
+          id: string
+          match_id: string
+          player_actions: Json
+          round_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          match_id: string
+          player_actions: Json
+          round_number: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          match_id?: string
+          player_actions?: Json
+          round_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rounds_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "battle_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_progress: {
         Row: {
           completed: boolean | null
