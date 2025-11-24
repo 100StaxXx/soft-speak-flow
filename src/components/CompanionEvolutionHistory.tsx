@@ -32,12 +32,41 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
 
       if (error) throw error;
 
+      // Find the actual Stage 0 image - check if Stage 1 evolution exists
+      // If it does, it will have the Stage 0 image before evolution happened
+      const stage1Evolution = evolutionData?.find(e => e.stage === 1);
+      
+      // For Stage 0, use the Stage 1's previous image if available, 
+      // otherwise fall back to current image (only works if still at Stage 0)
+      let stage0ImageUrl = companion.current_image_url;
+      
+      // If we have a Stage 1 evolution, we need to reconstruct Stage 0's image
+      // by looking at what was stored before the first evolution
+      if (stage1Evolution) {
+        // The companion's initial image should be stored somewhere
+        // For now, we'll query storage to find the stage 0 image
+        const { data: storageFiles } = await supabase.storage
+          .from('companion-images')
+          .list(`${companionId}`, { 
+            limit: 100,
+            sortBy: { column: 'created_at', order: 'asc' } 
+          });
+        
+        const stage0File = storageFiles?.find(f => f.name.includes('stage-0'));
+        if (stage0File) {
+          const { data: publicUrl } = supabase.storage
+            .from('companion-images')
+            .getPublicUrl(`${companionId}/${stage0File.name}`);
+          stage0ImageUrl = publicUrl.publicUrl;
+        }
+      }
+
       // Create Stage 0 entry from companion creation
       const stage0Entry = {
         id: `${companionId}-stage-0`,
         companion_id: companionId,
         stage: 0,
-        image_url: companion.current_image_url,
+        image_url: stage0ImageUrl,
         evolved_at: companion.created_at,
         xp_at_evolution: 0,
       };
