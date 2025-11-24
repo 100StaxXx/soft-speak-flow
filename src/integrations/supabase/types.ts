@@ -977,6 +977,7 @@ export type Database = {
           description: string | null
           end_date: string | null
           id: string
+          is_public: boolean | null
           progress_percentage: number | null
           start_date: string
           status: string
@@ -992,6 +993,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          is_public?: boolean | null
           progress_percentage?: number | null
           start_date?: string
           status?: string
@@ -1007,6 +1009,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          is_public?: boolean | null
           progress_percentage?: number | null
           start_date?: string
           status?: string
@@ -2033,6 +2036,7 @@ export type Database = {
           core_element: string
           created_at: string
           current_image_url: string | null
+          current_mood: string | null
           current_stage: number
           current_xp: number
           eye_color: string | null
@@ -2040,6 +2044,7 @@ export type Database = {
           fur_color: string | null
           id: string
           last_energy_update: string | null
+          last_mood_update: string | null
           mind: number | null
           soul: number | null
           spirit_animal: string
@@ -2052,6 +2057,7 @@ export type Database = {
           core_element: string
           created_at?: string
           current_image_url?: string | null
+          current_mood?: string | null
           current_stage?: number
           current_xp?: number
           eye_color?: string | null
@@ -2059,6 +2065,7 @@ export type Database = {
           fur_color?: string | null
           id?: string
           last_energy_update?: string | null
+          last_mood_update?: string | null
           mind?: number | null
           soul?: number | null
           spirit_animal: string
@@ -2071,6 +2078,7 @@ export type Database = {
           core_element?: string
           created_at?: string
           current_image_url?: string | null
+          current_mood?: string | null
           current_stage?: number
           current_xp?: number
           eye_color?: string | null
@@ -2078,6 +2086,7 @@ export type Database = {
           fur_color?: string | null
           id?: string
           last_energy_update?: string | null
+          last_mood_update?: string | null
           mind?: number | null
           soul?: number | null
           spirit_animal?: string

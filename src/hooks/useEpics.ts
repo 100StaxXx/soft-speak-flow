@@ -39,6 +39,7 @@ export const useEpics = () => {
       title: string;
       description?: string;
       target_days: number;
+      is_public?: boolean;
       habits: Array<{
         title: string;
         difficulty: string;
@@ -72,6 +73,7 @@ export const useEpics = () => {
           title: epicData.title,
           description: epicData.description,
           target_days: epicData.target_days,
+          is_public: epicData.is_public || false,
           xp_reward: Math.floor(epicData.target_days * 10),
         })
         .select()

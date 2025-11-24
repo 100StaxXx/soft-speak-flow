@@ -15,6 +15,7 @@ import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
+import { Switch } from "@/components/ui/switch";
 
 interface NewHabit {
   title: string;
@@ -31,6 +32,7 @@ interface CreateEpicDialogProps {
     description?: string;
     target_days: number;
     habits: NewHabit[];
+    is_public?: boolean;
   }) => void;
   isCreating: boolean;
 }
@@ -44,6 +46,7 @@ export const CreateEpicDialog = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
+  const [isPublic, setIsPublic] = useState(false);
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -76,12 +79,14 @@ export const CreateEpicDialog = ({
       description: description.trim() || undefined,
       target_days: targetDays,
       habits: newHabits,
+      is_public: isPublic,
     });
 
     // Reset form
     setTitle("");
     setDescription("");
     setTargetDays(30);
+    setIsPublic(false);
     setNewHabits([]);
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
@@ -154,6 +159,19 @@ export const CreateEpicDialog = ({
               value={targetDays}
               onChange={(e) => setTargetDays(parseInt(e.target.value) || 30)}
               className="mt-2"
+            />
+          </div>
+
+          {/* Share Epic Toggle */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="space-y-0.5">
+              <Label htmlFor="is-public" className="text-base">Share with Community</Label>
+              <p className="text-sm text-muted-foreground">Allow others to join this epic</p>
+            </div>
+            <Switch
+              id="is-public"
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
             />
           </div>
 
