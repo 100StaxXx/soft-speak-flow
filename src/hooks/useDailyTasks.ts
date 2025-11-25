@@ -222,19 +222,21 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { bonusXP, toastReason } = await getGuildBonusDetails(xpReward);
         const totalXP = xpReward + bonusXP;
 
-        const { data: rpcResult, error: rpcError } = await supabase.rpc('complete_quest_with_xp', {
-          p_task_id: taskId,
-          p_user_id: user!.id,
-          p_xp_amount: totalXP,
-        });
+        // Update task completion directly
+        const { error: updateError } = await supabase
+          .from('daily_tasks')
+          .update({ 
+            completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', taskId);
 
-        if (rpcError) {
-          throw rpcError;
+        if (updateError) {
+          throw updateError;
         }
 
-        if (!rpcResult?.success) {
-          throw new Error(rpcResult?.error || 'Failed to complete quest');
-        }
+        // Award XP
+        await awardCustomXP(totalXP, 'task_complete', toastReason);
 
         toggleInProgress.current = false;
         return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };

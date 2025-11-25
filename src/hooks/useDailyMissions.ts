@@ -14,7 +14,7 @@ export const useDailyMissions = () => {
   const { checkFirstTimeAchievements } = useAchievements();
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: missions, isLoading } = useQuery({
+  const { data: missions = [], isLoading } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -38,7 +38,12 @@ export const useDailyMissions = () => {
 
         if (generationError) {
           console.error('Mission generation failed:', generationError);
-          throw new Error(generationError.message || 'Unable to generate missions right now.');
+          toast({
+            title: "Unable to generate missions",
+            description: generationError.message || 'Unable to generate missions right now.',
+            variant: "destructive",
+          });
+          return [];
         }
         
         return generated?.missions || [];
@@ -47,18 +52,11 @@ export const useDailyMissions = () => {
       return existing;
     },
     enabled: !!user,
-    onError: (error: Error) => {
-      toast({
-        title: "Unable to load daily missions",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   const completeMission = useMutation({
     mutationFn: async (missionId: string) => {
-      const mission = missions?.find(m => m.id === missionId);
+      const mission = missions.find(m => m.id === missionId);
       if (!mission) throw new Error("Mission not found");
 
       // Check if already completed to prevent XP spam
@@ -103,8 +101,8 @@ export const useDailyMissions = () => {
     },
   });
 
-  const completedCount = missions?.filter(m => m.completed).length || 0;
-  const totalCount = missions?.length || 0;
+  const completedCount = missions.filter(m => m.completed).length;
+  const totalCount = missions.length;
 
   return {
     missions: missions || [],
