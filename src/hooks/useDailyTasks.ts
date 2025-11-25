@@ -99,20 +99,20 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const bonusUnlocked = completedTasksCount >= 4 || currentStreak >= 7;
 
         // Check if trying to add beyond base limit
-        const regularTasks = existingTasks?.filter((t: any) => !t.is_bonus) || [];
-        const bonusTasks = existingTasks?.filter((t: any) => t.is_bonus) || [];
+        const existingRegularTasks = existingTasks?.filter((t: any) => !t.is_bonus) || [];
+        const existingBonusTasks = existingTasks?.filter((t: any) => t.is_bonus) || [];
 
-        if (regularTasks.length >= 4 && !bonusUnlocked) {
+        if (existingRegularTasks.length >= 4 && !bonusUnlocked) {
           addInProgress.current = false;
           throw new Error('Maximum 4 quests per day. Complete all 4 or reach a 7-day streak to unlock Bonus Quest!');
         }
 
-        if (regularTasks.length >= 4 && bonusTasks.length >= 1) {
+        if (existingRegularTasks.length >= 4 && existingBonusTasks.length >= 1) {
           addInProgress.current = false;
           throw new Error('Maximum 5 quests per day (4 + 1 Bonus)');
         }
 
-        if (regularTasks.length >= 4 && !bonusTasks.length && bonusUnlocked) {
+        if (existingRegularTasks.length >= 4 && !existingBonusTasks.length && bonusUnlocked) {
           // This will be a bonus quest
         }
 
@@ -136,8 +136,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
         }
 
         // Determine if this is a bonus quest
-        const regularTasks = existingTasks?.filter((t: any) => !t.is_bonus) || [];
-        const isBonus = regularTasks.length >= 4;
+        const existingRegular = existingTasks?.filter((t: any) => !t.is_bonus) || [];
+        const isBonus = existingRegular.length >= 4;
 
         const { error } = await supabase
           .from('daily_tasks')
