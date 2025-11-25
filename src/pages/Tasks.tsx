@@ -490,6 +490,28 @@ export default function Tasks() {
     );
   }
 
+  // Show error state if companion is not loaded (prevents crash after onboarding)
+  if (!companion) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md p-4">
+          <div className="text-6xl mb-4">🐣</div>
+          <h2 className="text-2xl font-bold">No Companion Found</h2>
+          <p className="text-muted-foreground mb-4">
+            It looks like you haven't created your companion yet. Let's complete your onboarding!
+          </p>
+          <Button 
+            onClick={() => navigate("/onboarding")}
+            variant="cta"
+            size="lg"
+          >
+            Complete Onboarding
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 relative">
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
