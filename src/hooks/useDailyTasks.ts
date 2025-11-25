@@ -371,12 +371,22 @@ export const useDailyTasks = (selectedDate?: Date) => {
     },
   });
 
+  // Compute bonus quest logic
+  const regularTasks = tasks.filter(t => !t.is_bonus);
+  const bonusTasks = tasks.filter(t => t.is_bonus);
+  const allRegularCompleted = regularTasks.length === 4 && regularTasks.every(t => t.completed);
+  const hasStreak = (profile?.current_habit_streak || 0) >= 7;
+  const bonusUnlocked = allRegularCompleted || hasStreak;
+  
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const canAddMore = tasks.length < 4;
+  const canAddMore = regularTasks.length < 4 || (bonusUnlocked && bonusTasks.length === 0);
 
   return {
     tasks,
+    regularTasks,
+    bonusTasks,
+    bonusUnlocked,
     isLoading,
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
