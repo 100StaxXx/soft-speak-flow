@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
-import { IntroScreen } from "@/components/IntroScreen";
 
 const authSchema = z.object({
   email: z.string()
@@ -30,18 +29,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showIntro, setShowIntro] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Only show intro if user hasn't seen it before
-    const hasSeenIntro = localStorage.getItem('has_seen_intro');
-    if (!hasSeenIntro) {
-      const introTimer = setTimeout(() => setShowIntro(true), 100);
-      return () => clearTimeout(introTimer);
-    }
-  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -161,13 +150,6 @@ const Auth = () => {
       });
     }
   };
-
-  if (showIntro) {
-    return <IntroScreen onComplete={() => {
-      localStorage.setItem('has_seen_intro', 'true');
-      setShowIntro(false);
-    }} />;
-  }
 
   const scrollToForm = () => {
     document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' });
