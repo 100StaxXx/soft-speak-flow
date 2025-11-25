@@ -353,8 +353,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const regularTasks = tasks.filter(t => !t.is_bonus);
-  const bonusTasks = tasks.filter(t => t.is_bonus);
+  const regularTasks = tasks.filter(t => !(t as any).is_bonus);
+  const bonusTasks = tasks.filter(t => (t as any).is_bonus === true);
   const regularCompletedCount = regularTasks.filter(t => t.completed).length;
   
   // Bonus unlocks when all 4 regular tasks are completed OR 7+ day streak
