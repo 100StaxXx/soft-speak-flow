@@ -85,7 +85,10 @@ export default function Tasks() {
   
   // Tasks state - use regular hook for list view single-day tasks
   const { 
-    tasks, 
+    tasks,
+    regularTasks,
+    bonusTasks,
+    bonusUnlocked,
     addTask, 
     toggleTask, 
     deleteTask,
@@ -698,7 +701,10 @@ export default function Tasks() {
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
+                  <p className="text-sm text-muted-foreground">
+                    {regularTasks.length}/4 Regular Quests
+                    {bonusUnlocked && bonusTasks.length === 0 && " • Bonus Quest Available!"}
+                  </p>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {completedCount}/{totalCount}
@@ -723,17 +729,17 @@ export default function Tasks() {
                 </div>
               )}
 
-              {/* Quest List */}
+              {/* Regular Quest List */}
               <div className="space-y-6">
-                {tasks.length === 0 ? (
+                {regularTasks.length === 0 ? (
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
                     description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
                   />
                 ) : (() => {
-                  const mainQuest = tasks.find(t => t.is_main_quest);
-                  const sideQuests = tasks.filter(t => !t.is_main_quest);
+                  const mainQuest = regularTasks.find(t => t.is_main_quest);
+                  const sideQuests = regularTasks.filter(t => !t.is_main_quest);
                   
                   return (
                     <>
@@ -783,6 +789,44 @@ export default function Tasks() {
                   );
                 })()}
               </div>
+
+              {/* Bonus Quest Section */}
+              {bonusUnlocked && bonusTasks.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="h-5 w-5 text-amber-500" />
+                    <h3 className="font-semibold text-foreground">Bonus Quest</h3>
+                    <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full">
+                      Extra Challenge!
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {bonusTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
+                        onDelete={() => deleteTask(task.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bonus Quest Locked State */}
+              {!bonusUnlocked && regularTasks.length === 4 && bonusTasks.length === 0 && (
+                <div className="mt-6 pt-6 border-t border-border">
+                  <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                    <Star className="h-6 w-6 text-muted-foreground opacity-50" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm text-muted-foreground">Bonus Quest Locked</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Complete all 4 regular quests or maintain a 7+ day streak to unlock
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {canAddMore && (
                 <Card className="p-4 space-y-4">
