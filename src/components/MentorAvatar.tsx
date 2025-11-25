@@ -11,12 +11,12 @@ import solaceSage from "@/assets/solace-sage.png";
 const MENTOR_IMAGES: Record<string, string> = {
   atlas: atlasSage,
   darius: dariusSage,
-  kai: kaiSage,
+  kai: kaiSage, // Astor
   eli: eliSage,
   nova: novaSage,
   sienna: siennaSage,
   lumi: lumiSage,
-  stryker: strykerSage,
+  stryker: strykerSage, // Rich
   solace: solaceSage,
 };
 

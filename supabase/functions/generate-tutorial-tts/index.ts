@@ -14,8 +14,8 @@ const mentorVoiceMap: Record<string, string> = {
   nova: 'nova',       // Daniel - innovative, energetic
   sienna: 'shimmer',  // Charlotte - warm, compassionate
   lumi: 'alloy',      // Sarah - calm, peaceful
-  kai: 'onyx',        // Callum - high energy
-  stryker: 'fable',   // Rich - strong, resilient
+  kai: 'onyx',        // Callum (Astor) - high energy
+  stryker: 'fable',   // Rich (Rich) - strong, resilient
   solace: 'shimmer',  // Lily - gentle, empathetic
 };
 
