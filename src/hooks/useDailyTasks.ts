@@ -6,6 +6,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useProfile } from "@/hooks/useProfile";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
@@ -18,6 +19,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
+  const { profile } = useProfile();
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -85,9 +87,33 @@ export const useDailyTasks = (selectedDate?: Date) => {
           throw countError;
         }
 
-        if (existingTasks && existingTasks.length >= 4) {
-          addInProgress.current = false; // Reset on error
-          throw new Error('Maximum 4 tasks per day');
+        // Check bonus quest unlock status
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('current_habit_streak')
+          .eq('id', user!.id)
+          .single();
+
+        const currentStreak = profileData?.current_habit_streak || 0;
+        const completedTasksCount = existingTasks?.filter((t: any) => t.completed).length || 0;
+        const bonusUnlocked = completedTasksCount >= 4 || currentStreak >= 7;
+
+        // Check if trying to add beyond base limit
+        const regularTasks = existingTasks?.filter((t: any) => !t.is_bonus) || [];
+        const bonusTasks = existingTasks?.filter((t: any) => t.is_bonus) || [];
+
+        if (regularTasks.length >= 4 && !bonusUnlocked) {
+          addInProgress.current = false;
+          throw new Error('Maximum 4 quests per day. Complete all 4 or reach a 7-day streak to unlock Bonus Quest!');
+        }
+
+        if (regularTasks.length >= 4 && bonusTasks.length >= 1) {
+          addInProgress.current = false;
+          throw new Error('Maximum 5 quests per day (4 + 1 Bonus)');
+        }
+
+        if (regularTasks.length >= 4 && !bonusTasks.length && bonusUnlocked) {
+          // This will be a bonus quest
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -109,6 +135,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
           }
         }
 
+        // Determine if this is a bonus quest
+        const regularTasks = existingTasks?.filter((t: any) => !t.is_bonus) || [];
+        const isBonus = regularTasks.length >= 4;
+
         const { error } = await supabase
           .from('daily_tasks')
           .insert({
@@ -118,6 +148,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
             xp_reward: xpReward,
             task_date: customDate || taskDate,
             is_main_quest: isMainQuest ?? false,
+            is_bonus: isBonus,
             scheduled_time: scheduledTime || null,
             estimated_duration: estimatedDuration || null,
             recurrence_pattern: recurrencePattern || null,
@@ -125,7 +156,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
             is_recurring: !!recurrencePattern,
             reminder_enabled: reminderEnabled ?? false,
             reminder_minutes_before: reminderMinutesBefore ?? 15,
-            reminder_sent: false
+            reminder_sent: false,
+            category: detectedCategory
           });
 
         if (error) {
@@ -321,7 +353,15 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const canAddMore = tasks.length < 4;
+  const regularTasks = tasks.filter(t => !t.is_bonus);
+  const bonusTasks = tasks.filter(t => t.is_bonus);
+  const regularCompletedCount = regularTasks.filter(t => t.completed).length;
+  
+  // Bonus unlocks when all 4 regular tasks are completed OR 7+ day streak
+  const currentStreak = profile?.current_habit_streak || 0;
+  const bonusUnlocked = regularCompletedCount >= 4 || currentStreak >= 7;
+  
+  const canAddMore = regularTasks.length < 4 || (bonusUnlocked && bonusTasks.length < 1);
 
   return {
     tasks,
@@ -335,5 +375,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
     canAddMore,
     completedCount,
     totalCount,
+    bonusUnlocked,
+    regularTasks,
+    bonusTasks,
   };
 };
