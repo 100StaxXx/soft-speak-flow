@@ -58,10 +58,17 @@ export const EvolutionCardGallery = () => {
         }, {} as Record<string, string | null>);
       }
 
-      const cardsWithImages = (data || []).map(card => ({
-        ...card,
-        image_url: (card.evolution_id && evolutionImageLookup[card.evolution_id]) || card.image_url
-      }));
+      const cardsWithImages = (data || []).map(card => {
+        // Prioritize card's own image_url to prevent display issues
+        // Only fallback to evolution lookup if card doesn't have its own image
+        const cardImageUrl = card.image_url;
+        const evolutionImageUrl = card.evolution_id ? evolutionImageLookup[card.evolution_id] : null;
+        
+        return {
+          ...card,
+          image_url: cardImageUrl || evolutionImageUrl
+        };
+      });
       
       // Deduplicate cards by card_id
       const uniqueCards = new Map<string, any>();
