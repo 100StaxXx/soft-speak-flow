@@ -432,7 +432,7 @@ export default function Onboarding() {
     try {
       console.log("Starting companion creation:", data);
       
-      // Create companion (atomic function handles duplicate prevention)
+      // Create companion (atomic function handles duplicate prevention and returns existing if already created)
       try {
         await retryWithBackoff(
           () => createCompanion.mutateAsync(data),
@@ -445,15 +445,40 @@ export default function Onboarding() {
               const isNetworkError = errorMessage.includes('fetch') ||
                                    errorMessage.includes('network') ||
                                    errorMessage.includes('timeout');
-              return isNetworkError;
+              // Don't retry if companion already exists or database errors
+              return isNetworkError && !errorMessage.includes('Database error');
             }
           }
         );
-        console.log("Companion creation completed");
+        console.log("Companion creation/retrieval completed successfully");
       } catch (companionError: unknown) {
-        console.error("Companion creation error after retries:", companionError);
-        const errorMessage = companionError instanceof Error ? companionError.message : "Failed to create companion. Please check your connection.";
-        throw new Error(errorMessage);
+        console.error("Companion creation error after retries:", {
+          error: companionError,
+          message: companionError instanceof Error ? companionError.message : String(companionError),
+          stack: companionError instanceof Error ? companionError.stack : undefined
+        });
+        
+        // Check if companion actually already exists - if so, this isn't really an error
+        try {
+          const { data: existingCompanion } = await supabase
+            .from('user_companion')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (existingCompanion) {
+            console.log("Companion already exists, proceeding with onboarding completion");
+            // Continue to onboarding completion below
+          } else {
+            // Real error - companion doesn't exist and creation failed
+            const errorMessage = companionError instanceof Error ? companionError.message : "Failed to create companion. Please check your connection.";
+            throw new Error(errorMessage);
+          }
+        } catch (checkError) {
+          // If we can't even check, show the original error
+          const errorMessage = companionError instanceof Error ? companionError.message : "Failed to create companion. Please check your connection.";
+          throw new Error(errorMessage);
+        }
       }
       
       console.log("Marking onboarding as complete...");
