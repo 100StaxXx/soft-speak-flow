@@ -1,24 +1,5 @@
-import atlasSage from "@/assets/atlas-sage.png";
-import dariusSage from "@/assets/darius-sage.png";
-import kaiSage from "@/assets/kai-sage.png";
-import eliSage from "@/assets/eli-sage.png";
-import novaSage from "@/assets/nova-sage.png";
-import siennaSage from "@/assets/sienna-sage.png";
-import lumiSage from "@/assets/lumi-sage.png";
-import strykerSage from "@/assets/stryker-sage.png";
-import solaceSage from "@/assets/solace-sage.png";
-
-const MENTOR_IMAGES: Record<string, string> = {
-  atlas: atlasSage,
-  darius: dariusSage,
-  kai: kaiSage, // Astor
-  eli: eliSage,
-  nova: novaSage,
-  sienna: siennaSage,
-  lumi: lumiSage,
-  stryker: strykerSage, // Rich
-  solace: solaceSage,
-};
+import { useEffect, useState } from "react";
+import { loadMentorImage } from "@/utils/mentorImageLoader";
 
 const POSITION_MAP: Record<string, string> = {
   atlas: 'center 20%',
@@ -62,16 +43,27 @@ export const MentorAvatar = ({
   showGlow = false,
   style,
 }: MentorAvatarProps) => {
-  // Normalize slug and fall back to name-derived key
+  const [mentorImage, setMentorImage] = useState<string>(avatarUrl || '');
+  
+  // Dynamically load mentor image
+  useEffect(() => {
+    if (avatarUrl) {
+      setMentorImage(avatarUrl);
+      return;
+    }
+    
+    const baseSlug = (mentorSlug || '').trim().toLowerCase();
+    if (baseSlug) {
+      loadMentorImage(baseSlug).then(setMentorImage).catch(() => {
+        // Keep empty string as fallback
+      });
+    }
+  }, [mentorSlug, avatarUrl]);
+
+  // Normalize slug for position lookup
   const baseSlug = (mentorSlug || '').trim().toLowerCase();
   const nameSlug = (mentorName || '').trim().toLowerCase().replace(/\s+/g, '-');
-  const key = MENTOR_IMAGES[baseSlug]
-    ? baseSlug
-    : MENTOR_IMAGES[nameSlug]
-    ? nameSlug
-    : baseSlug || nameSlug;
-
-  const mentorImage = MENTOR_IMAGES[key] || avatarUrl;
+  const key = baseSlug || nameSlug;
   const imagePosition = POSITION_MAP[key] || 'center 25%';
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
 

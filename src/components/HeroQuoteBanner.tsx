@@ -2,15 +2,7 @@ import { useEffect, useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import dariusImage from "@/assets/darius-sage.png";
-import novaImage from "@/assets/nova-sage.png";
-import lumiImage from "@/assets/lumi-sage.png";
-import kaiImage from "@/assets/kai-sage.png";
-import atlasImage from "@/assets/atlas-sage.png";
-import siennaImage from "@/assets/sienna-sage.png";
-import eliImage from "@/assets/eli-sage.png";
-import strykerImage from "@/assets/stryker-sage.png";
-import solaceImage from "@/assets/solace-sage.png";
+import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
 interface QuoteData {
@@ -30,20 +22,8 @@ export const HeroQuoteBanner = () => {
   const { profile } = useProfile();
   const [todaysQuote, setTodaysQuote] = useState<QuoteData | null>(null);
   const [mentor, setMentor] = useState<Mentor | null>(null);
+  const [mentorImageUrl, setMentorImageUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
-
-  // Map mentor slugs to local images
-  const mentorImages: Record<string, string> = {
-    'darius': dariusImage,
-    'nova': novaImage,
-    'lumi': lumiImage,
-    'kai': kaiImage,
-    'atlas': atlasImage,
-    'sienna': siennaImage,
-    'eli': eliImage,
-    'stryker': strykerImage,
-    'solace': solaceImage,
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,6 +47,10 @@ export const HeroQuoteBanner = () => {
       }
 
       setMentor(mentorData);
+      
+      // Dynamically load only the needed mentor image
+      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+      setMentorImageUrl(imageUrl);
 
       // Get today's pep talk to find related quote
       const { data: dailyPepTalk } = await supabase
@@ -96,9 +80,7 @@ export const HeroQuoteBanner = () => {
     fetchData();
   }, [profile?.selected_mentor_id]);
 
-  if (loading || !todaysQuote || !mentor) return null;
-
-  const mentorImageUrl = mentor.avatar_url || mentorImages[mentor.slug] || mentorImages['darius'];
+  if (loading || !todaysQuote || !mentor || !mentorImageUrl) return null;
 
   return (
     <div className="relative w-full h-screen overflow-hidden">

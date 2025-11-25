@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -7,7 +8,7 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 
-export const BottomNav = () => {
+export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
 
@@ -137,4 +138,6 @@ export const BottomNav = () => {
     </nav>
     </>
   );
-};
+});
+
+BottomNav.displayName = 'BottomNav';

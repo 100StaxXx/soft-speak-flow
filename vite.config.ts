@@ -81,13 +81,8 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+    minify: 'esbuild', // 3-5x faster than terser
+    cssMinify: 'lightningcss',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -95,12 +90,27 @@ export default defineConfig(({ mode }) => ({
           'ui-vendor': ['framer-motion', 'lucide-react'],
           'query-vendor': ['@tanstack/react-query'],
           'supabase-vendor': ['@supabase/supabase-js'],
+          'radix-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+          ],
         },
       },
     },
     chunkSizeWarningLimit: 1000,
+    sourcemap: false, // Disable source maps in production for smaller bundle
+    reportCompressedSize: false, // Faster builds
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+    exclude: ['@radix-ui/react-icons'], // Exclude if not directly used
+  },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 }));
