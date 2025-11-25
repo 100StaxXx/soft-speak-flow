@@ -183,6 +183,8 @@ export const useCompanion = () => {
         throw new Error("Failed to save companion. Please check your connection and try again.");
       }
       
+      console.log("RPC call successful, result:", companionResult);
+      
       if (!companionResult || companionResult.length === 0) {
         console.error("No companion data returned from function");
         throw new Error("Failed to create companion record. Please try again.");
