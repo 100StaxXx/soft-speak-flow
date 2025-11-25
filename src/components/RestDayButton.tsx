@@ -19,13 +19,17 @@ export const RestDayButton = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // Check if already took rest today
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('daily_missions')
         .select('id')
         .eq('user_id', user.id)
         .eq('mission_date', today)
         .eq('mission_type', 'rest_day')
-        .single();
+        .maybeSingle();
+
+      if (existingError) {
+        throw existingError;
+      }
 
       if (existing) {
         throw new Error('You already took a rest day today');
@@ -75,7 +79,9 @@ export const RestDayButton = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
-      queryClient.invalidateQueries({ queryKey: ['user-companion'] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['companion', user.id] });
+      }
       toast.success('Rest day taken! 🌙', {
         description: 'Recovery fuels growth. +15 XP, +5 Soul'
       });

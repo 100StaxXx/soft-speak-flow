@@ -86,12 +86,13 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardPepTalkListened = () => {
+  const awardPepTalkListened = (metadata?: Record<string, any>) => {
     if (!companion) return;
     showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Pep Talk Listened!");
     awardXP.mutate({
       eventType: "pep_talk_listen",
       xpAmount: XP_REWARDS.PEP_TALK_LISTEN,
+      metadata,
     });
   };
 

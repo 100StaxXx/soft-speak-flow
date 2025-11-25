@@ -192,7 +192,7 @@ export const TodaysPepTalk = () => {
       // Award XP when user has listened to 80% (only once per pep talk)
       if (!hasAwardedXP && duration > 0 && time >= duration * 0.8 && pepTalk?.id && profile?.id) {
         setHasAwardedXP(true);
-        awardPepTalkListened();
+        awardPepTalkListened({ pep_talk_id: pepTalk.id });
       }
       
       // Update active word index based on word timestamps
