@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,24 +68,16 @@ Deno.serve(async (req) => {
 
     const { message, conversationHistory, mentorName, mentorTone } = validation.data;
 
-    // Server-side rate limit check
-    const today = new Date().toISOString().split('T')[0];
-    const { count } = await supabase
-      .from('mentor_chats')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('role', 'user')
-      .gte('created_at', `${today}T00:00:00`);
+    // Check rate limit using shared rateLimiter
+    const rateLimitCheck = await checkRateLimit(
+      supabase,
+      user.id,
+      'mentor-chat',
+      RATE_LIMITS.AI_GENERATION
+    );
 
-    if ((count || 0) >= DAILY_MESSAGE_LIMIT) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Rate limit exceeded",
-          limit: DAILY_MESSAGE_LIMIT,
-          resetAt: `${today}T23:59:59Z`
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!rateLimitCheck.allowed) {
+      return createRateLimitResponse(rateLimitCheck, corsHeaders);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

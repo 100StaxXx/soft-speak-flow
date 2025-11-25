@@ -2,6 +2,15 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy } from "react";
 import "./index.css";
 
+// Global error tracking for unhandled errors
+window.addEventListener('error', (event) => {
+  console.error('Unhandled error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+});
+
 // Register service worker for PWA with optimized caching
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
