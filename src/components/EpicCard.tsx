@@ -152,7 +152,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 <Target className="w-6 h-6 text-primary" />
               )}
               <h3 className="text-xl font-bold">{epic.title}</h3>
-              {epic.is_public && epic.invite_code && (
+              {epic.invite_code && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -264,21 +264,19 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         )}
 
         {/* Community Features for Shared Epics */}
-        {epic.is_public && (
-          <div className="mt-4 pt-4 border-t border-border space-y-3">
-            <EpicDiscordSection 
-              epic={{
-                id: epic.id,
-                user_id: epic.user_id,
-                discord_ready: epic.discord_ready || false,
-                discord_channel_id: epic.discord_channel_id,
-                discord_invite_url: epic.discord_invite_url,
-              }} 
-              memberCount={memberCount} 
-            />
-            <EpicLeaderboard epicId={epic.id} />
-          </div>
-        )}
+        <div className="mt-4 pt-4 border-t border-border space-y-3">
+          <EpicDiscordSection 
+            epic={{
+              id: epic.id,
+              user_id: epic.user_id,
+              discord_ready: epic.discord_ready || false,
+              discord_channel_id: epic.discord_channel_id,
+              discord_invite_url: epic.discord_invite_url,
+            }} 
+            memberCount={memberCount} 
+          />
+          <EpicLeaderboard epicId={epic.id} />
+        </div>
 
         {/* Action Buttons */}
         {isActive && epic.progress_percentage >= 100 && (
