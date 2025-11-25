@@ -94,7 +94,9 @@ export default function Tasks() {
     isToggling,
     canAddMore,
     completedCount,
-    totalCount 
+    totalCount,
+    hasBonusSlot,
+    maxQuests
   } = useDailyTasks(selectedDate);
   
   // Get all tasks for calendar views
@@ -682,12 +684,27 @@ export default function Tasks() {
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
+                  <p className="text-sm text-muted-foreground">
+                    {maxQuests} quest{maxQuests > 1 ? 's' : ''} available
+                    {hasBonusSlot && <span className="text-primary font-semibold ml-1">✨ Bonus Slot!</span>}
+                  </p>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {completedCount}/{totalCount}
                 </div>
               </div>
+
+              {/* Bonus Slot Info Banner */}
+              {!hasBonusSlot && totalCount >= 4 && (
+                <Card className="p-3 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+                  <div className="flex items-start gap-2">
+                    <Star className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">Unlock Bonus Quest Slot:</span> Complete all 4 quests today OR maintain a 7+ day streak!
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {/* Progress Bar */}
               {totalCount > 0 && (

@@ -6,7 +6,8 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
-import { useRef } from "react";
+import { useProfile } from "@/hooks/useProfile";
+import { useRef, useMemo } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
 
@@ -18,6 +19,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
+  const { profile } = useProfile();
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -76,10 +78,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
       addInProgress.current = true;
 
       try {
-        // Fetch fresh task count from database directly to avoid race conditions
+        // Fetch fresh task count and completion status from database directly to avoid race conditions
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
-          .select('id')
+          .select('id, completed')
           .eq('user_id', user!.id)
           .eq('task_date', customDate || taskDate);
 
@@ -88,9 +90,17 @@ export const useDailyTasks = (selectedDate?: Date) => {
           throw countError;
         }
 
-        if (existingTasks && existingTasks.length >= 4) {
+        // Calculate dynamic limit based on bonus slot conditions
+        const existingCount = existingTasks?.length || 0;
+        const allFourCompleted = existingCount === 4 && existingTasks?.every(t => t.completed);
+        const hasStreakBonus = (profile?.current_habit_streak ?? 0) >= 7;
+        const hasBonusSlot = allFourCompleted || hasStreakBonus;
+        const maxQuests = hasBonusSlot ? 5 : 4;
+
+        if (existingCount >= maxQuests) {
           addInProgress.current = false; // Reset on error
-          throw new Error('Maximum 4 tasks per day');
+          const bonusMessage = hasBonusSlot ? ' (including bonus slot)' : '';
+          throw new Error(`Maximum ${maxQuests} tasks per day${bonusMessage}`);
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -134,7 +144,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         if (error) {
           addInProgress.current = false; // Reset on error
           if (error.message && error.message.includes('MAX_TASKS_REACHED')) {
-            throw new Error('Maximum 4 tasks per day');
+            throw new Error('Maximum quest limit reached');
           }
           throw error;
         }
@@ -270,6 +280,19 @@ export const useDailyTasks = (selectedDate?: Date) => {
           await updateBodyFromActivity(companion.id);
         }
 
+        // Check if bonus slot was just unlocked (all 4 quests completed)
+        const updatedTasks = await queryClient.getQueryData(['daily-tasks', user?.id, taskDate]);
+        if (Array.isArray(updatedTasks)) {
+          const completed = updatedTasks.filter((t: any) => t.completed).length;
+          if (completed === 4) {
+            toast({
+              title: "🎉 Bonus Quest Slot Unlocked!",
+              description: "You've completed all 4 quests! Add a 5th bonus quest now!",
+              duration: 5000,
+            });
+          }
+        }
+
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
     },
@@ -325,7 +348,18 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const canAddMore = tasks.length < 4;
+  
+  // Bonus Quest Slot Logic:
+  // Base limit: 4 quests
+  // Unlock 5th slot if: (1) all 4 quests completed today OR (2) 7+ day streak
+  const hasBonusSlot = useMemo(() => {
+    const allFourCompleted = tasks.length === 4 && completedCount === 4;
+    const hasStreakBonus = (profile?.current_habit_streak ?? 0) >= 7;
+    return allFourCompleted || hasStreakBonus;
+  }, [tasks.length, completedCount, profile?.current_habit_streak]);
+  
+  const maxQuests = hasBonusSlot ? 5 : 4;
+  const canAddMore = tasks.length < maxQuests;
 
   return {
     tasks,
@@ -339,5 +373,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
     canAddMore,
     completedCount,
     totalCount,
+    hasBonusSlot,
+    maxQuests,
   };
 };

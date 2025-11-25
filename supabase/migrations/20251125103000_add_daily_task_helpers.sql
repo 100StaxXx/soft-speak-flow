@@ -29,7 +29,9 @@ BEGIN
   WHERE user_id = p_user_id
     AND task_date = target_date;
 
-  IF existing_count >= 4 THEN
+  -- Allow up to 5 tasks (4 base + 1 bonus slot)
+  -- The bonus slot logic is enforced in the application layer
+  IF existing_count >= 5 THEN
     RAISE EXCEPTION 'MAX_TASKS_REACHED';
   END IF;
 
