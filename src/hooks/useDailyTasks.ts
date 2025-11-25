@@ -6,6 +6,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useProfile } from "@/hooks/useProfile";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
@@ -18,6 +19,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
+  const { profile } = useProfile();
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
