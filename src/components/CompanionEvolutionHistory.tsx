@@ -19,9 +19,10 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
         .from("user_companion")
         .select("created_at, initial_image_url")
         .eq("id", companionId)
-        .single();
+        .maybeSingle();
 
       if (companionError) throw companionError;
+      if (!companion) return [];
 
       // Get evolution history
       const { data: evolutionData, error } = await supabase
