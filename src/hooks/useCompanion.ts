@@ -152,21 +152,16 @@ export const useCompanion = () => {
             }
           }
         );
-      } catch (imageError) {
-        console.error("Image generation failed:", imageError);
-        throw imageError; // Re-throw with specific error message
-      }
 
-      if (!imageData?.imageUrl) {
+        if (!imageData?.imageUrl) {
         console.error("Missing imageUrl after generation:", imageData);
         throw new Error("Unable to create your companion's image. Please try again.");
       }
 
       console.log("Image generated successfully, creating companion record...");
 
-      // Use atomic database function to create companion (prevents duplicates)
-      let companionResult;
-      try {
+        // Use atomic database function to create companion (prevents duplicates)
+        let companionResult;
         const result = await supabase.rpc('create_companion_if_not_exists', {
           p_user_id: user.id,
           p_favorite_color: data.favoriteColor,
@@ -185,12 +180,8 @@ export const useCompanion = () => {
         }
         
         companionResult = result.data;
-      } catch (dbError) {
-        console.error("Database operation failed:", dbError);
-        throw new Error("Failed to save companion. Please check your connection and try again.");
-      }
-      
-      console.log("RPC call successful, result:", companionResult);
+
+        console.log("RPC call successful, result:", companionResult);
       
       if (!companionResult || companionResult.length === 0) {
         console.error("No companion data returned from function");
@@ -310,7 +301,7 @@ export const useCompanion = () => {
         });
       }
 
-        return companionData;
+      return companionData;
       } catch (error) {
         // Reset flag on error
         companionCreationInProgress.current = false;
