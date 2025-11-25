@@ -11,7 +11,7 @@ import solaceSage from "@/assets/solace-sage.png";
 const MENTOR_IMAGES: Record<string, string> = {
   atlas: atlasSage,
   darius: dariusSage,
-  kai: kaiSage, // Astor
+  kai: kaiSage,
   eli: eliSage,
   nova: novaSage,
   sienna: siennaSage,

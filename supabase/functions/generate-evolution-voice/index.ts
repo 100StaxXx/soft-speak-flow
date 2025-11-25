@@ -9,15 +9,15 @@ const corsHeaders = {
 
 // Mentor voice IDs for ElevenLabs
 const MENTOR_VOICES: Record<string, string> = {
-  'atlas': 'TX3LPaxmHKxFdv7VOQHJ', // Liam - strong, authoritative
-  'darius': 'onwK4e9ZLuTAKqWW03F9', // Daniel - direct, intense
-  'solace': 'cgSgspJ2msm6clMCkdW9', // Jessica - warm, gentle
-  'kai': 'CwhRBWXzGAHq8TQ4Fs17', // Roger - balanced
-  'nova': '9BWtsMINqrJLrRacOk9x', // Aria - energetic
-  'stryker': 'bIHbv24MWmeRgasZH58o', // Will - powerful
-  'eli': 'N2lVS1w4EtoT3dr4eOWO', // Callum - friendly
-  'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah - nurturing
-  'sienna': 'pFZP5JQG7iQjIQuC4Bku', // Lily - inspiring
+  'atlas': 'JBFqnCBsd6RMkjVDRZzb', // George
+  'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian
+  'eli': 'iP95p4xoKVk53GoZ742B', // Chris
+  'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel
+  'sienna': 'XB0fDUnXU5powFXDhCwa', // Charlotte
+  'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah
+  'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum
+  'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich
+  'solace': 'pFZP5JQG7iQjIQuC4Bku', // Lily
 };
 
 serve(async (req) => {
