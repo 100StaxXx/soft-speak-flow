@@ -498,11 +498,12 @@ export default function Onboarding() {
       
       console.log("Onboarding marked complete");
       
-      // CRITICAL: Invalidate profile cache to force refetch with new data
+      // CRITICAL: Invalidate caches to force refetch with new data
       await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
       
-      // Wait longer to ensure database update propagates
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait longer to ensure database update and cache propagate
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       console.log("Navigating to quests...");
       // Navigate to quests page to start with tasks
