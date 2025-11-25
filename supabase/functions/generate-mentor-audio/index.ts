@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
 const mentorVoices: Record<string, any> = {
   atlas: {
     voiceId: "JBFqnCBsd6RMkjVDRZzb", // George
@@ -70,6 +76,44 @@ serve(async (req) => {
   }
 
   try {
+    if (!SUPABASE_ANON_KEY) {
+      throw new Error("SUPABASE_ANON_KEY is not configured");
+    }
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase service credentials are not configured");
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const rateLimitResult = await checkRateLimit(
+      supabaseAdmin,
+      user.id,
+      'mentor-audio',
+      RATE_LIMITS['mentor-audio']
+    );
+
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
+
     const { mentorSlug, script } = await req.json();
 
     if (!mentorSlug || !script) {
@@ -139,15 +183,12 @@ serve(async (req) => {
     const audioBuffer = await elevenLabsResponse.arrayBuffer();
     const audioBytes = new Uint8Array(audioBuffer);
 
-    // Initialize Supabase client
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
     // Upload to Supabase Storage
     const timestamp = Date.now();
     const fileName = `${mentorSlug}_${timestamp}.mp3`;
     const filePath = `${fileName}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from("mentor-audio")
       .upload(filePath, audioBytes, {
         contentType: "audio/mpeg",
@@ -160,7 +201,7 @@ serve(async (req) => {
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = supabaseAdmin.storage
       .from("mentor-audio")
       .getPublicUrl(filePath);
 

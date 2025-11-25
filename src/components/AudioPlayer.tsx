@@ -39,15 +39,16 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       onTimeUpdate?.(time);
     };
     const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("ended", () => setIsPlaying(false));
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("ended", () => setIsPlaying(false));
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl, onTimeUpdate]);
 

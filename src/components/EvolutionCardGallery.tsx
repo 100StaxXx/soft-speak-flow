@@ -38,21 +38,30 @@ export const EvolutionCardGallery = () => {
 
       if (error) throw error;
       
-      // Fetch the correct image for each card from companion_evolutions using evolution_id
-      const cardsWithImages = await Promise.all(
-        (data || []).map(async (card) => {
-          const { data: evolutionData } = await supabase
-            .from("companion_evolutions")
-            .select("image_url")
-            .eq("id", card.evolution_id)
-            .maybeSingle();
-          
-          return {
-            ...card,
-            image_url: evolutionData?.image_url || card.image_url
-          };
-        })
-      );
+      const evolutionIds = (data || [])
+        .map(card => card.evolution_id)
+        .filter((id): id is string => Boolean(id));
+
+      let evolutionImageLookup: Record<string, string | null> = {};
+
+      if (evolutionIds.length > 0) {
+        const { data: evolutionRows, error: evolutionError } = await supabase
+          .from("companion_evolutions")
+          .select("id, image_url")
+          .in("id", evolutionIds);
+
+        if (evolutionError) throw evolutionError;
+
+        evolutionImageLookup = (evolutionRows || []).reduce((acc, row) => {
+          acc[row.id] = row.image_url ?? null;
+          return acc;
+        }, {} as Record<string, string | null>);
+      }
+
+      const cardsWithImages = (data || []).map(card => ({
+        ...card,
+        image_url: (card.evolution_id && evolutionImageLookup[card.evolution_id]) || card.image_url
+      }));
       
       // Deduplicate cards by card_id
       const uniqueCards = new Map<string, any>();
@@ -63,7 +72,6 @@ export const EvolutionCardGallery = () => {
       });
       
       const mappedCards = Array.from(uniqueCards.values()) as EvolutionCard[];
-      console.log('Total unique cards:', mappedCards.length);
       return mappedCards;
     },
     enabled: !!user,

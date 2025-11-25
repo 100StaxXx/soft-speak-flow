@@ -73,11 +73,36 @@ Deno.serve(async (req) => {
       supabase,
       user.id,
       'mentor-chat',
-      RATE_LIMITS.AI_GENERATION
+      RATE_LIMITS['mentor-chat']
     );
 
     if (!rateLimitCheck.allowed) {
       return createRateLimitResponse(rateLimitCheck, corsHeaders);
+    }
+
+    // Enforce server-side daily cap regardless of client state
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const { count: messagesToday, error: dailyCountError } = await supabase
+      .from('mentor_chats')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('role', 'user')
+      .gte('created_at', startOfDay.toISOString());
+
+    if (dailyCountError) {
+      throw dailyCountError;
+    }
+
+    if ((messagesToday || 0) >= DAILY_MESSAGE_LIMIT) {
+      return new Response(
+        JSON.stringify({
+          error: "Daily limit reached",
+          message: `You've reached today's mentor chat limit of ${DAILY_MESSAGE_LIMIT} messages. Please come back tomorrow.`,
+          limit: DAILY_MESSAGE_LIMIT
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
