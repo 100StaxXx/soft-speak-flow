@@ -151,10 +151,14 @@ export default function Tasks() {
   const { data: habits = [] } = useQuery({
     queryKey: ['habits', user?.id],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data } = await supabase
         .from('habits')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('is_active', true);
       return data || [];
     },
@@ -173,11 +177,15 @@ export default function Tasks() {
   const { data: completions = [] } = useQuery({
     queryKey: ['habit-completions', user?.id],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const today = format(new Date(), 'yyyy-MM-dd');
       const { data } = await supabase
         .from('habit_completions')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('date', today);
       return data || [];
     },
@@ -187,12 +195,16 @@ export default function Tasks() {
   // Add habit mutation
   const addHabitMutation = useMutation({
     mutationFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       if (habits.length >= 2) {
         throw new Error('Maximum 2 habits allowed');
       }
       
       const { error } = await supabase.from('habits').insert({
-        user_id: user!.id,
+        user_id: user.id,
         title: newHabitTitle,
         frequency: selectedDays.length === 7 ? 'daily' : 'custom',
         custom_days: selectedDays.length === 7 ? null : selectedDays,
@@ -216,6 +228,10 @@ export default function Tasks() {
   // Toggle habit completion
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const today = format(new Date(), 'yyyy-MM-dd');
       
       if (isCompleted) {
@@ -233,14 +249,14 @@ export default function Tasks() {
           .from('habit_completions')
           .select('id')
           .eq('habit_id', habitId)
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .eq('date', today)
           .maybeSingle();
 
         // Insert new completion
         const { error } = await supabase
           .from('habit_completions')
-          .insert({ habit_id: habitId, user_id: user!.id, date: today });
+          .insert({ habit_id: habitId, user_id: user.id, date: today });
         if (error) throw error;
         
         // Only award XP if this is the FIRST completion today

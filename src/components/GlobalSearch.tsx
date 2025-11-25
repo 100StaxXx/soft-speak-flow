@@ -65,10 +65,14 @@ export const GlobalSearch = () => {
   const { data: tasks, isLoading: tasksLoading } = useQuery({
     queryKey: ['search-tasks', searchQuery, user?.id],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from('daily_tasks')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .ilike('task_text', `%${searchQuery}%`)
         .order('task_date', { ascending: false })
         .limit(10);

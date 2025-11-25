@@ -7,6 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
+// Warn if VAPID key is not configured
+if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined') {
+  console.warn('VITE_VAPID_PUBLIC_KEY not configured. Push notifications will be disabled.');
+}
+
 /**
  * Convert base64 string to Uint8Array (for VAPID key)
  */
@@ -61,7 +66,12 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();
     
-    if (!subscription && VAPID_PUBLIC_KEY) {
+    if (!subscription) {
+      if (!VAPID_PUBLIC_KEY) {
+        console.warn('Cannot subscribe to push notifications: VAPID key not configured');
+        return null;
+      }
+      
       // Create new subscription
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,

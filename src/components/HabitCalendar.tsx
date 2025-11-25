@@ -12,11 +12,15 @@ export const HabitCalendar = () => {
     queryKey: ["habit-calendar", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const thirtyDaysAgo = format(subDays(new Date(), 30), "yyyy-MM-dd");
       const { data, error } = await supabase
         .from("habit_completions")
         .select("date")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .gte("date", thirtyDaysAgo)
         .order("date", { ascending: true });
       
@@ -29,10 +33,14 @@ export const HabitCalendar = () => {
     queryKey: ["active-habits", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from("habits")
         .select("id")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .eq("is_active", true);
       
       if (error) throw error;
