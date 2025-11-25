@@ -61,7 +61,7 @@ serve(async (req) => {
       supabase,
       user.id,
       'generate-check-in-response',
-      RATE_LIMITS.AI_GENERATION
+      RATE_LIMITS['check-in-response']
     );
 
     if (!rateLimitCheck.allowed) {
