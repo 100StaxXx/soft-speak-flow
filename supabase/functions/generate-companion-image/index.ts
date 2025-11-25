@@ -55,8 +55,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("Generating companion image - request received");
+    
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      throw new Error("No authorization header");
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -64,9 +69,16 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error("Invalid user token");
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      throw new Error("Invalid user token");
+    }
+
+    console.log(`User authenticated: ${user.id}`);
 
     const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor } = await req.json();
+
+    console.log(`Request params - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}`);
 
     if (!spiritAnimal) throw new Error("spiritAnimal is required");
     if (!element) throw new Error("element is required");
@@ -74,7 +86,10 @@ serve(async (req) => {
     if (!favoriteColor) throw new Error("favoriteColor is required");
 
     const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
-    if (!stageInfo) throw new Error(`Invalid stage: ${stage}`);
+    if (!stageInfo) {
+      console.error(`Invalid stage provided: ${stage}`);
+      throw new Error(`Invalid stage: ${stage}`);
+    }
 
     const elementEffect = ELEMENT_EFFECTS[element.toLowerCase() as keyof typeof ELEMENT_EFFECTS] || ELEMENT_EFFECTS.light;
     
@@ -108,8 +123,12 @@ Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra 
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY not configured in environment");
+      throw new Error("LOVABLE_API_KEY not configured");
+    }
 
+    console.log("Calling Lovable AI for image generation...");
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -152,16 +171,24 @@ Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra 
 
     const aiData = await aiResponse.json();
     const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!imageUrl) throw new Error("No image URL in response");
+    if (!imageUrl) {
+      console.error("No image URL in AI response:", JSON.stringify(aiData));
+      throw new Error("No image URL in response");
+    }
 
+    console.log("Image generated successfully, uploading to storage...");
     const base64Data = imageUrl.split(",")[1];
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const filePath = `${user.id}/companion_${user.id}_stage${stage}_${Date.now()}.png`;
 
     const { error: uploadError } = await supabase.storage.from("mentors-avatars").upload(filePath, binaryData, { contentType: "image/png", upsert: false });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      throw uploadError;
+    }
 
     const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(filePath);
+    console.log(`Companion image uploaded successfully: ${publicUrl}`);
 
     return new Response(JSON.stringify({ imageUrl: publicUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
   } catch (error: any) {

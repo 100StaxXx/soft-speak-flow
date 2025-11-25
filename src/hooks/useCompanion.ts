@@ -93,16 +93,20 @@ export const useCompanion = () => {
           
           // Handle specific error codes from edge function
           if (error) {
+            console.error("Companion image generation error:", error);
             if (error.message?.includes("INSUFFICIENT_CREDITS") || error.message?.includes("Insufficient AI credits")) {
               throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
             }
             if (error.message?.includes("RATE_LIMITED") || error.message?.includes("AI service is currently busy")) {
               throw new Error("The service is currently busy. Please wait a moment and try again.");
             }
-            throw error;
+            throw new Error(error.message || "Failed to generate companion image. Please try again.");
           }
           
-          if (!imageResult?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
+          if (!imageResult?.imageUrl) {
+            console.error("No image URL in result:", imageResult);
+            throw new Error("Unable to create your companion's image. Please try again.");
+          }
           return imageResult;
         },
         {
@@ -121,7 +125,18 @@ export const useCompanion = () => {
         }
       );
 
-      if (!imageData?.imageUrl) throw new Error("Unable to create your companion's image. Please try again.");
+      if (!imageData?.imageUrl) {
+        console.error("Missing imageUrl after generation:", imageData);
+        throw new Error("Unable to create your companion's image. Please try again.");
+      }
+
+      console.log("Creating companion with data:", {
+        favoriteColor: data.favoriteColor,
+        spiritAnimal: data.spiritAnimal,
+        coreElement: data.coreElement,
+        storyTone: data.storyTone,
+        imageUrl: imageData.imageUrl
+      });
 
       // Create companion record with color specifications
       const { data: companionData, error: createError } = await supabase
@@ -142,8 +157,14 @@ export const useCompanion = () => {
         .select()
         .maybeSingle();
 
-      if (createError) throw createError;
-      if (!companionData) throw new Error("Failed to create companion");
+      if (createError) {
+        console.error("Database error creating companion:", createError);
+        throw new Error(`Failed to save companion: ${createError.message}`);
+      }
+      if (!companionData) {
+        console.error("No companion data returned after insert");
+        throw new Error("Failed to create companion");
+      }
 
       // Record initial evolution
       const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
