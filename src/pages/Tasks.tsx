@@ -68,7 +68,7 @@ export default function Tasks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { profile } = useProfile();
-  const { companion } = useCompanion();
+  const { companion, isLoading: companionLoading } = useCompanion();
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
@@ -478,6 +478,17 @@ export default function Tasks() {
     return false;
   };
 
+  // Show loading state while companion is being fetched (prevents crash on initial load)
+  if (companionLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+          <p className="text-muted-foreground">Loading your adventure...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 relative">
