@@ -76,6 +76,30 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
 
       if (memberError) throw memberError;
 
+      // Check if this brings the epic to 3+ members (Discord unlock threshold)
+      const { count: totalMembers } = await supabase
+        .from('epic_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('epic_id', epic.id);
+
+      // If we just hit the threshold, mark as discord_ready
+      if (totalMembers && totalMembers >= 3) {
+        const { data: currentEpic } = await supabase
+          .from('epics')
+          .select('discord_ready')
+          .eq('id', epic.id)
+          .single();
+        
+        if (currentEpic && !currentEpic.discord_ready) {
+          await supabase
+            .from('epics')
+            .update({ discord_ready: true })
+            .eq('id', epic.id);
+          
+          console.log('Epic reached 3 members - Discord channel unlocked!');
+        }
+      }
+
       // Copy habits to user's account
       if (epic.epic_habits && epic.epic_habits.length > 0) {
         const habitsToCreate = epic.epic_habits.map((eh: any) => ({

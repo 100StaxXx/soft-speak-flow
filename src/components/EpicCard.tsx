@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { EpicLeaderboard } from "./EpicLeaderboard";
+import { EpicDiscordSection } from "./EpicDiscordSection";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -29,6 +31,7 @@ const themeBorders: Record<EpicTheme, string> = {
 
 interface Epic {
   id: string;
+  user_id: string;
   title: string;
   description?: string;
   target_days: number;
@@ -40,6 +43,9 @@ interface Epic {
   is_public?: boolean;
   invite_code?: string;
   theme_color?: string;
+  discord_channel_id?: string | null;
+  discord_invite_url?: string | null;
+  discord_ready?: boolean;
   epic_habits?: Array<{
     habit_id: string;
     habits: {
@@ -58,6 +64,7 @@ interface EpicCardProps {
 
 export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
@@ -66,6 +73,41 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const theme = (epic.theme_color || 'heroic') as EpicTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
+
+  // Fetch member count for public epics (for Discord feature)
+  useEffect(() => {
+    if (epic.is_public && epic.id) {
+      const fetchMemberCount = async () => {
+        const { count } = await supabase
+          .from('epic_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('epic_id', epic.id);
+        
+        setMemberCount(count || 0);
+      };
+      
+      fetchMemberCount();
+      
+      // Subscribe to real-time updates
+      const channel = supabase
+        .channel(`epic-members-${epic.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'epic_members',
+            filter: `epic_id=eq.${epic.id}`
+          },
+          () => fetchMemberCount()
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [epic.is_public, epic.id]);
 
   const getMilestoneColor = (progress: number) => {
     if (progress >= 100) return "text-yellow-400";
@@ -223,7 +265,17 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
 
         {/* Community Features for Shared Epics */}
         {epic.is_public && (
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <EpicDiscordSection 
+              epic={{
+                id: epic.id,
+                user_id: epic.user_id,
+                discord_ready: epic.discord_ready || false,
+                discord_channel_id: epic.discord_channel_id,
+                discord_invite_url: epic.discord_invite_url,
+              }} 
+              memberCount={memberCount} 
+            />
             <EpicLeaderboard epicId={epic.id} />
           </div>
         )}

@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.check-task-reminders]
 verify_jwt = false
+
+[functions.create-discord-channel-for-guild]
+verify_jwt = true
