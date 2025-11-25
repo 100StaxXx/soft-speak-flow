@@ -94,7 +94,11 @@ export default function Tasks() {
     isToggling,
     canAddMore,
     completedCount,
-    totalCount 
+    totalCount,
+    bonusSlotUnlocked,
+    bonusUnlockReasons,
+    maxDailyQuests,
+    streakDays,
   } = useDailyTasks(selectedDate);
   
   // Get all tasks for calendar views
@@ -677,15 +681,43 @@ export default function Tasks() {
             )}
 
             <Card className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
+                  <p className="text-sm text-muted-foreground">
+                    Start with 4 quests per day. Unlock a Bonus Quest by finishing all 4 or keeping a 7+ day streak.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    {bonusSlotUnlocked ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 font-semibold text-green-600">
+                          Bonus Quest unlocked
+                        </span>
+                        {bonusUnlockReasons.includes("completion") && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 font-medium text-primary">
+                            Completed 4 quests today
+                          </span>
+                        )}
+                        {bonusUnlockReasons.includes("streak") && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-medium text-amber-600">
+                            🔥 {streakDays}-day streak
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Complete all 4 quests or reach a 7-day streak to unlock today's Bonus Quest slot.
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-sm font-medium text-primary">
-                  {completedCount}/{totalCount}
+                <div className="text-sm font-medium text-primary text-right">
+                  <div>{completedCount}/{totalCount} complete</div>
+                  <div className="text-xs text-muted-foreground">
+                    Slots: {totalCount}/{maxDailyQuests}
+                  </div>
                 </div>
               </div>
 
@@ -713,7 +745,7 @@ export default function Tasks() {
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
+                    description={`Start with 4 quests (unlock a Bonus Quest by finishing all 4 or hitting a 7-day streak). Mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
                   />
                 ) : (() => {
                   const mainQuest = tasks.find(t => t.is_main_quest);

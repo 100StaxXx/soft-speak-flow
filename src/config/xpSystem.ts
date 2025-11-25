@@ -6,7 +6,7 @@
  *
  * XP VALUES:
  *
- * QUESTS (One-time missions, max 4/day):
+ * QUESTS (One-time missions, 4 base slots + 1 Bonus slot):
  * - Easy Quest: 8 XP
  * - Medium Quest: 16 XP
  * - Hard Quest: 28 XP
