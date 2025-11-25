@@ -76,7 +76,7 @@ export const BattleMatchmaking = () => {
           You need at least 3 evolution cards to battle. Keep evolving your companion!
         </p>
         <p className="text-xs text-muted-foreground">
-          Cards unlock at stages 0, 5, 10, 15, and 20
+          Cards unlock at every evolution stage (0-20)
         </p>
       </Card>
     );

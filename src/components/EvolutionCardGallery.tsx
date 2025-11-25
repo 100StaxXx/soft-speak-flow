@@ -18,6 +18,8 @@ interface EvolutionCard {
   story_text: string;
   rarity: string;
   image_url: string | null;
+  energy_cost?: number | null;
+  bond_level?: number | null;
 }
 
 export const EvolutionCardGallery = () => {

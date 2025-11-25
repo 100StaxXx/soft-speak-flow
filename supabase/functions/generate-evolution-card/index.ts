@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { calculateBondLevel, calculateEnergyCost, calculateStats } from "../_shared/cardMath.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,22 +63,8 @@ serve(async (req) => {
     else if (stage >= 4) rarity = 'Epic';      // Stage 4-6: Juvenile, Apprentice, Scout
     else if (stage >= 1) rarity = 'Rare';      // Stage 1-3: Hatchling, Sproutling, Cub
 
-    // Generate stats based on stage and average attribute (balanced)
-    const baseStatValue = 20 + (stage * 8);
-    const avgAttribute = (
-      (userAttributes?.mind || 0) + 
-      (userAttributes?.body || 0) + 
-      (userAttributes?.soul || 0)
-    ) / 3;
-    
-    const stats = {
-      mind: Math.floor(baseStatValue + avgAttribute * 0.15),
-      body: Math.floor(baseStatValue + avgAttribute * 0.15),
-      soul: Math.floor(baseStatValue + avgAttribute * 0.15),
-    };
-
-    // Assign energy cost based on stage (0-9: 1, 10-14: 2, 15-20: 3)
-    const energyCost = stage <= 9 ? 1 : stage <= 14 ? 2 : 3;
+    const stats = calculateStats(stage, userAttributes);
+    const energyCost = calculateEnergyCost(stage);
 
     // Generate frame type based on element
     const frameType = `${element.toLowerCase()}-frame`;
@@ -217,10 +204,7 @@ Make it LEGENDARY. This is the birth of a companion.`;
     }
 
     // Calculate bond level based on user attributes
-    const totalAttributes = (userAttributes?.mind || 0) + 
-                          (userAttributes?.body || 0) + 
-                          (userAttributes?.soul || 0);
-    const bondLevel = Math.min(100, Math.floor(10 + (totalAttributes / 3) + (stage * 2)));
+    const bondLevel = calculateBondLevel(stage, userAttributes);
 
     // Insert the card into database
     const { data: card, error: insertError } = await supabaseClient

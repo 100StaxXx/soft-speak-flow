@@ -16,6 +16,8 @@ interface EvolutionCard {
   traits: string[] | null;
   element: string;
   species: string;
+  energy_cost?: number | null;
+  bond_level?: number | null;
 }
 
 interface Props {
@@ -45,12 +47,20 @@ const ELEMENT_SYMBOLS: Record<string, string> = {
   light: "✨",
 };
 
+const fallbackEnergyCost = (stage: number) => {
+  if (stage <= 9) return 1;
+  if (stage <= 14) return 2;
+  return 3;
+};
+
 export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
 
   const stats = card.stats as { mind?: number; body?: number; soul?: number };
+  const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
+  const bondLevel = card.bond_level ?? null;
 
   const handleCardClick = () => {
     tap();
@@ -99,6 +109,16 @@ export function EvolutionCardFlip({ card }: Props) {
 
             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
               <h3 className="font-bold text-sm text-white drop-shadow-lg">{card.creature_name}</h3>
+              <div className="flex items-center justify-between text-[10px] text-white/80 bg-black/30 rounded-md px-2 py-1">
+                <span className="flex items-center gap-1">
+                  ⚡<span className="font-semibold">{energyCost}</span>
+                </span>
+                {bondLevel !== null && (
+                  <span className="flex items-center gap-1">
+                    🤝 <span className="font-semibold">{bondLevel}</span>
+                  </span>
+                )}
+              </div>
               
               <div className="grid grid-cols-3 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
                 <div className="flex flex-col items-center text-white/90">
@@ -173,6 +193,14 @@ export function EvolutionCardFlip({ card }: Props) {
                       <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-base px-3 py-1">
                         Stage {card.evolution_stage}
                       </Badge>
+                      <div className="absolute top-20 right-4 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold flex items-center gap-1">
+                        ⚡ {energyCost}
+                      </div>
+                      {bondLevel !== null && (
+                        <div className="absolute top-32 right-4 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold flex items-center gap-1">
+                          🤝 {bondLevel}
+                        </div>
+                      )}
 
                       <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
                         <h3 className="font-bold text-2xl text-white drop-shadow-lg">{card.creature_name}</h3>
