@@ -9,55 +9,55 @@ const corsHeaders = {
 
 const mentorVoices: Record<string, any> = {
   atlas: {
-    voiceId: "bIHbv24MWmeRgasZH58o",
+    voiceId: "JBFqnCBsd6RMkjVDRZzb", // George
     stability: 0.75,
     similarity_boost: 0.85,
     style_exaggeration: 0.5,
   },
   darius: {
-    voiceId: "nPczCjzI2devNBz1zQrb",
+    voiceId: "rWyjfFeMZ6PxkHqD3wGC", // Brian
     stability: 0.8,
     similarity_boost: 0.9,
     style_exaggeration: 0.7,
   },
   eli: {
-    voiceId: "iP95p4xoKVk53GoZ742B",
+    voiceId: "iP95p4xoKVk53GoZ742B", // Chris
     stability: 0.7,
     similarity_boost: 0.8,
     style_exaggeration: 0.4,
   },
   nova: {
-    voiceId: "onwK4e9ZLuTAKqWW03F9",
+    voiceId: "onwK4e9ZLuTAKqWW03F9", // Daniel
     stability: 0.65,
     similarity_boost: 0.75,
     style_exaggeration: 0.6,
   },
   sienna: {
-    voiceId: "XB0fDUnXU5powFXDhCwa",
+    voiceId: "XB0fDUnXU5powFXDhCwa", // Charlotte
     stability: 0.8,
     similarity_boost: 0.85,
     style_exaggeration: 0.3,
   },
   lumi: {
-    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
     stability: 0.75,
     similarity_boost: 0.8,
     style_exaggeration: 0.2,
   },
   kai: {
-    voiceId: "pNInz6obpgDQGcFmaJgB",
+    voiceId: "N2lVS1w4EtoT3dr4eOWO", // Callum
     stability: 0.7,
     similarity_boost: 0.85,
     style_exaggeration: 0.8,
   },
   stryker: {
-    voiceId: "JBFqnCBsd6RMkjVDRZzb",
+    voiceId: "pNInz6obpgDQGcFmaJgB", // Rich
     stability: 0.85,
     similarity_boost: 0.9,
     style_exaggeration: 0.7,
   },
   solace: {
-    voiceId: "pFZP5JQG7iQjIQuC4Bku",
+    voiceId: "pFZP5JQG7iQjIQuC4Bku", // Lily
     stability: 0.8,
     similarity_boost: 0.85,
     style_exaggeration: 0.2,

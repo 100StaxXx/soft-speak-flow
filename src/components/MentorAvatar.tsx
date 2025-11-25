@@ -16,7 +16,7 @@ const MENTOR_IMAGES: Record<string, string> = {
   nova: novaSage,
   sienna: siennaSage,
   lumi: lumiSage,
-  stryker: strykerSage,
+  stryker: strykerSage, // Rich
   solace: solaceSage,
 };
 
