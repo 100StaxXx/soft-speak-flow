@@ -110,30 +110,34 @@ export const useAnalytics = () => {
       const weekAgo = subDays(today, 7);
       const twoWeeksAgo = subDays(today, 14);
       
-      const { data: all, error: allError } = await supabase
+      const { count: total, error: totalError } = await supabase
         .from('check_ins')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id);
       
-      const { data: thisWeek, error: thisWeekError } = await supabase
+      if (totalError) throw totalError;
+
+      const { count: thisWeekCount, error: thisWeekError } = await supabase
         .from('check_ins')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('date', format(weekAgo, 'yyyy-MM-dd'));
-      
-      const { data: lastWeek, error: lastWeekError } = await supabase
+
+      if (thisWeekError) throw thisWeekError;
+
+      const { count: lastWeekCount, error: lastWeekError } = await supabase
         .from('check_ins')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('date', format(twoWeeksAgo, 'yyyy-MM-dd'))
         .lt('date', format(weekAgo, 'yyyy-MM-dd'));
-      
-      if (allError || thisWeekError || lastWeekError) throw allError || thisWeekError || lastWeekError;
-      
+
+      if (lastWeekError) throw lastWeekError;
+
       return {
-        total: all?.length || 0,
-        thisWeek: thisWeek?.length || 0,
-        lastWeek: lastWeek?.length || 0
+        total: total || 0,
+        thisWeek: thisWeekCount || 0,
+        lastWeek: lastWeekCount || 0
       };
     },
     enabled: !!user,

@@ -40,6 +40,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
     enabled: !!user,
   });
 
+  type TaskCategory = 'mind' | 'body' | 'soul';
+  const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
+
   const addTask = useMutation({
     mutationFn: async ({ 
       taskText, 
@@ -92,11 +95,13 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
         const xpReward = getQuestXP(difficulty);
 
-        // Auto-detect category based on keywords
-        let detectedCategory = category || 'general';
+        // Auto-detect category based on keywords while respecting DB constraints
+        let detectedCategory: TaskCategory | null = category && validCategories.includes(category as TaskCategory)
+          ? (category as TaskCategory)
+          : null;
         const text = taskText.toLowerCase();
         
-        const categoryKeywords = {
+        const categoryKeywords: Record<TaskCategory, string[]> = {
           body: ['gym', 'run', 'exercise', 'workout', 'walk', 'yoga', 'stretch', 'fitness', 'sports'],
           soul: ['meditate', 'journal', 'breathe', 'gratitude', 'reflect', 'pray', 'mindful', 'relax', 'rest'],
           mind: ['read', 'learn', 'study', 'plan', 'organize', 'think', 'write', 'research', 'course']
@@ -104,32 +109,33 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
         for (const [cat, keywords] of Object.entries(categoryKeywords)) {
           if (keywords.some(keyword => text.includes(keyword))) {
-            detectedCategory = cat;
+            detectedCategory = cat as TaskCategory;
             break;
           }
         }
 
-        const { error } = await supabase
-          .from('daily_tasks')
-          .insert({
-            user_id: user!.id,
-            task_text: taskText,
-            difficulty,
-            xp_reward: xpReward,
-            task_date: customDate || taskDate,
-            is_main_quest: isMainQuest ?? false,
-            scheduled_time: scheduledTime || null,
-            estimated_duration: estimatedDuration || null,
-            recurrence_pattern: recurrencePattern || null,
-            recurrence_days: recurrenceDays || null,
-            is_recurring: !!recurrencePattern,
-            reminder_enabled: reminderEnabled ?? false,
-            reminder_minutes_before: reminderMinutesBefore ?? 15,
-            reminder_sent: false
-          });
+        const { error } = await supabase.rpc('add_daily_task', {
+          p_user_id: user!.id,
+          p_task_text: taskText,
+          p_task_difficulty: difficulty,
+          p_xp_reward: xpReward,
+          p_task_date: customDate || taskDate,
+          p_is_main_quest: isMainQuest ?? false,
+          p_scheduled_time: scheduledTime || null,
+          p_estimated_duration: estimatedDuration || null,
+          p_recurrence_pattern: recurrencePattern || null,
+          p_recurrence_days: recurrenceDays || null,
+          p_is_recurring: !!recurrencePattern,
+          p_reminder_enabled: reminderEnabled ?? false,
+          p_reminder_minutes_before: reminderMinutesBefore ?? 15,
+          p_category: detectedCategory
+        });
 
         if (error) {
           addInProgress.current = false; // Reset on error
+          if (error.message && error.message.includes('MAX_TASKS_REACHED')) {
+            throw new Error('Maximum 4 tasks per day');
+          }
           throw error;
         }
         
@@ -300,14 +306,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
-      // First, unset all main quests
-      await supabase.from('daily_tasks').update({ is_main_quest: false }).eq('user_id', user!.id).eq('task_date', taskDate);
-      // Then set the selected one
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update({ is_main_quest: true })
-        .eq('id', taskId)
-        .eq('user_id', user!.id);
+      const { error } = await supabase.rpc('set_main_quest_for_day', {
+        p_user_id: user!.id,
+        p_task_id: taskId,
+        p_task_date: taskDate
+      });
+
       if (error) throw error;
     },
     onSuccess: () => {
