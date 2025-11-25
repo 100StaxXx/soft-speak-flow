@@ -978,6 +978,7 @@ export type Database = {
           difficulty: string | null
           estimated_duration: number | null
           id: string
+          is_bonus: boolean | null
           is_main_quest: boolean | null
           is_recurring: boolean | null
           parent_template_id: string | null
@@ -1000,6 +1001,7 @@ export type Database = {
           difficulty?: string | null
           estimated_duration?: number | null
           id?: string
+          is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
           parent_template_id?: string | null
@@ -1022,6 +1024,7 @@ export type Database = {
           difficulty?: string | null
           estimated_duration?: number | null
           id?: string
+          is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
           parent_template_id?: string | null
