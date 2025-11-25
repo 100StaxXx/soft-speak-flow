@@ -91,7 +91,8 @@ export const useMissionAutoComplete = () => {
             await supabase
               .from('daily_missions')
               .update({ progress_current: newProgress })
-              .eq('id', mission.id);
+              .eq('id', mission.id)
+              .eq('user_id', user.id);
           }
 
           // Complete mission if criteria met
@@ -103,7 +104,8 @@ export const useMissionAutoComplete = () => {
                 completed_at: new Date().toISOString(),
                 progress_current: mission.progress_target 
               })
-              .eq('id', mission.id);
+              .eq('id', mission.id)
+              .eq('user_id', user.id);
 
             if (!error && mounted) {
               // Award XP

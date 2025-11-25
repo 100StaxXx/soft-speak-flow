@@ -296,6 +296,9 @@ export const useCompanion = () => {
     metadata: Record<string, any>,
     currentUser: typeof user
   ) => {
+    if (!currentUser?.id) {
+      throw new Error("Not authenticated");
+    }
     xpInProgress.current = true;
 
     const newXP = companionData.current_xp + xpAmount;
@@ -329,7 +332,8 @@ export const useCompanion = () => {
     const { error: updateError } = await supabase
       .from("user_companion")
       .update({ current_xp: newXP })
-      .eq("id", companionData.id);
+      .eq("id", companionData.id)
+      .eq("user_id", currentUser.id);
 
     if (updateError) throw updateError;
 

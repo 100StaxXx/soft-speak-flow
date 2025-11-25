@@ -67,15 +67,48 @@ serve(async (req) => {
   }
 
   try {
-    const { userId } = await req.json();
-
-    if (!userId) {
-      throw new Error("User ID is required");
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { userId } = await req.json();
+    const resolvedUserId = userId ?? user.id;
+
+    if (resolvedUserId !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "User mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!lovableApiKey) {
       return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
@@ -87,18 +120,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Rate limiting check - evolution is expensive
-    const rateLimit = await checkRateLimit(supabase, userId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
+    const rateLimit = await checkRateLimit(supabase, resolvedUserId, 'companion-evolution', RATE_LIMITS['companion-evolution']);
     if (!rateLimit.allowed) {
       return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
-    console.log("Fetching companion for user:", userId);
+    console.log("Fetching companion for user:", resolvedUserId);
 
     // 1. Load current companion
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", resolvedUserId)
       .single();
 
     if (companionError || !companion) {
