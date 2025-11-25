@@ -27,14 +27,15 @@ export interface Companion {
   updated_at: string;
 }
 
+// XP Rewards (Rebalanced Nov 2025 - aligned with xpRewards.ts)
 export const XP_REWARDS = {
-  HABIT_COMPLETE: 5,
-  ALL_HABITS_COMPLETE: 10,
-  CHALLENGE_COMPLETE: 20,
-  WEEKLY_CHALLENGE: 50,
-  PEP_TALK_LISTEN: 3,
-  CHECK_IN: 5,
-  STREAK_MILESTONE: 15,
+  HABIT_COMPLETE: 7,         // Base habit XP (easy difficulty)
+  ALL_HABITS_COMPLETE: 15,   // Bonus for completing all daily habits
+  CHALLENGE_COMPLETE: 25,    // Challenge day completion
+  WEEKLY_CHALLENGE: 60,      // Full weekly challenge
+  PEP_TALK_LISTEN: 8,        // 80%+ listen time (requires engagement)
+  CHECK_IN: 3,               // Morning check-in (quick tap)
+  STREAK_MILESTONE: 15,      // Hitting a streak milestone
 };
 
 export const useCompanion = () => {

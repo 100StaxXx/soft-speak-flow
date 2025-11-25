@@ -24,9 +24,9 @@ export const QUEST_XP_REWARDS = {
  * Done daily, these become the core XP engine.
  */
 export const HABIT_XP_REWARDS = {
-  EASY: 7,
-  MEDIUM: 14,
-  HARD: 24,
+  EASY: 7,    // Base habit XP (matches useCompanion constant)
+  MEDIUM: 14, // Nearly as valuable as medium quest
+  HARD: 24,   // Almost as valuable as hard quest
 } as const;
 
 /**

@@ -4,47 +4,58 @@
  * All XP rewards are centralized in @/config/xpRewards.ts
  * Import from there instead of hard-coding XP values.
  *
- * XP VALUES:
+ * XP VALUES (Rebalanced Nov 2025):
  *
- * QUESTS (One-time missions, max 3/day):
- * - Easy Quest: 5 XP
- * - Medium Quest: 15 XP
- * - Hard Quest: 25 XP
- * - Main Quest Multiplier: 2x
+ * QUESTS (One-time missions, max 4/day):
+ * - Easy Quest: 8 XP
+ * - Medium Quest: 16 XP
+ * - Hard Quest: 28 XP
+ * - Main Quest Multiplier: 1.5x (balanced to not overshadow other quests)
  *
  * HABITS (Recurring daily activities, max 2 active):
- * - Easy Habit: 5 XP
- * - Medium Habit: 10 XP
- * - Hard Habit: 20 XP
- * - All Habits Complete (daily bonus): 10 XP
+ * - Easy Habit: 7 XP
+ * - Medium Habit: 14 XP
+ * - Hard Habit: 24 XP
+ * - All Habits Complete (daily bonus): 15 XP (buffed to reward consistency)
  *
  * SYSTEM ACTIVITIES:
- * - Check-in: 5 XP
- * - Pep Talk Listened (80%+): 3 XP
+ * - Check-in: 3 XP (quick tap, low effort)
+ * - Pep Talk Listened (80%+): 8 XP (requires engagement)
  * - Streak Milestone: 15 XP
+ * - Challenge Day: 25 XP
+ * - Weekly Challenge: 60 XP
+ *
+ * STREAK MULTIPLIERS (Capped to prevent burnout):
+ * - 0-6 days: 1.0x XP
+ * - 7-29 days: 1.5x XP
+ * - 30+ days: 2.0x XP (capped - no more FOMO pressure)
+ *
+ * GUILD BONUS:
+ * - +10% XP on quest completion (for guild members only)
  * 
- * EVOLUTION THRESHOLDS (21-Stage System):
+ * EVOLUTION THRESHOLDS (21-Stage System - Rebalanced Nov 2025):
+ * Achievable in 8-10 months with consistent play (150 XP/day avg)
  * - Stage 0 (Egg): 0 XP
  * - Stage 1 (Hatchling): 10 XP (first quest!)
- * - Stage 2 (Sproutling): 120 XP
+ * - Stage 2 (Sproutling): 100 XP
  * - Stage 3 (Cub): 250 XP
- * - Stage 4 (Juvenile): 500 XP
- * - Stage 5 (Apprentice): 1200 XP
- * - Stage 6 (Scout): 2500 XP
- * - Stage 7 (Fledgling): 5000 XP
- * - Stage 8 (Warrior): 10000 XP
- * - Stage 9 (Guardian): 20000 XP
- * - Stage 10 (Champion): 35000 XP
- * - Stage 11 (Ascended): 50000 XP
- * - Stage 12 (Vanguard): 75000 XP
- * - Stage 13 (Titan): 100000 XP
- * - Stage 14 (Mythic): 150000 XP
- * - Stage 15 (Prime): 200000 XP
- * - Stage 16 (Regal): 300000 XP
- * - Stage 17 (Eternal): 450000 XP
- * - Stage 18 (Transcendent): 650000 XP
- * - Stage 19 (Apex): 1000000 XP
- * - Stage 20 (Ultimate): 1500000 XP
+ * - Stage 4 (Juvenile): 450 XP
+ * - Stage 5 (Apprentice): 800 XP (visual evolution)
+ * - Stage 6 (Scout): 1,300 XP
+ * - Stage 7 (Fledgling): 2,000 XP
+ * - Stage 8 (Warrior): 2,900 XP
+ * - Stage 9 (Guardian): 4,000 XP
+ * - Stage 10 (Champion): 5,400 XP (visual evolution)
+ * - Stage 11 (Ascended): 7,100 XP
+ * - Stage 12 (Vanguard): 9,100 XP
+ * - Stage 13 (Titan): 11,400 XP
+ * - Stage 14 (Mythic): 14,000 XP
+ * - Stage 15 (Prime): 17,000 XP (visual evolution)
+ * - Stage 16 (Regal): 20,400 XP
+ * - Stage 17 (Eternal): 24,200 XP
+ * - Stage 18 (Transcendent): 28,400 XP
+ * - Stage 19 (Apex): 33,000 XP
+ * - Stage 20 (Ultimate): 38,000 XP (visual evolution)
  *
  * USAGE EXAMPLE:
  * ```tsx
@@ -76,29 +87,30 @@
  * - awardQuoteShared() - When user shares a quote
  */
 
-// 21-Stage Evolution System: Early stages fast, late stages exponential
+// 21-Stage Evolution System: Early velocity, smooth curve, 38K max (8-10 month journey)
+// Rebalanced Nov 2025 - Now achievable with consistent daily play
 export const EVOLUTION_THRESHOLDS: Record<number, number> = {
   0: 0,       // Egg
   1: 10,      // Hatchling (first quest completes this!)
-  2: 120,     // Sproutling
+  2: 100,     // Sproutling
   3: 250,     // Cub
-  4: 500,     // Juvenile
-  5: 1200,    // Apprentice
-  6: 2500,    // Scout
-  7: 5000,    // Fledgling
-  8: 10000,   // Warrior
-  9: 20000,   // Guardian
-  10: 35000,  // Champion
-  11: 50000,  // Ascended
-  12: 75000,  // Vanguard
-  13: 100000, // Titan
-  14: 150000, // Mythic
-  15: 200000, // Prime
-  16: 300000, // Regal
-  17: 450000, // Eternal
-  18: 650000, // Transcendent
-  19: 1000000, // Apex
-  20: 1500000, // Ultimate
+  4: 450,     // Juvenile
+  5: 800,     // Apprentice (visual evolution)
+  6: 1300,    // Scout
+  7: 2000,    // Fledgling
+  8: 2900,    // Warrior
+  9: 4000,    // Guardian
+  10: 5400,   // Champion (visual evolution)
+  11: 7100,   // Ascended
+  12: 9100,   // Vanguard
+  13: 11400,  // Titan
+  14: 14000,  // Mythic
+  15: 17000,  // Prime (visual evolution)
+  16: 20400,  // Regal
+  17: 24200,  // Eternal
+  18: 28400,  // Transcendent
+  19: 33000,  // Apex
+  20: 38000,  // Ultimate (visual evolution)
 };
 
 export const XP_SYSTEM_DOCS = {
