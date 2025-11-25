@@ -1,4 +1,4 @@
-// Topic Categories for A Lil Push
+// Topic Categories for R-Evolution
 export const TOPIC_CATEGORIES = [
   { label: "Discipline", value: "discipline" },
   { label: "Confidence", value: "confidence" },

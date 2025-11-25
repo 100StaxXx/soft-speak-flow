@@ -28,7 +28,7 @@ serve(async (req) => {
     
     const mapping = moodMapping[mood] || moodMapping['Unmotivated'];
     
-    const systemPrompt = `You are a motivational coach for A Lil Push app. Create content for someone feeling "${mood}".
+    const systemPrompt = `You are a motivational coach for R-Evolution app. Create content for someone feeling "${mood}".
     
 Generate a response with:
 1. A powerful, short quote (1 sentence max)
@@ -36,7 +36,7 @@ Generate a response with:
 
 Tone: Strong, direct, supportive. Not overly soft. Think David Goggins meets a good friend.`;
 
-    const userPrompt = `The user is feeling: ${mood}. Give them a lil push.`;
+    const userPrompt = `The user is feeling: ${mood}. Help them evolve through this moment.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

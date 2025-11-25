@@ -22,7 +22,7 @@ serve(async (req) => {
     // Load VAPID keys for Web Push
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@alilpush.com';
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@revolution.app';
 
     if (!vapidPublicKey || !vapidPrivateKey) {
       console.error('VAPID keys not configured');

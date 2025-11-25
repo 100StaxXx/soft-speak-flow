@@ -147,7 +147,7 @@ TIME OF DAY CONTEXT: ${timeMap[time_of_day] || time_of_day}`;
 HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
     }
 
-    const systemPrompt = `You are writing a spoken motivational message for "A Lil Push" in the voice of ${mentor.name}.
+    const systemPrompt = `You are writing a spoken motivational message for "R-Evolution" in the voice of ${mentor.name}.
 
 MENTOR PROFILE:
 - Name: ${mentor.name}

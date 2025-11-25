@@ -16,7 +16,7 @@ Go to: **Supabase Dashboard → Your Project → Settings → Edge Functions →
 Add these three secrets:
 - `VAPID_PUBLIC_KEY` = (paste public key from step 1)
 - `VAPID_PRIVATE_KEY` = (paste private key from step 1)
-- `VAPID_SUBJECT` = `mailto:your-support-email@alilpush.com`
+- `VAPID_SUBJECT` = `mailto:your-support-email@revolution.app`
 
 ### 3. Apply Database Migrations
 

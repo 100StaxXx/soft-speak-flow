@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Lil Push now features a fully automated daily pep talk generation and delivery system. Each mentor generates ONE new pep talk every day at 12:01 AM UTC using AI + ElevenLabs, tailored to their unique personality and themes.
+R-Evolution now features a fully automated daily pep talk generation and delivery system. Each mentor generates ONE new pep talk every day at 12:01 AM UTC using AI + ElevenLabs, tailored to their unique personality and themes.
 
 ## System Architecture
 
