@@ -11,6 +11,8 @@ interface BattleCard {
   stats: any;
   rarity: string;
   image_url: string | null;
+  energy_cost?: number | null;
+  bond_level?: number | null;
 }
 
 interface BattleCardSelectorProps {
@@ -18,14 +20,6 @@ interface BattleCardSelectorProps {
   selectedCards: string[];
   onCardSelect: (cardId: string) => void;
 }
-
-const ENERGY_COSTS: Record<number, number> = {
-  0: 1,
-  5: 2,
-  10: 3,
-  15: 4,
-  20: 5,
-};
 
 const RARITY_COLORS: Record<string, string> = {
   common: "bg-gray-500",
@@ -40,11 +34,18 @@ export const BattleCardSelector = ({
   selectedCards,
   onCardSelect,
 }: BattleCardSelectorProps) => {
+  const fallbackEnergyCost = (stage: number) => {
+    if (stage <= 9) return 1;
+    if (stage <= 14) return 2;
+    return 3;
+  };
+
   return (
     <div className="grid grid-cols-2 gap-3">
       {cards.map((card) => {
         const isSelected = selectedCards.includes(card.id);
-        const energyCost = ENERGY_COSTS[card.evolution_stage] || 1;
+        const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
+        const rarityClass = RARITY_COLORS[card.rarity?.toLowerCase()] || "bg-gray-500";
 
         return (
           <button
@@ -82,6 +83,11 @@ export const BattleCardSelector = ({
                 <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-bold text-white border border-primary/50">
                   ⚡{energyCost}
                 </div>
+                {card.bond_level && (
+                  <div className="absolute bottom-2 left-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 text-[10px] font-semibold border text-foreground">
+                    Bond {card.bond_level}
+                  </div>
+                )}
               </div>
 
               {/* Card Info */}
@@ -92,7 +98,7 @@ export const BattleCardSelector = ({
                   </h4>
                   <Badge
                     variant="secondary"
-                    className={`${RARITY_COLORS[card.rarity] || "bg-gray-500"} text-white text-xs`}
+                    className={`${rarityClass} text-white text-xs`}
                   >
                     S{card.evolution_stage}
                   </Badge>

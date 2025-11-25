@@ -146,11 +146,46 @@ export const useCompanion = () => {
       if (!companionData) throw new Error("Failed to create companion");
 
       // Record initial evolution
-      await supabase.from("companion_evolutions").insert({
-        companion_id: companionData.id,
-        stage: 0,
-        image_url: imageData.imageUrl,
-        xp_at_evolution: 0,
+      const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
+        .from("companion_evolutions")
+        .insert({
+          companion_id: companionData.id,
+          stage: 0,
+          image_url: imageData.imageUrl,
+          xp_at_evolution: 0,
+        })
+        .select()
+        .single();
+
+      if (stageZeroInsertError || !stageZeroEvolution) {
+        throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
+      }
+
+      const generateStageZeroCard = async () => {
+        try {
+          await supabase.functions.invoke("generate-evolution-card", {
+            body: {
+              companionId: companionData.id,
+              evolutionId: stageZeroEvolution.id,
+              stage: 0,
+              species: companionData.spirit_animal,
+              element: companionData.core_element,
+              color: companionData.favorite_color,
+              userAttributes: {
+                body: companionData.body || 0,
+                mind: companionData.mind || 0,
+                soul: companionData.soul || 0,
+              },
+            },
+          });
+          queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+        } catch (cardError) {
+          console.error("Failed to generate stage 0 card:", cardError);
+        }
+      };
+
+      generateStageZeroCard().catch(() => {
+        // prevent unhandled rejection logging
       });
 
       // Auto-generate the first chapter of the companion's story in background with retry
@@ -395,8 +430,8 @@ export const useCompanion = () => {
 
         const existingStages = new Set(existingCards?.map(c => c.evolution_stage) || []);
 
-        // Generate cards for missing stages (stages 1 through newStage)
-        for (let stage = 1; stage <= newStage; stage++) {
+        // Generate cards for missing stages (stage 0 through current stage)
+        for (let stage = 0; stage <= newStage; stage++) {
           if (!existingStages.has(stage)) {
             console.log(`Generating card for stage ${stage}`);
             
