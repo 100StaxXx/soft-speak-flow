@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getHabitXP } from "@/config/xpRewards";
+import { getHabitXP, QUEST_XP_REWARDS } from "@/config/xpRewards";
 import {
   Drawer,
   DrawerClose,
@@ -54,6 +54,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 
+const MAIN_QUEST_MULTIPLIER = 1.5;
 const getLocalDateString = (date: Date = new Date()) => format(date, "yyyy-MM-dd");
 const toReferenceTime = (time: string) => {
   const [hours, minutes = "0"] = time.split(":");
@@ -130,10 +131,9 @@ export default function Tasks() {
   
   // Calculate total XP for the day
   const totalXP = tasks.reduce((sum, task) => {
-    if (task.completed) {
-      return sum + (task.is_main_quest ? task.xp_reward * 2 : task.xp_reward);
-    }
-    return sum;
+    if (!task.completed) return sum;
+    const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward;
+    return sum + reward;
   }, 0);
 
   // Habits state
@@ -713,7 +713,7 @@ export default function Tasks() {
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
+                    description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
                   />
                 ) : (() => {
                   const mainQuest = tasks.find(t => t.is_main_quest);
@@ -729,13 +729,13 @@ export default function Tasks() {
                             <h3 className="font-semibold text-foreground">Main Quest</h3>
                             <div className="ml-auto">
                               <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                                2x XP
+                                {`${MAIN_QUEST_MULTIPLIER}x XP`}
                               </span>
                             </div>
                           </div>
                           <TaskCard
-                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
-                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER }}
+                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
                             onDelete={() => deleteTask(mainQuest.id)}
                             isMainQuest={true}
                           />
@@ -800,7 +800,9 @@ export default function Tasks() {
                       >
                         <Zap className="h-4 w-4" />
                         <span className="hidden sm:inline">Easy</span>
-                        <span className="sm:hidden">5</span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          +{QUEST_XP_REWARDS.EASY} XP
+                        </span>
                       </Button>
                       <Button
                         variant={taskDifficulty === 'medium' ? 'default' : 'outline'}
@@ -810,7 +812,9 @@ export default function Tasks() {
                       >
                         <Flame className="h-4 w-4" />
                         <span className="hidden sm:inline">Medium</span>
-                        <span className="sm:hidden">10</span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          +{QUEST_XP_REWARDS.MEDIUM} XP
+                        </span>
                       </Button>
                       <Button
                         variant={taskDifficulty === 'hard' ? 'default' : 'outline'}
@@ -820,7 +824,9 @@ export default function Tasks() {
                       >
                         <Mountain className="h-4 w-4" />
                         <span className="hidden sm:inline">Hard</span>
-                        <span className="sm:hidden">20</span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          +{QUEST_XP_REWARDS.HARD} XP
+                        </span>
                       </Button>
                     </div>
 
@@ -949,7 +955,7 @@ export default function Tasks() {
               Set as Main Quest?
             </DrawerTitle>
             <DrawerDescription>
-              Main quests award 2x XP and help you focus on what matters most today.
+              {`Main quests award ${MAIN_QUEST_MULTIPLIER}x XP and help you focus on what matters most today.`}
             </DrawerDescription>
           </DrawerHeader>
           <DrawerFooter className="pt-4">
