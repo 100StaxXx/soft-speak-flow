@@ -477,15 +477,36 @@ export default function Onboarding() {
       await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
       await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
       
+      // Prefetch companion data to ensure it's loaded before navigation
+      console.log("Prefetching companion data...");
+      try {
+        await queryClient.prefetchQuery({
+          queryKey: ["companion", user.id],
+          queryFn: async () => {
+            const { data, error } = await supabase
+              .from("user_companion")
+              .select("*")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            
+            if (error) throw error;
+            return data;
+          },
+        });
+        console.log("Companion data prefetched successfully");
+      } catch (prefetchError) {
+        console.warn("Failed to prefetch companion (non-critical):", prefetchError);
+        // Continue anyway - the Tasks page will handle loading state
+      }
+      
       // Show success message
       toast({
         title: "Success!",
         description: "🎉 Your companion is ready! Welcome to your journey.",
       });
       
-      // Wait longer to ensure database update and cache propagate
-      // Increased from 1000ms to 2000ms to prevent race condition crashes
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Small delay for success message visibility
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       console.log("Navigating to tasks...");
       // Navigate to quests page to start with tasks
