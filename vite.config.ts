@@ -17,9 +17,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'A Lil Push - Your Personal AI Mentor',
-        short_name: 'A Lil Push',
-        description: 'Choose your AI mentor and receive personalized motivation, wisdom, and daily pushes tailored to your goals and mindset.',
+        name: 'R-Evolution - Your Personal AI Mentor',
+        short_name: 'R-Evolution',
+        description: 'Your gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.',
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone',
