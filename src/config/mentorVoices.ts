@@ -16,7 +16,7 @@ export interface MentorVoiceConfig {
 export const mentorVoices: Record<string, MentorVoiceConfig> = {
   atlas: {
     mentorSlug: "atlas",
-    mentorName: "Atlas",
+    mentorName: "George",
     voiceName: "George",
     voiceId: "JBFqnCBsd6RMkjVDRZzb",
     defaultIntensity: "medium",
@@ -30,7 +30,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   darius: {
     mentorSlug: "darius",
-    mentorName: "Darius",
+    mentorName: "Brian",
     voiceName: "Brian",
     voiceId: "rWyjfFeMZ6PxkHqD3wGC",
     defaultIntensity: "high",
@@ -44,7 +44,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   eli: {
     mentorSlug: "eli",
-    mentorName: "Eli",
+    mentorName: "Chris",
     voiceName: "Chris",
     voiceId: "iP95p4xoKVk53GoZ742B",
     defaultIntensity: "medium",
@@ -58,7 +58,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   nova: {
     mentorSlug: "nova",
-    mentorName: "Nova",
+    mentorName: "Daniel",
     voiceName: "Daniel",
     voiceId: "onwK4e9ZLuTAKqWW03F9",
     defaultIntensity: "medium",
@@ -72,7 +72,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   sienna: {
     mentorSlug: "sienna",
-    mentorName: "Sienna",
+    mentorName: "Charlotte",
     voiceName: "Charlotte",
     voiceId: "XB0fDUnXU5powFXDhCwa",
     defaultIntensity: "gentle",
@@ -86,7 +86,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   lumi: {
     mentorSlug: "lumi",
-    mentorName: "Lumi",
+    mentorName: "Sarah",
     voiceName: "Sarah",
     voiceId: "EXAVITQu4vr4xnSDxMaL",
     defaultIntensity: "gentle",
@@ -100,7 +100,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   kai: {
     mentorSlug: "kai",
-    mentorName: "Astor",
+    mentorName: "Callum",
     voiceName: "Callum",
     voiceId: "N2lVS1w4EtoT3dr4eOWO",
     defaultIntensity: "high",
@@ -128,7 +128,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   solace: {
     mentorSlug: "solace",
-    mentorName: "Solace",
+    mentorName: "Lily",
     voiceName: "Lily",
     voiceId: "pFZP5JQG7iQjIQuC4Bku",
     defaultIntensity: "gentle",

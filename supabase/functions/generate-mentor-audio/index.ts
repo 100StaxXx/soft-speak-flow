@@ -9,13 +9,13 @@ const corsHeaders = {
 
 const mentorVoices: Record<string, any> = {
   atlas: {
-    voiceId: "bIHbv24MWmeRgasZH58o",
+    voiceId: "JBFqnCBsd6RMkjVDRZzb",
     stability: 0.75,
     similarity_boost: 0.85,
     style_exaggeration: 0.5,
   },
   darius: {
-    voiceId: "nPczCjzI2devNBz1zQrb",
+    voiceId: "rWyjfFeMZ6PxkHqD3wGC",
     stability: 0.8,
     similarity_boost: 0.9,
     style_exaggeration: 0.7,
@@ -45,13 +45,13 @@ const mentorVoices: Record<string, any> = {
     style_exaggeration: 0.2,
   },
   kai: {
-    voiceId: "pNInz6obpgDQGcFmaJgB",
+    voiceId: "N2lVS1w4EtoT3dr4eOWO",
     stability: 0.7,
     similarity_boost: 0.85,
     style_exaggeration: 0.8,
   },
   stryker: {
-    voiceId: "JBFqnCBsd6RMkjVDRZzb",
+    voiceId: "pNInz6obpgDQGcFmaJgB",
     stability: 0.85,
     similarity_boost: 0.9,
     style_exaggeration: 0.7,

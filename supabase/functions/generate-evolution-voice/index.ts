@@ -9,15 +9,15 @@ const corsHeaders = {
 
 // Mentor voice IDs for ElevenLabs
 const MENTOR_VOICES: Record<string, string> = {
-  'atlas': 'TX3LPaxmHKxFdv7VOQHJ', // Liam - strong, authoritative
-  'darius': 'onwK4e9ZLuTAKqWW03F9', // Daniel - direct, intense
-  'solace': 'cgSgspJ2msm6clMCkdW9', // Jessica - warm, gentle
-  'kai': 'CwhRBWXzGAHq8TQ4Fs17', // Roger - balanced
-  'nova': '9BWtsMINqrJLrRacOk9x', // Aria - energetic
-  'stryker': 'bIHbv24MWmeRgasZH58o', // Will - powerful
-  'eli': 'N2lVS1w4EtoT3dr4eOWO', // Callum - friendly
+  'atlas': 'JBFqnCBsd6RMkjVDRZzb', // George - strong, authoritative
+  'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian - direct, intense
+  'solace': 'pFZP5JQG7iQjIQuC4Bku', // Lily - warm, gentle
+  'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum - balanced
+  'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel - energetic
+  'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich - powerful
+  'eli': 'iP95p4xoKVk53GoZ742B', // Chris - friendly
   'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah - nurturing
-  'sienna': 'pFZP5JQG7iQjIQuC4Bku', // Lily - inspiring
+  'sienna': 'XB0fDUnXU5powFXDhCwa', // Charlotte - inspiring
 };
 
 serve(async (req) => {
@@ -83,9 +83,9 @@ Generate a SHORT, powerful one-liner (10-15 words MAX) celebrating that the user
 Focus on DISCIPLINE and CONSISTENCY.
 
 Examples for different mentors:
-- Atlas (authoritative): "Growth like this doesn't happen by accident."
-- Darius (intense): "This is what consistency looks like."
-- Solace (gentle): "Look at what you're building, gently and surely."
+- George (authoritative): "Growth like this doesn't happen by accident."
+- Brian (intense): "This is what consistency looks like."
+- Lily (gentle): "Look at what you're building, gently and surely."
 
 Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
           },
