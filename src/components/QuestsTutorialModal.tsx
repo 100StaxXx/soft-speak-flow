@@ -42,6 +42,12 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
+                  Unlock Bonus Quest by completing all 4 or reaching a 7-day streak
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-foreground">
                   Complete them to earn XP
                 </p>
               </div>
