@@ -174,7 +174,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
 
       if (memberships && memberships.length > 0) {
-        const bonusXP = Math.floor(baseXP * 0.2);
+        const bonusXP = Math.floor(baseXP * 0.1);
         return { bonusXP, toastReason: `Task Complete! +${bonusXP} Guild Bonus 🎯` };
       }
     } catch (error) {

@@ -24,7 +24,7 @@ export const QUEST_XP_REWARDS = {
  * Done daily, these become the core XP engine.
  */
 export const HABIT_XP_REWARDS = {
-  EASY: 7,
+  EASY: 8,
   MEDIUM: 14,
   HARD: 24,
 } as const;
@@ -36,7 +36,7 @@ export const HABIT_XP_REWARDS = {
  */
 export const SYSTEM_XP_REWARDS = {
   /** Completing a habit (base - multiplied by difficulty) */
-  HABIT_COMPLETE: 7,
+  HABIT_COMPLETE: 8,
   /** Completing ALL daily habits */
   ALL_HABITS_COMPLETE: 15,
   /** Completing a challenge day */

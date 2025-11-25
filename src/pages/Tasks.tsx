@@ -131,7 +131,7 @@ export default function Tasks() {
   // Calculate total XP for the day
   const totalXP = tasks.reduce((sum, task) => {
     if (task.completed) {
-      return sum + (task.is_main_quest ? task.xp_reward * 2 : task.xp_reward);
+      return sum + (task.is_main_quest ? task.xp_reward * 1.5 : task.xp_reward);
     }
     return sum;
   }, 0);
@@ -713,7 +713,7 @@ export default function Tasks() {
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description="Add up to 3 quests - mark one as your Main Quest for 2x XP!"
+                    description="Add up to 3 quests - mark one as your Main Quest for 1.5x XP!"
                   />
                 ) : (() => {
                   const mainQuest = tasks.find(t => t.is_main_quest);
@@ -729,13 +729,13 @@ export default function Tasks() {
                             <h3 className="font-semibold text-foreground">Main Quest</h3>
                             <div className="ml-auto">
                               <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                                2x XP
+                                1.5x XP
                               </span>
                             </div>
                           </div>
                           <TaskCard
-                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 2 }}
-                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 2 })}
+                            task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * 1.5 }}
+                            onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * 1.5 })}
                             onDelete={() => deleteTask(mainQuest.id)}
                             isMainQuest={true}
                           />
@@ -949,7 +949,7 @@ export default function Tasks() {
               Set as Main Quest?
             </DrawerTitle>
             <DrawerDescription>
-              Main quests award 2x XP and help you focus on what matters most today.
+              Main quests award 1.5x XP and help you focus on what matters most today.
             </DrawerDescription>
           </DrawerHeader>
           <DrawerFooter className="pt-4">
