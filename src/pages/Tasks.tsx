@@ -728,8 +728,9 @@ export default function Tasks() {
                     description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
                   />
                 ) : (() => {
-                  const mainQuest = tasks.find(t => t.is_main_quest);
-                  const sideQuests = tasks.filter(t => !t.is_main_quest);
+                  const mainQuest = tasks.find(t => t.is_main_quest && !(t as any).is_bonus);
+                  const sideQuests = tasks.filter(t => !t.is_main_quest && !(t as any).is_bonus);
+                  const bonusQuest = bonusTasks[0]; // Only one bonus quest allowed
                   
                   return (
                     <>
@@ -773,6 +774,41 @@ export default function Tasks() {
                               />
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Bonus Quest Section */}
+                      {(bonusQuest || bonusUnlocked) && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Star className="h-5 w-5 text-amber-500" />
+                            <h3 className="font-semibold text-amber-600 dark:text-amber-400">Bonus Quest</h3>
+                            {bonusUnlocked && !bonusQuest && (
+                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full animate-pulse">
+                                Unlocked!
+                              </span>
+                            )}
+                          </div>
+                          {bonusQuest ? (
+                            <div className="relative">
+                              <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-lg blur"></div>
+                              <div className="relative">
+                                <TaskCard
+                                  task={bonusQuest}
+                                  onToggle={() => toggleTask({ taskId: bonusQuest.id, completed: !bonusQuest.completed, xpReward: bonusQuest.xp_reward })}
+                                  onDelete={() => deleteTask(bonusQuest.id)}
+                                  onSetMainQuest={!mainQuest ? () => setMainQuest(bonusQuest.id) : undefined}
+                                  showPromoteButton={!mainQuest}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-amber-500/30 rounded-lg p-4 text-center">
+                              <p className="text-sm text-muted-foreground">
+                                🎉 Add your bonus quest above!
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
