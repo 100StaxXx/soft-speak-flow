@@ -45,15 +45,18 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.HABIT_COMPLETE,
       });
       
-      // Update attributes in background without waiting
-      updateMindFromHabit(companion.id).catch(err => {
-        console.error('Mind update failed:', err);
-        // Non-critical - don't show toast to avoid spam
-      });
-      updateBodyFromActivity(companion.id).catch(err => {
-        console.error('Body update failed:', err);
-        // Non-critical - don't show toast to avoid spam
-      });
+      // Update attributes in background without waiting - verify companion exists at call time
+      const companionId = companion.id;
+      if (companionId) {
+        updateMindFromHabit(companionId).catch(err => {
+          console.error('Mind update failed:', err);
+          // Non-critical - don't show toast to avoid spam
+        });
+        updateBodyFromActivity(companionId).catch(err => {
+          console.error('Body update failed:', err);
+          // Non-critical - don't show toast to avoid spam
+        });
+      }
     } catch (error) {
       console.error('Error awarding habit completion:', error);
     }
@@ -106,15 +109,18 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update attributes in background without waiting
-      updateSoulFromReflection(companion.id).catch(err => {
-        console.error('Soul update failed:', err);
-        // Non-critical - don't show toast to avoid spam
-      });
-      updateBodyFromActivity(companion.id).catch(err => {
-        console.error('Body update failed:', err);
-        // Non-critical - don't show toast to avoid spam
-      });
+      // Update attributes in background without waiting - verify companion exists at call time
+      const companionId = companion.id;
+      if (companionId) {
+        updateSoulFromReflection(companionId).catch(err => {
+          console.error('Soul update failed:', err);
+          // Non-critical - don't show toast to avoid spam
+        });
+        updateBodyFromActivity(companionId).catch(err => {
+          console.error('Body update failed:', err);
+          // Non-critical - don't show toast to avoid spam
+        });
+      }
     } catch (error) {
       console.error('Error awarding check-in:', error);
     }
@@ -131,11 +137,14 @@ export const useXPRewards = () => {
         metadata: { milestone },
       });
       
-      // Update soul in background without waiting
-      updateSoulFromStreak({
-        companionId: companion.id,
-        streakDays: milestone,
-      }).catch(err => console.error('Soul streak update failed:', err));
+      // Update soul in background without waiting - verify companion exists at call time
+      const companionId = companion.id;
+      if (companionId) {
+        updateSoulFromStreak({
+          companionId,
+          streakDays: milestone,
+        }).catch(err => console.error('Soul streak update failed:', err));
+      }
     } catch (error) {
       console.error('Error awarding streak milestone:', error);
     }
@@ -151,10 +160,13 @@ export const useXPRewards = () => {
         xpAmount: XP_REWARDS.CHECK_IN,
       });
       
-      // Update soul in background without waiting
-      updateSoulFromReflection(companion.id).catch(err => 
-        console.error('Soul update failed:', err)
-      );
+      // Update soul in background without waiting - verify companion exists at call time
+      const companionId = companion.id;
+      if (companionId) {
+        updateSoulFromReflection(companionId).catch(err => 
+          console.error('Soul update failed:', err)
+        );
+      }
     } catch (error) {
       console.error('Error awarding reflection:', error);
     }

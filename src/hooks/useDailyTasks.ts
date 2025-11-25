@@ -309,8 +309,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
           showXPToast(xpAwarded, toastReason || 'Task Complete!');
         }
 
-        if (companion) {
-          await updateBodyFromActivity(companion.id);
+        // Update body attribute in background - null-safe
+        if (companion?.id) {
+          updateBodyFromActivity(companion.id).catch(err => {
+            console.error('Body attribute update failed:', err);
+            // Non-critical - don't block user flow
+          });
         }
 
         window.dispatchEvent(new CustomEvent('mission-completed'));

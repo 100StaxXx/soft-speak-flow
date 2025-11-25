@@ -97,9 +97,10 @@ export default function Challenges() {
       toast.success("Challenge started!");
       refetchUserChallenges();
       setActiveTab("active");
-    } catch (error: any) {
-      toast.error("Failed to start challenge");
-      console.error(error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to start challenge";
+      toast.error(errorMessage);
+      console.error('Challenge start failed:', error);
     }
   };
 

@@ -97,7 +97,8 @@ export const useMissionAutoComplete = () => {
 
           // Complete mission if criteria met
           if (shouldComplete && !mission.completed && mounted) {
-            const { error } = await supabase
+            // ATOMIC: Only update if not already completed (prevent double XP)
+            const { data: updateResult, error } = await supabase
               .from('daily_missions')
               .update({ 
                 completed: true, 
@@ -105,9 +106,12 @@ export const useMissionAutoComplete = () => {
                 progress_current: mission.progress_target 
               })
               .eq('id', mission.id)
-              .eq('user_id', user.id);
+              .eq('user_id', user.id)
+              .eq('completed', false) // CRITICAL: only update if not already completed
+              .select();
 
-            if (!error && mounted) {
+            // VERIFY: Only award XP if the update actually changed a row
+            if (!error && updateResult && updateResult.length > 0 && mounted) {
               // Award XP
               await awardCustomXP(
                 mission.xp_reward, 
