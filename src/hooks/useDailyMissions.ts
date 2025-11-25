@@ -5,7 +5,7 @@ import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export const useDailyMissions = () => {
   const { user } = useAuth();
@@ -16,7 +16,7 @@ export const useDailyMissions = () => {
   const today = new Date().toLocaleDateString('en-CA');
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
-  const { data: missions, isLoading } = useQuery({
+  const { data: missions, isLoading, error } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -60,14 +60,18 @@ export const useDailyMissions = () => {
       return existing;
     },
     enabled: !!user,
-    onError: (error: Error) => {
+  });
+
+  // Handle errors with useEffect instead of deprecated onError
+  useEffect(() => {
+    if (error) {
       toast({
         title: generationErrorMessage ? "Mission generation failed" : "Unable to load daily missions",
         description: generationErrorMessage || error.message,
         variant: "destructive",
       });
-    },
-  });
+    }
+  }, [error, generationErrorMessage, toast]);
 
   const regenerateMissions = useMutation({
     mutationFn: async () => {

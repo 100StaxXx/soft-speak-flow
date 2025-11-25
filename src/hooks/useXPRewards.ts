@@ -169,7 +169,7 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string) => {
+  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, any>) => {
     if (!companion) {
       console.warn('Attempted to award XP without companion');
       return;
@@ -180,6 +180,7 @@ export const useXPRewards = () => {
     awardXP.mutate({
       eventType,
       xpAmount,
+      metadata,
     });
   };
 
