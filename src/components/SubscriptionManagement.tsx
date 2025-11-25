@@ -16,7 +16,18 @@ export function SubscriptionManagement() {
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal');
       
-      if (error) throw error;
+      if (error) {
+        // Handle the case where user hasn't created a Stripe customer yet
+        if (error.message?.includes("No subscription found")) {
+          toast({
+            title: "No Subscription Yet",
+            description: "Please subscribe to a plan first before managing your subscription.",
+            variant: "default",
+          });
+          return;
+        }
+        throw error;
+      }
       
       if (data?.url) {
         window.open(data.url, '_blank');
