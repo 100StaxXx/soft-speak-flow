@@ -94,7 +94,9 @@ export default function Tasks() {
     isToggling,
     canAddMore,
     completedCount,
-    totalCount 
+    totalCount,
+    hasBonusSlot,
+    maxQuests 
   } = useDailyTasks(selectedDate);
   
   // Get all tasks for calendar views
@@ -676,13 +678,38 @@ export default function Tasks() {
               <TimeConflictDetector tasks={tasks} />
             )}
 
+            {/* Bonus Quest Slot Unlock Notification */}
+            {calendarView === "list" && hasBonusSlot && (
+              <Card className="p-3 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-primary/30">
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl">🎯</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-primary">Bonus Quest Slot Unlocked!</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(profile?.current_habit_streak || 0) >= 7 
+                        ? `You're on a ${profile?.current_habit_streak}-day streak!` 
+                        : "You completed all 4 quests!"}
+                      {" "}You can add a 5th quest today.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
+                  <p className="text-sm text-muted-foreground">
+                    Max {maxQuests} quests per day
+                    {hasBonusSlot && (
+                      <span className="text-primary ml-2 font-semibold">
+                        🎯 Bonus Slot Unlocked!
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {completedCount}/{totalCount}
