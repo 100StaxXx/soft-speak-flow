@@ -2780,6 +2780,36 @@ export type Database = {
       }
     }
     Functions: {
+      create_companion_if_not_exists: {
+        Args: {
+          p_core_element: string
+          p_current_image_url: string
+          p_eye_color: string
+          p_favorite_color: string
+          p_fur_color: string
+          p_initial_image_url: string
+          p_spirit_animal: string
+          p_story_tone: string
+          p_user_id: string
+        }
+        Returns: {
+          core_element: string
+          created_at: string
+          current_image_url: string
+          current_stage: number
+          current_xp: number
+          eye_color: string
+          favorite_color: string
+          fur_color: string
+          id: string
+          initial_image_url: string
+          is_new: boolean
+          spirit_animal: string
+          story_tone: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_next_evolution_threshold: {
         Args: { current_stage: number }
         Returns: number
