@@ -372,8 +372,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
   });
 
   // Compute bonus quest logic
-  const regularTasks = tasks.filter(t => !t.is_bonus);
-  const bonusTasks = tasks.filter(t => t.is_bonus);
+  const regularTasks = tasks?.filter(t => !t.is_bonus) || [];
+  const bonusTasks = tasks?.filter(t => t.is_bonus) || [];
   const allRegularCompleted = regularTasks.length === 4 && regularTasks.every(t => t.completed);
   const hasStreak = (profile?.current_habit_streak || 0) >= 7;
   const bonusUnlocked = allRegularCompleted || hasStreak;
