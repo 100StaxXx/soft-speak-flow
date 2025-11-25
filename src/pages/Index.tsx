@@ -15,15 +15,7 @@ import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { safeLocalStorage } from "@/utils/storage";
-import dariusImage from "@/assets/darius-sage.png";
-import novaImage from "@/assets/nova-sage.png";
-import lumiImage from "@/assets/lumi-sage.png";
-import kaiImage from "@/assets/kai-sage.png";
-import atlasImage from "@/assets/atlas-sage.png";
-import siennaImage from "@/assets/sienna-sage.png";
-import eliImage from "@/assets/eli-sage.png";
-import strykerImage from "@/assets/stryker-sage.png";
-import solaceImage from "@/assets/solace-sage.png";
+import { loadMentorImage } from "@/utils/mentorImageLoader";
 
 const Index = () => {
   const { user } = useAuth();
@@ -40,20 +32,7 @@ const Index = () => {
     author: string | null;
   } | null>(null);
 
-  // Map mentor slugs to local images
-  const mentorImages: Record<string, string> = {
-    'darius': dariusImage,
-    'nova': novaImage,
-    'lumi': lumiImage,
-    'kai': kaiImage,
-    'atlas': atlasImage,
-    'sienna': siennaImage,
-    'eli': eliImage,
-    'stryker': strykerImage,
-    'solace': solaceImage,
-  };
-
-  // Fetch mentor image and quote
+  // Fetch mentor image and quote (optimized - only loads needed image)
   useEffect(() => {
     const fetchMentorData = async () => {
       if (!profile?.selected_mentor_id) return;
@@ -66,7 +45,8 @@ const Index = () => {
           .maybeSingle();
 
         if (mentorData) {
-          const imageUrl = mentorData.avatar_url || mentorImages[mentorData.slug] || mentorImages['darius'];
+          // Dynamically load only the mentor image we need (saves ~20MB!)
+          const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
           setMentorImage(imageUrl);
 
           // Get today's pep talk to find related quote

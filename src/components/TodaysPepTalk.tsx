@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonPepTalk } from "@/components/SkeletonCard";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -32,7 +32,7 @@ interface DailyPepTalk {
   mentor_name?: string;
 }
 
-export const TodaysPepTalk = () => {
+export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
@@ -508,4 +508,6 @@ export const TodaysPepTalk = () => {
       </div>
     </Card>
   );
-};
+});
+
+TodaysPepTalk.displayName = 'TodaysPepTalk';

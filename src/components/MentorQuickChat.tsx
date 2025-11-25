@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ const ROTATING_QUESTIONS = [
   "Give me the hard truth",
 ];
 
-export const MentorQuickChat = () => {
+export const MentorQuickChat = memo(() => {
   const navigate = useNavigate();
   const personality = useMentorPersonality();
   const [currentQuestions, setCurrentQuestions] = useState<string[]>([]);
@@ -95,4 +95,6 @@ export const MentorQuickChat = () => {
       </div>
     </Card>
   );
-};
+});
+
+MentorQuickChat.displayName = 'MentorQuickChat';
