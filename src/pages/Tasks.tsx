@@ -94,7 +94,10 @@ export default function Tasks() {
     isToggling,
     canAddMore,
     completedCount,
-    totalCount 
+    totalCount,
+    bonusUnlocked,
+    regularTasks,
+    bonusTasks
   } = useDailyTasks(selectedDate);
   
   // Get all tasks for calendar views
@@ -682,10 +685,19 @@ export default function Tasks() {
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
+                  <p className="text-sm text-muted-foreground">
+                    {bonusUnlocked 
+                      ? "4 base quests + 1 bonus quest unlocked!" 
+                      : "4 base quests (Complete all 4 or reach 7-day streak to unlock Bonus Quest)"}
+                  </p>
                 </div>
-                <div className="text-sm font-medium text-primary">
-                  {completedCount}/{totalCount}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium text-primary">
+                    {completedCount}/{totalCount}
+                  </div>
+                  {bonusUnlocked && bonusTasks.length === 0 && (
+                    <Star className="h-4 w-4 text-amber-500 animate-pulse" />
+                  )}
                 </div>
               </div>
 
