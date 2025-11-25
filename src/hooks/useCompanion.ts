@@ -432,21 +432,60 @@ export const useCompanion = () => {
               .eq("stage", stage)
               .maybeSingle();
             
-            await supabase.functions.invoke("generate-evolution-card", {
-              body: {
-                companionId: companion.id,
-                evolutionId: evolutionRecord?.id || evolutionId,
-                stage: stage,
-                species: companion.spirit_animal,
-                element: companion.core_element,
-                color: companion.favorite_color,
-                userAttributes: {
-                  body: companion.body || 0,
-                  mind: companion.mind || 0,
-                  soul: companion.soul || 0,
+            // Special handling for stage 0 - ensure evolution record exists
+            let stageEvolutionId = evolutionRecord?.id;
+            
+            if (stage === 0 && !evolutionRecord) {
+              console.log("Stage 0 evolution record not found, creating one...");
+              
+              // Get the companion's initial image
+              const { data: companionData } = await supabase
+                .from("user_companion")
+                .select("initial_image_url, created_at")
+                .eq("id", companion.id)
+                .single();
+              
+              // Create stage 0 evolution record
+              const { data: newStage0Evolution, error: stage0Error } = await supabase
+                .from("companion_evolutions")
+                .insert({
+                  companion_id: companion.id,
+                  stage: 0,
+                  image_url: companionData?.initial_image_url || null,
+                  xp_at_evolution: 0,
+                  evolved_at: companionData?.created_at || new Date().toISOString(),
+                })
+                .select()
+                .single();
+              
+              if (!stage0Error && newStage0Evolution) {
+                stageEvolutionId = newStage0Evolution.id;
+                console.log("Created stage 0 evolution record:", stageEvolutionId);
+              } else {
+                console.error("Failed to create stage 0 evolution record:", stage0Error);
+              }
+            }
+            
+            // Only generate card if we have a valid evolution ID for this stage
+            if (stageEvolutionId) {
+              await supabase.functions.invoke("generate-evolution-card", {
+                body: {
+                  companionId: companion.id,
+                  evolutionId: stageEvolutionId,
+                  stage: stage,
+                  species: companion.spirit_animal,
+                  element: companion.core_element,
+                  color: companion.favorite_color,
+                  userAttributes: {
+                    body: companion.body || 0,
+                    mind: companion.mind || 0,
+                    soul: companion.soul || 0,
+                  },
                 },
-              },
-            });
+              });
+            } else {
+              console.warn(`Skipping card generation for stage ${stage} - no evolution record found`);
+            }
           }
         }
       } catch (cardError) {
