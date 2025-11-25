@@ -209,6 +209,17 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
             "Begin Your Journey"
           )}
         </Button>
+        
+        {isLoading && (
+          <div className="text-center space-y-2 animate-fade-in">
+            <p className="text-sm text-muted-foreground">
+              Please wait while we create your unique companion...
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              This may take up to 30 seconds
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );

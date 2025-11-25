@@ -71,77 +71,96 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
+      console.log("Starting companion creation process...");
+
       // Determine consistent colors for the companion's lifetime
       const eyeColor = `glowing ${data.favoriteColor}`;
       const furColor = data.favoriteColor;
 
       // Generate initial companion image with color specifications (with retry)
-      const imageData = await retryWithBackoff(
-        async () => {
-          const { data: imageResult, error } = await supabase.functions.invoke(
-            "generate-companion-image",
-            {
-              body: {
-                favoriteColor: data.favoriteColor,
-                spiritAnimal: data.spiritAnimal,
-                element: data.coreElement,
-                stage: 0,
-                eyeColor,
-                furColor,
-              },
+      let imageData;
+      try {
+        console.log("Generating companion image...");
+        imageData = await retryWithBackoff(
+          async () => {
+            const { data: imageResult, error } = await supabase.functions.invoke(
+              "generate-companion-image",
+              {
+                body: {
+                  favoriteColor: data.favoriteColor,
+                  spiritAnimal: data.spiritAnimal,
+                  element: data.coreElement,
+                  stage: 0,
+                  eyeColor,
+                  furColor,
+                },
+              }
+            );
+            
+            // Handle specific error codes from edge function
+            if (error) {
+              console.error("Companion image generation error:", error);
+              const errorMsg = error.message || String(error);
+              
+              // Check for specific error codes
+              if (errorMsg.includes("INSUFFICIENT_CREDITS") || errorMsg.includes("Insufficient AI credits")) {
+                throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
+              }
+              if (errorMsg.includes("RATE_LIMITED") || errorMsg.includes("AI service is currently busy")) {
+                throw new Error("The service is currently busy. Please wait a moment and try again.");
+              }
+              if (errorMsg.includes("NO_AUTH_HEADER") || errorMsg.includes("INVALID_AUTH") || 
+                  errorMsg.includes("Authentication required") || errorMsg.includes("Invalid authentication")) {
+                throw new Error("Your session has expired. Please refresh the page and try again.");
+              }
+              if (errorMsg.includes("NETWORK_ERROR") || errorMsg.includes("Network error")) {
+                throw new Error("Network error. Please check your connection and try again.");
+              }
+              if (errorMsg.includes("SERVER_CONFIG_ERROR") || errorMsg.includes("AI_SERVICE_NOT_CONFIGURED")) {
+                throw new Error("Service configuration error. Please contact support.");
+              }
+              
+              throw new Error(errorMsg || "Failed to generate companion image. Please try again.");
             }
-          );
-          
-          // Handle specific error codes from edge function
-          if (error) {
-            console.error("Companion image generation error:", error);
-            if (error.message?.includes("INSUFFICIENT_CREDITS") || error.message?.includes("Insufficient AI credits")) {
-              throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
+            
+            if (!imageResult?.imageUrl) {
+              console.error("No image URL in result:", imageResult);
+              throw new Error("Unable to create your companion's image. Please try again.");
             }
-            if (error.message?.includes("RATE_LIMITED") || error.message?.includes("AI service is currently busy")) {
-              throw new Error("The service is currently busy. Please wait a moment and try again.");
+            return imageResult;
+          },
+          {
+            maxAttempts: 3,
+            initialDelay: 2000,
+            shouldRetry: (error: unknown) => {
+              // Don't retry on payment/credits errors or auth errors
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              if (errorMessage.includes("INSUFFICIENT_CREDITS") ||
+                  errorMessage.includes("temporarily unavailable") ||
+                  errorMessage.includes("Authentication failed") ||
+                  errorMessage.includes("contact support")) {
+                return false;
+              }
+              return true;
             }
-            throw new Error(error.message || "Failed to generate companion image. Please try again.");
           }
-          
-          if (!imageResult?.imageUrl) {
-            console.error("No image URL in result:", imageResult);
-            throw new Error("Unable to create your companion's image. Please try again.");
-          }
-          return imageResult;
-        },
-        {
-          maxAttempts: 3,
-          initialDelay: 2000,
-          shouldRetry: (error: unknown) => {
-            // Don't retry on payment/credits errors
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes("INSUFFICIENT_CREDITS") ||
-                errorMessage.includes("temporarily unavailable") ||
-                errorMessage.includes("contact support")) {
-              return false;
-            }
-            return true;
-          }
-        }
-      );
+        );
+      } catch (imageError) {
+        console.error("Image generation failed:", imageError);
+        throw imageError; // Re-throw with specific error message
+      }
 
       if (!imageData?.imageUrl) {
         console.error("Missing imageUrl after generation:", imageData);
         throw new Error("Unable to create your companion's image. Please try again.");
       }
 
-      console.log("Creating companion with data:", {
-        favoriteColor: data.favoriteColor,
-        spiritAnimal: data.spiritAnimal,
-        coreElement: data.coreElement,
-        storyTone: data.storyTone,
-        imageUrl: imageData.imageUrl
-      });
+      console.log("Image generated successfully, creating companion record...");
 
       // Use atomic database function to create companion (prevents duplicates)
-      const { data: companionResult, error: createError } = await supabase
-        .rpc('create_companion_if_not_exists', {
+      let companionResult;
+      try {
+        const result = await supabase.rpc('create_companion_if_not_exists', {
           p_user_id: user.id,
           p_favorite_color: data.favoriteColor,
           p_spirit_animal: data.spiritAnimal,
@@ -153,14 +172,20 @@ export const useCompanion = () => {
           p_fur_color: furColor,
         });
 
-      if (createError) {
-        console.error("Database error creating companion:", createError);
-        throw new Error(`Failed to save companion: ${createError.message}`);
+        if (result.error) {
+          console.error("Database error creating companion:", result.error);
+          throw new Error(`Failed to save companion to database: ${result.error.message}`);
+        }
+        
+        companionResult = result.data;
+      } catch (dbError) {
+        console.error("Database operation failed:", dbError);
+        throw new Error("Failed to save companion. Please check your connection and try again.");
       }
       
       if (!companionResult || companionResult.length === 0) {
         console.error("No companion data returned from function");
-        throw new Error("Failed to create companion");
+        throw new Error("Failed to create companion record. Please try again.");
       }
 
       const companionData = companionResult[0];
@@ -275,11 +300,12 @@ export const useCompanion = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      toast.success("🎉 Your companion is ready!");
+      console.log("Companion creation successful!");
+      // Don't show toast here - let the parent component handle success message
     },
     onError: (error) => {
       console.error("Failed to create companion:", error);
-      toast.error(error instanceof Error ? error.message : "Unable to create your companion. Please try again.");
+      // Don't show toast here - let the parent component handle error display
     },
   });
 

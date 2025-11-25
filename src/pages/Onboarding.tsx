@@ -426,35 +426,20 @@ export default function Onboarding() {
     storyTone: string;
   }) => {
     if (!user?.id) {
-      throw new Error('User not authenticated');
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a companion.",
+        variant: "destructive",
+      });
+      return;
     }
     
     try {
       console.log("Starting companion creation:", data);
       
-      // Create companion (atomic function handles duplicate prevention)
-      try {
-        await retryWithBackoff(
-          () => createCompanion.mutateAsync(data),
-          {
-            maxAttempts: 3,
-            initialDelay: 1000,
-            shouldRetry: (error: unknown) => {
-              // Retry on network errors and timeouts
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const isNetworkError = errorMessage.includes('fetch') ||
-                                   errorMessage.includes('network') ||
-                                   errorMessage.includes('timeout');
-              return isNetworkError;
-            }
-          }
-        );
-        console.log("Companion creation completed");
-      } catch (companionError: unknown) {
-        console.error("Companion creation error after retries:", companionError);
-        const errorMessage = companionError instanceof Error ? companionError.message : "Failed to create companion. Please check your connection.";
-        throw new Error(errorMessage);
-      }
+      // Create companion (already has retry logic built-in)
+      await createCompanion.mutateAsync(data);
+      console.log("Companion creation completed successfully");
       
       console.log("Marking onboarding as complete...");
       // Use standard update with atomic read-modify-write
@@ -479,10 +464,12 @@ export default function Onboarding() {
       
       if (completeError) {
         console.error("Error completing onboarding:", completeError);
-        throw completeError;
+        throw new Error("Failed to complete onboarding. Please try again.");
       }
       
-      if (!updatedProfile) throw new Error('Failed to complete onboarding');
+      if (!updatedProfile) {
+        throw new Error('Failed to complete onboarding. Please try again.');
+      }
       
       console.log("Onboarding marked complete");
       
@@ -490,18 +477,24 @@ export default function Onboarding() {
       await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
       await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
       
+      // Show success message
+      toast({
+        title: "Success!",
+        description: "🎉 Your companion is ready! Welcome to your journey.",
+      });
+      
       // Wait longer to ensure database update and cache propagate
       // Increased from 1000ms to 2000ms to prevent race condition crashes
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      console.log("Navigating to quests...");
+      console.log("Navigating to tasks...");
       // Navigate to quests page to start with tasks
       navigate("/tasks", { replace: true });
     } catch (error: unknown) {
       console.error("Error in onboarding:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create companion. Please try again.";
       toast({
-        title: "Error",
+        title: "Unable to Create Companion",
         description: errorMessage,
         variant: "destructive",
       });
