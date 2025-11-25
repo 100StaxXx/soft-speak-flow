@@ -9,15 +9,15 @@ const corsHeaders = {
 
 // Mentor voice IDs for ElevenLabs
 const MENTOR_VOICES: Record<string, string> = {
-  'atlas': 'TX3LPaxmHKxFdv7VOQHJ', // Liam - strong, authoritative
-  'darius': 'onwK4e9ZLuTAKqWW03F9', // Daniel - direct, intense
-  'solace': 'cgSgspJ2msm6clMCkdW9', // Jessica - warm, gentle
-  'kai': 'CwhRBWXzGAHq8TQ4Fs17', // Roger - balanced
-  'nova': '9BWtsMINqrJLrRacOk9x', // Aria - energetic
-  'stryker': 'bIHbv24MWmeRgasZH58o', // Will - powerful
-  'eli': 'N2lVS1w4EtoT3dr4eOWO', // Callum - friendly
-  'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah - nurturing
-  'sienna': 'pFZP5JQG7iQjIQuC4Bku', // Lily - inspiring
+  'atlas': 'JBFqnCBsd6RMkjVDRZzb', // George - strong, authoritative
+  'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian - direct, intense
+  'eli': 'iP95p4xoKVk53GoZ742B', // Chris - wise, grounded
+  'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel - innovative energy
+  'sienna': 'XB0fDUnXU5powFXDhCwa', // Charlotte - warm encouragement
+  'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah - calm, nurturing
+  'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum - high-energy push
+  'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich - powerful drive
+  'solace': 'pFZP5JQG7iQjIQuC4Bku', // Lily - gentle empathy
 };
 
 serve(async (req) => {
