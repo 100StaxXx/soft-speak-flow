@@ -76,7 +76,7 @@ export const useEpics = () => {
           title: epicData.title,
           description: epicData.description,
           target_days: epicData.target_days,
-          is_public: epicData.is_public || false,
+          is_public: true,
           xp_reward: Math.floor(epicData.target_days * 10),
           invite_code: inviteCode,
         })

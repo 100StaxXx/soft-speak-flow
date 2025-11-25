@@ -15,7 +15,6 @@ import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
@@ -83,7 +82,6 @@ export const CreateEpicDialog = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
-  const [isPublic, setIsPublic] = useState(false);
   const [themeColor, setThemeColor] = useState<EpicTheme>('heroic');
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
@@ -117,7 +115,7 @@ export const CreateEpicDialog = ({
       description: description.trim() || undefined,
       target_days: targetDays,
       habits: newHabits,
-      is_public: isPublic,
+      is_public: true,
       theme_color: themeColor,
     });
 
@@ -125,13 +123,12 @@ export const CreateEpicDialog = ({
     setTitle("");
     setDescription("");
     setTargetDays(30);
-    setIsPublic(false);
     setThemeColor('heroic');
     setNewHabits([]);
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  }, [title, description, targetDays, newHabits, themeColor, isPublic, onCreateEpic]);
+  }, [title, description, targetDays, newHabits, themeColor, onCreateEpic]);
 
   const calculateXPReward = useCallback(() => targetDays * 10, [targetDays]);
 
@@ -232,19 +229,6 @@ export const CreateEpicDialog = ({
                 );
               })}
             </div>
-          </div>
-
-          {/* Share Epic Toggle */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="space-y-0.5">
-              <Label htmlFor="is-public" className="text-base">Share with Community</Label>
-              <p className="text-sm text-muted-foreground">Allow others to join this epic</p>
-            </div>
-            <Switch
-              id="is-public"
-              checked={isPublic}
-              onCheckedChange={setIsPublic}
-            />
           </div>
 
           {/* Create Habits */}
