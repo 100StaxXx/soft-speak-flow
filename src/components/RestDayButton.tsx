@@ -65,7 +65,7 @@ export const RestDayButton = () => {
         .from('user_companion')
         .select('soul')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (companionData) {
         const newSoul = Math.min(100, (companionData.soul || 0) + 5);

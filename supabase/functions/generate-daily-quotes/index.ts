@@ -19,7 +19,7 @@ serve(async (req) => {
 
     console.log("Starting daily quote generation...");
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     // Get all active mentors
     const { data: mentors, error: mentorsError } = await supabase

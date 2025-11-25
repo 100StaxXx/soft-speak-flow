@@ -125,30 +125,11 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     onComplete();
   };
 
-  const handleDialogChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      return;
-    }
-
-    if (hasCompleted) {
-      onComplete();
-      return;
-    }
-
-    if (currentSlide >= slides.length - 1) {
-      handleComplete();
-      return;
-    }
-
-    // Allow early dismiss without marking onboarding complete
-    onComplete();
-  };
-
   const slide = slides[currentSlide];
   const Icon = slide.icon;
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
+    <Dialog open={open}>
       <DialogContent className="max-w-lg">
         <DialogTitle className="sr-only">{slide.title}</DialogTitle>
         <DialogDescription className="sr-only">{slide.description}</DialogDescription>
@@ -174,22 +155,22 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-4">
+            <Button variant="ghost" onClick={handleComplete}>
+              Close
+            </Button>
             {currentSlide < slides.length - 1 ? (
-              <>
+              <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={handleSkip}>
                   Skip
                 </Button>
                 <Button onClick={handleNext}>
                   Next
                 </Button>
-              </>
+              </div>
             ) : (
-              <>
-                <div />
-                <Button onClick={handleComplete} size="lg" className="px-8">
-                  Get Started
-                </Button>
-              </>
+              <Button onClick={handleComplete} size="lg" className="px-8">
+                Get Started
+              </Button>
             )}
           </div>
         </div>

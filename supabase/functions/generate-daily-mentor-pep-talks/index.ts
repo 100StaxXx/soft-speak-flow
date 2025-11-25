@@ -62,7 +62,7 @@ serve(async (req) => {
 
     // Get today's date in UTC
     const today = new Date();
-    const todayDate = today.toISOString().split('T')[0];
+    const todayDate = today.toLocaleDateString('en-CA');
     console.log(`Generating pep talks for date: ${todayDate}`);
 
     const results = [];

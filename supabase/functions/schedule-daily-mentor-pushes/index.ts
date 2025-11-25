@@ -20,7 +20,7 @@ serve(async (req) => {
 
     // Get today's date
     const today = new Date();
-    const todayDate = today.toISOString().split('T')[0];
+    const todayDate = today.toLocaleDateString('en-CA');
     console.log(`Scheduling pushes for date: ${todayDate}`);
 
     // Get all users with daily pushes enabled

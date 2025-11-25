@@ -5,6 +5,7 @@ import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
+import { useState } from "react";
 
 export const useDailyMissions = () => {
   const { user } = useAuth();
@@ -12,12 +13,15 @@ export const useDailyMissions = () => {
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
+  const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
   const { data: missions, isLoading } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
       if (!user) return [];
+      
+      setGenerationErrorMessage(null);
       
       // Try to get existing missions
       const { data: existing, error: existingError } = await supabase
@@ -38,18 +42,68 @@ export const useDailyMissions = () => {
 
         if (generationError) {
           console.error('Mission generation failed:', generationError);
-          throw new Error(generationError.message || 'Unable to generate missions right now.');
+          const message = generationError.message || 'Unable to generate missions right now.';
+          setGenerationErrorMessage(message);
+          throw new Error(message);
         }
         
-        return generated?.missions || [];
+        const newMissions = generated?.missions || [];
+        if (newMissions.length === 0) {
+          const message = 'No missions available right now. Please try again soon.';
+          setGenerationErrorMessage(message);
+          throw new Error(message);
+        }
+        return newMissions;
       }
 
+      setGenerationErrorMessage(null);
       return existing;
     },
     enabled: !!user,
     onError: (error: Error) => {
       toast({
-        title: "Unable to load daily missions",
+        title: generationErrorMessage ? "Mission generation failed" : "Unable to load daily missions",
+        description: generationErrorMessage || error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const regenerateMissions = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Not authenticated");
+      setGenerationErrorMessage(null);
+
+      const { data: generated, error } = await supabase.functions.invoke('generate-daily-missions', {
+        body: { userId: user.id, forceRegenerate: true }
+      });
+
+      if (error) {
+        const message = error.message || 'Unable to regenerate missions right now.';
+        setGenerationErrorMessage(message);
+        throw new Error(message);
+      }
+
+      const newMissions = generated?.missions || [];
+      if (newMissions.length === 0) {
+        const message = 'No missions were generated. Please try again soon.';
+        setGenerationErrorMessage(message);
+        throw new Error(message);
+      }
+
+      return newMissions;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+      toast({
+        title: "Daily missions refreshed",
+        description: "Fresh challenges are ready for you!",
+      });
+      setGenerationErrorMessage(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Mission generation failed",
         description: error.message,
         variant: "destructive",
       });
@@ -81,7 +135,12 @@ export const useDailyMissions = () => {
       if (!data) throw new Error("Mission already completed");
       
       // Award XP with display reason
-      await awardCustomXP(mission.xp_reward, `mission_${mission.mission_type}`, "Mission Complete!");
+      await awardCustomXP(
+        mission.xp_reward, 
+        `mission_${mission.mission_type}`, 
+        "Mission Complete!",
+        { mission_id: mission.id }
+      );
       
       // Check for first mission achievement
       const { count } = await supabase
@@ -114,5 +173,8 @@ export const useDailyMissions = () => {
     completedCount,
     totalCount,
     allComplete: completedCount === totalCount && totalCount > 0,
+    regenerateMissions: regenerateMissions.mutateAsync,
+    isRegenerating: regenerateMissions.isPending,
+    generationErrorMessage,
   };
 };

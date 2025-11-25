@@ -105,7 +105,7 @@ serve(async (req) => {
       throw new Error('Mentor not found')
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('en-CA')
     const { data: pepTalk } = await supabase
       .from('daily_pep_talks')
       .select('title, topic_category')

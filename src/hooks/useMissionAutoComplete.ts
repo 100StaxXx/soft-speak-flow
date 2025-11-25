@@ -110,7 +110,8 @@ export const useMissionAutoComplete = () => {
               await awardCustomXP(
                 mission.xp_reward, 
                 `mission_${mission.mission_type}`, 
-                `Mission Complete! ${mission.mission_text}`
+                `Mission Complete! ${mission.mission_text}`,
+                { mission_id: mission.id, source: 'auto_complete' }
               );
 
               // Show toast

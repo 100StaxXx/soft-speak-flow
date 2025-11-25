@@ -81,7 +81,7 @@ serve(async (req) => {
       .join('\n') || 'No recent activity'
 
     // Get today's pep talk for cross-referencing
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('en-CA')
     const { data: todaysPepTalk } = await supabase
       .from('daily_pep_talks')
       .select('title, topic_category, emotional_triggers, summary')
