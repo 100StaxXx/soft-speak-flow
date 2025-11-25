@@ -17,9 +17,13 @@ export const useCompanionMood = () => {
         .from('user_companion')
         .select('current_mood, last_mood_update')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to fetch companion mood:', error);
+        throw error;
+      }
+      
       return data;
     },
     enabled: !!user?.id,
@@ -37,7 +41,7 @@ export const useCompanionMood = () => {
         .select('mood')
         .eq('user_id', user.id)
         .eq('check_in_date', today)
-        .single();
+        .maybeSingle();
 
       if (checkIn?.mood) {
         // Map user mood to companion mood

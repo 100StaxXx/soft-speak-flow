@@ -52,7 +52,7 @@ const MorningCheckInContent = () => {
     }
 
     // Prevent duplicate submissions
-    if (existingCheckIn) {
+    if (existingCheckIn || isSubmitting) {
       toast({ 
         title: "Already checked in", 
         description: "You've already completed your check-in today",
@@ -64,6 +64,26 @@ const MorningCheckInContent = () => {
     setIsSubmitting(true);
 
     try {
+      // Double-check right before insert (cache could be stale)
+      const { data: recentCheck } = await supabase
+        .from('daily_check_ins')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('check_in_type', 'morning')
+        .eq('check_in_date', today)
+        .maybeSingle();
+
+      if (recentCheck) {
+        toast({ 
+          title: "Already checked in", 
+          description: "You've already completed your check-in today",
+          variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
+        return;
+      }
+
       const { data: checkIn, error } = await supabase
         .from('daily_check_ins')
         .insert({

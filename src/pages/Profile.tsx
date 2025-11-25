@@ -98,8 +98,9 @@ const Profile = () => {
         if (error) throw error;
       }
       refetchSettings();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to toggle adaptive push";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
 
@@ -118,8 +119,9 @@ const Profile = () => {
       if (error) throw error;
       toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
       window.location.reload();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to change mentor";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
       setIsChangingMentor(false);
     }
   };
@@ -130,8 +132,9 @@ const Profile = () => {
     try {
       await signOut();
       navigate("/auth");
-    } catch (error: any) {
-      toast({ title: "Error signing out", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign out";
+      toast({ title: "Error signing out", description: errorMessage, variant: "destructive" });
       setIsSigningOut(false);
     }
   };
@@ -145,8 +148,9 @@ const Profile = () => {
         mentor_id: profile?.selected_mentor_id,
       });
       if (!error) refetchSettings();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update settings";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
 

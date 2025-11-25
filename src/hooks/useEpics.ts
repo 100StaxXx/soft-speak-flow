@@ -126,9 +126,16 @@ export const useEpics = () => {
         .from("epics")
         .select("xp_reward, title, progress_percentage")
         .eq("id", epicId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error("Failed to fetch epic:", fetchError);
+        throw new Error(`Failed to fetch epic: ${fetchError.message}`);
+      }
+
+      if (!epic) {
+        throw new Error("Epic not found");
+      }
 
       const { error } = await supabase
         .from("epics")

@@ -43,14 +43,23 @@ export const HabitCard = memo(({
   const [showActions, setShowActions] = useState(false);
 
   const handleArchive = useCallback(async () => {
-    const { error } = await supabase
-      .from('habits')
-      .update({ is_active: false })
-      .eq('id', id);
-    
-    if (!error) {
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ is_active: false })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Failed to archive habit:', error);
+        toast.error("Failed to archive habit. Please try again.");
+        return;
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       toast.success("Habit archived. Ready for a new one.");
+    } catch (error) {
+      console.error('Unexpected error archiving habit:', error);
+      toast.error("An unexpected error occurred. Please try again.");
     }
   }, [id, queryClient]);
 

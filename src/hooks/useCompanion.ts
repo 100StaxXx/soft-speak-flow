@@ -37,10 +37,11 @@ export const useCompanion = () => {
   const { isEvolvingLoading, setIsEvolvingLoading } = useEvolution();
   const { getThreshold, shouldEvolve } = useEvolutionThresholds();
 
-  // Prevent duplicate evolution/XP requests during lag
+  // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
   const evolutionPromise = useRef<Promise<unknown> | null>(null);
   const xpInProgress = useRef(false);
+  const companionCreationInProgress = useRef(false);
 
   const { data: companion, isLoading, error } = useQuery({
     queryKey: ["companion", user?.id],
@@ -71,15 +72,21 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
-      console.log("Starting companion creation process...");
+      // Prevent duplicate companion creation during rapid clicks
+      if (companionCreationInProgress.current) {
+        throw new Error("Companion creation already in progress");
+      }
+      companionCreationInProgress.current = true;
 
-      // Determine consistent colors for the companion's lifetime
-      const eyeColor = `glowing ${data.favoriteColor}`;
-      const furColor = data.favoriteColor;
-
-      // Generate initial companion image with color specifications (with retry)
-      let imageData;
       try {
+        console.log("Starting companion creation process...");
+
+        // Determine consistent colors for the companion's lifetime
+        const eyeColor = `glowing ${data.favoriteColor}`;
+        const furColor = data.favoriteColor;
+
+        // Generate initial companion image with color specifications (with retry)
+        let imageData;
         console.log("Generating companion image...");
         imageData = await retryWithBackoff(
           async () => {
@@ -215,11 +222,16 @@ export const useCompanion = () => {
             xp_at_evolution: 0,
           })
           .select()
-          .single();
+          .maybeSingle();
 
-        if (stageZeroInsertError || !stageZeroEvolution) {
+        if (stageZeroInsertError) {
           console.error("Failed to create stage 0 evolution:", stageZeroInsertError);
-          throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
+          throw new Error(`Unable to record stage 0 evolution: ${stageZeroInsertError.message}`);
+        }
+
+        if (!stageZeroEvolution) {
+          console.error("Stage 0 evolution insert returned no data");
+          throw new Error("Unable to record stage 0 evolution");
         }
 
         // Generate stage 0 card in background (don't await - don't block onboarding)
@@ -298,14 +310,21 @@ export const useCompanion = () => {
         });
       }
 
-      return companionData;
+        return companionData;
+      } catch (error) {
+        // Reset flag on error
+        companionCreationInProgress.current = false;
+        throw error;
+      }
     },
     onSuccess: () => {
+      companionCreationInProgress.current = false;
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       console.log("Companion creation successful!");
       // Don't show toast here - let the parent component handle success message
     },
     onError: (error) => {
+      companionCreationInProgress.current = false;
       console.error("Failed to create companion:", error);
       // Don't show toast here - let the parent component handle error display
     },
@@ -512,7 +531,7 @@ export const useCompanion = () => {
                 .from("user_companion")
                 .select("initial_image_url, created_at")
                 .eq("id", companion.id)
-                .single();
+                .maybeSingle();
               
               // Create stage 0 evolution record
               const { data: newStage0Evolution, error: stage0Error } = await supabase
@@ -525,7 +544,7 @@ export const useCompanion = () => {
                   evolved_at: companionData?.created_at || new Date().toISOString(),
                 })
                 .select()
-                .single();
+                .maybeSingle();
               
               if (!stage0Error && newStage0Evolution) {
                 stageEvolutionId = newStage0Evolution.id;
