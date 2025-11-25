@@ -7,6 +7,7 @@ import { retryWithBackoff } from "@/utils/retry";
 import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
+import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 
 export interface Companion {
   id: string;
@@ -27,15 +28,7 @@ export interface Companion {
   updated_at: string;
 }
 
-export const XP_REWARDS = {
-  HABIT_COMPLETE: 5,
-  ALL_HABITS_COMPLETE: 10,
-  CHALLENGE_COMPLETE: 20,
-  WEEKLY_CHALLENGE: 50,
-  PEP_TALK_LISTEN: 3,
-  CHECK_IN: 5,
-  STREAK_MILESTONE: 15,
-};
+export const XP_REWARDS = SYSTEM_XP_REWARDS;
 
 export const useCompanion = () => {
   const { user } = useAuth();

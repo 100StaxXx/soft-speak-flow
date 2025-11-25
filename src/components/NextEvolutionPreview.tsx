@@ -12,11 +12,12 @@ interface NextEvolutionPreviewProps {
 }
 
 const XP_TIPS = [
-  { action: "Complete a habit", xp: "5-20 XP", icon: "✓" },
-  { action: "Finish all daily habits", xp: "+10 XP bonus", icon: "🎯" },
-  { action: "Complete daily missions", xp: "5-30 XP each", icon: "⚡" },
-  { action: "Weekly challenge day", xp: "20 XP", icon: "💪" },
+  { action: "Complete a habit", xp: "7-24 XP", icon: "✓" },
+  { action: "Finish all daily habits", xp: "+15 XP bonus", icon: "🎯" },
+  { action: "Complete daily missions", xp: "8-28 XP (Main Quest 1.5x)", icon: "⚡" },
+  { action: "Challenge day bonus", xp: "25 XP", icon: "💪" },
   { action: "Streak milestones", xp: "15 XP", icon: "🔥" },
+  { action: "Weekly challenge complete", xp: "60 XP", icon: "🏆" },
 ];
 
 export const NextEvolutionPreview = ({
