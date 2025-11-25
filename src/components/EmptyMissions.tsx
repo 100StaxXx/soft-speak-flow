@@ -1,7 +1,22 @@
 import { Card } from "@/components/ui/card";
-import { Target, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Target, Sparkles, RefreshCcw } from "lucide-react";
 
-export const EmptyMissions = () => {
+interface EmptyMissionsProps {
+  onRetry?: () => Promise<unknown> | unknown;
+  isRetrying?: boolean;
+  errorMessage?: string | null;
+}
+
+export const EmptyMissions = ({ onRetry, isRetrying, errorMessage }: EmptyMissionsProps) => {
+  const handleRetry = () => {
+    if (!onRetry || isRetrying) return;
+    const result = onRetry();
+    if (result instanceof Promise) {
+      void result;
+    }
+  };
+
   return (
     <Card className="p-8 text-center bg-gradient-to-br from-accent/5 to-primary/5 border-dashed border-2 border-muted-foreground/20">
       <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
@@ -21,6 +36,32 @@ export const EmptyMissions = () => {
           <Sparkles className="h-3 w-3" />
           <span>New missions arrive at midnight</span>
         </div>
+        {errorMessage && (
+          <p className="text-xs text-destructive mt-2">
+            {errorMessage}
+          </p>
+        )}
+        {onRetry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRetry}
+            disabled={isRetrying}
+            className="mt-2 gap-2"
+          >
+            {isRetrying ? (
+              <>
+                <RefreshCcw className="h-3 w-3 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              <>
+                <RefreshCcw className="h-3 w-3" />
+                Retry Generation
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </Card>
   );

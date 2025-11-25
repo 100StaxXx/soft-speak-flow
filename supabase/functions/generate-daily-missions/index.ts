@@ -65,7 +65,7 @@ serve(async (req) => {
       return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     // Check if missions already exist for today
     const { data: existing } = await supabase

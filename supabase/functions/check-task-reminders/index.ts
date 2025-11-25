@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     
     // Get current date and time for comparison
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = now.toLocaleDateString('en-CA');
     
     // Find tasks that need reminders sent
     // We need to find tasks where scheduled_time today is coming up

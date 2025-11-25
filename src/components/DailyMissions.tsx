@@ -13,12 +13,30 @@ import { MissionErrorFallback } from "@/components/ErrorFallback";
 
 
 const DailyMissionsContent = () => {
-  const { missions, completeMission, isCompleting, completedCount, totalCount, allComplete } = useDailyMissions();
+  const { 
+    missions, 
+    completeMission, 
+    isCompleting, 
+    completedCount, 
+    totalCount, 
+    allComplete,
+    regenerateMissions,
+    isRegenerating,
+    generationErrorMessage,
+  } = useDailyMissions();
   
   // Enable auto-completion detection
   useMissionAutoComplete();
 
-  if (missions.length === 0) return <EmptyMissions />;
+  if (missions.length === 0) {
+    return (
+      <EmptyMissions
+        onRetry={regenerateMissions}
+        isRetrying={isRegenerating}
+        errorMessage={generationErrorMessage}
+      />
+    );
+  }
 
   const progress = (completedCount / totalCount) * 100;
   

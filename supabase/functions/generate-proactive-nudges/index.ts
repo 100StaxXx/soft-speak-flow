@@ -38,7 +38,7 @@ serve(async (req) => {
     for (const profile of profiles) {
       try {
         // Get today's date
-        const today = new Date().toISOString().split('T')[0]
+        const today = new Date().toLocaleDateString('en-CA')
         const currentHour = new Date().getHours()
 
         // Check morning check-in (only nudge after 10am if not completed)
