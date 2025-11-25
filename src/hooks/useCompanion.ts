@@ -154,13 +154,21 @@ export const useCompanion = () => {
         });
 
       if (createError) {
-        console.error("Database error creating companion:", createError);
-        throw new Error(`Failed to save companion: ${createError.message}`);
+        console.error("Database error creating companion:", {
+          error: createError,
+          message: createError.message,
+          details: createError.details,
+          hint: createError.hint,
+          code: createError.code
+        });
+        throw new Error(`Database error: ${createError.message}${createError.details ? ` - ${createError.details}` : ''}${createError.hint ? ` (${createError.hint})` : ''}`);
       }
       
+      console.log("RPC call successful, result:", companionResult);
+      
       if (!companionResult || companionResult.length === 0) {
-        console.error("No companion data returned from function");
-        throw new Error("Failed to create companion");
+        console.error("No companion data returned from function - RPC result was:", companionResult);
+        throw new Error("No data returned from database. Please try again.");
       }
 
       const companionData = companionResult[0];
