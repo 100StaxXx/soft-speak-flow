@@ -24,13 +24,16 @@ DECLARE
   new_task daily_tasks%rowtype;
   existing_count integer;
 BEGIN
+  -- Note: Daily tasks are different from daily missions
+  -- Daily tasks have a limit of 4 per day
+  -- Daily missions have a base of 4 + 1 bonus = 5 max
   SELECT count(*) INTO existing_count
   FROM daily_tasks
   WHERE user_id = p_user_id
     AND task_date = target_date;
 
   IF existing_count >= 4 THEN
-    RAISE EXCEPTION 'MAX_TASKS_REACHED';
+    RAISE EXCEPTION 'MAX_TASKS_REACHED: Maximum 4 daily tasks per day';
   END IF;
 
   INSERT INTO daily_tasks (

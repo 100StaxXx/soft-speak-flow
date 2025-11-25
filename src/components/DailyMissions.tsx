@@ -27,6 +27,14 @@ const DailyMissionsContent = () => {
   
   // Enable auto-completion detection
   useMissionAutoComplete();
+  
+  // Calculate bonus quest eligibility
+  const regularMissions = missions.filter(m => !m.is_bonus);
+  const bonusMissions = missions.filter(m => m.is_bonus);
+  const completedRegular = regularMissions.filter(m => m.completed).length;
+  const hasBonusQuest = bonusMissions.length > 0;
+  const bonusUnlocked = hasBonusQuest && !bonusMissions[0]?.completed;
+  const bonusCompleted = hasBonusQuest && bonusMissions[0]?.completed;
 
   if (missions.length === 0) {
     return (
@@ -42,6 +50,7 @@ const DailyMissionsContent = () => {
   
   const handleComplete = async (id: string) => {
     haptics.medium();
+    const mission = missions.find(m => m.id === id);
     await completeMission(id);
     
     // Check if this completion makes all missions complete
@@ -49,18 +58,31 @@ const DailyMissionsContent = () => {
       m.id === id ? { ...m, completed: true } : m
     );
     const allWillBeComplete = updatedMissions.every(m => m.completed);
+    const allRegularComplete = updatedMissions.filter(m => !m.is_bonus).every(m => m.completed);
     
-    if (allWillBeComplete) {
-      // Big celebration for completing all missions
+    // Big celebration for completing all regular missions (triggers bonus unlock)
+    if (allRegularComplete && !mission?.is_bonus) {
       setTimeout(() => {
         confetti({
-          particleCount: 150,
-          spread: 120,
+          particleCount: 100,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#FFD700', '#FFA500', '#FF6B6B'],
+        });
+      }, 500);
+    }
+    
+    // Extra special celebration for completing ALL missions including bonus
+    if (allWillBeComplete && mission?.is_bonus) {
+      setTimeout(() => {
+        confetti({
+          particleCount: 200,
+          spread: 160,
           origin: { y: 0.6 },
           colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
           ticks: 400,
           gravity: 0.6,
-          scalar: 1.5,
+          scalar: 1.8,
         });
       }, 500);
     }
@@ -76,15 +98,28 @@ const DailyMissionsContent = () => {
               <Target className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
             </div>
             <div>
-              <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
+                {bonusUnlocked && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600 animate-pulse">
+                    Bonus Unlocked!
+                  </Badge>
+                )}
+              </div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {completedCount}/{totalCount} complete
+                {hasBonusQuest && bonusCompleted && " • Bonus Done! 🌟"}
               </p>
             </div>
           </div>
-          {allComplete && (
+          {allComplete && !hasBonusQuest && (
             <div className="text-[10px] sm:text-xs font-bold text-green-500 animate-pulse">
               All Done! 🎉
+            </div>
+          )}
+          {allComplete && hasBonusQuest && bonusCompleted && (
+            <div className="text-[10px] sm:text-xs font-bold text-yellow-500 animate-pulse">
+              Perfect Day! 💫
             </div>
           )}
         </div>

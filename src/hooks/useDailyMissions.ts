@@ -5,7 +5,7 @@ import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export const useDailyMissions = () => {
   const { user } = useAuth();
@@ -13,8 +13,28 @@ export const useDailyMissions = () => {
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
-  const today = new Date().toLocaleDateString('en-CA');
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
+  const [userTimezone, setUserTimezone] = useState<string | null>(null);
+  
+  // Get user's timezone from profile
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', user.id)
+        .single();
+      setUserTimezone(data?.timezone || null);
+    };
+    fetchTimezone();
+  }, [user]);
+  
+  // Calculate today's date using user's timezone
+  const today = useMemo(() => {
+    const tz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  }, [userTimezone]);
 
   const { data: missions, isLoading, error } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
@@ -57,6 +77,30 @@ export const useDailyMissions = () => {
       }
 
       setGenerationErrorMessage(null);
+      
+      // Check for streak bonus unlock on load (for users with 7+ day streak)
+      if (existing && existing.length > 0) {
+        const hasBonusQuest = existing.some(m => m.is_bonus);
+        if (!hasBonusQuest) {
+          // Call the streak bonus check function
+          supabase.rpc('check_streak_bonus_on_login', {
+            p_user_id: user.id,
+            p_date: today
+          }).then(({ data, error }) => {
+            if (error) {
+              console.error('Error checking streak bonus:', error);
+            } else if (data?.bonus_created) {
+              // Refresh missions to show the bonus
+              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+              toast({
+                title: "🎉 Bonus Quest Unlocked!",
+                description: `Your ${data.streak}-day streak has unlocked a bonus quest!`,
+              });
+            }
+          });
+        }
+      }
+      
       return existing;
     },
     enabled: !!user,

@@ -17,7 +17,7 @@ interface GeneratedMission {
 }
 
 const CATEGORY_GUIDELINES = `**MISSION STRUCTURE:**
-Include exactly 1 mission from each category:
+Include exactly 1 mission from each category (4 total base missions):
 
 1. **Connection Mission** ("good human day" - kindness/gratitude)
    - Text a friend/family and check in
@@ -35,7 +35,15 @@ Include exactly 1 mission from each category:
 3. **Identity Mission** (supports habits/discipline)
    - Complete all your habits today
    - Do something your future self will thank you for
-   - Give yourself a 2-minute discipline burst`;
+   - Give yourself a 2-minute discipline burst
+
+4. **Growth Challenge** (stretches comfort zone)
+   - Try something new today
+   - Face one small fear
+   - Learn something in 10 minutes
+   - Do one thing outside your routine
+
+**Note:** A 5th bonus quest may be unlocked if user completes all 4 or has a 7+ day streak!`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -111,7 +119,7 @@ serve(async (req) => {
       templateKey: 'daily_missions',
       userId: userId,
       variables: {
-        missionCount: 3,
+        missionCount: 4, // Changed from 3 to 4 base missions
         userStreak: streak,
         userContext,
         categoryGuidelines: CATEGORY_GUIDELINES
