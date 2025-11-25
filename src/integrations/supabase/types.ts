@@ -1264,6 +1264,9 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           description: string | null
+          discord_channel_id: string | null
+          discord_invite_url: string | null
+          discord_ready: boolean | null
           end_date: string | null
           id: string
           invite_code: string | null
@@ -1282,6 +1285,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
+          discord_channel_id?: string | null
+          discord_invite_url?: string | null
+          discord_ready?: boolean | null
           end_date?: string | null
           id?: string
           invite_code?: string | null
@@ -1300,6 +1306,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
+          discord_channel_id?: string | null
+          discord_invite_url?: string | null
+          discord_ready?: boolean | null
           end_date?: string | null
           id?: string
           invite_code?: string | null
