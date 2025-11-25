@@ -18,7 +18,22 @@ import { useCompanion } from "@/hooks/useCompanion";
 
 
 const Companion = () => {
-  const { companion, nextEvolutionXP, progressToNext } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, isLoading } = useCompanion();
+
+  // Show loading state while companion is being fetched
+  if (isLoading || !companion) {
+    return (
+      <PageTransition>
+        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+            <p className="text-muted-foreground">Loading your companion...</p>
+          </div>
+        </div>
+        <BottomNav />
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
@@ -30,15 +45,13 @@ const Companion = () => {
                 <Sparkles className="h-5 w-5 text-primary" />
                 <h1 className="font-heading font-black text-xl">Companion</h1>
               </div>
-              {companion && (
-                <div data-tour="companion-tooltip-anchor">
-                  <CompanionBadge 
-                    element={companion.core_element}
-                    stage={companion.current_stage}
-                    showStage={true}
-                  />
-                </div>
-              )}
+              <div data-tour="companion-tooltip-anchor">
+                <CompanionBadge 
+                  element={companion.core_element}
+                  stage={companion.current_stage}
+                  showStage={true}
+                />
+              </div>
             </div>
           </header>
 

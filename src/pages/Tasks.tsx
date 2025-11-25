@@ -480,35 +480,14 @@ export default function Tasks() {
     return false;
   };
 
-  // Show loading state while companion is being fetched (prevents crash on initial load)
-  if (companionLoading) {
+  // Show loading state while companion is being fetched OR if companion is not loaded yet
+  // This prevents crashes after onboarding when companion query is still loading
+  if (companionLoading || !companion) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
           <p className="text-muted-foreground">Loading your adventure...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if companion is not loaded (prevents crash after onboarding)
-  if (!companion) {
-    return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
-        <div className="text-center space-y-4 max-w-md p-4">
-          <div className="text-6xl mb-4">🐣</div>
-          <h2 className="text-2xl font-bold">No Companion Found</h2>
-          <p className="text-muted-foreground mb-4">
-            It looks like you haven't created your companion yet. Let's complete your onboarding!
-          </p>
-          <Button 
-            onClick={() => navigate("/onboarding")}
-            variant="cta"
-            size="lg"
-          >
-            Complete Onboarding
-          </Button>
         </div>
       </div>
     );

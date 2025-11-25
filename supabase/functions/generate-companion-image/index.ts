@@ -60,18 +60,51 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       console.error("No authorization header provided");
-      throw new Error("No authorization header");
+      return new Response(
+        JSON.stringify({ 
+          error: "Authentication required. Please refresh the page and try again.",
+          code: "NO_AUTH_HEADER"
+        }), 
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 401 
+        }
+      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Supabase configuration missing");
+      return new Response(
+        JSON.stringify({ 
+          error: "Server configuration error. Please contact support.",
+          code: "SERVER_CONFIG_ERROR"
+        }), 
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 500 
+        }
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       console.error("Authentication failed:", authError);
-      throw new Error("Invalid user token");
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid authentication. Please refresh the page and try again.",
+          code: "INVALID_AUTH"
+        }), 
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 401 
+        }
+      );
     }
 
     console.log(`User authenticated: ${user.id}`);
@@ -125,15 +158,39 @@ Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY not configured in environment");
-      throw new Error("LOVABLE_API_KEY not configured");
+      return new Response(
+        JSON.stringify({ 
+          error: "AI service not configured. Please contact support.",
+          code: "AI_SERVICE_NOT_CONFIGURED"
+        }), 
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 500 
+        }
+      );
     }
 
     console.log("Calling Lovable AI for image generation...");
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash-image", messages: [{ role: "user", content: fullPrompt }], modalities: ["image", "text"] })
-    });
+    let aiResponse;
+    try {
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash-image", messages: [{ role: "user", content: fullPrompt }], modalities: ["image", "text"] })
+      });
+    } catch (fetchError) {
+      console.error("Network error calling AI service:", fetchError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Network error. Please check your connection and try again.",
+          code: "NETWORK_ERROR"
+        }), 
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+          status: 503 
+        }
+      );
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
