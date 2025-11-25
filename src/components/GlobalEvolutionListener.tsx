@@ -75,7 +75,9 @@ export const GlobalEvolutionListener = () => {
             window.dispatchEvent(new CustomEvent('evolution-loading-start'));
 
             // Invalidate companion query to refresh data
-            queryClient.invalidateQueries({ queryKey: ['companion'] });
+            if (user?.id) {
+              queryClient.invalidateQueries({ queryKey: ['companion', user.id] });
+            }
           }
         }
       )

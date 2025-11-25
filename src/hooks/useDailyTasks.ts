@@ -4,12 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
-import { useXPRewards } from "@/hooks/useXPRewards";
+import { useXPToast } from "@/contexts/XPContext";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
-
-const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -17,7 +15,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
   const { updateBodyFromActivity } = useCompanionAttributes();
-  const { awardCustomXP } = useXPRewards();
+  const { showXPToast } = useXPToast();
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -151,66 +149,111 @@ export const useDailyTasks = (selectedDate?: Date) => {
     },
   });
 
+  const getGuildBonusDetails = async (baseXP: number) => {
+    if (!user?.id) {
+      return { bonusXP: 0, toastReason: 'Task Complete!' };
+    }
+
+    try {
+      const { data: epicHabits } = await supabase
+        .from('epic_habits')
+        .select('epic_id, epics!inner(is_public, status)')
+        .eq('epics.status', 'active')
+        .eq('epics.is_public', true);
+
+      if (!epicHabits || epicHabits.length === 0) {
+        return { bonusXP: 0, toastReason: 'Task Complete!' };
+      }
+
+      const { data: memberships } = await supabase
+        .from('epic_members')
+        .select('epic_id')
+        .eq('user_id', user.id)
+        .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
+
+      if (memberships && memberships.length > 0) {
+        const bonusXP = Math.floor(baseXP * 0.2);
+        return { bonusXP, toastReason: `Task Complete! +${bonusXP} Guild Bonus 🎯` };
+      }
+    } catch (error) {
+      console.error('Failed to compute guild bonus:', error);
+    }
+
+    return { bonusXP: 0, toastReason: 'Task Complete!' };
+  };
+
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
       if (toggleInProgress.current) throw new Error('Please wait...');
       toggleInProgress.current = true;
 
       try {
-        const { data: existingTask } = await supabase.from('daily_tasks').select('completed_at').eq('id', taskId).maybeSingle();
+        const { data: existingTask, error: existingError } = await supabase
+          .from('daily_tasks')
+          .select('completed_at')
+          .eq('id', taskId)
+          .maybeSingle();
+
+        if (existingError) {
+          throw existingError;
+        }
+
         const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
         // Prevent unchecking completed tasks to avoid XP farming
         if (wasAlreadyCompleted && !completed) {
-          toggleInProgress.current = false;
           throw new Error('Cannot uncheck completed tasks');
         }
 
-        const { error } = await supabase.from('daily_tasks').update({ completed, completed_at: completed ? new Date().toISOString() : null }).eq('id', taskId);
-        if (error) {
+        if (!completed) {
+          const { error } = await supabase
+            .from('daily_tasks')
+            .update({ completed: false, completed_at: null })
+            .eq('id', taskId);
+
+          if (error) {
+            throw error;
+          }
+
           toggleInProgress.current = false;
-          throw error;
+          return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted };
         }
-        
+
+        const { bonusXP, toastReason } = await getGuildBonusDetails(xpReward);
+        const totalXP = xpReward + bonusXP;
+
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('complete_quest_with_xp', {
+          p_task_id: taskId,
+          p_user_id: user!.id,
+          p_xp_amount: totalXP,
+        });
+
+        if (rpcError) {
+          throw rpcError;
+        }
+
+        if (!rpcResult?.success) {
+          throw new Error(rpcResult?.error || 'Failed to complete quest');
+        }
+
         toggleInProgress.current = false;
-        return { taskId, completed, xpReward, wasAlreadyCompleted };
+        return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };
       } catch (error) {
         toggleInProgress.current = false;
         throw error;
       }
     },
-    onSuccess: async ({ taskId, completed, xpReward, wasAlreadyCompleted }) => {
+    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       if (completed && !wasAlreadyCompleted) {
-        console.log('[useDailyTasks] Quest completed, awarding XP:', xpReward);
-        
-        // Check if this task is part of a guild epic and award bonus XP
-        const { data: epicHabits } = await supabase
-          .from('epic_habits')
-          .select('epic_id, epics!inner(is_public, status)')
-          .eq('epics.status', 'active')
-          .eq('epics.is_public', true);
-
-        let bonusXP = 0;
-        if (epicHabits && epicHabits.length > 0) {
-          // Check if user is a member of any of these guild epics
-          const { data: memberships } = await supabase
-            .from('epic_members')
-            .select('epic_id')
-            .eq('user_id', user!.id)
-            .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
-
-          if (memberships && memberships.length > 0) {
-            bonusXP = Math.floor(xpReward * 0.2); // 20% bonus for guild participation
-            await awardCustomXP(xpReward + bonusXP, 'task_complete', `Task Complete! +${bonusXP} Guild Bonus 🎯`);
-          } else {
-            await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
-          }
-        } else {
-          await awardCustomXP(xpReward, 'task_complete', 'Task Complete!');
+        if (xpAwarded > 0) {
+          showXPToast(xpAwarded, toastReason || 'Task Complete!');
         }
-        
-        if (companion) await updateBodyFromActivity(companion.id);
+
+        if (companion) {
+          await updateBodyFromActivity(companion.id);
+        }
+
         window.dispatchEvent(new CustomEvent('mission-completed'));
       }
     },

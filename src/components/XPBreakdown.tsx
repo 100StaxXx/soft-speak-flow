@@ -27,11 +27,11 @@ export const XPBreakdown = () => {
       if (!data) return { total: 0, byType: {} };
 
       const byType = data.reduce((acc, event) => {
-        acc[event.event_type] = (acc[event.event_type] || 0) + event.xp_earned;
+        acc[event.event_type] = (acc[event.event_type] || 0) + event.xp_amount;
         return acc;
       }, {} as Record<string, number>);
 
-      const total = data.reduce((sum, event) => sum + event.xp_earned, 0);
+      const total = data.reduce((sum, event) => sum + event.xp_amount, 0);
 
       return { total, byType, events: data };
     },

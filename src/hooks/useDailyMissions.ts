@@ -12,7 +12,7 @@ export const useDailyMissions = () => {
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = new Date().toISOString().split('T')[0];
 
   const { data: missions, isLoading } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
@@ -20,17 +20,26 @@ export const useDailyMissions = () => {
       if (!user) return [];
       
       // Try to get existing missions
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('daily_missions')
         .select('*')
         .eq('user_id', user.id)
         .eq('mission_date', today);
 
+      if (existingError) {
+        throw existingError;
+      }
+
       // If no missions exist, generate them server-side
       if (!existing || existing.length === 0) {
-        const { data: generated } = await supabase.functions.invoke('generate-daily-missions', {
+        const { data: generated, error: generationError } = await supabase.functions.invoke('generate-daily-missions', {
           body: { userId: user.id }
         });
+
+        if (generationError) {
+          console.error('Mission generation failed:', generationError);
+          throw new Error(generationError.message || 'Unable to generate missions right now.');
+        }
         
         return generated?.missions || [];
       }
@@ -38,6 +47,13 @@ export const useDailyMissions = () => {
       return existing;
     },
     enabled: !!user,
+    onError: (error: Error) => {
+      toast({
+        title: "Unable to load daily missions",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const completeMission = useMutation({

@@ -40,6 +40,7 @@ interface OnboardingFlowProps {
 
 export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [hasCompleted, setHasCompleted] = useState(false);
   const { user } = useAuth();
   const progress = ((currentSlide + 1) / slides.length) * 100;
 
@@ -61,6 +62,12 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     };
     loadProgress();
   }, [user]);
+
+  useEffect(() => {
+    if (open) {
+      setHasCompleted(false);
+    }
+  }, [open]);
 
   const handleNext = async () => {
     if (currentSlide < slides.length - 1) {
@@ -114,6 +121,26 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
         })
         .eq("id", user.id);
     }
+    setHasCompleted(true);
+    onComplete();
+  };
+
+  const handleDialogChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      return;
+    }
+
+    if (hasCompleted) {
+      onComplete();
+      return;
+    }
+
+    if (currentSlide >= slides.length - 1) {
+      handleComplete();
+      return;
+    }
+
+    // Allow early dismiss without marking onboarding complete
     onComplete();
   };
 
@@ -121,7 +148,7 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
   const Icon = slide.icon;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && handleComplete()}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-lg">
         <DialogTitle className="sr-only">{slide.title}</DialogTitle>
         <DialogDescription className="sr-only">{slide.description}</DialogDescription>
