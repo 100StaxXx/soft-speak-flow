@@ -80,14 +80,17 @@ export function generateMentorExplanation(
   // Build paragraph
   let paragraph = "";
 
+  const toneDescription = mentor.tone_description?.toLowerCase() ?? "supportive";
+  const targetUser = mentor.target_user?.toLowerCase();
+
   if (q1Label && q2Label) {
     const commStyle = formatCommunicationStyle(q1Label);
     const struggle = formatStruggle(q2Label);
     
-    paragraph = `You said you prefer ${commStyle} and that you're ${struggle}. ${mentor.name} is ${mentor.tone_description.toLowerCase()} `;
+    paragraph = `You said you prefer ${commStyle} and that you're ${struggle}. ${mentor.name} is ${toneDescription} `;
     
-    if (mentor.target_user) {
-      paragraph += `and is best for ${mentor.target_user.toLowerCase()} `;
+    if (targetUser) {
+      paragraph += `and is best for ${targetUser} `;
     }
 
     if (mentor.themes && mentor.themes.length > 0) {
@@ -96,12 +99,13 @@ export function generateMentorExplanation(
     }
   } else {
     // Fallback if answers missing
-    paragraph = `${mentor.name} is ${mentor.tone_description.toLowerCase()} ${mentor.target_user ? `and is best for ${mentor.target_user.toLowerCase()}` : ''}`;
+    paragraph = `${mentor.name} is ${toneDescription} ${targetUser ? `and is best for ${targetUser}` : ''}`;
   }
 
   // Get bullets
+  const shortTitle = mentor.short_title || mentor.name || "mentor";
   const bullets = MENTOR_BULLETS[mentor.slug] || [
-    `Guides you with ${mentor.short_title.toLowerCase()}`,
+    `Guides you with ${shortTitle.toLowerCase()}`,
     `Matches your communication style`,
     `Helps you reach your goals`
   ];

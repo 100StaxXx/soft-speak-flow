@@ -67,8 +67,10 @@ export const useMentorPersonality = (): MentorPersonality | null => {
 
   if (!mentor) return null;
 
+  const toneDescription = mentor.tone_description?.toLowerCase() ?? "";
+
   // Determine personality type from tone
-  const toneKeyword = mentor.tone_description.toLowerCase();
+  const toneKeyword = toneDescription;
   let template = personalityTemplates.supportive; // default
   
   if (toneKeyword.includes('tough') || toneKeyword.includes('hard')) {
@@ -84,7 +86,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
   return {
     name: mentor.name,
     slug: mentor.slug || '',
-    tone: mentor.tone_description,
+    tone: mentor.tone_description ?? "",
     style: mentor.style || '',
     avatar_url: mentor.avatar_url || undefined,
     primary_color: mentor.primary_color || '#000',

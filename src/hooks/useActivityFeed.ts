@@ -101,10 +101,12 @@ export const useActivityFeed = () => {
 
   const markAsRead = useMutation({
     mutationFn: async (activityId: string) => {
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
         .from('activity_feed')
         .update({ is_read: true })
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .eq('user_id', user.id);
       
       if (error) throw error;
     },

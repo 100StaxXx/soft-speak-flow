@@ -192,6 +192,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
           .from('daily_tasks')
           .select('completed_at')
           .eq('id', taskId)
+          .eq('user_id', user!.id)
           .maybeSingle();
 
         if (existingError) {
@@ -209,7 +210,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
           const { error } = await supabase
             .from('daily_tasks')
             .update({ completed: false, completed_at: null })
-            .eq('id', taskId);
+            .eq('id', taskId)
+            .eq('user_id', user!.id);
 
           if (error) {
             throw error;
@@ -272,7 +274,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
-      const { error } = await supabase.from('daily_tasks').delete().eq('id', taskId);
+        const { error } = await supabase
+          .from('daily_tasks')
+          .delete()
+          .eq('id', taskId)
+          .eq('user_id', user!.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -289,7 +295,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
       // First, unset all main quests
       await supabase.from('daily_tasks').update({ is_main_quest: false }).eq('user_id', user!.id).eq('task_date', taskDate);
       // Then set the selected one
-      const { error } = await supabase.from('daily_tasks').update({ is_main_quest: true }).eq('id', taskId);
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: true })
+        .eq('id', taskId)
+        .eq('user_id', user!.id);
       if (error) throw error;
     },
     onSuccess: () => {

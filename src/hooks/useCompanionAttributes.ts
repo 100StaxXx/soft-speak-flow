@@ -24,9 +24,14 @@ export const useCompanionAttributes = () => {
         .from("user_companion")
         .select(attribute)
         .eq("id", companionId)
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
+
+      if (!companion) {
+        throw new Error("Companion not found");
+      }
 
       const currentValue = companion[attribute] ?? (attribute === 'body' ? 100 : 0);
       const newValue = Math.max(0, Math.min(100, currentValue + amount));
@@ -38,7 +43,8 @@ export const useCompanionAttributes = () => {
           [attribute]: newValue,
           last_energy_update: new Date().toISOString()
         })
-        .eq("id", companionId);
+        .eq("id", companionId)
+        .eq("user_id", user.id);
 
       if (updateError) throw updateError;
 

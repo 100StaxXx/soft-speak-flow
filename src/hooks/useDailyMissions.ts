@@ -131,6 +131,7 @@ export const useDailyMissions = () => {
           completed_at: new Date().toISOString() 
         })
         .eq('id', missionId)
+        .eq('user_id', user!.id)
         .eq('completed', false) // Only update if not already completed
         .select()
         .maybeSingle();
