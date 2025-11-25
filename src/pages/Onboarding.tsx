@@ -425,6 +425,10 @@ export default function Onboarding() {
     coreElement: string;
     storyTone: string;
   }) => {
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+    
     try {
       console.log("Starting companion creation:", data);
       
@@ -432,7 +436,7 @@ export default function Onboarding() {
       const { data: existingCompanion } = await supabase
         .from("user_companion")
         .select("id")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (!existingCompanion) {
@@ -469,7 +473,7 @@ export default function Onboarding() {
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('onboarding_data')
-        .eq('id', user!.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       const currentOnboardingData = (currentProfile?.onboarding_data as OnboardingData) || {};
@@ -481,7 +485,7 @@ export default function Onboarding() {
           onboarding_step: 'complete',
           onboarding_data: currentOnboardingData as any
         })
-        .eq('id', user!.id)
+        .eq('id', user.id)
         .select()
         .single();
       
@@ -495,7 +499,7 @@ export default function Onboarding() {
       console.log("Onboarding marked complete");
       
       // CRITICAL: Invalidate profile cache to force refetch with new data
-      await queryClient.invalidateQueries({ queryKey: ["profile", user!.id] });
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
       
       // Wait longer to ensure database update propagates
       await new Promise(resolve => setTimeout(resolve, 500));

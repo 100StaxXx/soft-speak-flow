@@ -37,13 +37,17 @@ export default function Challenges() {
     queryKey: ["user-challenges", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from("user_challenges")
         .select(`
           *,
           challenges (*)
         `)
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

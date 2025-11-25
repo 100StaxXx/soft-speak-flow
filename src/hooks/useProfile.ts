@@ -45,12 +45,15 @@ export const useProfile = () => {
       }
 
       if (!data) {
-        // Auto-create profile on first login if missing
+        // Auto-create profile on first login if missing (upsert prevents race conditions)
         const { data: inserted, error: insertError } = await supabase
           .from("profiles")
-          .insert({
+          .upsert({
             id: user.id,
             email: user.email ?? null,
+          }, {
+            onConflict: 'id',
+            ignoreDuplicates: false
           })
           .select("*")
           .maybeSingle();

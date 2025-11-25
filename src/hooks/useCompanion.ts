@@ -184,8 +184,8 @@ export const useCompanion = () => {
         }
       };
 
-      generateStageZeroCard().catch(() => {
-        // prevent unhandled rejection logging
+      generateStageZeroCard().catch((error) => {
+        console.warn('Stage 0 card generation failed (non-critical):', error?.message || error);
       });
 
       // Auto-generate the first chapter of the companion's story in background with retry
@@ -226,8 +226,8 @@ export const useCompanion = () => {
       };
 
       // Start story generation in background (don't await)
-      generateStoryWithRetry().catch(() => {
-        // Final catch to prevent unhandled rejection
+      generateStoryWithRetry().catch((error) => {
+        console.warn('Story generation failed (non-critical):', error?.message || error);
       });
 
       return companionData;
@@ -254,18 +254,10 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("No user found");
       
-      // Prevent duplicate XP awards - check FIRST before any async operations
+      // Prevent duplicate XP awards - check and set flag IMMEDIATELY before any async operations
       if (xpInProgress.current) {
-        console.warn('XP award already in progress, skipping duplicate');
-        // Return current state without throwing
-        const currentCompanion = companion || queryClient.getQueryData(["companion", user.id]) as Companion | null;
-        if (currentCompanion) {
-          return { shouldEvolve: false, newStage: currentCompanion.current_stage, newXP: currentCompanion.current_xp };
-        }
-        throw new Error("Cannot award XP: operation in progress and no companion data available");
+        throw new Error("XP award already in progress");
       }
-      
-      // Set flag immediately to prevent race
       xpInProgress.current = true;
       
       try {
@@ -284,14 +276,12 @@ export const useCompanion = () => {
         }
         
         return await performXPAward(companionToUse, xpAmount, eventType, metadata, user);
-      } catch (error) {
-        // Reset flag on error so user can retry
+      } finally {
+        // Always reset flag in finally block to ensure cleanup
         xpInProgress.current = false;
-        throw error;
       }
     },
     onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
-      xpInProgress.current = false;
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
       if (shouldEvolve && companion) {
@@ -310,7 +300,6 @@ export const useCompanion = () => {
       }
     },
     onError: (error) => {
-      xpInProgress.current = false;
       console.error('XP award failed:', error);
       toast.error("Failed to award XP. Please try again.");
     },
@@ -489,10 +478,13 @@ export const useCompanion = () => {
             queryClient.invalidateQueries({ queryKey: ["companion-story"] });
             queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
           } catch (error) {
-            console.error(`Failed to auto-generate story for stage ${newStage}:`, error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Failed to auto-generate story for stage ${newStage} (non-critical):`, errorMessage);
             // Don't throw - story generation is not critical to evolution
           }
-        })();
+        })().catch((error) => {
+          console.warn('Story generation promise rejected:', error?.message || error);
+        });
       }
 
           return evolutionData.image_url;
@@ -535,12 +527,12 @@ export const useCompanion = () => {
   const nextEvolutionXP = useMemo(() => {
     if (!companion) return null;
     return getThreshold(companion.current_stage + 1);
-  }, [companion?.current_stage, getThreshold]);
+  }, [companion?.current_stage, companion?.id, getThreshold]);
 
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;
     return ((companion.current_xp / nextEvolutionXP) * 100);
-  }, [companion?.current_xp, nextEvolutionXP]);
+  }, [companion?.current_xp, companion?.id, nextEvolutionXP]);
 
   return {
     companion,

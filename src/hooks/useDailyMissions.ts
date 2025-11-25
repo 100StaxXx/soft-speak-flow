@@ -116,6 +116,10 @@ export const useDailyMissions = () => {
 
   const completeMission = useMutation({
     mutationFn: async (missionId: string) => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const mission = missions?.find(m => m.id === missionId);
       if (!mission) throw new Error("Mission not found");
 
@@ -131,7 +135,7 @@ export const useDailyMissions = () => {
           completed_at: new Date().toISOString() 
         })
         .eq('id', missionId)
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('completed', false) // Only update if not already completed
         .select()
         .maybeSingle();
@@ -151,7 +155,7 @@ export const useDailyMissions = () => {
       const { count } = await supabase
         .from('daily_missions')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('completed', true);
       
       if (count === 1) {

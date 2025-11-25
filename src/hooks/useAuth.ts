@@ -8,12 +8,23 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Get initial session with proper error handling
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('Failed to get session:', error);
+          // Still set loading to false to prevent infinite loading
+        }
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Unexpected auth error:', error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

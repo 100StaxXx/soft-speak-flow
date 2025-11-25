@@ -35,10 +35,14 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['daily-tasks', user?.id, taskDate],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from('daily_tasks')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('task_date', taskDate)
         .order('created_at', { ascending: false });
 
@@ -84,11 +88,16 @@ export const useDailyTasks = (selectedDate?: Date) => {
       addInProgress.current = true;
 
       try {
+        if (!user?.id) {
+          addInProgress.current = false;
+          throw new Error('User not authenticated');
+        }
+        
         // Fetch fresh task count from database directly to avoid race conditions
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
           .select('id, completed')
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .eq('task_date', customDate || taskDate);
 
         if (countError) {
@@ -128,7 +137,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         }
 
         const { error } = await supabase.rpc('add_daily_task', {
-          p_user_id: user!.id,
+          p_user_id: user.id,
           p_task_text: taskText,
           p_task_difficulty: difficulty,
           p_xp_reward: xpReward,
@@ -206,6 +215,10 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       if (toggleInProgress.current) throw new Error('Please wait...');
       toggleInProgress.current = true;
 
@@ -214,7 +227,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
           .from('daily_tasks')
           .select('completed_at')
           .eq('id', taskId)
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .maybeSingle();
 
         if (existingError) {
@@ -233,7 +246,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
             .from('daily_tasks')
             .update({ completed: false, completed_at: null })
             .eq('id', taskId)
-            .eq('user_id', user!.id);
+            .eq('user_id', user.id);
 
           if (error) {
             throw error;
@@ -254,7 +267,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
             completed_at: new Date().toISOString() 
           })
           .eq('id', taskId)
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .eq('completed', false); // Prevent double-completion
 
         if (updateError) {
@@ -301,11 +314,15 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
-        const { error } = await supabase
-          .from('daily_tasks')
-          .delete()
-          .eq('id', taskId)
-          .eq('user_id', user!.id);
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      const { error } = await supabase
+        .from('daily_tasks')
+        .delete()
+        .eq('id', taskId)
+        .eq('user_id', user.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -319,8 +336,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { error } = await supabase.rpc('set_main_quest_for_day', {
-        p_user_id: user!.id,
+        p_user_id: user.id,
         p_task_id: taskId,
         p_task_date: taskDate
       });

@@ -15,10 +15,14 @@ export const BottomNav = () => {
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
     enabled: !!profile?.selected_mentor_id,
     queryFn: async () => {
+      if (!profile?.selected_mentor_id) {
+        throw new Error('No mentor selected');
+      }
+      
       const { data, error } = await supabase
         .from("mentors")
         .select("*")
-        .eq("id", profile!.selected_mentor_id!)
+        .eq("id", profile.selected_mentor_id)
         .maybeSingle();
       if (error) throw error;
       return data;

@@ -32,10 +32,14 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from('daily_tasks')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .gte('task_date', startDate)
         .lte('task_date', endDate)
         .order('scheduled_time', { ascending: true, nullsFirst: false })

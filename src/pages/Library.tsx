@@ -22,6 +22,10 @@ export default function Library() {
     queryKey: ["favorites", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from("favorites")
         .select(`
@@ -30,7 +34,7 @@ export default function Library() {
           content_id,
           created_at
         `)
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -43,6 +47,10 @@ export default function Library() {
     queryKey: ["downloads", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from("downloads")
         .select(`
@@ -51,7 +59,7 @@ export default function Library() {
           content_id,
           created_at
         `)
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

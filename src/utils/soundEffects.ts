@@ -1,3 +1,5 @@
+import { safeLocalStorage } from './storage';
+
 // Sound effects management system
 class SoundManager {
   private audioContext: AudioContext | null = null;
@@ -10,12 +12,17 @@ class SoundManager {
     if (typeof window !== 'undefined') {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.loadSoundPreferences();
+      
+      // Cleanup all intervals on page unload
+      window.addEventListener('beforeunload', () => {
+        this.stopAllAmbientSounds();
+      });
     }
   }
 
   private loadSoundPreferences() {
-    const savedVolume = localStorage.getItem('sound_volume');
-    const savedMuted = localStorage.getItem('sound_muted');
+    const savedVolume = safeLocalStorage.getItem('sound_volume');
+    const savedMuted = safeLocalStorage.getItem('sound_muted');
     
     if (savedVolume) this.masterVolume = parseFloat(savedVolume);
     if (savedMuted) this.isMuted = savedMuted === 'true';
@@ -23,12 +30,12 @@ class SoundManager {
 
   setVolume(volume: number) {
     this.masterVolume = Math.max(0, Math.min(1, volume));
-    localStorage.setItem('sound_volume', this.masterVolume.toString());
+    safeLocalStorage.setItem('sound_volume', this.masterVolume.toString());
   }
 
   toggleMute() {
     this.isMuted = !this.isMuted;
-    localStorage.setItem('sound_muted', this.isMuted.toString());
+    safeLocalStorage.setItem('sound_muted', this.isMuted.toString());
     if (this.isMuted) {
       this.stopAllAmbientSounds();
     }

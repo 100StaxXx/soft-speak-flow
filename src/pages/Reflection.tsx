@@ -34,12 +34,14 @@ export default function Reflection() {
   }, [user]);
 
   const loadTodayReflection = async () => {
+    if (!user?.id) return;
+    
     try {
       const today = new Date().toLocaleDateString('en-CA');
       const { data, error } = await supabase
         .from('user_reflections')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('reflection_date', today)
         .maybeSingle();
 

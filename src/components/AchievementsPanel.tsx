@@ -21,10 +21,14 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
     refetchOnMount: true, // Refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
       const { data, error } = await supabase
         .from("achievements")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("earned_at", { ascending: false });
 
       if (error) throw error;
