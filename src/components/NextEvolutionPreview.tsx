@@ -3,6 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { AttributeTooltip } from "./AttributeTooltip";
 import { getStageName } from "@/config/companionStages";
+import { HABIT_XP_REWARDS, QUEST_XP_REWARDS, SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -12,11 +13,11 @@ interface NextEvolutionPreviewProps {
 }
 
 const XP_TIPS = [
-  { action: "Complete a habit", xp: "5-20 XP", icon: "✓" },
-  { action: "Finish all daily habits", xp: "+10 XP bonus", icon: "🎯" },
-  { action: "Complete daily missions", xp: "5-30 XP each", icon: "⚡" },
-  { action: "Weekly challenge day", xp: "20 XP", icon: "💪" },
-  { action: "Streak milestones", xp: "15 XP", icon: "🔥" },
+  { action: "Complete a habit", xp: `${HABIT_XP_REWARDS.EASY}-${HABIT_XP_REWARDS.HARD} XP`, icon: "✓" },
+  { action: "Finish all daily habits", xp: `+${SYSTEM_XP_REWARDS.ALL_HABITS_COMPLETE} XP bonus`, icon: "🎯" },
+  { action: "Complete daily quests", xp: `${QUEST_XP_REWARDS.EASY}-${QUEST_XP_REWARDS.HARD} XP (1.5x Main Quest)`, icon: "⚔️" },
+  { action: "Weekly challenge day", xp: `${SYSTEM_XP_REWARDS.CHALLENGE_COMPLETE} XP`, icon: "💪" },
+  { action: "Streak milestones", xp: `${SYSTEM_XP_REWARDS.STREAK_MILESTONE} XP`, icon: "🔥" },
 ];
 
 export const NextEvolutionPreview = ({

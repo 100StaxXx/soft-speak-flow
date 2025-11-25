@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Flame, Zap, Mountain } from "lucide-react";
+import { HABIT_XP_REWARDS } from "@/config/xpRewards";
 
 interface HabitDifficultySelectorProps {
   value: "easy" | "medium" | "hard";
@@ -20,7 +21,7 @@ export const HabitDifficultySelector = ({ value, onChange }: HabitDifficultySele
           >
             <Zap className="h-5 w-5 text-green-500" />
             <span className="font-semibold">Easy</span>
-            <span className="text-xs text-muted-foreground">+5 XP</span>
+            <span className="text-xs text-muted-foreground">+{HABIT_XP_REWARDS.EASY} XP</span>
           </Label>
         </div>
 
@@ -32,7 +33,7 @@ export const HabitDifficultySelector = ({ value, onChange }: HabitDifficultySele
           >
             <Flame className="h-5 w-5 text-orange-500" />
             <span className="font-semibold">Medium</span>
-            <span className="text-xs text-muted-foreground">+10 XP</span>
+            <span className="text-xs text-muted-foreground">+{HABIT_XP_REWARDS.MEDIUM} XP</span>
           </Label>
         </div>
 
@@ -44,7 +45,7 @@ export const HabitDifficultySelector = ({ value, onChange }: HabitDifficultySele
           >
             <Mountain className="h-6 w-6 text-red-500" />
             <span className="font-semibold">Hard</span>
-            <span className="text-xs text-muted-foreground">+20 XP</span>
+            <span className="text-xs text-muted-foreground">+{HABIT_XP_REWARDS.HARD} XP</span>
           </Label>
         </div>
       </RadioGroup>

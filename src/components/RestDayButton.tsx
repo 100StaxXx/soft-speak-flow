@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useCompanion } from "@/hooks/useCompanion";
 import { format } from "date-fns";
+import { QUEST_XP_REWARDS } from "@/config/xpRewards";
 
 export const RestDayButton = () => {
   const { user } = useAuth();
@@ -44,7 +45,7 @@ export const RestDayButton = () => {
           mission_text: 'Rest and Recover',
           mission_type: 'rest_day',
           category: 'soul',
-          xp_reward: 15,
+          xp_reward: QUEST_XP_REWARDS.EASY,
           difficulty: 'easy',
           completed: true,
           completed_at: new Date().toISOString()
@@ -56,7 +57,7 @@ export const RestDayButton = () => {
       if (companion) {
         awardXP.mutate({
           eventType: 'rest_day',
-          xpAmount: 15,
+          xpAmount: QUEST_XP_REWARDS.EASY,
         });
       }
 
@@ -83,7 +84,7 @@ export const RestDayButton = () => {
         queryClient.invalidateQueries({ queryKey: ['companion', user.id] });
       }
       toast.success('Rest day taken! 🌙', {
-        description: 'Recovery fuels growth. +15 XP, +5 Soul'
+        description: `Recovery fuels growth. +${QUEST_XP_REWARDS.EASY} XP, +5 Soul`
       });
     },
     onError: (error: Error) => {
