@@ -584,6 +584,7 @@ export type Database = {
           created_at: string | null
           creature_name: string
           element: string
+          energy_cost: number
           evolution_id: string
           evolution_stage: number
           frame_type: string
@@ -605,6 +606,7 @@ export type Database = {
           created_at?: string | null
           creature_name: string
           element: string
+          energy_cost?: number
           evolution_id: string
           evolution_stage: number
           frame_type: string
@@ -626,6 +628,7 @@ export type Database = {
           created_at?: string | null
           creature_name?: string
           element?: string
+          energy_cost?: number
           evolution_id?: string
           evolution_stage?: number
           frame_type?: string
