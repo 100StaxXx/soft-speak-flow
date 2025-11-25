@@ -48,7 +48,7 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Main Quest = double XP
+                  Main Quest = 1.5x XP
                 </p>
               </div>
               <div className="flex items-start gap-2">
