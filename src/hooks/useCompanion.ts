@@ -195,11 +195,9 @@ export const useCompanion = () => {
           throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
         }
 
-        // Generate stage 0 card
-        console.log("Generating stage 0 card...");
+        // Generate stage 0 card in background (don't await - don't block onboarding)
         const generateStageZeroCard = async () => {
           try {
-            // Fetch full companion data with attributes
             const { data: fullCompanionData } = await supabase
               .from("user_companion")
               .select("*")
@@ -222,13 +220,12 @@ export const useCompanion = () => {
               },
             });
             queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-            console.log("Stage 0 card generation initiated");
           } catch (cardError) {
-            console.error("Failed to generate stage 0 card:", cardError);
+            console.error("Stage 0 card generation failed (non-critical):", cardError);
           }
         };
 
-        await generateStageZeroCard();
+        generateStageZeroCard(); // Fire and forget - don't block onboarding
       }
 
       // Generate story only for new companions
