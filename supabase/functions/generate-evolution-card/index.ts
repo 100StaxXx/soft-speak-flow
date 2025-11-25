@@ -62,13 +62,22 @@ serve(async (req) => {
     else if (stage >= 4) rarity = 'Epic';      // Stage 4-6: Juvenile, Apprentice, Scout
     else if (stage >= 1) rarity = 'Rare';      // Stage 1-3: Hatchling, Sproutling, Cub
 
-    // Generate stats based on stage and Mind/Body/Soul attributes
-    const baseStatValue = 10 + (stage * 5);
+    // Generate stats based on stage and average attribute (balanced)
+    const baseStatValue = 20 + (stage * 8);
+    const avgAttribute = (
+      (userAttributes?.mind || 0) + 
+      (userAttributes?.body || 0) + 
+      (userAttributes?.soul || 0)
+    ) / 3;
+    
     const stats = {
-      mind: Math.floor(baseStatValue + (userAttributes?.mind || 0) / 2),
-      body: Math.floor(baseStatValue + (userAttributes?.body || 0) / 2),
-      soul: Math.floor(baseStatValue + (userAttributes?.soul || 0) / 2)
+      mind: Math.floor(baseStatValue + avgAttribute * 0.15),
+      body: Math.floor(baseStatValue + avgAttribute * 0.15),
+      soul: Math.floor(baseStatValue + avgAttribute * 0.15),
     };
+
+    // Assign energy cost based on stage (0-9: 1, 10-14: 2, 15-20: 3)
+    const energyCost = stage <= 9 ? 1 : stage <= 14 ? 2 : 3;
 
     // Generate frame type based on element
     const frameType = `${element.toLowerCase()}-frame`;
@@ -232,6 +241,7 @@ Make it LEGENDARY. This is the birth of a companion.`;
         bond_level: bondLevel,
         rarity: rarity,
         frame_type: frameType,
+        energy_cost: energyCost,
       })
       .select()
       .single();
