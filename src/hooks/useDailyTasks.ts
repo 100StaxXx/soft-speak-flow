@@ -79,7 +79,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         // Fetch fresh task count from database directly to avoid race conditions
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
-          .select('id')
+          .select('id, is_bonus')
           .eq('user_id', user!.id)
           .eq('task_date', customDate || taskDate);
 
@@ -88,9 +88,27 @@ export const useDailyTasks = (selectedDate?: Date) => {
           throw countError;
         }
 
-        if (existingTasks && existingTasks.length >= 4) {
+        // Count regular tasks (non-bonus)
+        const regularTaskCount = existingTasks?.filter(t => !t.is_bonus).length || 0;
+        const bonusTaskCount = existingTasks?.filter(t => t.is_bonus).length || 0;
+
+        // Check if user can add a bonus quest
+        const allRegularCompleted = regularTaskCount === 4 && tasks?.filter(t => !t.is_bonus && t.completed).length === 4;
+        const hasStreak = (profile?.current_habit_streak || 0) >= 7;
+        const bonusUnlocked = allRegularCompleted || hasStreak;
+
+        // Determine if this will be a bonus task
+        const isBonus = regularTaskCount >= 4 && bonusUnlocked && bonusTaskCount === 0;
+
+        // Check limits
+        if (regularTaskCount >= 4 && !isBonus) {
           addInProgress.current = false; // Reset on error
-          throw new Error('Maximum 4 tasks per day');
+          throw new Error('Maximum 4 regular tasks per day. Complete all 4 or maintain a 7+ day streak to unlock bonus quest.');
+        }
+
+        if (isBonus && bonusTaskCount >= 1) {
+          addInProgress.current = false;
+          throw new Error('You can only have 1 bonus quest per day');
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -114,22 +132,25 @@ export const useDailyTasks = (selectedDate?: Date) => {
           }
         }
 
-        const { error } = await supabase.rpc('add_daily_task', {
-          p_user_id: user!.id,
-          p_task_text: taskText,
-          p_task_difficulty: difficulty,
-          p_xp_reward: xpReward,
-          p_task_date: customDate || taskDate,
-          p_is_main_quest: isMainQuest ?? false,
-          p_scheduled_time: scheduledTime || null,
-          p_estimated_duration: estimatedDuration || null,
-          p_recurrence_pattern: recurrencePattern || null,
-          p_recurrence_days: recurrenceDays || null,
-          p_is_recurring: !!recurrencePattern,
-          p_reminder_enabled: reminderEnabled ?? false,
-          p_reminder_minutes_before: reminderMinutesBefore ?? 15,
-          p_category: detectedCategory
-        });
+        const { error } = await supabase
+          .from('daily_tasks')
+          .insert({
+            user_id: user!.id,
+            task_text: taskText,
+            difficulty: difficulty,
+            xp_reward: xpReward,
+            task_date: customDate || taskDate,
+            is_main_quest: isMainQuest ?? false,
+            scheduled_time: scheduledTime || null,
+            estimated_duration: estimatedDuration || null,
+            recurrence_pattern: recurrencePattern || null,
+            recurrence_days: recurrenceDays || null,
+            is_recurring: !!recurrencePattern,
+            reminder_enabled: reminderEnabled ?? false,
+            reminder_minutes_before: reminderMinutesBefore ?? 15,
+            category: detectedCategory,
+            is_bonus: isBonus
+          });
 
         if (error) {
           addInProgress.current = false; // Reset on error
@@ -306,11 +327,19 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
-      const { error } = await supabase.rpc('set_main_quest_for_day', {
-        p_user_id: user!.id,
-        p_task_id: taskId,
-        p_task_date: taskDate
-      });
+      // First, unset any existing main quest for today
+      await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: false })
+        .eq('user_id', user!.id)
+        .eq('task_date', taskDate);
+
+      // Then set this task as the main quest
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: true })
+        .eq('id', taskId)
+        .eq('user_id', user!.id);
 
       if (error) throw error;
     },
