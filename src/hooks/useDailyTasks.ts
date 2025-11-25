@@ -269,8 +269,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { bonusXP, toastReason } = await getGuildBonusDetails(xpReward);
         const totalXP = xpReward + bonusXP;
 
-        // Update task completion in database
-        const { error: updateError } = await supabase
+        // Update task completion in database - ATOMIC: only update if not completed
+        const { data: updateResult, error: updateError } = await supabase
           .from('daily_tasks')
           .update({ 
             completed: true, 
@@ -278,14 +278,21 @@ export const useDailyTasks = (selectedDate?: Date) => {
           })
           .eq('id', taskId)
           .eq('user_id', user.id)
-          .eq('completed', false); // Prevent double-completion
+          .eq('completed', false) // Prevent double-completion
+          .select();
 
         if (updateError) {
           toggleInProgress.current = false;
           throw updateError;
         }
 
-        // Award XP using existing useXPRewards hook
+        // CRITICAL: Verify the update actually happened (row was not already completed)
+        if (!updateResult || updateResult.length === 0) {
+          toggleInProgress.current = false;
+          throw new Error('Task was already completed');
+        }
+
+        // Award XP only after verified database update - AWAIT to ensure no race
         await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
 
         toggleInProgress.current = false;

@@ -132,10 +132,15 @@ serve(async (req) => {
       .from("user_companion")
       .select("*")
       .eq("user_id", resolvedUserId)
-      .single();
+      .maybeSingle();
 
-    if (companionError || !companion) {
+    if (companionError) {
       console.error("Companion fetch error:", companionError);
+      throw new Error(`Failed to fetch companion: ${companionError.message}`);
+    }
+
+    if (!companion) {
+      console.error("No companion found for user:", resolvedUserId);
       throw new Error("Companion not found");
     }
 
@@ -272,7 +277,7 @@ Camera: Eye-level with the tiny hatchling, showing its small scale and vulnerabi
           .eq("companion_id", companion.id)
           .order("evolved_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         previousImageUrl = latestEvolution?.image_url;
       }
