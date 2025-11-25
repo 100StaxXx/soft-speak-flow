@@ -9,6 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MentorQuickChat } from "@/components/MentorQuickChat";
+import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
@@ -251,13 +252,17 @@ const Index = () => {
               <TodaysPepTalk />
             </ErrorBoundary>
             
-            <ErrorBoundary>
-              <MentorQuickChat />
-            </ErrorBoundary>
+            <CompanionErrorBoundary>
+              <ErrorBoundary>
+                <MentorQuickChat />
+              </ErrorBoundary>
+            </CompanionErrorBoundary>
           </div>
         </div>
       </PageTransition>
-      <BottomNav />
+      <ErrorBoundary>
+        <BottomNav />
+      </ErrorBoundary>
     </>
   );
 };

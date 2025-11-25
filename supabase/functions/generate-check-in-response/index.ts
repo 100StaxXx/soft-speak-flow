@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,6 +54,18 @@ serve(async (req) => {
     
     if (authError || !user) {
       throw new Error('Unauthorized')
+    }
+
+    // Check rate limit
+    const rateLimitCheck = await checkRateLimit(
+      supabase,
+      user.id,
+      'generate-check-in-response',
+      RATE_LIMITS.AI_GENERATION
+    );
+
+    if (!rateLimitCheck.allowed) {
+      return createRateLimitResponse(rateLimitCheck, corsHeaders);
     }
 
     const { data: checkIn, error: checkInError } = await supabase
