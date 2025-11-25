@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     // Fetch epic and verify ownership
     const { data: epic, error: epicError } = await supabase
       .from('epics')
-      .select('id, title, invite_code, user_id, discord_channel_id, discord_ready')
+      .select('id, title, invite_code, user_id, discord_channel_id, discord_invite_url, discord_ready')
       .eq('id', epicId)
       .single();
 
