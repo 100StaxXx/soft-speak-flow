@@ -2793,6 +2793,8 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          body: number
+          bond_level: number
           core_element: string
           created_at: string
           current_image_url: string
@@ -2804,6 +2806,9 @@ export type Database = {
           id: string
           initial_image_url: string
           is_new: boolean
+          mind: number
+          resilience: number
+          soul: number
           spirit_animal: string
           story_tone: string
           updated_at: string
