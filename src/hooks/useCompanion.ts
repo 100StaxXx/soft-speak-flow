@@ -71,6 +71,18 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
+      // Check if companion already exists - prevent duplicate creation
+      const { data: existingCompanion } = await supabase
+        .from("user_companion")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existingCompanion) {
+        console.log("Companion already exists, skipping creation");
+        return existingCompanion;
+      }
+
       // Determine consistent colors for the companion's lifetime
       const eyeColor = `glowing ${data.favoriteColor}`;
       const furColor = data.favoriteColor;
