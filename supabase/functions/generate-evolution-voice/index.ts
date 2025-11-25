@@ -83,9 +83,9 @@ Generate a SHORT, powerful one-liner (10-15 words MAX) celebrating that the user
 Focus on DISCIPLINE and CONSISTENCY.
 
 Examples for different mentors:
-- Atlas (authoritative): "Growth like this doesn't happen by accident."
-- Darius (intense): "This is what consistency looks like."
-- Solace (gentle): "Look at what you're building, gently and surely."
+- George (authoritative): "Growth like this doesn't happen by accident."
+- Brian (intense): "This is what consistency looks like."
+- Lily (gentle): "Look at what you're building, gently and surely."
 
 Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
           },
