@@ -18,6 +18,7 @@ import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay"
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
+import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -156,6 +157,7 @@ const App = () => {
             <Toaster />
             <Sonner />
             <InstallPWA />
+            <AmbientMusicPlayer />
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <ScrollToTop />
               <AppContent />

@@ -10,7 +10,7 @@ import { soundManager } from "@/utils/soundEffects";
 export const SoundSettings = () => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
-  const [bgMusicVolume, setBgMusicVolume] = useState(0.005);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.15);
   const [bgMusicMuted, setBgMusicMuted] = useState(false);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export const SoundSettings = () => {
               Ambient Music
             </h4>
             <p className="text-xs text-muted-foreground">
-              Calming background music creates a relaxing, immersive experience throughout the app
+              Calming background music plays continuously in the background, like MTG Arena and Pokémon TCG. It automatically ducks when other audio plays.
             </p>
           </div>
 
@@ -123,11 +123,14 @@ export const SoundSettings = () => {
             <Slider
               value={[bgMusicVolume]}
               onValueChange={handleBgMusicVolumeChange}
-              max={1}
-              step={0.05}
+              max={0.4}
+              step={0.01}
               disabled={bgMusicMuted}
               className="w-full"
             />
+            <p className="text-xs text-muted-foreground">
+              Recommended: 10-20% for subtle background ambience
+            </p>
           </div>
 
           <div className="flex items-center justify-between py-2">
