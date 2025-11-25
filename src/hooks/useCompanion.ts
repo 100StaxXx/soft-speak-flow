@@ -168,9 +168,17 @@ export const useCompanion = () => {
 
       console.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
 
-      // Only initialize evolution and cards for newly created companions
-      if (isNewCompanion) {
-        // Record initial evolution
+      // Check if stage 0 evolution exists (regardless of whether companion is new)
+      const { data: existingEvolution } = await supabase
+        .from("companion_evolutions")
+        .select("id")
+        .eq("companion_id", companionData.id)
+        .eq("stage", 0)
+        .maybeSingle();
+
+      // Create stage 0 evolution if missing
+      if (!existingEvolution) {
+        console.log("Creating stage 0 evolution...");
         const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
           .from("companion_evolutions")
           .insert({
@@ -183,10 +191,12 @@ export const useCompanion = () => {
           .single();
 
         if (stageZeroInsertError || !stageZeroEvolution) {
+          console.error("Failed to create stage 0 evolution:", stageZeroInsertError);
           throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
         }
 
-        // Generate stage 0 card in background
+        // Generate stage 0 card
+        console.log("Generating stage 0 card...");
         const generateStageZeroCard = async () => {
           try {
             // Fetch full companion data with attributes
@@ -212,15 +222,17 @@ export const useCompanion = () => {
               },
             });
             queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+            console.log("Stage 0 card generation initiated");
           } catch (cardError) {
             console.error("Failed to generate stage 0 card:", cardError);
           }
         };
 
-        generateStageZeroCard().catch((error) => {
-          console.warn('Stage 0 card generation failed (non-critical):', error?.message || error);
-        });
+        await generateStageZeroCard();
+      }
 
+      // Generate story only for new companions
+      if (isNewCompanion) {
         // Auto-generate the first chapter of the companion's story in background with retry
         const generateStoryWithRetry = async (attempts = 3) => {
           for (let attempt = 1; attempt <= attempts; attempt++) {
