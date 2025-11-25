@@ -503,7 +503,8 @@ export default function Onboarding() {
       await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
       
       // Wait longer to ensure database update and cache propagate
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Increased from 1000ms to 2000ms to prevent race condition crashes
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       console.log("Navigating to quests...");
       // Navigate to quests page to start with tasks

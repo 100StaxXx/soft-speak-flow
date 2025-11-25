@@ -58,7 +58,8 @@ export const useCompanion = () => {
     },
     enabled: !!user,
     staleTime: 30000, // 30 seconds - prevents unnecessary refetches
-    retry: 2,
+    retry: 3, // Increased from 2 to 3 for better reliability after onboarding
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
 
   const createCompanion = useMutation({
