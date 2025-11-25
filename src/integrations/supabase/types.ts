@@ -2794,10 +2794,10 @@ export type Database = {
         }
         Returns: {
           body: number
-          bond_level: number
           core_element: string
           created_at: string
           current_image_url: string
+          current_mood: string
           current_stage: number
           current_xp: number
           eye_color: string
@@ -2806,8 +2806,9 @@ export type Database = {
           id: string
           initial_image_url: string
           is_new: boolean
+          last_energy_update: string
+          last_mood_update: string
           mind: number
-          resilience: number
           soul: number
           spirit_animal: string
           story_tone: string
