@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
@@ -16,6 +17,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { companion } = useCompanion();
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
+  const { awardCustomXP } = useXPRewards();
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -224,19 +226,24 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { bonusXP, toastReason } = await getGuildBonusDetails(xpReward);
         const totalXP = xpReward + bonusXP;
 
-        const { data: rpcResult, error: rpcError } = await supabase.rpc('complete_quest_with_xp', {
-          p_task_id: taskId,
-          p_user_id: user!.id,
-          p_xp_amount: totalXP,
-        });
+        // Update task completion in database
+        const { error: updateError } = await supabase
+          .from('daily_tasks')
+          .update({ 
+            completed: true, 
+            completed_at: new Date().toISOString() 
+          })
+          .eq('id', taskId)
+          .eq('user_id', user!.id)
+          .eq('completed', false); // Prevent double-completion
 
-        if (rpcError) {
-          throw rpcError;
+        if (updateError) {
+          toggleInProgress.current = false;
+          throw updateError;
         }
 
-        if (!rpcResult?.success) {
-          throw new Error(rpcResult?.error || 'Failed to complete quest');
-        }
+        // Award XP using existing useXPRewards hook
+        await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
 
         toggleInProgress.current = false;
         return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };
