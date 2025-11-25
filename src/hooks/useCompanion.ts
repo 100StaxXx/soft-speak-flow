@@ -71,18 +71,6 @@ export const useCompanion = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Check if companion already exists - prevent duplicate creation
-      const { data: existingCompanion } = await supabase
-        .from("user_companion")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (existingCompanion) {
-        console.log("Companion already exists, skipping creation");
-        return existingCompanion;
-      }
-
       // Determine consistent colors for the companion's lifetime
       const eyeColor = `glowing ${data.favoriteColor}`;
       const furColor = data.favoriteColor;
@@ -151,118 +139,128 @@ export const useCompanion = () => {
         imageUrl: imageData.imageUrl
       });
 
-      // Create companion record with color specifications
-      const { data: companionData, error: createError } = await supabase
-        .from("user_companion")
-        .insert({
-          user_id: user.id,
-          favorite_color: data.favoriteColor,
-          spirit_animal: data.spiritAnimal,
-          core_element: data.coreElement,
-          story_tone: data.storyTone,
-          current_stage: 0,
-          current_xp: 0,
-          current_image_url: imageData.imageUrl,
-          initial_image_url: imageData.imageUrl, // Store the initial Stage 0 image
-          eye_color: eyeColor,
-          fur_color: furColor,
-        })
-        .select()
-        .maybeSingle();
+      // Use atomic database function to create companion (prevents duplicates)
+      const { data: companionResult, error: createError } = await supabase
+        .rpc('create_companion_if_not_exists', {
+          p_user_id: user.id,
+          p_favorite_color: data.favoriteColor,
+          p_spirit_animal: data.spiritAnimal,
+          p_core_element: data.coreElement,
+          p_story_tone: data.storyTone,
+          p_current_image_url: imageData.imageUrl,
+          p_initial_image_url: imageData.imageUrl,
+          p_eye_color: eyeColor,
+          p_fur_color: furColor,
+        });
 
       if (createError) {
         console.error("Database error creating companion:", createError);
         throw new Error(`Failed to save companion: ${createError.message}`);
       }
-      if (!companionData) {
-        console.error("No companion data returned after insert");
+      
+      if (!companionResult || companionResult.length === 0) {
+        console.error("No companion data returned from function");
         throw new Error("Failed to create companion");
       }
 
-      // Record initial evolution
-      const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
-        .from("companion_evolutions")
-        .insert({
-          companion_id: companionData.id,
-          stage: 0,
-          image_url: imageData.imageUrl,
-          xp_at_evolution: 0,
-        })
-        .select()
-        .single();
+      const companionData = companionResult[0];
+      const isNewCompanion = companionData.is_new;
 
-      if (stageZeroInsertError || !stageZeroEvolution) {
-        throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
-      }
+      console.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
 
-      const generateStageZeroCard = async () => {
-        try {
-          await supabase.functions.invoke("generate-evolution-card", {
-            body: {
-              companionId: companionData.id,
-              evolutionId: stageZeroEvolution.id,
-              stage: 0,
-              species: companionData.spirit_animal,
-              element: companionData.core_element,
-              color: companionData.favorite_color,
-              userAttributes: {
-                body: companionData.body || 0,
-                mind: companionData.mind || 0,
-                soul: companionData.soul || 0,
-              },
-            },
-          });
-          queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-        } catch (cardError) {
-          console.error("Failed to generate stage 0 card:", cardError);
+      // Only initialize evolution and cards for newly created companions
+      if (isNewCompanion) {
+        // Record initial evolution
+        const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
+          .from("companion_evolutions")
+          .insert({
+            companion_id: companionData.id,
+            stage: 0,
+            image_url: imageData.imageUrl,
+            xp_at_evolution: 0,
+          })
+          .select()
+          .single();
+
+        if (stageZeroInsertError || !stageZeroEvolution) {
+          throw stageZeroInsertError || new Error("Unable to record stage 0 evolution");
         }
-      };
 
-      generateStageZeroCard().catch((error) => {
-        console.warn('Stage 0 card generation failed (non-critical):', error?.message || error);
-      });
-
-      // Auto-generate the first chapter of the companion's story in background with retry
-      const generateStoryWithRetry = async (attempts = 3) => {
-        for (let attempt = 1; attempt <= attempts; attempt++) {
+        // Generate stage 0 card in background
+        const generateStageZeroCard = async () => {
           try {
-            const { data, error } = await supabase.functions.invoke('generate-companion-story', {
+            // Fetch full companion data with attributes
+            const { data: fullCompanionData } = await supabase
+              .from("user_companion")
+              .select("*")
+              .eq("id", companionData.id)
+              .single();
+
+            await supabase.functions.invoke("generate-evolution-card", {
               body: {
                 companionId: companionData.id,
+                evolutionId: stageZeroEvolution.id,
                 stage: 0,
-              }
+                species: companionData.spirit_animal,
+                element: companionData.core_element,
+                color: companionData.favorite_color,
+                userAttributes: {
+                  body: fullCompanionData?.body || 0,
+                  mind: fullCompanionData?.mind || 0,
+                  soul: fullCompanionData?.soul || 0,
+                },
+              },
             });
-
-            if (error) throw error;
-
-            console.log("Stage 0 story generation started");
-            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-            return;
-          } catch (storyError) {
-            const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
-            const isTransient = errorMessage.includes('network') ||
-                               errorMessage.includes('timeout') ||
-                               errorMessage.includes('temporarily unavailable');
-
-            if (attempt < attempts && isTransient) {
-              console.log(`Story generation attempt ${attempt} failed, retrying...`);
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-              continue;
-            }
-
-            console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
-            // Don't fail companion creation if story generation fails
-            // Story can be regenerated later by the user
-            break;
+            queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+          } catch (cardError) {
+            console.error("Failed to generate stage 0 card:", cardError);
           }
-        }
-      };
+        };
 
-      // Start story generation in background (don't await)
-      generateStoryWithRetry().catch((error) => {
-        console.warn('Story generation failed (non-critical):', error?.message || error);
-      });
+        generateStageZeroCard().catch((error) => {
+          console.warn('Stage 0 card generation failed (non-critical):', error?.message || error);
+        });
+
+        // Auto-generate the first chapter of the companion's story in background with retry
+        const generateStoryWithRetry = async (attempts = 3) => {
+          for (let attempt = 1; attempt <= attempts; attempt++) {
+            try {
+              const { data, error } = await supabase.functions.invoke('generate-companion-story', {
+                body: {
+                  companionId: companionData.id,
+                  stage: 0,
+                }
+              });
+
+              if (error) throw error;
+
+              console.log("Stage 0 story generation started");
+              queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+              queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+              return;
+            } catch (storyError) {
+              const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
+              const isTransient = errorMessage.includes('network') ||
+                                 errorMessage.includes('timeout') ||
+                                 errorMessage.includes('temporarily unavailable');
+
+              if (attempt < attempts && isTransient) {
+                console.log(`Story generation attempt ${attempt} failed, retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+                continue;
+              }
+
+              console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
+              break;
+            }
+          }
+        };
+
+        // Start story generation in background (don't await)
+        generateStoryWithRetry().catch((error) => {
+          console.warn('Story generation failed (non-critical):', error?.message || error);
+        });
+      }
 
       return companionData;
     },
