@@ -9,11 +9,6 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
-import { useProfile } from "./useProfile";
-
-export const BASE_QUEST_LIMIT = 4;
-export const BONUS_QUEST_LIMIT = BASE_QUEST_LIMIT + 1;
-export const BONUS_STREAK_THRESHOLD = 7;
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -23,9 +18,6 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
-  const { profile } = useProfile();
-  const currentStreak = profile?.current_habit_streak ?? 0;
-  const streakUnlocksBonus = currentStreak >= BONUS_STREAK_THRESHOLD;
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -87,7 +79,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         // Fetch fresh task count from database directly to avoid race conditions
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
-          .select('id, completed')
+          .select('id')
           .eq('user_id', user!.id)
           .eq('task_date', customDate || taskDate);
 
@@ -96,14 +88,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
           throw countError;
         }
 
-        const completedTasks = existingTasks?.filter(task => task.completed)?.length ?? 0;
-        const hasCompletedBaseQuests = completedTasks >= BASE_QUEST_LIMIT;
-        const hasBonusSlot = streakUnlocksBonus || hasCompletedBaseQuests;
-        const maxTasksForUser = hasBonusSlot ? BONUS_QUEST_LIMIT : BASE_QUEST_LIMIT;
-
-        if (existingTasks && existingTasks.length >= maxTasksForUser) {
+        if (existingTasks && existingTasks.length >= 4) {
           addInProgress.current = false; // Reset on error
-          throw new Error('Daily quest limit reached. Complete your base quests or keep a 7-day streak to unlock the Bonus slot.');
+          throw new Error('Maximum 4 tasks per day');
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -147,7 +134,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         if (error) {
           addInProgress.current = false; // Reset on error
           if (error.message && error.message.includes('MAX_TASKS_REACHED')) {
-            throw new Error('Daily quest limit reached. Complete your base quests or keep a 7-day streak to unlock the Bonus slot.');
+            throw new Error('Maximum 4 tasks per day');
           }
           throw error;
         }
@@ -338,15 +325,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const hasCompletedBaseQuests = completedCount >= BASE_QUEST_LIMIT;
-  const bonusSlotUnlocked = streakUnlocksBonus || hasCompletedBaseQuests;
-  const maxQuestSlots = bonusSlotUnlocked ? BONUS_QUEST_LIMIT : BASE_QUEST_LIMIT;
-  const canAddMore = totalCount < maxQuestSlots;
-  const bonusSlotReason: 'streak' | 'completion' | null = streakUnlocksBonus
-    ? 'streak'
-    : hasCompletedBaseQuests
-    ? 'completion'
-    : null;
+  const canAddMore = tasks.length < 4;
 
   return {
     tasks,
@@ -360,11 +339,5 @@ export const useDailyTasks = (selectedDate?: Date) => {
     canAddMore,
     completedCount,
     totalCount,
-    maxQuestSlots,
-    bonusSlotUnlocked,
-    bonusSlotReason,
-    baseQuestLimit: BASE_QUEST_LIMIT,
-    bonusQuestLimit: BONUS_QUEST_LIMIT,
-    bonusStreakThreshold: BONUS_STREAK_THRESHOLD,
   };
 };
