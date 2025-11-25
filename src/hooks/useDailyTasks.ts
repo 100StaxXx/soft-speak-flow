@@ -6,14 +6,10 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useProfile } from "@/hooks/useProfile";
 import { useRef } from "react";
 import { getQuestXP } from "@/config/xpRewards";
 import { format } from "date-fns";
-import { useProfile } from "./useProfile";
-
-export const BASE_QUEST_LIMIT = 4;
-export const BONUS_QUEST_LIMIT = BASE_QUEST_LIMIT + 1;
-export const BONUS_STREAK_THRESHOLD = 7;
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -24,8 +20,6 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { profile } = useProfile();
-  const currentStreak = profile?.current_habit_streak ?? 0;
-  const streakUnlocksBonus = currentStreak >= BONUS_STREAK_THRESHOLD;
 
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
@@ -96,8 +90,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
         // Fetch fresh task count from database directly to avoid race conditions
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
-          .select('id, completed')
-          .eq('user_id', user.id)
+          .select('id, is_bonus')
+          .eq('user_id', user!.id)
           .eq('task_date', customDate || taskDate);
 
         if (countError) {
@@ -105,14 +99,27 @@ export const useDailyTasks = (selectedDate?: Date) => {
           throw countError;
         }
 
-        const completedTasks = existingTasks?.filter(task => task.completed)?.length ?? 0;
-        const hasCompletedBaseQuests = completedTasks >= BASE_QUEST_LIMIT;
-        const hasBonusSlot = streakUnlocksBonus || hasCompletedBaseQuests;
-        const maxTasksForUser = hasBonusSlot ? BONUS_QUEST_LIMIT : BASE_QUEST_LIMIT;
+        // Count regular tasks (non-bonus)
+        const regularTaskCount = existingTasks?.filter(t => !t.is_bonus).length || 0;
+        const bonusTaskCount = existingTasks?.filter(t => t.is_bonus).length || 0;
 
-        if (existingTasks && existingTasks.length >= maxTasksForUser) {
+        // Check if user can add a bonus quest
+        const allRegularCompleted = regularTaskCount === 4 && tasks?.filter(t => !t.is_bonus && t.completed).length === 4;
+        const hasStreak = (profile?.current_habit_streak || 0) >= 7;
+        const bonusUnlocked = allRegularCompleted || hasStreak;
+
+        // Determine if this will be a bonus task
+        const isBonus = regularTaskCount >= 4 && bonusUnlocked && bonusTaskCount === 0;
+
+        // Check limits
+        if (regularTaskCount >= 4 && !isBonus) {
           addInProgress.current = false; // Reset on error
-          throw new Error('Daily quest limit reached. Complete your base quests or keep a 7-day streak to unlock the Bonus slot.');
+          throw new Error('Maximum 4 regular tasks per day. Complete all 4 or maintain a 7+ day streak to unlock bonus quest.');
+        }
+
+        if (isBonus && bonusTaskCount >= 1) {
+          addInProgress.current = false;
+          throw new Error('You can only have 1 bonus quest per day');
         }
 
         const xpReward = getQuestXP(difficulty);
@@ -136,27 +143,30 @@ export const useDailyTasks = (selectedDate?: Date) => {
           }
         }
 
-        const { error } = await supabase.rpc('add_daily_task', {
-          p_user_id: user.id,
-          p_task_text: taskText,
-          p_task_difficulty: difficulty,
-          p_xp_reward: xpReward,
-          p_task_date: customDate || taskDate,
-          p_is_main_quest: isMainQuest ?? false,
-          p_scheduled_time: scheduledTime || null,
-          p_estimated_duration: estimatedDuration || null,
-          p_recurrence_pattern: recurrencePattern || null,
-          p_recurrence_days: recurrenceDays || null,
-          p_is_recurring: !!recurrencePattern,
-          p_reminder_enabled: reminderEnabled ?? false,
-          p_reminder_minutes_before: reminderMinutesBefore ?? 15,
-          p_category: detectedCategory
-        });
+        const { error } = await supabase
+          .from('daily_tasks')
+          .insert({
+            user_id: user!.id,
+            task_text: taskText,
+            difficulty: difficulty,
+            xp_reward: xpReward,
+            task_date: customDate || taskDate,
+            is_main_quest: isMainQuest ?? false,
+            scheduled_time: scheduledTime || null,
+            estimated_duration: estimatedDuration || null,
+            recurrence_pattern: recurrencePattern || null,
+            recurrence_days: recurrenceDays || null,
+            is_recurring: !!recurrencePattern,
+            reminder_enabled: reminderEnabled ?? false,
+            reminder_minutes_before: reminderMinutesBefore ?? 15,
+            category: detectedCategory,
+            is_bonus: isBonus
+          });
 
         if (error) {
           addInProgress.current = false; // Reset on error
           if (error.message && error.message.includes('MAX_TASKS_REACHED')) {
-            throw new Error('Daily quest limit reached. Complete your base quests or keep a 7-day streak to unlock the Bonus slot.');
+            throw new Error('Maximum 4 tasks per day');
           }
           throw error;
         }
@@ -336,15 +346,19 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { error } = await supabase.rpc('set_main_quest_for_day', {
-        p_user_id: user.id,
-        p_task_id: taskId,
-        p_task_date: taskDate
-      });
+      // First, unset any existing main quest for today
+      await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: false })
+        .eq('user_id', user!.id)
+        .eq('task_date', taskDate);
+
+      // Then set this task as the main quest
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: true })
+        .eq('id', taskId)
+        .eq('user_id', user!.id);
 
       if (error) throw error;
     },
@@ -359,15 +373,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
-  const hasCompletedBaseQuests = completedCount >= BASE_QUEST_LIMIT;
-  const bonusSlotUnlocked = streakUnlocksBonus || hasCompletedBaseQuests;
-  const maxQuestSlots = bonusSlotUnlocked ? BONUS_QUEST_LIMIT : BASE_QUEST_LIMIT;
-  const canAddMore = totalCount < maxQuestSlots;
-  const bonusSlotReason: 'streak' | 'completion' | null = streakUnlocksBonus
-    ? 'streak'
-    : hasCompletedBaseQuests
-    ? 'completion'
-    : null;
+  const canAddMore = tasks.length < 4;
 
   return {
     tasks,
@@ -381,11 +387,5 @@ export const useDailyTasks = (selectedDate?: Date) => {
     canAddMore,
     completedCount,
     totalCount,
-    maxQuestSlots,
-    bonusSlotUnlocked,
-    bonusSlotReason,
-    baseQuestLimit: BASE_QUEST_LIMIT,
-    bonusQuestLimit: BONUS_QUEST_LIMIT,
-    bonusStreakThreshold: BONUS_STREAK_THRESHOLD,
   };
 };

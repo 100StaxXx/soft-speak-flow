@@ -36,7 +36,7 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { Sliders } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
-import { useDailyTasks, BASE_QUEST_LIMIT, BONUS_QUEST_LIMIT, BONUS_STREAK_THRESHOLD } from "@/hooks/useDailyTasks";
+import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -94,20 +94,8 @@ export default function Tasks() {
     isToggling,
     canAddMore,
     completedCount,
-    totalCount,
-    maxQuestSlots,
-    bonusSlotUnlocked,
-    bonusSlotReason,
+    totalCount 
   } = useDailyTasks(selectedDate);
-
-  const remainingQuestSlots = Math.max(maxQuestSlots - totalCount, 0);
-  const bonusSlotMessage = bonusSlotUnlocked
-    ? bonusSlotReason === 'streak'
-      ? "Bonus Quest active thanks to your streak 🔥"
-      : "Bonus Quest unlocked for completing every core quest 🎯"
-    : `Bonus Quest locked - complete all ${BASE_QUEST_LIMIT} quests or reach a ${BONUS_STREAK_THRESHOLD}-day streak to unlock it.`;
-  const bonusSlotMessageClass = bonusSlotUnlocked ? "text-emerald-600" : "text-primary";
-  const slotsUsedLabel = `${Math.min(totalCount, maxQuestSlots)}/${maxQuestSlots}`;
   
   // Get all tasks for calendar views
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, calendarView);
@@ -705,25 +693,15 @@ export default function Tasks() {
             )}
 
             <Card className="p-4 space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center justify-between">
                 <div>
                   <h3 data-tour="today-quests-header" className="font-semibold">
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Base limit: {BASE_QUEST_LIMIT} quests/day.{" "}
-                    <span className={cn("font-medium", bonusSlotMessageClass)}>
-                      {bonusSlotMessage}
-                    </span>
-                  </p>
+                  <p className="text-sm text-muted-foreground">Max 4 quests per day</p>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium text-primary">
-                    {completedCount}/{totalCount} Complete
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Slots used: {slotsUsedLabel}
-                  </p>
+                <div className="text-sm font-medium text-primary">
+                  {completedCount}/{totalCount}
                 </div>
               </div>
 
@@ -751,7 +729,7 @@ export default function Tasks() {
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description={`Add ${BASE_QUEST_LIMIT} core quests (+1 Bonus slot when unlocked). Mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
+                    description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
                   />
                 ) : (() => {
                   const mainQuest = tasks.find(t => t.is_main_quest);
@@ -808,20 +786,8 @@ export default function Tasks() {
 
               {canAddMore && (
                 <Card className="p-4 space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">Add New Quest</p>
-                        {bonusSlotUnlocked && (
-                          <span className="text-xs font-semibold text-emerald-600 bg-emerald-600/10 px-2 py-0.5 rounded-full">
-                            Bonus slot active
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {remainingQuestSlots} slot{remainingQuestSlots === 1 ? "" : "s"} left ({totalCount}/{maxQuestSlots} used)
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Add New Quest</p>
                     <button
                       onClick={() => setShowAdvanced(!showAdvanced)}
                       className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5"
