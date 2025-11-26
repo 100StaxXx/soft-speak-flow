@@ -19,6 +19,14 @@ const config: CapacitorConfig = {
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true
+    },
+    SocialLogin: {
+      providers: {
+        google: true,      // Google Sign-In enabled
+        facebook: false,   // Facebook disabled (not bundled)
+        apple: true,       // Apple Sign-In enabled
+        twitter: false     // Twitter disabled (not bundled)
+      }
     }
   }
 };
