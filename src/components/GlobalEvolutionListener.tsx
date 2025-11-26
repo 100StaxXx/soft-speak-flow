@@ -86,7 +86,7 @@ export const GlobalEvolutionListener = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, queryClient, profile, setIsEvolvingLoading]);
+  }, [user?.id, queryClient]); // Only depend on user ID to avoid unnecessary reconnections
 
   if (!isEvolving || !evolutionData) {
     return null;

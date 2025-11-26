@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, memo } from "react";
+import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
 import { SkeletonPepTalk } from "@/components/SkeletonCard";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -54,7 +55,7 @@ export const TodaysPepTalk = memo(() => {
   // Track walkthrough state
   useEffect(() => {
     const checkWalkthrough = () => {
-      setIsWalkthroughActive(Boolean(localStorage.getItem('appWalkthroughActive')));
+      setIsWalkthroughActive(Boolean(safeLocalStorage.getItem('appWalkthroughActive')));
     };
 
     checkWalkthrough();

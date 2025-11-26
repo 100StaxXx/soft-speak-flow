@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { safeLocalStorage } from "@/utils/storage";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LegalDocumentViewer } from "./LegalDocumentViewer";
@@ -20,8 +21,8 @@ export const LegalAcceptance = ({ onAccept }: LegalAcceptanceProps) => {
   const handleAccept = () => {
     if (canProceed) {
       // Store acceptance timestamp
-      localStorage.setItem('legal_accepted_at', new Date().toISOString());
-      localStorage.setItem('legal_accepted_version', '2025-11-21');
+      safeLocalStorage.setItem('legal_accepted_at', new Date().toISOString());
+      safeLocalStorage.setItem('legal_accepted_version', '2025-11-21');
       onAccept();
     }
   };

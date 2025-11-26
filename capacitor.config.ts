@@ -4,10 +4,12 @@ const config: CapacitorConfig = {
   appId: 'com.revolution.app',
   appName: 'R-Evolution',
   webDir: 'dist',
-  server: {
-    url: 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  },
+  // ⚠️ PRODUCTION BUILD: server config commented out
+  // Only use during LOCAL development - DO NOT uncomment for iOS/Android builds!
+  // server: {
+  //   url: 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com?forceHideBadge=true',
+  //   cleartext: true
+  // },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

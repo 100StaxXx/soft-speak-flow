@@ -11,7 +11,8 @@ const EvolutionContext = createContext<EvolutionContextType | undefined>(undefin
 
 export const EvolutionProvider = ({ children }: { children: ReactNode }) => {
   const [isEvolvingLoading, setIsEvolvingLoading] = useState(false);
-  const [onEvolutionComplete, setOnEvolutionComplete] = useState<(() => void) | null>(null);
+  // Use function initializer to properly store function state
+  const [onEvolutionComplete, setOnEvolutionComplete] = useState<(() => void) | null>(() => null);
 
   return (
     <EvolutionContext.Provider value={{ 

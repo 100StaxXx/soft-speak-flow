@@ -9,6 +9,7 @@ import { SchedulePowerUps } from "@/components/SchedulePowerUps";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { Button } from "@/components/ui/button";
+import { safeLocalStorage } from "@/utils/storage";
 import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
@@ -388,7 +389,7 @@ export default function Tasks() {
     if (!user || !profile) return;
     
     // Check localStorage first for immediate feedback
-    const tutorialDismissed = localStorage.getItem(`tutorial_dismissed_${user.id}`);
+    const tutorialDismissed = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`);
     if (tutorialDismissed === 'true') {
       if (showTutorial) setShowTutorial(false);
       return;
@@ -399,7 +400,7 @@ export default function Tasks() {
     
     // If database says tutorial was seen, mark localStorage and close
     if (tutorialSeen) {
-      localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+      safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
       if (showTutorial) setShowTutorial(false);
       return;
     }
@@ -433,8 +434,14 @@ export default function Tasks() {
               })
               .then(() => {
                 queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+              })
+              .catch((error) => {
+                console.error('Failed to create tutorial quest:', error);
               });
           }
+        })
+        .catch((error) => {
+          console.error('Failed to check for existing tutorial quest:', error);
         });
     }
   }, [user, profile, showTutorial, queryClient]);
@@ -443,7 +450,7 @@ export default function Tasks() {
     if (!user) return;
     
     // Immediately mark as dismissed in localStorage to prevent re-showing
-    localStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+    safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
     setShowTutorial(false);
     
     // Then update database in background

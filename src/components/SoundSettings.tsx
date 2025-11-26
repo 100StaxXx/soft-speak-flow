@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -14,10 +15,10 @@ export const SoundSettings = () => {
   const [bgMusicMuted, setBgMusicMuted] = useState(false);
 
   useEffect(() => {
-    const savedVolume = localStorage.getItem('sound_volume');
-    const savedMuted = localStorage.getItem('sound_muted');
-    const savedBgVolume = localStorage.getItem('bg_music_volume');
-    const savedBgMuted = localStorage.getItem('bg_music_muted');
+    const savedVolume = safeLocalStorage.getItem('sound_volume');
+    const savedMuted = safeLocalStorage.getItem('sound_muted');
+    const savedBgVolume = safeLocalStorage.getItem('bg_music_volume');
+    const savedBgMuted = safeLocalStorage.getItem('bg_music_muted');
     
     if (savedVolume) {
       const parsed = parseFloat(savedVolume);
@@ -49,14 +50,14 @@ export const SoundSettings = () => {
   const handleBgMusicVolumeChange = (values: number[]) => {
     const newVolume = values[0];
     setBgMusicVolume(newVolume);
-    localStorage.setItem('bg_music_volume', newVolume.toString());
+    safeLocalStorage.setItem('bg_music_volume', newVolume.toString());
     window.dispatchEvent(new CustomEvent('bg-music-volume-change', { detail: newVolume }));
   };
 
   const handleBgMusicMuteToggle = () => {
     const newMuted = !bgMusicMuted;
     setBgMusicMuted(newMuted);
-    localStorage.setItem('bg_music_muted', newMuted.toString());
+    safeLocalStorage.setItem('bg_music_muted', newMuted.toString());
     window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMuted }));
   };
 

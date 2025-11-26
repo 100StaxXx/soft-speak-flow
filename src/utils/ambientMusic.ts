@@ -97,8 +97,8 @@ class AmbientMusicManager {
 
   private loadPreferences() {
     try {
-      const savedVolume = localStorage.getItem('bg_music_volume');
-      const savedMuted = localStorage.getItem('bg_music_muted');
+      const savedVolume = safeLocalStorage.getItem('bg_music_volume');
+      const savedMuted = safeLocalStorage.getItem('bg_music_muted');
       
       if (savedVolume) {
         const parsed = parseFloat(savedVolume);
@@ -214,7 +214,7 @@ class AmbientMusicManager {
     this.volume = Math.max(0, Math.min(1, volume));
     
     try {
-      localStorage.setItem('bg_music_volume', this.volume.toString());
+      safeLocalStorage.setItem('bg_music_volume', this.volume.toString());
     } catch (e) {
       console.warn('Failed to save volume preference:', e);
     }
@@ -235,7 +235,7 @@ class AmbientMusicManager {
     
     this.isMuted = true;
     try {
-      localStorage.setItem('bg_music_muted', 'true');
+      safeLocalStorage.setItem('bg_music_muted', 'true');
     } catch (e) {
       console.warn('Failed to save mute preference:', e);
     }
@@ -261,7 +261,7 @@ class AmbientMusicManager {
     
     this.isMuted = false;
     try {
-      localStorage.setItem('bg_music_muted', 'false');
+      safeLocalStorage.setItem('bg_music_muted', 'false');
     } catch (e) {
       console.warn('Failed to save mute preference:', e);
     }

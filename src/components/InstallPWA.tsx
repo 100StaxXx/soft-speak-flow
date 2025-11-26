@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { safeLocalStorage } from '@/utils/storage';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -38,11 +39,11 @@ export const InstallPWA = () => {
 
   const handleDismiss = () => {
     setShowInstallPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    safeLocalStorage.setItem('pwa-install-dismissed', 'true');
   };
 
   // Don't show if already dismissed or installed
-  if (!showInstallPrompt || localStorage.getItem('pwa-install-dismissed')) {
+  if (!showInstallPrompt || safeLocalStorage.getItem('pwa-install-dismissed')) {
     return null;
   }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeLocalStorage } from "@/utils/storage";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export const CompanionOnboarding = () => {
 
   useEffect(() => {
     // Check if user has seen onboarding AND if main onboarding is completed
-    const hasSeenOnboarding = localStorage.getItem("companion-onboarding-complete");
+    const hasSeenOnboarding = safeLocalStorage.getItem("companion-onboarding-complete");
     
     // Don't show during initial onboarding flow - only after user has completed profile setup
     const checkOnboardingStatus = async () => {
@@ -87,7 +88,7 @@ export const CompanionOnboarding = () => {
   };
 
   const handleComplete = () => {
-    localStorage.setItem("companion-onboarding-complete", "true");
+    safeLocalStorage.setItem("companion-onboarding-complete", "true");
     setIsVisible(false);
     
     // Get primary color from CSS variables for confetti
@@ -108,7 +109,7 @@ export const CompanionOnboarding = () => {
   };
 
   const handleSkip = () => {
-    localStorage.setItem("companion-onboarding-complete", "true");
+    safeLocalStorage.setItem("companion-onboarding-complete", "true");
     setIsVisible(false);
   };
 
