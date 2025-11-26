@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Trash2, Edit, Plus, Upload, X, Loader2, Music } from "lucide-react";
+import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download, Share } from "lucide-react";
 import { AudioGenerator } from "@/components/AudioGenerator";
+import { downloadImage } from "@/utils/imageDownload";
+import { Capacitor } from '@capacitor/core';
 
 interface PepTalk {
   id?: string;
@@ -498,7 +500,7 @@ const Admin = () => {
                   id="spiritAnimal"
                   value={companionTestData.spiritAnimal}
                   onChange={(e) => setCompanionTestData({ ...companionTestData, spiritAnimal: e.target.value })}
-                  className="w-full p-2 border rounded-2xl bg-background"
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
                 >
                   <option value="wolf">Wolf</option>
                   <option value="lion">Lion</option>
@@ -524,7 +526,7 @@ const Admin = () => {
                   id="element"
                   value={companionTestData.element}
                   onChange={(e) => setCompanionTestData({ ...companionTestData, element: e.target.value })}
-                  className="w-full p-2 border rounded-2xl bg-background"
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
                 >
                   <option value="fire">Fire</option>
                   <option value="water">Water</option>
@@ -547,7 +549,7 @@ const Admin = () => {
                 max="20"
                 value={companionTestData.stage}
                 onChange={(e) => setCompanionTestData({ ...companionTestData, stage: parseInt(e.target.value) })}
-                className="w-full"
+                className="w-full h-10 cursor-pointer"
               />
             </div>
 
@@ -560,13 +562,13 @@ const Admin = () => {
                     id="favoriteColor"
                     value={companionTestData.favoriteColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, favoriteColor: e.target.value })}
-                    className="w-16 h-10 rounded-2xl"
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
                   />
                   <Input
                     type="text"
                     value={companionTestData.favoriteColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, favoriteColor: e.target.value })}
-                    className="flex-1 rounded-2xl"
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
                     placeholder="#FF6B35"
                   />
                 </div>
@@ -580,13 +582,13 @@ const Admin = () => {
                     id="eyeColor"
                     value={companionTestData.eyeColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, eyeColor: e.target.value })}
-                    className="w-16 h-10 rounded-2xl"
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
                   />
                   <Input
                     type="text"
                     value={companionTestData.eyeColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, eyeColor: e.target.value })}
-                    className="flex-1 rounded-2xl"
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
                     placeholder="#FFD700"
                   />
                 </div>
@@ -600,13 +602,13 @@ const Admin = () => {
                     id="furColor"
                     value={companionTestData.furColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, furColor: e.target.value })}
-                    className="w-16 h-10 rounded-2xl"
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
                   />
                   <Input
                     type="text"
                     value={companionTestData.furColor}
                     onChange={(e) => setCompanionTestData({ ...companionTestData, furColor: e.target.value })}
-                    className="flex-1 rounded-2xl"
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
                     placeholder="#8B4513"
                   />
                 </div>
@@ -616,11 +618,11 @@ const Admin = () => {
             <Button
               onClick={handleGenerateCompanionImage}
               disabled={generatingCompanionImage}
-              className="w-full rounded-2xl"
+              className="w-full rounded-2xl min-h-[48px] text-base"
             >
               {generatingCompanionImage ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Generating Image...
                 </>
               ) : (
@@ -629,12 +631,12 @@ const Admin = () => {
             </Button>
 
             {generatedCompanionImage && (
-              <div className="space-y-4 p-4 border rounded-2xl bg-card">
+              <div className="space-y-4 p-4 md:p-6 border rounded-2xl bg-card">
                 <div className="flex justify-center">
                   <img
                     src={generatedCompanionImage}
                     alt="Generated Companion"
-                    className="max-w-md w-full rounded-2xl shadow-lg"
+                    className="max-w-md w-full rounded-2xl shadow-lg touch-manipulation"
                   />
                 </div>
                 {generatedPrompt && (
@@ -647,18 +649,28 @@ const Admin = () => {
                     />
                   </div>
                 )}
-                <Button
-                  onClick={() => {
-                    const a = document.createElement('a');
-                    a.href = generatedCompanionImage;
-                    a.download = `companion-${companionTestData.spiritAnimal}-stage${companionTestData.stage}.png`;
-                    a.click();
-                  }}
-                  variant="outline"
-                  className="w-full rounded-2xl"
-                >
-                  📥 Download Image
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => downloadImage(
+                      generatedCompanionImage,
+                      `companion-${companionTestData.spiritAnimal}-stage${companionTestData.stage}.png`
+                    )}
+                    variant="outline"
+                    className="flex-1 rounded-2xl min-h-[44px]"
+                  >
+                    {Capacitor.isNativePlatform() ? (
+                      <>
+                        <Share className="h-4 w-4 mr-2" />
+                        Share Image
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Image
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
