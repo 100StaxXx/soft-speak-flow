@@ -33,13 +33,17 @@ export const AmbientMusicPlayer = () => {
   // Handle visibility changes separately to avoid stale closure issues
   useEffect(() => {
     const handleVisibilityChange = () => {
+      const currentState = ambientMusic.getState();
+      
       if (document.hidden) {
-        // Pause audio when app goes to background - don't use stop() to preserve position
-        ambientMusic.pause();
+        // Only pause if not paused for an event (evolution, etc.)
+        // Events handle their own pause/resume logic
+        if (!currentState.isPausedForEvent) {
+          ambientMusic.pause();
+        }
       } else {
-        // Resume only if not muted
-        const currentState = ambientMusic.getState();
-        if (!currentState.isMuted) {
+        // Resume only if not muted and not paused for event
+        if (!currentState.isMuted && !currentState.isPausedForEvent) {
           ambientMusic.play();
         }
       }

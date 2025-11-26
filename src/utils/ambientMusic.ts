@@ -18,6 +18,8 @@ class AmbientMusicManager {
   private isDucked = false; // Track if currently ducked
   private isMuting = false; // Prevent rapid mute/unmute
   private isStopped = false; // Track if intentionally stopped to prevent callback execution
+  private isDucking = false; // Prevent rapid duck/unduck
+  private wasDuckedBeforeMute = false; // Remember duck state when muted
 
   // Background music track - nostalgic piano
   private trackUrl = '/sounds/ambient-calm.mp3';
@@ -109,7 +111,18 @@ class AmbientMusicManager {
     document.addEventListener('keydown', startOnInteraction);
   }
 
+  private lastVolumeChangeTime = 0;
+  
   setVolume(volume: number) {
+    // Rate limit volume changes to prevent excessive calls
+    const now = Date.now();
+    if (now - this.lastVolumeChangeTime < 50) {
+      // Debounce: save for later
+      setTimeout(() => this.setVolume(volume), 50);
+      return;
+    }
+    this.lastVolumeChangeTime = now;
+    
     this.volume = Math.max(0, Math.min(1, volume));
     
     try {
@@ -128,6 +141,9 @@ class AmbientMusicManager {
   mute() {
     if (this.isMuting) return; // Prevent rapid clicks
     this.isMuting = true;
+    
+    // Remember duck state before muting
+    this.wasDuckedBeforeMute = this.isDucked;
     
     this.isMuted = true;
     try {
@@ -160,6 +176,12 @@ class AmbientMusicManager {
       localStorage.setItem('bg_music_muted', 'false');
     } catch (e) {
       console.warn('Failed to save mute preference:', e);
+    }
+    
+    // Restore duck state if it was ducked before muting
+    if (this.wasDuckedBeforeMute) {
+      this.isDucked = true;
+      this.wasDuckedBeforeMute = false;
     }
     
     if (!this.isPlaying) {
@@ -221,7 +243,7 @@ class AmbientMusicManager {
   }
 
   pause() {
-    if (!this.audio) return;
+    if (!this.audio || !this.isPlaying) return;
     
     this.fadeOut(() => {
       if (this.audio) {
@@ -234,11 +256,11 @@ class AmbientMusicManager {
 
   // Pause for major events (evolution, etc.)
   pauseForEvent() {
-    if (!this.audio || !this.isPlaying) return;
+    if (!this.audio || !this.isPlaying || this.isPausedForEvent) return;
     
     this.isPausedForEvent = true;
     this.fadeOut(() => {
-      if (this.audio) {
+      if (this.audio && !this.isStopped) {
         this.audio.pause();
         this.isPlaying = false;
       }
@@ -256,6 +278,8 @@ class AmbientMusicManager {
     }
     
     this.isPausedForEvent = false;
+    this.isStopped = false; // Clear stopped flag when resuming from event
+    
     if (!this.isMuted) {
       this.audio.volume = 0;
       this.audio.play()
@@ -293,11 +317,14 @@ class AmbientMusicManager {
   private fadeIn(duration = 2000) {
     if (!this.audio || this.isMuted || this.isStopped) return;
     
+    // Prevent very small durations that could cause issues
+    duration = Math.max(duration, 100);
+    
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     // Use ducked volume if currently ducked, otherwise use normal volume
     const targetVolume = this.isDucked ? this.volume * 0.15 : this.volume;
-    const steps = 20;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
     const stepDuration = duration / steps;
     const volumeIncrement = targetVolume / steps;
     let currentStep = 0;
@@ -323,10 +350,13 @@ class AmbientMusicManager {
   private fadeOut(callback?: () => void, duration = 1000) {
     if (!this.audio) return;
     
+    // Prevent very small durations that could cause issues
+    duration = Math.max(duration, 100);
+    
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
-    const steps = 20;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
     const stepDuration = duration / steps;
     const volumeDecrement = startVolume / steps;
     let currentStep = 0;
@@ -356,8 +386,9 @@ class AmbientMusicManager {
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
-    if (!this.audio || this.isDucked || this.isMuted || !this.isPlaying) return;
+    if (!this.audio || this.isDucked || this.isDucking || this.isMuted || !this.isPlaying) return;
     
+    this.isDucking = true;
     this.isDucked = true;
     const duckedVolume = this.volume * 0.15; // Reduce to 15% of original
     
@@ -367,6 +398,7 @@ class AmbientMusicManager {
     // If audio volume is very low or zero, skip fade and set directly
     if (startVolume <= duckedVolume) {
       this.audio.volume = duckedVolume;
+      this.isDucking = false;
       return;
     }
     
@@ -376,9 +408,10 @@ class AmbientMusicManager {
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio || !this.isPlaying) {
+      if (!this.audio || !this.isPlaying || this.isStopped) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
         return;
       }
       
@@ -388,20 +421,23 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
       }
     }, stepDuration);
   }
 
   // Restore volume after ducking
   unduck() {
-    if (!this.audio || !this.isDucked) return;
+    if (!this.audio || !this.isDucked || this.isDucking) return;
     
-    // Don't restore if muted
+    // Don't restore if muted, but remember we were ducked
     if (this.isMuted) {
+      this.wasDuckedBeforeMute = true;
       this.isDucked = false;
       return;
     }
     
+    this.isDucking = true;
     this.isDucked = false;
     // Use current this.volume in case user changed it while ducked
     const targetVolume = this.volume;
@@ -412,6 +448,7 @@ class AmbientMusicManager {
     // If already at or above target, set directly
     if (startVolume >= targetVolume) {
       this.audio.volume = targetVolume;
+      this.isDucking = false;
       return;
     }
     
@@ -421,9 +458,10 @@ class AmbientMusicManager {
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio || !this.isPlaying) {
+      if (!this.audio || !this.isPlaying || this.isStopped) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
         return;
       }
       
@@ -433,6 +471,7 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
       }
     }, stepDuration);
   }
@@ -443,6 +482,7 @@ class AmbientMusicManager {
       isPlaying: this.isPlaying,
       isMuted: this.isMuted,
       volume: this.volume,
+      isPausedForEvent: this.isPausedForEvent,
     };
   }
 }
