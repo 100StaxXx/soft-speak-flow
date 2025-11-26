@@ -65,6 +65,17 @@ export const useReferrals = () => {
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      // FIX: Check if user already has a referral code applied
+      const { data: currentProfile } = await supabase
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", user.id)
+        .single();
+
+      if (currentProfile?.referred_by) {
+        throw new Error("You have already used a referral code");
+      }
+
       // Validate code exists and get referrer
       const { data: referrer, error: referrerError } = await supabase
         .from("profiles")
@@ -81,11 +92,12 @@ export const useReferrals = () => {
         throw new Error("You cannot use your own referral code");
       }
 
-      // Update current user's referred_by
+      // Update current user's referred_by (with extra safety check)
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ referred_by: referrer.id })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .is("referred_by", null); // Only update if still null
 
       if (updateError) throw updateError;
 

@@ -449,21 +449,20 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
-      // Increment referrer's count
-      const { data: referrer, error: referrerError } = await supabase
-        .from("profiles")
-        .select("referral_count")
-        .eq("id", profile.referred_by)
-        .single();
+      // FIX: Use atomic increment to prevent race condition
+      // Instead of read-modify-write, increment directly in the database
+      const { data: updatedProfile, error: updateError } = await supabase.rpc(
+        'increment_referral_count',
+        { referrer_id: profile.referred_by }
+      );
 
-      if (referrerError || !referrer) return;
+      if (updateError) {
+        console.error("Failed to increment referral count:", updateError);
+        return;
+      }
 
-      const newCount = (referrer.referral_count || 0) + 1;
-
-      await supabase
-        .from("profiles")
-        .update({ referral_count: newCount })
-        .eq("id", profile.referred_by);
+      // Get the new count from the response
+      const newCount = updatedProfile?.[0]?.referral_count ?? 0;
 
       // Check for milestone unlocks (1, 3, 5)
       if (newCount === 1 || newCount === 3 || newCount === 5) {
@@ -476,16 +475,23 @@ export const useCompanion = () => {
           .single();
 
         if (skin) {
-          // Unlock skin for referrer (ignore if already exists)
-          await supabase
+          // FIX: Use upsert to handle duplicate key errors gracefully
+          // This won't fail if the skin is already unlocked
+          const { error: insertError } = await supabase
             .from("user_companion_skins")
-            .insert({
+            .upsert({
               user_id: profile.referred_by,
               skin_id: skin.id,
               acquired_via: `referral_milestone_${newCount}`,
-            })
-            .select()
-            .single();
+            }, {
+              onConflict: 'user_id,skin_id',
+              ignoreDuplicates: true
+            });
+
+          if (insertError) {
+            console.error("Failed to unlock skin:", insertError);
+            // Continue anyway - don't block clearing referred_by
+          }
         }
       }
 
