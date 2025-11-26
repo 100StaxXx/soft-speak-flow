@@ -27,7 +27,6 @@ export const AmbientMusicPlayer = () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount, not when state changes
 
   // Handle visibility changes separately to avoid stale closure issues
