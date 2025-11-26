@@ -84,19 +84,28 @@ export const CompanionDisplay = () => {
   const skinStyles = useMemo(() => {
     if (!equippedSkin?.css_effect) return {};
     
-    const effects = equippedSkin.css_effect as any;
+    try {
+      const effects = equippedSkin.css_effect as Record<string, any>;
 
-    // Apply different effects based on skin type
-    if (equippedSkin.skin_type === 'aura' && effects.glowColor) {
-      return {
-        boxShadow: `0 0 30px ${effects.glowColor}, 0 0 60px ${effects.glowColor}`,
-        filter: `drop-shadow(0 0 20px ${effects.glowColor})`
-      };
-    } else if (equippedSkin.skin_type === 'frame' && effects.borderColor) {
-      return {
-        border: `${effects.borderWidth || '3px'} solid ${effects.borderColor}`,
-        boxShadow: effects.shimmer ? `0 0 20px ${effects.borderColor}` : undefined
-      };
+      // Apply different effects based on skin type with validation
+      if (equippedSkin.skin_type === 'aura' && 
+          effects.glowColor && 
+          typeof effects.glowColor === 'string') {
+        return {
+          boxShadow: `0 0 30px ${effects.glowColor}, 0 0 60px ${effects.glowColor}`,
+          filter: `drop-shadow(0 0 20px ${effects.glowColor})`
+        };
+      } else if (equippedSkin.skin_type === 'frame' && 
+                 effects.borderColor && 
+                 typeof effects.borderColor === 'string') {
+        return {
+          border: `${effects.borderWidth || '3px'} solid ${effects.borderColor}`,
+          boxShadow: effects.shimmer ? `0 0 20px ${effects.borderColor}` : undefined
+        };
+      }
+    } catch (error) {
+      console.error("Failed to parse skin effects:", error);
+      return {};
     }
 
     return {};

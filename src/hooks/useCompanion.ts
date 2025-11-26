@@ -449,54 +449,61 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
-      // Increment referrer's count
-      const { data: referrer, error: referrerError } = await supabase
-        .from("profiles")
-        .select("referral_count")
-        .eq("id", profile.referred_by)
-        .single();
+      // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
+      const result = await retryWithBackoff<CompleteReferralStage3Result>(
+        async () => {
+          const { data, error } = await supabase.rpc(
+            'complete_referral_stage3',
+            { 
+              p_referee_id: user.id,
+              p_referrer_id: profile.referred_by
+            }
+          );
 
-      if (referrerError || !referrer) return;
-
-      const newCount = (referrer.referral_count || 0) + 1;
-
-      await supabase
-        .from("profiles")
-        .update({ referral_count: newCount })
-        .eq("id", profile.referred_by);
-
-      // Check for milestone unlocks (1, 3, 5)
-      if (newCount === 1 || newCount === 3 || newCount === 5) {
-        // Get the skin for this milestone
-        const { data: skin } = await supabase
-          .from("companion_skins")
-          .select("id")
-          .eq("unlock_type", "referral")
-          .eq("unlock_requirement", newCount)
-          .single();
-
-        if (skin) {
-          // Unlock skin for referrer (ignore if already exists)
-          await supabase
-            .from("user_companion_skins")
-            .insert({
-              user_id: profile.referred_by,
-              skin_id: skin.id,
-              acquired_via: `referral_milestone_${newCount}`,
-            })
-            .select()
-            .single();
+          if (error) throw error;
+          if (!data) throw new Error("No data returned from referral completion");
+          
+          return data as CompleteReferralStage3Result;
+        },
+        {
+          maxAttempts: 3,
+          initialDelay: 1000,
+          shouldRetry: (error: unknown) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            
+            // Don't retry business logic errors
+            if (msg.includes('already_completed') ||
+                msg.includes('concurrent_completion') ||
+                msg.includes('not found')) {
+              return false;
+            }
+            
+            // Retry network/transient errors
+            return msg.includes('network') ||
+                   msg.includes('timeout') ||
+                   msg.includes('temporarily unavailable') ||
+                   msg.includes('connection') ||
+                   msg.includes('ECONNRESET') ||
+                   msg.includes('fetch');
+          }
         }
+      );
+
+      if (!result || !result.success) {
+        // Referral already completed or concurrent request (not an error)
+        console.log('Referral not completed:', result?.reason ?? 'unknown', result?.message ?? '');
+        return;
       }
 
-      // Clear referred_by so we don't count this user multiple times
-      await supabase
-        .from("profiles")
-        .update({ referred_by: null })
-        .eq("id", user.id);
+      // Success! Log the result with safe access
+      console.log('Referral completed successfully:', {
+        newCount: result.new_count ?? 0,
+        milestoneReached: result.milestone_reached ?? false,
+        skinUnlocked: result.skin_unlocked ?? false
+      });
 
     } catch (error) {
-      console.error("Failed to validate referral:", error);
+      console.error("Failed to validate referral after retries:", error);
       // Don't throw - this shouldn't block evolution
     }
   };
@@ -551,9 +558,11 @@ export const useCompanion = () => {
 
       const evolutionId = evolutionData.evolution_id;
         const newStage = evolutionData.new_stage;
+        const oldStage = companion.current_stage;
 
-      // Check if user reached Stage 3 and validate referral
-      if (newStage === 3) {
+      // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
+      // This handles cases where user skips from Stage 2 to Stage 4+
+      if (oldStage < 3 && newStage >= 3) {
         await validateReferralAtStage3();
       }
 

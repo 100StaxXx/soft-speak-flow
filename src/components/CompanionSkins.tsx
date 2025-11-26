@@ -89,7 +89,7 @@ export const CompanionSkins = () => {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Lock className="h-4 w-4" />
                     <span>
-                      Refer {skin.unlock_requirement} friend{skin.unlock_requirement! > 1 ? 's' : ''}
+                      Refer {skin.unlock_requirement ?? 0} friend{(skin.unlock_requirement ?? 0) > 1 ? 's' : ''}
                     </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">

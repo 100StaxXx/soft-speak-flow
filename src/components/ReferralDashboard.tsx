@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Share, Copy, Users, Gift } from "lucide-react";
@@ -8,48 +9,73 @@ import { Capacitor } from "@capacitor/core";
 
 export const ReferralDashboard = () => {
   const { referralStats, availableSkins } = useReferrals();
+  const [isSharing, setIsSharing] = useState(false);
 
   const handleShare = async () => {
     if (!referralStats?.referral_code) return;
+    setIsSharing(true);
 
     const shareText = `Join me on R-Evolution and use my code: ${referralStats.referral_code}`;
 
-    // Use native share on mobile
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await CapacitorShare.share({
-          title: "Join R-Evolution",
-          text: shareText,
-          dialogTitle: "Share your referral code",
-        });
-      } catch (error) {
-        console.error("Share failed:", error);
-        copyToClipboard();
-      }
-    } else {
-      // Fallback to Web Share API or clipboard
-      if (navigator.share) {
+    try {
+      // Use native share on mobile
+      if (Capacitor.isNativePlatform()) {
         try {
-          await navigator.share({
+          await CapacitorShare.share({
             title: "Join R-Evolution",
             text: shareText,
+            dialogTitle: "Share your referral code",
           });
         } catch (error) {
-          if ((error as Error).name !== "AbortError") {
-            copyToClipboard();
-          }
+          console.error("Share failed:", error);
+          await copyToClipboard();
         }
       } else {
-        copyToClipboard();
+        // Fallback to Web Share API or clipboard
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: "Join R-Evolution",
+              text: shareText,
+            });
+          } catch (error) {
+            if ((error as Error).name !== "AbortError") {
+              await copyToClipboard();
+            }
+          }
+        } else {
+          await copyToClipboard();
+        }
       }
+    } finally {
+      setIsSharing(false);
     }
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (!referralStats?.referral_code) return;
     
-    navigator.clipboard.writeText(referralStats.referral_code);
-    toast.success("Referral code copied to clipboard!");
+    try {
+      // FIX: Check if Clipboard API is available
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(referralStats.referral_code);
+        toast.success("Referral code copied to clipboard!");
+      } else {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = referralStats.referral_code;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        toast.success("Referral code copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Copy failed:", error);
+      toast.error(`Failed to copy. Your code: ${referralStats.referral_code}`);
+    }
   };
 
   const nextMilestone = availableSkins?.find(
@@ -86,10 +112,10 @@ export const ReferralDashboard = () => {
         <Button
           className="w-full"
           onClick={handleShare}
-          disabled={!referralStats?.referral_code}
+          disabled={!referralStats?.referral_code || isSharing}
         >
           <Share className="mr-2 h-4 w-4" />
-          Share Your Code
+          {isSharing ? "Sharing..." : "Share Your Code"}
         </Button>
 
         {/* Stats */}
