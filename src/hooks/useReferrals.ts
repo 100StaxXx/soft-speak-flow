@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { retryWithBackoff } from "@/utils/retry";
+import type { ApplyReferralCodeResult } from "@/types/referral-functions";
 
 export const useReferrals = () => {
   const { user } = useAuth();
@@ -31,13 +33,16 @@ export const useReferrals = () => {
     queryFn: async () => {
       if (!user) return [];
 
+      // FIX Bug #25: Add pagination limit for safety
       const { data, error } = await supabase
         .from("user_companion_skins")
         .select(`
           *,
           companion_skins (*)
         `)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .order("unlocked_at", { ascending: false })
+        .limit(100); // Safety limit to prevent OOM with many skins
 
       if (error) throw error;
       return data;
@@ -49,11 +54,13 @@ export const useReferrals = () => {
   const { data: availableSkins } = useQuery({
     queryKey: ["available-skins"],
     queryFn: async () => {
+      // FIX Bug #25: Add pagination limit for safety
       const { data, error } = await supabase
         .from("companion_skins")
         .select("*")
         .eq("unlock_type", "referral")
-        .order("unlock_requirement", { ascending: true });
+        .order("unlock_requirement", { ascending: true })
+        .limit(100); // Safety limit to prevent OOM if skin catalog grows
 
       if (error) throw error;
       return data;
@@ -76,24 +83,50 @@ export const useReferrals = () => {
         throw new Error("Invalid referral code");
       }
 
-      // FIX Bugs #15, #18: Use atomic function to prevent TOCTOU and detect 0-row updates
-      const { data: result, error: applyError } = await supabase.rpc(
-        'apply_referral_code_atomic',
+      // FIX Bugs #15, #18, #21, #24: Use atomic function with retry logic and type safety
+      const result = await retryWithBackoff<ApplyReferralCodeResult>(
+        async () => {
+          const { data, error } = await supabase.rpc(
+            'apply_referral_code_atomic',
+            {
+              p_user_id: user.id,
+              p_referrer_id: referrer.id,
+              p_referral_code: code
+            }
+          );
+
+          if (error) throw error;
+          if (!data) throw new Error("No data returned from referral application");
+          
+          return data as ApplyReferralCodeResult;
+        },
         {
-          p_user_id: user.id,
-          p_referrer_id: referrer.id,
-          p_referral_code: code
+          maxAttempts: 3,
+          initialDelay: 1000,
+          shouldRetry: (error: unknown) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            
+            // Don't retry business logic errors
+            if (msg.includes('already_applied') ||
+                msg.includes('invalid_code') ||
+                msg.includes('self_referral')) {
+              return false;
+            }
+            
+            // Retry network/transient errors
+            return msg.includes('network') ||
+                   msg.includes('timeout') ||
+                   msg.includes('temporarily unavailable') ||
+                   msg.includes('connection') ||
+                   msg.includes('ECONNRESET') ||
+                   msg.includes('fetch');
+          }
         }
       );
 
-      if (applyError) {
-        console.error("Failed to apply referral code:", applyError);
-        throw new Error("Failed to apply referral code. Please try again.");
-      }
-
-      if (!result?.success) {
+      if (!result || !result.success) {
         // Get user-friendly error message from database
-        throw new Error(result?.message || "Failed to apply referral code");
+        throw new Error(result?.message ?? "Failed to apply referral code");
       }
 
       return referrer;

@@ -17,11 +17,23 @@ BEGIN
   -- All operations in single transaction (implicit in function)
   -- Either ALL succeed or ALL rollback
   
+  -- Validate inputs (Bug #26 fix)
+  IF p_referee_id IS NULL OR p_referrer_id IS NULL THEN
+    RAISE EXCEPTION 'referee_id and referrer_id cannot be NULL';
+  END IF;
+  
+  IF p_referee_id = p_referrer_id THEN
+    RAISE EXCEPTION 'Cannot refer yourself';
+  END IF;
+  
   -- Step 1: Check if already completed (with row lock to prevent race)
+  -- FIX Bug #22: Use WAIT instead of NOWAIT to allow retries
+  SET LOCAL lock_timeout = '5s';
+  
   PERFORM 1 FROM referral_completions
   WHERE referee_id = p_referee_id 
     AND referrer_id = p_referrer_id
-  FOR UPDATE NOWAIT; -- Fail fast if another transaction is processing
+  FOR UPDATE; -- Wait up to 5 seconds for lock
   
   IF FOUND THEN
     RETURN jsonb_build_object(
@@ -107,13 +119,6 @@ EXCEPTION
       'reason', 'concurrent_completion',
       'message', 'Another process already completed this referral'
     );
-  WHEN lock_not_available THEN
-    -- Another transaction is currently processing this referral
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'concurrent_processing',
-      'message', 'Referral is currently being processed by another request'
-    );
   WHEN OTHERS THEN
     -- Unexpected error - rollback happens automatically
     RAISE WARNING 'complete_referral_stage3 failed for referee % referrer %: %', 
@@ -132,6 +137,26 @@ DECLARE
   v_current_referred_by UUID;
   v_already_completed BOOLEAN;
 BEGIN
+  -- Validate inputs (Bug #26 fix)
+  IF p_user_id IS NULL OR p_referrer_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'reason', 'invalid_input',
+      'message', 'User ID and referrer ID are required'
+    );
+  END IF;
+  
+  -- Validate referral code format (Bug #27 fix)
+  IF p_referral_code IS NULL OR 
+     p_referral_code = '' OR
+     p_referral_code !~ '^REF-[A-Z0-9]{8}$' THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'reason', 'invalid_code_format',
+      'message', 'Invalid referral code format'
+    );
+  END IF;
+  
   -- Lock the user's profile row to prevent concurrent modifications
   SELECT referred_by INTO v_current_referred_by
   FROM profiles

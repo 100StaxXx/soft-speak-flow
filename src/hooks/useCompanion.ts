@@ -449,37 +449,61 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
-      // FIX Bugs #14, #16, #17: Use single atomic function for all operations
-      // This prevents race conditions, partial state, and ensures all-or-nothing behavior
-      const { data: result, error: completionError } = await supabase.rpc(
-        'complete_referral_stage3',
-        { 
-          p_referee_id: user.id,
-          p_referrer_id: profile.referred_by
+      // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
+      const result = await retryWithBackoff<CompleteReferralStage3Result>(
+        async () => {
+          const { data, error } = await supabase.rpc(
+            'complete_referral_stage3',
+            { 
+              p_referee_id: user.id,
+              p_referrer_id: profile.referred_by
+            }
+          );
+
+          if (error) throw error;
+          if (!data) throw new Error("No data returned from referral completion");
+          
+          return data as CompleteReferralStage3Result;
+        },
+        {
+          maxAttempts: 3,
+          initialDelay: 1000,
+          shouldRetry: (error: unknown) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            
+            // Don't retry business logic errors
+            if (msg.includes('already_completed') ||
+                msg.includes('concurrent_completion') ||
+                msg.includes('not found')) {
+              return false;
+            }
+            
+            // Retry network/transient errors
+            return msg.includes('network') ||
+                   msg.includes('timeout') ||
+                   msg.includes('temporarily unavailable') ||
+                   msg.includes('connection') ||
+                   msg.includes('ECONNRESET') ||
+                   msg.includes('fetch');
+          }
         }
       );
 
-      if (completionError) {
-        console.error("Failed to complete referral:", completionError);
-        // This is a critical error - log it but don't block evolution
+      if (!result || !result.success) {
+        // Referral already completed or concurrent request (not an error)
+        console.log('Referral not completed:', result?.reason ?? 'unknown', result?.message ?? '');
         return;
       }
 
-      if (!result?.success) {
-        // Referral already completed or concurrent request
-        console.log('Referral not completed:', result?.reason, result?.message);
-        return;
-      }
-
-      // Success! Log the result
+      // Success! Log the result with safe access
       console.log('Referral completed successfully:', {
-        newCount: result.new_count,
-        milestoneReached: result.milestone_reached,
-        skinUnlocked: result.skin_unlocked
+        newCount: result.new_count ?? 0,
+        milestoneReached: result.milestone_reached ?? false,
+        skinUnlocked: result.skin_unlocked ?? false
       });
 
     } catch (error) {
-      console.error("Failed to validate referral:", error);
+      console.error("Failed to validate referral after retries:", error);
       // Don't throw - this shouldn't block evolution
     }
   };
