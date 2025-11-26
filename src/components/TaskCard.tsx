@@ -142,12 +142,12 @@ export const TaskCard = ({
         )}
       <div className={cn("p-4 flex items-center gap-3", isMainQuest && "py-5")}>
         {/* Completion Button */}
-        <div className="relative">
+        <div className="relative overflow-visible">
           {/* Pulsing Ring Indicator for Tutorial Quest */}
           {isTutorialQuest && !task.completed && (
             <>
               <div
-                className="absolute inset-0 rounded-full -m-1"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full pointer-events-none"
                 style={{
                   animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   backgroundColor: 'hsl(var(--primary))',
@@ -155,7 +155,7 @@ export const TaskCard = ({
                 }}
               />
               <div
-                className="absolute inset-0 rounded-full -m-2"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full pointer-events-none"
                 style={{
                   animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   animationDelay: '0.5s',
@@ -167,10 +167,7 @@ export const TaskCard = ({
           )}
           <button
             onClick={onToggle}
-            className={cn(
-              "flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10",
-              isTutorialQuest && !task.completed && "animate-pulse"
-            )}
+            className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10"
             aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
           >
             {task.completed ? (
