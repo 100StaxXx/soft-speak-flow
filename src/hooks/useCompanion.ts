@@ -8,6 +8,7 @@ import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
+import type { CompleteReferralStage3Result } from "@/types/referral-functions";
 
 export interface Companion {
   id: string;
@@ -393,7 +394,8 @@ export const useCompanion = () => {
     if (!currentUser?.id) {
       throw new Error("Not authenticated");
     }
-    xpInProgress.current = true;
+    // Note: xpInProgress flag is managed by the caller (awardXP mutation)
+    // Setting it here would cause issues with error handling
 
     const newXP = companionData.current_xp + xpAmount;
     const nextStage = companionData.current_stage + 1;
@@ -452,6 +454,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
+          // @ts-expect-error - RPC function exists but types not yet regenerated
           const { data, error } = await supabase.rpc(
             'complete_referral_stage3',
             { 

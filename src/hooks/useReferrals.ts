@@ -86,6 +86,7 @@ export const useReferrals = () => {
       // FIX Bugs #15, #18, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<ApplyReferralCodeResult>(
         async () => {
+          // @ts-expect-error - RPC function exists but types not yet regenerated
           const { data, error } = await supabase.rpc(
             'apply_referral_code_atomic',
             {
@@ -131,9 +132,9 @@ export const useReferrals = () => {
 
       return referrer;
     },
-    onSuccess: async () => {
-      // FIX Bug #19: Wait for refetch before showing toast
-      await queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+    onSuccess: () => {
+      // Invalidate queries to trigger refetch (UI updates asynchronously)
+      queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
       toast.success("Referral code applied! Your friend will earn rewards when you reach Stage 3.");
     },
     onError: (error: Error) => {
