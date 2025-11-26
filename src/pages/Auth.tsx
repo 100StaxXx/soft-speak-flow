@@ -142,19 +142,34 @@ const Auth = () => {
     try {
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && Capacitor.isNativePlatform()) {
+        // Generate secure random nonce (Supabase provides this method)
+        const rawNonce = crypto.randomUUID();
+        
+        // Hash the nonce for Apple (Apple requires SHA-256 hashed nonce)
+        const encoder = new TextEncoder();
+        const data = encoder.encode(rawNonce);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
           clientId: 'B6VW78ABTR.com.darrylgraham.revolution',
           redirectURI: 'com.revolution.app://',
           scopes: 'email name',
-          state: '12345',
-          nonce: 'nonce',
+          state: crypto.randomUUID(), // Random state for security
+          nonce: hashedNonce, // Hashed nonce for Apple
         });
 
-        // Sign in to Supabase with Apple identity token
+        // Verify identity token exists
+        if (!result.response.identityToken) {
+          throw new Error('Apple Sign-In failed - no identity token returned');
+        }
+
+        // Sign in to Supabase with Apple identity token and RAW nonce
         const { error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: result.response.identityToken,
-          nonce: 'nonce',
+          nonce: rawNonce, // Use raw (unhashed) nonce for Supabase
         });
 
         if (error) throw error;
@@ -171,6 +186,11 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error: any) {
+      // Handle user cancellation gracefully (don't show error toast)
+      if (error.message?.includes('1001') || error.message?.includes('cancel')) {
+        return; // User cancelled, just return silently
+      }
+      
       toast({
         title: "Error",
         description: error.message,
