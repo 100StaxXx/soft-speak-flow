@@ -15,7 +15,6 @@ class AmbientMusicManager {
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
   private isPausedForEvent = false; // Track if paused for major events
-  private originalVolume = 0.15; // Store original volume before ducking
   private isDucked = false; // Track if currently ducked
 
   // Background music track - nostalgic piano
@@ -79,7 +78,9 @@ class AmbientMusicManager {
     this.volume = Math.max(0, Math.min(1, volume));
     localStorage.setItem('bg_music_volume', this.volume.toString());
     
-    if (this.audio && !this.isMuted) {
+    // Only update audio volume if not muted and not ducked
+    // If ducked, the volume will be restored when unduck() is called
+    if (this.audio && !this.isMuted && !this.isDucked) {
       this.audio.volume = this.volume;
     }
   }
@@ -153,6 +154,7 @@ class AmbientMusicManager {
     this.fadeOut(() => {
       if (this.audio) {
         this.audio.pause();
+        this.isPlaying = false;
       }
     }, 500); // Faster fade for events
   }
@@ -235,7 +237,6 @@ class AmbientMusicManager {
     if (!this.audio || this.isDucked || this.isMuted) return;
     
     this.isDucked = true;
-    this.originalVolume = this.volume;
     const duckedVolume = this.volume * 0.15; // Reduce to 15% of original
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
@@ -264,7 +265,8 @@ class AmbientMusicManager {
     if (!this.audio || !this.isDucked || this.isMuted) return;
     
     this.isDucked = false;
-    const targetVolume = this.originalVolume;
+    // Use current this.volume in case user changed it while ducked
+    const targetVolume = this.volume;
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
