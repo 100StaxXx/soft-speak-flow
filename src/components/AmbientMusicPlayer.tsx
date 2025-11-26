@@ -9,7 +9,9 @@ export const AmbientMusicPlayer = () => {
 
   useEffect(() => {
     // Start playing ambient music on mount (will wait for user interaction)
-    if (!state.isMuted) {
+    // Get fresh state instead of using potentially stale state
+    const currentState = ambientMusic.getState();
+    if (!currentState.isMuted) {
       ambientMusic.play();
     }
 
@@ -32,8 +34,8 @@ export const AmbientMusicPlayer = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Pause and stop audio when app goes to background or screen locks
-        ambientMusic.stop();
+        // Pause audio when app goes to background - don't use stop() to preserve position
+        ambientMusic.pause();
       } else {
         // Resume only if not muted
         const currentState = ambientMusic.getState();

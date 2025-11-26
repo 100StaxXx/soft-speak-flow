@@ -16,6 +16,7 @@ class AmbientMusicManager {
   private fadeInterval: NodeJS.Timeout | null = null;
   private isPausedForEvent = false; // Track if paused for major events
   private isDucked = false; // Track if currently ducked
+  private isMuting = false; // Prevent rapid mute/unmute
 
   // Background music track - nostalgic piano
   private trackUrl = '/sounds/ambient-calm.mp3';
@@ -101,7 +102,12 @@ class AmbientMusicManager {
     }
   }
 
+  private isMuting = false; // Prevent rapid mute/unmute
+  
   mute() {
+    if (this.isMuting) return; // Prevent rapid clicks
+    this.isMuting = true;
+    
     this.isMuted = true;
     localStorage.setItem('bg_music_muted', 'true');
     if (this.audio) {
@@ -112,24 +118,36 @@ class AmbientMusicManager {
       }
       this.fadeOut(() => {
         if (this.audio) this.audio.volume = 0;
+        this.isMuting = false;
       });
+    } else {
+      this.isMuting = false;
     }
   }
 
   unmute() {
+    if (this.isMuting) return; // Prevent rapid clicks
+    this.isMuting = true;
+    
     this.isMuted = false;
     localStorage.setItem('bg_music_muted', 'false');
     
     if (!this.isPlaying) {
       this.play();
+      this.isMuting = false;
     } else if (this.audio) {
       // If ducked, don't fade in to full volume - let duck state manage volume
       if (!this.isDucked) {
         this.fadeIn();
+        // Reset flag after fade completes
+        setTimeout(() => { this.isMuting = false; }, 2000);
       } else {
         // Set to ducked volume
         this.audio.volume = this.volume * 0.15;
+        this.isMuting = false;
       }
+    } else {
+      this.isMuting = false;
     }
   }
 
@@ -174,6 +192,7 @@ class AmbientMusicManager {
       if (this.audio) {
         this.audio.pause();
         this.isPlaying = false;
+        // Don't reset isPausedForEvent - that's only for event-specific pauses
       }
     });
   }
@@ -244,7 +263,12 @@ class AmbientMusicManager {
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      // Verify audio still exists and is playing
+      if (!this.audio || !this.isPlaying) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.min(volumeIncrement * currentStep, targetVolume);
@@ -268,7 +292,12 @@ class AmbientMusicManager {
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      // Verify audio still exists
+      if (!this.audio) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), 0);
@@ -284,7 +313,7 @@ class AmbientMusicManager {
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
-    if (!this.audio || this.isDucked || this.isMuted) return;
+    if (!this.audio || this.isDucked || this.isMuted || !this.isPlaying) return;
     
     this.isDucked = true;
     const duckedVolume = this.volume * 0.15; // Reduce to 15% of original
@@ -292,13 +321,23 @@ class AmbientMusicManager {
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
+    // If audio volume is very low or zero, skip fade and set directly
+    if (startVolume <= duckedVolume) {
+      this.audio.volume = duckedVolume;
+      return;
+    }
+    
     const steps = 10;
     const stepDuration = 300 / steps;
     const volumeDecrement = (startVolume - duckedVolume) / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      if (!this.audio || !this.isPlaying) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), duckedVolume);
@@ -321,13 +360,23 @@ class AmbientMusicManager {
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
+    // If already at or above target, set directly
+    if (startVolume >= targetVolume) {
+      this.audio.volume = targetVolume;
+      return;
+    }
+    
     const steps = 10;
     const stepDuration = 500 / steps;
     const volumeIncrement = (targetVolume - startVolume) / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      if (!this.audio || !this.isPlaying) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.min(startVolume + (volumeIncrement * currentStep), targetVolume);

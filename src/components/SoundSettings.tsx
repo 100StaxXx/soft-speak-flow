@@ -19,9 +19,19 @@ export const SoundSettings = () => {
     const savedBgVolume = localStorage.getItem('bg_music_volume');
     const savedBgMuted = localStorage.getItem('bg_music_muted');
     
-    if (savedVolume) setVolume(parseFloat(savedVolume));
+    if (savedVolume) {
+      const parsed = parseFloat(savedVolume);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        setVolume(parsed);
+      }
+    }
     if (savedMuted) setIsMuted(savedMuted === 'true');
-    if (savedBgVolume) setBgMusicVolume(parseFloat(savedBgVolume));
+    if (savedBgVolume) {
+      const parsed = parseFloat(savedBgVolume);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        setBgMusicVolume(parsed);
+      }
+    }
     if (savedBgMuted) setBgMusicMuted(savedBgMuted === 'true');
   }, []);
 
