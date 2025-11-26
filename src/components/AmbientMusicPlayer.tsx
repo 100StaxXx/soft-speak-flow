@@ -27,7 +27,6 @@ export const AmbientMusicPlayer = () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount, not when state changes
 
   // Handle visibility changes separately to avoid stale closure issues
@@ -57,8 +56,9 @@ export const AmbientMusicPlayer = () => {
   }, []);
 
   const handleToggle = () => {
-    ambientMusic.toggleMute();
-    setState(ambientMusic.getState());
+    const newMutedState = ambientMusic.toggleMute();
+    // Dispatch window event to notify all listeners (including this component)
+    window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMutedState }));
   };
 
   return (

@@ -35,6 +35,7 @@ const CompanionEvolutionContent = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const emergencyTimeoutRef = useRef<number | null>(null);
+  const timersRef = useRef<NodeJS.Timeout[]>([]);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -62,11 +63,12 @@ const CompanionEvolutionContent = ({
     const shake = () => {
       if (containerRef.current) {
         containerRef.current.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => {
+        const shakeTimer = setTimeout(() => {
           if (containerRef.current) {
             containerRef.current.style.animation = '';
           }
         }, 500);
+        timersRef.current.push(shakeTimer);
       }
     };
 
@@ -115,86 +117,88 @@ const CompanionEvolutionContent = ({
       }
     }, 20000);
 
-    const timers = [
-      // Stage 1: Prophetic text appears (0.5s)
-      setTimeout(() => {
-        setAnimationStage(1);
-        haptics.light();
-      }, 500),
-      
-      // Stage 2: Text fades, screen darkens (1.5s)
-      setTimeout(() => {
-        setAnimationStage(2);
-        haptics.medium();
-      }, 1500),
-      
-      // Stage 3: Egg fades in with rumble (2s)
-      setTimeout(() => {
-        setAnimationStage(3);
-        shake();
-        haptics.heavy();
-        // Deep bass rumble sound
-        playEvolutionStart();
-      }, 2000),
-      
-      // Stage 4: Egg fully visible with glow (2.5s)
-      setTimeout(() => {
-        setAnimationStage(4);
-      }, 2500),
+    // Track all timers in ref for proper cleanup
+    timersRef.current = [];
+    
+    // Stage 1: Prophetic text appears (0.5s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(1);
+      haptics.light();
+    }, 500));
+    
+    // Stage 2: Text fades, screen darkens (1.5s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(2);
+      haptics.medium();
+    }, 1500));
+    
+    // Stage 3: Egg fades in with rumble (2s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(3);
+      shake();
+      haptics.heavy();
+      // Deep bass rumble sound
+      playEvolutionStart();
+    }, 2000));
+    
+    // Stage 4: Egg fully visible with glow (2.5s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(4);
+    }, 2500));
 
-      // Stage 5: Show evolution title and confetti (4s)
-      setTimeout(() => {
-        setAnimationStage(5);
-        shake();
-        haptics.success();
-        playEvolutionSuccess();
-        
-        // Play voice if available
-        if (audioRef.current && !isLoadingVoice) {
-          audioRef.current.play().catch(err => console.error('Audio play failed:', err));
-        }
+    // Stage 5: Show evolution title and confetti (4s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(5);
+      shake();
+      haptics.success();
+      playEvolutionSuccess();
+      
+      // Play voice if available
+      if (audioRef.current && !isLoadingVoice) {
+        audioRef.current.play().catch(err => console.error('Audio play failed:', err));
+      }
 
-        // MASSIVE confetti burst
+      // MASSIVE confetti burst
+      confetti({
+        particleCount: 250,
+        spread: 140,
+        origin: { y: 0.5 },
+        colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
+        ticks: 600,
+        gravity: 0.5,
+        scalar: 2,
+      });
+      
+      // Side bursts - track this timer too
+      timersRef.current.push(setTimeout(() => {
         confetti({
-          particleCount: 250,
-          spread: 140,
-          origin: { y: 0.5 },
-          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
-          ticks: 600,
-          gravity: 0.5,
-          scalar: 2,
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.7, x: 0.2 },
+          colors: ['#A76CFF', '#E879F9'],
         });
-        
-        // Side bursts
-        setTimeout(() => {
-          confetti({
-            particleCount: 100,
-            spread: 80,
-            origin: { y: 0.7, x: 0.2 },
-            colors: ['#A76CFF', '#E879F9'],
-          });
-          confetti({
-            particleCount: 100,
-            spread: 80,
-            origin: { y: 0.7, x: 0.8 },
-            colors: ['#C084FC', '#FFD700'],
-          });
-        }, 200);
-      }, 4000),
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.7, x: 0.8 },
+          colors: ['#C084FC', '#FFD700'],
+        });
+      }, 200));
+    }, 4000));
 
-      // Stage 6: Show voice line (5s)
-      setTimeout(() => {
-        setAnimationStage(6);
-        // Enable dismiss after 5.5s delay
-        setTimeout(() => {
-          setCanDismiss(true);
-        }, 5500);
-      }, 5000),
-    ];
+    // Stage 6: Show voice line (5s)
+    timersRef.current.push(setTimeout(() => {
+      setAnimationStage(6);
+      // Enable dismiss after 5.5s delay - track this timer too
+      timersRef.current.push(setTimeout(() => {
+        setCanDismiss(true);
+      }, 5500));
+    }, 5000));
 
     return () => {
       isMounted = false;
-      timers.forEach(clearTimeout);
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
       if (emergencyTimeoutRef.current) {
         clearTimeout(emergencyTimeoutRef.current);
         emergencyTimeoutRef.current = null;

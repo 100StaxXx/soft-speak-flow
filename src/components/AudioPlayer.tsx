@@ -25,7 +25,10 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     }
 
     return () => {
-      unduckAmbient();
+      // Only unduck if we were actually playing (and thus ducked the music)
+      if (isPlaying) {
+        unduckAmbient();
+      }
     };
   }, [isPlaying]);
 
