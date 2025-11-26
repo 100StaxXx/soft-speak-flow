@@ -9,7 +9,9 @@ export const AmbientMusicPlayer = () => {
 
   useEffect(() => {
     // Start playing ambient music on mount (will wait for user interaction)
-    if (!state.isMuted) {
+    // Get fresh state instead of using potentially stale state
+    const currentState = ambientMusic.getState();
+    if (!currentState.isMuted) {
       ambientMusic.play();
     }
 
@@ -25,18 +27,23 @@ export const AmbientMusicPlayer = () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
     };
-  }, [state.isMuted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount, not when state changes
 
   // Handle visibility changes separately to avoid stale closure issues
   useEffect(() => {
     const handleVisibilityChange = () => {
+      const currentState = ambientMusic.getState();
+      
       if (document.hidden) {
-        // Pause and stop audio when app goes to background or screen locks
-        ambientMusic.stop();
+        // Only pause if not paused for an event (evolution, etc.)
+        // Events handle their own pause/resume logic
+        if (!currentState.isPausedForEvent) {
+          ambientMusic.pause();
+        }
       } else {
-        // Resume only if not muted
-        const currentState = ambientMusic.getState();
-        if (!currentState.isMuted) {
+        // Resume only if not muted and not paused for event
+        if (!currentState.isMuted && !currentState.isPausedForEvent) {
           ambientMusic.play();
         }
       }

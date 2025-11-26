@@ -10,39 +10,107 @@ interface MuteChangeEvent extends CustomEvent {
 // Ambient music system with persistence
 class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
-  private volume = 0.005; // Very subtle background volume (0.5%)
+  private volume = 0.15; // Subtle background volume (15%) - like MTG Arena/Pokemon TCG
   private isMuted = false;
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
-  private currentTrack = 'ambient';
   private isPausedForEvent = false; // Track if paused for major events
-  private originalVolume = 0.005; // Store original volume before ducking
   private isDucked = false; // Track if currently ducked
+  private isMuting = false; // Prevent rapid mute/unmute
+  private isStopped = false; // Track if intentionally stopped to prevent callback execution
+  private isDucking = false; // Prevent rapid duck/unduck
+  private wasDuckedBeforeMute = false; // Remember duck state when muted
+  private lastVolumeChangeTime = 0; // Rate limiting for volume changes
+  private pendingVolumeTimeout: NodeJS.Timeout | null = null; // Track pending volume change
+  private volumeChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
+  private muteChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
+  private playTimeout: NodeJS.Timeout | null = null; // Timeout for play() promise
+  private errorHandler: ((e: Event) => void) | null = null; // Audio error handler
+  private stalledHandler: (() => void) | null = null; // Audio stalled handler
+  private canPlayHandler: (() => void) | null = null; // Audio can play handler
 
-  // Ambient music URLs - these would be your actual music files
-  private tracks = {
-    ambient: '/sounds/ambient-calm.mp3',
-    meditation: '/sounds/ambient-meditation.mp3',
-    focus: '/sounds/ambient-focus.mp3',
-    energy: '/sounds/ambient-energy.mp3',
-  };
+  // Background music track - nostalgic piano
+  private trackUrl = '/sounds/ambient-calm.mp3';
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.loadPreferences();
       this.initializeAudio();
+      
+      // Clean up on page unload to prevent timer leaks
+      window.addEventListener('beforeunload', () => {
+        this.cleanup();
+      });
+    }
+  }
+  
+  // Clean up all timers, listeners, and state
+  private cleanup() {
+    // Clear all timers
+    if (this.fadeInterval) {
+      clearInterval(this.fadeInterval);
+      this.fadeInterval = null;
+    }
+    if (this.pendingVolumeTimeout) {
+      clearTimeout(this.pendingVolumeTimeout);
+      this.pendingVolumeTimeout = null;
+    }
+    if (this.playTimeout) {
+      clearTimeout(this.playTimeout);
+      this.playTimeout = null;
+    }
+    
+    // Remove window event listeners
+    if (typeof window !== 'undefined') {
+      if (this.volumeChangeHandler) {
+        window.removeEventListener('bg-music-volume-change', this.volumeChangeHandler);
+        this.volumeChangeHandler = null;
+      }
+      if (this.muteChangeHandler) {
+        window.removeEventListener('bg-music-mute-change', this.muteChangeHandler);
+        this.muteChangeHandler = null;
+      }
+    }
+    
+    // Clean up audio element (remove event listeners to prevent memory leaks)
+    if (this.audio) {
+      this.audio.pause();
+      
+      // Remove all audio event listeners
+      if (this.errorHandler) {
+        this.audio.removeEventListener('error', this.errorHandler);
+        this.errorHandler = null;
+      }
+      if (this.stalledHandler) {
+        this.audio.removeEventListener('stalled', this.stalledHandler);
+        this.stalledHandler = null;
+      }
+      if (this.canPlayHandler) {
+        this.audio.removeEventListener('canplaythrough', this.canPlayHandler);
+        this.canPlayHandler = null;
+      }
+      
+      this.audio.src = ''; // Release audio resource
+      this.audio = null;
     }
   }
 
   private loadPreferences() {
-    const savedVolume = localStorage.getItem('bg_music_volume');
-    const savedMuted = localStorage.getItem('bg_music_muted');
-    const savedTrack = localStorage.getItem('bg_music_track');
-    
-    if (savedVolume) this.volume = parseFloat(savedVolume);
-    if (savedMuted) this.isMuted = savedMuted === 'true';
-    if (savedTrack && savedTrack in this.tracks) {
-      this.currentTrack = savedTrack as keyof typeof this.tracks;
+    try {
+      const savedVolume = localStorage.getItem('bg_music_volume');
+      const savedMuted = localStorage.getItem('bg_music_muted');
+      
+      if (savedVolume) {
+        const parsed = parseFloat(savedVolume);
+        // Validate parsed volume is a valid number between 0 and 1
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+          this.volume = parsed;
+        }
+      }
+      if (savedMuted) this.isMuted = savedMuted === 'true';
+    } catch (e) {
+      // localStorage might not be available (private browsing, etc.)
+      console.warn('Failed to load music preferences:', e);
     }
   }
 
@@ -52,21 +120,63 @@ class AmbientMusicManager {
     this.audio.volume = this.isMuted ? 0 : this.volume;
     this.audio.preload = 'auto';
     
-    // Listen for volume/mute changes
+    // Add error handlers for audio element - store refs for cleanup
+    this.errorHandler = (e) => {
+      console.error('Background music error:', e);
+      this.isPlaying = false;
+      this.isDucked = false;
+      this.isPausedForEvent = false;
+      this.isDucking = false;
+      this.isMuting = false;
+      this.isStopped = false;
+      this.wasDuckedBeforeMute = false;
+      // Clear any active fades on error
+      if (this.fadeInterval) {
+        clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
+      // Clear any pending volume changes
+      if (this.pendingVolumeTimeout) {
+        clearTimeout(this.pendingVolumeTimeout);
+        this.pendingVolumeTimeout = null;
+      }
+      // Clear any pending play timeout
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+        this.playTimeout = null;
+      }
+    };
+    this.audio.addEventListener('error', this.errorHandler);
+    
+    this.stalledHandler = () => {
+      // Audio loading stalled - browser will retry automatically
+    };
+    this.audio.addEventListener('stalled', this.stalledHandler);
+    
+    // Handle successful load
+    this.canPlayHandler = () => {
+      // Audio loaded and ready to play
+    };
+    this.audio.addEventListener('canplaythrough', this.canPlayHandler);
+    
+    // Listen for volume/mute changes - store handlers for cleanup
     if (typeof window !== 'undefined') {
-      window.addEventListener('bg-music-volume-change', (e: Event) => {
+      this.volumeChangeHandler = (e: Event) => {
         const volumeEvent = e as VolumeChangeEvent;
         this.setVolume(volumeEvent.detail);
-      });
-
-      window.addEventListener('bg-music-mute-change', (e: Event) => {
+      };
+      
+      this.muteChangeHandler = (e: Event) => {
         const muteEvent = e as MuteChangeEvent;
         if (muteEvent.detail) {
           this.mute();
         } else {
           this.unmute();
         }
-      });
+      };
+      
+      window.addEventListener('bg-music-volume-change', this.volumeChangeHandler);
+      window.addEventListener('bg-music-mute-change', this.muteChangeHandler);
     }
 
     // Auto-play on user interaction (browser requirement)
@@ -86,87 +196,186 @@ class AmbientMusicManager {
   }
 
   setVolume(volume: number) {
-    this.volume = Math.max(0, Math.min(1, volume));
-    localStorage.setItem('bg_music_volume', this.volume.toString());
+    // Rate limit volume changes to prevent excessive calls
+    const now = Date.now();
+    if (now - this.lastVolumeChangeTime < 50) {
+      // Clear any pending timeout and schedule a new one
+      if (this.pendingVolumeTimeout) {
+        clearTimeout(this.pendingVolumeTimeout);
+      }
+      this.pendingVolumeTimeout = setTimeout(() => {
+        this.pendingVolumeTimeout = null;
+        this.setVolume(volume);
+      }, 50);
+      return;
+    }
+    this.lastVolumeChangeTime = now;
     
-    if (this.audio && !this.isMuted) {
+    this.volume = Math.max(0, Math.min(1, volume));
+    
+    try {
+      localStorage.setItem('bg_music_volume', this.volume.toString());
+    } catch (e) {
+      console.warn('Failed to save volume preference:', e);
+    }
+    
+    // Only update audio volume if not muted and not ducked and not in active fade
+    // If ducked or fading, the volume will be managed by those operations
+    if (this.audio && !this.isMuted && !this.isDucked && !this.fadeInterval) {
       this.audio.volume = this.volume;
     }
   }
 
   mute() {
+    if (this.isMuting) return; // Prevent rapid clicks
+    this.isMuting = true;
+    
+    // Remember duck state before muting
+    this.wasDuckedBeforeMute = this.isDucked;
+    
     this.isMuted = true;
-    localStorage.setItem('bg_music_muted', 'true');
+    try {
+      localStorage.setItem('bg_music_muted', 'true');
+    } catch (e) {
+      console.warn('Failed to save mute preference:', e);
+    }
+    
     if (this.audio) {
+      // Clear any active fades first
+      if (this.fadeInterval) {
+        clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
       this.fadeOut(() => {
-        if (this.audio) this.audio.volume = 0;
-      });
+        if (this.audio && !this.isStopped) this.audio.volume = 0;
+        this.isMuting = false;
+      }, 1000);
+    } else {
+      this.isMuting = false;
     }
   }
 
   unmute() {
+    if (this.isMuting) return; // Prevent rapid clicks
+    this.isMuting = true;
+    
     this.isMuted = false;
-    localStorage.setItem('bg_music_muted', 'false');
+    try {
+      localStorage.setItem('bg_music_muted', 'false');
+    } catch (e) {
+      console.warn('Failed to save mute preference:', e);
+    }
+    
+    // Restore duck state if it was ducked before muting
+    if (this.wasDuckedBeforeMute) {
+      this.isDucked = true;
+      this.wasDuckedBeforeMute = false;
+    }
     
     if (!this.isPlaying) {
       this.play();
+      this.isMuting = false;
     } else if (this.audio) {
-      this.fadeIn();
+      // If ducked, don't fade in to full volume - let duck state manage volume
+      if (!this.isDucked) {
+        this.fadeIn(2000);
+        // Reset flag after fade completes (use actual fade duration)
+        setTimeout(() => { this.isMuting = false; }, 2000);
+      } else {
+        // Set to ducked volume
+        this.audio.volume = this.volume * 0.15;
+        this.isMuting = false;
+      }
+    } else {
+      this.isMuting = false;
     }
   }
 
   toggleMute(): boolean {
     if (this.isMuted) {
       this.unmute();
+      return false; // Now unmuted
     } else {
       this.mute();
+      return true; // Now muted
     }
-    return this.isMuted;
   }
 
-  play(track?: keyof typeof this.tracks) {
+  play() {
     if (!this.audio) return;
+    
+    // Don't play if already playing
+    if (this.isPlaying && !this.audio.paused) return;
 
-    if (track && track !== this.currentTrack) {
-      this.currentTrack = track;
-      localStorage.setItem('bg_music_track', track);
-      this.audio.src = this.tracks[track];
-    } else if (!this.audio.src) {
-      this.audio.src = this.tracks[this.currentTrack];
+    if (!this.audio.src) {
+      this.audio.src = this.trackUrl;
     }
 
     if (!this.isMuted) {
+      this.isStopped = false;
       this.audio.volume = 0;
+      
+      // Clear any existing play timeout
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+      }
+      
+      // Set timeout in case play() promise never resolves
+      this.playTimeout = setTimeout(() => {
+        if (!this.isPlaying) {
+          this.isPlaying = false;
+        }
+        this.playTimeout = null;
+      }, 5000); // 5 second timeout
+      
       this.audio.play()
         .then(() => {
-          this.isPlaying = true;
-          this.fadeIn();
+          // Clear timeout on success
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
+          if (!this.isStopped && !this.isMuted) {
+            this.isPlaying = true;
+            this.fadeIn();
+          }
         })
-        .catch(() => {
+        .catch((err) => {
+          // Clear timeout on error
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
           // Autoplay prevented - this is expected on some browsers
+          this.isPlaying = false;
         });
+    } else {
+      // If muted, don't change isPlaying state
+      this.isPlaying = false;
     }
   }
 
   pause() {
-    if (!this.audio) return;
+    if (!this.audio || !this.isPlaying) return;
     
     this.fadeOut(() => {
       if (this.audio) {
         this.audio.pause();
         this.isPlaying = false;
+        // Don't reset isPausedForEvent - that's only for event-specific pauses
       }
     });
   }
 
   // Pause for major events (evolution, etc.)
   pauseForEvent() {
-    if (!this.audio || !this.isPlaying) return;
+    if (!this.audio || !this.isPlaying || this.isPausedForEvent) return;
     
     this.isPausedForEvent = true;
     this.fadeOut(() => {
-      if (this.audio) {
+      if (this.audio && !this.isStopped) {
         this.audio.pause();
+        this.isPlaying = false;
       }
     }, 500); // Faster fade for events
   }
@@ -175,38 +384,106 @@ class AmbientMusicManager {
   resumeAfterEvent() {
     if (!this.audio || !this.isPausedForEvent) return;
     
+    // Don't resume if already playing
+    if (this.isPlaying && !this.audio.paused) {
+      this.isPausedForEvent = false;
+      return;
+    }
+    
     this.isPausedForEvent = false;
+    this.isStopped = false; // Clear stopped flag when resuming from event
+    
     if (!this.isMuted) {
+      this.audio.volume = 0;
+      
+      // Set timeout for resume
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+      }
+      this.playTimeout = setTimeout(() => {
+        if (!this.isPlaying) {
+          this.isPlaying = false;
+        }
+        this.playTimeout = null;
+      }, 5000);
+      
       this.audio.play()
         .then(() => {
-          this.isPlaying = true;
-          this.fadeIn(1500); // Gentle fade back in
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
+          if (!this.isStopped && !this.isMuted) {
+            this.isPlaying = true;
+            this.fadeIn(1500); // Gentle fade back in
+          }
         })
-        .catch(err => console.error('Resume failed:', err));
+        .catch(err => {
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
+          this.isPlaying = false;
+        });
     }
   }
 
   stop() {
     if (!this.audio) return;
+    
+    // Set flag to prevent callbacks from executing
+    this.isStopped = true;
+    
+    // Clear any active fade
+    if (this.fadeInterval) {
+      clearInterval(this.fadeInterval);
+      this.fadeInterval = null;
+    }
+    
+    // Clear any pending volume changes
+    if (this.pendingVolumeTimeout) {
+      clearTimeout(this.pendingVolumeTimeout);
+      this.pendingVolumeTimeout = null;
+    }
+    
+    // Clear any pending play timeout
+    if (this.playTimeout) {
+      clearTimeout(this.playTimeout);
+      this.playTimeout = null;
+    }
+    
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
     this.isPausedForEvent = false;
+    this.isDucked = false; // Reset duck state
+    this.isMuting = false; // Reset muting flag
+    this.isDucking = false; // Reset ducking flag
+    this.wasDuckedBeforeMute = false; // Reset remembered duck state
   }
 
   private fadeIn(duration = 2000) {
-    if (!this.audio || this.isMuted) return;
+    if (!this.audio || this.isMuted || this.isStopped) return;
+    
+    // Prevent very small durations that could cause issues
+    duration = Math.max(duration, 100);
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
-    const targetVolume = this.volume;
-    const steps = 20;
+    // Use ducked volume if currently ducked, otherwise use normal volume
+    const targetVolume = this.isDucked ? this.volume * 0.15 : this.volume;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
     const stepDuration = duration / steps;
     const volumeIncrement = targetVolume / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      // Verify audio still exists and is playing, and not stopped
+      if (!this.audio || !this.isPlaying || this.isStopped) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.min(volumeIncrement * currentStep, targetVolume);
@@ -221,16 +498,26 @@ class AmbientMusicManager {
   private fadeOut(callback?: () => void, duration = 1000) {
     if (!this.audio) return;
     
+    // Prevent very small durations that could cause issues
+    duration = Math.max(duration, 100);
+    
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
-    const steps = 20;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
     const stepDuration = duration / steps;
     const volumeDecrement = startVolume / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      // Verify audio still exists and not stopped
+      if (!this.audio || this.isStopped) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        // Don't execute callback if stopped
+        if (!this.isStopped) callback?.();
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), 0);
@@ -238,45 +525,44 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
-        callback?.();
+        // Only execute callback if not stopped
+        if (!this.isStopped) callback?.();
       }
     }, stepDuration);
   }
 
-  // Transition between tracks
-  changeTrack(track: keyof typeof this.tracks) {
-    if (this.currentTrack === track) return;
-    
-    this.fadeOut(() => {
-      this.currentTrack = track;
-      localStorage.setItem('bg_music_track', track);
-      if (this.audio) {
-        this.audio.src = this.tracks[track];
-        if (!this.isMuted && this.isPlaying) {
-          this.audio.play().then(() => this.fadeIn());
-        }
-      }
-    });
-  }
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
-    if (!this.audio || this.isDucked || this.isMuted) return;
+    if (!this.audio || this.isDucked || this.isDucking || this.isMuted || !this.isPlaying) return;
     
+    this.isDucking = true;
     this.isDucked = true;
-    this.originalVolume = this.volume;
     const duckedVolume = this.volume * 0.15; // Reduce to 15% of original
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
-    const steps = 10;
-    const stepDuration = 300 / steps;
+    // If audio volume is very low or zero, skip fade and set directly
+    if (startVolume <= duckedVolume) {
+      this.audio.volume = duckedVolume;
+      this.isDucking = false;
+      return;
+    }
+    
+    const duration = 300;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
+    const stepDuration = duration / steps;
     const volumeDecrement = (startVolume - duckedVolume) / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      if (!this.audio || !this.isPlaying || this.isStopped) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        this.isDucking = false;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), duckedVolume);
@@ -284,27 +570,51 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
       }
     }, stepDuration);
   }
 
   // Restore volume after ducking
   unduck() {
-    if (!this.audio || !this.isDucked || this.isMuted) return;
+    if (!this.audio || !this.isDucked || this.isDucking) return;
     
+    // If muted, clear duck state without audio changes
+    // Also clear the saved duck state so unmute() won't restore it
+    if (this.isMuted) {
+      this.isDucked = false;
+      this.wasDuckedBeforeMute = false;
+      return;
+    }
+    
+    this.isDucking = true;
     this.isDucked = false;
-    const targetVolume = this.originalVolume;
+    // Use current this.volume in case user changed it while ducked
+    const targetVolume = this.volume;
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     const startVolume = this.audio.volume;
-    const steps = 10;
-    const stepDuration = 500 / steps;
+    // If already at or above target, set directly
+    if (startVolume >= targetVolume) {
+      this.audio.volume = targetVolume;
+      this.isDucking = false;
+      return;
+    }
+    
+    const duration = 500;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
+    const stepDuration = duration / steps;
     const volumeIncrement = (targetVolume - startVolume) / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      if (!this.audio) return;
+      if (!this.audio || !this.isPlaying || this.isStopped) {
+        if (this.fadeInterval) clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+        this.isDucking = false;
+        return;
+      }
       
       currentStep++;
       this.audio.volume = Math.min(startVolume + (volumeIncrement * currentStep), targetVolume);
@@ -312,6 +622,7 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        this.isDucking = false;
       }
     }, stepDuration);
   }
@@ -322,7 +633,7 @@ class AmbientMusicManager {
       isPlaying: this.isPlaying,
       isMuted: this.isMuted,
       volume: this.volume,
-      currentTrack: this.currentTrack,
+      isPausedForEvent: this.isPausedForEvent,
     };
   }
 }
@@ -336,7 +647,5 @@ export const pauseAmbientForEvent = () => ambientMusic.pauseForEvent();
 export const resumeAmbientAfterEvent = () => ambientMusic.resumeAfterEvent();
 export const toggleAmbientMute = () => ambientMusic.toggleMute();
 export const setAmbientVolume = (volume: number) => ambientMusic.setVolume(volume);
-export const changeAmbientTrack = (track: 'ambient' | 'meditation' | 'focus' | 'energy') => 
-  ambientMusic.changeTrack(track);
 export const duckAmbient = () => ambientMusic.duck();
 export const unduckAmbient = () => ambientMusic.unduck();
