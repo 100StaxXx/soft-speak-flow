@@ -435,6 +435,72 @@ export const useCompanion = () => {
   };
 
 
+  // Helper function to validate referral when user reaches Stage 3
+  const validateReferralAtStage3 = async () => {
+    if (!user) return;
+
+    try {
+      // Check if user was referred by someone
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.referred_by) return;
+
+      // Increment referrer's count
+      const { data: referrer, error: referrerError } = await supabase
+        .from("profiles")
+        .select("referral_count")
+        .eq("id", profile.referred_by)
+        .single();
+
+      if (referrerError || !referrer) return;
+
+      const newCount = (referrer.referral_count || 0) + 1;
+
+      await supabase
+        .from("profiles")
+        .update({ referral_count: newCount })
+        .eq("id", profile.referred_by);
+
+      // Check for milestone unlocks (1, 3, 5)
+      if (newCount === 1 || newCount === 3 || newCount === 5) {
+        // Get the skin for this milestone
+        const { data: skin } = await supabase
+          .from("companion_skins")
+          .select("id")
+          .eq("unlock_type", "referral")
+          .eq("unlock_requirement", newCount)
+          .single();
+
+        if (skin) {
+          // Unlock skin for referrer (ignore if already exists)
+          await supabase
+            .from("user_companion_skins")
+            .insert({
+              user_id: profile.referred_by,
+              skin_id: skin.id,
+              acquired_via: `referral_milestone_${newCount}`,
+            })
+            .select()
+            .single();
+        }
+      }
+
+      // Clear referred_by so we don't count this user multiple times
+      await supabase
+        .from("profiles")
+        .update({ referred_by: null })
+        .eq("id", user.id);
+
+    } catch (error) {
+      console.error("Failed to validate referral:", error);
+      // Don't throw - this shouldn't block evolution
+    }
+  };
+
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
@@ -485,6 +551,11 @@ export const useCompanion = () => {
 
       const evolutionId = evolutionData.evolution_id;
         const newStage = evolutionData.new_stage;
+
+      // Check if user reached Stage 3 and validate referral
+      if (newStage === 3) {
+        await validateReferralAtStage3();
+      }
 
       // Generate evolution cards for all stages up to current stage
       try {

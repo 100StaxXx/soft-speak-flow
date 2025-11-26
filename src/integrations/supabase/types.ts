@@ -702,6 +702,45 @@ export type Database = {
           },
         ]
       }
+      companion_skins: {
+        Row: {
+          created_at: string | null
+          css_effect: Json
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          rarity: string | null
+          skin_type: string
+          unlock_requirement: number | null
+          unlock_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          css_effect: Json
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          rarity?: string | null
+          skin_type: string
+          unlock_requirement?: number | null
+          unlock_type: string
+        }
+        Update: {
+          created_at?: string | null
+          css_effect?: Json
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          rarity?: string | null
+          skin_type?: string
+          unlock_requirement?: number | null
+          unlock_type?: string
+        }
+        Relationships: []
+      }
       companion_stories: {
         Row: {
           bond_moment: string
@@ -1981,6 +2020,9 @@ export type Database = {
           onboarding_data: Json | null
           onboarding_step: string | null
           preferences: Json | null
+          referral_code: string | null
+          referral_count: number | null
+          referred_by: string | null
           selected_mentor_id: string | null
           timezone: string | null
           updated_at: string | null
@@ -2004,6 +2046,9 @@ export type Database = {
           onboarding_data?: Json | null
           onboarding_step?: string | null
           preferences?: Json | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           selected_mentor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
@@ -2027,12 +2072,22 @@ export type Database = {
           onboarding_data?: Json | null
           onboarding_step?: string | null
           preferences?: Json | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           selected_mentor_id?: string | null
           timezone?: string | null
           updated_at?: string | null
           zodiac_sign?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_selected_mentor_id_fkey"
             columns: ["selected_mentor_id"]
@@ -2424,6 +2479,48 @@ export type Database = {
             foreignKeyName: "user_companion_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_companion_skins: {
+        Row: {
+          acquired_at: string | null
+          acquired_via: string | null
+          id: string
+          is_equipped: boolean | null
+          skin_id: string
+          user_id: string
+        }
+        Insert: {
+          acquired_at?: string | null
+          acquired_via?: string | null
+          id?: string
+          is_equipped?: boolean | null
+          skin_id: string
+          user_id: string
+        }
+        Update: {
+          acquired_at?: string | null
+          acquired_via?: string | null
+          id?: string
+          is_equipped?: boolean | null
+          skin_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_companion_skins_skin_id_fkey"
+            columns: ["skin_id"]
+            isOneToOne: false
+            referencedRelation: "companion_skins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_companion_skins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -2825,6 +2922,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      generate_referral_code: { Args: never; Returns: string }
       get_next_evolution_threshold: {
         Args: { current_stage: number }
         Returns: number

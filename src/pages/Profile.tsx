@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
+import { ReferralDashboard } from "@/components/ReferralDashboard";
+import { CompanionSkins } from "@/components/CompanionSkins";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -195,10 +197,14 @@ const Profile = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="preferences">Preferences</TabsTrigger>
+              <TabsTrigger value="referrals">
+                <Gift className="h-4 w-4 mr-2" />
+                Referrals
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="account" className="space-y-6">
@@ -336,6 +342,11 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground">More preferences coming soon...</p>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="referrals" className="space-y-6">
+              <ReferralDashboard />
+              <CompanionSkins />
             </TabsContent>
           </Tabs>
         </div>
