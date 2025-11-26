@@ -13,8 +13,6 @@ import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
-import { safeLocalStorage } from "@/utils/storage";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 
 const Index = () => {
@@ -24,7 +22,6 @@ const Index = () => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [mentorImage, setMentorImage] = useState<string>("");
   const [todaysQuote, setTodaysQuote] = useState<{
@@ -178,14 +175,6 @@ const Index = () => {
 
   return (
     <>
-      <ErrorBoundary>
-        <OnboardingFlow 
-          open={showOnboarding} 
-          onComplete={() => {
-            setShowOnboarding(false);
-          }} 
-        />
-      </ErrorBoundary>
       <PageTransition>
         {/* Fixed Background Image */}
         {mentorImage && (
