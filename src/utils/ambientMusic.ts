@@ -17,6 +17,7 @@ class AmbientMusicManager {
   private isPausedForEvent = false; // Track if paused for major events
   private isDucked = false; // Track if currently ducked
   private isMuting = false; // Prevent rapid mute/unmute
+  private isStopped = false; // Track if intentionally stopped to prevent callback execution
 
   // Background music track - nostalgic piano
   private trackUrl = '/sounds/ambient-calm.mp3';
@@ -29,17 +30,22 @@ class AmbientMusicManager {
   }
 
   private loadPreferences() {
-    const savedVolume = localStorage.getItem('bg_music_volume');
-    const savedMuted = localStorage.getItem('bg_music_muted');
-    
-    if (savedVolume) {
-      const parsed = parseFloat(savedVolume);
-      // Validate parsed volume is a valid number between 0 and 1
-      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
-        this.volume = parsed;
+    try {
+      const savedVolume = localStorage.getItem('bg_music_volume');
+      const savedMuted = localStorage.getItem('bg_music_muted');
+      
+      if (savedVolume) {
+        const parsed = parseFloat(savedVolume);
+        // Validate parsed volume is a valid number between 0 and 1
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+          this.volume = parsed;
+        }
       }
+      if (savedMuted) this.isMuted = savedMuted === 'true';
+    } catch (e) {
+      // localStorage might not be available (private browsing, etc.)
+      console.warn('Failed to load music preferences:', e);
     }
-    if (savedMuted) this.isMuted = savedMuted === 'true';
   }
 
   private initializeAudio() {
@@ -52,10 +58,22 @@ class AmbientMusicManager {
     this.audio.addEventListener('error', (e) => {
       console.error('Background music error:', e);
       this.isPlaying = false;
+      this.isDucked = false;
+      this.isPausedForEvent = false;
+      // Clear any active fades on error
+      if (this.fadeInterval) {
+        clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
     });
     
     this.audio.addEventListener('stalled', () => {
       console.warn('Background music stalled, attempting to recover...');
+    });
+    
+    // Handle successful load
+    this.audio.addEventListener('canplaythrough', () => {
+      console.log('Background music loaded successfully');
     });
     
     // Listen for volume/mute changes
@@ -93,23 +111,31 @@ class AmbientMusicManager {
 
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume));
-    localStorage.setItem('bg_music_volume', this.volume.toString());
     
-    // Only update audio volume if not muted and not ducked
-    // If ducked, the volume will be restored when unduck() is called
-    if (this.audio && !this.isMuted && !this.isDucked) {
+    try {
+      localStorage.setItem('bg_music_volume', this.volume.toString());
+    } catch (e) {
+      console.warn('Failed to save volume preference:', e);
+    }
+    
+    // Only update audio volume if not muted and not ducked and not in active fade
+    // If ducked or fading, the volume will be managed by those operations
+    if (this.audio && !this.isMuted && !this.isDucked && !this.fadeInterval) {
       this.audio.volume = this.volume;
     }
   }
 
-  private isMuting = false; // Prevent rapid mute/unmute
-  
   mute() {
     if (this.isMuting) return; // Prevent rapid clicks
     this.isMuting = true;
     
     this.isMuted = true;
-    localStorage.setItem('bg_music_muted', 'true');
+    try {
+      localStorage.setItem('bg_music_muted', 'true');
+    } catch (e) {
+      console.warn('Failed to save mute preference:', e);
+    }
+    
     if (this.audio) {
       // Clear any active fades first
       if (this.fadeInterval) {
@@ -117,9 +143,9 @@ class AmbientMusicManager {
         this.fadeInterval = null;
       }
       this.fadeOut(() => {
-        if (this.audio) this.audio.volume = 0;
+        if (this.audio && !this.isStopped) this.audio.volume = 0;
         this.isMuting = false;
-      });
+      }, 1000);
     } else {
       this.isMuting = false;
     }
@@ -130,7 +156,11 @@ class AmbientMusicManager {
     this.isMuting = true;
     
     this.isMuted = false;
-    localStorage.setItem('bg_music_muted', 'false');
+    try {
+      localStorage.setItem('bg_music_muted', 'false');
+    } catch (e) {
+      console.warn('Failed to save mute preference:', e);
+    }
     
     if (!this.isPlaying) {
       this.play();
@@ -138,8 +168,8 @@ class AmbientMusicManager {
     } else if (this.audio) {
       // If ducked, don't fade in to full volume - let duck state manage volume
       if (!this.isDucked) {
-        this.fadeIn();
-        // Reset flag after fade completes
+        this.fadeIn(2000);
+        // Reset flag after fade completes (use actual fade duration)
         setTimeout(() => { this.isMuting = false; }, 2000);
       } else {
         // Set to ducked volume
@@ -172,16 +202,21 @@ class AmbientMusicManager {
     }
 
     if (!this.isMuted) {
+      this.isStopped = false;
       this.audio.volume = 0;
       this.audio.play()
         .then(() => {
           this.isPlaying = true;
           this.fadeIn();
         })
-        .catch(() => {
+        .catch((err) => {
           // Autoplay prevented - this is expected on some browsers
+          console.warn('Play prevented:', err);
           this.isPlaying = false;
         });
+    } else {
+      // If muted, don't change isPlaying state
+      this.isPlaying = false;
     }
   }
 
@@ -238,6 +273,9 @@ class AmbientMusicManager {
   stop() {
     if (!this.audio) return;
     
+    // Set flag to prevent callbacks from executing
+    this.isStopped = true;
+    
     // Clear any active fade
     if (this.fadeInterval) {
       clearInterval(this.fadeInterval);
@@ -249,22 +287,24 @@ class AmbientMusicManager {
     this.isPlaying = false;
     this.isPausedForEvent = false;
     this.isDucked = false; // Reset duck state
+    this.isMuting = false; // Reset muting flag
   }
 
   private fadeIn(duration = 2000) {
-    if (!this.audio || this.isMuted) return;
+    if (!this.audio || this.isMuted || this.isStopped) return;
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
-    const targetVolume = this.volume;
+    // Use ducked volume if currently ducked, otherwise use normal volume
+    const targetVolume = this.isDucked ? this.volume * 0.15 : this.volume;
     const steps = 20;
     const stepDuration = duration / steps;
     const volumeIncrement = targetVolume / steps;
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      // Verify audio still exists and is playing
-      if (!this.audio || !this.isPlaying) {
+      // Verify audio still exists and is playing, and not stopped
+      if (!this.audio || !this.isPlaying || this.isStopped) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
         return;
@@ -292,10 +332,12 @@ class AmbientMusicManager {
     let currentStep = 0;
 
     this.fadeInterval = setInterval(() => {
-      // Verify audio still exists
-      if (!this.audio) {
+      // Verify audio still exists and not stopped
+      if (!this.audio || this.isStopped) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+        // Don't execute callback if stopped
+        if (!this.isStopped) callback?.();
         return;
       }
       
@@ -305,7 +347,8 @@ class AmbientMusicManager {
       if (currentStep >= steps) {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
-        callback?.();
+        // Only execute callback if not stopped
+        if (!this.isStopped) callback?.();
       }
     }, stepDuration);
   }
@@ -351,7 +394,13 @@ class AmbientMusicManager {
 
   // Restore volume after ducking
   unduck() {
-    if (!this.audio || !this.isDucked || this.isMuted) return;
+    if (!this.audio || !this.isDucked) return;
+    
+    // Don't restore if muted
+    if (this.isMuted) {
+      this.isDucked = false;
+      return;
+    }
     
     this.isDucked = false;
     // Use current this.volume in case user changed it while ducked
