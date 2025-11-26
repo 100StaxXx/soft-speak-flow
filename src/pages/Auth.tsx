@@ -44,7 +44,7 @@ const Auth = () => {
             google: {
               // Google OAuth Client IDs configured
               webClientId: '371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com',
-              iOSClientId: import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID || '',
+              iOSClientId: '371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com',
               mode: 'online'
             }
           });
