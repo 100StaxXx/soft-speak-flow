@@ -305,8 +305,8 @@ export default function Tasks() {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
-    // Store task data temporarily
-    setPendingTaskData({
+    // Create task data object
+    const taskData = {
       text: newTaskText,
       difficulty: taskDifficulty,
       date: taskDate,
@@ -316,32 +316,33 @@ export default function Tasks() {
       recurrenceDays,
       reminderEnabled,
       reminderMinutesBefore,
-    });
+    };
     
     // If no main quest exists, ask user BEFORE creating the task
     if (!hasMainQuest) {
+      setPendingTaskData(taskData);
       setShowMainQuestPrompt(true);
     } else {
-      // Main quest already exists, create as side quest
-      actuallyAddTask(false);
+      // Main quest already exists, create as side quest immediately
+      actuallyAddTask(false, taskData);
     }
   };
   
-  const actuallyAddTask = async (isMainQuest: boolean) => {
-    if (!pendingTaskData) return;
+  const actuallyAddTask = async (isMainQuest: boolean, dataToAdd?: typeof pendingTaskData) => {
+    if (!dataToAdd) return;
     
     try {
       await addTask({ 
-        taskText: pendingTaskData.text, 
-        difficulty: pendingTaskData.difficulty,
-        taskDate: pendingTaskData.date,
+        taskText: dataToAdd.text, 
+        difficulty: dataToAdd.difficulty,
+        taskDate: dataToAdd.date,
         isMainQuest: isMainQuest,
-        scheduledTime: pendingTaskData.scheduledTime,
-        estimatedDuration: pendingTaskData.estimatedDuration,
-        recurrencePattern: pendingTaskData.recurrencePattern,
-        recurrenceDays: pendingTaskData.recurrenceDays,
-        reminderEnabled: pendingTaskData.reminderEnabled,
-        reminderMinutesBefore: pendingTaskData.reminderMinutesBefore,
+        scheduledTime: dataToAdd.scheduledTime,
+        estimatedDuration: dataToAdd.estimatedDuration,
+        recurrencePattern: dataToAdd.recurrencePattern,
+        recurrenceDays: dataToAdd.recurrenceDays,
+        reminderEnabled: dataToAdd.reminderEnabled,
+        reminderMinutesBefore: dataToAdd.reminderMinutesBefore,
       });
       
       // Clear form
@@ -354,16 +355,17 @@ export default function Tasks() {
       setReminderEnabled(false);
       setReminderMinutesBefore(15);
       setShowAdvanced(false);
-      setPendingTaskData(null);
     } catch (error) {
       console.error('Failed to add task:', error);
-      setPendingTaskData(null);
     }
   };
   
   const handleMainQuestResponse = (makeMainQuest: boolean) => {
     setShowMainQuestPrompt(false);
-    actuallyAddTask(makeMainQuest);
+    // Clear pending data immediately to prevent duplicate creation
+    const dataToAdd = pendingTaskData;
+    setPendingTaskData(null);
+    actuallyAddTask(makeMainQuest, dataToAdd);
   };
   const handleDrawerClose = () => {
     // Only default to side quest if user dismissed without choosing
