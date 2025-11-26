@@ -117,6 +117,19 @@ export const useReferrals = () => {
     mutationFn: async (skinId: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      // FIX Bug #13: Verify user owns this skin first
+      const { data: ownedSkin, error: checkError } = await supabase
+        .from("user_companion_skins")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("skin_id", skinId)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (!ownedSkin) {
+        throw new Error("You don't own this skin");
+      }
+
       // Unequip all other skins first
       await supabase
         .from("user_companion_skins")

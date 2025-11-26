@@ -449,6 +449,26 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
+      // FIX Bug #8: Check if this referral was already completed
+      // This prevents infinite farming via companion reset
+      const { data: alreadyCompleted } = await supabase.rpc(
+        'has_completed_referral',
+        { 
+          p_referee_id: user.id,
+          p_referrer_id: profile.referred_by
+        }
+      );
+
+      if (alreadyCompleted) {
+        console.log('Referral already completed for this user-referrer pair');
+        // Clear referred_by but don't increment count
+        await supabase
+          .from("profiles")
+          .update({ referred_by: null })
+          .eq("id", user.id);
+        return;
+      }
+
       // FIX: Use atomic increment to prevent race condition
       // Instead of read-modify-write, increment directly in the database
       const { data: updatedProfile, error: updateError } = await supabase.rpc(
@@ -463,6 +483,15 @@ export const useCompanion = () => {
 
       // Get the new count from the response
       const newCount = updatedProfile?.[0]?.referral_count ?? 0;
+
+      // Record completion to prevent re-use after reset
+      await supabase
+        .from("referral_completions")
+        .insert({
+          referee_id: user.id,
+          referrer_id: profile.referred_by,
+          stage_reached: 3
+        });
 
       // Check for milestone unlocks (1, 3, 5)
       if (newCount === 1 || newCount === 3 || newCount === 5) {
@@ -557,9 +586,11 @@ export const useCompanion = () => {
 
       const evolutionId = evolutionData.evolution_id;
         const newStage = evolutionData.new_stage;
+        const oldStage = companion.current_stage;
 
-      // Check if user reached Stage 3 and validate referral
-      if (newStage === 3) {
+      // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
+      // This handles cases where user skips from Stage 2 to Stage 4+
+      if (oldStage < 3 && newStage >= 3) {
         await validateReferralAtStage3();
       }
 
