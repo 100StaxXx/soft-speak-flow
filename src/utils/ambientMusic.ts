@@ -22,6 +22,12 @@ class AmbientMusicManager {
   private wasDuckedBeforeMute = false; // Remember duck state when muted
   private lastVolumeChangeTime = 0; // Rate limiting for volume changes
   private pendingVolumeTimeout: NodeJS.Timeout | null = null; // Track pending volume change
+  private volumeChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
+  private muteChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
+  private playTimeout: NodeJS.Timeout | null = null; // Timeout for play() promise
+  private errorHandler: ((e: Event) => void) | null = null; // Audio error handler
+  private stalledHandler: (() => void) | null = null; // Audio stalled handler
+  private canPlayHandler: (() => void) | null = null; // Audio can play handler
 
   // Background music track - nostalgic piano
   private trackUrl = '/sounds/ambient-calm.mp3';
@@ -38,8 +44,9 @@ class AmbientMusicManager {
     }
   }
   
-  // Clean up all timers and state
+  // Clean up all timers, listeners, and state
   private cleanup() {
+    // Clear all timers
     if (this.fadeInterval) {
       clearInterval(this.fadeInterval);
       this.fadeInterval = null;
@@ -48,8 +55,43 @@ class AmbientMusicManager {
       clearTimeout(this.pendingVolumeTimeout);
       this.pendingVolumeTimeout = null;
     }
+    if (this.playTimeout) {
+      clearTimeout(this.playTimeout);
+      this.playTimeout = null;
+    }
+    
+    // Remove window event listeners
+    if (typeof window !== 'undefined') {
+      if (this.volumeChangeHandler) {
+        window.removeEventListener('bg-music-volume-change', this.volumeChangeHandler);
+        this.volumeChangeHandler = null;
+      }
+      if (this.muteChangeHandler) {
+        window.removeEventListener('bg-music-mute-change', this.muteChangeHandler);
+        this.muteChangeHandler = null;
+      }
+    }
+    
+    // Clean up audio element (remove event listeners to prevent memory leaks)
     if (this.audio) {
       this.audio.pause();
+      
+      // Remove all audio event listeners
+      if (this.errorHandler) {
+        this.audio.removeEventListener('error', this.errorHandler);
+        this.errorHandler = null;
+      }
+      if (this.stalledHandler) {
+        this.audio.removeEventListener('stalled', this.stalledHandler);
+        this.stalledHandler = null;
+      }
+      if (this.canPlayHandler) {
+        this.audio.removeEventListener('canplaythrough', this.canPlayHandler);
+        this.canPlayHandler = null;
+      }
+      
+      this.audio.src = ''; // Release audio resource
+      this.audio = null;
     }
   }
 
@@ -78,8 +120,8 @@ class AmbientMusicManager {
     this.audio.volume = this.isMuted ? 0 : this.volume;
     this.audio.preload = 'auto';
     
-    // Add error handlers for audio element
-    this.audio.addEventListener('error', (e) => {
+    // Add error handlers for audio element - store refs for cleanup
+    this.errorHandler = (e) => {
       console.error('Background music error:', e);
       this.isPlaying = false;
       this.isDucked = false;
@@ -98,32 +140,43 @@ class AmbientMusicManager {
         clearTimeout(this.pendingVolumeTimeout);
         this.pendingVolumeTimeout = null;
       }
-    });
+      // Clear any pending play timeout
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+        this.playTimeout = null;
+      }
+    };
+    this.audio.addEventListener('error', this.errorHandler);
     
-    this.audio.addEventListener('stalled', () => {
+    this.stalledHandler = () => {
       // Audio loading stalled - browser will retry automatically
-    });
+    };
+    this.audio.addEventListener('stalled', this.stalledHandler);
     
     // Handle successful load
-    this.audio.addEventListener('canplaythrough', () => {
+    this.canPlayHandler = () => {
       // Audio loaded and ready to play
-    });
+    };
+    this.audio.addEventListener('canplaythrough', this.canPlayHandler);
     
-    // Listen for volume/mute changes
+    // Listen for volume/mute changes - store handlers for cleanup
     if (typeof window !== 'undefined') {
-      window.addEventListener('bg-music-volume-change', (e: Event) => {
+      this.volumeChangeHandler = (e: Event) => {
         const volumeEvent = e as VolumeChangeEvent;
         this.setVolume(volumeEvent.detail);
-      });
-
-      window.addEventListener('bg-music-mute-change', (e: Event) => {
+      };
+      
+      this.muteChangeHandler = (e: Event) => {
         const muteEvent = e as MuteChangeEvent;
         if (muteEvent.detail) {
           this.mute();
         } else {
           this.unmute();
         }
-      });
+      };
+      
+      window.addEventListener('bg-music-volume-change', this.volumeChangeHandler);
+      window.addEventListener('bg-music-mute-change', this.muteChangeHandler);
     }
 
     // Auto-play on user interaction (browser requirement)
@@ -261,14 +314,39 @@ class AmbientMusicManager {
     if (!this.isMuted) {
       this.isStopped = false;
       this.audio.volume = 0;
+      
+      // Clear any existing play timeout
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+      }
+      
+      // Set timeout in case play() promise never resolves
+      this.playTimeout = setTimeout(() => {
+        if (!this.isPlaying) {
+          this.isPlaying = false;
+        }
+        this.playTimeout = null;
+      }, 5000); // 5 second timeout
+      
       this.audio.play()
         .then(() => {
-          this.isPlaying = true;
-          this.fadeIn();
+          // Clear timeout on success
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
+          if (!this.isStopped && !this.isMuted) {
+            this.isPlaying = true;
+            this.fadeIn();
+          }
         })
         .catch((err) => {
+          // Clear timeout on error
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
           // Autoplay prevented - this is expected on some browsers
-          console.warn('Play prevented:', err);
           this.isPlaying = false;
         });
     } else {
@@ -317,13 +395,34 @@ class AmbientMusicManager {
     
     if (!this.isMuted) {
       this.audio.volume = 0;
+      
+      // Set timeout for resume
+      if (this.playTimeout) {
+        clearTimeout(this.playTimeout);
+      }
+      this.playTimeout = setTimeout(() => {
+        if (!this.isPlaying) {
+          this.isPlaying = false;
+        }
+        this.playTimeout = null;
+      }, 5000);
+      
       this.audio.play()
         .then(() => {
-          this.isPlaying = true;
-          this.fadeIn(1500); // Gentle fade back in
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
+          if (!this.isStopped && !this.isMuted) {
+            this.isPlaying = true;
+            this.fadeIn(1500); // Gentle fade back in
+          }
         })
         .catch(err => {
-          console.error('Resume failed:', err);
+          if (this.playTimeout) {
+            clearTimeout(this.playTimeout);
+            this.playTimeout = null;
+          }
           this.isPlaying = false;
         });
     }
@@ -345,6 +444,12 @@ class AmbientMusicManager {
     if (this.pendingVolumeTimeout) {
       clearTimeout(this.pendingVolumeTimeout);
       this.pendingVolumeTimeout = null;
+    }
+    
+    // Clear any pending play timeout
+    if (this.playTimeout) {
+      clearTimeout(this.playTimeout);
+      this.playTimeout = null;
     }
     
     this.audio.pause();
