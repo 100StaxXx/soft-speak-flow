@@ -86,6 +86,7 @@ export const useReferrals = () => {
       // FIX Bugs #15, #18, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<ApplyReferralCodeResult>(
         async () => {
+          // @ts-expect-error - RPC function exists but types not yet regenerated
           const { data, error } = await supabase.rpc(
             'apply_referral_code_atomic',
             {
