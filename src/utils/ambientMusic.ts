@@ -18,8 +18,8 @@ class AmbientMusicManager {
   private originalVolume = 0.15; // Store original volume before ducking
   private isDucked = false; // Track if currently ducked
 
-  // Background music track
-  private trackUrl = '/sounds/nostalgic-piano.mp3';
+  // Background music track - nostalgic piano
+  private trackUrl = '/sounds/ambient-calm.mp3';
 
   constructor() {
     if (typeof window !== 'undefined') {
