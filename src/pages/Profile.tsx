@@ -17,6 +17,7 @@ import { PushNotificationSettings } from "@/components/PushNotificationSettings"
 import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
+import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -345,6 +346,7 @@ const Profile = () => {
             </TabsContent>
 
             <TabsContent value="referrals" className="space-y-6">
+              <ReferralCodeRedeemCard />
               <ReferralDashboard />
               <CompanionSkins />
             </TabsContent>
