@@ -21,6 +21,7 @@ interface TaskCardProps {
   onSetMainQuest?: () => void;
   showPromoteButton?: boolean;
   isMainQuest?: boolean;
+  isTutorialQuest?: boolean;
 }
 
 export const TaskCard = ({
@@ -30,6 +31,7 @@ export const TaskCard = ({
   onSetMainQuest,
   showPromoteButton,
   isMainQuest,
+  isTutorialQuest,
 }: TaskCardProps) => {
   const [showXP, setShowXP] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
@@ -140,23 +142,48 @@ export const TaskCard = ({
         )}
       <div className={cn("p-4 flex items-center gap-3", isMainQuest && "py-5")}>
         {/* Completion Button */}
-        <button
-          onClick={onToggle}
-          className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform"
-          aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
-        >
-          {task.completed ? (
-            <CheckCircle2 className={cn(
-              "h-6 w-6 transition-all",
-              isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-green-500"
-            )} />
-          ) : (
-            <Circle className={cn(
-              "h-6 w-6 transition-all",
-              isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
-            )} />
+        <div className="relative overflow-visible">
+          {/* Pulsing Ring Indicator for Tutorial Quest */}
+          {isTutorialQuest && !task.completed && (
+            <>
+              <div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full pointer-events-none"
+                style={{
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  backgroundColor: 'hsl(var(--primary))',
+                  opacity: 0.4,
+                }}
+              />
+              <div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full pointer-events-none"
+                style={{
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  animationDelay: '0.5s',
+                  backgroundColor: 'hsl(var(--primary))',
+                  opacity: 0.3,
+                }}
+              />
+            </>
           )}
-        </button>
+          <button
+            onClick={onToggle}
+            className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10"
+            aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
+          >
+            {task.completed ? (
+              <CheckCircle2 className={cn(
+                "h-6 w-6 transition-all",
+                isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-green-500"
+              )} />
+            ) : (
+              <Circle className={cn(
+                "h-6 w-6 transition-all",
+                isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground",
+                isTutorialQuest && "text-primary"
+              )} />
+            )}
+          </button>
+        </div>
 
           {/* Task Content */}
           <div className="flex-1 min-w-0">

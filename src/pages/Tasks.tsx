@@ -783,6 +783,7 @@ export default function Tasks() {
                             onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
                             onDelete={() => deleteTask(mainQuest.id)}
                             isMainQuest={true}
+                            isTutorialQuest={mainQuest.task_text === 'Join R-Evolution'}
                           />
                         </div>
                       )}
@@ -803,6 +804,7 @@ export default function Tasks() {
                                 onDelete={() => deleteTask(task.id)}
                                 onSetMainQuest={() => setMainQuest(task.id)}
                                 showPromoteButton={!mainQuest}
+                                isTutorialQuest={task.task_text === 'Join R-Evolution'}
                               />
                             ))}
                           </div>
@@ -830,6 +832,7 @@ export default function Tasks() {
                         task={task}
                         onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
                         onDelete={() => deleteTask(task.id)}
+                        isTutorialQuest={task.task_text === 'Join R-Evolution'}
                       />
                     ))}
                   </div>
