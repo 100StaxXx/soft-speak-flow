@@ -2142,6 +2142,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_device_tokens: {
+        Row: {
+          created_at: string | null
+          device_token: string
+          id: string
+          platform: string
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_token: string
+          id?: string
+          platform: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_token?: string
+          id?: string
+          platform?: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
