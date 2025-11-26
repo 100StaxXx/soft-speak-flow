@@ -132,9 +132,9 @@ export const useReferrals = () => {
 
       return referrer;
     },
-    onSuccess: async () => {
-      // FIX Bug #19: Wait for refetch before showing toast
-      await queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+    onSuccess: () => {
+      // Invalidate queries to trigger refetch (UI updates asynchronously)
+      queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
       toast.success("Referral code applied! Your friend will earn rewards when you reach Stage 3.");
     },
     onError: (error: Error) => {

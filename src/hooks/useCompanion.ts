@@ -394,7 +394,8 @@ export const useCompanion = () => {
     if (!currentUser?.id) {
       throw new Error("Not authenticated");
     }
-    xpInProgress.current = true;
+    // Note: xpInProgress flag is managed by the caller (awardXP mutation)
+    // Setting it here would cause issues with error handling
 
     const newXP = companionData.current_xp + xpAmount;
     const nextStage = companionData.current_stage + 1;

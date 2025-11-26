@@ -12,10 +12,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Add check constraint to prevent negative referral counts
-ALTER TABLE profiles
-ADD CONSTRAINT referral_count_non_negative
-CHECK (referral_count >= 0);
+-- Note: referral_count_non_negative constraint is added in 20251126_fix_transaction_bugs.sql
+-- with proper IF NOT EXISTS check to prevent migration conflicts
 
 -- Add index for performance on referred_by lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_referred_by 

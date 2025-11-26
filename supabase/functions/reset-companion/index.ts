@@ -59,6 +59,14 @@ serve(async (req) => {
       .eq('id', compId);
     if (delCompErr) throw delCompErr;
 
+    // Clear referral relationship (allows user to apply a new code if they want)
+    // This prevents UX issues where users are stuck with an old referral code
+    const { error: clearReferralErr } = await supabase
+      .from('profiles')
+      .update({ referred_by: null })
+      .eq('id', user.id);
+    if (clearReferralErr) throw clearReferralErr;
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
