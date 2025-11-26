@@ -101,12 +101,12 @@ class AmbientMusicManager {
     });
     
     this.audio.addEventListener('stalled', () => {
-      console.warn('Background music stalled, attempting to recover...');
+      // Audio loading stalled - browser will retry automatically
     });
     
     // Handle successful load
     this.audio.addEventListener('canplaythrough', () => {
-      console.log('Background music loaded successfully');
+      // Audio loaded and ready to play
     });
     
     // Listen for volume/mute changes
@@ -445,8 +445,9 @@ class AmbientMusicManager {
       return;
     }
     
-    const steps = 10;
-    const stepDuration = 300 / steps;
+    const duration = 300;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
+    const stepDuration = duration / steps;
     const volumeDecrement = (startVolume - duckedVolume) / steps;
     let currentStep = 0;
 
@@ -473,10 +474,11 @@ class AmbientMusicManager {
   unduck() {
     if (!this.audio || !this.isDucked || this.isDucking) return;
     
-    // Don't restore if muted, but remember we were ducked
+    // If muted, clear duck state without audio changes
+    // Also clear the saved duck state so unmute() won't restore it
     if (this.isMuted) {
-      this.wasDuckedBeforeMute = true;
       this.isDucked = false;
+      this.wasDuckedBeforeMute = false;
       return;
     }
     
@@ -495,8 +497,9 @@ class AmbientMusicManager {
       return;
     }
     
-    const steps = 10;
-    const stepDuration = 500 / steps;
+    const duration = 500;
+    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
+    const stepDuration = duration / steps;
     const volumeIncrement = (targetVolume - startVolume) / steps;
     let currentStep = 0;
 
