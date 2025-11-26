@@ -5,6 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Target, TrendingUp, MessageCircleHeart, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { ReferralCodeInput } from "@/components/ReferralCodeInput";
+import { useReferrals } from "@/hooks/useReferrals";
 
 const slides = [
   {
@@ -41,7 +43,9 @@ interface OnboardingFlowProps {
 export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [hasCompleted, setHasCompleted] = useState(false);
+  const [showReferralInput, setShowReferralInput] = useState(true);
   const { user } = useAuth();
+  const { applyReferralCode } = useReferrals();
   const progress = ((currentSlide + 1) / slides.length) * 100;
 
   // Restore progress on mount
@@ -101,6 +105,15 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     handleComplete();
   };
 
+  const handleReferralSubmit = async (code: string) => {
+    await applyReferralCode.mutateAsync(code);
+    setShowReferralInput(false);
+  };
+
+  const handleReferralSkip = () => {
+    setShowReferralInput(false);
+  };
+
   const handleComplete = async () => {
     if (user) {
       // Fetch existing onboarding_data to preserve userName, walkthrough_completed, etc.
@@ -124,6 +137,16 @@ export const OnboardingFlow = ({ open, onComplete }: OnboardingFlowProps) => {
     setHasCompleted(true);
     onComplete();
   };
+
+  // Show referral input first if not completed
+  if (showReferralInput) {
+    return (
+      <ReferralCodeInput
+        onSubmit={handleReferralSubmit}
+        onSkip={handleReferralSkip}
+      />
+    );
+  }
 
   const slide = slides[currentSlide];
   const Icon = slide.icon;

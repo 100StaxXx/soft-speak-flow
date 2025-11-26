@@ -4,12 +4,13 @@ import { Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { useReferrals } from "@/hooks/useReferrals";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getStageName } from "@/config/companionStages";
 
 // Convert hex color to color name
@@ -66,12 +67,40 @@ export const CompanionDisplay = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
+  const { unlockedSkins } = useReferrals();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  // Get equipped skin and calculate styles
+  const equippedSkin = useMemo(() => {
+    return unlockedSkins?.find(us => us.is_equipped)?.companion_skins;
+  }, [unlockedSkins]);
+
+  // Parse skin CSS effects
+  const skinStyles = useMemo(() => {
+    if (!equippedSkin?.css_effect) return {};
+    
+    const effects = equippedSkin.css_effect as any;
+
+    // Apply different effects based on skin type
+    if (equippedSkin.skin_type === 'aura' && effects.glowColor) {
+      return {
+        boxShadow: `0 0 30px ${effects.glowColor}, 0 0 60px ${effects.glowColor}`,
+        filter: `drop-shadow(0 0 20px ${effects.glowColor})`
+      };
+    } else if (equippedSkin.skin_type === 'frame' && effects.borderColor) {
+      return {
+        border: `${effects.borderWidth || '3px'} solid ${effects.borderColor}`,
+        boxShadow: effects.shimmer ? `0 0 20px ${effects.borderColor}` : undefined
+      };
+    }
+
+    return {};
+  }, [equippedSkin]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -177,6 +206,7 @@ export const CompanionDisplay = () => {
                 src={companion.current_image_url || ""}
                 alt={`${stageName} companion at stage ${companion.current_stage}`}
                 className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
+                style={skinStyles}
                 onLoad={() => {
                   setImageLoaded(true);
                   setImageError(false); // Clear error on successful load

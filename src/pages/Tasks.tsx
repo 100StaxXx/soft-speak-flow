@@ -413,16 +413,18 @@ export default function Tasks() {
       const today = format(new Date(), 'yyyy-MM-dd');
       
       // Check if this quest already exists
-      supabase
-        .from('daily_tasks')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('task_text', 'Join R-Evolution')
-        .maybeSingle()
-        .then(({ data: existingQuest }) => {
+      const checkAndCreateQuest = async () => {
+        try {
+          const { data: existingQuest } = await supabase
+            .from('daily_tasks')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('task_text', 'Join R-Evolution')
+            .maybeSingle();
+          
           if (!existingQuest) {
             // Create the welcome quest
-            supabase
+            await supabase
               .from('daily_tasks')
               .insert({
                 user_id: user.id,
@@ -431,18 +433,16 @@ export default function Tasks() {
                 xp_reward: 10,
                 task_date: today,
                 is_main_quest: false,
-              })
-              .then(() => {
-                queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-              })
-              .catch((error) => {
-                console.error('Failed to create tutorial quest:', error);
               });
+            
+            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
           }
-        })
-        .catch((error) => {
-          console.error('Failed to check for existing tutorial quest:', error);
-        });
+        } catch (error) {
+          console.error('Failed to check/create tutorial quest:', error);
+        }
+      };
+      
+      checkAndCreateQuest();
     }
   }, [user, profile, showTutorial, queryClient]);
 

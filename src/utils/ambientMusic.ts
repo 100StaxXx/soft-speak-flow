@@ -1,3 +1,5 @@
+import { safeLocalStorage } from '@/utils/storage';
+
 // Custom event interfaces
 interface VolumeChangeEvent extends CustomEvent {
   detail: number;
