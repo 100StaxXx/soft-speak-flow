@@ -42,10 +42,8 @@ const Auth = () => {
         try {
           await SocialLogin.initialize({
             google: {
-              // Note: You need to configure these values in your Google Cloud Console
-              // For web: Create a Web application OAuth client
-              // For iOS: Create an iOS OAuth client
-              webClientId: import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || '',
+              // Google OAuth Client IDs configured
+              webClientId: '371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com',
               iOSClientId: import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID || '',
               mode: 'online'
             }
