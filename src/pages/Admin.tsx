@@ -42,6 +42,19 @@ const Admin = () => {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
+  // Companion Image Tester State
+  const [companionTestData, setCompanionTestData] = useState({
+    spiritAnimal: "wolf",
+    element: "fire",
+    stage: 0,
+    favoriteColor: "#FF6B35",
+    eyeColor: "#FFD700",
+    furColor: "#8B4513",
+  });
+  const [generatingCompanionImage, setGeneratingCompanionImage] = useState(false);
+  const [generatedCompanionImage, setGeneratedCompanionImage] = useState<string | null>(null);
+  const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
+  
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: "",
@@ -319,6 +332,46 @@ const Admin = () => {
     }
   };
 
+  const getStageNameForAdmin = (stage: number): string => {
+    const stageNames = [
+      "Egg", "Hatchling", "Sproutling", "Cub", "Juvenile",
+      "Apprentice", "Scout", "Fledgling", "Warrior", "Guardian",
+      "Champion", "Ascended", "Vanguard", "Titan", "Mythic",
+      "Prime", "Regal", "Eternal", "Transcendent", "Apex", "Ultimate Form"
+    ];
+    return stageNames[stage] || "Unknown";
+  };
+
+  const handleGenerateCompanionImage = async () => {
+    setGeneratingCompanionImage(true);
+    setGeneratedCompanionImage(null);
+    setGeneratedPrompt(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-companion-image", {
+        body: {
+          spiritAnimal: companionTestData.spiritAnimal,
+          element: companionTestData.element,
+          stage: companionTestData.stage,
+          favoriteColor: companionTestData.favoriteColor,
+          eyeColor: companionTestData.eyeColor || undefined,
+          furColor: companionTestData.furColor || undefined,
+        },
+      });
+
+      if (error) throw error;
+
+      setGeneratedCompanionImage(data.imageUrl);
+      setGeneratedPrompt(data.prompt || "Prompt not returned");
+      toast.success("Companion image generated successfully!");
+    } catch (error: any) {
+      console.error("Error generating companion image:", error);
+      toast.error(error.message || "Failed to generate companion image");
+    } finally {
+      setGeneratingCompanionImage(false);
+    }
+  };
+
   const handleFullAIGenerate = async () => {
     if (!formData.mentor_id) {
       toast.error("Please select a mentor first");
@@ -429,6 +482,185 @@ const Admin = () => {
                 </Button>
               </div>
             ))}
+          </div>
+        </Card>
+
+        {/* Companion Image Tester */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">🎨 Companion Image Tester</h2>
+          <p className="text-muted-foreground mb-6">Test companion image generation for different animals, elements, and stages</p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="spiritAnimal">Spirit Animal</Label>
+                <select
+                  id="spiritAnimal"
+                  value={companionTestData.spiritAnimal}
+                  onChange={(e) => setCompanionTestData({ ...companionTestData, spiritAnimal: e.target.value })}
+                  className="w-full p-2 border rounded-2xl bg-background"
+                >
+                  <option value="wolf">Wolf</option>
+                  <option value="lion">Lion</option>
+                  <option value="tiger">Tiger</option>
+                  <option value="eagle">Eagle</option>
+                  <option value="bear">Bear</option>
+                  <option value="phoenix">Phoenix</option>
+                  <option value="dragon">Dragon</option>
+                  <option value="shark">Shark</option>
+                  <option value="whale">Whale</option>
+                  <option value="dolphin">Dolphin</option>
+                  <option value="owl">Owl</option>
+                  <option value="fox">Fox</option>
+                  <option value="panther">Panther</option>
+                  <option value="hawk">Hawk</option>
+                  <option value="lynx">Lynx</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="element">Element</Label>
+                <select
+                  id="element"
+                  value={companionTestData.element}
+                  onChange={(e) => setCompanionTestData({ ...companionTestData, element: e.target.value })}
+                  className="w-full p-2 border rounded-2xl bg-background"
+                >
+                  <option value="fire">Fire</option>
+                  <option value="water">Water</option>
+                  <option value="earth">Earth</option>
+                  <option value="air">Air</option>
+                  <option value="lightning">Lightning</option>
+                  <option value="ice">Ice</option>
+                  <option value="light">Light</option>
+                  <option value="shadow">Shadow</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="stage">Evolution Stage: {companionTestData.stage} - {getStageNameForAdmin(companionTestData.stage)}</Label>
+              <input
+                type="range"
+                id="stage"
+                min="0"
+                max="20"
+                value={companionTestData.stage}
+                onChange={(e) => setCompanionTestData({ ...companionTestData, stage: parseInt(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="favoriteColor">Favorite Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="favoriteColor"
+                    value={companionTestData.favoriteColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, favoriteColor: e.target.value })}
+                    className="w-16 h-10 rounded-2xl"
+                  />
+                  <Input
+                    type="text"
+                    value={companionTestData.favoriteColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, favoriteColor: e.target.value })}
+                    className="flex-1 rounded-2xl"
+                    placeholder="#FF6B35"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="eyeColor">Eye Color (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="eyeColor"
+                    value={companionTestData.eyeColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, eyeColor: e.target.value })}
+                    className="w-16 h-10 rounded-2xl"
+                  />
+                  <Input
+                    type="text"
+                    value={companionTestData.eyeColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, eyeColor: e.target.value })}
+                    className="flex-1 rounded-2xl"
+                    placeholder="#FFD700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="furColor">Fur/Scale Color (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="furColor"
+                    value={companionTestData.furColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, furColor: e.target.value })}
+                    className="w-16 h-10 rounded-2xl"
+                  />
+                  <Input
+                    type="text"
+                    value={companionTestData.furColor}
+                    onChange={(e) => setCompanionTestData({ ...companionTestData, furColor: e.target.value })}
+                    className="flex-1 rounded-2xl"
+                    placeholder="#8B4513"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleGenerateCompanionImage}
+              disabled={generatingCompanionImage}
+              className="w-full rounded-2xl"
+            >
+              {generatingCompanionImage ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating Image...
+                </>
+              ) : (
+                "🔄 Generate Companion Image"
+              )}
+            </Button>
+
+            {generatedCompanionImage && (
+              <div className="space-y-4 p-4 border rounded-2xl bg-card">
+                <div className="flex justify-center">
+                  <img
+                    src={generatedCompanionImage}
+                    alt="Generated Companion"
+                    className="max-w-md w-full rounded-2xl shadow-lg"
+                  />
+                </div>
+                {generatedPrompt && (
+                  <div className="space-y-2">
+                    <Label>Generated Prompt:</Label>
+                    <Textarea
+                      value={generatedPrompt}
+                      readOnly
+                      className="font-mono text-xs rounded-2xl min-h-[100px]"
+                    />
+                  </div>
+                )}
+                <Button
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = generatedCompanionImage;
+                    a.download = `companion-${companionTestData.spiritAnimal}-stage${companionTestData.stage}.png`;
+                    a.click();
+                  }}
+                  variant="outline"
+                  className="w-full rounded-2xl"
+                >
+                  📥 Download Image
+                </Button>
+              </div>
+            )}
           </div>
         </Card>
 
