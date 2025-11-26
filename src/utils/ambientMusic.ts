@@ -20,6 +20,8 @@ class AmbientMusicManager {
   private isStopped = false; // Track if intentionally stopped to prevent callback execution
   private isDucking = false; // Prevent rapid duck/unduck
   private wasDuckedBeforeMute = false; // Remember duck state when muted
+  private lastVolumeChangeTime = 0; // Rate limiting for volume changes
+  private pendingVolumeTimeout: NodeJS.Timeout | null = null; // Track pending volume change
 
   // Background music track - nostalgic piano
   private trackUrl = '/sounds/ambient-calm.mp3';
@@ -62,6 +64,9 @@ class AmbientMusicManager {
       this.isPlaying = false;
       this.isDucked = false;
       this.isPausedForEvent = false;
+      this.isDucking = false;
+      this.isMuting = false;
+      this.wasDuckedBeforeMute = false;
       // Clear any active fades on error
       if (this.fadeInterval) {
         clearInterval(this.fadeInterval);
@@ -111,14 +116,18 @@ class AmbientMusicManager {
     document.addEventListener('keydown', startOnInteraction);
   }
 
-  private lastVolumeChangeTime = 0;
-  
   setVolume(volume: number) {
     // Rate limit volume changes to prevent excessive calls
     const now = Date.now();
     if (now - this.lastVolumeChangeTime < 50) {
-      // Debounce: save for later
-      setTimeout(() => this.setVolume(volume), 50);
+      // Clear any pending timeout and schedule a new one
+      if (this.pendingVolumeTimeout) {
+        clearTimeout(this.pendingVolumeTimeout);
+      }
+      this.pendingVolumeTimeout = setTimeout(() => {
+        this.pendingVolumeTimeout = null;
+        this.setVolume(volume);
+      }, 50);
       return;
     }
     this.lastVolumeChangeTime = now;
@@ -306,12 +315,20 @@ class AmbientMusicManager {
       this.fadeInterval = null;
     }
     
+    // Clear any pending volume changes
+    if (this.pendingVolumeTimeout) {
+      clearTimeout(this.pendingVolumeTimeout);
+      this.pendingVolumeTimeout = null;
+    }
+    
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
     this.isPausedForEvent = false;
     this.isDucked = false; // Reset duck state
     this.isMuting = false; // Reset muting flag
+    this.isDucking = false; // Reset ducking flag
+    this.wasDuckedBeforeMute = false; // Reset remembered duck state
   }
 
   private fadeIn(duration = 2000) {
