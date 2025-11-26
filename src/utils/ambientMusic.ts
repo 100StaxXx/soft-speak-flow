@@ -14,18 +14,12 @@ class AmbientMusicManager {
   private isMuted = false;
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
-  private currentTrack = 'ambient';
   private isPausedForEvent = false; // Track if paused for major events
   private originalVolume = 0.15; // Store original volume before ducking
   private isDucked = false; // Track if currently ducked
 
-  // Ambient music URLs - these would be your actual music files
-  private tracks = {
-    ambient: '/sounds/ambient-calm.mp3',
-    meditation: '/sounds/ambient-meditation.mp3',
-    focus: '/sounds/ambient-focus.mp3',
-    energy: '/sounds/ambient-energy.mp3',
-  };
+  // Background music track
+  private trackUrl = '/sounds/nostalgic-piano.mp3';
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -37,13 +31,9 @@ class AmbientMusicManager {
   private loadPreferences() {
     const savedVolume = localStorage.getItem('bg_music_volume');
     const savedMuted = localStorage.getItem('bg_music_muted');
-    const savedTrack = localStorage.getItem('bg_music_track');
     
     if (savedVolume) this.volume = parseFloat(savedVolume);
     if (savedMuted) this.isMuted = savedMuted === 'true';
-    if (savedTrack && savedTrack in this.tracks) {
-      this.currentTrack = savedTrack as keyof typeof this.tracks;
-    }
   }
 
   private initializeAudio() {
@@ -124,15 +114,11 @@ class AmbientMusicManager {
     return this.isMuted;
   }
 
-  play(track?: keyof typeof this.tracks) {
+  play() {
     if (!this.audio) return;
 
-    if (track && track !== this.currentTrack) {
-      this.currentTrack = track;
-      localStorage.setItem('bg_music_track', track);
-      this.audio.src = this.tracks[track];
-    } else if (!this.audio.src) {
-      this.audio.src = this.tracks[this.currentTrack];
+    if (!this.audio.src) {
+      this.audio.src = this.trackUrl;
     }
 
     if (!this.isMuted) {
@@ -243,21 +229,6 @@ class AmbientMusicManager {
     }, stepDuration);
   }
 
-  // Transition between tracks
-  changeTrack(track: keyof typeof this.tracks) {
-    if (this.currentTrack === track) return;
-    
-    this.fadeOut(() => {
-      this.currentTrack = track;
-      localStorage.setItem('bg_music_track', track);
-      if (this.audio) {
-        this.audio.src = this.tracks[track];
-        if (!this.isMuted && this.isPlaying) {
-          this.audio.play().then(() => this.fadeIn());
-        }
-      }
-    });
-  }
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
@@ -322,7 +293,6 @@ class AmbientMusicManager {
       isPlaying: this.isPlaying,
       isMuted: this.isMuted,
       volume: this.volume,
-      currentTrack: this.currentTrack,
     };
   }
 }
@@ -336,7 +306,5 @@ export const pauseAmbientForEvent = () => ambientMusic.pauseForEvent();
 export const resumeAmbientAfterEvent = () => ambientMusic.resumeAfterEvent();
 export const toggleAmbientMute = () => ambientMusic.toggleMute();
 export const setAmbientVolume = (volume: number) => ambientMusic.setVolume(volume);
-export const changeAmbientTrack = (track: 'ambient' | 'meditation' | 'focus' | 'energy') => 
-  ambientMusic.changeTrack(track);
 export const duckAmbient = () => ambientMusic.duck();
 export const unduckAmbient = () => ambientMusic.unduck();
