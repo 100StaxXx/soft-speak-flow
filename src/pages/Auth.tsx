@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
+import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,13 +139,29 @@ const Auth = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
-    // Note: Apple OAuth requires additional setup in Supabase dashboard:
-    // 1. Apple Developer account with Sign in with Apple configured
-    // 2. Service ID, Key ID, Team ID, and Private Key configured in Supabase
-    // 3. Redirect URLs properly configured
-    // Google OAuth should work if configured in Supabase dashboard
-    // 4. Add 'com.revolution.app://' to Redirect URLs in Supabase dashboard
     try {
+      // Native Apple Sign-In for iOS
+      if (provider === 'apple' && Capacitor.isNativePlatform()) {
+        const result: SignInWithAppleResponse = await SignInWithApple.authorize({
+          clientId: 'B6VW78ABTR.com.darrylgraham.revolution',
+          redirectURI: 'com.revolution.app://',
+          scopes: 'email name',
+          state: '12345',
+          nonce: 'nonce',
+        });
+
+        // Sign in to Supabase with Apple identity token
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: result.response.identityToken,
+          nonce: 'nonce',
+        });
+
+        if (error) throw error;
+        return;
+      }
+
+      // Web OAuth flow for Google and web Apple Sign-In
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {

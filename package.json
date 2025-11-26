@@ -12,6 +12,7 @@
     "cards:snapshot": "tsx scripts/cardSnapshot.ts"
   },
   "dependencies": {
+    "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor-community/stripe": "^7.2.1",
     "@capacitor/android": "^7.4.4",
     "@capacitor/cli": "^7.4.4",
