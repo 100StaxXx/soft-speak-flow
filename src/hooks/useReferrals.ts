@@ -41,7 +41,7 @@ export const useReferrals = () => {
           companion_skins (*)
         `)
         .eq("user_id", user.id)
-        .order("unlocked_at", { ascending: false })
+        .order("acquired_at", { ascending: false })
         .limit(100); // Safety limit to prevent OOM with many skins
 
       if (error) throw error;
