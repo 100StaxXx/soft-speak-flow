@@ -57,8 +57,9 @@ export const AmbientMusicPlayer = () => {
   }, []);
 
   const handleToggle = () => {
-    ambientMusic.toggleMute();
-    setState(ambientMusic.getState());
+    const newMutedState = ambientMusic.toggleMute();
+    // Dispatch window event to notify all listeners (including this component)
+    window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMutedState }));
   };
 
   return (
