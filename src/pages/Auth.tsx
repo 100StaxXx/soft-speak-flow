@@ -297,7 +297,8 @@ const Auth = () => {
               </Button>
             </form>
 
-            <div className="relative">
+            {/* Social login options temporarily hidden */}
+            {/* <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-steel/20" />
               </div>
@@ -333,7 +334,7 @@ const Auth = () => {
                 </svg>
                 Apple
               </Button>
-            </div>
+            </div> */}
 
             <div className="text-center">
               <Button
