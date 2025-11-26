@@ -30,6 +30,26 @@ class AmbientMusicManager {
     if (typeof window !== 'undefined') {
       this.loadPreferences();
       this.initializeAudio();
+      
+      // Clean up on page unload to prevent timer leaks
+      window.addEventListener('beforeunload', () => {
+        this.cleanup();
+      });
+    }
+  }
+  
+  // Clean up all timers and state
+  private cleanup() {
+    if (this.fadeInterval) {
+      clearInterval(this.fadeInterval);
+      this.fadeInterval = null;
+    }
+    if (this.pendingVolumeTimeout) {
+      clearTimeout(this.pendingVolumeTimeout);
+      this.pendingVolumeTimeout = null;
+    }
+    if (this.audio) {
+      this.audio.pause();
     }
   }
 
@@ -66,11 +86,17 @@ class AmbientMusicManager {
       this.isPausedForEvent = false;
       this.isDucking = false;
       this.isMuting = false;
+      this.isStopped = false;
       this.wasDuckedBeforeMute = false;
       // Clear any active fades on error
       if (this.fadeInterval) {
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
+      }
+      // Clear any pending volume changes
+      if (this.pendingVolumeTimeout) {
+        clearTimeout(this.pendingVolumeTimeout);
+        this.pendingVolumeTimeout = null;
       }
     });
     
