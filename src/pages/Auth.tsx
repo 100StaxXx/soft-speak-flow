@@ -45,8 +45,8 @@ const Auth = () => {
               // Note: You need to configure these values in your Google Cloud Console
               // For web: Create a Web application OAuth client
               // For iOS: Create an iOS OAuth client
-              webClientId: process.env.VITE_GOOGLE_WEB_CLIENT_ID || '',
-              iOSClientId: process.env.VITE_GOOGLE_IOS_CLIENT_ID || '',
+              webClientId: import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || '',
+              iOSClientId: import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID || '',
               mode: 'online'
             }
           });
