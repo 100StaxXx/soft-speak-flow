@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { useEffect, Suspense, lazy, memo } from "react";
+import { useEffect, Suspense, lazy, memo, useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
@@ -19,6 +19,7 @@ import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
+import { hideSplashScreen } from "@/utils/capacitor";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -100,7 +101,20 @@ const EvolutionAwareContent = memo(() => {
 EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const AppContent = memo(() => {
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
+  const [splashHidden, setSplashHidden] = useState(false);
+  
+  // Hide splash screen once profile data is loaded (or failed to load)
+  useEffect(() => {
+    if (!profileLoading && !splashHidden) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        hideSplashScreen();
+        setSplashHidden(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [profileLoading, splashHidden]);
   
   return (
     <ThemeProvider mentorId={profile?.selected_mentor_id}>
