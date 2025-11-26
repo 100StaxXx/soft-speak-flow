@@ -10,10 +10,12 @@ import { NameInput } from "@/components/NameInput";
 import { LegalAcceptance } from "@/components/LegalAcceptance";
 import { ZodiacSelector } from "@/components/ZodiacSelector";
 import { ZodiacReveal } from "@/components/ZodiacReveal";
+import { ReferralCodeInput } from "@/components/ReferralCodeInput";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useReferrals } from "@/hooks/useReferrals";
 import { retryWithBackoff } from "@/utils/retry";
 import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
@@ -45,7 +47,7 @@ interface MentorExplanation {
 }
 
 export default function Onboarding() {
-  const [stage, setStage] = useState<'legal' | 'name' | 'zodiac-select' | 'questionnaire' | 'result' | 'zodiac-reveal' | 'browse' | 'companion'>('legal');
+  const [stage, setStage] = useState<'legal' | 'name' | 'referral-code' | 'zodiac-select' | 'questionnaire' | 'result' | 'zodiac-reveal' | 'browse' | 'companion'>('legal');
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [explanation, setExplanation] = useState<MentorExplanation | null>(null);
@@ -54,6 +56,7 @@ export default function Onboarding() {
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const { user } = useAuth();
   const { createCompanion } = useCompanion();
+  const { applyReferralCode } = useReferrals();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -99,6 +102,10 @@ export default function Onboarding() {
           setStage('browse');
         } else if (profile.onboarding_step === 'questionnaire' && savedData?.userName) {
           setStage('questionnaire');
+        } else if (profile.onboarding_step === 'referral-code') {
+          setStage('referral-code');
+        } else if (profile.onboarding_step === 'zodiac-select') {
+          setStage('zodiac-select');
         }
       }
     };
@@ -154,7 +161,7 @@ export default function Onboarding() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          onboarding_step: 'zodiac-select',
+          onboarding_step: 'referral-code',
           onboarding_data: {
             ...existingData,
             userName: name,
@@ -169,7 +176,7 @@ export default function Onboarding() {
         description: `Nice to meet you, ${name}!`,
       });
 
-      setStage('zodiac-select');
+      setStage('referral-code');
     } catch (error: unknown) {
       console.error("Error saving name:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to save name";
@@ -178,6 +185,49 @@ export default function Onboarding() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleReferralCodeSubmit = async (code: string) => {
+    if (!user) return;
+
+    try {
+      setSelecting(true);
+      await applyReferralCode.mutateAsync(code);
+      
+      // Save progress and move to next stage
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: 'zodiac-select' })
+        .eq("id", user.id);
+
+      setStage('zodiac-select');
+    } catch (error: unknown) {
+      console.error("Error applying referral code:", error);
+      // Error toast is handled by the mutation
+      throw error;
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleReferralCodeSkip = async () => {
+    if (!user) return;
+
+    try {
+      setSelecting(true);
+      
+      // Save progress and move to next stage
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: 'zodiac-select' })
+        .eq("id", user.id);
+
+      setStage('zodiac-select');
+    } catch (error: unknown) {
+      console.error("Error skipping referral code:", error);
     } finally {
       setSelecting(false);
     }
@@ -584,6 +634,13 @@ export default function Onboarding() {
         <NameInput
           onComplete={handleNameSubmit}
           isLoading={selecting}
+        />
+      )}
+
+      {stage === "referral-code" && (
+        <ReferralCodeInput
+          onSubmit={handleReferralCodeSubmit}
+          onSkip={handleReferralCodeSkip}
         />
       )}
 
