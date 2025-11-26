@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
@@ -131,7 +132,7 @@ export const DailyContentWidget = () => {
             <Button 
               onClick={() => navigate("/library")}
               size="sm"
-              disabled={Boolean(localStorage.getItem('appWalkthroughActive'))}
+              disabled={Boolean(safeLocalStorage.getItem('appWalkthroughActive'))}
               className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="h-3 w-3 mr-2" />

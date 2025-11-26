@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { safeLocalStorage } from "@/utils/storage";
 import { useQueryClient } from "@tanstack/react-query";
 import { EnhancedQuestionnaire } from "@/components/EnhancedQuestionnaire";
 import { MentorResult } from "@/components/MentorResult";
@@ -106,7 +107,7 @@ export default function Onboarding() {
 
   // Restore onboarding progress - check if legal was already accepted
   useEffect(() => {
-    const legalAccepted = localStorage.getItem('legal_accepted_at');
+    const legalAccepted = safeLocalStorage.getItem('legal_accepted_at');
     if (legalAccepted && stage === 'legal') {
       setStage('name');
     }
@@ -130,8 +131,8 @@ export default function Onboarding() {
       const acceptedAt = new Date().toISOString();
       const acceptedVersion = '2025-11-21';
       
-      localStorage.setItem('legal_accepted_at', acceptedAt);
-      localStorage.setItem('legal_accepted_version', acceptedVersion);
+      safeLocalStorage.setItem('legal_accepted_at', acceptedAt);
+      safeLocalStorage.setItem('legal_accepted_version', acceptedVersion);
     }
     setStage('name');
   };
