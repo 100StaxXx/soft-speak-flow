@@ -65,17 +65,6 @@ export const useReferrals = () => {
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
-      // FIX: Check if user already has a referral code applied
-      const { data: currentProfile } = await supabase
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", user.id)
-        .single();
-
-      if (currentProfile?.referred_by) {
-        throw new Error("You have already used a referral code");
-      }
-
       // Validate code exists and get referrer
       const { data: referrer, error: referrerError } = await supabase
         .from("profiles")
@@ -87,24 +76,31 @@ export const useReferrals = () => {
         throw new Error("Invalid referral code");
       }
 
-      // Can't refer yourself
-      if (referrer.id === user.id) {
-        throw new Error("You cannot use your own referral code");
+      // FIX Bugs #15, #18: Use atomic function to prevent TOCTOU and detect 0-row updates
+      const { data: result, error: applyError } = await supabase.rpc(
+        'apply_referral_code_atomic',
+        {
+          p_user_id: user.id,
+          p_referrer_id: referrer.id,
+          p_referral_code: code
+        }
+      );
+
+      if (applyError) {
+        console.error("Failed to apply referral code:", applyError);
+        throw new Error("Failed to apply referral code. Please try again.");
       }
 
-      // Update current user's referred_by (with extra safety check)
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ referred_by: referrer.id })
-        .eq("id", user.id)
-        .is("referred_by", null); // Only update if still null
-
-      if (updateError) throw updateError;
+      if (!result?.success) {
+        // Get user-friendly error message from database
+        throw new Error(result?.message || "Failed to apply referral code");
+      }
 
       return referrer;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
+    onSuccess: async () => {
+      // FIX Bug #19: Wait for refetch before showing toast
+      await queryClient.invalidateQueries({ queryKey: ["referral-stats"] });
       toast.success("Referral code applied! Your friend will earn rewards when you reach Stage 3.");
     },
     onError: (error: Error) => {

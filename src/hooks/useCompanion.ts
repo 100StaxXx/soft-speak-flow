@@ -449,86 +449,34 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
-      // FIX Bug #8: Check if this referral was already completed
-      // This prevents infinite farming via companion reset
-      const { data: alreadyCompleted } = await supabase.rpc(
-        'has_completed_referral',
+      // FIX Bugs #14, #16, #17: Use single atomic function for all operations
+      // This prevents race conditions, partial state, and ensures all-or-nothing behavior
+      const { data: result, error: completionError } = await supabase.rpc(
+        'complete_referral_stage3',
         { 
           p_referee_id: user.id,
           p_referrer_id: profile.referred_by
         }
       );
 
-      if (alreadyCompleted) {
-        console.log('Referral already completed for this user-referrer pair');
-        // Clear referred_by but don't increment count
-        await supabase
-          .from("profiles")
-          .update({ referred_by: null })
-          .eq("id", user.id);
+      if (completionError) {
+        console.error("Failed to complete referral:", completionError);
+        // This is a critical error - log it but don't block evolution
         return;
       }
 
-      // FIX: Use atomic increment to prevent race condition
-      // Instead of read-modify-write, increment directly in the database
-      const { data: updatedProfile, error: updateError } = await supabase.rpc(
-        'increment_referral_count',
-        { referrer_id: profile.referred_by }
-      );
-
-      if (updateError) {
-        console.error("Failed to increment referral count:", updateError);
+      if (!result?.success) {
+        // Referral already completed or concurrent request
+        console.log('Referral not completed:', result?.reason, result?.message);
         return;
       }
 
-      // Get the new count from the response
-      const newCount = updatedProfile?.[0]?.referral_count ?? 0;
-
-      // Record completion to prevent re-use after reset
-      await supabase
-        .from("referral_completions")
-        .insert({
-          referee_id: user.id,
-          referrer_id: profile.referred_by,
-          stage_reached: 3
-        });
-
-      // Check for milestone unlocks (1, 3, 5)
-      if (newCount === 1 || newCount === 3 || newCount === 5) {
-        // Get the skin for this milestone
-        const { data: skin } = await supabase
-          .from("companion_skins")
-          .select("id")
-          .eq("unlock_type", "referral")
-          .eq("unlock_requirement", newCount)
-          .single();
-
-        if (skin) {
-          // FIX: Use upsert to handle duplicate key errors gracefully
-          // This won't fail if the skin is already unlocked
-          const { error: insertError } = await supabase
-            .from("user_companion_skins")
-            .upsert({
-              user_id: profile.referred_by,
-              skin_id: skin.id,
-              acquired_via: `referral_milestone_${newCount}`,
-            }, {
-              onConflict: 'user_id,skin_id',
-              ignoreDuplicates: true
-            });
-
-          if (insertError) {
-            console.error("Failed to unlock skin:", insertError);
-            // Continue anyway - don't block clearing referred_by
-          }
-        }
-      }
-
-      // Clear referred_by so we don't count this user multiple times
-      await supabase
-        .from("profiles")
-        .update({ referred_by: null })
-        .eq("id", user.id);
+      // Success! Log the result
+      console.log('Referral completed successfully:', {
+        newCount: result.new_count,
+        milestoneReached: result.milestone_reached,
+        skinUnlocked: result.skin_unlocked
+      });
 
     } catch (error) {
       console.error("Failed to validate referral:", error);
