@@ -86,9 +86,8 @@ export const useCompanion = () => {
         const furColor = data.favoriteColor;
 
         // Generate initial companion image with color specifications (with retry)
-        let imageData;
         console.log("Generating companion image...");
-        imageData = await retryWithBackoff(
+        const imageData = await retryWithBackoff(
           async () => {
             const { data: imageResult, error } = await supabase.functions.invoke(
               "generate-companion-image",
@@ -161,7 +160,6 @@ export const useCompanion = () => {
       console.log("Image generated successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
-        let companionResult;
         const result = await supabase.rpc('create_companion_if_not_exists', {
           p_user_id: user.id,
           p_favorite_color: data.favoriteColor,
@@ -179,7 +177,7 @@ export const useCompanion = () => {
           throw new Error(`Failed to save companion to database: ${result.error.message}`);
         }
         
-        companionResult = result.data;
+        const companionResult = result.data;
 
         console.log("RPC call successful, result:", companionResult);
       
