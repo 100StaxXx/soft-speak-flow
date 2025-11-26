@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from '@capacitor/core';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,7 @@ const Auth = () => {
           email: sanitizedEmail,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: getRedirectUrl(),
             data: {
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
             }
@@ -127,17 +128,27 @@ const Auth = () => {
     }
   };
 
+  const getRedirectUrl = () => {
+    // For Capacitor iOS/Android, use the app scheme
+    if (Capacitor.isNativePlatform()) {
+      return 'com.revolution.app://';
+    }
+    // For web, use current origin
+    return `${window.location.origin}/`;
+  };
+
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     // Note: Apple OAuth requires additional setup in Supabase dashboard:
     // 1. Apple Developer account with Sign in with Apple configured
     // 2. Service ID, Key ID, Team ID, and Private Key configured in Supabase
     // 3. Redirect URLs properly configured
     // Google OAuth should work if configured in Supabase dashboard
+    // 4. Add 'com.revolution.app://' to Redirect URLs in Supabase dashboard
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: getRedirectUrl(),
         },
       });
 
