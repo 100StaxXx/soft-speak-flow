@@ -63,6 +63,15 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Helper function for Capacitor-compatible redirect URLs
+  const getRedirectUrl = () => {
+    // For Capacitor iOS/Android, use the app scheme
+    if (Capacitor.isNativePlatform()) {
+      return 'com.revolution.app://';
+    }
+    // For web, use current origin
+    return `${window.location.origin}/`;
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,15 +135,6 @@ const Auth = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getRedirectUrl = () => {
-    // For Capacitor iOS/Android, use the app scheme
-    if (Capacitor.isNativePlatform()) {
-      return 'com.revolution.app://';
-    }
-    // For web, use current origin
-    return `${window.location.origin}/`;
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
