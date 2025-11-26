@@ -153,7 +153,7 @@ const Auth = () => {
         const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
-          clientId: 'B6VW78ABTR.com.darrylgraham.revolution',
+          clientId: 'com.revolution.app', // Use bundle ID for native iOS
           redirectURI: 'com.revolution.app://',
           scopes: 'email name',
           state: crypto.randomUUID(), // Random state for security
