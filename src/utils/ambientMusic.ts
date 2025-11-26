@@ -31,7 +31,13 @@ class AmbientMusicManager {
     const savedVolume = localStorage.getItem('bg_music_volume');
     const savedMuted = localStorage.getItem('bg_music_muted');
     
-    if (savedVolume) this.volume = parseFloat(savedVolume);
+    if (savedVolume) {
+      const parsed = parseFloat(savedVolume);
+      // Validate parsed volume is a valid number between 0 and 1
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        this.volume = parsed;
+      }
+    }
     if (savedMuted) this.isMuted = savedMuted === 'true';
   }
 
@@ -40,6 +46,16 @@ class AmbientMusicManager {
     this.audio.loop = true;
     this.audio.volume = this.isMuted ? 0 : this.volume;
     this.audio.preload = 'auto';
+    
+    // Add error handlers for audio element
+    this.audio.addEventListener('error', (e) => {
+      console.error('Background music error:', e);
+      this.isPlaying = false;
+    });
+    
+    this.audio.addEventListener('stalled', () => {
+      console.warn('Background music stalled, attempting to recover...');
+    });
     
     // Listen for volume/mute changes
     if (typeof window !== 'undefined') {
@@ -89,6 +105,11 @@ class AmbientMusicManager {
     this.isMuted = true;
     localStorage.setItem('bg_music_muted', 'true');
     if (this.audio) {
+      // Clear any active fades first
+      if (this.fadeInterval) {
+        clearInterval(this.fadeInterval);
+        this.fadeInterval = null;
+      }
       this.fadeOut(() => {
         if (this.audio) this.audio.volume = 0;
       });
@@ -102,21 +123,31 @@ class AmbientMusicManager {
     if (!this.isPlaying) {
       this.play();
     } else if (this.audio) {
-      this.fadeIn();
+      // If ducked, don't fade in to full volume - let duck state manage volume
+      if (!this.isDucked) {
+        this.fadeIn();
+      } else {
+        // Set to ducked volume
+        this.audio.volume = this.volume * 0.15;
+      }
     }
   }
 
   toggleMute(): boolean {
     if (this.isMuted) {
       this.unmute();
+      return false; // Now unmuted
     } else {
       this.mute();
+      return true; // Now muted
     }
-    return this.isMuted;
   }
 
   play() {
     if (!this.audio) return;
+    
+    // Don't play if already playing
+    if (this.isPlaying && !this.audio.paused) return;
 
     if (!this.audio.src) {
       this.audio.src = this.trackUrl;
@@ -131,6 +162,7 @@ class AmbientMusicManager {
         })
         .catch(() => {
           // Autoplay prevented - this is expected on some browsers
+          this.isPlaying = false;
         });
     }
   }
@@ -163,23 +195,41 @@ class AmbientMusicManager {
   resumeAfterEvent() {
     if (!this.audio || !this.isPausedForEvent) return;
     
+    // Don't resume if already playing
+    if (this.isPlaying && !this.audio.paused) {
+      this.isPausedForEvent = false;
+      return;
+    }
+    
     this.isPausedForEvent = false;
     if (!this.isMuted) {
+      this.audio.volume = 0;
       this.audio.play()
         .then(() => {
           this.isPlaying = true;
           this.fadeIn(1500); // Gentle fade back in
         })
-        .catch(err => console.error('Resume failed:', err));
+        .catch(err => {
+          console.error('Resume failed:', err);
+          this.isPlaying = false;
+        });
     }
   }
 
   stop() {
     if (!this.audio) return;
+    
+    // Clear any active fade
+    if (this.fadeInterval) {
+      clearInterval(this.fadeInterval);
+      this.fadeInterval = null;
+    }
+    
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
     this.isPausedForEvent = false;
+    this.isDucked = false; // Reset duck state
   }
 
   private fadeIn(duration = 2000) {
