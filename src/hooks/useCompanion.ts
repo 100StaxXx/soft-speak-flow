@@ -454,8 +454,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          // @ts-expect-error - RPC function exists but types not yet regenerated
-          const { data, error } = await supabase.rpc(
+          const { data, error } = await (supabase.rpc as any)(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,
