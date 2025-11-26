@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,26 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    const initializeAuth = async () => {
+      // Initialize SocialLogin plugin for native platforms
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await SocialLogin.initialize({
+            google: {
+              // Note: You need to configure these values in your Google Cloud Console
+              // For web: Create a Web application OAuth client
+              // For iOS: Create an iOS OAuth client
+              webClientId: process.env.VITE_GOOGLE_WEB_CLIENT_ID || '',
+              iOSClientId: process.env.VITE_GOOGLE_IOS_CLIENT_ID || '',
+              mode: 'online'
+            }
+          });
+        } catch (error) {
+          console.error('Failed to initialize SocialLogin:', error);
+        }
+      }
+    };
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -44,6 +65,7 @@ const Auth = () => {
       }
     };
 
+    initializeAuth();
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -140,6 +162,34 @@ const Auth = () => {
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     try {
+      // Native Google Sign-In for iOS/Android
+      if (provider === 'google' && Capacitor.isNativePlatform()) {
+        const result = await SocialLogin.login({
+          provider: 'google',
+          options: {}
+        });
+
+        // Check if we got a valid response
+        if (result.provider === 'google' && result.result.responseType === 'online') {
+          const { idToken } = result.result;
+          
+          if (!idToken) {
+            throw new Error('No ID token received from Google sign-in');
+          }
+
+          // Sign in to Supabase with Google ID token
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: idToken,
+          });
+
+          if (error) throw error;
+          return;
+        } else {
+          throw new Error('Unexpected Google sign-in response');
+        }
+      }
+
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && Capacitor.isNativePlatform()) {
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
@@ -173,7 +223,7 @@ const Auth = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || 'Failed to sign in. Please try again.',
         variant: "destructive",
       });
     }
