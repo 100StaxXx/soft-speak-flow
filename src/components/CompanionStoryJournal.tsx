@@ -90,6 +90,29 @@ export const CompanionStoryJournal = () => {
     placeholderData: (previousData) => previousData, // Prevent flashing during navigation
   });
 
+  const handleGenerate = useCallback(() => {
+    if (!companion) {
+      toast.error("Companion not loaded. Please refresh the page.");
+      return;
+    }
+    generateStory.mutate({
+      companionId: companion.id,
+      stage: debouncedStage,
+    });
+  }, [companion, debouncedStage, generateStory]);
+
+  // Check if this stage can be accessed (must be at or below companion's current stage)
+  const canAccessStage = useCallback((stage: number) => {
+    if (!companion) return false;
+    return stage <= companion.current_stage;
+  }, [companion]);
+
+  const isStageUnlocked = canAccessStage(debouncedStage);
+
+  // Calculate which stages to show in gallery (unlocked + 1 preview)
+  const maxVisibleStage = companion ? Math.min(companion.current_stage + 1, 20) : 0;
+  const galleryStages = Array.from({ length: maxVisibleStage + 1 }, (_, i) => i);
+
   // Show loading state
   if (companionLoading) {
     return (
@@ -113,25 +136,6 @@ export const CompanionStoryJournal = () => {
       </Card>
     );
   }
-
-  const handleGenerate = useCallback(() => {
-    if (!companion) {
-      toast.error("Companion not loaded. Please refresh the page.");
-      return;
-    }
-    generateStory.mutate({
-      companionId: companion.id,
-      stage: debouncedStage,
-    });
-  }, [companion, debouncedStage, generateStory]);
-
-  // Check if this stage can be accessed (must be at or below companion's current stage)
-  const canAccessStage = useCallback((stage: number) => {
-    if (!companion) return false;
-    return stage <= companion.current_stage;
-  }, [companion]);
-
-  const isStageUnlocked = canAccessStage(debouncedStage);
 
   const handleShare = async () => {
     if (!story || !canShare) return;
@@ -161,10 +165,6 @@ export const CompanionStoryJournal = () => {
       }
     }
   };
-
-  // Calculate which stages to show in gallery (unlocked + 1 preview)
-  const maxVisibleStage = Math.min(companion.current_stage + 1, 20);
-  const galleryStages = Array.from({ length: maxVisibleStage + 1 }, (_, i) => i);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">{showGallery && (
