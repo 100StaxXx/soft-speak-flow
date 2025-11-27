@@ -120,6 +120,7 @@ serve(async (req) => {
       throw new Error("mentorSlug and script are required");
     }
 
+// Get ElevenLabs API key from environment
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
     if (!ELEVENLABS_API_KEY) {
