@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -143,27 +143,18 @@ export const TaskCard = ({
       <div className={cn("p-4 flex items-center gap-3", isMainQuest && "py-5")}>
         {/* Completion Button */}
         <div className="relative overflow-visible">
-          {/* Pulsing Ring Indicator for Tutorial Quest */}
+          {/* Animated Arrow Indicator for Tutorial Quest */}
           {isTutorialQuest && !task.completed && (
-            <>
-              <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full pointer-events-none"
-                style={{
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                  backgroundColor: 'hsl(var(--primary))',
-                  opacity: 0.4,
-                }}
+            <div 
+              className="absolute -left-6 top-1/2 -translate-y-1/2 pointer-events-none z-20"
+              style={{
+                animation: 'bounceRight 1s ease-in-out infinite, pulse 2s ease-in-out infinite',
+              }}
+            >
+              <ArrowRight 
+                className="h-6 w-6 text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]"
               />
-              <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full pointer-events-none"
-                style={{
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                  animationDelay: '0.5s',
-                  backgroundColor: 'hsl(var(--primary))',
-                  opacity: 0.3,
-                }}
-              />
-            </>
+            </div>
           )}
           <button
             onClick={onToggle}
