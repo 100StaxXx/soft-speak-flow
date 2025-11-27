@@ -46,7 +46,7 @@ const MorningCheckInContent = () => {
     },
     enabled: !!user,
     // Poll every 2 seconds if check-in exists but mentor response is still pending
-    refetchInterval: (data) => {
+    refetchInterval: (data: any) => {
       if (data?.completed_at && !data?.mentor_response) {
         // Check if we've exceeded max poll duration
         if (pollStartTime && Date.now() - pollStartTime > MAX_POLL_DURATION) {
