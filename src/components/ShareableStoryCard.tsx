@@ -113,7 +113,9 @@ export const ShareableStoryCard = ({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium opacity-80">Chapter {stage + 1}</span>
+              <span className="text-sm font-medium opacity-80">
+                {stage === 0 ? "Prologue" : `Chapter ${stage}`}
+              </span>
             </div>
             <div className="text-xs px-3 py-1 bg-primary/20 rounded-full border border-primary/30">
               Stage {stage}
