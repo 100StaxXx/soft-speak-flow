@@ -202,29 +202,61 @@ serve(async (req) => {
       
       console.log(`Creating stage 0 champion destiny preview`);
       
-      userPrompt = `A colossal, divine glowing egg containing the blurred silhouette of a FULLY EVOLVED, majestic ${companion.spirit_animal} champion. 
+      userPrompt = `PHOTOREAL EPIC FANTASY - Stage 0 Divine Egg:
 
-CRITICAL - The creature inside must appear:
-- ADULT and FULLY EVOLVED (not a baby)
-- Massive, powerful, commanding presence visible through the translucent egg
-- Heroic pose: standing tall, dominant, regal
-- Muscular, god-tier physique
-- If wings/features would exist on a mature ${companion.spirit_animal}: fully spread and majestic
-- Silhouette showing PEAK FORM - what this creature becomes at its ultimate destiny
+SUBJECT: A monumental crystalline egg suspended in cosmic realm, containing the destiny of a legendary ${companion.spirit_animal} champion.
 
-The egg itself is ${crackDescription}
+EGG CONSTRUCTION:
+- Massive scale suggesting the colossal being within
+- Semi-translucent opalescent shell with iridescent shimmer
+- Crystalline structure with visible depth and refraction
+- ${crackDescription}
+- Surface catching and refracting divine light with realistic material physics
+- Subsurface scattering showing thickness and translucency
 
-Visual requirements:
-- Egg radiates powerful ${companion.favorite_color} divine glow with ${companion.core_element} elemental energy
-- The silhouette is intentionally blurred and out of focus - we see the EPIC SHAPE and MASSIVE SCALE but not fine details
-- Low-angle camera looking UP at this colossal form within the egg
-- Divine light rays (Sistine Chapel-style) illuminating from within
-- Epic ${companion.favorite_color} particle effects and ${companion.core_element} energy swirling around
-- Floating in a cosmic/divine realm with ethereal ${companion.favorite_color} nebula background
+CRITICAL SILHOUETTE WITHIN (MUST BE VISIBLE):
+Through the mystical shell, a dark shadowy form of a FULLY EVOLVED ${companion.spirit_animal}:
+- ADULT peak form at maximum power (Stage 15+ appearance)
+- Anatomically correct ${companion.spirit_animal} silhouette showing proper proportions
+- Heroic regal pose: standing tall, dominant, wings spread (if applicable), commanding stance
+- Muscular god-tier physique visible in shadow form
+- The outline suggests IMMENSE SIZE and MAJESTIC PRESENCE
+- Shadow is intentionally blurred/out of focus - we see EPIC SHAPE not details
+- This is what the creature will become at ultimate evolution
+- Properly proportioned: correct limb structure, head size, body shape for mature ${companion.spirit_animal}
 
-Style: Hyper-realistic, cinematic, awe-inspiring, god-tier, larger than life
-Mood: Legendary destiny sealed within, unstoppable potential, the champion king awaits
-Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
+ELEMENTAL & COLOR:
+- ${companion.core_element} energy radiating with realistic physics and particle effects
+- Divine ${companion.favorite_color} glow pulsing rhythmically like a cosmic heartbeat
+- Energy wisps and particles swirling with volumetric rendering
+- Light bleeding through shell showing internal power
+
+ENVIRONMENT & ATMOSPHERE:
+- Floating in ethereal cosmic realm with ${companion.favorite_color} nebula clouds
+- Distant stars and cosmic phenomena in background
+- Divine volumetric god rays (Sistine Chapel-style) piercing through mystical atmosphere
+- Atmospheric depth and scale perspective
+
+COMPOSITION:
+- Low-angle heroic shot looking UP at the colossal egg
+- Dramatic perspective emphasizing scale and grandeur
+- Cinematic depth of field with bokeh effects
+- Rule of thirds composition with egg as dominant focal point
+
+LIGHTING:
+- Divine backlight creating rim glow around egg
+- Dramatic ${companion.favorite_color} radiance from within
+- Motivated light sources showing dimensional depth
+- High contrast creating epic mood
+
+STYLE & QUALITY:
+- Hyper-realistic photoreal rendering (Unreal Engine 5 quality)
+- Cinematic blockbuster VFX
+- Awe-inspiring larger-than-life scale
+- Professional concept art mastery
+- 8K detail with perfect materials
+
+MOOD: Legendary destiny sealed within, unstoppable divine potential, the champion awaits`;
 
     } else if (nextStage === 1) {
       // Stage 1: Hatchling emerging from the egg - NEW LIFE!
@@ -233,36 +265,70 @@ Lighting: Divine backlight with dramatic ${companion.favorite_color} radiance`;
       // Special handling for aquatic creatures to prevent legs
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
-      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is a baby aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs.' : '';
+      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a baby aquatic creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Underwater environment with water physics and bubbles' : '';
       
-      userPrompt = `A tiny, adorable baby ${companion.spirit_animal} just hatching from a cracked egg. This is the moment of BIRTH.
+      userPrompt = `PHOTOREAL CREATURE BIRTH - Stage 1 Hatchling:
 
-CRITICAL - First life stage requirements:
-- BABY/NEWBORN size - small, fragile, cute
-- Just emerged from broken eggshells (visible around it)
-- Wobbly, uncertain posture - first moments of life
-- Big curious eyes, innocent expression
-- Still has hints of egg glow on its body
-- Small wisps of ${companion.core_element} elemental energy starting to manifest${aquaticNote}
+SUBJECT: A tiny newborn baby ${companion.spirit_animal} at the sacred moment of hatching.
 
-Color and identity (MUST match):
-- Primary color: ${companion.favorite_color}
-- Animal type: ${companion.spirit_animal}
-- Element: ${companion.core_element}
-${companion.eye_color ? `- Eye color: ${companion.eye_color}` : ''}
-${companion.fur_color ? `- Fur/scale color: ${companion.fur_color}` : ''}
+CREATURE DETAILS (ANATOMICALLY ACCURATE):
+- Species: ${companion.spirit_animal} - perfect baby anatomy for this species
+- Size: NEWBORN tiny scale - small, fragile, precious
+- Proportions: Realistic hatchling proportions (large head-to-body ratio, short limbs, oversized features)
+- Eyes: Big curious infant eyes with proper iris detail, light reflection, innocent wonder
+- Body: Soft vulnerable form with visible baby features (chubby, round, delicate)
+- Posture: Wobbly, uncertain stance - first moments discovering balance and movement
+- Expression: Pure innocence and wonder, slightly confused but curious
+- Still glistening wet from egg with subtle sheen${aquaticNote}
 
-Visual style:
-- Warm, soft lighting from broken egg
-- Scattered eggshell pieces around
-- Faint ${companion.favorite_color} glow particles from hatching
-- Gentle ${companion.core_element} energy wisps
-- Background: mystical nursery realm with soft ${companion.favorite_color} ambient light
+HATCHING SCENE:
+- Broken eggshell pieces scattered around showing recent emergence
+- Egg fragments still glowing with residual magical energy
+- Some shells stuck to the hatchling's back/head (cute detail)
+- Clear evidence this just happened - wet, fresh, brand new life
 
-Mood: Wonder, new beginnings, innocent potential, first breath of life
-Style: Adorable but epic, soft but magical, Studio Ghibli meets fantasy art
-Camera: Eye-level with the tiny hatchling, showing its small scale and vulnerability`;
+COLOR PALETTE (CRITICAL MATCH):
+- Primary colors: ${companion.favorite_color} tones
+- Animal species: ${companion.spirit_animal}
+- Elemental affinity: ${companion.core_element}
+${companion.eye_color ? `- Eye color: ${companion.eye_color} with infant brightness` : ''}
+${companion.fur_color ? `- Fur/scales/feathers: ${companion.fur_color} with baby softness` : ''}
 
+ELEMENTAL MANIFESTATION:
+- Small delicate wisps of ${companion.core_element} elemental energy beginning to manifest
+- Energy tentative and gentle, just awakening
+- Soft ${companion.favorite_color} glow particles rising from the hatching
+- Elemental aura flickering uncertainly like a candle flame
+
+ENVIRONMENT:
+- Mystical nursery realm with soft ethereal lighting
+- Warm ambient ${companion.favorite_color} atmospheric glow
+- Gentle floating particles and magical dust motes
+- Soft ground with natural materials (moss, petals, soft earth, or water)
+- Background slightly out of focus creating dreamy depth
+
+LIGHTING:
+- Warm soft key light from above (motherly protective feel)
+- Gentle rim lighting defining the tiny form
+- Glow from broken egg illuminating from below
+- Subsurface scattering through delicate baby skin/scales
+- Magical sparkle in eyes catching light
+
+COMPOSITION:
+- Eye-level perspective with the tiny hatchling (we see the world from its view)
+- Shallow depth of field focusing on the baby creature
+- Rule of thirds with creature slightly off-center
+- Negative space emphasizing vulnerability and small scale
+- Environmental elements framing the subject
+
+STYLE & QUALITY:
+- Photoreal rendering with tender softness
+- Studio Ghibli emotional resonance meets fantasy realism
+- Natural history photography precision
+- Cinematic newborn portrait quality
+- 8K detail showing every delicate feature
+
+MOOD: Pure wonder, new beginning, innocent potential, sacred first breath, protective tenderness, hope incarnate`;
     } else {
       // Stages 2+: ALWAYS use image analysis for strict color continuity
       console.log("Using existing evolution logic with image reference");
@@ -358,39 +424,107 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
       const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.' : '';
       
-      userPrompt = `Here is the previous evolution of this companion.
+      userPrompt = `PHOTOREAL EVOLUTION CONTINUATION - Stage ${currentStage} to ${nextStage}:
 
-PREVIOUS STAGE ANALYSIS:
-${previousFeatures.vision_analysis || "No previous image available - this is the first evolution"}
+=== PREVIOUS EVOLUTION ANALYSIS ===
+${previousFeatures.vision_analysis || "No previous image available - using core identity as foundation"}
 
-COMPANION CORE IDENTITY (MUST PRESERVE):
-- Favorite color: ${companion.favorite_color}
-- Animal type: ${companion.spirit_animal}
-- Element: ${companion.core_element}
-${companion.eye_color ? `- Eye color: ${companion.eye_color}` : ''}
-${companion.fur_color ? `- Fur/scale color: ${companion.fur_color}` : ''}${aquaticNote}
+=== CORE IDENTITY (100% PRESERVATION REQUIRED) ===
+THESE ARE ABSOLUTE UNCHANGEABLE FACTS ABOUT THIS CREATURE:
+- Species: ${companion.spirit_animal}
+- Primary Color Theme: ${companion.favorite_color}
+- Elemental Affinity: ${companion.core_element}
+${companion.eye_color ? `- Eye Color: ${companion.eye_color} (exact match required)` : ''}
+${companion.fur_color ? `- Fur/Scale/Feather Color: ${companion.fur_color} (exact match required)` : ''}${aquaticNote}
 
-Current stage: ${currentStage}
-Next stage: ${nextStage}
+=== EVOLUTION STAGE CONTEXT ===
+- Previous Stage: ${currentStage}
+- New Stage: ${nextStage}
+- Evolution Theme: ${getStageGuidance(nextStage)}
 
-STRICT CONTINUITY REQUIREMENTS:
-- Keep the EXACT same animal species
-- Keep the EXACT same color palette (${companion.favorite_color} must remain dominant)
-- Keep the EXACT same eye color and eye shape
-- Keep the EXACT same elemental effect location and style (${companion.core_element})
-- Keep all existing markings, patterns, and signature features
-- Only enhance detail, size, and maturity - NO redesigns
+=== CRITICAL CONTINUITY REQUIREMENTS (DO NOT BREAK) ===
 
-Generate the next evolution image with 95% visual continuity. The creature should look like the SAME individual growing stronger, NOT a different design.
+1. SPECIES ANATOMY (100% PRESERVATION):
+   - Maintain EXACT ${companion.spirit_animal} skeletal structure and proportions
+   - Same bone structure, joint placement, limb configuration
+   - Same facial structure, skull shape, feature placement
+   - Same body type and natural physique for this species
+   - NO species changes, NO hybrid features, NO anatomical redesigns
 
-Focus on:
-- Same colors (95% match)
-- Same silhouette (90% match)  
-- Same markings (100% match)
-- Same animal identity (100% match)
-- Same elemental effects (enhanced but same location)
+2. COLOR PALETTE (95% MATCH):
+   - ${companion.favorite_color} MUST remain the dominant color
+   - Exact same primary, secondary, and accent colors
+   - Same color placement and distribution patterns
+   - Same hue, saturation relationships
+   - Only allow subtle increases in luminosity/glow intensity
 
-Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
+3. FACIAL FEATURES (100% PRESERVATION):
+   - EXACT same eye color (${companion.eye_color || companion.favorite_color})
+   - Same eye shape, size, and placement
+   - Same iris patterns and pupil shape
+   - Same facial markings and patterns
+   - Same expression capability and character
+
+4. SIGNATURE MARKINGS (100% MATCH):
+   - Every stripe, spot, pattern MUST be in exact same location
+   - Same marking colors and contrast
+   - Same pattern complexity and style
+   - Markings can become more defined but NOT relocated or redesigned
+
+5. ELEMENTAL EFFECTS (SAME LOCATION, ENHANCED INTENSITY):
+   - ${companion.core_element} energy in EXACT same locations as previous stage
+   - Same elemental manifestation style (aura/wisps/glow/particles)
+   - Enhanced intensity and detail but same placement
+   - Energy follows same anatomical contours
+
+6. SIGNATURE FEATURES:
+   - Same horns/antlers (if present) - location and base shape unchanged
+   - Same wings (if present) - structure and attachment unchanged  
+   - Same tail structure and length ratio
+   - Same claws/talons - shape and configuration
+   - Same unique identifying characteristics
+
+=== ALLOWED EVOLUTION CHANGES ===
+You MAY enhance these aspects while maintaining continuity:
+- Size and scale increase (growth)
+- Muscle definition and anatomical detail
+- Texture quality and material rendering
+- Pose confidence and dynamic energy
+- Elemental effect intensity and particle count
+- Environmental interaction scope
+- Detail level and rendering quality
+- Battle scars or experience marks that ADD to the design
+
+=== EVOLUTION GENERATION INSTRUCTIONS ===
+
+Create the Stage ${nextStage} evolution showing:
+${getStageGuidance(nextStage)}
+
+This creature MUST look like the SAME INDIVIDUAL growing more powerful.
+Think: "This is my companion, my friend, more mature and stronger"
+NOT: "This is a redesign" or "This is a different creature"
+
+The viewer should immediately recognize this as THE SAME companion from Stage ${currentStage}.
+
+=== TECHNICAL RENDERING REQUIREMENTS ===
+- Photoreal quality (Unreal Engine 5 / Octane render)
+- Anatomically accurate ${companion.spirit_animal} at Stage ${nextStage} maturity
+- Museum-specimen precision in biological details
+- Cinematic three-point lighting
+- Proper subsurface scattering and material response
+- Atmospheric volumetric effects
+- Dynamic heroic composition
+- 8K ultra-detail resolution
+
+Focus on these continuity percentages:
+✓ Species Identity: 100% match
+✓ Markings & Patterns: 100% match
+✓ Eye Features: 100% match
+✓ Color Palette: 95% match
+✓ Silhouette: 90% match (growth allowed)
+✓ Elemental Style: 95% match (intensity increase allowed)
+
+Generate an evolution that honors the companion's journey while showing clear growth and power increase.`;
     }
 
     console.log("Generating evolution image...");
@@ -530,28 +664,28 @@ Evolution stage ${nextStage} should show: ${getStageGuidance(nextStage)}`;
 
 function getStageGuidance(stage: number): string {
   const guidance: Record<number, string> = {
-    0: "Pristine mystical egg containing the champion's destiny",
-    1: "Tiny hatchling, newly emerged and fragile",
-    2: "Young guardian, gaining strength",
-    3: "Ascended form, radiating power",
-    4: "Mythic being, legendary presence",
-    5: "Titan form, immense and commanding",
-    6: "Stage 6 evolution, growing stronger",
-    7: "Stage 7 evolution, enhanced power",
-    8: "Stage 8 evolution, formidable presence",
-    9: "Stage 9 evolution, battle-hardened",
-    10: "Stage 10 evolution, veteran warrior",
-    11: "Stage 11 evolution, touching ethereal power",
-    12: "Stage 12 evolution, mastering cosmic forces",
-    13: "Stage 13 evolution, legendary status",
-    14: "Stage 14 evolution, mythic entity",
-    15: "Stage 15 evolution, colossal form",
-    16: "Stage 16 evolution, cosmic guardian",
-    17: "Stage 17 evolution, astral overlord",
-    18: "Stage 18 evolution, universal sovereign",
-    19: "Stage 19 evolution, near-divine apex",
-    20: "Ultimate form, peak of all evolution - absolute divine manifestation"
+    0: "Pristine mystical egg containing the champion's divine destiny, silhouette of ultimate form barely visible within",
+    1: "Newborn hatchling emerging with first breath of life, tiny and vulnerable yet radiating pure potential",
+    2: "Young guardian taking first steps, anatomically accurate infant form with oversized features, gaining confidence",
+    3: "Early adolescent form, lengthening body with developing musculature, playful energy and growing coordination",
+    4: "Juvenile warrior, balanced proportions emerging, signature features becoming prominent, athletic and agile",
+    5: "Young adult reaching full size, powerful stance, all anatomical features fully developed and majestic",
+    6: "Seasoned protector with battle scars and experience, peak physical conditioning, commanding presence",
+    7: "Elite guardian radiating heroic energy, perfected anatomy, elemental mastery evident in every movement",
+    8: "Legendary champion, imposing scale, flawless physique, environmental reality bending to its power",
+    9: "Mythic warrior at absolute peak, battle-hardened yet elegant, aura of invincibility and wisdom",
+    10: "Veteran legend, refined grace, every detail telling stories of countless victories, museum-quality perfection",
+    11: "Transcendent being achieving weightlessness, gravitational defiance, ethereal trails and elevated consciousness",
+    12: "Ascended entity hovering in pure energy, species perfection enhanced by cosmic power, reality-bending presence",
+    13: "Ether-born avatar phasing between dimensions, sacred geometry manifesting, cosmic patterns on biological form",
+    14: "Primordial aspect at titan scale, ancient power condensed into runic energy wrapping anatomically perfect form",
+    15: "Colossal divine champion, monumental scale yet every detail pristine, environmental phenomena manifest its presence",
+    16: "Cosmic guardian merged with nebula and stars, eyes containing galaxies, biological perfection meets stellar phenomenon",
+    17: "Astral overlord transcending dimensions, multiple temporal echoes, reality fragmenting around ultimate power",
+    18: "Universal sovereign at planetary scale, apocalyptic environmental forces, godlike yet anatomically unchanged",
+    19: "Mythic apex standing as deity of its species, divine proportions, golden ratio perfection, worshipful grandeur",
+    20: "Origin of Creation - the primordial first, absolute divine completion, universe-birthing presence, perfection incarnate"
   };
 
-  return guidance[stage] || "Continued evolution";
+  return guidance[stage] || "Continued evolution with enhanced power and presence";
 }
