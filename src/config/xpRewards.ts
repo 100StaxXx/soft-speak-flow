@@ -52,10 +52,15 @@ export const SYSTEM_XP_REWARDS = {
 } as const;
 
 /**
+ * Type-safe difficulty type
+ */
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+/**
  * Helper: Get quest XP by difficulty string
  */
-export function getQuestXP(difficulty: 'easy' | 'medium' | 'hard'): number {
-  const map: Record<typeof difficulty, number> = {
+export function getQuestXP(difficulty: Difficulty): number {
+  const map: Record<Difficulty, number> = {
     easy: QUEST_XP_REWARDS.EASY,
     medium: QUEST_XP_REWARDS.MEDIUM,
     hard: QUEST_XP_REWARDS.HARD,
@@ -66,8 +71,8 @@ export function getQuestXP(difficulty: 'easy' | 'medium' | 'hard'): number {
 /**
  * Helper: Get habit XP by difficulty string
  */
-export function getHabitXP(difficulty: 'easy' | 'medium' | 'hard'): number {
-  const map: Record<typeof difficulty, number> = {
+export function getHabitXP(difficulty: Difficulty): number {
+  const map: Record<Difficulty, number> = {
     easy: HABIT_XP_REWARDS.EASY,
     medium: HABIT_XP_REWARDS.MEDIUM,
     hard: HABIT_XP_REWARDS.HARD,
@@ -106,8 +111,3 @@ export function getEffectiveQuestXP(difficulty: Difficulty, questPosition: numbe
   const multiplier = getQuestXPMultiplier(questPosition);
   return Math.round(baseXP * multiplier);
 }
-
-/**
- * Type-safe difficulty type
- */
-export type Difficulty = 'easy' | 'medium' | 'hard';
