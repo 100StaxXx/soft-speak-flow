@@ -251,16 +251,33 @@ export const TodaysPepTalk = memo(() => {
     }
   }, [activeWordIndex, showFullTranscript]);
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      console.error('Audio element not found');
+      return;
+    }
 
     if (isPlaying) {
       audio.pause();
+      setIsPlaying(false);
     } else {
-      audio.play().catch(err => console.error('Audio play failed:', err));
+      try {
+        console.log('Attempting to play audio from:', pepTalk?.audio_url);
+        await audio.play();
+        setIsPlaying(true);
+      } catch (err) {
+        console.error('Audio play failed:', err);
+        // Reload the audio element and try again
+        audio.load();
+        try {
+          await audio.play();
+          setIsPlaying(true);
+        } catch (retryErr) {
+          console.error('Audio play retry failed:', retryErr);
+        }
+      }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = useCallback((value: number[]) => {
@@ -407,7 +424,21 @@ export const TodaysPepTalk = memo(() => {
           </div>
 
           {/* Audio Player */}
-          <audio ref={audioRef} src={pepTalk.audio_url} preload="metadata" />
+          <audio 
+            ref={audioRef} 
+            src={pepTalk.audio_url} 
+            preload="metadata"
+            onError={(e) => {
+              console.error('Audio loading error:', e);
+              console.error('Audio URL:', pepTalk.audio_url);
+              console.error('Audio error code:', audioRef.current?.error?.code);
+              console.error('Audio error message:', audioRef.current?.error?.message);
+            }}
+            onLoadedMetadata={() => {
+              console.log('Audio loaded successfully');
+              console.log('Duration:', audioRef.current?.duration);
+            }}
+          />
           
           <div className="space-y-4">
             {/* Large central play button */}
