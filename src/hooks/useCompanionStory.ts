@@ -23,7 +23,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: story, isLoading } = useQuery({
+  const { data: story, isLoading } = useQuery<CompanionStory | null>({
     queryKey: ["companion-story", companionId, stage],
     queryFn: async () => {
       if (!companionId || stage === undefined) return null;
@@ -39,7 +39,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
       return data as CompanionStory | null;
     },
     enabled: !!companionId && stage !== undefined,
-    keepPreviousData: true, // Prevent flashing during stage navigation
+    placeholderData: (previousData) => previousData, // Prevent flashing during stage navigation
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
