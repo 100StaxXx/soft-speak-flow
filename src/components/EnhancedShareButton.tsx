@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2, Download, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toPng } from "html-to-image";
+import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 
 interface EnhancedShareButtonProps {
   title: string;
@@ -23,27 +25,49 @@ export const EnhancedShareButton = ({
   variant = "outline",
   size = "icon"
 }: EnhancedShareButtonProps) => {
+  const [isSharing, setIsSharing] = useState(false);
   
   const handleShare = async (platform?: string) => {
-    const shareUrl = url || window.location.href;
-    const shareText = `${text}\n\n${shareUrl}`;
-
+    if (isSharing) return; // Prevent double-click
+    
+    setIsSharing(true);
+    
     try {
+      const shareUrl = url || window.location.href;
+      const shareText = `${text}\n\n${shareUrl}`;
+
       if (platform === "copy") {
-        await navigator.clipboard.writeText(shareText);
-        toast.success("Copied to clipboard!");
+        const success = await safeClipboardWrite(shareText);
+        if (success) {
+          toast.success("Copied to clipboard!");
+        } else {
+          toast.error("Failed to copy to clipboard");
+        }
         return;
       }
 
       if (platform === "download" && imageElementId) {
-        const element = document.getElementById(imageElementId);
-        if (element) {
+        try {
+          const element = document.getElementById(imageElementId);
+          if (!element) {
+            toast.error("Image element not found");
+            return;
+          }
+          
           const dataUrl = await toPng(element);
           const link = document.createElement("a");
           link.download = `${title.toLowerCase().replace(/\s+/g, "-")}.png`;
           link.href = dataUrl;
           link.click();
+          
+          // Clean up link element
+          setTimeout(() => link.remove(), 100);
+          
           toast.success("Image downloaded!");
+          return;
+        } catch (downloadError) {
+          console.error("Download error:", downloadError);
+          toast.error("Failed to download image");
           return;
         }
       }
@@ -60,14 +84,38 @@ export const EnhancedShareButton = ({
         await navigator.share({ title, text, url: shareUrl });
         toast.success("Shared successfully!");
       } else {
-        await navigator.clipboard.writeText(shareText);
-        toast.success("Link copied to clipboard!");
+        // Fallback: copy to clipboard (safe for all contexts)
+        const success = await safeClipboardWrite(shareText);
+        if (success) {
+          toast.success("Link copied to clipboard!");
+        } else {
+          toast.error("Failed to copy to clipboard");
+        }
       }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        console.error("Error sharing:", error);
-        toast.error("Failed to share");
+    } catch (error: any) {
+      console.error("Error sharing:", error);
+      
+      // Check if user cancelled (case-insensitive)
+      const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+      const isCancelled = errorMsg.includes('cancel') || 
+                         errorMsg.includes('abort') || 
+                         errorMsg.includes('dismissed') ||
+                         error?.name === 'AbortError';
+      
+      if (!isCancelled) {
+        // Try fallback to clipboard as last resort
+        const shareUrl = url || window.location.href;
+        const shareText = `${text}\n\n${shareUrl}`;
+        const success = await safeClipboardWrite(shareText);
+        
+        if (success) {
+          toast.info("Couldn't share, but link was copied to clipboard!");
+        } else {
+          toast.error(getClipboardErrorMessage(error));
+        }
       }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -78,10 +126,11 @@ export const EnhancedShareButton = ({
           variant={variant}
           size={size}
           className={className}
+          disabled={isSharing}
           aria-label={`Share ${title}`}
           aria-haspopup="menu"
         >
-          <Share2 className="h-4 w-4" aria-hidden="true" />
+          <Share2 className={`h-4 w-4 ${isSharing ? 'animate-pulse' : ''}`} aria-hidden="true" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" role="menu" aria-label="Share options">

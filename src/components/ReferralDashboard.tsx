@@ -26,9 +26,19 @@ export const ReferralDashboard = () => {
             text: shareText,
             dialogTitle: "Share your referral code",
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Share failed:", error);
-          await copyToClipboard();
+          
+          // Check if user cancelled (case-insensitive)
+          const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+          const isCancelled = errorMsg.includes('cancel') || 
+                             errorMsg.includes('abort') || 
+                             errorMsg.includes('dismissed') ||
+                             error?.name === 'AbortError';
+          
+          if (!isCancelled) {
+            await copyToClipboard();
+          }
         }
       } else {
         // Fallback to Web Share API or clipboard
@@ -38,8 +48,17 @@ export const ReferralDashboard = () => {
               title: "Join R-Evolution",
               text: shareText,
             });
-          } catch (error) {
-            if ((error as Error).name !== "AbortError") {
+          } catch (error: any) {
+            console.error("Share failed:", error);
+            
+            // Check if user cancelled (case-insensitive)
+            const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+            const isCancelled = errorMsg.includes('cancel') || 
+                               errorMsg.includes('abort') || 
+                               errorMsg.includes('dismissed') ||
+                               error?.name === 'AbortError';
+            
+            if (!isCancelled) {
               await copyToClipboard();
             }
           }
