@@ -11,11 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
 import { 
-  isPushSupported, 
-  subscribeToPush, 
-  unsubscribeFromPush,
-  hasActivePushSubscription 
-} from "@/utils/pushNotifications";
+  isNativePushSupported, 
+  initializeNativePush, 
+  unregisterNativePush,
+  hasActiveNativePushSubscription 
+} from "@/utils/nativePushNotifications";
 
 const timeOptions = [
   { value: "06:00", label: "6:00 AM" },
@@ -34,11 +34,11 @@ export const PushNotificationSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [isSupported] = useState(isPushSupported());
+  const [isSupported] = useState(isNativePushSupported());
 
   useEffect(() => {
     if (user) {
-      hasActivePushSubscription(user.id).then(setPushEnabled);
+      hasActiveNativePushSubscription(user.id).then(setPushEnabled);
     }
   }, [user]);
 
@@ -47,21 +47,15 @@ export const PushNotificationSettings = () => {
     
     try {
       if (enabled) {
-        // Subscribe to push notifications
-        const subscription = await subscribeToPush(user.id);
-        if (subscription) {
-          setPushEnabled(true);
-        } else {
-          toast({ 
-            title: "Permission denied", 
-            description: "You denied notification permissions",
-            variant: "destructive" 
-          });
-        }
+        // Subscribe to native push notifications
+        await initializeNativePush(user.id);
+        setPushEnabled(true);
+        toast({ title: "Notifications Enabled", description: "You'll receive daily notifications" });
       } else {
         // Unsubscribe from push notifications
-        await unsubscribeFromPush(user.id);
+        await unregisterNativePush(user.id);
         setPushEnabled(false);
+        toast({ title: "Notifications Disabled", description: "You won't receive push notifications" });
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -157,7 +151,7 @@ export const PushNotificationSettings = () => {
         <Alert className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Push notifications are not supported in your browser. Please use a modern browser like Chrome, Firefox, or Safari.
+            Push notifications are only available on iOS devices.
           </AlertDescription>
         </Alert>
       )}
