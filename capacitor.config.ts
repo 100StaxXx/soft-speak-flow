@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.revolution.app',
+  appId: 'com.darrylgraham.revolution',
   appName: 'R-Evolution',
   webDir: 'dist',
   // ⚠️ PRODUCTION BUILD: server config commented out
