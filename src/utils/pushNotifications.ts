@@ -1,16 +1,21 @@
 /**
- * Web Push Notification Service
- * Handles browser push notification subscriptions
+ * Push Notification Service
+ * Handles both Web Push (browsers) and Native Push (iOS/Android via Capacitor)
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
-// Warn if VAPID key is not configured
-if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined') {
-  console.warn('VITE_VAPID_PUBLIC_KEY not configured. Push notifications will be disabled.');
+// Warn if VAPID key is not configured for web
+if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
+  console.warn('VITE_VAPID_PUBLIC_KEY not configured. Web push notifications will be disabled.');
 }
+
+// Track if native push listeners are already registered
+let nativePushListenersRegistered = false;
 
 /**
  * Convert base64 string to Uint8Array (for VAPID key)
@@ -32,6 +37,11 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
  * Check if push notifications are supported
  */
 export function isPushSupported(): boolean {
+  // Native platforms always support push
+  if (Capacitor.isNativePlatform()) {
+    return true;
+  }
+  // Web browsers need service worker and PushManager
   return 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
@@ -40,9 +50,17 @@ export function isPushSupported(): boolean {
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!isPushSupported()) {
-    throw new Error('Push notifications are not supported in this browser');
+    throw new Error('Push notifications are not supported');
   }
   
+  // Native platform
+  if (Capacitor.isNativePlatform()) {
+    const result = await PushNotifications.requestPermissions();
+    // Map native permission to web NotificationPermission type
+    return result.receive === 'granted' ? 'granted' : 'denied';
+  }
+  
+  // Web platform
   const permission = await Notification.requestPermission();
   return permission;
 }
@@ -55,36 +73,17 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
     // Request permission first
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      
       return null;
     }
 
-    // Register service worker
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    await navigator.serviceWorker.ready;
-
-    // Check for existing subscription
-    let subscription = await registration.pushManager.getSubscription();
-    
-    if (!subscription) {
-      if (!VAPID_PUBLIC_KEY) {
-        console.warn('Cannot subscribe to push notifications: VAPID key not configured');
-        return null;
-      }
-      
-      // Create new subscription
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource
-      });
+    // Native platform (iOS/Android)
+    if (Capacitor.isNativePlatform()) {
+      await subscribeToNativePush(userId);
+      return null; // Native doesn't return PushSubscription object
     }
 
-    if (subscription) {
-      // Save subscription to database
-      await savePushSubscription(userId, subscription);
-    }
-
-    return subscription;
+    // Web platform
+    return await subscribeToWebPush(userId);
   } catch (error) {
     console.error('Error subscribing to push:', error);
     throw error;
@@ -92,10 +91,99 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
 }
 
 /**
+ * Subscribe to native push notifications (iOS/Android)
+ */
+async function subscribeToNativePush(userId: string): Promise<void> {
+  // Register push notifications
+  await PushNotifications.register();
+  
+  // Set up listeners (only once)
+  if (!nativePushListenersRegistered) {
+    setupNativePushListeners(userId);
+    nativePushListenersRegistered = true;
+  }
+  
+  console.log('Native push notifications registered');
+}
+
+/**
+ * Subscribe to web push notifications (browsers)
+ */
+async function subscribeToWebPush(userId: string): Promise<PushSubscription | null> {
+  // Register service worker
+  const registration = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+
+  // Check for existing subscription
+  let subscription = await registration.pushManager.getSubscription();
+  
+  if (!subscription) {
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn('Cannot subscribe to push notifications: VAPID key not configured');
+      return null;
+    }
+    
+    // Create new subscription
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as BufferSource
+    });
+  }
+
+  if (subscription) {
+    // Save subscription to database
+    await savePushSubscription(userId, subscription);
+  }
+
+  return subscription;
+}
+
+/**
+ * Set up native push notification listeners
+ */
+function setupNativePushListeners(userId: string): void {
+  // Called when push registration succeeds
+  PushNotifications.addListener('registration', async (token: Token) => {
+    console.log('Native push token:', token.value);
+    await saveNativePushToken(userId, token.value);
+  });
+
+  // Called when push registration fails
+  PushNotifications.addListener('registrationError', (error: any) => {
+    console.error('Native push registration error:', error);
+  });
+
+  // Called when a push notification is received
+  PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+    console.log('Push notification received:', notification);
+    // Notification is automatically shown by the OS
+  });
+
+  // Called when a push notification is tapped
+  PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+    console.log('Push notification action performed:', action);
+    // Handle notification tap (e.g., navigate to specific screen)
+    const data = action.notification.data;
+    if (data.url) {
+      window.location.href = data.url;
+    }
+  });
+}
+
+/**
  * Unsubscribe from push notifications
  */
 export async function unsubscribeFromPush(userId: string): Promise<void> {
   try {
+    // Native platform
+    if (Capacitor.isNativePlatform()) {
+      // Note: Native push can't be "unregistered" per se, but we can remove from database
+      await deleteNativePushToken(userId);
+      console.log('Native push token removed from database');
+      return;
+    }
+
+    // Web platform
     const registration = await navigator.serviceWorker.getRegistration();
     if (registration) {
       const subscription = await registration.pushManager.getSubscription();
@@ -111,7 +199,7 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
 }
 
 /**
- * Save push subscription to database
+ * Save web push subscription to database
  */
 async function savePushSubscription(userId: string, subscription: PushSubscription): Promise<void> {
   const subJSON = subscription.toJSON();
@@ -123,13 +211,57 @@ async function savePushSubscription(userId: string, subscription: PushSubscripti
       endpoint: subscription.endpoint,
       p256dh: subJSON.keys?.p256dh || '',
       auth: subJSON.keys?.auth || '',
-      user_agent: navigator.userAgent
+      user_agent: navigator.userAgent,
+      platform: 'web'
     }, {
       onConflict: 'user_id,endpoint'
     });
 
   if (error) {
     console.error('Error saving push subscription:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save native push token to database (iOS/Android)
+ */
+async function saveNativePushToken(userId: string, token: string): Promise<void> {
+  const platform = Capacitor.getPlatform(); // 'ios' or 'android'
+  
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .upsert({
+      user_id: userId,
+      endpoint: token, // Store FCM/APNs token in endpoint field
+      p256dh: '', // Not used for native push
+      auth: '', // Not used for native push
+      user_agent: navigator.userAgent,
+      platform: platform
+    }, {
+      onConflict: 'user_id,endpoint'
+    });
+
+  if (error) {
+    console.error('Error saving native push token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete native push token from database
+ */
+async function deleteNativePushToken(userId: string): Promise<void> {
+  const platform = Capacitor.getPlatform();
+  
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('user_id', userId)
+    .eq('platform', platform);
+
+  if (error) {
+    console.error('Error deleting native push token:', error);
     throw error;
   }
 }

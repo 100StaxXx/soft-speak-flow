@@ -27,6 +27,9 @@ const config: CapacitorConfig = {
         apple: true,       // Apple Sign-In enabled
         twitter: false     // Twitter disabled (not bundled)
       }
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert']
     }
   }
 };
