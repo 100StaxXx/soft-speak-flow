@@ -12,19 +12,32 @@ serve(async (req) => {
   }
 
   try {
+    // Use service role key for database writes (RLS policies require service_role)
     const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Get user from the request Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Unauthorized");
+    }
+
+    // Create a separate client with anon key to verify the user token
+    const anonClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
         global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
     const {
       data: { user },
-    } = await supabaseClient.auth.getUser();
+    } = await anonClient.auth.getUser();
 
     if (!user) {
       throw new Error("Unauthorized");

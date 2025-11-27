@@ -53,3 +53,12 @@ verify_jwt = false
 
 [functions.create-discord-channel-for-guild]
 verify_jwt = true
+
+[functions.verify-apple-receipt]
+verify_jwt = true
+
+[functions.check-apple-subscription]
+verify_jwt = true
+
+[functions.apple-webhook]
+verify_jwt = false
