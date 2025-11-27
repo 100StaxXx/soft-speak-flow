@@ -107,10 +107,27 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
   const productId = latestReceipt.product_id;
   const originalTransactionId = latestReceipt.original_transaction_id;
 
+  // SECURITY: Check if this receipt is already registered to another user (prevent hijacking)
+  const { data: existingSubscription } = await supabase
+    .from("subscriptions")
+    .select("user_id")
+    .eq("stripe_subscription_id", originalTransactionId)
+    .maybeSingle();
+  
+  if (existingSubscription && existingSubscription.user_id !== userId) {
+    throw new Error("This receipt is already registered to another account");
+  }
+
   // Determine plan from product ID
   let plan = "monthly";
   if (productId.includes("yearly") || productId.includes("annual")) {
     plan = "yearly";
+  }
+
+  // Determine correct payment amount based on plan
+  let amount = 999; // Default $9.99 monthly in cents
+  if (plan === "yearly") {
+    amount = 9999; // $99.99 yearly in cents
   }
 
   // Check if this transaction was already processed (prevent duplicates)
@@ -118,10 +135,10 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
     .from("payment_history")
     .select("id")
     .eq("stripe_payment_intent_id", originalTransactionId)
-    .single();
+    .maybeSingle();
 
   // Update subscriptions table
-  await supabase.from("subscriptions").upsert({
+  const { data: updatedSubscription } = await supabase.from("subscriptions").upsert({
     user_id: userId,
     stripe_subscription_id: originalTransactionId,
     stripe_customer_id: originalTransactionId,
@@ -132,7 +149,7 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
     updated_at: new Date().toISOString(),
   }, {
     onConflict: "user_id"
-  });
+  }).select().single();
 
   // Update profile
   await supabase.from("profiles").update({
@@ -146,9 +163,10 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
   if (!existingPayment) {
     await supabase.from("payment_history").insert({
       user_id: userId,
+      subscription_id: updatedSubscription?.id, // Link to subscription
       stripe_payment_intent_id: originalTransactionId,
       stripe_invoice_id: latestReceipt.transaction_id,
-      amount: 999, // $9.99 in cents - should be retrieved from product info
+      amount: amount, // Correct amount based on plan
       currency: "usd",
       status: "succeeded",
       created_at: purchaseDate.toISOString(),

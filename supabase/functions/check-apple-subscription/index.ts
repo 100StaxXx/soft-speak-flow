@@ -31,11 +31,15 @@ serve(async (req) => {
     }
 
     // Get subscription from database
-    const { data: subscription } = await supabaseClient
+    const { data: subscription, error: subError } = await supabaseClient
       .from("subscriptions")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
+
+    if (subError) {
+      throw subError;
+    }
 
     if (!subscription) {
       return new Response(
@@ -48,7 +52,9 @@ serve(async (req) => {
     }
 
     const expiresAt = new Date(subscription.current_period_end);
-    const isActive = expiresAt > new Date() && subscription.status === "active";
+    // Support both active and trialing status
+    const isActive = expiresAt > new Date() && 
+      (subscription.status === "active" || subscription.status === "trialing");
 
     return new Response(
       JSON.stringify({
@@ -64,11 +70,22 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("Error checking subscription:", error);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (error.message === "Unauthorized") {
+      statusCode = 401;
+    } else if (error.message?.includes("not found")) {
+      statusCode = 404;
+    } else if (error.message?.includes("invalid") || error.message?.includes("required")) {
+      statusCode = 400;
+    }
+    
     return new Response(
       JSON.stringify({ error: error?.message || "Unknown error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: statusCode,
       }
     );
   }
