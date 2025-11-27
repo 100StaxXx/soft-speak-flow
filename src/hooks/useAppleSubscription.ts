@@ -23,9 +23,9 @@ export function useAppleSubscription() {
     try {
       const purchase = await purchaseProduct(productId);
       
-      // Verify receipt with backend
+      // Verify receipt with backend - use correct field from Capacitor IAP
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt: purchase.receipt },
+        body: { receipt: purchase.transactionReceipt || purchase.receipt },
       });
 
       if (error) throw error;
@@ -64,16 +64,38 @@ export function useAppleSubscription() {
       const restored = await restorePurchases();
       
       if (restored.purchases && restored.purchases.length > 0) {
-        // Verify the most recent receipt
-        const latestPurchase = restored.purchases[0];
-        await supabase.functions.invoke('verify-apple-receipt', {
-          body: { receipt: latestPurchase.receipt },
+        // Sort by date, newest first
+        const sortedPurchases = [...restored.purchases].sort((a: any, b: any) => {
+          const dateA = a.transactionDate || 0;
+          const dateB = b.transactionDate || 0;
+          return dateB - dateA;
         });
+        
+        // Find subscription purchase (contains "premium" in product ID)
+        const subscriptionPurchase = sortedPurchases.find((p: any) => 
+          p.productId?.includes('premium')
+        );
+        
+        if (subscriptionPurchase) {
+          // Verify with correct receipt field
+          const { error } = await supabase.functions.invoke('verify-apple-receipt', {
+            body: { receipt: subscriptionPurchase.transactionReceipt || subscriptionPurchase.receipt },
+          });
 
-        toast({
-          title: "Restored!",
-          description: "Your subscription has been restored",
-        });
+          if (error) {
+            throw error;
+          }
+
+          toast({
+            title: "Restored!",
+            description: "Your subscription has been restored",
+          });
+        } else {
+          toast({
+            title: "No Subscription Found",
+            description: "No active subscription to restore",
+          });
+        }
       } else {
         toast({
           title: "No Purchases Found",

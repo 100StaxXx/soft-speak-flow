@@ -150,6 +150,7 @@ The app verifies purchases server-side:
 ### Edge Functions
 - `/supabase/functions/verify-apple-receipt/index.ts` - Receipt verification
 - `/supabase/functions/check-apple-subscription/index.ts` - Check subscription status
+- `/supabase/functions/apple-webhook/index.ts` - Server-to-server notifications (NEW)
 
 ### Frontend
 - `/src/utils/appleIAP.ts` - IAP utility functions
@@ -193,17 +194,71 @@ Uses existing subscription tables:
 
 ---
 
+## Server-to-Server Notifications (Recommended for Production)
+
+Apple can send automatic notifications about subscription events:
+
+### Setup Webhook
+
+1. Deploy the webhook function:
+```bash
+supabase functions deploy apple-webhook
+```
+
+2. Get the webhook URL:
+```bash
+echo "$(supabase status | grep 'API URL')/functions/v1/apple-webhook"
+```
+
+3. Configure in App Store Connect:
+   - Go to **App Information**
+   - Find **App Store Server Notifications**
+   - Add the webhook URL
+   - Version: 2 (recommended)
+
+### Events Handled
+
+The webhook automatically processes:
+- ✅ **INITIAL_BUY** - New subscription
+- ✅ **DID_RENEW** - Auto-renewal
+- ✅ **DID_CHANGE_RENEWAL_STATUS** - Enable/disable auto-renew
+- ✅ **DID_CHANGE_RENEWAL_PREF** - Plan change
+- ✅ **DID_FAIL_TO_RENEW** - Billing issue
+- ✅ **CANCEL** - User cancelled
+- ✅ **REFUND** - Payment refunded
+- ✅ **REVOKE** - Access revoked
+
+### Benefits
+
+With webhook enabled:
+- Subscriptions auto-renew without user opening app
+- Cancellations detected immediately
+- Billing issues marked in database
+- Refunds automatically revoke access
+
+### Testing Webhook
+
+Use Apple's test notifications in App Store Connect:
+1. Go to webhook configuration
+2. Click "Send Test Notification"
+3. Check Supabase function logs:
+```bash
+supabase functions logs apple-webhook --tail
+```
+
 ## Production Checklist
 
 Before launching:
 
 - [ ] All IAP products approved in App Store Connect
 - [ ] Shared secret configured in Supabase
+- [ ] Webhook endpoint configured (recommended)
 - [ ] Tested purchase flow with sandbox account
 - [ ] Tested restore purchases
 - [ ] Tested cancellation via iOS Settings
 - [ ] Verified receipt validation works
 - [ ] Confirmed premium features unlock correctly
+- [ ] Tested webhook notifications (if enabled)
 - [ ] App Store listing includes IAP pricing info
 - [ ] Privacy policy mentions subscriptions
 

@@ -33,8 +33,8 @@ export function useSubscription() {
   });
 
   const subscription = subscriptionData ? {
-    status: subscriptionData.status as "active" | "cancelled",
-    plan: subscriptionData.plan as "monthly" | "yearly",
+    status: subscriptionData.status as Subscription["status"],
+    plan: subscriptionData.plan as Subscription["plan"],
     current_period_end: subscriptionData.subscription_end,
   } : null;
 
