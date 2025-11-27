@@ -66,7 +66,7 @@ export const ShareableStoryCard = ({
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: story.chapter_title,
+          title: story.chapter_title || 'Companion Story',
           text: `Check out this chapter from my companion's story! 📖`,
         });
         toast.success("Shared successfully!");
@@ -145,9 +145,11 @@ export const ShareableStoryCard = ({
 
           {/* Story Title */}
           <div className="space-y-2 text-center">
-            <h3 className="text-xl font-bold leading-tight">{story.chapter_title}</h3>
+            <h3 className="text-xl font-bold leading-tight">
+              {story.chapter_title || 'Untitled Chapter'}
+            </h3>
             <p className="text-sm italic opacity-90 line-clamp-2">
-              "{story.intro_line}"
+              "{story.intro_line || 'A new chapter begins...'}"
             </p>
           </div>
 
