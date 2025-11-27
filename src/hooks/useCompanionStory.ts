@@ -39,6 +39,8 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
       return data as CompanionStory | null;
     },
     enabled: !!companionId && stage !== undefined,
+    keepPreviousData: true, // Prevent flashing during stage navigation
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
   const { data: allStories } = useQuery({

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -208,6 +210,19 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) throw new Error('Unauthorized');
 
+    // Rate limiting check - prevent abuse (15 stories per 24 hours)
+    const rateLimitResult = await checkRateLimit(
+      supabaseClient,
+      user.id,
+      'companion-story',
+      { maxCalls: 15, windowHours: 24 }
+    );
+
+    if (!rateLimitResult.allowed) {
+      console.warn(`Rate limit exceeded for user ${user.id} on companion-story generation`);
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
+
     // Get companion details including story_tone
     const { data: companion, error: companionError } = await supabaseClient
       .from('user_companion')
@@ -234,7 +249,7 @@ serve(async (req) => {
     const userPersonality = onboardingData.userPersonality || "determined";
     const creaturePersonality = onboardingData.creaturePersonality || "loyal and brave";
 
-    // Get ALL previous chapters for full continuity (not just the previous one)
+    // Get previous chapters for continuity with smart truncation
     let memoryNotes = "This is the beginning of your journey.";
     if (stage > 0) {
       const { data: previousStories } = await supabaseClient
@@ -245,14 +260,31 @@ serve(async (req) => {
         .order('stage', { ascending: true });
 
       if (previousStories && previousStories.length > 0) {
-        // Build comprehensive memory notes from ALL previous chapters
-        memoryNotes = previousStories
+        // Smart memory strategy: Last 5 stories in detail + summary of older ones
+        const recentStories = previousStories.slice(-5);
+        const olderStories = previousStories.slice(0, -5);
+        
+        let memoryParts: string[] = [];
+        
+        // Summary of older stories if they exist
+        if (olderStories.length > 0) {
+          const oldestStage = olderStories[0].stage;
+          const oldestToNewest = olderStories[olderStories.length - 1].stage;
+          const keyEvents = olderStories.map(s => s.chapter_title).join(', ');
+          memoryParts.push(`Early Journey (Stages ${oldestStage}-${oldestToNewest}): ${keyEvents}`);
+        }
+        
+        // Detailed memory of recent 5 stories
+        const recentMemory = recentStories
           .map((s: any) => {
-            const loreItems = Array.isArray(s.lore_expansion) ? s.lore_expansion.slice(0, 3).join('; ') : '';
-            const storySnippet = s.main_story?.substring(0, 200) || '';
-            return `Stage ${s.stage} - "${s.chapter_title}":\nKey moments: ${storySnippet}...\nBond: ${s.bond_moment}\nLore: ${loreItems}\nNext hook: ${s.next_hook}`;
+            const loreItems = Array.isArray(s.lore_expansion) ? s.lore_expansion.slice(0, 2).join('; ') : '';
+            const storySnippet = s.main_story?.substring(0, 150) || '';
+            return `Stage ${s.stage} - "${s.chapter_title}":\n${storySnippet}...\nBond: ${s.bond_moment}\nNext: ${s.next_hook}`;
           })
           .join('\n\n');
+        
+        memoryParts.push(recentMemory);
+        memoryNotes = memoryParts.join('\n\n---\n\n');
       }
     }
 
@@ -409,10 +441,49 @@ Generate now:`;
       throw new Error('Failed to parse story data');
     }
 
-    // Validate story data fields
+    // Validate story data using OutputValidator
+    const validator = new OutputValidator({
+      outputFormat: 'json',
+      requiredFields: [
+        'chapter_title',
+        'intro_line',
+        'main_story',
+        'bond_moment',
+        'life_lesson',
+        'lore_expansion',
+        'next_hook'
+      ],
+      forbiddenPhrases: ['As an AI', 'I cannot', 'I apologize', 'Sorry, I', 'I\'m unable'],
+    }, {
+      toneMarkers: ['epic', 'mythic', 'adventure', 'bond', 'journey']
+    });
+
+    // Validate required fields
     if (!storyData.chapter_title || !storyData.intro_line || !storyData.main_story || 
         !storyData.bond_moment || !storyData.life_lesson || !storyData.next_hook) {
       throw new Error('Invalid story data: missing required fields');
+    }
+
+    // Validate main story length (250-600 words approximately = 1250-3600 chars)
+    const mainStoryLength = (storyData.main_story || '').length;
+    if (mainStoryLength < 250) {
+      console.warn(`Story too short: ${mainStoryLength} chars`);
+      throw new Error('Generated story is too short. Please try again.');
+    }
+    if (mainStoryLength > 4000) {
+      console.warn(`Story too long: ${mainStoryLength} chars`);
+      throw new Error('Generated story is too long. Please try again.');
+    }
+
+    // Run validation checks
+    const validationResult = validator.validate(storyData);
+    if (!validationResult.isValid) {
+      console.error('Story validation failed:', validationResult.errors);
+      throw new Error('Generated story does not meet quality standards');
+    }
+    
+    if (validationResult.warnings.length > 0) {
+      console.warn('Story validation warnings:', validationResult.warnings);
     }
 
     // Ensure lore_expansion is an array
