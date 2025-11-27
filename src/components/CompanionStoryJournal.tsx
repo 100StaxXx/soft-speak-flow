@@ -8,10 +8,7 @@ import { Button } from "./ui/button";
 import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Share2, Grid3x3 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
-import { shareContent } from "@/utils/capacitor";
 import { toast } from "sonner";
-import { Capacitor } from "@capacitor/core";
-import { Share } from "@capacitor/share";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
@@ -32,10 +29,19 @@ export const CompanionStoryJournal = () => {
   // Check if sharing is supported
   useEffect(() => {
     const checkShareSupport = async () => {
-      if (Capacitor.isNativePlatform()) {
-        const canShareResult = await Share.canShare();
-        setCanShare(canShareResult.value);
-      } else {
+      try {
+        // Dynamically import Capacitor modules to prevent web build issues
+        const { Capacitor } = await import("@capacitor/core");
+        
+        if (Capacitor.isNativePlatform()) {
+          const { Share } = await import("@capacitor/share");
+          const canShareResult = await Share.canShare();
+          setCanShare(canShareResult.value);
+        } else {
+          setCanShare(!!navigator.share);
+        }
+      } catch (error) {
+        // Capacitor not available in web environment, check web share API
         setCanShare(!!navigator.share);
       }
     };
@@ -130,14 +136,29 @@ export const CompanionStoryJournal = () => {
   const handleShare = async () => {
     if (!story || !canShare) return;
     
-    const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
-    const success = await shareContent({
-      title: `${debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: ${story.chapter_title}`,
-      text: chapterText,
-    });
-    
-    if (success) {
+    try {
+      const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
+      const shareData = {
+        title: `${debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: ${story.chapter_title}`,
+        text: chapterText,
+      };
+
+      // Dynamically import Capacitor for native platforms
+      const { Capacitor } = await import("@capacitor/core");
+      
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import("@capacitor/share");
+        await Share.share(shareData);
+      } else if (navigator.share) {
+        await navigator.share(shareData);
+      }
+      
       toast.success("Story shared!");
+    } catch (error: any) {
+      // User cancelled or error occurred
+      if (!error.message?.includes('cancel')) {
+        toast.error("Failed to share story");
+      }
     }
   };
 
