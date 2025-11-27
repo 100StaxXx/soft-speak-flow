@@ -68,11 +68,22 @@ serve(async (req) => {
       return createRateLimitResponse(rateLimitCheck, corsHeaders);
     }
 
-    const { data: checkIn, error: checkInError } = await supabase
-      .from('daily_check_ins')
-      .select('*')
-      .eq('id', checkInId)
-      .single()
+    // Fetch check-in and profile in parallel
+    const [
+      { data: checkIn, error: checkInError },
+      { data: profile, error: profileError }
+    ] = await Promise.all([
+      supabase
+        .from('daily_check_ins')
+        .select('*')
+        .eq('id', checkInId)
+        .single(),
+      supabase
+        .from('profiles')
+        .select('selected_mentor_id')
+        .eq('id', user.id)
+        .single()
+    ]);
 
     if (checkInError) {
       console.error('Check-in fetch error:', checkInError);
@@ -83,17 +94,12 @@ serve(async (req) => {
       throw new Error('Unauthorized: You can only access your own check-ins')
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('selected_mentor_id')
-      .eq('id', user.id)
-      .single()
-
     if (profileError || !profile?.selected_mentor_id) {
       console.error('Profile fetch error:', profileError);
       throw new Error('User profile or mentor not found')
     }
 
+    // Fetch mentor and pep talk in parallel (pep talk needs mentor slug, so we get mentor first)
     const { data: mentor, error: mentorError } = await supabase
       .from('mentors')
       .select('name, tone_description, slug')
@@ -105,6 +111,7 @@ serve(async (req) => {
       throw new Error('Mentor not found')
     }
 
+    // Fetch pep talk for today
     const today = new Date().toLocaleDateString('en-CA')
     const { data: pepTalk } = await supabase
       .from('daily_pep_talks')

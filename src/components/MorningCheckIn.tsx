@@ -43,6 +43,13 @@ const MorningCheckInContent = () => {
       return data;
     },
     enabled: !!user,
+    // Poll every 2 seconds if check-in exists but mentor response is still pending
+    refetchInterval: (data) => {
+      if (data?.completed_at && !data?.mentor_response) {
+        return 2000; // Poll every 2 seconds
+      }
+      return false; // Stop polling once we have the response
+    },
   });
 
   const submitCheckIn = async () => {
