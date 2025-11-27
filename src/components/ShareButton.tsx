@@ -52,8 +52,8 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
       
       if (!isCancelled) {
         // Try fallback to clipboard as last resort
-        const shareText = `${text}\n\n${shareData.url || url || window.location.href}`;
-        const success = await safeClipboardWrite(shareText);
+        const fallbackText = `${text}\n\n${url || window.location.href}`;
+        const success = await safeClipboardWrite(fallbackText);
         
         if (success) {
           toast.info("Couldn't share, but link was copied to clipboard!");
