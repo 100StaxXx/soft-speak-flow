@@ -2,14 +2,14 @@
 
 ## 🎯 Summary
 
-This PR implements a complete subscription system with Stripe integration, plus several critical bug fixes and accessibility improvements.
+This PR implements Apple In-App Purchases for iOS subscription management, plus critical bug fixes and native iOS optimizations.
 
-## 💳 Subscription System ($9.99/month with 7-day free trial)
+## 💳 Apple In-App Purchase System ($9.99/month)
 
 ### Features
-- ✅ Complete Stripe integration with Checkout, webhooks, and subscription management
-- ✅ 7-day free trial for all new subscribers (no charge until trial ends)
-- ✅ Multiple payment methods: Credit cards, Apple Pay, Google Pay, Link, Cash App Pay
+- ✅ Complete Apple IAP integration with native iOS StoreKit
+- ✅ Server-side receipt verification with Apple's API
+- ✅ Subscription management via iOS Settings (Apple's required flow)
 - ✅ Subscription management UI (cancel/resume subscriptions)
 - ✅ Trial countdown and billing date tracking
 - ✅ Beautiful success page with confetti celebration
