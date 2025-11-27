@@ -77,6 +77,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 
 /**
  * Subscribe to push notifications
+ * Returns PushSubscription for web, or a mock subscription object for native
  */
 export async function subscribeToPush(userId: string): Promise<PushSubscription | null> {
   try {
@@ -89,7 +90,9 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
     // Native platform (iOS/Android)
     if (Capacitor.isNativePlatform()) {
       await subscribeToNativePush(userId);
-      return null; // Native doesn't return PushSubscription object
+      // Return a mock subscription object so components know subscription succeeded
+      // The actual token will be received asynchronously via the listener
+      return {} as PushSubscription;
     }
 
     // Web platform
@@ -199,6 +202,10 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
     if (Capacitor.isNativePlatform()) {
       // Note: Native push can't be "unregistered" per se, but we can remove from database
       await deleteNativePushToken(userId);
+      // Clear the stored user ID if it matches
+      if (currentNativePushUserId === userId) {
+        currentNativePushUserId = null;
+      }
       console.log('Native push token removed from database');
       return;
     }
