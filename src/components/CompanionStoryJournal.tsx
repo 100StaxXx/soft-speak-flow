@@ -138,7 +138,15 @@ export const CompanionStoryJournal = () => {
   }
 
   const handleShare = async () => {
-    if (!story || !canShare) return;
+    if (!story) {
+      toast.error("No story to share");
+      return;
+    }
+    
+    if (!canShare) {
+      toast.error("Sharing is not supported on this device");
+      return;
+    }
     
     try {
       const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
@@ -153,14 +161,17 @@ export const CompanionStoryJournal = () => {
       if (Capacitor.isNativePlatform()) {
         const { Share } = await import("@capacitor/share");
         await Share.share(shareData);
+        toast.success("Story shared!");
       } else if (navigator.share) {
         await navigator.share(shareData);
+        toast.success("Story shared!");
+      } else {
+        toast.error("Sharing is not available");
       }
-      
-      toast.success("Story shared!");
     } catch (error: any) {
+      console.error("Share error:", error);
       // User cancelled or error occurred
-      if (!error.message?.includes('cancel')) {
+      if (!error.message?.includes('cancel') && !error.message?.includes('abort')) {
         toast.error("Failed to share story");
       }
     }
