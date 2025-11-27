@@ -151,7 +151,7 @@ export const CompanionStoryJournal = () => {
           onClick={() => setShowGallery(!showGallery)}
         >
           <Grid3x3 className="w-4 h-4 mr-2" />
-          Gallery
+          {showGallery ? "Close Gallery" : "Gallery"}
         </Button>
       </div>
 
@@ -241,6 +241,7 @@ export const CompanionStoryJournal = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleShare}
+                  disabled={!story}
                   className="flex-shrink-0"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
