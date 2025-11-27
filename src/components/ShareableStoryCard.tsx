@@ -22,7 +22,9 @@ export const ShareableStoryCard = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const downloadCard = async () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || isProcessing) return;
+    
+    setIsProcessing(true);
     
     try {
       const dataUrl = await toPng(cardRef.current, {
@@ -30,8 +32,9 @@ export const ShareableStoryCard = ({
         pixelRatio: 2,
       });
       
+      const fileName = (story.chapter_title || 'story').replace(/\s+/g, '-').toLowerCase();
       const link = document.createElement('a');
-      link.download = `${story.chapter_title.replace(/\s+/g, '-').toLowerCase()}-story.png`;
+      link.download = `${fileName}-story.png`;
       link.href = dataUrl;
       link.click();
       
@@ -40,6 +43,8 @@ export const ShareableStoryCard = ({
     } catch (error) {
       console.error('Error generating card:', error);
       toast.error("Failed to download card");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -55,7 +60,8 @@ export const ShareableStoryCard = ({
       });
       
       const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `${story.chapter_title}-story.png`, { type: 'image/png' });
+      const fileName = (story.chapter_title || 'story').replace(/\s+/g, '-').toLowerCase();
+      const file = new File([blob], `${fileName}-story.png`, { type: 'image/png' });
       
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -130,7 +136,7 @@ export const ShareableStoryCard = ({
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-full blur-2xl" />
                 <img 
                   src={companionImage} 
-                  alt={companionName}
+                  alt={`${companionName} at Stage ${stage}`}
                   className="relative w-full h-full object-contain drop-shadow-2xl"
                 />
               </div>
