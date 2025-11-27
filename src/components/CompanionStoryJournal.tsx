@@ -9,6 +9,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Share2, G
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
+import { safeClipboardWrite, isClipboardAvailable, getClipboardErrorMessage } from "@/utils/clipboard";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
@@ -16,6 +17,7 @@ export const CompanionStoryJournal = () => {
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   // Debounce stage changes to prevent race conditions
   useEffect(() => {
@@ -39,11 +41,11 @@ export const CompanionStoryJournal = () => {
           setCanShare(canShareResult.value);
         } else {
           // Check for Web Share API or clipboard as fallback
-          setCanShare(!!navigator.share || !!navigator.clipboard);
+          setCanShare(!!navigator.share || isClipboardAvailable());
         }
       } catch (error) {
         // Capacitor not available, check web share API or clipboard fallback
-        setCanShare(!!navigator.share || !!navigator.clipboard);
+        setCanShare(!!navigator.share || isClipboardAvailable());
       }
     };
     checkShareSupport();
@@ -139,6 +141,8 @@ export const CompanionStoryJournal = () => {
   }
 
   const handleShare = async () => {
+    if (isSharing) return; // Prevent double-click
+    
     if (!story) {
       toast.error("No story to share");
       return;
@@ -149,7 +153,10 @@ export const CompanionStoryJournal = () => {
       return;
     }
     
+    setIsSharing(true);
+    
     try {
+      // Create chapter text once (fixes Bug #3: code duplication)
       const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
       const shareData = {
         title: `${debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: ${story.chapter_title}`,
@@ -167,9 +174,13 @@ export const CompanionStoryJournal = () => {
         await navigator.share(shareData);
         toast.success("Story shared!");
       } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(chapterText);
-        toast.success("Story copied to clipboard!");
+        // Fallback: copy to clipboard (safe for all contexts)
+        const success = await safeClipboardWrite(chapterText);
+        if (success) {
+          toast.success("Story copied to clipboard!");
+        } else {
+          toast.error("Failed to copy story to clipboard");
+        }
       }
     } catch (error: any) {
       console.error("Share error:", error);
@@ -182,16 +193,18 @@ export const CompanionStoryJournal = () => {
                          error?.name === 'AbortError';
       
       if (!isCancelled) {
-        // Try fallback to clipboard as last resort
-        try {
-          const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
-          await navigator.clipboard.writeText(chapterText);
+        // Try fallback to clipboard as last resort (reuse already created chapterText)
+        const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
+        const success = await safeClipboardWrite(chapterText);
+        
+        if (success) {
           toast.info("Couldn't share, but story was copied to clipboard!");
-        } catch (clipboardError) {
-          console.error("Clipboard error:", clipboardError);
-          toast.error("Failed to share story. Please try again.");
+        } else {
+          toast.error(getClipboardErrorMessage(error));
         }
       }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -363,11 +376,11 @@ export const CompanionStoryJournal = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleShare}
-                    disabled={!story}
+                    disabled={!story || isSharing}
                     className="flex-shrink-0"
                   >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
+                    <Share2 className={`w-4 h-4 mr-2 ${isSharing ? 'animate-pulse' : ''}`} />
+                    {isSharing ? "Sharing..." : "Share"}
                   </Button>
                 )}
               </div>

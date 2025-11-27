@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2, Download, Flame } from "lucide-react";
 import { toPng } from 'html-to-image';
@@ -18,6 +18,7 @@ export const ShareableStreakBadge = ({
   mentorQuote = "Consistency beats intensity." 
 }: ShareableStreakBadgeProps) => {
   const badgeRef = useRef<HTMLDivElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const downloadBadge = async () => {
     if (!badgeRef.current) return;
@@ -33,6 +34,9 @@ export const ShareableStreakBadge = ({
       link.href = dataUrl;
       link.click();
       
+      // Clean up link element
+      setTimeout(() => link.remove(), 100);
+      
       toast.success("Badge downloaded!");
     } catch (error) {
       console.error('Error generating badge:', error);
@@ -41,7 +45,9 @@ export const ShareableStreakBadge = ({
   };
 
   const shareBadge = async () => {
-    if (!badgeRef.current) return;
+    if (!badgeRef.current || isProcessing) return;
+    
+    setIsProcessing(true);
     
     try {
       const dataUrl = await toPng(badgeRef.current, {
@@ -61,7 +67,7 @@ export const ShareableStreakBadge = ({
         toast.success("Shared successfully!");
       } else {
         // Fallback to download if sharing not supported
-        downloadBadge();
+        await downloadBadge();
       }
     } catch (error: any) {
       console.error('Error sharing badge:', error);
@@ -74,10 +80,17 @@ export const ShareableStreakBadge = ({
                          error?.name === 'AbortError';
       
       if (!isCancelled) {
-        // Fallback to download on error
-        toast.info("Couldn't share, downloading instead...");
-        await downloadBadge();
+        // Fallback to download on error (with proper error handling)
+        try {
+          toast.info("Couldn't share, downloading instead...");
+          await downloadBadge();
+        } catch (downloadError) {
+          console.error('Download fallback failed:', downloadError);
+          toast.error('Failed to share or download badge. Please try again.');
+        }
       }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -121,17 +134,19 @@ export const ShareableStreakBadge = ({
         <Button
           variant="outline"
           onClick={downloadBadge}
+          disabled={isProcessing}
           className="w-full"
         >
-          <Download className="h-4 w-4 mr-2" />
+          <Download className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-pulse' : ''}`} />
           Download
         </Button>
         <Button
           onClick={shareBadge}
+          disabled={isProcessing}
           className="w-full bg-gradient-to-r from-primary to-accent"
         >
-          <Share2 className="h-4 w-4 mr-2" />
-          Share
+          <Share2 className={`h-4 w-4 mr-2 ${isProcessing ? 'animate-pulse' : ''}`} />
+          {isProcessing ? 'Processing...' : 'Share'}
         </Button>
       </div>
     </div>

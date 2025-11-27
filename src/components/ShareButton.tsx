@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { safeClipboardWrite, getClipboardErrorMessage } from "@/utils/clipboard";
 
 interface ShareButtonProps {
   title: string;
@@ -10,21 +12,33 @@ interface ShareButtonProps {
 }
 
 export const ShareButton = ({ title, text, url, className = "" }: ShareButtonProps) => {
+  const [isSharing, setIsSharing] = useState(false);
+  
   const handleShare = async () => {
-    const shareData = {
-      title,
-      text,
-      url: url || window.location.href,
-    };
-
+    if (isSharing) return; // Prevent double-click
+    
+    setIsSharing(true);
+    
     try {
+      const shareData = {
+        title,
+        text,
+        url: url || window.location.href,
+      };
+      
+      const shareText = `${text}\n\n${shareData.url}`;
+
       if (navigator.share) {
         await navigator.share(shareData);
         toast.success("Shared successfully!");
       } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(`${text}\n\n${shareData.url}`);
-        toast.success("Link copied to clipboard!");
+        // Fallback: copy to clipboard (safe for all contexts)
+        const success = await safeClipboardWrite(shareText);
+        if (success) {
+          toast.success("Link copied to clipboard!");
+        } else {
+          toast.error("Failed to copy to clipboard");
+        }
       }
     } catch (error: any) {
       console.error("Error sharing:", error);
@@ -38,14 +52,17 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
       
       if (!isCancelled) {
         // Try fallback to clipboard as last resort
-        try {
-          await navigator.clipboard.writeText(`${text}\n\n${shareData.url}`);
+        const shareText = `${text}\n\n${shareData.url || url || window.location.href}`;
+        const success = await safeClipboardWrite(shareText);
+        
+        if (success) {
           toast.info("Couldn't share, but link was copied to clipboard!");
-        } catch (clipboardError) {
-          console.error("Clipboard error:", clipboardError);
-          toast.error("Failed to share. Please try again.");
+        } else {
+          toast.error(getClipboardErrorMessage(error));
         }
       }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -54,10 +71,11 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
       variant="outline"
       size="icon"
       onClick={handleShare}
+      disabled={isSharing}
       className={className}
       aria-label="Share"
     >
-      <Share2 className="h-4 w-4" />
+      <Share2 className={`h-4 w-4 ${isSharing ? 'animate-pulse' : ''}`} />
     </Button>
   );
 };
