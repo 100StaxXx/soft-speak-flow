@@ -10,7 +10,8 @@ const corsHeaders = {
 // Evolution thresholds are now loaded from database (single source of truth)
 // No more hardcoded values!
 
-const SYSTEM_PROMPT = `You generate evolved versions of a user's personal creature companion. 
+// Stage-specific system prompts for different creative freedom levels
+const SYSTEM_PROMPT_REALISTIC = `You generate evolved versions of a user's personal creature companion. 
 Your TOP PRIORITY is absolute visual continuity with the previous evolution.
 
 You must preserve the creature so it looks like the SAME INDIVIDUAL evolving, not a new design.
@@ -44,13 +45,6 @@ ALLOWED EVOLUTION CHANGES:
 - Strengthened elemental effects (subtle, not overwhelming).
 - More heroic or confident posture.
 - Evolved versions of EXISTING features only.
-  (Example: small horn → slightly longer horn, not a new horn.)
-
-EVOLUTION PHASE RULES:
-- Small upgrades early stages (0-4).
-- Moderate upgrades mid stages (5-9).
-- Dramatic (but consistent) power-up in later stages (10-14).
-ALWAYS with 95% visual continuity.
 
 DO NOT:
 - Change species.
@@ -59,7 +53,85 @@ DO NOT:
 - Change colors.
 - Change style.
 
-Your output must be an image that tightly adheres to these continuity rules.`;
+Your output must be an image that tightly adheres to these continuity rules with 95% visual continuity.`;
+
+const SYSTEM_PROMPT_MYTHIC = `You generate evolved versions of a user's personal creature companion.
+Your goal is to balance CONTINUITY with MYTHIC ENHANCEMENT as the creature enters legendary status.
+
+CONTINUITY RULES (80% preservation):
+1. Preserve 85% of the previous color palette.
+   - Same dominant colors, but can add divine/cosmic accent colors.
+   - Allow increased glow, luminosity, and ethereal effects.
+
+2. Preserve 80% of the previous silhouette.
+   - Core body type, head shape, and limb structure maintained.
+   - Can add divine enhancements: ethereal wings, halos, energy constructs.
+   - Proportions can shift toward heroic/idealized.
+
+3. Preserve species recognition (80%).
+   - Must be recognizable as same species at first glance.
+   - Can add mythic features (divine horns, cosmic patterns, reality effects).
+   - Base anatomy remains but enhanced with legendary elements.
+
+4. Signature features evolve but persist.
+   - Core markings, eye style, and defining traits preserved.
+   - Can become more elaborate, divine, or cosmic versions.
+
+5. Elemental identity can expand.
+   - Core element remains but can manifest in grander ways.
+   - Can add secondary cosmic/divine elemental effects.
+
+MYTHIC ENHANCEMENTS NOW ALLOWED:
+- Divine horns, antlers, or crowns (even if species didn't have them).
+- Ethereal energy wings or appendages.
+- Cosmic patterns, runes, or sacred geometry.
+- Halos, auras, or divine light effects.
+- Larger-than-life heroic proportions.
+- Reality-bending atmospheric effects.
+
+You are creating a LEGENDARY version while maintaining the companion's core identity.`;
+
+const SYSTEM_PROMPT_LEGENDARY = `You generate evolved versions of a user's personal creature companion.
+This is the ULTIMATE EVOLUTION - a cosmic god-tier entity. Your goal is GRANDIOSE CREATIVITY while maintaining species ESSENCE.
+
+CREATIVE FREEDOM (Essence-Based):
+1. Color evolution is fluid.
+   - Core color theme should echo through cosmic form.
+   - Full freedom to add stellar, nebula, cosmic colors.
+   - Original palette visible in overall composition.
+
+2. Form transcends but echoes origin.
+   - Species essence recognizable (this came from a wolf/eagle/dragon).
+   - Can add: multiple forms, dimensional echoes, reality fragments.
+   - Silhouette can be broken by cosmic scale and divine additions.
+
+3. Species soul is the anchor.
+   - Viewer should sense what species this evolved from.
+   - Core "spirit" of the animal maintained through chaos.
+   - Can be abstract, cosmic, reality-bending.
+
+4. All features are malleable.
+   - Signature features can transcend physical form.
+   - Can become cosmic constructs, energy patterns, dimensional rifts.
+   - Original traits visible in divine/cosmic interpretation.
+
+5. Elements become cosmic forces.
+   - Element manifests at universe-scale.
+   - Can combine with stellar/cosmic phenomena.
+   - Original element evident in the chaos.
+
+LEGENDARY FREEDOM GRANTED:
+- Multiple heads, forms, or dimensional echoes.
+- Cosmic appendages: star-matter limbs, nebula wings, galaxy constructs.
+- Reality-warping anatomy: impossible geometry, dimensional rifts, spacetime breaks.
+- Planet/universe scale: colossal beyond comprehension.
+- Divine constructs: halos of galaxies, crowns of stars, armor of reality itself.
+- Transcendent features: the creature IS the environment, IS the cosmos.
+
+GRANDIOSE MANDATE: Push creative boundaries. Make this LARGER THAN LIFE. A living god, a force of nature, 
+an entity that births universes. This is the pinnacle - absolute divine manifestation.
+
+Maintain the SOUL of the species while achieving cosmic transcendence.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -436,10 +508,28 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       // Late stages (15-20): Full grandiose creativity
       const stageLevel = nextStage <= 10 ? 'realistic' : nextStage <= 14 ? 'mythic' : 'legendary';
       
-      // Special handling for aquatic creatures to prevent legs
+      // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
-      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.' : '';
+      
+      // Stage-appropriate aquatic enforcement
+      let aquaticNote = '';
+      if (isAquatic) {
+        if (stageLevel === 'realistic' || stageLevel === 'mythic') {
+          aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.';
+        } else {
+          // Legendary tier - aquatic still maintained even at cosmic scale
+          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE: Even at cosmic/divine scale, this remains an AQUATIC entity. NO LEGS OR TERRESTRIAL LIMBS even in legendary form. Cosmic fins, nebula tail flukes, stellar streamlined form - but NEVER legs. The creature can be universe-scale but must remain recognizably aquatic in nature (fins, not limbs; flowing, not walking; oceanic movement even through space).';
+        }
+      }
+      
+      // Select appropriate system prompt based on stage
+      let systemPrompt = SYSTEM_PROMPT_REALISTIC;
+      if (stageLevel === 'mythic') {
+        systemPrompt = SYSTEM_PROMPT_MYTHIC;
+      } else if (stageLevel === 'legendary') {
+        systemPrompt = SYSTEM_PROMPT_LEGENDARY;
+      }
       
       // Stage-appropriate species requirements
       let speciesRequirements = '';
@@ -572,15 +662,29 @@ The viewer should immediately recognize this as THE SAME companion from Stage ${
 - Dynamic heroic composition
 - 8K ultra-detail resolution
 
-Focus on these continuity percentages:
-✓ Species Identity: 100% match
+Focus on these continuity percentages for Stage ${nextStage}:
+${stageLevel === 'realistic' ? `✓ Species Identity: 100% match
 ✓ Markings & Patterns: 100% match
 ✓ Eye Features: 100% match
 ✓ Color Palette: 95% match
 ✓ Silhouette: 90% match (growth allowed)
 ✓ Elemental Style: 95% match (intensity increase allowed)
 
-Generate an evolution that honors the companion's journey while showing clear growth and power increase.`;
+Generate an evolution that preserves the companion's exact identity while showing clear growth.` : stageLevel === 'mythic' ? `✓ Species Recognition: 80% match (mythic enhancements allowed)
+✓ Core Markings: 80% match (can become divine versions)
+✓ Eye Character: 80% match (can gain cosmic properties)
+✓ Color Palette: 85% match (can add divine/cosmic accents)
+✓ Silhouette: 80% match (heroic proportions and divine additions allowed)
+✓ Elemental Style: 80% match (can expand into cosmic manifestations)
+
+Generate a LEGENDARY evolution that maintains core identity while adding mythic grandeur.` : `✓ Species Essence: Recognizable through cosmic form
+✓ Signature Elements: Visible in divine/cosmic interpretation
+✓ Eye Soul: Core character maintained in transcendent form
+✓ Color Theme: Original palette echoes through stellar composition
+✓ Form Echo: Species origin evident in god-tier manifestation
+✓ Elemental Soul: Core element visible in universe-scale phenomena
+
+Generate an ULTIMATE COSMIC EVOLUTION that achieves grandiose divinity while maintaining species essence.`}`;
     }
 
     console.log("Generating evolution image...");
@@ -600,7 +704,7 @@ Generate an evolution that honors the companion's journey while showing clear gr
         messages: shouldUseContinuityPrompt ? [
           {
             role: "system",
-            content: SYSTEM_PROMPT
+            content: systemPrompt
           },
           {
             role: "user",

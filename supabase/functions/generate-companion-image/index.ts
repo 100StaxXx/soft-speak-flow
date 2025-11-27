@@ -181,10 +181,20 @@ STYLE REFERENCES:
       // Late stages (15-20): Full grandiose creativity
       const stageLevel = stage <= 10 ? 'realistic' : stage <= 14 ? 'mythic' : 'legendary';
       
-      // Special handling for aquatic creatures to prevent legs
+      // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
-      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a purely AQUATIC creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Must follow real-world aquatic animal anatomy\n- Underwater environment with water physics' : '';
+      
+      // Stage-appropriate aquatic enforcement
+      let aquaticNote = '';
+      if (isAquatic) {
+        if (stageLevel === 'realistic' || stageLevel === 'mythic') {
+          aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a purely AQUATIC creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Must follow real-world aquatic animal anatomy\n- Underwater environment with water physics';
+        } else {
+          // Legendary tier - aquatic still maintained even at cosmic scale
+          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE (COSMIC SCALE):\n- Even at universe-scale, this remains an AQUATIC entity - NO LEGS OR TERRESTRIAL LIMBS\n- Cosmic fins, nebula tail flukes, galaxy-scale streamlined form\n- NEVER legs, arms, or terrestrial appendages - aquatic movement through space itself\n- Can have ethereal fins, stellar tail, cosmic flippers - but must remain recognizably aquatic\n- Think: cosmic whale swimming through stars, not a legged deity';
+        }
+      }
       
       // Stage-appropriate species enforcement
       let speciesGuidance = '';
