@@ -17,10 +17,20 @@ if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined' && !Capacitor.isNativePla
 // Track if native push listeners are already registered
 let nativePushListenersRegistered = false;
 
+// Store current user ID for native push token registration
+// This is updated whenever a user subscribes to push
+let currentNativePushUserId: string | null = null;
+
 /**
  * Convert base64 string to Uint8Array (for VAPID key)
+ * Only used for Web Push API, not native push
  */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  // This function is only called in web context, but add safety check
+  if (typeof window === 'undefined' || !window.atob) {
+    throw new Error('atob not available - this should only be called in browser context');
+  }
+  
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
     .replace(/-/g, '+')
@@ -94,16 +104,19 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
  * Subscribe to native push notifications (iOS/Android)
  */
 async function subscribeToNativePush(userId: string): Promise<void> {
+  // Update current user ID for token registration
+  currentNativePushUserId = userId;
+  
   // Register push notifications
   await PushNotifications.register();
   
-  // Set up listeners (only once)
+  // Set up listeners (only once per app lifecycle)
   if (!nativePushListenersRegistered) {
-    setupNativePushListeners(userId);
+    setupNativePushListeners();
     nativePushListenersRegistered = true;
   }
   
-  console.log('Native push notifications registered');
+  console.log('Native push notifications registered for user:', userId);
 }
 
 /**
@@ -140,12 +153,19 @@ async function subscribeToWebPush(userId: string): Promise<PushSubscription | nu
 
 /**
  * Set up native push notification listeners
+ * These are set up once per app lifecycle and use the current user ID
  */
-function setupNativePushListeners(userId: string): void {
+function setupNativePushListeners(): void {
   // Called when push registration succeeds
   PushNotifications.addListener('registration', async (token: Token) => {
-    console.log('Native push token:', token.value);
-    await saveNativePushToken(userId, token.value);
+    console.log('Native push token received:', token.value);
+    
+    // Use the current user ID (set during subscribeToPush call)
+    if (currentNativePushUserId) {
+      await saveNativePushToken(currentNativePushUserId, token.value);
+    } else {
+      console.warn('No user ID available for saving native push token');
+    }
   });
 
   // Called when push registration fails
@@ -164,7 +184,7 @@ function setupNativePushListeners(userId: string): void {
     console.log('Push notification action performed:', action);
     // Handle notification tap (e.g., navigate to specific screen)
     const data = action.notification.data;
-    if (data.url) {
+    if (data && data.url) {
       window.location.href = data.url;
     }
   });
