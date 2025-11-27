@@ -19,18 +19,12 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Load VAPID keys for Web Push
+    // Load VAPID keys for Web Push (optional, only for web browsers)
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
     const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@revolution.app';
 
-    if (!vapidPublicKey || !vapidPrivateKey) {
-      console.error('VAPID keys not configured');
-      return new Response(
-        JSON.stringify({ error: 'Push notification system not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log('Note: This function is for web push only. Native iOS uses dispatch-daily-pushes-native.');
 
     const now = new Date().toISOString();
 
@@ -98,6 +92,12 @@ serve(async (req) => {
             .update({ delivered_at: new Date().toISOString() })
             .eq('id', push.id);
           dispatched++;
+          continue;
+        }
+
+        // Skip web push if VAPID not configured
+        if (!vapidPublicKey || !vapidPrivateKey) {
+          console.log(`Skipping web push for user ${push.user_id} - VAPID not configured`);
           continue;
         }
 

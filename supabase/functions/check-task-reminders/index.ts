@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { sendToMultipleSubscriptions, PushSubscription, PushNotificationPayload } from "../_shared/webPush.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,19 +17,6 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Load VAPID keys
-    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@revolution.app';
-
-    if (!vapidPublicKey || !vapidPrivateKey) {
-      console.error('VAPID keys not configured');
-      return new Response(
-        JSON.stringify({ error: 'Push notification system not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
     console.log('Checking for tasks needing reminders...');
     
     // Get current date and time for comparison
@@ -38,7 +24,6 @@ Deno.serve(async (req) => {
     const today = now.toLocaleDateString('en-CA');
     
     // Find tasks that need reminders sent
-    // We need to find tasks where scheduled_time today is coming up
     const { data: tasks, error } = await supabase
       .from('daily_tasks')
       .select('*')
@@ -54,7 +39,6 @@ Deno.serve(async (req) => {
     }
     
     console.log(`Found ${tasks?.length || 0} tasks to check`);
-    
     
     const tasksToRemind = tasks?.filter(task => {
       if (!task.scheduled_time || !task.reminder_minutes_before) return false;
@@ -73,14 +57,15 @@ Deno.serve(async (req) => {
     // Send reminders for each task
     for (const task of tasksToRemind) {
       try {
-        // Get push subscriptions for this user
-        const { data: subscriptions } = await supabase
-          .from('push_subscriptions')
-          .select('*')
-          .eq('user_id', task.user_id);
+        // Get iOS push device tokens for this user
+        const { data: deviceTokens } = await supabase
+          .from('push_device_tokens')
+          .select('device_token')
+          .eq('user_id', task.user_id)
+          .eq('platform', 'ios');
         
-        if (!subscriptions || subscriptions.length === 0) {
-          console.log(`No push subscriptions for user ${task.user_id}`);
+        if (!deviceTokens || deviceTokens.length === 0) {
+          console.log(`No iOS device tokens for user ${task.user_id}`);
           continue;
         }
         
@@ -100,68 +85,37 @@ Deno.serve(async (req) => {
                               companion?.spirit_animal === 'Lion' ? '🦁' :
                               companion?.spirit_animal === 'Fox' ? '🦊' : '⚔️';
         
-        const payload: PushNotificationPayload = {
-          title: `Quest Starting Soon! ${companionEmoji}`,
-          body: `${task.task_text} (+${task.xp_reward} XP)`,
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
-          tag: `task-${task.id}`,
-          data: {
-            taskId: task.id,
-            type: 'task_reminder',
-            url: '/tasks'
-          },
-          actions: [
-            { action: 'open', title: 'View Task' },
-            { action: 'snooze', title: 'Snooze 5min' }
-          ]
-        };
-        
-        // Send to all user's devices
-        const pushSubscriptions: PushSubscription[] = subscriptions.map(sub => ({
-          endpoint: sub.endpoint,
-          keys: sub.keys as { p256dh: string; auth: string }
-        }));
+        // Send to all user's iOS devices via APNs
+        for (const token of deviceTokens) {
+          try {
+            const { error: sendError } = await supabase.functions.invoke('send-apns-notification', {
+              body: {
+                deviceToken: token.device_token,
+                title: `Quest Starting Soon! ${companionEmoji}`,
+                body: `${task.task_text} (+${task.xp_reward} XP)`,
+                data: {
+                  taskId: task.id,
+                  type: 'task_reminder',
+                  url: '/tasks'
+                }
+              }
+            });
 
-        const results = await sendToMultipleSubscriptions(
-          pushSubscriptions,
-          payload,
-          {
-            publicKey: vapidPublicKey,
-            privateKey: vapidPrivateKey,
-            subject: vapidSubject
+            if (sendError) {
+              console.error(`Failed to send to device ${token.device_token}:`, sendError);
+            } else {
+              console.log(`Sent reminder to device for task ${task.id}`);
+            }
+          } catch (deviceError) {
+            console.error(`Error sending to device:`, deviceError);
           }
-        );
-
-        // Remove expired subscriptions
-        const expiredSubs = results
-          .filter(r => r.result.error === 'SUBSCRIPTION_EXPIRED')
-          .map(r => r.subscription.endpoint);
-
-        if (expiredSubs.length > 0) {
-          await supabase
-            .from('push_subscriptions')
-            .delete()
-            .in('endpoint', expiredSubs);
         }
-
-        const successCount = results.filter(r => r.result.success).length;
-        console.log(`Sent reminder to ${successCount}/${results.length} devices for task ${task.id}`);
         
         // Mark reminder as sent
         await supabase
           .from('daily_tasks')
           .update({ reminder_sent: true })
           .eq('id', task.id);
-        
-        // Log reminder
-        await supabase
-          .from('task_reminders_log')
-          .insert({
-            task_id: task.id,
-            user_id: task.user_id,
-            notification_status: 'sent'
-          });
         
         console.log(`Reminder sent for task ${task.id}`);
       } catch (taskError) {

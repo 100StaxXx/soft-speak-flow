@@ -12,34 +12,6 @@ interface PushError {
   attempt?: number;
 }
 
-// Retry helper for transient failures
-async function retryOperation<T>(
-  operation: () => Promise<T>,
-  maxAttempts = 3,
-  delayMs = 1000
-): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isTransient = errorMessage.includes('network') ||
-                         errorMessage.includes('timeout') ||
-                         errorMessage.includes('ECONNREFUSED');
-
-      if (attempt < maxAttempts && isTransient) {
-        console.log(`Attempt ${attempt} failed, retrying in ${delayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw lastError;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -51,7 +23,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log("Starting daily quote push dispatch...");
+    console.log("Starting daily quote push dispatch (iOS native)...");
 
     const now = new Date().toISOString();
 
@@ -97,21 +69,22 @@ serve(async (req) => {
           continue;
         }
 
-        // Get user's push subscriptions
-        const { data: subscriptions, error: subError } = await supabase
-          .from('push_subscriptions')
-          .select('endpoint, p256dh, auth')
-          .eq('user_id', push.user_id);
+        // Get user's iOS device tokens
+        const { data: deviceTokens, error: tokenError } = await supabase
+          .from('push_device_tokens')
+          .select('device_token')
+          .eq('user_id', push.user_id)
+          .eq('platform', 'ios');
 
-        if (subError) {
-          console.error(`Error fetching subscriptions for user ${push.user_id}:`, subError);
-          errors.push({ push_id: push.id, error: subError.message });
+        if (tokenError) {
+          console.error(`Error fetching device tokens for user ${push.user_id}:`, tokenError);
+          errors.push({ push_id: push.id, error: tokenError.message });
           continue;
         }
 
-        if (!subscriptions || subscriptions.length === 0) {
-          console.log(`No push subscriptions for user ${push.user_id}`);
-          // Still mark as delivered even if no subscriptions
+        if (!deviceTokens || deviceTokens.length === 0) {
+          console.log(`No iOS devices for user ${push.user_id}`);
+          // Still mark as delivered even if no devices
           await supabase
             .from('user_daily_quote_pushes')
             .update({ delivered_at: new Date().toISOString() })
@@ -120,44 +93,29 @@ serve(async (req) => {
           continue;
         }
 
-        // Send push notification to each subscription
-        for (const subscription of subscriptions) {
+        // Send to all user's iOS devices
+        for (const token of deviceTokens) {
           try {
-            const pushPayload = {
-              notification: {
+            const { error: sendError } = await supabase.functions.invoke('send-apns-notification', {
+              body: {
+                deviceToken: token.device_token,
                 title: "Your Daily Quote",
                 body: `"${quote.text}" - ${quote.author || 'Unknown'}`,
-                icon: '/icon-192.png',
-                badge: '/icon-192.png',
                 data: {
+                  type: 'daily_quote',
+                  quote_id: quote.id,
                   url: '/inspire?tab=quotes'
                 }
               }
-            };
+            });
 
-            // Send push notification using Web Push with retry
-            await retryOperation(async () => {
-              const webPushResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `key=${Deno.env.get('FCM_SERVER_KEY') || ''}`
-                },
-                body: JSON.stringify({
-                  to: subscription.endpoint,
-                  ...pushPayload
-                })
-              });
-
-              if (!webPushResponse.ok) {
-                const errorText = await webPushResponse.text();
-                throw new Error(`Push notification failed: ${errorText}`);
-              }
-              console.log(`Push notification sent successfully`);
-            }, 3, 500);
-          } catch (subError) {
-            console.error(`Error sending to subscription:`, subError);
-            // Don't fail the entire push if one subscription fails
+            if (sendError) {
+              console.error(`Failed to send to device:`, sendError);
+            } else {
+              console.log(`Sent quote push to iOS device`);
+            }
+          } catch (deviceError) {
+            console.error(`Error sending to device:`, deviceError);
           }
         }
 

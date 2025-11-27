@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -20,6 +21,7 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { hideSplashScreen } from "@/utils/capacitor";
+import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -102,7 +104,23 @@ EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
+  const { session } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
+  
+  // Initialize native push on login
+  useEffect(() => {
+    if (session?.user) {
+      try {
+        if (isNativePushSupported()) {
+          initializeNativePush(session.user.id).catch(err => {
+            console.error('Failed to initialize native push:', err);
+          });
+        }
+      } catch (error) {
+        console.debug('Native push initialization skipped:', error);
+      }
+    }
+  }, [session]);
   
   // Hide splash screen once profile data is loaded (or failed to load)
   useEffect(() => {

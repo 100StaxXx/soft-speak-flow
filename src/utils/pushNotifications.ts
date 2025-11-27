@@ -1,8 +1,12 @@
 /**
  * Push Notification Service
  * Handles both Web Push (browsers) and Native Push (iOS/Android via Capacitor)
+ * Web Push Notification Service (DEPRECATED FOR iOS)
+ * NOTE: This file is deprecated for native iOS. Use nativePushNotifications.ts instead.
+ * Only kept for potential future web-only deployment.
  */
 
+import { Capacitor } from '@capacitor/core';
 import { supabase } from "@/integrations/supabase/client";
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
@@ -12,6 +16,9 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 // Warn if VAPID key is not configured for web
 if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
   console.warn('VITE_VAPID_PUBLIC_KEY not configured. Web push notifications will be disabled.');
+// Disable on native platforms
+if (Capacitor.isNativePlatform()) {
+  console.log('Web push disabled on native platform. Use nativePushNotifications.ts');
 }
 
 // Track if native push listeners are already registered
@@ -44,7 +51,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
- * Check if push notifications are supported
+ * Check if push notifications are supported (web only, not native)
  */
 export function isPushSupported(): boolean {
   // Native platforms always support push
@@ -53,6 +60,7 @@ export function isPushSupported(): boolean {
   }
   // Web browsers need service worker and PushManager
   return 'serviceWorker' in navigator && 'PushManager' in window;
+  return !Capacitor.isNativePlatform() && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
 /**
