@@ -267,6 +267,7 @@ serve(async (req) => {
 
     // Stage 0 = egg destiny preview, Stage 1 = hatchling emerging
     let userPrompt: string;
+    let systemPrompt: string = SYSTEM_PROMPT_REALISTIC; // Default, will be set for stages 2+
     
     if (nextStage === 0) {
       // Stage 0: Show the FULLY EVOLVED champion form sealed inside the egg
@@ -524,11 +525,12 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       }
       
       // Select appropriate system prompt based on stage
-      let systemPrompt = SYSTEM_PROMPT_REALISTIC;
       if (stageLevel === 'mythic') {
         systemPrompt = SYSTEM_PROMPT_MYTHIC;
       } else if (stageLevel === 'legendary') {
         systemPrompt = SYSTEM_PROMPT_LEGENDARY;
+      } else {
+        systemPrompt = SYSTEM_PROMPT_REALISTIC;
       }
       
       // Stage-appropriate species requirements
