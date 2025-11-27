@@ -44,7 +44,7 @@ export const CompanionStoryJournal = () => {
         // Special handling for Stage 0 (Egg state)
         if (debouncedStage === 0) {
           // Return current image or a placeholder
-          return companion.current_image_url || '/placeholder-egg.png';
+          return companion.current_image_url || '/placeholder-egg.svg';
         }
         
         const { data, error } = await supabase
@@ -56,13 +56,13 @@ export const CompanionStoryJournal = () => {
         
         if (error && error.code !== 'PGRST116') {
           console.error('Failed to fetch evolution image:', error);
-          return companion.current_image_url || '/placeholder-companion.png';
+          return companion.current_image_url || '/placeholder-companion.svg';
         }
         
-        return data?.image_url || companion.current_image_url || '/placeholder-companion.png';
+        return data?.image_url || companion.current_image_url || '/placeholder-companion.svg';
       } catch (error) {
         console.error('Error in evolution image query:', error);
-        return companion.current_image_url || '/placeholder-companion.png';
+        return companion.current_image_url || '/placeholder-companion.svg';
       }
     },
     enabled: !!companion,
@@ -209,8 +209,8 @@ export const CompanionStoryJournal = () => {
                 onError={(e) => {
                   console.error('Image failed to load:', evolutionImage);
                   e.currentTarget.src = debouncedStage === 0 
-                    ? '/placeholder-egg.png' 
-                    : '/placeholder-companion.png';
+                    ? '/placeholder-egg.svg' 
+                    : '/placeholder-companion.svg';
                 }}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
@@ -374,7 +374,7 @@ export const CompanionStoryJournal = () => {
 
       {/* Share Dialog */}
       <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Share Your Story</DialogTitle>
           </DialogHeader>
