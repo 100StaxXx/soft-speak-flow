@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { playAchievementUnlock } from "@/utils/soundEffects";
+import { useCallback } from "react";
 
 interface AchievementData {
   type: string;
@@ -20,7 +21,7 @@ interface AchievementData {
 export const useAchievements = () => {
   const { user } = useAuth();
 
-  const awardAchievement = async (achievement: AchievementData) => {
+  const awardAchievement = useCallback(async (achievement: AchievementData) => {
     if (!user) return;
 
     try {
@@ -55,7 +56,7 @@ export const useAchievements = () => {
     } catch (error) {
       console.error("Error awarding achievement:", error);
     }
-  };
+  }, [user]);
 
   const checkStreakAchievements = async (streak: number) => {
     // Silver: 3-day streak (early effort)

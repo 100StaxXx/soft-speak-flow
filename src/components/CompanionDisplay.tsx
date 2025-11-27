@@ -10,10 +10,10 @@ import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { getStageName } from "@/config/companionStages";
 
-// Convert hex color to color name
+// Convert hex color to color name (moved outside component for performance)
 const getColorName = (hexColor: string): string => {
   const colorMap: Record<string, string> = {
     '#FF0000': 'Red', '#FF4500': 'Orange Red', '#FF6347': 'Tomato',
@@ -63,7 +63,7 @@ const getColorName = (hexColor: string): string => {
   }
 };
 
-export const CompanionDisplay = () => {
+export const CompanionDisplay = memo(() => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
@@ -133,6 +133,7 @@ export const CompanionDisplay = () => {
   if (!companion) return null;
 
   const stageName = getStageName(companion.current_stage);
+  const colorName = getColorName(companion.favorite_color);
 
   return (
     <>
@@ -255,7 +256,7 @@ export const CompanionDisplay = () => {
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Color</p>
-                <p className="font-medium text-sm">{getColorName(companion.favorite_color)}</p>
+                <p className="font-medium text-sm">{colorName}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-accent/5 to-primary/5 border border-accent/10 hover:border-accent/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Spirit</p>
@@ -278,4 +279,6 @@ export const CompanionDisplay = () => {
       </Card>
     </>
   );
-};
+});
+
+CompanionDisplay.displayName = 'CompanionDisplay';

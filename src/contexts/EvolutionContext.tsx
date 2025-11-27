@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 
 interface EvolutionContextType {
   isEvolvingLoading: boolean;
@@ -14,13 +14,15 @@ export const EvolutionProvider = ({ children }: { children: ReactNode }) => {
   // Use function initializer to properly store function state
   const [onEvolutionComplete, setOnEvolutionComplete] = useState<(() => void) | null>(() => null);
 
+  const value = useMemo(() => ({ 
+    isEvolvingLoading, 
+    setIsEvolvingLoading,
+    onEvolutionComplete,
+    setOnEvolutionComplete
+  }), [isEvolvingLoading, onEvolutionComplete]);
+
   return (
-    <EvolutionContext.Provider value={{ 
-      isEvolvingLoading, 
-      setIsEvolvingLoading,
-      onEvolutionComplete,
-      setOnEvolutionComplete
-    }}>
+    <EvolutionContext.Provider value={value}>
       {children}
     </EvolutionContext.Provider>
   );

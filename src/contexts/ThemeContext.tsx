@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MentorTheme {
@@ -37,11 +37,16 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    let transitionTimeout: NodeJS.Timeout;
+
     const applyTheme = async () => {
       if (!mentorId) {
         // Reset to default theme without transition
-        setCurrentTheme(null);
-        applyDefaultTheme();
+        if (isMounted) {
+          setCurrentTheme(null);
+          applyDefaultTheme();
+        }
         return;
       }
 
@@ -53,6 +58,8 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
           .eq("id", mentorId)
           .maybeSingle();
 
+        if (!isMounted) return;
+
         // Only show transition if we actually have a theme to apply
         if (mentor?.theme_config) {
           setIsTransitioning(true);
@@ -62,19 +69,32 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
           applyThemeToDOM(theme);
           
           // Transition duration
-          setTimeout(() => setIsTransitioning(false), 300);
+          transitionTimeout = setTimeout(() => {
+            if (isMounted) {
+              setIsTransitioning(false);
+            }
+          }, 300);
         } else {
           // No theme config, apply default without transition
           applyDefaultTheme();
         }
       } catch (error) {
         console.error("Error applying theme:", error);
-        applyDefaultTheme();
-        setIsTransitioning(false);
+        if (isMounted) {
+          applyDefaultTheme();
+          setIsTransitioning(false);
+        }
       }
     };
 
     applyTheme();
+
+    return () => {
+      isMounted = false;
+      if (transitionTimeout) {
+        clearTimeout(transitionTimeout);
+      }
+    };
   }, [mentorId]);
 
   const applyThemeToDOM = (theme: MentorTheme) => {
@@ -137,8 +157,10 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
     root.classList.remove("sharp-borders");
   };
 
+  const value = useMemo(() => ({ currentTheme, isTransitioning }), [currentTheme, isTransitioning]);
+
   return (
-    <ThemeContext.Provider value={{ currentTheme, isTransitioning }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
