@@ -7,14 +7,14 @@ const corsHeaders = {
 };
 
 const ELEMENT_EFFECTS = {
-  fire: "glowing embers, flame trails, warm orange-red aura",
-  water: "flowing water effects, ripple patterns, cool blue mist",
-  earth: "stone textures, crystal formations, moss details",
-  air: "wind swirls, feather details, cloud wisps",
-  lightning: "electric arcs, crackling purple-blue glow, sparks",
-  ice: "frost patterns, crystal shards, cold cyan vapor",
-  light: "radiant golden beams, holy glow, sparkles",
-  shadow: "dark purple wisps, mysterious smoke, ethereal darkness",
+  fire: "glowing embers dancing upward, molten lava veins, flame trails with realistic heat distortion, warm orange-red volumetric aura with ember particles",
+  water: "flowing liquid water droplets, dynamic ripple patterns with realistic refraction, cool blue translucent mist, bioluminescent aquatic glow",
+  earth: "weathered stone textures with moss growth, crystalline mineral formations catching light, floating dust particles, ancient runic carvings",
+  air: "swirling wind currents with visible motion blur, delicate feather details with realistic barbs, cumulus cloud wisps, atmospheric pressure waves",
+  lightning: "branching electric arcs following realistic paths, crackling purple-blue plasma glow, electromagnetic field distortions, ozone shimmer",
+  ice: "intricate frost patterns with hexagonal crystals, sharp ice shards refracting light, cold cyan vapor condensation, frozen breath effects",
+  light: "divine radiant beams with god rays, holy luminescence with lens flare, iridescent sparkle particles, prismatic rainbow refraction",
+  shadow: "volumetric dark purple tendrils, mysterious smoke with depth, ethereal darkness with subtle gradients, void energy wisps",
 };
 
 const EVOLUTION_STAGES = {
@@ -30,25 +30,25 @@ const EVOLUTION_STAGES = {
     useFutureSilhouette: true,
     futureStage: 20
   },
-  2: { name: "Newborn Emergence", prompt: "A tiny {spirit} fully emerged from the egg, fragile and newborn. Anatomically accurate to species. Oversized curious eyes, soft body, faint markings in {color} tones on fur/feathers/scales. Gentle {element} aura flickering around it." },
-  3: { name: "Early Infant Form", prompt: "A slightly larger infant {spirit}, steadier posture but still round proportions. Bright curious eyes. Species-specific textures becoming clearer. {element} effects forming tiny motifs around body." },
-  4: { name: "Juvenile Form", prompt: "A young {spirit} with lengthening body and strengthening limbs. Playful movements. Fur/feathers/scales showing early patterning in {color} tones. {element} energy forming natural highlights." },
-  5: { name: "Young Explorer", prompt: "A noticeably growing {spirit}, still youthful but more balanced proportions. Early signature traits (horns/wings/claws/fins/tail) sharpening. {element} energy wraps gently along limbs or body edges." },
-  6: { name: "Adolescent Guardian", prompt: "A larger adolescent {spirit} with developing musculature or body density. Confident posture. {element} markings glowing lightly across body in patterns or runes. {color} highlights prominent." },
-  7: { name: "Initiate Protector", prompt: "A {spirit} with strengthened silhouette and sharper edges. Maturing facial features. Fur/feathers/scales gaining depth and complexity in {color} patterns. {element} aura forming a soft shield-like halo." },
-  8: { name: "Seasoned Guardian", prompt: "An impressively larger {spirit}, fully grounded in species anatomy. Powerful, controlled movements. Patterns glowing brighter in {color} tones. {element} energy subtly influencing the environment." },
-  9: { name: "Mature Protector", prompt: "An adult {spirit} at peak physical form. Strong, balanced, poised. Environment reacting gently (rustling wind, glowing particles, rippling effects). {element} power radiating. {color} markings intricate." },
-  10: { name: "Veteran Form", prompt: "A hardened, experienced {spirit}. Muscles/feathers/scales/skin showing refinement and elegance. {element} markings deepening and illuminating in controlled pulses. Wise eyes, {color} patterns telling stories of growth." },
-  11: { name: "Elevated Form", prompt: "A {spirit} with slight levitation or lighter movement. {element} trails extending behind movements. Eyes shining brighter. Body maintaining perfect species anatomy but with enhanced presence." },
-  12: { name: "Ascended Form", prompt: "A {spirit} with heightened presence, hovering slightly in ambient energy. Species silhouette 100% intact. {element} forming a radiant outline around the creature. {color} aura intensifying." },
-  13: { name: "Ether-Born Avatar", prompt: "A {spirit} with semi-transparent layers of {element} energy appearing around body. Cosmic or elemental patterns emerging faintly on fur/feathers/scales in {color} tones. Silhouette still unaltered, just enhanced." },
-  14: { name: "Primordial Aspect", prompt: "A significantly enlarged {spirit}. {element} energy condensing into luminous lines or glyphs wrapping around anatomy (never modifying it). Background subtly warping. Ancient power in {color} hues." },
-  15: { name: "Colossus Form", prompt: "A giant, mythic-scale {spirit}. Features remain identical to base species but more defined, ancient, powerful. {element} effects thick, flowing, majestic in {color} shades. Colossal presence, unchanged silhouette." },
-  16: { name: "Cosmic Guardian", prompt: "A {spirit} surrounded by nebula-like wisps in {element} energy and {color} tones. Eyes holding star-like glints. Body patterns glowing with complex geometry following species contours perfectly." },
-  17: { name: "Astral Overlord", prompt: "A large, radiant {spirit}. Multi-layered transparent versions of the creature echo faintly behind it in {element} energy. {color} aura expanding massively. Silhouette crystal clear." },
-  18: { name: "Universal Sovereign", prompt: "A {spirit} appearing grand and unstoppable. {element} storms or cosmic tides swirling behind in {color} hues. Creature itself anatomically unchanged, simply at impossible scale." },
-  19: { name: "Mythic Apex", prompt: "A {spirit} standing as a mythic deity of its species. Runes or sigils floating around it in {element} energy. Light and shadow contouring the body in {color} tones, emphasizing every species-specific detail." },
-  20: { name: "Origin of Creation", prompt: "The ultimate {spirit}: embodiment of pure {element} essence while retaining exact face, body, limb structure, wings, fins, tail of base species. Glowing cosmic patterns pulsing through fur/feathers/scales in {color} brilliance. Majestic, infinite, recognizably the same creature — perfected." }
+  2: { name: "Newborn Emergence", prompt: "A tiny newborn {spirit} taking its first breaths, anatomically accurate with realistic proportions for a hatchling. Oversized curious eyes with proper iris detail and light reflection, soft vulnerable body with correct skeletal structure visible beneath skin/fur/scales. Realistic newborn proportions: large head-to-body ratio, short stubby limbs with proper joint placement. Delicate faint markings in {color} tones. Gentle {element} aura flickering softly. Cinematic lighting highlighting vulnerability and innocence." },
+  3: { name: "Early Infant Form", prompt: "A slightly larger infant {spirit} with improved motor control, steadier posture showing proper spine alignment and center of gravity. Still youthfully round with baby fat/fluff but developing muscle definition. Bright intelligent eyes with proper anatomical positioning. Species-accurate features emerging: correct number of digits, proper ear/horn placement, accurate tail structure. {element} effects manifesting naturally along the creature's energetic meridians. Dynamic lighting showing form and depth." },
+  4: { name: "Juvenile Form", prompt: "A young {spirit} entering adolescence with lengthening limbs showing proper bone structure and joint articulation. Playful athletic pose demonstrating agility and emerging coordination. Anatomically correct musculature beginning to define beneath fur/feathers/scales. Realistic texture details: individual hair strands, scale overlap patterns, or feather barbules. {color} patterning following natural pigmentation paths. {element} energy highlighting movement with motion blur and particle effects." },
+  5: { name: "Young Explorer", prompt: "A growing {spirit} reaching balanced adult proportions with realistic skeletal structure and proper weight distribution. Signature anatomical features now prominent: horns with proper keratin texture, wings with accurate bone structure and membrane/feather detail, claws with realistic curvature, fins with proper ray structure, or tail with correct vertebrae articulation. {element} energy flowing along natural body contours. Confident dynamic pose with cinematic three-point lighting." },
+  6: { name: "Adolescent Guardian", prompt: "A larger adolescent {spirit} with well-defined musculature showing proper anatomical groups: shoulders, haunches, core. Realistic skin/fur/scale texture with subsurface scattering. Confident powerful stance with accurate weight-bearing posture. {element} markings following natural body patterns like tiger stripes or leopard spots but glowing with magical energy. {color} highlights emphasizing anatomical form. Dramatic atmospheric lighting with rim light defining silhouette." },
+  7: { name: "Initiate Protector", prompt: "A mature {spirit} with peak physical conditioning, every muscle group anatomically correct and properly defined. Majestic facial features with realistic bone structure, proper eye socket depth, accurate muzzle/beak proportions. Fur/feathers/scales rendered with microscopic detail showing individual elements. Battle-ready stance with proper weight distribution and tension. {element} aura forming a luminous shield-like corona with atmospheric perspective. {color} patterns creating visual hierarchy. Epic hero lighting with motivated shadows." },
+  8: { name: "Seasoned Guardian", prompt: "An imposing {spirit} at full adult size with flawless species anatomy and heroic proportions. Powerful physique showing realistic muscle tension and relaxation. Every anatomical detail perfect: teeth/fangs with proper dental structure, eyes with corneal reflection and depth, skin showing appropriate thickness and texture variation. Dynamic pose mid-motion with realistic momentum. {element} energy creating environmental interaction: heat waves, water displacement, ground fissures. Cinematic wide-angle composition with depth of field." },
+  9: { name: "Mature Protector", prompt: "A battle-hardened {spirit} in its prime, anatomically perfect with scars and weathering that tell a story. Peak physical condition with defined musculature showing proper insertion points and fiber direction. Regal commanding pose with perfect posture and balance. Environment responding realistically: wind-blown debris, displaced water, crackling energy, gravitational distortion. {element} power radiating with volumetric lighting effects. {color} markings intricate and luminous. Dramatic low-angle cinematic framing emphasizing power." },
+  10: { name: "Veteran Form", prompt: "A legendary {spirit} with refined elegant anatomy showing both power and grace. Muscles/feathers/scales/skin exhibiting masterful detail: individual muscle striations, scale iridescence, feather microstructures, skin pores and texture. Wise battle-scarred face with deep intelligent eyes showing inner light. Poised stance radiating authority. {element} markings pulsing with rhythmic energy following circulatory patterns. {color} accents creating focal points. Museum-quality rendering with perfect subsurface scattering and ambient occlusion." },
+  11: { name: "Elevated Form", prompt: "A transcendent {spirit} achieving weightless grace while maintaining perfect anatomical accuracy. Slight gravitational defiance with realistic physics: fur/feathers flowing upward, subtle ground separation with energy cushion. {element} trails creating realistic motion paths with particle physics. Eyes glowing with inner luminescence showing proper eye anatomy with magical enhancement. Every muscle, bone, and feature rendered flawlessly. Ethereal atmospheric lighting with volumetric god rays." },
+  12: { name: "Ascended Form", prompt: "A majestic {spirit} hovering in concentrated ambient energy field, species anatomy 100% preserved and enhanced. Powerful physique showing peak evolutionary form with perfect proportions. {element} forming a brilliant radiant outline following exact body contours with proper light diffusion. {color} aura intensifying with realistic energy physics. Heroic floating pose with proper center of gravity. IMAX-quality cinematic composition with dramatic scale and atmospheric depth. Photorealistic fur/scale/feather rendering with every detail visible." },
+  13: { name: "Ether-Born Avatar", prompt: "A reality-bending {spirit} with semi-transparent layers of {element} energy phasing around its physically perfect body. Cosmic or elemental sacred geometry patterns emerging organically on anatomically accurate fur/feathers/scales in {color} luminescence. Base creature silhouette completely unaltered, just cosmically enhanced. Multiple energy layers creating depth with atmospheric perspective. Mystical aura suggesting dimensional transcendence while maintaining biological perfection. Octane render quality with path-traced lighting." },
+  14: { name: "Primordial Aspect", prompt: "A monumentally enlarged {spirit} radiating ancient primordial power while maintaining exact anatomical proportions at massive scale. {element} energy condensing into luminous runic lines and glyphs wrapping around body following natural anatomy (veins, muscle groups, bone structure) without modifying base form. Reality warping subtly around the creature with spacetime distortion effects. Ground cracking beneath its weight with realistic physics. Ancient cosmic power radiating in {color} hues. Epic fantasy art quality with perfect anatomy at titan scale." },
+  15: { name: "Colossus Form", prompt: "A colossal mythic-scale {spirit} towering with divine presence. Every anatomical feature identical to base species but rendered at monumental scale with museum-quality detail: individual scales/feathers visible despite size, proper muscle definition throughout, correct skeletal structure, accurate proportions maintained. {element} effects manifesting as massive environmental phenomena in {color} brilliance. Kaiju-scale cinematography with proper forced perspective. The creature is impossibly large yet perfectly anatomically sound. Photoreal rendering showing atmospheric scattering and scale depth cues." },
+  16: { name: "Cosmic Guardian", prompt: "A celestial {spirit} merged with cosmic forces while retaining perfect biological anatomy. Surrounded by photorealistic nebula clouds in {element} energy and {color} star matter. Eyes containing actual galaxies with realistic astronomical detail while maintaining proper eye structure. Body covered in bioluminescent patterns following natural markings with complex sacred geometry overlays. Every anatomical feature present and correct beneath cosmic enhancement. Space-based environment with realistic stellar lighting. NASA-quality astrophotography meets natural history museum specimen." },
+  17: { name: "Astral Overlord", prompt: "A dimension-transcending {spirit} with crystal-clear anatomical definition. Multiple ghost-image echoes trailing behind showing motion through dimensional space, each maintaining perfect species anatomy. {element} energy creating chromatic aberration effects and reality ripples. {color} aura expanding into a massive presence field with realistic energy falloff. Main body hyper-detailed showing every muscle fiber, scale ridge, feather barbule in sharp focus. Dramatic dutch angle with impossible scale. Reality fragmenting around absolute power while creature remains anatomically flawless." },
+  18: { name: "Universal Sovereign", prompt: "A world-ending scale {spirit} appearing catastrophically powerful yet anatomically pristine. {element} manifesting as apocalyptic environmental phenomena: hurricane-force winds, tsunami waves, seismic ruptures, plasma storms swirling in {color} cosmic fury. The creature itself maintains perfect unchanged anatomy simply existing at impossible planetary scale. Every biological detail correct and visible despite godlike size. Satellite-view composition showing creature affecting continental-scale environment. Photoreal disaster-movie cinematography with the creature as unstoppable natural force." },
+  19: { name: "Mythic Apex", prompt: "A deity-tier {spirit} standing as the perfected mythological ideal of its species. Floating runes and sigils orbiting in {element} script with ancient divine power. Physically flawless with every anatomical detail representing the absolute peak of evolutionary design: perfect symmetry, ideal muscle definition, pristine features, divine proportions following golden ratio. Light and shadow playing across form in {color} divine radiance emphasizing every species-specific detail like a Baroque religious painting. Heroic pose on cosmic throne or platform. Worshipful low-angle composition with dramatic chiaroscuro lighting." },
+  20: { name: "Origin of Creation", prompt: "The absolute ultimate {spirit}: the primordial template from which all others descend. Pure embodiment of {element} in its creation-myth form while retaining EXACT anatomical accuracy of face, eyes, skull structure, body, musculature, skeletal system, limb articulation, wings, fins, tail, and every species-defining feature of base creature. Every surface glowing with {color} cosmic genesis energy pulsing through perfect fur/feathers/scales like living stardust. The creature that existed before time, perfect in every biological detail. Background shows universe being born from its presence. Biblical/mythological grandeur with museum-specimen anatomical accuracy. This is perfection incarnate: the Original, the First, the Eternal - recognizably the same beloved companion but ascended to absolute divine completion." }
 };
 
 serve(async (req) => {
@@ -130,29 +130,164 @@ serve(async (req) => {
     
     // Stage 0 uses special silhouette prompt
     if (stage === 0) {
-      fullPrompt = `Ultra high quality digital art, photorealistic fantasy magical egg:\n\nA mystical egg floating in gentle ${element} energy. The egg has a smooth, opalescent surface with subtle ${favoriteColor} undertones and delicate natural patterns. 
+      fullPrompt = `PHOTOREALISTIC CINEMATIC FANTASY ART - Ultra high quality, 8K detail:
 
-CRITICAL: Deep within the semi-translucent shell, there must be a dark shadowy silhouette barely visible - the mysterious outline of a powerful, majestic ${spiritAnimal} creature curled in dormant slumber (showing what it will look like at stage 15 - a fully mature, impressive form).
+SUBJECT: A monumental mystical egg suspended in a divine realm, radiating ${element} elemental power.
 
-The silhouette should be:
-- Completely dark and featureless (just a shadow/outline)  
-- Show the basic powerful shape of a mature ${spiritAnimal}
-- Curled in sleeping position inside the egg
-- Barely visible through the translucent egg shell
-- Mysterious and promising
+EGG DETAILS:
+- Smooth opalescent surface with iridescent rainbow shimmer
+- Subtle ${favoriteColor} undertones with natural organic patterns
+- Semi-translucent crystalline shell with depth and thickness
+- Realistic material properties: subsurface scattering, refraction, reflection
+- Scale: Large enough to suggest the powerful creature within
 
-The egg itself glows softly with ${element} energy (${elementEffect}), with faint pulses of ${favoriteColor} light.
+CRITICAL SILHOUETTE INSIDE:
+Deep within the translucent shell, there MUST be a dark shadowy silhouette:
+- The outline of a FULLY MATURE, powerful ${spiritAnimal.toUpperCase()} at peak adult form (Stage 15)
+- This is a PURE ${spiritAnimal} - NOT a hybrid, NOT a dragon, NOT any other species
+- Anatomically accurate silhouette showing correct ${spiritAnimal} proportions and features
+- Recognizable as a real ${spiritAnimal} from its silhouette alone (correct head shape, body proportions, limb count)
+- Curled in a regal sleeping position, muscles relaxed but defined
+- Shadow is mysterious but shows recognizable ${spiritAnimal} characteristics (ears, tail, body shape)
+- Completely dark and featureless (pure shadow/outline only)
+- Barely visible through shell creating mystical anticipation
+- The shadow suggests IMPRESSIVE SIZE and MAJESTIC PRESENCE
+- Real-world ${spiritAnimal} anatomy maintained even in shadow form
 
-Style: Ethereal, magical, mysterious, cinematic lighting, depth of field, ultra detailed 8K quality, professional fantasy concept art`;
+ELEMENTAL EFFECTS:
+${elementEffect}
+- Energy flowing around egg with realistic physics and volumetric rendering
+- Pulsing rhythmic glow in ${favoriteColor} tones suggesting heartbeat
+- Environmental interaction: floating particles, light refraction, atmospheric effects
+
+COMPOSITION & LIGHTING:
+- Dramatic three-quarter view showing egg volume and depth
+- Divine volumetric lighting with god rays piercing through mystical atmosphere
+- Cinematic depth of field with bokeh effects in background
+- Atmospheric perspective creating sense of scale and grandeur
+- Color grading: ethereal, magical, hint of ${favoriteColor} throughout
+
+STYLE REFERENCES:
+- Photoreal rendering quality (Octane/Unreal Engine 5)
+- Fantasy concept art mastery (professional game cinematics)
+- Museum specimen photography meets epic fantasy
+- WETA Workshop creature design quality`;
     } else {
       const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
       
-      // Special handling for aquatic creatures to prevent legs
+      // Progressive creative freedom based on stage
+      // Early stages (1-10): Strict realism
+      // Mid stages (11-14): Allow mythic enhancements
+      // Late stages (15-20): Full grandiose creativity
+      const stageLevel = stage <= 10 ? 'realistic' : stage <= 14 ? 'mythic' : 'legendary';
+      
+      // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
-      const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: NO LEGS OR LIMBS. This is a purely aquatic creature with fins, tail, and streamlined body only. Absolutely no legs, arms, or terrestrial limbs of any kind.' : '';
       
-      fullPrompt = `Ultra high quality digital art, photorealistic fantasy creature:\n\n${basePrompt}\n\nCRITICAL: MUST be anatomically accurate ${spiritAnimal}. Maintain EXACT ${spiritAnimal} silhouette, proportions, and features.${aquaticNote}\n\nCOLORS: Primary ${favoriteColor}, Eyes ${eyeColor || favoriteColor}, Fur/Feathers/Scales ${furColor || favoriteColor}, Element ${elementEffect}\n\nSTYLE: Hyper-detailed textures, cinematic lighting, ethereal magical atmosphere, depth of field\n\nStage ${stage}: ${stageInfo.name}\n${element} element creature\nPerfect ${spiritAnimal} anatomy\n\nUltra detailed, 8K quality, professional concept art`;
+      // Stage-appropriate aquatic enforcement
+      let aquaticNote = '';
+      if (isAquatic) {
+        if (stageLevel === 'realistic' || stageLevel === 'mythic') {
+          aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a purely AQUATIC creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Must follow real-world aquatic animal anatomy\n- Underwater environment with water physics';
+        } else {
+          // Legendary tier - aquatic still maintained even at cosmic scale
+          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE (COSMIC SCALE):\n- Even at universe-scale, this remains an AQUATIC entity - NO LEGS OR TERRESTRIAL LIMBS\n- Cosmic fins, nebula tail flukes, galaxy-scale streamlined form\n- NEVER legs, arms, or terrestrial appendages - aquatic movement through space itself\n- Can have ethereal fins, stellar tail, cosmic flippers - but must remain recognizably aquatic\n- Think: cosmic whale swimming through stars, not a legged deity';
+        }
+      }
+      
+      // Stage-appropriate species enforcement
+      let speciesGuidance = '';
+      if (stageLevel === 'realistic') {
+        speciesGuidance = `
+SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
+THIS IS A ${spiritAnimal.toUpperCase()} - Nothing else, no exceptions, no creative interpretation.
+
+CRITICAL SPECIES REQUIREMENTS:
+- Species: Pure ${spiritAnimal} - 100% anatomically accurate to real-world ${spiritAnimal} biology
+- NO HYBRIDS: This is NOT a ${spiritAnimal}-dragon, NOT a ${spiritAnimal}-human, NOT any other species
+- NO ADDED FEATURES: Do not add wings unless ${spiritAnimal} naturally has wings in reality
+- NO REMOVED FEATURES: Do not remove limbs that real ${spiritAnimal} have
+- EXACT ${spiritAnimal} skeletal structure following real animal anatomy textbooks
+- EXACT ${spiritAnimal} proportions (head-to-body ratio, limb length, body shape)
+- Correct number of limbs: Real ${spiritAnimal} have [X] legs - match this exactly
+- Correct digit count: Real ${spiritAnimal} have [Y] toes/claws - match this exactly
+- Species-defining features: ${spiritAnimal} have specific ears/snout/tail - include all of them
+- Realistic muscle groups and bone structure for ${spiritAnimal} species
+- Species-appropriate posture, gait, and natural movement for ${spiritAnimal}${aquaticNote}
+
+REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.`;
+      } else if (stageLevel === 'mythic') {
+        speciesGuidance = `
+SPECIES IDENTITY (CORE FOUNDATION):
+THIS IS A ${spiritAnimal.toUpperCase()} - Recognizable species with mythic enhancements allowed.
+
+ENHANCED SPECIES REQUIREMENTS:
+- Base Species: ${spiritAnimal} - core anatomy maintained but mythic features now permitted
+- Species recognizable: Should still be identifiable as ${spiritAnimal} at first glance
+- Core features preserved: Maintain ${spiritAnimal} head shape, body structure, limb configuration
+- Mythic enhancements allowed: Can add divine horns, ethereal wings, cosmic patterns, reality-bending features
+- Size enhancement: Can be larger than real-world scale
+- Proportions can be heroic/idealized while maintaining ${spiritAnimal} identity
+- Elemental features can manifest as additional visual elements (energy wings, particle effects, auras)${aquaticNote}
+
+CREATIVE FREEDOM: You may add mythic/divine features that enhance the ${spiritAnimal} into a legendary form, BUT the creature must remain recognizable as a ${spiritAnimal}.`;
+      } else {
+        speciesGuidance = `
+SPECIES IDENTITY (DIVINE EVOLUTION):
+THIS IS THE ULTIMATE ${spiritAnimal.toUpperCase()} - A god-tier, reality-breaking, cosmic entity that transcends while maintaining ${spiritAnimal} essence.
+
+LEGENDARY CREATIVE FREEDOM:
+- Base Species Recognition: ${spiritAnimal} identity visible through divine form
+- FULL CREATIVE LIBERTY: Add cosmic wings, divine horns, multiple forms, reality fragments, celestial features
+- Scale: Colossal, planetary, universe-scale presence
+- Anatomy can be fantastical: Multiple ethereal limbs, cosmic energy constructs, dimensional features
+- Can transcend physical form: Ghost images, dimensional echoes, astral projections
+- Divine enhancements: Halos, crowns, divine armor, cosmic patterns, universe-birthing energy
+- Reality-bending: Environment warps around the creature, space-time distortions, cosmic phenomena${aquaticNote}
+
+GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
+      }
+      
+      fullPrompt = `PHOTOREALISTIC FANTASY CREATURE - Professional concept art quality:
+
+CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
+
+BASE DESCRIPTION:
+${basePrompt}
+${speciesGuidance}
+
+COLOR PALETTE:
+- Primary colors: ${favoriteColor} tones
+- Eye color: ${eyeColor || favoriteColor}
+- Fur/Feathers/Scales: ${furColor || favoriteColor} with natural variation
+- Elemental glow: ${element} effects (${elementEffect})
+
+RENDERING QUALITY:
+- Photoreal textures with microscopic detail (fur strands, scale patterns, feather barbules)
+- Proper subsurface scattering on skin/scales
+- Realistic material properties (wet, dry, metallic, organic)
+- Accurate light interaction (reflection, refraction, absorption)
+
+CINEMATIC PRESENTATION:
+- Professional three-point lighting setup
+- Atmospheric effects and volumetric lighting
+- Depth of field with cinematic bokeh
+- Dynamic composition emphasizing power and grace
+- Color grading for emotional impact
+
+ELEMENTAL INTEGRATION:
+- ${element} element manifesting naturally with creature's biology
+- Energy effects following anatomical contours
+- Environmental interaction showing elemental power
+- Balanced integration - enhancing not overwhelming
+
+STYLE REFERENCES:
+- Photorealistic CGI (Unreal Engine 5 / Octane render quality)
+- Natural history museum specimen detail
+- Fantasy blockbuster VFX (WETA, ILM quality)
+- 8K ultra-high resolution
+- Professional creature design standards`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
