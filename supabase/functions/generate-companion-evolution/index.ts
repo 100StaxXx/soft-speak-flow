@@ -215,15 +215,19 @@ EGG CONSTRUCTION:
 - Subsurface scattering showing thickness and translucency
 
 CRITICAL SILHOUETTE WITHIN (MUST BE VISIBLE):
-Through the mystical shell, a dark shadowy form of a FULLY EVOLVED ${companion.spirit_animal}:
+Through the mystical shell, a dark shadowy form of a FULLY EVOLVED ${companion.spirit_animal.toUpperCase()}:
+- THIS IS A PURE ${companion.spirit_animal} - NOT a hybrid, NOT a dragon, NOT any other species
 - ADULT peak form at maximum power (Stage 15+ appearance)
-- Anatomically correct ${companion.spirit_animal} silhouette showing proper proportions
-- Heroic regal pose: standing tall, dominant, wings spread (if applicable), commanding stance
+- 100% anatomically correct ${companion.spirit_animal} silhouette following real animal anatomy
+- Recognizable as a real ${companion.spirit_animal} from silhouette alone
+- Correct limb count for ${companion.spirit_animal} species (real animals have specific number of legs)
+- Heroic regal pose: standing tall, dominant, wings ONLY if ${companion.spirit_animal} naturally has them, commanding stance
 - Muscular god-tier physique visible in shadow form
 - The outline suggests IMMENSE SIZE and MAJESTIC PRESENCE
 - Shadow is intentionally blurred/out of focus - we see EPIC SHAPE not details
 - This is what the creature will become at ultimate evolution
-- Properly proportioned: correct limb structure, head size, body shape for mature ${companion.spirit_animal}
+- Properly proportioned: correct limb structure, head size, body shape matching real-world ${companion.spirit_animal}
+- Species-defining features visible in outline: ${companion.spirit_animal}-specific ears, tail, body type
 
 ELEMENTAL & COLOR:
 - ${companion.core_element} energy radiating with realistic physics and particle effects
@@ -271,15 +275,22 @@ MOOD: Legendary destiny sealed within, unstoppable divine potential, the champio
 
 SUBJECT: A tiny newborn baby ${companion.spirit_animal} at the sacred moment of hatching.
 
+SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
+THIS IS A BABY ${companion.spirit_animal.toUpperCase()} - Pure species, no hybrids, no creative liberties.
+
 CREATURE DETAILS (ANATOMICALLY ACCURATE):
-- Species: ${companion.spirit_animal} - perfect baby anatomy for this species
+- Species: 100% pure ${companion.spirit_animal} - perfect baby anatomy for this specific species
+- NOT a hybrid: This is a real ${companion.spirit_animal} baby, not mixed with dragon/human/other species
+- Correct limb count: Baby ${companion.spirit_animal} have the same number of legs as adult ${companion.spirit_animal}
+- Species-accurate features: Baby ${companion.spirit_animal} ears, snout/beak, tail, paws/hooves/claws matching real animals
 - Size: NEWBORN tiny scale - small, fragile, precious
-- Proportions: Realistic hatchling proportions (large head-to-body ratio, short limbs, oversized features)
+- Proportions: Realistic hatchling proportions for ${companion.spirit_animal} species (large head-to-body ratio, short stubby limbs, oversized features)
 - Eyes: Big curious infant eyes with proper iris detail, light reflection, innocent wonder
 - Body: Soft vulnerable form with visible baby features (chubby, round, delicate)
 - Posture: Wobbly, uncertain stance - first moments discovering balance and movement
 - Expression: Pure innocence and wonder, slightly confused but curious
-- Still glistening wet from egg with subtle sheen${aquaticNote}
+- Still glistening wet from egg with subtle sheen
+- Reference real baby ${companion.spirit_animal} from nature documentaries for anatomy${aquaticNote}
 
 HATCHING SCENE:
 - Broken eggshell pieces scattered around showing recent emergence
@@ -444,12 +455,18 @@ ${companion.fur_color ? `- Fur/Scale/Feather Color: ${companion.fur_color} (exac
 
 === CRITICAL CONTINUITY REQUIREMENTS (DO NOT BREAK) ===
 
-1. SPECIES ANATOMY (100% PRESERVATION):
-   - Maintain EXACT ${companion.spirit_animal} skeletal structure and proportions
-   - Same bone structure, joint placement, limb configuration
-   - Same facial structure, skull shape, feature placement
+1. SPECIES ANATOMY (100% PRESERVATION - ABSOLUTELY NON-NEGOTIABLE):
+   THIS IS A ${companion.spirit_animal.toUpperCase()} - Not a hybrid, not a dragon, not any other species.
+   
+   - Maintain EXACT ${companion.spirit_animal} skeletal structure following real animal anatomy
+   - Same bone structure, joint placement, limb configuration as real ${companion.spirit_animal}
+   - Correct number of legs: ${companion.spirit_animal} have a specific number - DO NOT CHANGE THIS
+   - Same facial structure, skull shape, feature placement as real ${companion.spirit_animal}
    - Same body type and natural physique for this species
-   - NO species changes, NO hybrid features, NO anatomical redesigns
+   - Species-defining features: ${companion.spirit_animal} ears/horns/antlers/snout/beak are distinct - keep them exact
+   - NO species changes, NO hybrid features (no dragon wings unless naturally present)
+   - NO added limbs, NO removed limbs, NO anatomical redesigns
+   - Reference: This should look like a real ${companion.spirit_animal} from a nature documentary with magical enhancements
 
 2. COLOR PALETTE (95% MATCH):
    - ${companion.favorite_color} MUST remain the dominant color

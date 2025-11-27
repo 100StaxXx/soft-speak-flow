@@ -143,13 +143,16 @@ EGG DETAILS:
 
 CRITICAL SILHOUETTE INSIDE:
 Deep within the translucent shell, there MUST be a dark shadowy silhouette:
-- The outline of a FULLY MATURE, powerful ${spiritAnimal} at peak adult form (Stage 15)
-- Anatomically accurate silhouette showing correct proportions and features
+- The outline of a FULLY MATURE, powerful ${spiritAnimal.toUpperCase()} at peak adult form (Stage 15)
+- This is a PURE ${spiritAnimal} - NOT a hybrid, NOT a dragon, NOT any other species
+- Anatomically accurate silhouette showing correct ${spiritAnimal} proportions and features
+- Recognizable as a real ${spiritAnimal} from its silhouette alone (correct head shape, body proportions, limb count)
 - Curled in a regal sleeping position, muscles relaxed but defined
-- Shadow is mysterious but shows recognizable ${spiritAnimal} characteristics
+- Shadow is mysterious but shows recognizable ${spiritAnimal} characteristics (ears, tail, body shape)
 - Completely dark and featureless (pure shadow/outline only)
 - Barely visible through shell creating mystical anticipation
 - The shadow suggests IMPRESSIVE SIZE and MAJESTIC PRESENCE
+- Real-world ${spiritAnimal} anatomy maintained even in shadow form
 
 ELEMENTAL EFFECTS:
 ${elementEffect}
@@ -184,12 +187,23 @@ CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
 BASE DESCRIPTION:
 ${basePrompt}
 
-ANATOMICAL REQUIREMENTS (CRITICAL):
-- Species: ${spiritAnimal} - MUST be anatomically accurate to this species
-- Maintain EXACT ${spiritAnimal} skeletal structure, proportions, and biological features
-- Realistic muscle definition, bone structure, and anatomical details
-- Correct number and placement of limbs, digits, features
-- Species-appropriate posture, stance, and movement${aquaticNote}
+SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
+THIS IS A ${spiritAnimal.toUpperCase()} - Nothing else, no exceptions, no creative interpretation.
+
+CRITICAL SPECIES REQUIREMENTS:
+- Species: Pure ${spiritAnimal} - 100% anatomically accurate to real-world ${spiritAnimal} biology
+- NO HYBRIDS: This is NOT a ${spiritAnimal}-dragon, NOT a ${spiritAnimal}-human, NOT any other species
+- NO ADDED FEATURES: Do not add wings unless ${spiritAnimal} naturally has wings in reality
+- NO REMOVED FEATURES: Do not remove limbs that real ${spiritAnimal} have
+- EXACT ${spiritAnimal} skeletal structure following real animal anatomy textbooks
+- EXACT ${spiritAnimal} proportions (head-to-body ratio, limb length, body shape)
+- Correct number of limbs: Real ${spiritAnimal} have [X] legs - match this exactly
+- Correct digit count: Real ${spiritAnimal} have [Y] toes/claws - match this exactly
+- Species-defining features: ${spiritAnimal} have specific ears/snout/tail - include all of them
+- Realistic muscle groups and bone structure for ${spiritAnimal} species
+- Species-appropriate posture, gait, and natural movement for ${spiritAnimal}${aquaticNote}
+
+REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.
 
 COLOR PALETTE:
 - Primary colors: ${favoriteColor} tones
