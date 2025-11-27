@@ -84,11 +84,22 @@ serve(async (req) => {
     throw new Error(`Receipt verification failed: ${verifyData.status}`);
   } catch (error: any) {
     console.error("Error verifying receipt:", error);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (error.message === "Unauthorized") {
+      statusCode = 401;
+    } else if (error.message?.includes("not found")) {
+      statusCode = 404;
+    } else if (error.message?.includes("invalid") || error.message?.includes("required")) {
+      statusCode = 400;
+    }
+    
     return new Response(
       JSON.stringify({ error: error?.message || "Unknown error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: statusCode,
       }
     );
   }

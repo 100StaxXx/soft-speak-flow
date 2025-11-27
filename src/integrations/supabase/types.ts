@@ -1818,6 +1818,53 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_history: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          failure_reason: string | null
+          id: string
+          status: string
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          status: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          status?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pep_talk_mentors: {
         Row: {
           created_at: string | null
@@ -2024,7 +2071,12 @@ export type Database = {
           referral_count: number | null
           referred_by: string | null
           selected_mentor_id: string | null
+          stripe_customer_id: string | null
+          subscription_expires_at: string | null
+          subscription_started_at: string | null
+          subscription_status: string | null
           timezone: string | null
+          trial_ends_at: string | null
           updated_at: string | null
           zodiac_sign: string | null
         }
@@ -2050,7 +2102,12 @@ export type Database = {
           referral_count?: number | null
           referred_by?: string | null
           selected_mentor_id?: string | null
+          stripe_customer_id?: string | null
+          subscription_expires_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           updated_at?: string | null
           zodiac_sign?: string | null
         }
@@ -2076,7 +2133,12 @@ export type Database = {
           referral_count?: number | null
           referred_by?: string | null
           selected_mentor_id?: string | null
+          stripe_customer_id?: string | null
+          subscription_expires_at?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           updated_at?: string | null
           zodiac_sign?: string | null
         }
@@ -2310,6 +2372,54 @@ export type Database = {
           is_active?: boolean | null
           label?: string | null
           time_of_day?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at: string | null
+          cancelled_at: string | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          id: string
+          plan: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at?: string | null
+          cancelled_at?: string | null
+          created_at?: string | null
+          current_period_end: string
+          current_period_start: string
+          id?: string
+          plan: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at?: string | null
+          cancelled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
