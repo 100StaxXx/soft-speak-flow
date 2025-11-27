@@ -9,15 +9,15 @@ import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Share2, G
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
-import { safeClipboardWrite, isClipboardAvailable, getClipboardErrorMessage } from "@/utils/clipboard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { ShareableStoryCard } from "./ShareableStoryCard";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
-  const [canShare, setCanShare] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   
   // Debounce stage changes to prevent race conditions
   useEffect(() => {
@@ -28,28 +28,6 @@ export const CompanionStoryJournal = () => {
     return () => clearTimeout(timer);
   }, [viewingStage]);
   
-  // Check if sharing is supported
-  useEffect(() => {
-    const checkShareSupport = async () => {
-      try {
-        // Dynamically import Capacitor modules to prevent web build issues
-        const { Capacitor } = await import("@capacitor/core");
-        
-        if (Capacitor.isNativePlatform()) {
-          const { Share } = await import("@capacitor/share");
-          const canShareResult = await Share.canShare();
-          setCanShare(canShareResult.value);
-        } else {
-          // Check for Web Share API or clipboard as fallback
-          setCanShare(!!navigator.share || isClipboardAvailable());
-        }
-      } catch (error) {
-        // Capacitor not available, check web share API or clipboard fallback
-        setCanShare(!!navigator.share || isClipboardAvailable());
-      }
-    };
-    checkShareSupport();
-  }, []);
   
   const { story, allStories, isLoading, generateStory } = useCompanionStory(
     companion?.id,
@@ -140,73 +118,8 @@ export const CompanionStoryJournal = () => {
     );
   }
 
-  const handleShare = async () => {
-    if (isSharing) return; // Prevent double-click
-    
-    if (!story) {
-      toast.error("No story to share");
-      return;
-    }
-    
-    if (!canShare) {
-      toast.error("Sharing is not supported on this device");
-      return;
-    }
-    
-    setIsSharing(true);
-    
-    try {
-      // Create chapter text once (fixes Bug #3: code duplication)
-      const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
-      const shareData = {
-        title: `${debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: ${story.chapter_title}`,
-        text: chapterText,
-      };
-
-      // Dynamically import Capacitor for native platforms
-      const { Capacitor } = await import("@capacitor/core");
-      
-      if (Capacitor.isNativePlatform()) {
-        const { Share } = await import("@capacitor/share");
-        await Share.share(shareData);
-        toast.success("Story shared!");
-      } else if (navigator.share) {
-        await navigator.share(shareData);
-        toast.success("Story shared!");
-      } else {
-        // Fallback: copy to clipboard (safe for all contexts)
-        const success = await safeClipboardWrite(chapterText);
-        if (success) {
-          toast.success("Story copied to clipboard!");
-        } else {
-          toast.error("Failed to copy story to clipboard");
-        }
-      }
-    } catch (error: any) {
-      console.error("Share error:", error);
-      
-      // Check if user cancelled (case-insensitive)
-      const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
-      const isCancelled = errorMsg.includes('cancel') || 
-                         errorMsg.includes('abort') || 
-                         errorMsg.includes('dismissed') ||
-                         error?.name === 'AbortError';
-      
-      if (!isCancelled) {
-        // Try fallback to clipboard as last resort (reuse already created chapterText)
-        const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
-        const success = await safeClipboardWrite(chapterText);
-        
-        if (success) {
-          toast.info("Couldn't share, but story was copied to clipboard!");
-        } else {
-          toast.error(getClipboardErrorMessage(error));
-        }
-      }
-    } finally {
-      setIsSharing(false);
-    }
-  };
+  // Companion name for card
+  const companionName = companion?.spirit_animal || "Your Companion";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">{showGallery && (
@@ -371,16 +284,15 @@ export const CompanionStoryJournal = () => {
                   </h2>
                   <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
                 </div>
-                {canShare && (
+                {evolutionImage && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleShare}
-                    disabled={!story || isSharing}
+                    onClick={() => setShowShareDialog(true)}
                     className="flex-shrink-0"
                   >
-                    <Share2 className={`w-4 h-4 mr-2 ${isSharing ? 'animate-pulse' : ''}`} />
-                    {isSharing ? "Sharing..." : "Share"}
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Create Story Card
                   </Button>
                 )}
               </div>
@@ -459,6 +371,23 @@ export const CompanionStoryJournal = () => {
           </Card>
         ) : null}
       </Card>
+
+      {/* Share Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Your Story</DialogTitle>
+          </DialogHeader>
+          {story && evolutionImage && (
+            <ShareableStoryCard
+              story={story}
+              companionImage={evolutionImage}
+              companionName={companionName}
+              stage={debouncedStage}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
