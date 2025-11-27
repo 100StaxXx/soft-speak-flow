@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
@@ -10,34 +10,73 @@ import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { shareContent } from "@/utils/capacitor";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
 
 export const CompanionStoryJournal = () => {
   const { companion } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
+  const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  
+  // Debounce stage changes to prevent race conditions
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStage(viewingStage);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [viewingStage]);
+  
+  // Check if sharing is supported
+  useEffect(() => {
+    const checkShareSupport = async () => {
+      if (Capacitor.isNativePlatform()) {
+        const canShareResult = await Share.canShare();
+        setCanShare(canShareResult.value);
+      } else {
+        setCanShare(!!navigator.share);
+      }
+    };
+    checkShareSupport();
+  }, []);
   
   const { story, allStories, isLoading, generateStory } = useCompanionStory(
     companion?.id,
-    viewingStage
+    debouncedStage
   );
 
-  // Fetch companion evolution image for current stage
-  const { data: evolutionImage } = useQuery({
-    queryKey: ["companion-evolution-image", companion?.id, viewingStage],
+  // Fetch companion evolution image for current stage with Stage 0 handling
+  const { data: evolutionImage, isLoading: isImageLoading } = useQuery({
+    queryKey: ["companion-evolution-image", companion?.id, debouncedStage],
     queryFn: async () => {
       if (!companion) return null;
+      
+      // Special handling for Stage 0 (Egg state)
+      if (debouncedStage === 0) {
+        // Return current image or a placeholder
+        return companion.current_image_url || '/placeholder-egg.png';
+      }
       
       const { data, error } = await supabase
         .from("companion_evolutions")
         .select("image_url")
         .eq("companion_id", companion.id)
-        .eq("stage", viewingStage)
+        .eq("stage", debouncedStage)
         .maybeSingle();
       
-      if (error) throw error;
-      return data?.image_url || companion.current_image_url;
+      if (error) {
+        console.error('Failed to fetch evolution image:', error);
+        return companion.current_image_url || '/placeholder-companion.png';
+      }
+      
+      return data?.image_url || companion.current_image_url || '/placeholder-companion.png';
     },
     enabled: !!companion,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+    keepPreviousData: true, // Prevent flashing during navigation
   });
 
   if (!companion) {
@@ -51,27 +90,28 @@ export const CompanionStoryJournal = () => {
     );
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = useCallback(() => {
     if (!companion) return;
     generateStory.mutate({
       companionId: companion.id,
-      stage: viewingStage,
+      stage: debouncedStage,
     });
-  };
+  }, [companion, debouncedStage, generateStory]);
 
   // Check if this stage can be accessed (must be at or below companion's current stage)
-  const canAccessStage = (stage: number) => {
+  const canAccessStage = useCallback((stage: number) => {
+    if (!companion) return false;
     return stage <= companion.current_stage;
-  };
+  }, [companion]);
 
-  const isStageUnlocked = canAccessStage(viewingStage);
+  const isStageUnlocked = canAccessStage(debouncedStage);
 
   const handleShare = async () => {
-    if (!story) return;
+    if (!story || !canShare) return;
     
     const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
     const success = await shareContent({
-      title: `${viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}: ${story.chapter_title}`,
+      title: `${debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: ${story.chapter_title}`,
       text: chapterText,
     });
     
@@ -79,6 +119,10 @@ export const CompanionStoryJournal = () => {
       toast.success("Story shared!");
     }
   };
+
+  // Calculate which stages to show in gallery (unlocked + 1 preview)
+  const maxVisibleStage = Math.min(companion.current_stage + 1, 20);
+  const galleryStages = Array.from({ length: maxVisibleStage + 1 }, (_, i) => i);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">{showGallery && (
@@ -90,7 +134,7 @@ export const CompanionStoryJournal = () => {
             </Button>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-            {Array.from({ length: 21 }, (_, i) => {
+            {galleryStages.map((i) => {
               const isUnlocked = canAccessStage(i);
               const hasStory = allStories?.some(s => s.stage === i);
               return (
@@ -163,12 +207,18 @@ export const CompanionStoryJournal = () => {
             <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-glow">
               <img 
                 src={evolutionImage} 
-                alt={`${companion.spirit_animal} at ${getStageName(viewingStage)}`}
+                alt={`${companion.spirit_animal} at ${getStageName(debouncedStage)}`}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error('Image failed to load:', evolutionImage);
+                  e.currentTarget.src = debouncedStage === 0 
+                    ? '/placeholder-egg.png' 
+                    : '/placeholder-companion.png';
+                }}
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-2">
                 <p className="text-xs text-center font-medium text-foreground">
-                  {getStageName(viewingStage)}
+                  {getStageName(debouncedStage)}
                 </p>
               </div>
             </div>
@@ -188,9 +238,9 @@ export const CompanionStoryJournal = () => {
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}
+              {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
             </p>
-            <p className="font-semibold">{getStageName(viewingStage)}</p>
+            <p className="font-semibold">{getStageName(debouncedStage)}</p>
           </div>
 
           <Button
@@ -217,9 +267,9 @@ export const CompanionStoryJournal = () => {
             <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">Chapter Locked</h3>
             <p className="text-muted-foreground">
-              {viewingStage === 0 
+              {debouncedStage === 0 
                 ? "Complete companion creation to unlock the Prologue"
-                : `This chapter unlocks when your companion reaches Stage ${viewingStage}`
+                : `This chapter unlocks when your companion reaches Stage ${debouncedStage}`
               }
             </p>
           </Card>
@@ -233,20 +283,22 @@ export const CompanionStoryJournal = () => {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 text-center space-y-2">
                   <h2 className="text-2xl font-bold">
-                    {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}: {story.chapter_title}
+                    {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: {story.chapter_title}
                   </h2>
                   <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShare}
-                  disabled={!story}
-                  className="flex-shrink-0"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share
-                </Button>
+                {canShare && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShare}
+                    disabled={!story}
+                    className="flex-shrink-0"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -296,7 +348,7 @@ export const CompanionStoryJournal = () => {
             <div>
               <h3 className="text-xl font-semibold mb-2">Chapter Not Yet Written</h3>
               <p className="text-muted-foreground mb-6">
-                {viewingStage === 0 
+                {debouncedStage === 0 
                   ? "The beginning of your companion's story awaits..."
                   : `Generate this chapter of your companion's story to continue the journey.`
                 }
@@ -304,7 +356,7 @@ export const CompanionStoryJournal = () => {
               
               <Button
                 onClick={handleGenerate}
-                disabled={generateStory.isPending}
+                disabled={generateStory.isPending || isLoading}
                 className="w-full max-w-sm mx-auto"
               >
                 {generateStory.isPending ? (
@@ -315,7 +367,7 @@ export const CompanionStoryJournal = () => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate {viewingStage === 0 ? "Prologue" : `Chapter ${viewingStage}`}
+                    Generate {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
                   </>
                 )}
               </Button>
