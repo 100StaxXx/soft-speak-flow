@@ -40,16 +40,30 @@ const Auth = () => {
       // Initialize SocialLogin plugin for native platforms
       if (Capacitor.isNativePlatform()) {
         try {
+          const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
+          const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
+          
+          console.log('[OAuth Init] Initializing with:', { 
+            hasWebClientId: !!webClientId, 
+            hasIOSClientId: !!iOSClientId 
+          });
+
+          if (!webClientId || !iOSClientId) {
+            console.error('[OAuth Init] Missing Google Client IDs in environment variables');
+            throw new Error('Google Client IDs not configured');
+          }
+
           await SocialLogin.initialize({
             google: {
-              // Google OAuth Client IDs configured
-              webClientId: '371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com',
-              iOSClientId: '371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com',
+              webClientId,
+              iOSClientId,
               mode: 'online'
             }
           });
+          
+          console.log('[OAuth Init] SocialLogin initialized successfully');
         } catch (error) {
-          console.error('Failed to initialize SocialLogin:', error);
+          console.error('[OAuth Init] Failed to initialize SocialLogin:', error);
         }
       }
     };
