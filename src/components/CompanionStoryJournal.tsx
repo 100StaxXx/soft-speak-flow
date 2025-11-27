@@ -14,7 +14,7 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 
 export const CompanionStoryJournal = () => {
-  const { companion } = useCompanion();
+  const { companion, isLoading: companionLoading } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
@@ -53,25 +53,30 @@ export const CompanionStoryJournal = () => {
     queryFn: async () => {
       if (!companion) return null;
       
-      // Special handling for Stage 0 (Egg state)
-      if (debouncedStage === 0) {
-        // Return current image or a placeholder
-        return companion.current_image_url || '/placeholder-egg.png';
-      }
-      
-      const { data, error } = await supabase
-        .from("companion_evolutions")
-        .select("image_url")
-        .eq("companion_id", companion.id)
-        .eq("stage", debouncedStage)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Failed to fetch evolution image:', error);
+      try {
+        // Special handling for Stage 0 (Egg state)
+        if (debouncedStage === 0) {
+          // Return current image or a placeholder
+          return companion.current_image_url || '/placeholder-egg.png';
+        }
+        
+        const { data, error } = await supabase
+          .from("companion_evolutions")
+          .select("image_url")
+          .eq("companion_id", companion.id)
+          .eq("stage", debouncedStage)
+          .maybeSingle();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('Failed to fetch evolution image:', error);
+          return companion.current_image_url || '/placeholder-companion.png';
+        }
+        
+        return data?.image_url || companion.current_image_url || '/placeholder-companion.png';
+      } catch (error) {
+        console.error('Error in evolution image query:', error);
         return companion.current_image_url || '/placeholder-companion.png';
       }
-      
-      return data?.image_url || companion.current_image_url || '/placeholder-companion.png';
     },
     enabled: !!companion,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -79,6 +84,19 @@ export const CompanionStoryJournal = () => {
     placeholderData: (previousData) => previousData, // Prevent flashing during navigation
   });
 
+  // Show loading state
+  if (companionLoading) {
+    return (
+      <Card className="p-8 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+          <p className="text-muted-foreground">Loading your companion's story...</p>
+        </div>
+      </Card>
+    );
+  }
+
+  // Show empty state if no companion
   if (!companion) {
     return (
       <Card className="p-8 text-center">
@@ -91,7 +109,10 @@ export const CompanionStoryJournal = () => {
   }
 
   const handleGenerate = useCallback(() => {
-    if (!companion) return;
+    if (!companion) {
+      toast.error("Companion not loaded. Please refresh the page.");
+      return;
+    }
     generateStory.mutate({
       companionId: companion.id,
       stage: debouncedStage,

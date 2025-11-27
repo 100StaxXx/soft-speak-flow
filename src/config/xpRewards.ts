@@ -81,11 +81,6 @@ export function getHabitXP(difficulty: Difficulty): number {
 }
 
 /**
- * Type-safe difficulty type
- */
-export type Difficulty = 'easy' | 'medium' | 'hard';
-
-/**
  * Quest XP Multiplier based on quest position (diminishing returns)
  * 
  * Quests 1-3: 100% XP
