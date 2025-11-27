@@ -1,11 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") as string, {
-  apiVersion: "2024-11-20.acacia",
-  httpClient: Stripe.createFetchHttpClient(),
-});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,21 +30,32 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    const { subscriptionId } = await req.json();
+    // Get subscription from database
+    const { data: subscription } = await supabaseClient
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
 
-    if (!subscriptionId) {
-      throw new Error("Subscription ID required");
+    if (!subscription) {
+      return new Response(
+        JSON.stringify({ subscribed: false }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
     }
 
-    // Cancel subscription at period end (not immediately)
-    const subscription = await stripe.subscriptions.update(subscriptionId, {
-      cancel_at_period_end: true,
-    });
+    const expiresAt = new Date(subscription.current_period_end);
+    const isActive = expiresAt > new Date() && subscription.status === "active";
 
     return new Response(
       JSON.stringify({
-        success: true,
-        cancelAt: subscription.cancel_at,
+        subscribed: isActive,
+        status: subscription.status,
+        plan: subscription.plan,
+        subscription_end: subscription.current_period_end,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,9 +63,9 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error("Error cancelling subscription:", error);
+    console.error("Error checking subscription:", error);
     return new Response(
-      JSON.stringify({ error: error?.message || 'Unknown error' }),
+      JSON.stringify({ error: error?.message || "Unknown error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,

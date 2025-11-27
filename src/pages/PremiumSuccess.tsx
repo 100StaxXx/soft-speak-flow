@@ -11,7 +11,7 @@ export default function PremiumSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { profile, loading } = useProfile();
-  const { refetch: refetchSubscription, isTrialing, trialDaysRemaining } = useSubscription();
+  const { refetch: refetchSubscription } = useSubscription();
   const [showConfetti, setShowConfetti] = useState(true);
   const [isVerifying, setIsVerifying] = useState(true);
 
@@ -66,18 +66,6 @@ export default function PremiumSuccess() {
         <p className="text-muted-foreground mb-6 text-lg">
           Your subscription is now active
         </p>
-
-        {isTrialing && (
-          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-6">
-            <p className="text-sm font-medium text-foreground mb-1">
-              🎉 Your 7-day free trial has started!
-            </p>
-            <p className="text-xs text-muted-foreground">
-              You have {trialDaysRemaining} days to explore all premium features. You won't be
-              charged until your trial ends. Cancel anytime.
-            </p>
-          </div>
-        )}
 
         <div className="space-y-3 mb-8 text-left bg-muted/30 rounded-lg p-4">
           <h3 className="font-semibold text-sm text-foreground mb-3">What you get:</h3>

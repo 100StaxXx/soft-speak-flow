@@ -1,39 +1,19 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Sparkles, Zap, Bell, Download, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
-import { supabase } from "@/integrations/supabase/client";
+import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 
 export default function Premium() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { isActive, isTrialing, trialDaysRemaining } = useSubscription();
-  const [subscribing, setSubscribing] = useState(false);
+  const { isActive } = useSubscription();
+  const { handlePurchase, loading, isAvailable } = useAppleSubscription();
 
   const handleSubscribe = async () => {
-    setSubscribing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-subscription-checkout');
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (error: any) {
-      console.error('Subscription error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create checkout session",
-        variant: "destructive",
-      });
-    } finally {
-      setSubscribing(false);
+    const success = await handlePurchase('com.revolutions.app.premium.monthly');
+    if (success) {
+      navigate('/premium-success');
     }
   };
 
@@ -51,11 +31,6 @@ export default function Premium() {
           <p className="text-muted-foreground mb-4">
             Enjoy unlimited access to all content
           </p>
-          {isTrialing && (
-            <p className="text-sm text-muted-foreground mb-6 bg-accent/20 p-3 rounded-lg">
-              🎉 Free trial • {trialDaysRemaining} days remaining
-            </p>
-          )}
           <div className="space-y-3">
             <Button
               onClick={() => navigate("/")}
@@ -85,19 +60,16 @@ export default function Premium() {
             <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-5xl text-foreground">
-            Start Your Free Trial
+            Upgrade to Premium
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            7 days free, then $9.99/month. Full access from day one.
+            $9.99/month. Full access to all features.
           </p>
         </div>
 
         {/* Pricing Card */}
         <Card className="border-2 border-primary/20 shadow-2xl bg-card/80 backdrop-blur">
           <CardHeader className="text-center pb-8">
-            <div className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-accent/20 text-accent font-semibold text-sm mb-4 mx-auto">
-              🎉 7-Day Free Trial
-            </div>
             <div className="space-y-2">
               <CardTitle className="text-3xl font-bold text-foreground">R-Evolution Premium</CardTitle>
               <div className="flex items-baseline justify-center gap-2">
@@ -105,7 +77,7 @@ export default function Premium() {
                 <span className="text-xl text-muted-foreground">/month</span>
               </div>
               <CardDescription className="text-base">
-                After 7-day free trial • Cancel anytime
+                Manage subscription via iOS Settings • Cancel anytime
               </CardDescription>
             </div>
           </CardHeader>
@@ -155,36 +127,34 @@ export default function Premium() {
               ))}
             </div>
 
-            {/* Trial Terms */}
-            <div className="bg-muted/30 rounded-lg p-4 space-y-2">
-              <p className="text-sm font-semibold text-foreground">How it works:</p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>✓ Start your 7-day free trial with full access</li>
-                <li>✓ Payment method required (you won't be charged during trial)</li>
-                <li>✓ After 7 days, you'll be charged $9.99/month</li>
-                <li>✓ Cancel anytime during trial - no charge</li>
-              </ul>
-            </div>
+            {/* Apple IAP Notice */}
+            {!isAvailable && (
+              <div className="bg-muted/30 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  In-App Purchases are only available on iOS devices
+                </p>
+              </div>
+            )}
 
             {/* CTA Button */}
             <Button
               onClick={handleSubscribe}
-              disabled={subscribing}
+              disabled={loading || !isAvailable}
               className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
               size="lg"
             >
-              {subscribing ? (
+              {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground mr-2" />
-                  Opening Checkout...
+                  Processing...
                 </>
               ) : (
-                "Start 7-Day Free Trial →"
+                "Subscribe Now →"
               )}
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Secure payment • Cancel anytime • No hidden fees
+              Processed via Apple • Manage in iOS Settings • Cancel anytime
             </p>
           </CardContent>
         </Card>
