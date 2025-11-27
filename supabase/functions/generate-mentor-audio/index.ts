@@ -83,6 +83,8 @@ serve(async (req) => {
       throw new Error("Supabase service credentials are not configured");
     }
 
+    const { mentorSlug, script } = await req.json();
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -91,30 +93,34 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } }
-    });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    // Check if this is a service role call (from cron/internal functions)
+    const isServiceRole = authHeader.includes(SUPABASE_SERVICE_ROLE_KEY);
 
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // Only check rate limits for user calls, not service role calls
+    if (!isServiceRole) {
+      const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const rateLimitResult = await checkRateLimit(
+        supabaseAdmin,
+        user.id,
+        'mentor-audio',
+        RATE_LIMITS['mentor-audio']
       );
+
+      if (!rateLimitResult.allowed) {
+        return createRateLimitResponse(rateLimitResult, corsHeaders);
+      }
     }
-
-    const rateLimitResult = await checkRateLimit(
-      supabaseAdmin,
-      user.id,
-      'mentor-audio',
-      RATE_LIMITS['mentor-audio']
-    );
-
-    if (!rateLimitResult.allowed) {
-      return createRateLimitResponse(rateLimitResult, corsHeaders);
-    }
-
-    const { mentorSlug, script } = await req.json();
 
     if (!mentorSlug || !script) {
       throw new Error("mentorSlug and script are required");

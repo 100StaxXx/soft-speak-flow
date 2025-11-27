@@ -127,7 +127,7 @@ serve(async (req) => {
           {
             body: {
               mentorSlug: mentorSlug,
-              category: theme.topic_category,
+              topic_category: theme.topic_category,
               intensity: theme.intensity,
               emotionalTriggers: theme.triggers
             }
