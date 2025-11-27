@@ -25,8 +25,10 @@ const MorningCheckInContent = () => {
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pollStartTime, setPollStartTime] = useState<number | null>(null);
 
   const today = new Date().toLocaleDateString('en-CA');
+  const MAX_POLL_DURATION = 30000; // 30 seconds max polling
 
   const { data: existingCheckIn } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
@@ -43,6 +45,18 @@ const MorningCheckInContent = () => {
       return data;
     },
     enabled: !!user,
+    // Poll every 2 seconds if check-in exists but mentor response is still pending
+    refetchInterval: (data) => {
+      if (data?.completed_at && !data?.mentor_response) {
+        // Check if we've exceeded max poll duration
+        if (pollStartTime && Date.now() - pollStartTime > MAX_POLL_DURATION) {
+          console.warn('Mentor response polling timeout exceeded');
+          return false; // Stop polling after 30 seconds
+        }
+        return 2000; // Poll every 2 seconds
+      }
+      return false; // Stop polling once we have the response
+    },
   });
 
   const submitCheckIn = async () => {
@@ -115,10 +129,23 @@ const MorningCheckInContent = () => {
         await checkFirstTimeAchievements('checkin');
       }
 
-      // Generate mentor response in background
-      supabase.functions.invoke('generate-check-in-response', {
-        body: { checkInId: checkIn.id }
-      });
+      // Start polling timer
+      setPollStartTime(Date.now());
+
+      // Generate mentor response in background with error handling
+      try {
+        const { error: invocationError } = await supabase.functions.invoke('generate-check-in-response', {
+          body: { checkInId: checkIn.id }
+        });
+        
+        if (invocationError) {
+          console.error('Edge function invocation error:', invocationError);
+          // Don't block the UI - mentor response is optional
+        }
+      } catch (error) {
+        console.error('Edge function invocation failed:', error);
+        // Don't block the UI - mentor response is optional
+      }
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
     } catch (error) {
@@ -167,6 +194,10 @@ const MorningCheckInContent = () => {
                     {existingCheckIn.mentor_response ? (
                       <p className="text-sm italic text-foreground/90 leading-relaxed">
                         "{existingCheckIn.mentor_response}"
+                      </p>
+                    ) : pollStartTime && Date.now() - pollStartTime > MAX_POLL_DURATION ? (
+                      <p className="text-sm text-foreground/80 italic leading-relaxed">
+                        "Great work on setting your intention today. Stay focused and crush it."
                       </p>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">
