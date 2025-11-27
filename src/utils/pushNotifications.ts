@@ -1,15 +1,17 @@
 /**
- * Web Push Notification Service
- * Handles browser push notification subscriptions
+ * Web Push Notification Service (DEPRECATED FOR iOS)
+ * NOTE: This file is deprecated for native iOS. Use nativePushNotifications.ts instead.
+ * Only kept for potential future web-only deployment.
  */
 
+import { Capacitor } from '@capacitor/core';
 import { supabase } from "@/integrations/supabase/client";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
-// Warn if VAPID key is not configured
-if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined') {
-  console.warn('VITE_VAPID_PUBLIC_KEY not configured. Push notifications will be disabled.');
+// Disable on native platforms
+if (Capacitor.isNativePlatform()) {
+  console.log('Web push disabled on native platform. Use nativePushNotifications.ts');
 }
 
 /**
@@ -29,10 +31,10 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
- * Check if push notifications are supported
+ * Check if push notifications are supported (web only, not native)
  */
 export function isPushSupported(): boolean {
-  return 'serviceWorker' in navigator && 'PushManager' in window;
+  return !Capacitor.isNativePlatform() && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
 /**
