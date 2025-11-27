@@ -29,6 +29,24 @@ export const purchaseProduct = async (productId: string): Promise<any> => {
       productIdentifier: productId,
     });
 
+    // Check transaction state - handle different purchase states
+    if (result.state === 'deferred') {
+      throw new Error('Purchase is pending approval. Please check with the account owner.');
+    }
+    
+    if (result.state === 'failed') {
+      throw new Error('Purchase failed. Please try again.');
+    }
+    
+    if (result.state === 'cancelled') {
+      throw new Error('Purchase was cancelled.');
+    }
+    
+    // Only return if purchase was successful or restored
+    if (result.state !== 'purchased' && result.state !== 'restored') {
+      throw new Error(`Unexpected transaction state: ${result.state}`);
+    }
+
     return result;
   } catch (error) {
     console.error('Purchase failed:', error);
@@ -50,6 +68,15 @@ export const restorePurchases = async (): Promise<any> => {
     }
     
     const result = await InAppPurchase.restorePurchases();
+    
+    // Validate restored purchases
+    if (result.purchases) {
+      result.purchases = result.purchases.filter((purchase: any) => {
+        // Only include purchases that are in valid states
+        return purchase.state === 'purchased' || purchase.state === 'restored';
+      });
+    }
+    
     return result;
   } catch (error) {
     console.error('Restore failed:', error);

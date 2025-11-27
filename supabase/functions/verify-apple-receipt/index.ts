@@ -102,8 +102,10 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
   }
 
   const expiresDate = new Date(parseInt(latestReceipt.expires_date_ms));
+  const purchaseDate = new Date(parseInt(latestReceipt.purchase_date_ms));
   const isActive = expiresDate > new Date();
   const productId = latestReceipt.product_id;
+  const originalTransactionId = latestReceipt.original_transaction_id;
 
   // Determine plan from product ID
   let plan = "monthly";
@@ -111,13 +113,21 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
     plan = "yearly";
   }
 
+  // Check if this transaction was already processed (prevent duplicates)
+  const { data: existingPayment } = await supabase
+    .from("payment_history")
+    .select("id")
+    .eq("stripe_payment_intent_id", originalTransactionId)
+    .single();
+
   // Update subscriptions table
   await supabase.from("subscriptions").upsert({
     user_id: userId,
-    stripe_subscription_id: latestReceipt.original_transaction_id,
-    stripe_customer_id: latestReceipt.original_transaction_id,
+    stripe_subscription_id: originalTransactionId,
+    stripe_customer_id: originalTransactionId,
     plan,
     status: isActive ? "active" : "cancelled",
+    current_period_start: purchaseDate.toISOString(),
     current_period_end: expiresDate.toISOString(),
     updated_at: new Date().toISOString(),
   }, {
@@ -131,4 +141,17 @@ async function updateSubscription(supabase: any, userId: string, receiptData: an
     subscription_expires_at: expiresDate.toISOString(),
     updated_at: new Date().toISOString(),
   }).eq("id", userId);
+
+  // Log payment only if not already processed
+  if (!existingPayment) {
+    await supabase.from("payment_history").insert({
+      user_id: userId,
+      stripe_payment_intent_id: originalTransactionId,
+      stripe_invoice_id: latestReceipt.transaction_id,
+      amount: 999, // $9.99 in cents - should be retrieved from product info
+      currency: "usd",
+      status: "succeeded",
+      created_at: purchaseDate.toISOString(),
+    });
+  }
 }
