@@ -48,7 +48,7 @@ export const CompanionStoryJournal = () => {
   );
 
   // Fetch companion evolution image for current stage with Stage 0 handling
-  const { data: evolutionImage, isLoading: isImageLoading } = useQuery({
+  const { data: evolutionImage, isLoading: isImageLoading } = useQuery<string | null>({
     queryKey: ["companion-evolution-image", companion?.id, debouncedStage],
     queryFn: async () => {
       if (!companion) return null;
@@ -75,8 +75,8 @@ export const CompanionStoryJournal = () => {
     },
     enabled: !!companion,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    keepPreviousData: true, // Prevent flashing during navigation
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    placeholderData: (previousData) => previousData, // Prevent flashing during navigation
   });
 
   if (!companion) {
