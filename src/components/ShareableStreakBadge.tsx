@@ -63,9 +63,21 @@ export const ShareableStreakBadge = ({
         // Fallback to download if sharing not supported
         downloadBadge();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sharing badge:', error);
-      toast.error("Failed to share badge");
+      
+      // Check if user cancelled (case-insensitive)
+      const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+      const isCancelled = errorMsg.includes('cancel') || 
+                         errorMsg.includes('abort') || 
+                         errorMsg.includes('dismissed') ||
+                         error?.name === 'AbortError';
+      
+      if (!isCancelled) {
+        // Fallback to download on error
+        toast.info("Couldn't share, downloading instead...");
+        await downloadBadge();
+      }
     }
   };
 

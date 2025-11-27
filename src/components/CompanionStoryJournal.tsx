@@ -38,11 +38,12 @@ export const CompanionStoryJournal = () => {
           const canShareResult = await Share.canShare();
           setCanShare(canShareResult.value);
         } else {
-          setCanShare(!!navigator.share);
+          // Check for Web Share API or clipboard as fallback
+          setCanShare(!!navigator.share || !!navigator.clipboard);
         }
       } catch (error) {
-        // Capacitor not available in web environment, check web share API
-        setCanShare(!!navigator.share);
+        // Capacitor not available, check web share API or clipboard fallback
+        setCanShare(!!navigator.share || !!navigator.clipboard);
       }
     };
     checkShareSupport();
@@ -166,13 +167,30 @@ export const CompanionStoryJournal = () => {
         await navigator.share(shareData);
         toast.success("Story shared!");
       } else {
-        toast.error("Sharing is not available");
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(chapterText);
+        toast.success("Story copied to clipboard!");
       }
     } catch (error: any) {
       console.error("Share error:", error);
-      // User cancelled or error occurred
-      if (!error.message?.includes('cancel') && !error.message?.includes('abort')) {
-        toast.error("Failed to share story");
+      
+      // Check if user cancelled (case-insensitive)
+      const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+      const isCancelled = errorMsg.includes('cancel') || 
+                         errorMsg.includes('abort') || 
+                         errorMsg.includes('dismissed') ||
+                         error?.name === 'AbortError';
+      
+      if (!isCancelled) {
+        // Try fallback to clipboard as last resort
+        try {
+          const chapterText = `${story.chapter_title}\n\n${story.intro_line}\n\n${story.main_story}`;
+          await navigator.clipboard.writeText(chapterText);
+          toast.info("Couldn't share, but story was copied to clipboard!");
+        } catch (clipboardError) {
+          console.error("Clipboard error:", clipboardError);
+          toast.error("Failed to share story. Please try again.");
+        }
       }
     }
   };

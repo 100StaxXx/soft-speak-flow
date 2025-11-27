@@ -26,10 +26,25 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
         await navigator.clipboard.writeText(`${text}\n\n${shareData.url}`);
         toast.success("Link copied to clipboard!");
       }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        console.error("Error sharing:", error);
-        toast.error("Failed to share");
+    } catch (error: any) {
+      console.error("Error sharing:", error);
+      
+      // Check if user cancelled (case-insensitive)
+      const errorMsg = error?.message?.toLowerCase() || error?.toString?.()?.toLowerCase() || '';
+      const isCancelled = errorMsg.includes('cancel') || 
+                         errorMsg.includes('abort') || 
+                         errorMsg.includes('dismissed') ||
+                         error?.name === 'AbortError';
+      
+      if (!isCancelled) {
+        // Try fallback to clipboard as last resort
+        try {
+          await navigator.clipboard.writeText(`${text}\n\n${shareData.url}`);
+          toast.info("Couldn't share, but link was copied to clipboard!");
+        } catch (clipboardError) {
+          console.error("Clipboard error:", clipboardError);
+          toast.error("Failed to share. Please try again.");
+        }
       }
     }
   };
