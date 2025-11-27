@@ -102,7 +102,7 @@ const Auth = () => {
   const getRedirectUrl = () => {
     // For Capacitor iOS/Android, use the app scheme
     if (Capacitor.isNativePlatform()) {
-      return 'com.revolution.app://';
+      return 'com.darrylgraham.revolution://';
     }
     // For web, use current origin
     return `${window.location.origin}/`;
@@ -239,11 +239,11 @@ const Auth = () => {
         
         console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
 
-        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.revolution.app');
+        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.revolution');
         
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
-          clientId: 'com.revolution.app', // Use bundle ID for native iOS
-          redirectURI: 'com.revolution.app://',
+          clientId: 'com.darrylgraham.revolution', // Use bundle ID for native iOS
+          redirectURI: 'com.darrylgraham.revolution://',
           scopes: 'email name',
           state: crypto.randomUUID(), // Random state for security
           nonce: hashedNonce, // Hashed nonce for Apple
