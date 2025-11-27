@@ -159,47 +159,74 @@ const Auth = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
+    console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
+    
     try {
       // Native Google Sign-In for iOS/Android
       if (provider === 'google' && Capacitor.isNativePlatform()) {
+        console.log('[Google OAuth] Initiating native Google sign-in');
+        
         const result = await SocialLogin.login({
           provider: 'google',
           options: {}
         });
 
+        console.log('[Google OAuth] SocialLogin result:', JSON.stringify(result, null, 2));
+
         // Check if we got a valid response
         if (result.provider === 'google' && result.result.responseType === 'online') {
           const { idToken } = result.result;
+          
+          console.log('[Google OAuth] ID token received:', idToken ? `${idToken.substring(0, 20)}...` : 'MISSING');
           
           if (!idToken) {
             throw new Error('No ID token received from Google sign-in');
           }
 
+          console.log('[Google OAuth] Calling Supabase signInWithIdToken');
+          
           // Sign in to Supabase with Google ID token
-          const { error } = await supabase.auth.signInWithIdToken({
+          const { data: authData, error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: idToken,
           });
 
+          console.log('[Google OAuth] Supabase response:', { 
+            hasSession: !!authData?.session, 
+            hasUser: !!authData?.user,
+            error: error?.message 
+          });
+
           if (error) throw error;
+          
+          console.log('[Google OAuth] Sign-in successful');
           return;
         } else {
+          console.error('[Google OAuth] Unexpected response type:', result);
           throw new Error('Unexpected Google sign-in response');
         }
       }
 
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && Capacitor.isNativePlatform()) {
+        console.log('[Apple OAuth] Initiating native Apple sign-in');
+        
         // Generate secure random nonce (Supabase provides this method)
         const rawNonce = crypto.randomUUID();
+        console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
         
         // Hash the nonce for Apple (Apple requires SHA-256 hashed nonce)
         const encoder = new TextEncoder();
-        const data = encoder.encode(rawNonce);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const encodedData = encoder.encode(rawNonce);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
 
+        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.revolution.app');
+        
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
           clientId: 'com.revolution.app', // Use bundle ID for native iOS
           redirectURI: 'com.revolution.app://',
@@ -208,34 +235,68 @@ const Auth = () => {
           nonce: hashedNonce, // Hashed nonce for Apple
         });
 
+        console.log('[Apple OAuth] SignInWithApple result:', {
+          hasIdentityToken: !!result.response.identityToken,
+          hasEmail: !!result.response.email,
+          hasUser: !!result.response.user
+        });
+
         // Verify identity token exists
         if (!result.response.identityToken) {
+          console.error('[Apple OAuth] No identity token in response');
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
+        console.log('[Apple OAuth] Calling Supabase signInWithIdToken');
+
         // Sign in to Supabase with Apple identity token and RAW nonce
-        const { error } = await supabase.auth.signInWithIdToken({
+        const { data: authData, error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: result.response.identityToken,
           nonce: rawNonce, // Use raw (unhashed) nonce for Supabase
         });
 
+        console.log('[Apple OAuth] Supabase response:', { 
+          hasSession: !!authData?.session, 
+          hasUser: !!authData?.user,
+          error: error?.message 
+        });
+
         if (error) throw error;
+        
+        console.log('[Apple OAuth] Sign-in successful');
         return;
       }
 
       // Web OAuth flow for Google and web Apple Sign-In
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log(`[${provider} OAuth] Using web OAuth flow`);
+      console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
+      
+      const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: getRedirectUrl(),
         },
       });
 
+      console.log(`[${provider} OAuth] OAuth response:`, { 
+        hasUrl: !!oauthData?.url, 
+        provider: oauthData?.provider,
+        error: error?.message 
+      });
+
       if (error) throw error;
     } catch (error: any) {
+      console.error(`[${provider} OAuth] Error caught:`, {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        fullError: error
+      });
+      
       // Handle user cancellation gracefully (don't show error toast)
       if (error.message?.includes('1001') || error.message?.includes('cancel')) {
+        console.log(`[${provider} OAuth] User cancelled sign-in`);
         return; // User cancelled, just return silently
       }
       
