@@ -34,7 +34,12 @@ export const PushNotificationSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [isSupported] = useState(isNativePushSupported());
+  const [isSupported, setIsSupported] = useState(false);
+
+  // Check platform support after mount
+  useEffect(() => {
+    setIsSupported(isNativePushSupported());
+  }, []);
 
   useEffect(() => {
     if (user) {

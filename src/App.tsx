@@ -109,10 +109,16 @@ const AppContent = memo(() => {
   
   // Initialize native push on login
   useEffect(() => {
-    if (session?.user && isNativePushSupported()) {
-      initializeNativePush(session.user.id).catch(err => {
-        console.error('Failed to initialize native push:', err);
-      });
+    if (session?.user) {
+      try {
+        if (isNativePushSupported()) {
+          initializeNativePush(session.user.id).catch(err => {
+            console.error('Failed to initialize native push:', err);
+          });
+        }
+      } catch (error) {
+        console.debug('Native push initialization skipped:', error);
+      }
     }
   }, [session]);
   

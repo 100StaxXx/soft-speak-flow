@@ -7,13 +7,16 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 
-const isNative = Capacitor.isNativePlatform();
-
 /**
  * Check if native push notifications are supported
  */
 export function isNativePushSupported(): boolean {
-  return isNative && Capacitor.getPlatform() === 'ios';
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  } catch (error) {
+    console.debug('Native push not available:', error);
+    return false;
+  }
 }
 
 /**
@@ -21,7 +24,7 @@ export function isNativePushSupported(): boolean {
  */
 export async function initializeNativePush(userId: string): Promise<void> {
   if (!isNativePushSupported()) {
-    console.log('Native push not supported on this platform');
+    console.debug('Native push not supported on this platform');
     return;
   }
 
