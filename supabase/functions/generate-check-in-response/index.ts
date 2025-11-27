@@ -85,17 +85,29 @@ serve(async (req) => {
         .single()
     ]);
 
-    if (checkInError) {
-      console.error('Check-in fetch error:', checkInError);
-      throw checkInError;
+    // Check both errors and provide detailed error message
+    if (checkInError || profileError) {
+      const errors = [];
+      if (checkInError) {
+        console.error('Check-in fetch error:', checkInError);
+        errors.push(`check-in: ${checkInError.message}`);
+      }
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        errors.push(`profile: ${profileError.message}`);
+      }
+      throw new Error(`Failed to fetch required data: ${errors.join(', ')}`);
+    }
+    
+    if (!checkIn) {
+      throw new Error('Check-in not found');
     }
     
     if (checkIn.user_id !== user.id) {
       throw new Error('Unauthorized: You can only access your own check-ins')
     }
 
-    if (profileError || !profile?.selected_mentor_id) {
-      console.error('Profile fetch error:', profileError);
+    if (!profile?.selected_mentor_id) {
       throw new Error('User profile or mentor not found')
     }
 
