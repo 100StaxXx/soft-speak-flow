@@ -52,7 +52,7 @@ serve(async (req) => {
     }
 
     const expiresAt = new Date(subscription.current_period_end);
-    // Support both active and trialing status
+    // Support active and trialing status
     const isActive = expiresAt > new Date() && 
       (subscription.status === "active" || subscription.status === "trialing");
 
