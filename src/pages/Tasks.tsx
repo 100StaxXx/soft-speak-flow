@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getHabitXP, QUEST_XP_REWARDS } from "@/config/xpRewards";
+import { getHabitXP, QUEST_XP_REWARDS, getEffectiveQuestXP, getQuestXPMultiplier } from "@/config/xpRewards";
 import {
   Drawer,
   DrawerClose,
@@ -89,16 +89,12 @@ export default function Tasks() {
   // Tasks state - use regular hook for list view single-day tasks
   const { 
     tasks,
-    regularTasks,
-    bonusTasks,
-    bonusUnlocked,
     addTask, 
     toggleTask, 
     deleteTask,
     setMainQuest,
     isAdding,
     isToggling,
-    canAddMore,
     completedCount,
     totalCount 
   } = useDailyTasks(selectedDate);
@@ -725,8 +721,7 @@ export default function Tasks() {
                     {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {regularTasks.length}/4 Regular Quests
-                    {bonusUnlocked && bonusTasks.length === 0 && " • Bonus Quest Available!"}
+                    {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
                   </p>
                 </div>
                 <div className="text-sm font-medium text-primary">
@@ -752,17 +747,17 @@ export default function Tasks() {
                 </div>
               )}
 
-              {/* Regular Quest List */}
+              {/* Quest List */}
               <div className="space-y-6">
-                {regularTasks.length === 0 ? (
+                {tasks.length === 0 ? (
                   <EmptyState 
                     icon={Target}
                     title="No quests yet"
-                    description={`Add up to 4 quests - mark one as your Main Quest for ${MAIN_QUEST_MULTIPLIER}x XP!`}
+                    description="Add quests throughout your day - first 3 earn full XP!"
                   />
                 ) : (() => {
-                  const mainQuest = regularTasks.find(t => t.is_main_quest);
-                  const sideQuests = regularTasks.filter(t => !t.is_main_quest);
+                  const mainQuest = tasks.find(t => t.is_main_quest);
+                  const sideQuests = tasks.filter(t => !t.is_main_quest);
                   
                   return (
                     <>
@@ -815,57 +810,48 @@ export default function Tasks() {
                 })()}
               </div>
 
-              {/* Bonus Quest Section */}
-              {bonusUnlocked && bonusTasks.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-border">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star className="h-5 w-5 text-amber-500" />
-                    <h3 className="font-semibold text-foreground">Bonus Quest</h3>
-                    <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full">
-                      Extra Challenge!
+              {/* XP Preview for Next Quest */}
+              {tasks.length > 0 && (
+                <div className={cn(
+                  "flex items-center justify-between p-3 rounded-lg border",
+                  tasks.length >= 3 ? "bg-amber-500/5 border-amber-500/20" : "bg-primary/5 border-primary/20"
+                )}>
+                  <div className="flex items-center gap-2">
+                    <Zap className={cn(
+                      "h-4 w-4",
+                      tasks.length >= 3 ? "text-amber-500" : "text-primary"
+                    )} />
+                    <span className="text-sm font-medium">
+                      Next Quest ({tasks.length + 1})
                     </span>
                   </div>
-                  <div className="space-y-3">
-                    {bonusTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
-                        onDelete={() => deleteTask(task.id)}
-                        isTutorialQuest={task.task_text === 'Join R-Evolution'}
-                      />
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded-full",
+                      tasks.length >= 3 
+                        ? "text-amber-600 bg-amber-500/10" 
+                        : "text-primary bg-primary/10"
+                    )}>
+                      {Math.round(getQuestXPMultiplier(tasks.length + 1) * 100)}% XP
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {getEffectiveQuestXP(taskDifficulty, tasks.length + 1)} XP
+                    </span>
                   </div>
                 </div>
               )}
 
-              {/* Bonus Quest Locked State */}
-              {!bonusUnlocked && regularTasks.length === 4 && bonusTasks.length === 0 && (
-                <div className="mt-6 pt-6 border-t border-border">
-                  <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
-                    <Star className="h-6 w-6 text-muted-foreground opacity-50" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm text-muted-foreground">Bonus Quest Locked</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Complete all 4 regular quests or maintain a 7+ day streak to unlock
-                      </p>
-                    </div>
-                  </div>
+              <Card className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Add New Quest</p>
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    {showAdvanced ? "Hide" : "Advanced"}
+                  </button>
                 </div>
-              )}
-
-              {canAddMore && (
-                <Card className="p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Add New Quest</p>
-                    <button
-                      onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5"
-                    >
-                      <Sliders className="w-3 h-3" />
-                      {showAdvanced ? "Hide" : "Advanced"}
-                    </button>
-                  </div>
                   
                   <div className="space-y-3">
                     <Input
@@ -943,7 +929,6 @@ export default function Tasks() {
                     </Button>
                   </div>
                 </Card>
-              )}
             </Card>
           </TabsContent>
 
