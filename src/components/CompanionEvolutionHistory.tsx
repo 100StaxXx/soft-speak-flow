@@ -33,18 +33,26 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
 
       if (error) throw error;
 
-      // Create Stage 0 entry from companion creation
-      const stage0Entry = {
-        id: `${companionId}-stage-0`,
-        companion_id: companionId,
-        stage: 0,
-        image_url: companion.initial_image_url,
-        evolved_at: companion.created_at,
-        xp_at_evolution: 0,
-      };
+      // Check if Stage 0 already exists in evolution data
+      const hasStage0 = evolutionData?.some(evo => evo.stage === 0);
 
-      // Combine Stage 0 with evolutions, sorted by stage descending
-      return [stage0Entry, ...(evolutionData || [])];
+      // Only create Stage 0 entry if it doesn't exist in the database
+      if (!hasStage0) {
+        const stage0Entry = {
+          id: `${companionId}-stage-0`,
+          companion_id: companionId,
+          stage: 0,
+          image_url: companion.initial_image_url,
+          evolved_at: companion.created_at,
+          xp_at_evolution: 0,
+        };
+
+        // Combine Stage 0 with evolutions
+        return [stage0Entry, ...(evolutionData || [])];
+      }
+
+      // Stage 0 already exists in database, just return the data
+      return evolutionData || [];
     },
   });
 
