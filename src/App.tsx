@@ -51,12 +51,13 @@ const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const BattleArena = lazy(() => import("./pages/BattleArena"));
 
 
+// Create query client outside component for better performance and stability
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
       gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
-      refetchOnWindowFocus: false, // Don't refetch on tab switch
+      refetchOnWindowFocus: false, // Don't refetch on tab switch - saves API calls
       refetchOnReconnect: true, // Refetch on reconnect
       retry: 2, // Retry failed requests twice
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
@@ -68,16 +69,20 @@ const queryClient = new QueryClient({
   },
 });
 
-const LoadingFallback = () => (
+// Memoized loading fallback to prevent recreation
+const LoadingFallback = memo(() => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="text-center space-y-4">
       <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
       <p className="text-muted-foreground">Loading...</p>
     </div>
   </div>
-);
+));
 
-function ScrollToTop() {
+LoadingFallback.displayName = 'LoadingFallback';
+
+// Memoized scroll to top component
+const ScrollToTop = memo(() => {
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -85,7 +90,9 @@ function ScrollToTop() {
   }, [pathname]);
 
   return null;
-}
+});
+
+ScrollToTop.displayName = 'ScrollToTop';
 
 // Separate component for evolution-aware features
 const EvolutionAwareContent = memo(() => {

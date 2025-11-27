@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,8 +29,13 @@ const Index = () => {
     author: string | null;
   } | null>(null);
 
-  // Fetch mentor image and quote (optimized - only loads needed image)
+  // Combined initialization effect for better performance
   useEffect(() => {
+    // Scroll to top on mount
+    window.scrollTo(0, 0);
+
+    let isMounted = true;
+
     const fetchMentorData = async () => {
       if (!profile?.selected_mentor_id) return;
 
@@ -41,43 +46,45 @@ const Index = () => {
           .eq("id", profile.selected_mentor_id)
           .maybeSingle();
 
-        if (mentorData) {
-          // Dynamically load only the mentor image we need (saves ~20MB!)
-          const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+        if (!isMounted || !mentorData) return;
+
+        // Dynamically load only the mentor image we need (saves ~20MB!)
+        const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+        if (isMounted) {
           setMentorImage(imageUrl);
+        }
 
-          // Get today's pep talk to find related quote
-          const today = new Date().toLocaleDateString("en-CA");
-          const { data: dailyPepTalk } = await supabase
-            .from("daily_pep_talks")
-            .select("emotional_triggers, topic_category")
-            .eq("for_date", today)
-            .eq("mentor_slug", mentorData.slug)
-            .maybeSingle();
+        // Get today's pep talk to find related quote
+        const today = new Date().toLocaleDateString("en-CA");
+        const { data: dailyPepTalk } = await supabase
+          .from("daily_pep_talks")
+          .select("emotional_triggers, topic_category")
+          .eq("for_date", today)
+          .eq("mentor_slug", mentorData.slug)
+          .maybeSingle();
 
-          if (dailyPepTalk) {
-            // Try to fetch a quote that matches category first, then fall back to any quote
-            let { data: quotes } = await supabase
-              .from("quotes")
-              .select("text, author")
-              .eq("category", dailyPepTalk.topic_category)
-              .limit(10);
+        if (!isMounted || !dailyPepTalk) return;
 
-            // If no category match, get any quotes
-            if (!quotes || quotes.length === 0) {
-              const { data: allQuotes } = await supabase
-                .from("quotes")
-                .select("text, author")
-                .limit(20);
-              quotes = allQuotes;
-            }
+        // Try to fetch a quote that matches category first, then fall back to any quote
+        let { data: quotes } = await supabase
+          .from("quotes")
+          .select("text, author")
+          .eq("category", dailyPepTalk.topic_category)
+          .limit(10);
 
-            // Pick a random quote
-            if (quotes && quotes.length > 0) {
-              const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-              setTodaysQuote(randomQuote);
-            }
-          }
+        // If no category match, get any quotes
+        if (!quotes || quotes.length === 0) {
+          const { data: allQuotes } = await supabase
+            .from("quotes")
+            .select("text, author")
+            .limit(20);
+          quotes = allQuotes;
+        }
+
+        // Pick a random quote
+        if (isMounted && quotes && quotes.length > 0) {
+          const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+          setTodaysQuote(randomQuote);
         }
       } catch (error) {
         console.error('Error fetching mentor data:', error);
@@ -85,29 +92,35 @@ const Index = () => {
       }
     };
 
-    // Properly handle async function in useEffect
-    fetchMentorData().catch(error => {
-      console.error('Unhandled error in fetchMentorData:', error);
-    });
-  }, [profile?.selected_mentor_id]);
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  useEffect(() => {
     const checkHabits = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("habits")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .limit(1);
-      setHasActiveHabits(!!data && data.length > 0);
+      try {
+        const { data } = await supabase
+          .from("habits")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1);
+        if (isMounted) {
+          setHasActiveHabits(!!data && data.length > 0);
+        }
+      } catch (error) {
+        console.error('Error checking habits:', error);
+      }
     };
-    checkHabits();
-  }, [user]);
+
+    // Run both async operations in parallel
+    Promise.all([
+      fetchMentorData(),
+      checkHabits()
+    ]).catch(error => {
+      console.error('Error in initialization:', error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profile?.selected_mentor_id, user]);
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {

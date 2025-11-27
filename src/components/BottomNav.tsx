@@ -15,6 +15,7 @@ export const BottomNav = memo(() => {
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
     enabled: !!profile?.selected_mentor_id,
+    staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
     queryFn: async () => {
       if (!profile?.selected_mentor_id) {
         throw new Error('No mentor selected');
@@ -22,7 +23,7 @@ export const BottomNav = memo(() => {
       
       const { data, error } = await supabase
         .from("mentors")
-        .select("*")
+        .select("slug, name, primary_color") // Select only needed fields
         .eq("id", profile.selected_mentor_id)
         .maybeSingle();
       if (error) throw error;

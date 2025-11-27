@@ -1,6 +1,7 @@
 import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
@@ -28,27 +29,33 @@ export function useSubscription() {
       } | null;
     },
     enabled: !!user,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    refetchInterval: 1 * 60 * 1000, // Refetch every minute
+    staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance
+    refetchInterval: false, // Disable automatic refetching for better performance
   });
 
-  const subscription = subscriptionData ? {
+  const subscription = useMemo(() => subscriptionData ? {
     status: subscriptionData.status as Subscription["status"],
     plan: subscriptionData.plan as Subscription["plan"],
     current_period_end: subscriptionData.subscription_end,
-  } : null;
+  } : null, [subscriptionData]);
 
-  // Helper functions
+  // Helper functions - memoized for performance
   const isActive = subscriptionData?.subscribed || false;
   const isCancelled = subscription?.status === "cancelled";
 
-  // Calculate next billing date
-  const nextBillingDate = subscription?.current_period_end
-    ? new Date(subscription.current_period_end)
-    : null;
+  // Calculate next billing date - memoized
+  const nextBillingDate = useMemo(() => 
+    subscription?.current_period_end
+      ? new Date(subscription.current_period_end)
+      : null,
+    [subscription?.current_period_end]
+  );
 
-  // Format price based on plan
-  const planPrice = subscription?.plan === "yearly" ? "$99.99/year" : "$9.99/month";
+  // Format price based on plan - memoized
+  const planPrice = useMemo(() => 
+    subscription?.plan === "yearly" ? "$99.99/year" : "$9.99/month",
+    [subscription?.plan]
+  );
 
   return {
     subscription,

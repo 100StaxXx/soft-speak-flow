@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 
 interface ProtectedRouteProps {
@@ -25,17 +24,24 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
   // Animate progress bar while loading
   useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
     if (authLoading || profileLoading) {
-      const timer = setInterval(() => {
+      timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
           return prev + Math.random() * 15;
         });
       }, 300);
-      return () => clearInterval(timer);
     } else {
       setProgress(100);
     }
+    
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
   }, [authLoading, profileLoading]);
 
   // Show loading while checking auth

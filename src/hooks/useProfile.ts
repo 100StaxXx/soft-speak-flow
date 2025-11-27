@@ -71,8 +71,8 @@ export const useProfile = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 30 * 1000, // 30 seconds - reduced to catch tutorial updates faster
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 60 * 1000, // 60 seconds - cache profile data longer for better performance
+    refetchOnWindowFocus: false, // Prevent unnecessary refetches on tab switch
   });
 
   return { profile: profile ?? null, loading };

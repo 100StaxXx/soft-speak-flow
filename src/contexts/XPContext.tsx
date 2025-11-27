@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useMemo } from "react";
 import { XPToast } from "@/components/XPToast";
 import { playXPGain } from "@/utils/soundEffects";
 
@@ -15,19 +15,25 @@ export const XPProvider = ({ children }: { children: ReactNode }) => {
     show: false,
   });
 
-  const showXPToast = (xp: number, reason: string) => {
+  const showXPToast = useCallback((xp: number, reason: string) => {
     setToastData({ xp, reason, show: true });
     playXPGain();
-  };
+  }, []);
+
+  const handleComplete = useCallback(() => {
+    setToastData(prev => ({ ...prev, show: false }));
+  }, []);
+
+  const value = useMemo(() => ({ showXPToast }), [showXPToast]);
 
   return (
-    <XPContext.Provider value={{ showXPToast }}>
+    <XPContext.Provider value={value}>
       {children}
       <XPToast
         xp={toastData.xp}
         reason={toastData.reason}
         show={toastData.show}
-        onComplete={() => setToastData(prev => ({ ...prev, show: false }))}
+        onComplete={handleComplete}
       />
     </XPContext.Provider>
   );
