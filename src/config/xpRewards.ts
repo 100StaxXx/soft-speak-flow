@@ -76,6 +76,11 @@ export function getHabitXP(difficulty: 'easy' | 'medium' | 'hard'): number {
 }
 
 /**
+ * Type-safe difficulty type
+ */
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+/**
  * Quest XP Multiplier based on quest position (diminishing returns)
  * 
  * Quests 1-3: 100% XP
@@ -106,8 +111,3 @@ export function getEffectiveQuestXP(difficulty: Difficulty, questPosition: numbe
   const multiplier = getQuestXPMultiplier(questPosition);
   return Math.round(baseXP * multiplier);
 }
-
-/**
- * Type-safe difficulty type
- */
-export type Difficulty = 'easy' | 'medium' | 'hard';
