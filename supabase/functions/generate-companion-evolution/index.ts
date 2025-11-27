@@ -430,10 +430,61 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       }
 
       // 5. Build evolution prompt with ultra-strict continuity
+      // Progressive creative freedom based on stage
+      // Early stages (2-10): Strict realism
+      // Mid stages (11-14): Allow mythic enhancements
+      // Late stages (15-20): Full grandiose creativity
+      const stageLevel = nextStage <= 10 ? 'realistic' : nextStage <= 14 ? 'mythic' : 'legendary';
+      
       // Special handling for aquatic creatures to prevent legs
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
       const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.' : '';
+      
+      // Stage-appropriate species requirements
+      let speciesRequirements = '';
+      if (stageLevel === 'realistic') {
+        speciesRequirements = `
+1. SPECIES ANATOMY (100% PRESERVATION - ABSOLUTELY NON-NEGOTIABLE):
+   THIS IS A ${companion.spirit_animal.toUpperCase()} - Not a hybrid, not a dragon, not any other species.
+   
+   - Maintain EXACT ${companion.spirit_animal} skeletal structure following real animal anatomy
+   - Same bone structure, joint placement, limb configuration as real ${companion.spirit_animal}
+   - Correct number of legs: ${companion.spirit_animal} have a specific number - DO NOT CHANGE THIS
+   - Same facial structure, skull shape, feature placement as real ${companion.spirit_animal}
+   - Same body type and natural physique for this species
+   - Species-defining features: ${companion.spirit_animal} ears/horns/antlers/snout/beak are distinct - keep them exact
+   - NO species changes, NO hybrid features (no dragon wings unless naturally present)
+   - NO added limbs, NO removed limbs, NO anatomical redesigns
+   - Reference: This should look like a real ${companion.spirit_animal} from a nature documentary with magical enhancements`;
+      } else if (stageLevel === 'mythic') {
+        speciesRequirements = `
+1. SPECIES ANATOMY (MYTHIC ENHANCEMENT ALLOWED):
+   THIS IS A ${companion.spirit_animal.toUpperCase()} - Core identity preserved, mythic features now permitted.
+   
+   - Core ${companion.spirit_animal} anatomy maintained: recognizable silhouette and proportions
+   - Species recognizable: Should be identifiable as ${companion.spirit_animal} at first glance
+   - Base limb structure: Original limb configuration preserved
+   - Mythic additions allowed: Divine horns, ethereal wings, cosmic patterns, energy constructs
+   - Size can exceed natural limits: Larger-than-life scale permitted
+   - Proportions can be heroic/idealized while maintaining species characteristics
+   - Elemental manifestations: Can add energy wings, particle limbs, astral features
+   - Core features (head shape, body type, tail) maintained but can be enhanced
+   - Reference: A ${companion.spirit_animal} that has transcended into legend while remaining recognizable`;
+      } else {
+        speciesRequirements = `
+1. SPECIES ANATOMY (LEGENDARY CREATIVE FREEDOM):
+   THIS IS THE ULTIMATE ${companion.spirit_animal.toUpperCase()} - A cosmic god-entity with full creative liberty.
+   
+   - Base species recognition: ${companion.spirit_animal} essence visible through divine form
+   - FULL CREATIVE FREEDOM: Add cosmic wings, multiple forms, reality fragments, divine constructs
+   - Can transcend anatomy: Ethereal limbs, dimensional echoes, astral projections, ghost forms
+   - Scale: Colossal, planetary, universe-breaking presence
+   - Divine enhancements unlimited: Halos, crowns, armor, multiple heads, cosmic appendages
+   - Reality-bending features: Spacetime distortions, dimensional rifts, universe-birthing energy
+   - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
+   - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
+      }
       
       userPrompt = `PHOTOREAL EVOLUTION CONTINUATION - Stage ${currentStage} to ${nextStage}:
 
@@ -454,19 +505,7 @@ ${companion.fur_color ? `- Fur/Scale/Feather Color: ${companion.fur_color} (exac
 - Evolution Theme: ${getStageGuidance(nextStage)}
 
 === CRITICAL CONTINUITY REQUIREMENTS (DO NOT BREAK) ===
-
-1. SPECIES ANATOMY (100% PRESERVATION - ABSOLUTELY NON-NEGOTIABLE):
-   THIS IS A ${companion.spirit_animal.toUpperCase()} - Not a hybrid, not a dragon, not any other species.
-   
-   - Maintain EXACT ${companion.spirit_animal} skeletal structure following real animal anatomy
-   - Same bone structure, joint placement, limb configuration as real ${companion.spirit_animal}
-   - Correct number of legs: ${companion.spirit_animal} have a specific number - DO NOT CHANGE THIS
-   - Same facial structure, skull shape, feature placement as real ${companion.spirit_animal}
-   - Same body type and natural physique for this species
-   - Species-defining features: ${companion.spirit_animal} ears/horns/antlers/snout/beak are distinct - keep them exact
-   - NO species changes, NO hybrid features (no dragon wings unless naturally present)
-   - NO added limbs, NO removed limbs, NO anatomical redesigns
-   - Reference: This should look like a real ${companion.spirit_animal} from a nature documentary with magical enhancements
+${speciesRequirements}
 
 2. COLOR PALETTE (95% MATCH):
    - ${companion.favorite_color} MUST remain the dominant color

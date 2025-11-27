@@ -175,18 +175,21 @@ STYLE REFERENCES:
     } else {
       const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
       
+      // Progressive creative freedom based on stage
+      // Early stages (1-10): Strict realism
+      // Mid stages (11-14): Allow mythic enhancements
+      // Late stages (15-20): Full grandiose creativity
+      const stageLevel = stage <= 10 ? 'realistic' : stage <= 14 ? 'mythic' : 'legendary';
+      
       // Special handling for aquatic creatures to prevent legs
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
       const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
       const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a purely AQUATIC creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Must follow real-world aquatic animal anatomy\n- Underwater environment with water physics' : '';
       
-      fullPrompt = `PHOTOREALISTIC FANTASY CREATURE - Professional concept art quality:
-
-CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
-
-BASE DESCRIPTION:
-${basePrompt}
-
+      // Stage-appropriate species enforcement
+      let speciesGuidance = '';
+      if (stageLevel === 'realistic') {
+        speciesGuidance = `
 SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
 THIS IS A ${spiritAnimal.toUpperCase()} - Nothing else, no exceptions, no creative interpretation.
 
@@ -203,7 +206,46 @@ CRITICAL SPECIES REQUIREMENTS:
 - Realistic muscle groups and bone structure for ${spiritAnimal} species
 - Species-appropriate posture, gait, and natural movement for ${spiritAnimal}${aquaticNote}
 
-REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.
+REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.`;
+      } else if (stageLevel === 'mythic') {
+        speciesGuidance = `
+SPECIES IDENTITY (CORE FOUNDATION):
+THIS IS A ${spiritAnimal.toUpperCase()} - Recognizable species with mythic enhancements allowed.
+
+ENHANCED SPECIES REQUIREMENTS:
+- Base Species: ${spiritAnimal} - core anatomy maintained but mythic features now permitted
+- Species recognizable: Should still be identifiable as ${spiritAnimal} at first glance
+- Core features preserved: Maintain ${spiritAnimal} head shape, body structure, limb configuration
+- Mythic enhancements allowed: Can add divine horns, ethereal wings, cosmic patterns, reality-bending features
+- Size enhancement: Can be larger than real-world scale
+- Proportions can be heroic/idealized while maintaining ${spiritAnimal} identity
+- Elemental features can manifest as additional visual elements (energy wings, particle effects, auras)${aquaticNote}
+
+CREATIVE FREEDOM: You may add mythic/divine features that enhance the ${spiritAnimal} into a legendary form, BUT the creature must remain recognizable as a ${spiritAnimal}.`;
+      } else {
+        speciesGuidance = `
+SPECIES IDENTITY (DIVINE EVOLUTION):
+THIS IS THE ULTIMATE ${spiritAnimal.toUpperCase()} - A god-tier, reality-breaking, cosmic entity that transcends while maintaining ${spiritAnimal} essence.
+
+LEGENDARY CREATIVE FREEDOM:
+- Base Species Recognition: ${spiritAnimal} identity visible through divine form
+- FULL CREATIVE LIBERTY: Add cosmic wings, divine horns, multiple forms, reality fragments, celestial features
+- Scale: Colossal, planetary, universe-scale presence
+- Anatomy can be fantastical: Multiple ethereal limbs, cosmic energy constructs, dimensional features
+- Can transcend physical form: Ghost images, dimensional echoes, astral projections
+- Divine enhancements: Halos, crowns, divine armor, cosmic patterns, universe-birthing energy
+- Reality-bending: Environment warps around the creature, space-time distortions, cosmic phenomena${aquaticNote}
+
+GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
+      }
+      
+      fullPrompt = `PHOTOREALISTIC FANTASY CREATURE - Professional concept art quality:
+
+CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
+
+BASE DESCRIPTION:
+${basePrompt}
+${speciesGuidance}
 
 COLOR PALETTE:
 - Primary colors: ${favoriteColor} tones
