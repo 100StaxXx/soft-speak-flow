@@ -76,6 +76,38 @@ export function getHabitXP(difficulty: 'easy' | 'medium' | 'hard'): number {
 }
 
 /**
+ * Quest XP Multiplier based on quest position (diminishing returns)
+ * 
+ * Quests 1-3: 100% XP
+ * Quest 4: 75% XP
+ * Quest 5: 50% XP
+ * Quest 6: 35% XP
+ * Quest 7: 25% XP
+ * Quest 8: 15% XP
+ * Quests 9-10: 10% XP
+ * Quests 11+: 5% XP
+ */
+export function getQuestXPMultiplier(questPosition: number): number {
+  if (questPosition <= 3) return 1.0;
+  if (questPosition === 4) return 0.75;
+  if (questPosition === 5) return 0.5;
+  if (questPosition === 6) return 0.35;
+  if (questPosition === 7) return 0.25;
+  if (questPosition === 8) return 0.15;
+  if (questPosition <= 10) return 0.1;
+  return 0.05; // 11+
+}
+
+/**
+ * Get effective quest XP with position-based multiplier applied
+ */
+export function getEffectiveQuestXP(difficulty: Difficulty, questPosition: number): number {
+  const baseXP = getQuestXP(difficulty);
+  const multiplier = getQuestXPMultiplier(questPosition);
+  return Math.round(baseXP * multiplier);
+}
+
+/**
  * Type-safe difficulty type
  */
 export type Difficulty = 'easy' | 'medium' | 'hard';

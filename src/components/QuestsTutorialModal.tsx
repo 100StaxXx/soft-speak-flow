@@ -36,19 +36,13 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Add up to 4 regular quests per day
+                  Add quests throughout your day
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Unlock a 5th bonus quest by completing all 4 or maintaining a 7+ day streak
-                </p>
-              </div>
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
-                  Complete them to earn XP
+                  First 3 quests earn full XP, then rewards gradually decrease
                 </p>
               </div>
               <div className="flex items-start gap-2">
