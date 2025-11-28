@@ -271,22 +271,34 @@ const Auth = () => {
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
-        console.log('[Apple OAuth] Calling Supabase signInWithIdToken');
+        console.log('[Apple OAuth] Calling apple-native-auth edge function');
 
-        // Sign in to Supabase with Apple identity token and RAW nonce
-        const { data: authData, error } = await supabase.auth.signInWithIdToken({
-          provider: 'apple',
-          token: result.response.identityToken,
-          nonce: rawNonce, // Use raw (unhashed) nonce for Supabase
+        // Call our edge function to handle native Apple auth
+        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
+          body: { 
+            identityToken: result.response.identityToken,
+            nonce: rawNonce // Pass raw nonce for validation
+          }
         });
 
-        console.log('[Apple OAuth] Supabase response:', { 
-          hasSession: !!authData?.session, 
-          hasUser: !!authData?.user,
-          error: error?.message 
+        console.log('[Apple OAuth] Edge function response:', { 
+          hasAccessToken: !!sessionData?.access_token,
+          hasRefreshToken: !!sessionData?.refresh_token,
+          error: functionError?.message 
         });
 
-        if (error) throw error;
+        if (functionError) throw functionError;
+        if (!sessionData?.access_token || !sessionData?.refresh_token) {
+          throw new Error('Failed to get session tokens from edge function');
+        }
+
+        // Set the session with tokens from edge function
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+        });
+
+        if (sessionError) throw sessionError;
         
         console.log('[Apple OAuth] Sign-in successful');
         return;
