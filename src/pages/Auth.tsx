@@ -81,8 +81,9 @@ const Auth = () => {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only redirect on actual sign-in events, not on token refresh or other events
-      if (event === 'SIGNED_IN' && session) {
+      // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
+      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
+        console.log(`[Auth] Auth event: ${event}, redirecting...`);
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
           await ensureProfile(session.user.id, session.user.email);
@@ -224,14 +225,8 @@ const Auth = () => {
 
           if (sessionError) throw sessionError;
           
-          console.log('[Google OAuth] Sign-in successful, redirecting...');
-          
-          // Manually redirect after session is set
-          if (newSession?.user) {
-            await ensureProfile(newSession.user.id, newSession.user.email);
-            const path = await getAuthRedirectPath(newSession.user.id);
-            navigate(path);
-          }
+          console.log('[Google OAuth] Session set successfully, onAuthStateChange will handle redirect');
+          // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
           return;
         } else {
           console.error('[Google OAuth] Unexpected response type:', result);
@@ -304,14 +299,8 @@ const Auth = () => {
 
         if (sessionError) throw sessionError;
         
-        console.log('[Apple OAuth] Sign-in successful, redirecting...');
-        
-        // Manually redirect after session is set
-        if (newSession?.user) {
-          await ensureProfile(newSession.user.id, newSession.user.email);
-          const path = await getAuthRedirectPath(newSession.user.id);
-          navigate(path);
-        }
+        console.log('[Apple OAuth] Session set successfully, onAuthStateChange will handle redirect');
+        // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
         return;
       }
 
