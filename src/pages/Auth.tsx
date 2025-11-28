@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
@@ -34,6 +34,13 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Refs to track OAuth fallback timeouts (for cleanup)
+  const googleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
+  const appleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Ref to track if initial session check has redirected
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -71,6 +78,7 @@ const Auth = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        hasRedirected.current = true; // Mark that we're handling initial redirect
         await ensureProfile(session.user.id, session.user.email);
         const path = await getAuthRedirectPath(session.user.id);
         navigate(path);
@@ -83,11 +91,19 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
-        console.log(`[Auth] Auth event: ${event}, redirecting...`);
+        // Skip INITIAL_SESSION if checkSession already handled the redirect
+        if (event === 'INITIAL_SESSION' && hasRedirected.current) {
+          console.log('[Auth onAuthStateChange] Skipping INITIAL_SESSION - already redirected by checkSession');
+          return;
+        }
+        
+        const timestamp = Date.now();
+        console.log(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
         try {
           await new Promise(resolve => setTimeout(resolve, 100));
           await ensureProfile(session.user.id, session.user.email);
           const path = await getAuthRedirectPath(session.user.id);
+          console.log(`[Auth onAuthStateChange] Navigating to ${path} at ${Date.now()} (${Date.now() - timestamp}ms elapsed)`);
           navigate(path);
         } catch (error) {
           console.error('Error in auth state change:', error);
@@ -96,7 +112,16 @@ const Auth = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      // Clean up any pending OAuth fallback timeouts to prevent memory leaks
+      if (googleFallbackTimeout.current) {
+        clearTimeout(googleFallbackTimeout.current);
+      }
+      if (appleFallbackTimeout.current) {
+        clearTimeout(appleFallbackTimeout.current);
+      }
+    };
   }, [navigate]);
 
   // Helper function for Capacitor-compatible redirect URLs
@@ -225,16 +250,29 @@ const Auth = () => {
 
           if (sessionError) throw sessionError;
           
-          console.log('[Google OAuth] Session set successfully, onAuthStateChange will handle redirect');
+          const sessionSetTime = Date.now();
+          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
           // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
           
-          // Fallback: manually redirect if onAuthStateChange doesn't fire
+          // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
           if (newSession?.user) {
-            setTimeout(async () => {
-              await ensureProfile(newSession.user.id, newSession.user.email);
-              const path = await getAuthRedirectPath(newSession.user.id);
-              navigate(path);
-            }, 200);
+            googleFallbackTimeout.current = setTimeout(async () => {
+              try {
+                // Check if already redirected by onAuthStateChange
+                if (window.location.pathname !== '/auth') {
+                  console.log(`[Google OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
+                  return;
+                }
+                console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
+                await ensureProfile(newSession.user.id, newSession.user.email);
+                const path = await getAuthRedirectPath(newSession.user.id);
+                navigate(path);
+              } catch (error) {
+                console.error('[Google OAuth Fallback] Error during redirect:', error);
+                // Fallback to onboarding if something goes wrong
+                navigate('/onboarding');
+              }
+            }, 800);
           }
           return;
         } else {
@@ -308,16 +346,29 @@ const Auth = () => {
 
         if (sessionError) throw sessionError;
         
-        console.log('[Apple OAuth] Session set successfully, onAuthStateChange will handle redirect');
+        const sessionSetTime = Date.now();
+        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
         // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
         
-        // Fallback: manually redirect if onAuthStateChange doesn't fire
+        // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
         if (newSession?.user) {
-          setTimeout(async () => {
-            await ensureProfile(newSession.user.id, newSession.user.email);
-            const path = await getAuthRedirectPath(newSession.user.id);
-            navigate(path);
-          }, 200);
+          appleFallbackTimeout.current = setTimeout(async () => {
+            try {
+              // Check if already redirected by onAuthStateChange
+              if (window.location.pathname !== '/auth') {
+                console.log(`[Apple OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
+                return;
+              }
+              console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
+              await ensureProfile(newSession.user.id, newSession.user.email);
+              const path = await getAuthRedirectPath(newSession.user.id);
+              navigate(path);
+            } catch (error) {
+              console.error('[Apple OAuth Fallback] Error during redirect:', error);
+              // Fallback to onboarding if something goes wrong
+              navigate('/onboarding');
+            }
+          }, 800);
         }
         return;
       }
