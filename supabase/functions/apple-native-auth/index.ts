@@ -1,5 +1,24 @@
+/**
+ * Apple Native Authentication Edge Function
+ * 
+ * NOTE: This edge function is currently NOT used by the frontend.
+ * The frontend uses Supabase's built-in signInWithIdToken for Apple Sign-In (Auth.tsx line 277).
+ * This function is kept as a reference implementation for custom Apple authentication.
+ * 
+ * Current Apple Sign-In Flow:
+ * 1. Frontend gets identity token from Apple via @capacitor-community/apple-sign-in
+ * 2. Frontend calls supabase.auth.signInWithIdToken() with the token
+ * 3. Supabase validates the token with Apple directly
+ * 4. User is authenticated
+ * 
+ * If you need to use this custom edge function instead:
+ * 1. Complete the JWT signature verification (see TODO at line 62)
+ * 2. Update Auth.tsx to call this function instead of signInWithIdToken
+ * 3. Deploy this function: npx supabase functions deploy apple-native-auth
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,8 +78,10 @@ serve(async (req) => {
     const appleKeysResponse = await fetch('https://appleid.apple.com/auth/keys');
     const appleKeys = await appleKeysResponse.json();
     
-    // For production, implement full JWT signature verification
-    // For now, we trust the token after basic validation
+    // TODO: Complete JWT signature verification before using this function in production
+    // The keys are fetched but signature is not verified. See AUTH_LOGIN_QUICK_FIXES.md
+    // for implementation details. This is safe for now since this function is not used.
+    // The frontend uses Supabase's built-in signInWithIdToken which handles verification.
     console.log('Apple keys fetched successfully');
 
     const tokenInfo = {
