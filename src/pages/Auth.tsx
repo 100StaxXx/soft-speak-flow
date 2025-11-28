@@ -217,14 +217,21 @@ const Auth = () => {
           }
 
           // Set the session with tokens from edge function
-          const { error: sessionError } = await supabase.auth.setSession({
+          const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
             access_token: sessionData.access_token,
             refresh_token: sessionData.refresh_token,
           });
 
           if (sessionError) throw sessionError;
           
-          console.log('[Google OAuth] Sign-in successful');
+          console.log('[Google OAuth] Sign-in successful, redirecting...');
+          
+          // Manually redirect after session is set
+          if (newSession?.user) {
+            await ensureProfile(newSession.user.id, newSession.user.email);
+            const path = await getAuthRedirectPath(newSession.user.id);
+            navigate(path);
+          }
           return;
         } else {
           console.error('[Google OAuth] Unexpected response type:', result);
@@ -290,14 +297,21 @@ const Auth = () => {
         }
 
         // Set the session with tokens from edge function
-        const { error: sessionError } = await supabase.auth.setSession({
+        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
           access_token: sessionData.access_token,
           refresh_token: sessionData.refresh_token,
         });
 
         if (sessionError) throw sessionError;
         
-        console.log('[Apple OAuth] Sign-in successful');
+        console.log('[Apple OAuth] Sign-in successful, redirecting...');
+        
+        // Manually redirect after session is set
+        if (newSession?.user) {
+          await ensureProfile(newSession.user.id, newSession.user.email);
+          const path = await getAuthRedirectPath(newSession.user.id);
+          navigate(path);
+        }
         return;
       }
 
