@@ -227,6 +227,15 @@ const Auth = () => {
           
           console.log('[Google OAuth] Session set successfully, onAuthStateChange will handle redirect');
           // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
+          
+          // Fallback: manually redirect if onAuthStateChange doesn't fire
+          if (newSession?.user) {
+            setTimeout(async () => {
+              await ensureProfile(newSession.user.id, newSession.user.email);
+              const path = await getAuthRedirectPath(newSession.user.id);
+              navigate(path);
+            }, 200);
+          }
           return;
         } else {
           console.error('[Google OAuth] Unexpected response type:', result);
@@ -301,6 +310,15 @@ const Auth = () => {
         
         console.log('[Apple OAuth] Session set successfully, onAuthStateChange will handle redirect');
         // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
+        
+        // Fallback: manually redirect if onAuthStateChange doesn't fire
+        if (newSession?.user) {
+          setTimeout(async () => {
+            await ensureProfile(newSession.user.id, newSession.user.email);
+            const path = await getAuthRedirectPath(newSession.user.id);
+            navigate(path);
+          }, 200);
+        }
         return;
       }
 
