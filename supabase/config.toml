@@ -3,6 +3,9 @@ project_id = "tffrgsaawvletgiztfry"
 [functions.google-native-auth]
 verify_jwt = false
 
+[functions.apple-native-auth]
+verify_jwt = false
+
 [functions.generate-tutorial-tts]
 verify_jwt = false
 
