@@ -59,16 +59,35 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Look up user by email (not Google sub ID)
+    // Look up user by email with pagination
     console.log('Looking up user by email:', tokenInfo.email);
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error('Failed to list users:', listError);
-      throw new Error('Failed to look up user');
-    }
+    let existingUser = null;
+    let page = 1;
+    const perPage = 1000;
 
-    let existingUser = users?.find(u => u.email === tokenInfo.email);
+    // Paginate through users to find by email
+    while (!existingUser) {
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      
+      if (listError) {
+        console.error('Failed to list users:', listError);
+        throw new Error('Failed to look up user');
+      }
+
+      if (!users || users.length === 0) {
+        break; // No more users to check
+      }
+
+      existingUser = users.find(u => u.email?.toLowerCase() === tokenInfo.email?.toLowerCase());
+      
+      if (users.length < perPage) {
+        break; // Last page
+      }
+      page++;
+    }
     let userId: string;
 
     if (!existingUser) {
