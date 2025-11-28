@@ -198,21 +198,31 @@ const Auth = () => {
             throw new Error('No ID token received from Google sign-in');
           }
 
-          console.log('[Google OAuth] Calling Supabase signInWithIdToken');
+          console.log('[Google OAuth] Calling google-native-auth edge function');
           
-          // Sign in to Supabase with Google ID token
-          const { data: authData, error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token: idToken,
+          // Call our edge function to handle native Google auth
+          const { data: sessionData, error: functionError } = await supabase.functions.invoke('google-native-auth', {
+            body: { idToken }
           });
 
-          console.log('[Google OAuth] Supabase response:', { 
-            hasSession: !!authData?.session, 
-            hasUser: !!authData?.user,
-            error: error?.message 
+          console.log('[Google OAuth] Edge function response:', { 
+            hasAccessToken: !!sessionData?.access_token,
+            hasRefreshToken: !!sessionData?.refresh_token,
+            error: functionError?.message 
           });
 
-          if (error) throw error;
+          if (functionError) throw functionError;
+          if (!sessionData?.access_token || !sessionData?.refresh_token) {
+            throw new Error('Failed to get session tokens from edge function');
+          }
+
+          // Set the session with tokens from edge function
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: sessionData.access_token,
+            refresh_token: sessionData.refresh_token,
+          });
+
+          if (sessionError) throw sessionError;
           
           console.log('[Google OAuth] Sign-in successful');
           return;
