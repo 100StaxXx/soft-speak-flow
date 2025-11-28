@@ -59,13 +59,21 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if user exists
-    const { data: existingUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(tokenInfo.sub);
+    // Check if user exists by email (not by Google sub ID)
+    console.log('Looking up user by email:', tokenInfo.email);
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('Failed to list users:', listError);
+      throw new Error('Failed to look up user');
+    }
 
+    const existingUser = users?.users?.find(u => u.email === tokenInfo.email);
     let userId: string;
 
-    if (userError || !existingUser.user) {
-      console.log('Creating new user...');
+    if (!existingUser) {
+      console.log('User not found, creating new user...');
+      
       // Create new user
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: tokenInfo.email,
@@ -74,18 +82,41 @@ serve(async (req) => {
           provider: 'google',
           full_name: tokenInfo.name,
           avatar_url: tokenInfo.picture,
+          google_sub: tokenInfo.sub,
         }
       });
 
-      if (createError || !newUser.user) {
-        console.error('Failed to create user:', createError);
-        throw new Error('Failed to create user');
+      // Handle race condition: user might have been created between lookup and creation
+      if (createError) {
+        if (createError.message?.includes('already exists') || createError.message?.includes('duplicate')) {
+          console.log('User was created by concurrent request, looking up again...');
+          const { data: retryUsers, error: retryError } = await supabaseAdmin.auth.admin.listUsers();
+          
+          if (retryError) {
+            console.error('Failed to retry user lookup:', retryError);
+            throw new Error('Failed to create or find user');
+          }
+          
+          const retryUser = retryUsers?.users?.find(u => u.email === tokenInfo.email);
+          if (!retryUser) {
+            console.error('User still not found after race condition');
+            throw new Error('Failed to create or find user');
+          }
+          
+          userId = retryUser.id;
+          console.log('Found user after race condition:', userId);
+        } else {
+          console.error('Failed to create user:', createError);
+          throw new Error('Failed to create user: ' + createError.message);
+        }
+      } else if (!newUser.user) {
+        throw new Error('Failed to create user: No user returned');
+      } else {
+        userId = newUser.user.id;
+        console.log('New user created:', userId);
       }
-
-      userId = newUser.user.id;
-      console.log('New user created:', userId);
     } else {
-      userId = existingUser.user.id;
+      userId = existingUser.id;
       console.log('Existing user found:', userId);
     }
 
