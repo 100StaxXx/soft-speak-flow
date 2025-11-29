@@ -22,39 +22,46 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkRecoveryToken = async () => {
-      // Check if we have a valid recovery token in the URL hash
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const type = hashParams.get('type');
-      
-      if (!accessToken || type !== 'recovery') {
-        toast({
-          variant: "destructive",
-          title: "Invalid Link",
-          description: "This password reset link is invalid or has expired",
-        });
-        navigate("/auth");
-        return;
+    // Check if we have a valid recovery token in the URL hash
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (!accessToken || type !== 'recovery') {
+      toast({
+        variant: "destructive",
+        title: "Invalid Link",
+        description: "This password reset link is invalid or has expired",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    // Wait for Supabase to process the recovery token via onAuthStateChange
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Supabase has successfully processed the recovery token
+        if (session) {
+          setValidToken(true);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Session Error",
+            description: "Unable to establish password reset session. Please try again.",
+          });
+          navigate("/auth");
+        }
       }
+    });
 
-      // Verify the session is valid
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
-        toast({
-          variant: "destructive",
-          title: "Session Expired",
-          description: "Your reset link has expired. Please request a new one.",
-        });
-        navigate("/auth");
-        return;
+    // Also check if session already exists (in case event already fired)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setValidToken(true);
       }
+    });
 
-      setValidToken(true);
-    };
-
-    checkRecoveryToken();
+    return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]); // toast is stable from useToast hook
 
