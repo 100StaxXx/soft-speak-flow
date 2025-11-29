@@ -46,7 +46,7 @@ export const QuoteImageGenerator = ({
       } else {
         throw new Error("No image URL returned");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating image:", error);
       toast.error(error.message || "Failed to generate image");
     } finally {

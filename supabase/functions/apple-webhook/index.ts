@@ -112,7 +112,7 @@ serve(async (req) => {
         );
         break;
 
-      case NotificationType.DID_CHANGE_RENEWAL_STATUS:
+      case NotificationType.DID_CHANGE_RENEWAL_STATUS: {
         // User enabled/disabled auto-renewal
         const willRenew = payload.auto_renew_status === "true";
         await handleRenewalStatusChange(
@@ -122,6 +122,7 @@ serve(async (req) => {
           expiresDateMs
         );
         break;
+      }
 
       case NotificationType.DID_CHANGE_RENEWAL_PREF:
         // User changed plan (e.g., monthly to yearly)
@@ -172,7 +173,7 @@ serve(async (req) => {
       headers: corsHeaders,
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error processing Apple notification:", error);
     
     // Still return 200 to prevent Apple from retrying

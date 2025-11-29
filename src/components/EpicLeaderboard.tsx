@@ -28,31 +28,6 @@ export const EpicLeaderboard = ({ epicId }: EpicLeaderboardProps) => {
   const [members, setMembers] = useState<LeaderboardMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchLeaderboard();
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('epic-members-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'epic_members',
-          filter: `epic_id=eq.${epicId}`
-        },
-        () => {
-          fetchLeaderboard();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [epicId]);
-
   const fetchLeaderboard = async () => {
     try {
       const { data: membersData, error } = await supabase
@@ -98,6 +73,32 @@ export const EpicLeaderboard = ({ epicId }: EpicLeaderboardProps) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchLeaderboard();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('epic-members-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'epic_members',
+          filter: `epic_id=eq.${epicId}`
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epicId]); // fetchLeaderboard is stable and depends on epicId indirectly
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Trophy className="w-5 h-5 text-yellow-400" />;

@@ -118,7 +118,7 @@ export default function Onboarding() {
     if (legalAccepted && stage === 'legal') {
       setStage('name');
     }
-  }, []);
+  }, [stage]); // Include stage since we check it
 
   // Scroll to top when stage changes
   useEffect(() => {

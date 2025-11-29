@@ -55,7 +55,8 @@ const ResetPassword = () => {
     };
 
     checkRecoveryToken();
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]); // toast is stable from useToast hook
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +100,7 @@ const ResetPassword = () => {
         });
         navigate("/auth");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",

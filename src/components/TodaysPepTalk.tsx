@@ -161,7 +161,7 @@ export const TodaysPepTalk = memo(() => {
       }
     };
     runSync();
-  }, [pepTalk?.id]);
+  }, [pepTalk?.id, pepTalk?.audio_url]);
 
   // Check if XP was already awarded for this specific pep talk
   useEffect(() => {

@@ -103,7 +103,7 @@ serve(async (req) => {
     }
 
     // Build prompt based on whether user has advanced astrology details
-    let systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
+    const systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
     if (hasCosmicProfile) {

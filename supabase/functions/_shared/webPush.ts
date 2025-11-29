@@ -64,7 +64,7 @@ export async function sendWebPush(
     );
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Web Push error:', error);
     
     // Handle specific error codes

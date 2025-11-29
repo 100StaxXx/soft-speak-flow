@@ -36,7 +36,7 @@ export function useAppleSubscription() {
       });
 
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Purchase error:', error);
       toast({
         title: "Purchase Failed",
@@ -102,7 +102,7 @@ export function useAppleSubscription() {
           description: "No previous purchases to restore",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Restore error:', error);
       toast({
         title: "Restore Failed",

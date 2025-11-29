@@ -38,7 +38,7 @@ export const downloadImage = async (imageUrl: string, filename: string) => {
       a.click();
       toast.success('Image downloaded!');
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error downloading image:', error);
     toast.error('Failed to save image');
   }

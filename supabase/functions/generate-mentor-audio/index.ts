@@ -167,7 +167,7 @@ serve(async (req) => {
           signal: controller.signal,
         }
       );
-    } catch (error: any) {
+    } catch (error) {
       clearTimeout(timeoutId);
       if (error?.name === 'AbortError') {
         console.error("ElevenLabs API timeout after 55 seconds");

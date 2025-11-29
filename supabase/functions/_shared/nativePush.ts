@@ -109,7 +109,7 @@ export async function sendNativePush(
       success: true, 
       error: 'Native push sending not configured - notification logged only' 
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Native push error:', error);
     return {
       success: false,

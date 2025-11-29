@@ -725,12 +725,12 @@ export const useCompanion = () => {
   const nextEvolutionXP = useMemo(() => {
     if (!companion) return null;
     return getThreshold(companion.current_stage + 1);
-  }, [companion?.current_stage, companion?.id, getThreshold]);
+  }, [companion, getThreshold]);
 
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;
     return ((companion.current_xp / nextEvolutionXP) * 100);
-  }, [companion?.current_xp, companion?.id, nextEvolutionXP]);
+  }, [companion, nextEvolutionXP]);
 
   return {
     companion,

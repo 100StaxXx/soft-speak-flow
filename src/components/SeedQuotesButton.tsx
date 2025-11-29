@@ -19,7 +19,7 @@ export const SeedQuotesButton = () => {
       } else {
         throw new Error("Unexpected response from seed function");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error seeding quotes:", error);
       toast.error(error.message || "Failed to seed quotes");
     } finally {

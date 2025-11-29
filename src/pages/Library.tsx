@@ -112,7 +112,7 @@ export default function Library() {
 
       if (error) throw error;
       toast.success("Removed from favorites");
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Failed to remove favorite");
       console.error(error);
     }

@@ -163,7 +163,7 @@ serve(async (req) => {
           });
         }
 
-      } catch (error: any) {
+      } catch (error) {
         console.error(`Error dispatching push ${push.id}:`, error);
         errors.push({ pushId: push.id, error: error.message });
       }
@@ -181,7 +181,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Fatal error in dispatch:', error);
     return new Response(
       JSON.stringify({ error: error.message }),

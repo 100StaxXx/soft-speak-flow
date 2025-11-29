@@ -26,7 +26,7 @@ export const ReferralDashboard = () => {
             text: shareText,
             dialogTitle: "Share your referral code",
           });
-        } catch (error: any) {
+        } catch (error) {
           console.error("Share failed:", error);
           
           // Check if user cancelled (case-insensitive)
@@ -48,7 +48,7 @@ export const ReferralDashboard = () => {
               title: "Join R-Evolution",
               text: shareText,
             });
-          } catch (error: any) {
+          } catch (error) {
             console.error("Share failed:", error);
             
             // Check if user cancelled (case-insensitive)

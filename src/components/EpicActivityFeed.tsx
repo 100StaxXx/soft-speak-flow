@@ -25,32 +25,6 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchActivities();
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('epic-activity-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'epic_activity_feed',
-          filter: `epic_id=eq.${epicId}`
-        },
-        (payload) => {
-          // Add new activity to top of feed
-          fetchActivities();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [epicId]);
-
   const fetchActivities = async () => {
     try {
       const { data, error } = await supabase
@@ -86,6 +60,33 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchActivities();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('epic-activity-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'epic_activity_feed',
+          filter: `epic_id=eq.${epicId}`
+        },
+        () => {
+          // Add new activity to top of feed
+          fetchActivities();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epicId]); // fetchActivities is stable and depends on epicId indirectly
 
   const getActivityIcon = (type: string) => {
     switch (type) {

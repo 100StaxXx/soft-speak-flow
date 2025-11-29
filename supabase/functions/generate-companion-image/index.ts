@@ -383,7 +383,7 @@ STYLE REFERENCES:
     console.log(`Companion image uploaded successfully: ${publicUrl}`);
 
     return new Response(JSON.stringify({ imageUrl: publicUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: error.message || "Internal server error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
   }

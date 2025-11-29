@@ -212,7 +212,7 @@ serve(async (req) => {
           category: theme.topic_category
         });
 
-      } catch (error: any) {
+      } catch (error) {
         console.error(`Error processing ${mentorSlug}:`, error);
         errors.push({ mentor: mentorSlug, error: error.message });
       }
@@ -232,7 +232,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Fatal error in daily generation:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
