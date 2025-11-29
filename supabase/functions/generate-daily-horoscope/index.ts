@@ -59,38 +59,46 @@ serve(async (req) => {
     const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
 
     // Check if horoscope already exists for today
-    const { data: existingHoroscope } = await supabaseClient
+    const { data: existingHoroscope, error: fetchError } = await supabaseClient
       .from('user_daily_horoscopes')
       .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip')
       .eq('user_id', user.id)
       .eq('for_date', today)
-      .single();
+      .maybeSingle();
 
-    if (existingHoroscope && existingHoroscope.cosmic_tip) {
-      console.log('[Horoscope] Returning existing horoscope for', today);
-      return new Response(
-        JSON.stringify({ 
-          horoscope: existingHoroscope.horoscope_text,
-          zodiac: existingHoroscope.zodiac,
-          isPersonalized: existingHoroscope.is_personalized,
-          date: existingHoroscope.for_date,
-          cosmicTip: existingHoroscope.cosmic_tip
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      );
+    if (fetchError) {
+      console.error('[Horoscope] Error fetching existing horoscope:', fetchError);
     }
 
-    // If cosmic_tip is missing, delete old record so we can regenerate
-    if (existingHoroscope && !existingHoroscope.cosmic_tip) {
-      await supabaseClient
-        .from('user_daily_horoscopes')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('for_date', today);
-      console.log('[Horoscope] Deleted incomplete horoscope to regenerate with cosmic tip');
+    if (existingHoroscope) {
+      console.log('[Horoscope] Found existing horoscope for', today, 'has cosmic_tip:', !!existingHoroscope.cosmic_tip);
+      
+      if (existingHoroscope.cosmic_tip) {
+        console.log('[Horoscope] Returning cached horoscope');
+        return new Response(
+          JSON.stringify({ 
+            horoscope: existingHoroscope.horoscope_text,
+            zodiac: existingHoroscope.zodiac,
+            isPersonalized: existingHoroscope.is_personalized,
+            date: existingHoroscope.for_date,
+            cosmicTip: existingHoroscope.cosmic_tip
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        );
+      } else {
+        // If cosmic_tip is missing, delete old record so we can regenerate
+        console.log('[Horoscope] Deleting incomplete horoscope to regenerate with cosmic tip');
+        await supabaseClient
+          .from('user_daily_horoscopes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('for_date', today);
+      }
+    } else {
+      console.log('[Horoscope] No existing horoscope found for', today, '- will generate new one');
     }
 
     // Build prompt based on whether user has advanced astrology details
