@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
-    "@capacitor-community/stripe": "^7.2.1",
     "@capacitor/android": "^7.4.4",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
@@ -52,8 +51,6 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@stripe/react-stripe-js": "^5.3.0",
-    "@stripe/stripe-js": "^8.4.0",
     "@supabase/supabase-js": "^2.81.1",
     "@tanstack/react-query": "^5.83.0",
     "canvas-confetti": "^1.9.4",

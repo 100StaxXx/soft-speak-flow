@@ -1,5 +1,14 @@
 import { Capacitor } from '@capacitor/core';
 
+// Dynamically import IAP plugin to avoid build errors if not installed
+let InAppPurchase: any = null;
+try {
+  // @ts-ignore - Dynamic import for optional plugin
+  InAppPurchase = (window as any).CapacitorInAppPurchases;
+} catch (e) {
+  console.warn('In-App Purchase plugin not loaded');
+}
+
 // Apple IAP Product IDs - configure these in App Store Connect
 export const IAP_PRODUCTS = {
   MONTHLY: 'com.revolutions.app.premium.monthly',
@@ -18,11 +27,8 @@ export const purchaseProduct = async (productId: string): Promise<any> => {
   }
 
   try {
-    // Dynamically import to avoid build errors when package is not installed
-    const InAppPurchase = (window as any).CapacitorInAppPurchases;
-    
     if (!InAppPurchase) {
-      throw new Error('In-App Purchase plugin not available. Please install @capacitor-community/in-app-purchases');
+      throw new Error('In-App Purchase plugin not available');
     }
     
     const result = await InAppPurchase.buy({
@@ -61,10 +67,8 @@ export const restorePurchases = async (): Promise<any> => {
   }
 
   try {
-    const InAppPurchase = (window as any).CapacitorInAppPurchases;
-    
     if (!InAppPurchase) {
-      throw new Error('In-App Purchase plugin not available. Please install @capacitor-community/in-app-purchases');
+      throw new Error('In-App Purchase plugin not available');
     }
     
     const result = await InAppPurchase.restorePurchases();
@@ -91,8 +95,6 @@ export const getProducts = async (productIds: string[]): Promise<any> => {
   }
 
   try {
-    const InAppPurchase = (window as any).CapacitorInAppPurchases;
-    
     if (!InAppPurchase) {
       console.warn('In-App Purchase plugin not available');
       return [];
