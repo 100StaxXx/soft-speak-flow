@@ -301,15 +301,6 @@ const Profile = () => {
                 </CardContent>
               </Card>
 
-              <Button
-                onClick={handleSignOut}
-                variant="outline"
-                className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                disabled={isSigningOut}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                {isSigningOut ? "Signing out..." : "Sign Out"}
-              </Button>
             </TabsContent>
 
             <TabsContent value="notifications" className="space-y-6">
@@ -366,6 +357,19 @@ const Profile = () => {
             <ReferralCodeRedeemCard />
             <ReferralDashboard />
             <CompanionSkins />
+          </div>
+
+          {/* Sign Out Button */}
+          <div className="mt-8 pb-6">
+            <Button
+              onClick={handleSignOut}
+              variant="outline"
+              className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              disabled={isSigningOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {isSigningOut ? "Signing out..." : "Sign Out"}
+            </Button>
           </div>
         </div>
       </div>
