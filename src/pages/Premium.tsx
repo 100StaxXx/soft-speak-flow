@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, Sparkles, Zap, Bell, Download, Check } from "lucide-react";
+import { Crown, Sparkles, Zap, Bell, Download, Check, Moon } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 
@@ -90,6 +90,11 @@ export default function Premium() {
                   icon: Sparkles,
                   title: "Full Companion Evolution",
                   description: "Watch your companion grow through all 21 evolution stages"
+                },
+                {
+                  icon: Moon,
+                  title: "Personalized Cosmic Insight",
+                  description: "Daily horoscope with rising sign and planetary transit influences"
                 },
                 {
                   icon: Crown,
