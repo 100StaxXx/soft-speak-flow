@@ -96,83 +96,21 @@ export default function MentorChat() {
           <TodaysPepTalk />
           
           {/* Cosmic Insight Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          <div
+            className="relative overflow-hidden rounded-2xl cursor-pointer p-8 bg-gradient-to-br from-purple-600/30 via-blue-600/30 to-pink-600/30 border-2 border-purple-500/50 hover:border-purple-400 transition-all"
             onClick={() => navigate('/horoscope')}
           >
-            {/* Animated cosmic background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-pink-600/20" />
-            
-            {/* Content */}
-            <div className="relative p-8 backdrop-blur-sm bg-background/60 border-2 border-purple-500/30 group-hover:border-purple-500/60 transition-all duration-500">
-              <div className="flex items-center justify-center gap-4">
-                {/* Glowing moon icon */}
-                <motion.div
-                  animate={{
-                    scale: [1, 1.15, 1],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="relative"
-                >
-                  <div className="absolute inset-0 bg-purple-500/40 blur-xl rounded-full" />
-                  <div className="relative p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl">
-                    <Moon className="w-8 h-8 text-white" />
-                  </div>
-                </motion.div>
-
-                {/* Rainbow text */}
-                <div className="flex-1 text-center">
-                  <motion.h2
-                    className="text-3xl md:text-4xl font-black mb-2"
-                    style={{
-                      background: "linear-gradient(90deg, #a855f7, #ec4899, #f59e0b, #10b981, #3b82f6, #8b5cf6)",
-                      backgroundSize: "200% 100%",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                    animate={{
-                      backgroundPosition: ["0% 50%", "200% 50%"],
-                    }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  >
-                    ✨ Cosmic Insight ✨
-                  </motion.h2>
-                  <p className="text-base text-foreground/80 font-medium">Discover your daily celestial guidance</p>
-                </div>
-
-                {/* Sparkle indicator */}
-                <motion.div
-                  animate={{
-                    rotate: [0, 360],
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                >
-                  <Sparkles className="w-8 h-8 text-purple-400" />
-                </motion.div>
-              </div>
+            <div className="flex items-center justify-center gap-4">
+              <Moon className="w-10 h-10 text-purple-400" />
+              <h2 className="text-4xl font-black text-center bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                ✨ Cosmic Insight ✨
+              </h2>
+              <Sparkles className="w-10 h-10 text-purple-400" />
             </div>
-
-            {/* Shine effect on hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            </div>
-          </motion.div>
+            <p className="text-center mt-4 text-lg text-foreground/90 font-medium">
+              Discover your daily celestial guidance
+            </p>
+          </div>
 
           <AskMentorChat
             mentorName={mentor.name}
