@@ -370,19 +370,9 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw new Error('User not authenticated');
       }
 
-      // Use database function for atomic main quest update
-      const { data, error } = await supabase.rpc('set_main_quest_for_day', {
-        p_user_id: user.id,
-        p_task_id: taskId,
-        p_task_date: taskDate
-      });
-
-      if (error) {
-        // If RPC doesn't exist, fall back to two-step update with safeguards
-        console.warn('RPC not available, using fallback method:', error);
-        
-        // Verify task exists and belongs to user
-        const { data: task, error: fetchError } = await supabase
+      // Use two-step update with safeguards for atomic main quest update
+      // Verify task exists and belongs to user
+      const { data: task, error: fetchError } = await supabase
           .from('daily_tasks')
           .select('id, user_id, task_date')
           .eq('id', taskId)
@@ -390,25 +380,24 @@ export const useDailyTasks = (selectedDate?: Date) => {
           .eq('task_date', taskDate)
           .maybeSingle();
 
-        if (fetchError) throw fetchError;
-        if (!task) throw new Error('Task not found or access denied');
+      if (fetchError) throw fetchError;
+      if (!task) throw new Error('Task not found or access denied');
 
-        // First, unset any existing main quest for today
-        await supabase
-          .from('daily_tasks')
-          .update({ is_main_quest: false })
-          .eq('user_id', user.id)
-          .eq('task_date', taskDate);
+      // First, unset any existing main quest for today
+      await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: false })
+        .eq('user_id', user.id)
+        .eq('task_date', taskDate);
 
-        // Then set this task as the main quest
-        const { error: updateError } = await supabase
-          .from('daily_tasks')
-          .update({ is_main_quest: true })
-          .eq('id', taskId)
-          .eq('user_id', user.id);
+      // Then set this task as the main quest
+      const { error: updateError } = await supabase
+        .from('daily_tasks')
+        .update({ is_main_quest: true })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
 
-        if (updateError) throw updateError;
-      }
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });

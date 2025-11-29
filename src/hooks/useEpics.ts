@@ -151,14 +151,18 @@ export const useEpics = () => {
       } catch (error) {
         // Final cleanup in case of any unexpected error
         if (createdEpic) {
-          await supabase.from("epics").delete().eq("id", createdEpic.id).catch(() => {});
+          void supabase.from("epics").delete().eq("id", createdEpic.id).then(({ error: delErr }) => {
+            if (delErr) console.error('Failed to cleanup epic:', delErr);
+          });
         }
         if (createdHabits.length > 0) {
-          await supabase
+          void supabase
             .from("habits")
             .delete()
             .in("id", createdHabits.map(h => h.id))
-            .catch(() => {});
+            .then(({ error: delErr }) => {
+              if (delErr) console.error('Failed to cleanup habits:', delErr);
+            });
         }
         throw error;
       }
@@ -192,7 +196,7 @@ export const useEpics = () => {
       // Get epic details for XP reward - verify ownership
       const { data: epic, error: fetchError } = await supabase
         .from("epics")
-        .select("xp_reward, title, progress_percentage, status as current_status, user_id")
+        .select("xp_reward, title, progress_percentage, status, user_id")
         .eq("id", epicId)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -207,7 +211,7 @@ export const useEpics = () => {
       }
 
       // Prevent double-completion XP award
-      if (epic.current_status === "completed" && status === "completed") {
+      if (epic.status === "completed" && status === "completed") {
         throw new Error("Epic is already completed");
       }
 
@@ -222,7 +226,7 @@ export const useEpics = () => {
 
       if (error) throw error;
 
-      return { epic, status, wasAlreadyCompleted: epic.current_status === "completed" };
+      return { epic, status, wasAlreadyCompleted: epic.status === "completed" };
     },
     onSuccess: ({ epic, status, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
