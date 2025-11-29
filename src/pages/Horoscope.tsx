@@ -279,7 +279,7 @@ const Horoscope = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate('/profile', { state: { openTab: 'astrology' } })}
+                          onClick={() => navigate('/profile', { state: { openTab: 'preferences' } })}
                           className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
                         >
                           Add Birth Details →
