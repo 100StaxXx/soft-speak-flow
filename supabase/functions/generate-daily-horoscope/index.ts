@@ -66,7 +66,7 @@ serve(async (req) => {
       .eq('for_date', today)
       .single();
 
-    if (existingHoroscope) {
+    if (existingHoroscope && existingHoroscope.cosmic_tip) {
       console.log('[Horoscope] Returning existing horoscope for', today);
       return new Response(
         JSON.stringify({ 
@@ -81,6 +81,16 @@ serve(async (req) => {
           status: 200
         }
       );
+    }
+
+    // If cosmic_tip is missing, delete old record so we can regenerate
+    if (existingHoroscope && !existingHoroscope.cosmic_tip) {
+      await supabaseClient
+        .from('user_daily_horoscopes')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('for_date', today);
+      console.log('[Horoscope] Deleted incomplete horoscope to regenerate with cosmic tip');
     }
 
     // Build prompt based on whether user has advanced astrology details
