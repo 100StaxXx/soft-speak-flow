@@ -240,7 +240,7 @@ const Index = () => {
               <TodaysPepTalk />
             </ErrorBoundary>
 
-            {/* Cosmic Insight Section */}
+            {/* Cosmiq Insight Section */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -254,26 +254,7 @@ const Index = () => {
               
               {/* Content */}
               <div className="relative p-8 backdrop-blur-sm bg-background/40 border-2 border-purple-500/40 group-hover:border-purple-400/60 transition-all duration-500">
-                <div className="flex items-center justify-center gap-4">
-                  {/* Glowing moon icon */}
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.15, 1],
-                      rotate: [0, 5, -5, 0],
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="relative"
-                  >
-                    <div className="absolute inset-0 bg-purple-500/40 blur-2xl rounded-full" />
-                    <div className="relative p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl">
-                      <Moon className="w-8 h-8 text-white" />
-                    </div>
-                  </motion.div>
-
+                <div className="flex items-center justify-center">
                   {/* Rainbow gradient text */}
                   <div className="flex-1 text-center">
                     <motion.h2
@@ -294,24 +275,10 @@ const Index = () => {
                         ease: "linear",
                       }}
                     >
-                      ✨ Cosmic Insight ✨
+                      ✨ Cosmiq Insight ✨
                     </motion.h2>
                     <p className="text-base text-foreground/90 font-medium">Discover your daily celestial guidance</p>
                   </div>
-
-                  {/* Sparkle indicator */}
-                  <motion.div
-                    animate={{
-                      rotate: [0, 360],
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  >
-                    <Sparkles className="w-8 h-8 text-purple-400" />
-                  </motion.div>
                 </div>
               </div>
 
