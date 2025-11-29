@@ -37,9 +37,9 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* R-Evolution - Enhanced Premium Design */
+    /* Cosmiq - Cosmic Design System */
     
-    /* Core Brand Colors - More Vibrant */
+    /* Core Brand Colors - Deep Space Palette */
     --obsidian: 0 0% 5%;
     --midnight: 240 10% 10%;
     --charcoal: 240 8% 18%;
@@ -51,6 +51,13 @@ All colors MUST be HSL.
     --accent-purple: 280 80% 65%;
     --electric-purple: 280 90% 70%;
     --neon-glow: 270 100% 75%;
+    
+    /* Cosmic Color Additions */
+    --nebula-pink: 330 70% 55%;
+    --celestial-blue: 210 80% 50%;
+    --stardust-gold: 45 100% 65%;
+    --deep-space: 240 15% 8%;
+    --cosmic-glow: 270 80% 65%;
     
     /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
@@ -499,6 +506,122 @@ All colors MUST be HSL.
     }
   }
 
+  /* ========== COSMIQ COSMIC ANIMATIONS ========== */
+  
+  /* Star twinkling animation */
+  @keyframes twinkle {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+  }
+
+  /* Orbital motion for floating elements */
+  @keyframes orbit {
+    0% {
+      transform: rotate(0deg) translateX(10px) rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg) translateX(10px) rotate(-360deg);
+    }
+  }
+
+  /* Nebula gradient shift */
+  @keyframes nebula-shift {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 0.3;
+    }
+    50% {
+      transform: translate(20px, 30px) scale(1.1);
+      opacity: 0.5;
+    }
+  }
+
+  /* Shooting star effect */
+  @keyframes shooting-star {
+    0% {
+      transform: translateX(-100px) translateY(-100px);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(1000px) translateY(1000px);
+      opacity: 0;
+    }
+  }
+
+  /* Supernova burst for quest completion */
+  @keyframes supernova {
+    0% {
+      transform: scale(0);
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(3);
+      opacity: 0;
+    }
+  }
+
+  /* Warp effect for navigation */
+  @keyframes warp {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(0.95);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Cosmic glow pulse */
+  @keyframes cosmic-pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px hsl(var(--cosmic-glow) / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(var(--cosmic-glow) / 0.6), 0 0 60px hsl(var(--cosmic-glow) / 0.3);
+    }
+  }
+
+  /* Animation utility classes */
+  .animate-twinkle {
+    animation: twinkle 3s ease-in-out infinite;
+  }
+
+  .animate-orbit {
+    animation: orbit 20s linear infinite;
+  }
+
+  .animate-supernova {
+    animation: supernova 0.6s ease-out forwards;
+  }
+
+  .animate-warp {
+    animation: warp 0.3s ease-in-out;
+  }
+
+  .animate-cosmic-pulse {
+    animation: cosmic-pulse 2s ease-in-out infinite;
+  }
+
   .animate-fade-in {
     animation: fadeIn 2.5s ease-out forwards;
   }
@@ -611,6 +734,76 @@ All colors MUST be HSL.
 
   .mb-nav-safe {
     margin-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ========== COSMIQ GLASS-MORPHISM UTILITIES ========== */
+  
+  /* Base cosmic glass effect */
+  .cosmic-glass {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.7),
+      hsl(var(--card) / 0.5)
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--cosmic-glow) / 0.2);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.1);
+  }
+
+  /* Enhanced cosmic card with glow */
+  .cosmic-card {
+    @apply cosmic-glass;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .cosmic-card:hover {
+    border-color: hsl(var(--cosmic-glow) / 0.4);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 40px hsl(var(--cosmic-glow) / 0.2),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.1);
+    transform: translateY(-2px);
+  }
+
+  /* Cosmic button with glow effect */
+  .cosmic-button {
+    @apply cosmic-glass;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cosmic-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      transparent,
+      hsl(var(--cosmic-glow) / 0.1),
+      transparent
+    );
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+
+  .cosmic-button:hover::before {
+    transform: translateX(100%);
+  }
+
+  /* Star shimmer effect for loading states */
+  .star-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--stardust-gold) / 0.3),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmerBackground 2s ease-in-out infinite;
   }
 
 }

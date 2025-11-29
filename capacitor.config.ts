@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.darrylgraham.revolution',
-  appName: 'R-Evolution',
+  appName: 'Cosmiq',
   webDir: 'dist',
   // ⚠️ PRODUCTION BUILD: server config commented out
   // Only use during LOCAL development - DO NOT uncomment for iOS/Android builds!
