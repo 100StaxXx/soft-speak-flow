@@ -2109,6 +2109,7 @@ export type Database = {
           birth_location: string | null
           birth_time: string | null
           birthdate: string | null
+          cosmic_profile_generated_at: string | null
           created_at: string | null
           current_habit_streak: number | null
           daily_push_enabled: boolean | null
@@ -2121,6 +2122,9 @@ export type Database = {
           id: string
           is_premium: boolean | null
           longest_habit_streak: number | null
+          mars_sign: string | null
+          mercury_sign: string | null
+          moon_sign: string | null
           onboarding_completed: boolean | null
           onboarding_data: Json | null
           onboarding_step: string | null
@@ -2128,6 +2132,7 @@ export type Database = {
           referral_code: string | null
           referral_count: number | null
           referred_by: string | null
+          rising_sign: string | null
           selected_mentor_id: string | null
           stripe_customer_id: string | null
           subscription_expires_at: string | null
@@ -2136,12 +2141,14 @@ export type Database = {
           timezone: string | null
           trial_ends_at: string | null
           updated_at: string | null
+          venus_sign: string | null
           zodiac_sign: string | null
         }
         Insert: {
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
+          cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
@@ -2154,6 +2161,9 @@ export type Database = {
           id: string
           is_premium?: boolean | null
           longest_habit_streak?: number | null
+          mars_sign?: string | null
+          mercury_sign?: string | null
+          moon_sign?: string | null
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
@@ -2161,6 +2171,7 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          rising_sign?: string | null
           selected_mentor_id?: string | null
           stripe_customer_id?: string | null
           subscription_expires_at?: string | null
@@ -2169,12 +2180,14 @@ export type Database = {
           timezone?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          venus_sign?: string | null
           zodiac_sign?: string | null
         }
         Update: {
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
+          cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
           daily_push_enabled?: boolean | null
@@ -2187,6 +2200,9 @@ export type Database = {
           id?: string
           is_premium?: boolean | null
           longest_habit_streak?: number | null
+          mars_sign?: string | null
+          mercury_sign?: string | null
+          moon_sign?: string | null
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
@@ -2194,6 +2210,7 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          rising_sign?: string | null
           selected_mentor_id?: string | null
           stripe_customer_id?: string | null
           subscription_expires_at?: string | null
@@ -2202,6 +2219,7 @@ export type Database = {
           timezone?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          venus_sign?: string | null
           zodiac_sign?: string | null
         }
         Relationships: [
