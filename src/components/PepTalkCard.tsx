@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { ShareButton } from "@/components/ShareButton";
 import { useNavigate } from "react-router-dom";
 import { memo } from "react";
+import { getRedirectUrl } from '@/utils/redirectUrl';
 
 interface PepTalkCardProps {
   id: string;
@@ -56,7 +57,7 @@ export const PepTalkCard = memo(({ id, title, category, topicCategories, descrip
         <ShareButton
           title={title}
           text={`${title} - ${description || quote || ''}`}
-          url={`${window.location.origin}/pep-talk/${id}`}
+          url={`${getRedirectUrl()}/pep-talk/${id}`}
         />
       </div>
       <div className="flex items-start gap-3">
