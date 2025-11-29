@@ -25,6 +25,7 @@ import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -170,7 +171,8 @@ const Profile = () => {
   if (!user) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-24 flex items-center justify-center">
+        <StarfieldBackground />
+        <div className="min-h-screen pb-24 flex items-center justify-center relative z-10">
           <div className="text-center">
             <h2 className="text-3xl font-bold mb-4">Sign in to view your profile</h2>
             <Button onClick={() => navigate("/auth")}>Sign In</Button>
@@ -183,7 +185,10 @@ const Profile = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background pb-24">
+      {/* Cosmic Starfield Background */}
+      <StarfieldBackground />
+      
+      <div className="min-h-screen pb-24 relative">
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -193,7 +198,7 @@ const Profile = () => {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 space-y-6">
+        <div className="max-w-4xl mx-auto px-4 space-y-6 relative z-10">
           <div className="max-w-md">
             <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/library")} data-tour="library">
               <CardHeader>

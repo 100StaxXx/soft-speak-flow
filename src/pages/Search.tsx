@@ -1,11 +1,15 @@
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 const Search = () => {
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background pb-24">
+      {/* Cosmic Starfield Background */}
+      <StarfieldBackground />
+      
+      <div className="min-h-screen pb-24 relative">
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -15,7 +19,7 @@ const Search = () => {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-4xl mx-auto px-4 relative z-10">
           <GlobalSearch />
         </div>
       </div>
