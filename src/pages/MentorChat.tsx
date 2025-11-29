@@ -5,7 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -80,6 +80,16 @@ export default function MentorChat() {
             className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
           >
             <ArrowLeft className="w-5 h-5" />
+          </Button>
+          
+          {/* Horoscope button */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate('/horoscope')} 
+            className="absolute top-4 right-4 z-10 bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
+          >
+            <Sparkles className="w-5 h-5" />
           </Button>
           
           {/* Title overlay */}

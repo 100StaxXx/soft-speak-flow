@@ -68,3 +68,7 @@ verify_jwt = true
 
 [functions.apple-webhook]
 verify_jwt = false
+
+[functions.generate-daily-horoscope]
+verify_jwt = true
+

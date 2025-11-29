@@ -2050,6 +2050,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          birth_location: string | null
+          birth_time: string | null
           birthdate: string | null
           created_at: string | null
           current_habit_streak: number | null
@@ -2081,6 +2083,8 @@ export type Database = {
           zodiac_sign: string | null
         }
         Insert: {
+          birth_location?: string | null
+          birth_time?: string | null
           birthdate?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
@@ -2112,6 +2116,8 @@ export type Database = {
           zodiac_sign?: string | null
         }
         Update: {
+          birth_location?: string | null
+          birth_time?: string | null
           birthdate?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
