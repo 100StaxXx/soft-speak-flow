@@ -54,7 +54,8 @@ serve(async (req) => {
       .eq('id', profile.selected_mentor_id)
       .single();
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date instead of UTC to avoid timezone issues
+    const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
     const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
 
     // Build prompt based on whether user has advanced astrology details
