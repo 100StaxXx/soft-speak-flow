@@ -58,6 +58,30 @@ serve(async (req) => {
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
     const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
 
+    // Check if horoscope already exists for today
+    const { data: existingHoroscope } = await supabaseClient
+      .from('user_daily_horoscopes')
+      .select('horoscope_text, zodiac, is_personalized, for_date')
+      .eq('user_id', user.id)
+      .eq('for_date', today)
+      .single();
+
+    if (existingHoroscope) {
+      console.log('[Horoscope] Returning existing horoscope for', today);
+      return new Response(
+        JSON.stringify({ 
+          horoscope: existingHoroscope.horoscope_text,
+          zodiac: existingHoroscope.zodiac,
+          isPersonalized: existingHoroscope.is_personalized,
+          date: existingHoroscope.for_date
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
+    }
+
     // Build prompt based on whether user has advanced astrology details
     let systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''}`;
     
@@ -123,6 +147,22 @@ Keep it warm, inspiring, and under 150 words.`;
     }
 
     console.log('[Horoscope] Generated successfully');
+
+    // Store the horoscope for today
+    const { error: insertError } = await supabaseClient
+      .from('user_daily_horoscopes')
+      .insert({
+        user_id: user.id,
+        for_date: today,
+        zodiac: profile.zodiac_sign,
+        horoscope_text: horoscope,
+        is_personalized: hasAdvancedDetails
+      });
+
+    if (insertError) {
+      console.error('[Horoscope] Error storing horoscope:', insertError);
+      // Don't throw - still return the generated horoscope even if storage fails
+    }
 
     return new Response(
       JSON.stringify({ 

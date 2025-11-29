@@ -2672,6 +2672,36 @@ export type Database = {
           },
         ]
       }
+      user_daily_horoscopes: {
+        Row: {
+          created_at: string | null
+          for_date: string
+          horoscope_text: string
+          id: string
+          is_personalized: boolean
+          user_id: string
+          zodiac: string
+        }
+        Insert: {
+          created_at?: string | null
+          for_date?: string
+          horoscope_text: string
+          id?: string
+          is_personalized?: boolean
+          user_id: string
+          zodiac: string
+        }
+        Update: {
+          created_at?: string | null
+          for_date?: string
+          horoscope_text?: string
+          id?: string
+          is_personalized?: boolean
+          user_id?: string
+          zodiac?: string
+        }
+        Relationships: []
+      }
       user_daily_pushes: {
         Row: {
           created_at: string
