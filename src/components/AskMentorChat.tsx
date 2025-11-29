@@ -125,10 +125,10 @@ export const AskMentorChat = ({
       setDailyMessageCount(prev => prev + 1);
 
       // Save conversation history (non-blocking - don't fail if this errors)
-      supabase.from('mentor_chats').insert([
+      void supabase.from('mentor_chats').insert([
         { user_id: currentUser.id, role: 'user', content: text },
         { user_id: currentUser.id, role: 'assistant', content: data.response }
-      ]).catch(err => console.error('Failed to save chat history:', err));
+      ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -155,10 +155,10 @@ export const AskMentorChat = ({
       setDailyMessageCount(prev => prev + 1);
 
       // Save both messages even with fallback (non-blocking)
-      supabase.from('mentor_chats').insert([
+      void supabase.from('mentor_chats').insert([
         { user_id: currentUser.id, role: 'user', content: text },
         { user_id: currentUser.id, role: 'assistant', content: fallback.content }
-      ]).catch(err => console.error('Failed to save fallback chat:', err));
+      ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
     } finally {
       setIsLoading(false);
     }
