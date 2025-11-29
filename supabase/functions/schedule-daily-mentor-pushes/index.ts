@@ -117,7 +117,8 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`Error processing user ${profile.id}:`, error);
-        errors.push({ userId: profile.id, error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push({ userId: profile.id, error: errorMessage });
       }
     }
 
@@ -135,8 +136,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Fatal error in scheduling:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

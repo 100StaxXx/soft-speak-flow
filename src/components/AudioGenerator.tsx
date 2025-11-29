@@ -172,7 +172,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
             <SelectContent className="bg-background z-50 max-h-[300px]">
               {mentors.map((mentor) => {
                 const config = getMentorVoiceConfig(mentor.slug);
-                const displayText = `${mentor.name} (${config?.voiceName || "Unknown"}) - ${mentor.short_title || mentor.description}`;
+                const displayText = `${mentor.name} (${config?.voiceName || "Unknown"})`;
                 return (
                   <SelectItem 
                     key={mentor.slug} 

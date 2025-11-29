@@ -8,7 +8,7 @@ import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
-import type { CompleteReferralStage3Result } from "@/types/referral-functions";
+import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
 
 export interface Companion {
@@ -455,7 +455,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const { data, error } = await supabase.rpc(
+          const { data, error } = await (supabase.rpc as any)(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,

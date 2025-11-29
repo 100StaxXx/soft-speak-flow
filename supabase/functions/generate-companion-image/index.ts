@@ -385,6 +385,7 @@ STYLE REFERENCES:
     return new Response(JSON.stringify({ imageUrl: publicUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
   } catch (error) {
     console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Internal server error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return new Response(JSON.stringify({ error: errorMessage }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
   }
 });

@@ -18,6 +18,8 @@ interface PepTalk {
   id?: string;
   title: string;
   category: string;
+  topic_category?: string[];
+  emotional_triggers?: string[];
   quote: string;
   description: string;
   audio_url: string;
@@ -196,7 +198,7 @@ const Admin = () => {
       return;
     }
 
-    const pepTalkData: Partial<PepTalk> = {
+    const pepTalkData = {
       ...formData,
       audio_url: audioUrl || formData.audio_url,
     };
@@ -214,7 +216,7 @@ const Admin = () => {
       }
       toast.success("Pep talk updated successfully");
     } else {
-      const { error } = await supabase.from("pep_talks").insert([pepTalkData]);
+      const { error } = await supabase.from("pep_talks").insert([pepTalkData as any]);
 
       if (error) {
         toast.error("Failed to create pep talk");
@@ -241,7 +243,7 @@ const Admin = () => {
     setFormData({
       title: pepTalk.title,
       category: pepTalk.category,
-      topic_category: pepTalk.topic_category || "",
+      topic_category: pepTalk.topic_category || [],
       emotional_triggers: pepTalk.emotional_triggers || [],
       quote: pepTalk.quote,
       description: pepTalk.description,

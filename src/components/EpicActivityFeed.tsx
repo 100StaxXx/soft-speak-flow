@@ -47,6 +47,9 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
         const enrichedActivities = data.map(activity => ({
           ...activity,
+          activity_data: typeof activity.activity_data === 'object' && activity.activity_data !== null 
+            ? activity.activity_data as Record<string, unknown>
+            : {},
           profiles: profileMap.get(activity.user_id)
         }));
         

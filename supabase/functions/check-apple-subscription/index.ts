@@ -72,17 +72,19 @@ serve(async (req) => {
     console.error("Error checking subscription:", error);
     
     // Determine appropriate status code
+    const err = error as any;
     let statusCode = 500;
-    if (error.message === "Unauthorized") {
+    if (err.message === "Unauthorized") {
       statusCode = 401;
-    } else if (error.message?.includes("not found")) {
+    } else if (err.message?.includes("not found")) {
       statusCode = 404;
-    } else if (error.message?.includes("invalid") || error.message?.includes("required")) {
+    } else if (err.message?.includes("invalid") || err.message?.includes("required")) {
       statusCode = 400;
     }
     
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: error?.message || "Unknown error" }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: statusCode,

@@ -68,7 +68,8 @@ export async function sendWebPush(
     console.error('Web Push error:', error);
     
     // Handle specific error codes
-    if (error.statusCode === 410 || error.statusCode === 404) {
+    const err = error as any;
+    if (err.statusCode === 410 || err.statusCode === 404) {
       // Subscription expired or invalid - should be removed
       return {
         success: false,
@@ -76,7 +77,7 @@ export async function sendWebPush(
       };
     }
     
-    if (error.statusCode === 429) {
+    if (err.statusCode === 429) {
       // Rate limited
       return {
         success: false,
@@ -84,9 +85,10 @@ export async function sendWebPush(
       };
     }
 
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,
-      error: error.message || 'Unknown error'
+      error: errorMessage
     };
   }
 }

@@ -111,9 +111,10 @@ export async function sendNativePush(
     };
   } catch (error) {
     console.error('Native push error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,
-      error: error.message || 'Unknown error'
+      error: errorMessage
     };
   }
 }

@@ -214,7 +214,8 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`Error processing ${mentorSlug}:`, error);
-        errors.push({ mentor: mentorSlug, error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push({ mentor: mentorSlug, error: errorMessage });
       }
     }
 
@@ -234,8 +235,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Fatal error in daily generation:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
