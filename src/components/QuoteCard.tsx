@@ -62,9 +62,10 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
 
       onFavoriteChange?.();
     } catch (error) {
+      console.error("Error toggling favorite:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to update favorite",
         variant: "destructive",
       });
     } finally {

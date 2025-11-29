@@ -63,7 +63,8 @@ export const PushNotificationSettings = () => {
         toast({ title: "Notifications Disabled", description: "You won't receive push notifications" });
       }
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Error toggling push notifications:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle notifications", variant: "destructive" });
     }
   };
 
@@ -91,7 +92,8 @@ export const PushNotificationSettings = () => {
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Error toggling pep talk:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle pep talk", variant: "destructive" });
     }
   };
 
@@ -119,7 +121,8 @@ export const PushNotificationSettings = () => {
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Error toggling quote push:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle quote push", variant: "destructive" });
     }
   };
 
@@ -136,7 +139,8 @@ export const PushNotificationSettings = () => {
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Error updating time:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to update time", variant: "destructive" });
     }
   };
 

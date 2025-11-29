@@ -139,7 +139,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       }
     } catch (error) {
       console.error("Error generating complete pep talk:", error);
-      toast.error(error.message || "Failed to generate pep talk");
+      toast.error(error instanceof Error ? error.message : "Failed to generate pep talk");
     } finally {
       setIsGenerating(false);
     }

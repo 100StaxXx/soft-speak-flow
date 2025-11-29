@@ -49,9 +49,28 @@ serve(async (req) => {
 
     console.log('[Cosmic Profile] Calculating for user:', user.id);
 
-    // Parse birthdate and time
+    // Parse and validate birthdate and time
     const birthDate = profile.birthdate ? new Date(profile.birthdate) : new Date();
-    const [hours, minutes] = profile.birth_time.split(':').map(Number);
+    
+    // Validate birth_time format (HH:mm)
+    const timeMatch = profile.birth_time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!timeMatch) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid birth time values. Hours must be 0-23, minutes 0-59' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     birthDate.setHours(hours, minutes, 0);
 
     // For now, use AI to generate placements based on birth details
@@ -108,9 +127,29 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
     const placementsData = await placementsResponse.json();
     let placementsText = placementsData.choices?.[0]?.message?.content || '';
     
+    if (!placementsText) {
+      throw new Error('No placement data returned from AI');
+    }
+    
     // Clean up response to extract JSON
     placementsText = placementsText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const placements = JSON.parse(placementsText);
+    
+    let placements;
+    try {
+      placements = JSON.parse(placementsText);
+    } catch (parseError) {
+      console.error('[Cosmic Profile] JSON parse error:', parseError);
+      console.error('[Cosmic Profile] Raw response:', placementsText);
+      throw new Error('Failed to parse astrological calculations. Please try again.');
+    }
+    
+    // Validate that all required fields are present
+    const requiredFields = ['moonSign', 'risingSign', 'mercurySign', 'marsSign', 'venusSign'];
+    const missingFields = requiredFields.filter(field => !placements[field]);
+    if (missingFields.length > 0) {
+      console.error('[Cosmic Profile] Missing fields:', missingFields);
+      throw new Error('Incomplete astrological calculations. Please try again.');
+    }
 
     console.log('[Cosmic Profile] Calculated placements:', placements);
 

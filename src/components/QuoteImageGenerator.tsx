@@ -48,7 +48,7 @@ export const QuoteImageGenerator = ({
       }
     } catch (error) {
       console.error("Error generating image:", error);
-      toast.error(error.message || "Failed to generate image");
+      toast.error(error instanceof Error ? error.message : "Failed to generate image");
     } finally {
       setIsGenerating(false);
     }
