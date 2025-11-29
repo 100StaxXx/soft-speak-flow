@@ -39,7 +39,7 @@ const Companion = () => {
   return (
     <PageTransition>
       <CompanionErrorBoundary>
-        <div className="min-h-screen bg-background pb-20 relative">
+        <div className="min-h-screen pb-20 relative">
           {/* Cosmic Starfield Background */}
           <StarfieldBackground />
           
