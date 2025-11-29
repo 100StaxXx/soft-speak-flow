@@ -258,7 +258,7 @@ const Index = () => {
                   {/* Rainbow gradient text */}
                   <div className="flex-1 text-center">
                     <motion.h2
-                      className="text-3xl md:text-4xl font-black mb-2"
+                      className="text-2xl md:text-3xl font-black mb-2"
                       style={{
                         background: "linear-gradient(90deg, #a855f7, #ec4899, #f59e0b, #10b981, #3b82f6, #8b5cf6)",
                         backgroundSize: "200% 100%",
