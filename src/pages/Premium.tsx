@@ -109,7 +109,7 @@ export default function Premium() {
                 {
                   icon: Download,
                   title: "All Premium Features",
-                  description: "Battle Arena, Pet Mode, Weekly Challenges, and more"
+                  description: "Pet Mode, Guild Stories, Weekly Challenges, and more"
                 }
               ].map((feature, index) => (
                 <div key={index} className="flex items-start gap-3 group hover:bg-primary/5 p-3 rounded-lg transition-colors">
