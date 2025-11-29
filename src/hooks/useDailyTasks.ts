@@ -190,7 +190,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .from('epic_members')
         .select('epic_id')
         .eq('user_id', user.id)
-        .in('epic_id', epicHabits.map((eh: any) => eh.epic_id));
+        .in('epic_id', epicHabits.map((eh: { epic_id: string }) => eh.epic_id));
 
       if (memberships && memberships.length > 0) {
         const rawBonus = Math.round(baseXP * 0.1);

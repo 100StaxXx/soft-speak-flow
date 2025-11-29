@@ -89,7 +89,7 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardPepTalkListened = (metadata?: Record<string, any>) => {
+  const awardPepTalkListened = (metadata?: Record<string, string | number | boolean | undefined>) => {
     if (!companion) return;
     showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Pep Talk Listened!");
     awardXP.mutate({
@@ -181,7 +181,7 @@ export const useXPRewards = () => {
     });
   };
 
-  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, any>) => {
+  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
     if (!companion) {
       console.warn('Companion not loaded yet, attempting XP award anyway');
     }
