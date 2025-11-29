@@ -29,7 +29,8 @@ export const useAudioGeneration = () => {
       return data?.script || null;
     } catch (error) {
       console.error("Error generating script:", error);
-      toast.error(error.message || "Failed to generate script");
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate script";
+      toast.error(errorMessage);
       return null;
     }
   };
@@ -47,7 +48,8 @@ export const useAudioGeneration = () => {
       return data?.audioUrl || null;
     } catch (error) {
       console.error("Error generating audio:", error);
-      toast.error(error.message || "Failed to generate audio");
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate audio";
+      toast.error(errorMessage);
       return null;
     }
   };
@@ -73,7 +75,8 @@ export const useAudioGeneration = () => {
       throw new Error("Invalid response from server");
     } catch (error) {
       console.error("Error generating full audio:", error);
-      toast.error(error.message || "Failed to generate audio");
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate audio";
+      toast.error(errorMessage);
       return null;
     } finally {
       setIsGenerating(false);

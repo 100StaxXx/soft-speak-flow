@@ -86,7 +86,7 @@ export const useReferrals = () => {
       // FIX Bugs #15, #18, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<ApplyReferralCodeResult>(
         async () => {
-          const { data, error } = await (supabase.rpc as any)(
+          const { data, error } = await supabase.rpc(
             'apply_referral_code_atomic',
             {
               p_user_id: user.id,
@@ -98,7 +98,8 @@ export const useReferrals = () => {
           if (error) throw error;
           if (!data) throw new Error("No data returned from referral application");
           
-          return data as ApplyReferralCodeResult;
+          // Data from this RPC should match ApplyReferralCodeResult
+          return data as unknown as ApplyReferralCodeResult;
         },
         {
           maxAttempts: 3,

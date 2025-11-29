@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
+import { logger } from "@/utils/logger";
 
 const authSchema = z.object({
   email: z.string()

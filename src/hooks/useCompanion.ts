@@ -9,6 +9,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CompleteReferralStage3Result } from "@/types/referral-functions";
+import { logger } from "@/utils/logger";
 
 export interface Companion {
   id: string;
@@ -80,14 +81,14 @@ export const useCompanion = () => {
       companionCreationInProgress.current = true;
 
       try {
-        console.log("Starting companion creation process...");
+        logger.log("Starting companion creation process...");
 
         // Determine consistent colors for the companion's lifetime
         const eyeColor = `glowing ${data.favoriteColor}`;
         const furColor = data.favoriteColor;
 
         // Generate initial companion image with color specifications (with retry)
-        console.log("Generating companion image...");
+        logger.log("Generating companion image...");
         const imageData = await retryWithBackoff(
           async () => {
             const { data: imageResult, error } = await supabase.functions.invoke(
@@ -154,11 +155,11 @@ export const useCompanion = () => {
         );
 
         if (!imageData?.imageUrl) {
-        console.error("Missing imageUrl after generation:", imageData);
+        logger.error("Missing imageUrl after generation:", imageData);
         throw new Error("Unable to create your companion's image. Please try again.");
       }
 
-      console.log("Image generated successfully, creating companion record...");
+      logger.log("Image generated successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
         const result = await supabase.rpc('create_companion_if_not_exists', {
@@ -180,17 +181,17 @@ export const useCompanion = () => {
         
         const companionResult = result.data;
 
-        console.log("RPC call successful, result:", companionResult);
+        logger.log("RPC call successful, result:", companionResult);
       
       if (!companionResult || companionResult.length === 0) {
-        console.error("No companion data returned from function");
+        logger.error("No companion data returned from function");
         throw new Error("Failed to create companion record. Please try again.");
       }
 
-      const companionData = companionResult[0];
+      const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
       const isNewCompanion = companionData.is_new;
 
-      console.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
+      logger.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
 
       // Check if stage 0 evolution exists (regardless of whether companion is new)
       const { data: existingEvolution } = await supabase
@@ -202,7 +203,7 @@ export const useCompanion = () => {
 
       // Create stage 0 evolution if missing
       if (!existingEvolution) {
-        console.log("Creating stage 0 evolution...");
+        logger.log("Creating stage 0 evolution...");
         const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
           .from("companion_evolutions")
           .insert({
@@ -272,7 +273,7 @@ export const useCompanion = () => {
 
               if (error) throw error;
 
-              console.log("Stage 0 story generation started");
+              logger.log("Stage 0 story generation started");
               queryClient.invalidateQueries({ queryKey: ["companion-story"] });
               queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
               return;
@@ -283,7 +284,7 @@ export const useCompanion = () => {
                                  errorMessage.includes('temporarily unavailable');
 
               if (attempt < attempts && isTransient) {
-                console.log(`Story generation attempt ${attempt} failed, retrying...`);
+                logger.log(`Story generation attempt ${attempt} failed, retrying...`);
                 await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
                 continue;
               }
@@ -310,7 +311,7 @@ export const useCompanion = () => {
     onSuccess: () => {
       companionCreationInProgress.current = false;
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      console.log("Companion creation successful!");
+      logger.log("Companion creation successful!");
       // Don't show toast here - let the parent component handle success message
     },
     onError: (error) => {
@@ -328,7 +329,7 @@ export const useCompanion = () => {
     }: {
       eventType: string;
       xpAmount: number;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, string | number | boolean | undefined>;
     }) => {
       if (!user) throw new Error("No user found");
       
@@ -343,7 +344,7 @@ export const useCompanion = () => {
         let companionToUse = companion;
         
         if (!companionToUse) {
-          console.warn('Companion not loaded yet, fetching...');
+          logger.warn('Companion not loaded yet, fetching...');
           // Refetch companion data and wait for it to complete
           await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
           companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
@@ -388,7 +389,7 @@ export const useCompanion = () => {
     companionData: Companion,
     xpAmount: number,
     eventType: string,
-    metadata: Record<string, any>,
+    metadata: Record<string, string | number | boolean | undefined>,
     currentUser: typeof user
   ) => {
     if (!currentUser?.id) {
@@ -401,7 +402,7 @@ export const useCompanion = () => {
     const nextStage = companionData.current_stage + 1;
     const nextThreshold = getThreshold(nextStage);
     
-    console.log('[XP Award Debug]', {
+    logger.log('[XP Award Debug]', {
       currentStage: companionData.current_stage,
       currentXP: companionData.current_xp,
       xpAmount,
@@ -417,7 +418,7 @@ export const useCompanion = () => {
     
     if (shouldEvolveNow) {
       newStage = nextStage;
-      console.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
+      logger.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
     }
 
     // XP events are logged server-side via triggers/functions
@@ -454,7 +455,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const { data, error } = await (supabase.rpc as any)(
+          const { data, error } = await supabase.rpc(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,
@@ -465,7 +466,8 @@ export const useCompanion = () => {
           if (error) throw error;
           if (!data) throw new Error("No data returned from referral completion");
           
-          return data as CompleteReferralStage3Result;
+          // Data from this RPC should match CompleteReferralStage3Result
+          return data as unknown as CompleteReferralStage3Result;
         },
         {
           maxAttempts: 3,
@@ -493,12 +495,12 @@ export const useCompanion = () => {
 
       if (!result || !result.success) {
         // Referral already completed or concurrent request (not an error)
-        console.log('Referral not completed:', result?.reason ?? 'unknown', result?.message ?? '');
+        logger.log('Referral not completed:', result?.reason ?? 'unknown', result?.message ?? '');
         return;
       }
 
       // Success! Log the result with safe access
-      console.log('Referral completed successfully:', {
+      logger.log('Referral completed successfully:', {
         newCount: result.new_count ?? 0,
         milestoneReached: result.milestone_reached ?? false,
         skinUnlocked: result.skin_unlocked ?? false
@@ -514,7 +516,7 @@ export const useCompanion = () => {
     mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
       if (evolutionInProgress.current) {
-        console.log('Evolution already in progress, rejecting duplicate request');
+        logger.log('Evolution already in progress, rejecting duplicate request');
         if (evolutionPromise.current) {
           // Wait for existing evolution to complete
           await evolutionPromise.current;
@@ -554,7 +556,7 @@ export const useCompanion = () => {
         if (!evolutionData?.evolved) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);
-          console.log('Evolution not triggered:', evolutionData?.message);
+          logger.log('Evolution not triggered:', evolutionData?.message);
           return null; // Return null instead of throwing when evolution isn't needed
         }
 
@@ -581,7 +583,7 @@ export const useCompanion = () => {
         // Generate cards for missing stages (stage 0 through current stage)
         for (let stage = 0; stage <= newStage; stage++) {
           if (!existingStages.has(stage)) {
-            console.log(`Generating card for stage ${stage}`);
+            logger.log(`Generating card for stage ${stage}`);
             
             // Get the evolution record for this stage
             const { data: evolutionRecord } = await supabase
@@ -595,7 +597,7 @@ export const useCompanion = () => {
             let stageEvolutionId = evolutionRecord?.id;
             
             if (stage === 0 && !evolutionRecord) {
-              console.log("Stage 0 evolution record not found, creating one...");
+              logger.log("Stage 0 evolution record not found, creating one...");
               
               // Get the companion's initial image
               const { data: companionData } = await supabase
@@ -619,7 +621,7 @@ export const useCompanion = () => {
               
               if (!stage0Error && newStage0Evolution) {
                 stageEvolutionId = newStage0Evolution.id;
-                console.log("Created stage 0 evolution record:", stageEvolutionId);
+                logger.log("Created stage 0 evolution record:", stageEvolutionId);
               } else {
                 console.error("Failed to create stage 0 evolution record:", stage0Error);
               }
@@ -643,7 +645,7 @@ export const useCompanion = () => {
                 },
               });
             } else {
-              console.warn(`Skipping card generation for stage ${stage} - no evolution record found`);
+              logger.warn(`Skipping card generation for stage ${stage} - no evolution record found`);
             }
           }
         }
@@ -672,7 +674,7 @@ export const useCompanion = () => {
                 themeIntensity: "moderate",
               },
             });
-            console.log(`Stage ${newStage} story generation started`);
+            logger.log(`Stage ${newStage} story generation started`);
             queryClient.invalidateQueries({ queryKey: ["companion-story"] });
             queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
           } catch (error) {
