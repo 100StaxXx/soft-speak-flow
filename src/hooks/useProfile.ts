@@ -23,6 +23,17 @@ interface Profile {
   longest_habit_streak: number | null;
   onboarding_completed: boolean | null;
   onboarding_data: Record<string, unknown> | null;
+  // Astrology fields
+  zodiac_sign: string | null;
+  birthdate: string | null;
+  birth_time: string | null;
+  birth_location: string | null;
+  moon_sign: string | null;
+  rising_sign: string | null;
+  mercury_sign: string | null;
+  mars_sign: string | null;
+  venus_sign: string | null;
+  cosmic_profile_generated_at: string | null;
 }
 
 export const useProfile = () => {

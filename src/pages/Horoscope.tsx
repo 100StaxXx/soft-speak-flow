@@ -37,9 +37,14 @@ const Horoscope = () => {
       console.error('Error generating horoscope:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load your horoscope",
+        description: error instanceof Error ? error.message : "Failed to load your horoscope",
         variant: "destructive",
       });
+      // Set fallback content so UI doesn't break
+      setHoroscope("Unable to load your cosmic insights at this moment. Please try again later.");
+      setZodiac(profile?.zodiac_sign || "");
+      setIsPersonalized(false);
+      setDate(new Date().toLocaleDateString('en-CA'));
     } finally {
       setLoading(false);
     }

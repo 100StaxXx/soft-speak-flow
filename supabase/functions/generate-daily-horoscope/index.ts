@@ -47,12 +47,17 @@ serve(async (req) => {
       );
     }
 
-    // Fetch mentor info for personalization
-    const { data: mentor } = await supabaseClient
+    // Fetch mentor info for personalization (optional - fallback to default if not found)
+    const { data: mentor, error: mentorError } = await supabaseClient
       .from('mentors')
       .select('name, tone_description, style_description')
       .eq('id', profile.selected_mentor_id)
-      .single();
+      .maybeSingle();
+    
+    if (mentorError) {
+      console.error('[Horoscope] Error fetching mentor:', mentorError);
+      // Continue without mentor context - use defaults
+    }
 
     // Use local date instead of UTC to avoid timezone issues
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format

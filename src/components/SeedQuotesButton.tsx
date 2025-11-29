@@ -21,7 +21,7 @@ export const SeedQuotesButton = () => {
       }
     } catch (error) {
       console.error("Error seeding quotes:", error);
-      toast.error(error.message || "Failed to seed quotes");
+      toast.error(error instanceof Error ? error.message : "Failed to seed quotes");
     } finally {
       setIsSeeding(false);
     }

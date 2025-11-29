@@ -40,9 +40,10 @@ const MentorSelection = () => {
         }
       }
     } catch (error) {
+      console.error("Error loading mentors:", error);
       toast({
         title: "Error loading mentors",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to load mentors",
         variant: "destructive",
       });
     } finally {
@@ -87,9 +88,10 @@ const MentorSelection = () => {
       // Navigate without full reload
       navigate("/", { replace: true });
     } catch (error) {
+      console.error("Error selecting mentor:", error);
       toast({
         title: "Error selecting mentor",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to select mentor",
         variant: "destructive",
       });
     } finally {

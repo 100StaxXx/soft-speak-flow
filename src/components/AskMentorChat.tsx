@@ -81,8 +81,9 @@ export const AskMentorChat = ({
   const DAILY_MESSAGE_LIMIT = 10;
 
   const sendMessage = useCallback(async (text: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    // Verify user is still authenticated
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !currentUser) {
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
       return;
     }
@@ -123,10 +124,11 @@ export const AskMentorChat = ({
       // Increment daily count
       setDailyMessageCount(prev => prev + 1);
 
-      await supabase.from('mentor_chats').insert([
-        { user_id: user.id, role: 'user', content: text },
-        { user_id: user.id, role: 'assistant', content: data.response }
-      ]);
+      // Save conversation history (non-blocking - don't fail if this errors)
+      supabase.from('mentor_chats').insert([
+        { user_id: currentUser.id, role: 'user', content: text },
+        { user_id: currentUser.id, role: 'assistant', content: data.response }
+      ]).catch(err => console.error('Failed to save chat history:', err));
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -152,15 +154,11 @@ export const AskMentorChat = ({
       // Still increment count and save to history
       setDailyMessageCount(prev => prev + 1);
 
-      // Save both messages even with fallback
-      try {
-        await supabase.from('mentor_chats').insert([
-          { user_id: user.id, role: 'user', content: text },
-          { user_id: user.id, role: 'assistant', content: fallback.content }
-        ]);
-      } catch (error) {
-        // Silently fail if database insert fails - at least user got a response
-      }
+      // Save both messages even with fallback (non-blocking)
+      supabase.from('mentor_chats').insert([
+        { user_id: currentUser.id, role: 'user', content: text },
+        { user_id: currentUser.id, role: 'assistant', content: fallback.content }
+      ]).catch(err => console.error('Failed to save fallback chat:', err));
     } finally {
       setIsLoading(false);
     }

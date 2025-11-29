@@ -76,48 +76,65 @@ export const TodaysPepTalk = memo(() => {
         return;
       }
 
-      const today = new Date().toLocaleDateString("en-CA");
+      try {
+        const today = new Date().toLocaleDateString("en-CA");
 
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
+        const { data: mentor, error: mentorError } = await supabase
+          .from("mentors")
+          .select("slug, name")
+          .eq("id", profile.selected_mentor_id)
+          .maybeSingle();
 
-      if (!mentor) {
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("daily_pep_talks")
-        .select("*")
-        .eq("for_date", today)
-        .eq("mentor_slug", mentor.slug)
-        .maybeSingle();
-
-      if (data) {
-        // Validate and sanitize transcript data
-        let transcript: CaptionWord[] = [];
-        if (Array.isArray(data.transcript)) {
-          // Validate each word object has required fields
-          transcript = (data.transcript as unknown as CaptionWord[]).filter(
-            (word): word is CaptionWord => 
-              word && 
-              typeof word === 'object' &&
-              typeof word.word === 'string' &&
-              typeof word.start === 'number' &&
-              typeof word.end === 'number'
-          );
+        if (mentorError) {
+          console.error("Error fetching mentor:", mentorError);
+          setLoading(false);
+          return;
         }
-        
-        setPepTalk({ 
-          ...data, 
-          mentor_name: mentor.name,
-          transcript,
-        } as DailyPepTalk);
+
+        if (!mentor) {
+          setLoading(false);
+          return;
+        }
+
+        const { data, error: pepTalkError } = await supabase
+          .from("daily_pep_talks")
+          .select("*")
+          .eq("for_date", today)
+          .eq("mentor_slug", mentor.slug)
+          .maybeSingle();
+
+        if (pepTalkError) {
+          console.error("Error fetching pep talk:", pepTalkError);
+          setLoading(false);
+          return;
+        }
+
+        if (data) {
+          // Validate and sanitize transcript data
+          let transcript: CaptionWord[] = [];
+          if (Array.isArray(data.transcript)) {
+            // Validate each word object has required fields
+            transcript = (data.transcript as unknown as CaptionWord[]).filter(
+              (word): word is CaptionWord => 
+                word && 
+                typeof word === 'object' &&
+                typeof word.word === 'string' &&
+                typeof word.start === 'number' &&
+                typeof word.end === 'number'
+            );
+          }
+          
+          setPepTalk({ 
+            ...data, 
+            mentor_name: mentor.name,
+            transcript,
+          } as DailyPepTalk);
+        }
+      } catch (error) {
+        console.error("Unexpected error fetching pep talk:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchDailyPepTalk();

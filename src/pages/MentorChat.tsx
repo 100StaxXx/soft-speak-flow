@@ -16,26 +16,48 @@ export default function MentorChat() {
   const { profile } = useProfile();
   const navigate = useNavigate();
 
-  const { data: mentor } = useQuery({
+  const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
     queryKey: ['mentor', profile?.selected_mentor_id],
     queryFn: async () => {
       if (!profile?.selected_mentor_id) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('mentors')
         .select('*')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();
+      
+      if (error) throw error;
       return data;
     },
     enabled: !!profile?.selected_mentor_id,
   });
 
-  if (!user || !mentor) {
+  // Show loading state
+  if (!user || mentorLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground text-sm">Loading your motivator...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if mentor not found or failed to load
+  if (!mentor || mentorError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <p className="text-lg font-semibold">No mentor selected</p>
+          <p className="text-muted-foreground">
+            {mentorError 
+              ? "We couldn't load your mentor. Please try again."
+              : "Please select a mentor to continue."}
+          </p>
+          <Button onClick={() => navigate('/mentor-selection')}>
+            Choose Your Mentor
+          </Button>
         </div>
       </div>
     );

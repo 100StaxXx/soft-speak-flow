@@ -45,7 +45,7 @@ export const AstrologySettings = () => {
       console.error('Error saving astrology details:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save astrology details",
+        description: error instanceof Error ? error.message : "Failed to save astrology details",
         variant: "destructive",
       });
     } finally {
@@ -70,13 +70,16 @@ export const AstrologySettings = () => {
         description: "Your celestial map has been calculated from the stars.",
       });
 
-      // Refresh profile to show new data
-      window.location.reload();
+      // Use router navigation to refresh instead of hard reload
+      // This preserves React state and provides better UX
+      setTimeout(() => {
+        window.location.href = window.location.pathname;
+      }, 1000);
     } catch (error) {
       console.error('Error calculating cosmic profile:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to calculate cosmic profile",
+        description: error instanceof Error ? error.message : "Failed to calculate cosmic profile",
         variant: "destructive",
       });
     } finally {
