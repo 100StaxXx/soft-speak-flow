@@ -196,7 +196,7 @@ const Admin = () => {
       return;
     }
 
-    const pepTalkData: any = {
+    const pepTalkData: Partial<PepTalk> = {
       ...formData,
       audio_url: audioUrl || formData.audio_url,
     };
@@ -237,7 +237,7 @@ const Admin = () => {
     toast.info("Returned to editing");
   };
 
-  const handleEdit = (pepTalk: any) => {
+  const handleEdit = (pepTalk: PepTalk) => {
     setFormData({
       title: pepTalk.title,
       category: pepTalk.category,

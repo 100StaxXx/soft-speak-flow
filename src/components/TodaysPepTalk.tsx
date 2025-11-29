@@ -131,7 +131,7 @@ export const TodaysPepTalk = memo(() => {
           body: { id: pepTalk.id }
         });
       if (!error && data?.script) {
-        setPepTalk((prev: any) => {
+        setPepTalk((prev: DailyPepTalk | null) => {
           if (!prev) return prev;
           
           // Validate transcript from sync response

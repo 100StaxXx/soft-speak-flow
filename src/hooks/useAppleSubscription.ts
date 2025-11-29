@@ -65,14 +65,14 @@ export function useAppleSubscription() {
       
       if (restored.purchases && restored.purchases.length > 0) {
         // Sort by date, newest first
-        const sortedPurchases = [...restored.purchases].sort((a: any, b: any) => {
+        const sortedPurchases = [...restored.purchases].sort((a: { transactionDate?: string }, b: { transactionDate?: string }) => {
           const dateA = a.transactionDate || 0;
           const dateB = b.transactionDate || 0;
           return dateB - dateA;
         });
         
         // Find subscription purchase (contains "premium" in product ID)
-        const subscriptionPurchase = sortedPurchases.find((p: any) => 
+        const subscriptionPurchase = sortedPurchases.find((p: { productId?: string }) => 
           p.productId?.includes('premium')
         );
         

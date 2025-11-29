@@ -47,7 +47,7 @@ export const ResetCompanionButton = () => {
       } else {
         throw new Error(data?.error || 'Failed to reset companion');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Reset companion failed:', err);
       toast.error(err.message || 'Failed to reset companion');
     } finally {

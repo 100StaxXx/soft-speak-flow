@@ -19,7 +19,7 @@ interface AudioGeneratorProps {
     mentor_id: string;
     transcript: Array<{ word: string; start: number; end: number }>;
   }) => void;
-  mentors: any[];
+  mentors: Array<{ id: string; slug: string; name: string }>;
 }
 
 export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGeneratorProps) => {

@@ -10,7 +10,7 @@ interface ActivityItem {
   id: string;
   user_id: string;
   activity_type: string;
-  activity_data: any;
+  activity_data: Record<string, unknown>;
   created_at: string;
   profiles?: {
     email?: string;
