@@ -54,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -554,6 +555,9 @@ export default function Tasks() {
 
   return (
     <div className="min-h-screen bg-background pb-20 relative">
+      {/* Cosmic Starfield Background */}
+      <StarfieldBackground />
+      
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
       {/* Loading Overlay */}
       {isAdding && (

@@ -16,6 +16,7 @@ import { MentorNudges } from "@/components/MentorNudges";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 const Index = () => {
   const { user } = useAuth();
@@ -191,6 +192,9 @@ const Index = () => {
   return (
     <>
       <PageTransition>
+        {/* Cosmic Starfield Background */}
+        <StarfieldBackground />
+        
         {/* Fixed Background Image */}
         {mentorImage && (
           <div className="fixed inset-0 z-0">
@@ -319,7 +323,9 @@ const Index = () => {
             
             <CompanionErrorBoundary>
               <ErrorBoundary>
-                <MentorQuickChat />
+                <div className="cosmic-glass rounded-2xl">
+                  <MentorQuickChat />
+                </div>
               </ErrorBoundary>
             </CompanionErrorBoundary>
           </div>
