@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { memo } from "react";
 
 interface Mentor {
   id: string;
@@ -32,7 +33,7 @@ const mentorBackgrounds: Record<string, string> = {
   'darius': 'bg-gradient-to-br from-[hsl(var(--mentor-fierce))]/10 to-[hsl(var(--mentor-fierce))]/5',
 };
 
-export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
+export const MentorCard = memo(({ mentor, selected, onSelect }: MentorCardProps) => {
   const personalityBg = mentorBackgrounds[mentor.slug || ''] || 'bg-card';
   
   return (
@@ -96,4 +97,4 @@ export const MentorCard = ({ mentor, selected, onSelect }: MentorCardProps) => {
       </div>
     </Card>
   );
-};
+});

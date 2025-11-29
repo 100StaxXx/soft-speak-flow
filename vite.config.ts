@@ -85,19 +85,68 @@ export default defineConfig(({ mode }) => ({
     cssMinify: 'lightningcss',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['framer-motion', 'lucide-react'],
-          'query-vendor': ['@tanstack/react-query'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'radix-ui': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-          ],
+        manualChunks: (id) => {
+          // Core React libraries
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+            return 'react-vendor';
+          }
+          
+          // Supabase
+          if (id.includes('node_modules/@supabase')) {
+            return 'supabase-vendor';
+          }
+          
+          // React Query
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+          
+          // UI Libraries - Split into smaller chunks
+          if (id.includes('node_modules/framer-motion')) {
+            return 'animation-vendor';
+          }
+          
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons-vendor';
+          }
+          
+          // Radix UI - Split into logical groups
+          if (id.includes('node_modules/@radix-ui/react-dialog') || 
+              id.includes('node_modules/@radix-ui/react-alert-dialog')) {
+            return 'radix-dialogs';
+          }
+          
+          if (id.includes('node_modules/@radix-ui/react-dropdown-menu') || 
+              id.includes('node_modules/@radix-ui/react-popover') ||
+              id.includes('node_modules/@radix-ui/react-tooltip')) {
+            return 'radix-overlays';
+          }
+          
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'radix-ui';
+          }
+          
+          // Form libraries
+          if (id.includes('node_modules/react-hook-form') || 
+              id.includes('node_modules/@hookform') ||
+              id.includes('node_modules/zod')) {
+            return 'forms-vendor';
+          }
+          
+          // Chart libraries
+          if (id.includes('node_modules/recharts')) {
+            return 'charts-vendor';
+          }
+          
+          // Date utilities
+          if (id.includes('node_modules/date-fns')) {
+            return 'date-vendor';
+          }
+          
+          // Capacitor plugins
+          if (id.includes('node_modules/@capacitor')) {
+            return 'capacitor-vendor';
+          }
         },
       },
     },

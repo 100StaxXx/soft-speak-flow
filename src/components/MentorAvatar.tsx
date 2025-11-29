@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 
 const POSITION_MAP: Record<string, string> = {
@@ -32,7 +32,7 @@ const SIZE_CLASSES = {
   xl: 'w-48 h-48 md:w-56 md:h-56',
 };
 
-export const MentorAvatar = ({
+export const MentorAvatar = memo(({
   mentorSlug,
   mentorName,
   primaryColor,
@@ -99,4 +99,4 @@ export const MentorAvatar = ({
       )}
     </div>
   );
-};
+});
