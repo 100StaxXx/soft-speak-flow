@@ -5,7 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles, Moon } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
@@ -94,23 +94,6 @@ export default function MentorChat() {
 
         <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
           <TodaysPepTalk />
-          
-          {/* Cosmic Insight Section */}
-          <div
-            className="relative overflow-hidden rounded-2xl cursor-pointer p-8 bg-gradient-to-br from-purple-600/30 via-blue-600/30 to-pink-600/30 border-2 border-purple-500/50 hover:border-purple-400 transition-all"
-            onClick={() => navigate('/horoscope')}
-          >
-            <div className="flex items-center justify-center gap-4">
-              <Moon className="w-10 h-10 text-purple-400" />
-              <h2 className="text-4xl font-black text-center bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                ✨ Cosmic Insight ✨
-              </h2>
-              <Sparkles className="w-10 h-10 text-purple-400" />
-            </div>
-            <p className="text-center mt-4 text-lg text-foreground/90 font-medium">
-              Discover your daily celestial guidance
-            </p>
-          </div>
 
           <AskMentorChat
             mentorName={mentor.name}
