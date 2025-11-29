@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
+import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 
 const authSchema = z.object({
   email: z.string()
@@ -137,15 +138,8 @@ const Auth = () => {
     };
   }, [navigate]);
 
-  // Helper function for Capacitor-compatible redirect URLs
-  const getRedirectUrl = () => {
-    // For Capacitor iOS/Android, use the app scheme
-    if (Capacitor.isNativePlatform()) {
-      return 'com.darrylgraham.revolution://';
-    }
-    // For web, use current origin
-    return `${window.location.origin}/`;
-  };
+  // Import the redirect URL helper at the top of the component
+  // (moved to import statement)
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +171,7 @@ const Auth = () => {
           email: sanitizedEmail,
           password,
           options: {
-            emailRedirectTo: getRedirectUrl(),
+            emailRedirectTo: getRedirectUrlWithPath('/'),
             data: {
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
             }
@@ -240,7 +234,7 @@ const Auth = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: getRedirectUrlWithPath('/auth/reset-password'),
       });
 
       if (error) {
@@ -450,7 +444,7 @@ const Auth = () => {
       const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: getRedirectUrl(),
+          redirectTo: getRedirectUrlWithPath('/'),
         },
       });
 
