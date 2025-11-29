@@ -36,11 +36,12 @@ export function useAppleSubscription() {
       });
 
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Purchase error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Purchase Failed",
-        description: error.message || "Please try again",
+        description: errorMessage,
         variant: "destructive",
       });
       return false;
@@ -65,15 +66,15 @@ export function useAppleSubscription() {
       
       if (restored.purchases && restored.purchases.length > 0) {
         // Sort by date, newest first
-        const sortedPurchases = [...restored.purchases].sort((a: any, b: any) => {
-          const dateA = a.transactionDate || 0;
-          const dateB = b.transactionDate || 0;
+        const sortedPurchases = [...restored.purchases].sort((a, b) => {
+          const dateA = (a as { transactionDate?: number }).transactionDate || 0;
+          const dateB = (b as { transactionDate?: number }).transactionDate || 0;
           return dateB - dateA;
         });
         
         // Find subscription purchase (contains "premium" in product ID)
-        const subscriptionPurchase = sortedPurchases.find((p: any) => 
-          p.productId?.includes('premium')
+        const subscriptionPurchase = sortedPurchases.find(p => 
+          (p as { productId?: string }).productId?.includes('premium')
         );
         
         if (subscriptionPurchase) {
@@ -102,11 +103,12 @@ export function useAppleSubscription() {
           description: "No previous purchases to restore",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Restore error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Restore Failed",
-        description: error.message || "Please try again",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

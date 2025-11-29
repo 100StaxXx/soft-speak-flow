@@ -14,7 +14,7 @@ interface AchievementData {
     pepTalkDuration?: string;
     pepTalkMessage?: string;
     pepTalkCategory?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
   };
 }
 
