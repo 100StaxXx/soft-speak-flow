@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ interface ShareButtonProps {
   className?: string;
 }
 
-export const ShareButton = ({ title, text, url, className = "" }: ShareButtonProps) => {
+export const ShareButton = memo(({ title, text, url, className = "" }: ShareButtonProps) => {
   const [isSharing, setIsSharing] = useState(false);
   
   const handleShare = async () => {
@@ -78,4 +78,4 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
       <Share2 className={`h-4 w-4 ${isSharing ? 'animate-pulse' : ''}`} />
     </Button>
   );
-};
+});

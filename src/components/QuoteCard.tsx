@@ -1,5 +1,5 @@
 import { Heart } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ShareButton } from "@/components/ShareButton";
@@ -17,7 +17,7 @@ interface QuoteCardProps {
   onFavoriteChange?: () => void;
 }
 
-export const QuoteCard = ({ quote, isFavorited: initialFavorited, onFavoriteChange }: QuoteCardProps) => {
+export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavoriteChange }: QuoteCardProps) => {
   const { id, text, author, is_premium } = quote;
   const [isFavorited, setIsFavorited] = useState(initialFavorited || false);
   const [loading, setLoading] = useState(false);
@@ -108,4 +108,4 @@ export const QuoteCard = ({ quote, isFavorited: initialFavorited, onFavoriteChan
       )}
     </div>
   );
-};
+});

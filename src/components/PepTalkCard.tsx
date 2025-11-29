@@ -2,6 +2,7 @@ import { Heart, Crown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ShareButton } from "@/components/ShareButton";
 import { useNavigate } from "react-router-dom";
+import { memo } from "react";
 
 interface PepTalkCardProps {
   id: string;
@@ -16,7 +17,7 @@ interface PepTalkCardProps {
   highlightedTriggers?: string[];
 }
 
-export const PepTalkCard = ({ id, title, category, topicCategories, description, quote, isPremium, onClick, emotionalTriggers, highlightedTriggers }: PepTalkCardProps) => {
+export const PepTalkCard = memo(({ id, title, category, topicCategories, description, quote, isPremium, onClick, emotionalTriggers, highlightedTriggers }: PepTalkCardProps) => {
   const navigate = useNavigate();
 
   // Combine category and topic_categories, remove duplicates
@@ -88,4 +89,4 @@ export const PepTalkCard = ({ id, title, category, topicCategories, description,
       </div>
     </Card>
   );
-};
+});

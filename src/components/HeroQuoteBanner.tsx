@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -18,7 +18,7 @@ interface Mentor {
   slug: string;
 }
 
-export const HeroQuoteBanner = () => {
+export const HeroQuoteBanner = memo(() => {
   const { profile } = useProfile();
   const [todaysQuote, setTodaysQuote] = useState<QuoteData | null>(null);
   const [mentor, setMentor] = useState<Mentor | null>(null);
@@ -111,4 +111,4 @@ export const HeroQuoteBanner = () => {
       </div>
     </div>
   );
-};
+});
