@@ -12,10 +12,12 @@ import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { toast } from "sonner";
 
+type LibraryTab = "favorites" | "downloads" | "history";
+
 export default function Library() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"favorites" | "downloads" | "history">("favorites");
+  const [activeTab, setActiveTab] = useState<LibraryTab>("favorites");
 
   // Fetch favorites
   const { data: favorites, isLoading: loadingFavorites } = useQuery({
@@ -140,7 +142,7 @@ export default function Library() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LibraryTab)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-8 bg-card/50 backdrop-blur-xl border border-border/50">
             <TabsTrigger value="favorites" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground">
               <Heart className="h-4 w-4 mr-2" />
