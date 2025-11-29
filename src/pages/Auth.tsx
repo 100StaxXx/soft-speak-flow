@@ -29,6 +29,7 @@ const authSchema = z.object({
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -192,6 +193,50 @@ const Auth = () => {
         title: "Error",
         description: error.message,
         variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast({
+        variant: "destructive",
+        title: "Email Required",
+        description: "Please enter your email address",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: "Check your email",
+          description: "We've sent you a password reset link",
+        });
+        setIsForgotPassword(false);
+        setEmail("");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "An unexpected error occurred",
       });
     } finally {
       setLoading(false);
@@ -429,47 +474,89 @@ const Auth = () => {
       >
         <div className="w-full max-w-md px-6 space-y-8">
           <div className="space-y-6">
-            <form onSubmit={handleAuth} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-steel text-sm uppercase tracking-wide">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
-                disabled={loading}
-              >
-                {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
-              </Button>
-            </form>
+            {isForgotPassword ? (
+              <form onSubmit={handleForgotPassword} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
+                  disabled={loading}
+                >
+                  {loading ? "Sending..." : "Send Reset Link"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleAuth} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-steel text-sm uppercase tracking-wide">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-steel text-sm uppercase tracking-wide">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                  />
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPassword(true)}
+                      className="text-xs text-steel hover:text-pure-white transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
+                  disabled={loading}
+                >
+                  {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
+                </Button>
+              </form>
+            )}
 
             <div className="text-center">
               <Button
                 variant="link"
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  if (isForgotPassword) {
+                    setIsForgotPassword(false);
+                    setEmail("");
+                  } else {
+                    setIsLogin(!isLogin);
+                  }
+                }}
                 className="text-royal-purple hover:text-accent-purple"
               >
-                {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
+                {isForgotPassword 
+                  ? "Back to Sign In" 
+                  : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
             </div>
           </div>
