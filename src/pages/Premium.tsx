@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Crown, Sparkles, Zap, Bell, Download, Check, Moon } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
+import { IAP_PRODUCTS } from "@/utils/appleIAP";
 
 export default function Premium() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function Premium() {
   const { handlePurchase, loading, isAvailable } = useAppleSubscription();
 
   const handleSubscribe = async () => {
-    const success = await handlePurchase('com.revolutions.app.premium.monthly');
+    const success = await handlePurchase(IAP_PRODUCTS.MONTHLY);
     if (success) {
       navigate('/premium-success');
     }
