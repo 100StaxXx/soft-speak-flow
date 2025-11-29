@@ -49,6 +49,8 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
       return data || [];
     },
     enabled: !!user,
+    staleTime: 2 * 60 * 1000, // 2 minutes - calendar data changes infrequently
+    refetchOnWindowFocus: false,
   });
 
   return { tasks, isLoading };

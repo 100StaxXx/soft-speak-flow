@@ -31,6 +31,8 @@ export const useEpics = () => {
       return data;
     },
     enabled: !!user,
+    staleTime: 3 * 60 * 1000, // 3 minutes - epics don't change frequently
+    refetchOnWindowFocus: false,
   });
 
   // Create new epic
