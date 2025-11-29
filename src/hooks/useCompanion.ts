@@ -161,7 +161,7 @@ export const useCompanion = () => {
       console.log("Image generated successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
-        const result = await supabase.rpc<CreateCompanionIfNotExistsResult[]>('create_companion_if_not_exists', {
+        const result = await supabase.rpc('create_companion_if_not_exists', {
           p_user_id: user.id,
           p_favorite_color: data.favoriteColor,
           p_spirit_animal: data.spiritAnimal,
@@ -171,7 +171,7 @@ export const useCompanion = () => {
           p_initial_image_url: imageData.imageUrl,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
-        } as CreateCompanionIfNotExistsArgs);
+        });
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
@@ -187,7 +187,7 @@ export const useCompanion = () => {
         throw new Error("Failed to create companion record. Please try again.");
       }
 
-      const companionData = companionResult[0];
+      const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
       const isNewCompanion = companionData.is_new;
 
       console.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
@@ -454,7 +454,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const { data, error } = await supabase.rpc<CompleteReferralStage3Result>(
+          const { data, error } = await (supabase.rpc as any)(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,
@@ -465,7 +465,7 @@ export const useCompanion = () => {
           if (error) throw error;
           if (!data) throw new Error("No data returned from referral completion");
           
-          return data as CompleteReferralStage3Result;
+          return data as unknown as CompleteReferralStage3Result;
         },
         {
           maxAttempts: 3,
