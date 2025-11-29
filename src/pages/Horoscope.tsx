@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Sparkles, Star, Moon, Sun, Settings, ArrowLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
+import { motion } from "framer-motion";
+import { useProfile } from "@/hooks/useProfile";
 
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
@@ -16,6 +18,7 @@ const Horoscope = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { profile } = useProfile();
 
   useEffect(() => {
     generateHoroscope();
@@ -59,116 +62,281 @@ const Horoscope = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-obsidian to-obsidian/95 p-6 pb-24">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
+      {/* Animated constellation background */}
+      <div className="absolute inset-0">
+        {/* Stars */}
+        {[...Array(50)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              opacity: [0.1, 1, 0.1],
+              scale: [1, 1.5, 1],
+            }}
+            transition={{
+              duration: 2 + Math.random() * 3,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
+        ))}
+        
+        {/* Cosmic nebula */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
+      </div>
+
+      <div className="relative max-w-2xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/mentor-chat')}
-            className="text-steel hover:text-pure-white"
+            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="flex-1 text-center">
-            <h1 className="text-3xl font-bold text-pure-white flex items-center justify-center gap-2">
-              <Moon className="w-8 h-8 text-accent-purple" />
-              Daily Horoscope
+          <motion.div
+            className="flex-1 text-center"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
+              <motion.div
+                animate={{
+                  rotate: [0, 360],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Moon className="w-8 h-8 text-purple-400" />
+              </motion.div>
+              Cosmic Insight
             </h1>
-            <p className="text-steel text-sm mt-1">
+            <p className="text-gray-400 text-sm mt-1">
               {date ? formatDate(date) : 'Loading...'}
             </p>
-          </div>
+          </motion.div>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/profile')}
-            className="text-steel hover:text-pure-white"
+            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
           >
             <Settings className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Main Horoscope Card */}
-        <Card className="bg-obsidian/50 border-royal-purple/30 backdrop-blur-sm p-8">
-          {loading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-6 w-32 bg-steel/20" />
-              <Skeleton className="h-4 w-full bg-steel/20" />
-              <Skeleton className="h-4 w-full bg-steel/20" />
-              <Skeleton className="h-4 w-3/4 bg-steel/20" />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Zodiac Badge */}
-              <div className="flex items-center gap-3">
-                {getZodiacIcon()}
-                <div>
-                  <h2 className="text-xl font-semibold text-pure-white capitalize">
-                    {zodiac}
-                  </h2>
-                  <p className="text-xs text-steel">
-                    {isPersonalized ? 'Personalized Reading' : 'Daily Overview'}
-                  </p>
+        {/* Constellation Zodiac Display */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="relative"
+        >
+          {/* Glowing zodiac symbol */}
+          <div className="flex justify-center mb-8">
+            <motion.div
+              className="relative"
+              animate={{
+                rotate: [0, 360],
+              }}
+              transition={{
+                duration: 20,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            >
+              {/* Glow rings */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 blur-2xl opacity-50 animate-pulse" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 blur-xl opacity-30" style={{ animation: 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+              
+              {/* Zodiac circle */}
+              <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 p-1">
+                <div className="w-full h-full rounded-full bg-gray-950 flex items-center justify-center">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.1, 1],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                    }}
+                  >
+                    <Star className="w-16 h-16 text-purple-300" />
+                  </motion.div>
                 </div>
               </div>
 
-              {/* Horoscope Content */}
-              <div className="prose prose-invert max-w-none">
-                <p className="text-cloud-white leading-relaxed whitespace-pre-wrap">
-                  {horoscope}
-                </p>
-              </div>
+              {/* Orbiting particles */}
+              {[...Array(8)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 bg-purple-400 rounded-full"
+                  style={{
+                    top: '50%',
+                    left: '50%',
+                  }}
+                  animate={{
+                    rotate: [0, 360],
+                    x: [0, Math.cos((i / 8) * Math.PI * 2) * 80],
+                    y: [0, Math.sin((i / 8) * Math.PI * 2) * 80],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "linear",
+                    delay: i * 0.5,
+                  }}
+                />
+              ))}
+            </motion.div>
+          </div>
 
-              {/* Unlock Advanced Astrology CTA */}
-              {!isPersonalized && (
-                <div className="mt-6 p-4 rounded-lg bg-royal-purple/10 border border-royal-purple/30">
-                  <div className="flex items-start gap-3">
-                    <Sun className="w-5 h-5 text-accent-purple flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-cloud-white mb-2">
-                        Want a personalized reading with your rising sign and planetary transits?
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate('/profile')}
-                        className="border-royal-purple/50 text-accent-purple hover:bg-royal-purple/20"
-                      >
-                        Add Birth Details
-                      </Button>
-                    </div>
+          {/* Main Horoscope Card */}
+          <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
+            {loading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-32 bg-gray-700/50" />
+                <Skeleton className="h-4 w-full bg-gray-700/50" />
+                <Skeleton className="h-4 w-full bg-gray-700/50" />
+                <Skeleton className="h-4 w-3/4 bg-gray-700/50" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Zodiac Badge */}
+                <motion.div
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  className="flex items-center gap-3"
+                >
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-full" />
+                    {getZodiacIcon()}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
+                  <div>
+                    <h2 className="text-2xl font-black text-white capitalize">
+                      {zodiac}
+                    </h2>
+                    <p className="text-xs text-gray-400">
+                      {isPersonalized ? '✨ Personalized Reading' : '🌙 Daily Overview'}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Divider */}
+                <div className="h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+
+                {/* Horoscope Content */}
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="prose prose-invert max-w-none"
+                >
+                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap text-lg">
+                    {horoscope}
+                  </p>
+                </motion.div>
+
+                {/* Unlock Advanced Astrology CTA */}
+                {!isPersonalized && (
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-6 p-5 rounded-xl bg-gradient-to-br from-purple-900/30 via-pink-900/30 to-blue-900/30 border border-purple-500/30 backdrop-blur-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <motion.div
+                        animate={{
+                          rotate: [0, 360],
+                        }}
+                        transition={{
+                          duration: 8,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      >
+                        <Sun className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" />
+                      </motion.div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-200 mb-3 font-medium">
+                          🌟 Unlock deeper cosmic insights with your rising sign and planetary transits
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate('/profile')}
+                          className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
+                        >
+                          Add Birth Details →
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            )}
+          </Card>
+        </motion.div>
 
         {/* Cosmic Tip */}
-        <Card className="bg-gradient-to-r from-royal-purple/10 to-accent-purple/10 border-royal-purple/30 p-6">
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-accent-purple flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-semibold text-pure-white mb-1">
-                Cosmic Tip
-              </h3>
-              <p className="text-sm text-cloud-white">
-                Your horoscope refreshes daily. Check back tomorrow for new cosmic guidance!
-              </p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="bg-gradient-to-r from-purple-900/20 via-pink-900/20 to-blue-900/20 border-purple-500/20 p-6 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 180, 360],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                }}
+              >
+                <Sparkles className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+              </motion.div>
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">
+                  ✨ Cosmic Reminder
+                </h3>
+                <p className="text-sm text-gray-300">
+                  Your celestial guidance refreshes with each sunrise. Return tomorrow for new wisdom from the stars.
+                </p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
 
         {/* Refresh Button */}
-        <Button
-          onClick={generateHoroscope}
-          disabled={loading}
-          className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
         >
-          {loading ? 'Loading...' : 'Refresh Horoscope'}
-        </Button>
+          <Button
+            onClick={generateHoroscope}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold py-6 rounded-xl shadow-glow-lg transition-all"
+          >
+            {loading ? 'Consulting the cosmos...' : '🌙 Refresh Cosmic Insight'}
+          </Button>
+        </motion.div>
       </div>
       <BottomNav />
     </div>
