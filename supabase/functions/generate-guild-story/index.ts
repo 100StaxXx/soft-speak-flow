@@ -108,22 +108,41 @@ serve(async (req) => {
       throw new Error("No companions found for guild members");
     }
 
-    // Build companion data array
-    const companionData: CompanionData[] = companions.map(c => {
-      const member = members.find(m => m.user_id === c.user_id);
-      return {
-        user_id: c.user_id,
-        user_name: (member?.profiles as any)?.display_name || 'Adventurer',
-        spirit_animal: c.spirit_animal || 'Unknown',
-        core_element: c.core_element || 'None',
-        mind: c.mind || 0,
-        body: c.body || 0,
-        soul: c.soul || 0,
-        eye_color: c.eye_color || 'unknown',
-        fur_color: c.fur_color || 'unknown',
-        current_stage: c.current_stage || 0
-      };
-    });
+    // Build companion data array and validate all members have companions
+    const companionData: CompanionData[] = [];
+    const membersWithoutCompanions: string[] = [];
+
+    for (const member of members) {
+      const companion = companions.find(c => c.user_id === member.user_id);
+      
+      if (!companion) {
+        membersWithoutCompanions.push(
+          (member.profiles as any)?.display_name || 'Unknown'
+        );
+        continue;
+      }
+      
+      companionData.push({
+        user_id: companion.user_id,
+        user_name: (member.profiles as any)?.display_name || 'Adventurer',
+        spirit_animal: companion.spirit_animal || 'Unknown',
+        core_element: companion.core_element || 'None',
+        mind: companion.mind || 0,
+        body: companion.body || 0,
+        soul: companion.soul || 0,
+        eye_color: companion.eye_color || 'unknown',
+        fur_color: companion.fur_color || 'unknown',
+        current_stage: companion.current_stage || 0
+      });
+    }
+
+    // Ensure all members have companions
+    if (membersWithoutCompanions.length > 0) {
+      throw new Error(
+        `Some guild members don't have companions yet: ${membersWithoutCompanions.join(', ')}. ` +
+        `All members need a companion to generate a guild story.`
+      );
+    }
 
     // Get chapter number (count existing stories + 1)
     const { count } = await supabase
@@ -221,6 +240,42 @@ Generate a collaborative story in this EXACT JSON format:
       console.error('Failed to parse AI response:', content);
       throw new Error('Failed to parse AI-generated story');
     }
+
+    // Validate required fields
+    const requiredFields = [
+      'chapter_title', 
+      'intro_line', 
+      'main_story',
+      'climax_moment', 
+      'bond_lesson', 
+      'companion_spotlights'
+    ];
+
+    for (const field of requiredFields) {
+      if (!storyData[field]) {
+        console.error('Missing field in AI response:', field, storyData);
+        throw new Error(`AI generated incomplete story (missing ${field}). Please try again.`);
+      }
+    }
+
+    // Validate types
+    if (!Array.isArray(storyData.companion_spotlights)) {
+      console.warn('companion_spotlights is not an array, converting:', storyData.companion_spotlights);
+      storyData.companion_spotlights = [];
+    }
+
+    // Validate story length (800-1200 words ≈ 1000-6000 chars)
+    const storyLength = storyData.main_story.length;
+    if (storyLength < 1000) {
+      console.warn('Story too short:', storyLength, 'chars');
+      throw new Error('Generated story is too short. Please try again.');
+    }
+    if (storyLength > 10000) {
+      console.warn('Story too long:', storyLength, 'chars');
+      throw new Error('Generated story is too long. Please try again.');
+    }
+
+    console.log(`Story validated successfully: ${storyLength} chars, ${storyData.companion_spotlights.length} companion spotlights`);
 
     // Insert guild story into database
     const { data: insertedStory, error: insertError } = await supabase
