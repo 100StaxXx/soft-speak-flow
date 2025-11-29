@@ -60,6 +60,8 @@ export const useDailyMissions = () => {
       return existing;
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes - missions are daily, don't change often
+    refetchOnWindowFocus: false,
   });
 
   // Handle errors with useEffect instead of deprecated onError

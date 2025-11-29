@@ -44,6 +44,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
       return data || [];
     },
     enabled: !!user,
+    staleTime: 2 * 60 * 1000, // 2 minutes - tasks change frequently but not every second
+    refetchOnWindowFocus: false, // Don't refetch when user switches tabs
   });
 
   type TaskCategory = 'mind' | 'body' | 'soul';
