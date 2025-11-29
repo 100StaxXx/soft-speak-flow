@@ -12,6 +12,7 @@ import { useProfile } from "@/hooks/useProfile";
 
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
+  const [cosmicTip, setCosmicTip] = useState<string | null>(null);
   const [zodiac, setZodiac] = useState<string | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [date, setDate] = useState<string>("");
@@ -35,6 +36,7 @@ const Horoscope = () => {
       setZodiac(data.zodiac);
       setIsPersonalized(data.isPersonalized);
       setDate(data.date);
+      setCosmicTip(data.cosmicTip || null);
     } catch (error: any) {
       console.error('Error generating horoscope:', error);
       toast({
@@ -291,7 +293,7 @@ const Horoscope = () => {
           </Card>
         </motion.div>
 
-        {/* Cosmic Reminder */}
+        {/* Cosmic Tip */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -311,13 +313,17 @@ const Horoscope = () => {
               >
                 <Sparkles className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
               </motion.div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-sm font-bold text-white mb-1">
-                  ✨ Cosmic Reminder
+                  ✨ Cosmic Tip
                 </h3>
-                <p className="text-sm text-white/90">
-                  Your celestial guidance refreshes with each sunrise. Return tomorrow for new wisdom from the stars.
-                </p>
+                {loading ? (
+                  <Skeleton className="h-4 w-full bg-white/20" />
+                ) : (
+                  <p className="text-sm text-white/90">
+                    {cosmicTip || 'The stars guide those who listen. Trust your inner compass today.'}
+                  </p>
+                )}
               </div>
             </div>
           </Card>

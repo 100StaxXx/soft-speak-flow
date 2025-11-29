@@ -2674,6 +2674,7 @@ export type Database = {
       }
       user_daily_horoscopes: {
         Row: {
+          cosmic_tip: string | null
           created_at: string | null
           for_date: string
           horoscope_text: string
@@ -2683,6 +2684,7 @@ export type Database = {
           zodiac: string
         }
         Insert: {
+          cosmic_tip?: string | null
           created_at?: string | null
           for_date?: string
           horoscope_text: string
@@ -2692,6 +2694,7 @@ export type Database = {
           zodiac: string
         }
         Update: {
+          cosmic_tip?: string | null
           created_at?: string | null
           for_date?: string
           horoscope_text?: string
