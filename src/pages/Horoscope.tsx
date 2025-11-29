@@ -127,10 +127,10 @@ const Horoscope = () => {
                   ease: "easeInOut",
                 }}
               >
-                <Moon className="w-8 h-8 text-purple-400" />
-              </motion.div>
-              Cosmic Insight
-            </h1>
+              <Moon className="w-8 h-8 text-purple-400" />
+            </motion.div>
+            Cosmiq Insight
+          </h1>
             <p className="text-gray-400 text-sm mt-1">
               {date ? formatDate(date) : 'Loading...'}
             </p>
