@@ -5,9 +5,10 @@ import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Moon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
+import { motion } from "framer-motion";
 
 
 export default function MentorChat() {
@@ -82,16 +83,6 @@ export default function MentorChat() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
-          {/* Horoscope button */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate('/horoscope')} 
-            className="absolute top-4 right-4 z-10 bg-primary/90 backdrop-blur-sm hover:bg-primary rounded-full shadow-glow-lg border-2 border-primary/50"
-          >
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
-          </Button>
-          
           {/* Title overlay */}
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent p-6 pb-4">
             <h1 className="text-2xl md:text-3xl font-heading font-black text-foreground text-center">
@@ -102,6 +93,110 @@ export default function MentorChat() {
         </div>
 
         <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+          {/* Cosmic Insight Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative overflow-hidden rounded-2xl cursor-pointer group"
+            onClick={() => navigate('/horoscope')}
+          >
+            {/* Animated cosmic background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-pink-600/20 animate-gradient-shift" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-400/10 via-transparent to-transparent animate-pulse" />
+            
+            {/* Floating stars */}
+            <div className="absolute inset-0 overflow-hidden">
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                  }}
+                  animate={{
+                    opacity: [0.2, 1, 0.2],
+                    scale: [1, 1.5, 1],
+                  }}
+                  transition={{
+                    duration: 2 + Math.random() * 2,
+                    repeat: Infinity,
+                    delay: Math.random() * 2,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="relative p-6 backdrop-blur-sm bg-background/50 border-2 border-transparent group-hover:border-purple-500/50 transition-all duration-500">
+              <div className="flex items-center gap-4">
+                {/* Glowing moon icon */}
+                <motion.div
+                  className="relative"
+                  animate={{
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 5, -5, 0],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-purple-500/30 blur-2xl rounded-full animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-glow-lg">
+                    <Moon className="w-6 h-6 text-white" />
+                  </div>
+                </motion.div>
+
+                {/* Rainbow text */}
+                <div className="flex-1">
+                  <motion.h2
+                    className="text-2xl font-black mb-1"
+                    style={{
+                      background: "linear-gradient(90deg, #a855f7, #ec4899, #f59e0b, #10b981, #3b82f6, #8b5cf6)",
+                      backgroundSize: "200% 100%",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}
+                    animate={{
+                      backgroundPosition: ["0% 50%", "200% 50%"],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                  >
+                    ✨ Cosmic Insight ✨
+                  </motion.h2>
+                  <p className="text-sm text-muted-foreground">Discover your daily celestial guidance</p>
+                </div>
+
+                {/* Sparkle indicator */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 180, 360],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                >
+                  <Sparkles className="w-6 h-6 text-purple-400" />
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Shine effect on hover */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </div>
+          </motion.div>
+
           <TodaysPepTalk />
           <AskMentorChat
             mentorName={mentor.name}
