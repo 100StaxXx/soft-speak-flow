@@ -16,16 +16,25 @@ export function useAppleSubscription() {
         description: "In-App Purchases are only available on iOS devices",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     setLoading(true);
     try {
       const purchase = await purchaseProduct(productId);
       
-      // Verify receipt with backend - use correct field from Capacitor IAP
+      if (!purchase) {
+        throw new Error("Purchase returned no data");
+      }
+      
+      // Verify receipt with backend - safely access receipt fields
+      const receipt = purchase.transactionReceipt ?? purchase.receipt;
+      if (!receipt) {
+        throw new Error("No receipt data available");
+      }
+      
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt: purchase.transactionReceipt || purchase.receipt },
+        body: { receipt },
       });
 
       if (error) throw error;
@@ -64,45 +73,65 @@ export function useAppleSubscription() {
     try {
       const restored = await restorePurchases();
       
-      if (restored.purchases && restored.purchases.length > 0) {
-        // Sort by date, newest first
-        const sortedPurchases = [...restored.purchases].sort((a, b) => {
-          const dateA = (a as { transactionDate?: number }).transactionDate || 0;
-          const dateB = (b as { transactionDate?: number }).transactionDate || 0;
-          return dateB - dateA;
-        });
-        
-        // Find subscription purchase (contains "premium" in product ID)
-        const subscriptionPurchase = sortedPurchases.find(p => 
-          (p as { productId?: string }).productId?.includes('premium')
-        );
-        
-        if (subscriptionPurchase) {
-          // Verify with correct receipt field
-          const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-            body: { receipt: subscriptionPurchase.transactionReceipt || subscriptionPurchase.receipt },
-          });
-
-          if (error) {
-            throw error;
-          }
-
-          toast({
-            title: "Restored!",
-            description: "Your subscription has been restored",
-          });
-        } else {
-          toast({
-            title: "No Subscription Found",
-            description: "No active subscription to restore",
-          });
-        }
-      } else {
+      if (!restored?.purchases || restored.purchases.length === 0) {
         toast({
           title: "No Purchases Found",
           description: "No previous purchases to restore",
         });
+        return;
       }
+
+      // Type guard for purchase objects
+      const isValidPurchase = (p: unknown): p is { 
+        transactionDate?: number; 
+        productId?: string;
+        transactionReceipt?: string;
+        receipt?: string;
+      } => {
+        return typeof p === 'object' && p !== null;
+      };
+
+      // Sort by date, newest first
+      const sortedPurchases = [...restored.purchases]
+        .filter(isValidPurchase)
+        .sort((a, b) => {
+          const dateA = a.transactionDate || 0;
+          const dateB = b.transactionDate || 0;
+          return dateB - dateA;
+        });
+      
+      // Find subscription purchase (contains "premium" in product ID)
+      const subscriptionPurchase = sortedPurchases.find(p => 
+        p.productId?.includes('premium')
+      );
+      
+      if (!subscriptionPurchase) {
+        toast({
+          title: "No Subscription Found",
+          description: "No active subscription to restore",
+        });
+        return;
+      }
+
+      // Safely access receipt field
+      const receipt = subscriptionPurchase.transactionReceipt ?? subscriptionPurchase.receipt;
+      if (!receipt) {
+        throw new Error("No receipt data available for subscription");
+      }
+
+      // Verify with backend
+      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
+        body: { receipt },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Restored!",
+        description: "Your subscription has been restored",
+      });
     } catch (error) {
       console.error('Restore error:', error);
       const errorMessage = error instanceof Error ? error.message : "Please try again";
