@@ -102,7 +102,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
 
       // Copy habits to user's account
       if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: any) => ({
+        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency: string; custom_days?: number[] } }) => ({
           user_id: user.user.id,
           title: eh.habits.title,
           difficulty: eh.habits.difficulty,
@@ -118,10 +118,10 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
         if (habitsError) throw habitsError;
 
         // Link new habits back to the epic
-        const habitLinks = newHabits.map((habit: any) => ({
+        const habitLinks = newHabits?.map((habit: { id: string }) => ({
           epic_id: epic.id,
           habit_id: habit.id,
-        }));
+        })) || [];
 
         const { error: linkError } = await supabase
           .from('epic_habits')

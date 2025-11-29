@@ -69,7 +69,7 @@ export const ShareableStreakBadge = ({
         // Fallback to download if sharing not supported
         await downloadBadge();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error sharing badge:', error);
       
       // Check if user cancelled (case-insensitive)

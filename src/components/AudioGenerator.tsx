@@ -19,7 +19,7 @@ interface AudioGeneratorProps {
     mentor_id: string;
     transcript: Array<{ word: string; start: number; end: number }>;
   }) => void;
-  mentors: any[];
+  mentors: Array<{ id: string; slug: string; name: string }>;
 }
 
 export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGeneratorProps) => {
@@ -137,7 +137,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           transcript,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating complete pep talk:", error);
       toast.error(error.message || "Failed to generate pep talk");
     } finally {

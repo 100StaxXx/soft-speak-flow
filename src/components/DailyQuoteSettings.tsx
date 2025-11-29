@@ -27,7 +27,7 @@ export const DailyQuoteSettings = () => {
       if (error) throw error;
       
       toast.success(enabled ? "Daily quotes enabled" : "Daily quotes disabled");
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Failed to update settings");
       console.error(error);
     } finally {
@@ -48,7 +48,7 @@ export const DailyQuoteSettings = () => {
       if (error) throw error;
       
       toast.success("Delivery time updated");
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Failed to update settings");
       console.error(error);
     } finally {
@@ -69,7 +69,7 @@ export const DailyQuoteSettings = () => {
       if (error) throw error;
       
       toast.success("Delivery time updated");
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Failed to update settings");
       console.error(error);
     } finally {

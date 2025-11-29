@@ -62,7 +62,7 @@ export const PushNotificationSettings = () => {
         setPushEnabled(false);
         toast({ title: "Notifications Disabled", description: "You won't receive push notifications" });
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
@@ -90,7 +90,7 @@ export const PushNotificationSettings = () => {
       toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
@@ -118,7 +118,7 @@ export const PushNotificationSettings = () => {
       toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
@@ -135,7 +135,7 @@ export const PushNotificationSettings = () => {
       toast({ title: "Time Updated", description: "Your push notification time has been updated" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };

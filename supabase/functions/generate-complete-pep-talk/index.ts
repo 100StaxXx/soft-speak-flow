@@ -273,7 +273,7 @@ Return ONLY a valid JSON object:
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in generate-complete-pep-talk:", error);
     return new Response(
       JSON.stringify({ error: error.message || "An error occurred" }),

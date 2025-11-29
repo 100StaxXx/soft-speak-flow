@@ -264,7 +264,7 @@ serve(async (req) => {
         const recentStories = previousStories.slice(-5);
         const olderStories = previousStories.slice(0, -5);
         
-        let memoryParts: string[] = [];
+        const memoryParts: string[] = [];
         
         // Summary of older stories if they exist
         if (olderStories.length > 0) {

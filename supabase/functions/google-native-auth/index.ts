@@ -187,7 +187,7 @@ serve(async (req) => {
       }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in google-native-auth:', error);
     return new Response(
       JSON.stringify({ error: error?.message || 'Unknown error occurred' }),

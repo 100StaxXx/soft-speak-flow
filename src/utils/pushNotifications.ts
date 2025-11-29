@@ -181,7 +181,7 @@ function setupNativePushListeners(): void {
   });
 
   // Called when push registration fails
-  PushNotifications.addListener('registrationError', (error: any) => {
+  PushNotifications.addListener('registrationError', (error: { error: string }) => {
     console.error('Native push registration error:', error);
   });
 

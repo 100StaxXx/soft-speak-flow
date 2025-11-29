@@ -115,7 +115,7 @@ serve(async (req) => {
         scheduled++;
         console.log(`✓ Scheduled push for user ${profile.id} at ${scheduledAt}`);
 
-      } catch (error: any) {
+      } catch (error) {
         console.error(`Error processing user ${profile.id}:`, error);
         errors.push({ userId: profile.id, error: error.message });
       }
@@ -133,7 +133,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Fatal error in scheduling:', error);
     return new Response(
       JSON.stringify({ error: error.message }),

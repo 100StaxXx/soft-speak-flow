@@ -27,12 +27,6 @@ export default function Reflection() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentMoodSelection, setCurrentMoodSelection] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      loadTodayReflection();
-    }
-  }, [user]);
-
   const loadTodayReflection = async () => {
     if (!user?.id) return;
     
@@ -58,6 +52,13 @@ export default function Reflection() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      loadTodayReflection();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // loadTodayReflection depends on user.id
 
   const handleSubmit = async () => {
     if (!selectedMood || !user) return;
@@ -106,7 +107,7 @@ export default function Reflection() {
       });
 
       setTodayReflection(reflection);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving reflection:', error);
       toast({
         title: "Error",

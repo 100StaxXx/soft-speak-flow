@@ -95,7 +95,7 @@ serve(async (req) => {
     }
 
     throw new Error(`Receipt verification failed: ${verifyData.status}`);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error verifying receipt:", error);
     
     // Determine appropriate status code

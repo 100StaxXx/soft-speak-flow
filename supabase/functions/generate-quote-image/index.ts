@@ -123,7 +123,7 @@ CRITICAL: The text must be spelled EXACTLY as written above with perfect accurac
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error generating quote image:", error);
     return new Response(
       JSON.stringify({ 

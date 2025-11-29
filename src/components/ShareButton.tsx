@@ -40,7 +40,7 @@ export const ShareButton = ({ title, text, url, className = "" }: ShareButtonPro
           toast.error("Failed to copy to clipboard");
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sharing:", error);
       
       // Check if user cancelled (case-insensitive)

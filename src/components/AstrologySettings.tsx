@@ -41,7 +41,7 @@ export const AstrologySettings = () => {
         title: "Saved!",
         description: "Your astrology details have been updated.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving astrology details:', error);
       toast({
         title: "Error",
@@ -72,7 +72,7 @@ export const AstrologySettings = () => {
 
       // Refresh profile to show new data
       window.location.reload();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error calculating cosmic profile:', error);
       toast({
         title: "Error",

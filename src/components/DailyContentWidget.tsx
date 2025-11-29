@@ -9,8 +9,8 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
 interface DailyContent {
-  pepTalk?: any;
-  quote?: any;
+  pepTalk?: { title: string; summary: string; audio_url?: string; id: string } | null;
+  quote?: { text: string; author: string; category?: string } | null;
 }
 
 export const DailyContentWidget = () => {

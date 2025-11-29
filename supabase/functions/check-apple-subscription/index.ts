@@ -68,7 +68,7 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error checking subscription:", error);
     
     // Determine appropriate status code

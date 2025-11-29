@@ -33,12 +33,6 @@ const PepTalkDetail = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      fetchPepTalk(id);
-    }
-  }, [id]);
-
   const fetchPepTalk = async (pepTalkId: string) => {
     try {
       const { data, error } = await supabase
@@ -68,6 +62,13 @@ const PepTalkDetail = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (id) {
+      fetchPepTalk(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // fetchPepTalk is stable and depends on id
 
   const handleTranscribe = async () => {
     if (!pepTalk || !id) return;

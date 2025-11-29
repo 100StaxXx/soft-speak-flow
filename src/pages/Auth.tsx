@@ -189,7 +189,7 @@ const Auth = () => {
           });
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
         description: error.message,
@@ -246,7 +246,7 @@ const Auth = () => {
         setIsForgotPassword(false);
         setEmail("");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -450,7 +450,7 @@ const Auth = () => {
       });
 
       if (error) throw error;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`[${provider} OAuth] Error caught:`, {
         message: error.message,
         code: error.code,

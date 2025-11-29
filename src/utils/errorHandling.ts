@@ -77,4 +77,13 @@ export const isNetworkError = (error: unknown): boolean => {
   );
 };
 
+/**
+ * Helper to safely get error message from unknown type
+ * Use this in catch blocks: catch (error) { const msg = getErrorMessage(error); }
+ */
+export const getErrorMessage = (error: unknown): string => {
+  const details = extractErrorDetails(error);
+  return details.message || "An unexpected error occurred";
+};
+
 // NOTE: Use retryWithBackoff from @/utils/retry for proper retry logic with shouldRetry callbacks

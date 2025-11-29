@@ -71,7 +71,7 @@ export const restorePurchases = async (): Promise<any> => {
     
     // Validate restored purchases
     if (result.purchases) {
-      result.purchases = result.purchases.filter((purchase: any) => {
+      result.purchases = result.purchases.filter((purchase: { productId?: string }) => {
         // Only include purchases that are in valid states
         return purchase.state === 'purchased' || purchase.state === 'restored';
       });

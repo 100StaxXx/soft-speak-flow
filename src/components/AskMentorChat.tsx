@@ -127,7 +127,7 @@ export const AskMentorChat = ({
         { user_id: user.id, role: 'user', content: text },
         { user_id: user.id, role: 'assistant', content: data.response }
       ]);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Mentor chat error:", error);
 
       // Use fallback response instead of just showing error

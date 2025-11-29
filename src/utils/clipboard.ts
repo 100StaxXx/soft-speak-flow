@@ -18,7 +18,7 @@ export const safeClipboardWrite = async (text: string): Promise<boolean> => {
     
     // Fallback for insecure contexts (HTTP) or older browsers
     return fallbackCopyToClipboard(text);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Clipboard API failed:', error);
     
     // If clipboard API failed (e.g., permissions denied), try fallback
@@ -93,7 +93,7 @@ export const isClipboardAvailable = (): boolean => {
  * @param error - The error that occurred
  * @returns string - User-friendly error message
  */
-export const getClipboardErrorMessage = (error: any): string => {
+export const getClipboardErrorMessage = (error: unknown): string => {
   const errorName = error?.name || '';
   const errorMessage = error?.message?.toLowerCase() || '';
   

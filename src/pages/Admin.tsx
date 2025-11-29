@@ -101,7 +101,7 @@ const Admin = () => {
     };
 
     checkAdmin();
-  }, [user, authLoadingFromHook, toast]);
+  }, [user, authLoadingFromHook]); // toast from sonner is stable
 
   useEffect(() => {
     if (isAdmin) {
@@ -196,7 +196,7 @@ const Admin = () => {
       return;
     }
 
-    const pepTalkData: any = {
+    const pepTalkData: Partial<PepTalk> = {
       ...formData,
       audio_url: audioUrl || formData.audio_url,
     };
@@ -237,7 +237,7 @@ const Admin = () => {
     toast.info("Returned to editing");
   };
 
-  const handleEdit = (pepTalk: any) => {
+  const handleEdit = (pepTalk: PepTalk) => {
     setFormData({
       title: pepTalk.title,
       category: pepTalk.category,
@@ -327,7 +327,7 @@ const Admin = () => {
       audio.onended = () => {
         setPreviewingVoice(null);
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error previewing voice:", error);
       toast.error(error.message || "Failed to preview voice");
       setPreviewingVoice(null);
@@ -366,7 +366,7 @@ const Admin = () => {
       setGeneratedCompanionImage(data.imageUrl);
       setGeneratedPrompt(data.prompt || "Prompt not returned");
       toast.success("Companion image generated successfully!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating companion image:", error);
       toast.error(error.message || "Failed to generate companion image");
     } finally {
@@ -428,7 +428,7 @@ const Admin = () => {
 
       setIsEditing(true);
       toast.success("Complete pep talk generated successfully!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating complete pep talk:", error);
       toast.error(error.message || "Failed to generate pep talk");
     } finally {

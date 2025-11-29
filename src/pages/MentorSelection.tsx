@@ -15,10 +15,6 @@ const MentorSelection = () => {
   const [selecting, setSelecting] = useState(false);
   const [currentMentorId, setCurrentMentorId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
   const fetchData = async () => {
     try {
       // Fetch mentors
@@ -43,7 +39,7 @@ const MentorSelection = () => {
           setCurrentMentorId(profile.selected_mentor_id);
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error loading mentors",
         description: error.message,
@@ -53,6 +49,11 @@ const MentorSelection = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // fetchData depends on user indirectly via user.id check
 
   const handleSelectMentor = async (mentorId: string) => {
     if (!user) {
@@ -85,7 +86,7 @@ const MentorSelection = () => {
       
       // Navigate without full reload
       navigate("/", { replace: true });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error selecting mentor",
         description: error.message,

@@ -21,10 +21,6 @@ const Horoscope = () => {
   const navigate = useNavigate();
   const { profile } = useProfile();
 
-  useEffect(() => {
-    generateHoroscope();
-  }, []);
-
   const generateHoroscope = async () => {
     setLoading(true);
     try {
@@ -37,7 +33,7 @@ const Horoscope = () => {
       setIsPersonalized(data.isPersonalized);
       setDate(data.date);
       setCosmicTip(data.cosmicTip || null);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating horoscope:', error);
       toast({
         title: "Error",
@@ -48,6 +44,11 @@ const Horoscope = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    generateHoroscope();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
