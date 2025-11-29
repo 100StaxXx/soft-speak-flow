@@ -43,8 +43,14 @@ const Auth = () => {
   
   // Ref to track if initial session check has redirected
   const hasRedirected = useRef(false);
+  
+  // Ref to prevent re-renders during initialization
+  const initializationComplete = useRef(false);
 
+  // Separate effect for OAuth initialization to prevent re-renders
   useEffect(() => {
+    if (initializationComplete.current) return;
+    
     const initializeAuth = async () => {
       // Initialize SocialLogin plugin for native platforms
       if (Capacitor.isNativePlatform()) {
@@ -75,8 +81,14 @@ const Auth = () => {
           console.error('[OAuth Init] Failed to initialize SocialLogin:', error);
         }
       }
+      initializationComplete.current = true;
     };
 
+    initializeAuth();
+  }, []); // No dependencies - run only once
+
+  // Separate effect for session check and auth state listener
+  useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -87,7 +99,6 @@ const Auth = () => {
       }
     };
 
-    initializeAuth();
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
