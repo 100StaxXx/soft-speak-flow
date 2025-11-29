@@ -291,13 +291,13 @@ const Horoscope = () => {
           </Card>
         </motion.div>
 
-        {/* Cosmic Tip */}
+        {/* Cosmic Reminder */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          <Card className="bg-gradient-to-r from-purple-900/20 via-pink-900/20 to-blue-900/20 border-purple-500/20 p-6 backdrop-blur-sm">
+          <Card className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 border-none p-6 shadow-glow-lg">
             <div className="flex items-start gap-3">
               <motion.div
                 animate={{
@@ -309,33 +309,18 @@ const Horoscope = () => {
                   repeat: Infinity,
                 }}
               >
-                <Sparkles className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                <Sparkles className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
               </motion.div>
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
                   ✨ Cosmic Reminder
                 </h3>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-white/90">
                   Your celestial guidance refreshes with each sunrise. Return tomorrow for new wisdom from the stars.
                 </p>
               </div>
             </div>
           </Card>
-        </motion.div>
-
-        {/* Refresh Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Button
-            onClick={generateHoroscope}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold py-6 rounded-xl shadow-glow-lg transition-all"
-          >
-            {loading ? 'Consulting the cosmos...' : '🌙 Refresh Cosmic Insight'}
-          </Button>
         </motion.div>
       </div>
       <BottomNav />
