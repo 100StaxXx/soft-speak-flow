@@ -71,11 +71,11 @@ export const SubscriptionGate = () => {
         <div className="space-y-4 py-4">
           {/* Features */}
           <div className="space-y-3">
-            {[
-              { icon: Sparkles, text: "All 21 evolution stages unlocked" },
-              { icon: Crown, text: "Battle Arena, Pet Mode & all game features" },
-              { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
-            ].map((feature, idx) => (
+          {[
+            { icon: Sparkles, text: "All 21 evolution stages unlocked" },
+            { icon: Crown, text: "Pet Mode, Guild Stories & all premium features" },
+            { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
+          ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-3 text-sm">
                 <feature.icon className="h-5 w-5 text-primary flex-shrink-0" />
                 <span className="text-foreground">{feature.text}</span>
