@@ -61,7 +61,7 @@ serve(async (req) => {
     // Check if horoscope already exists for today
     const { data: existingHoroscope } = await supabaseClient
       .from('user_daily_horoscopes')
-      .select('horoscope_text, zodiac, is_personalized, for_date')
+      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip')
       .eq('user_id', user.id)
       .eq('for_date', today)
       .single();
@@ -73,7 +73,8 @@ serve(async (req) => {
           horoscope: existingHoroscope.horoscope_text,
           zodiac: existingHoroscope.zodiac,
           isPersonalized: existingHoroscope.is_personalized,
-          date: existingHoroscope.for_date
+          date: existingHoroscope.for_date,
+          cosmicTip: existingHoroscope.cosmic_tip
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -148,7 +149,37 @@ Keep it warm, inspiring, and under 150 words.`;
 
     console.log('[Horoscope] Generated successfully');
 
-    // Store the horoscope for today
+    // Generate cosmic tip
+    const tipResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { 
+            role: 'system', 
+            content: `You are a cosmic guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}.` 
+          },
+          { 
+            role: 'user', 
+            content: `Generate a single daily cosmic tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmic energy. Keep it under 50 words and make it unique and inspiring.` 
+          }
+        ],
+      }),
+    });
+
+    let cosmicTip = 'The stars guide those who listen. Trust your inner compass today.';
+    if (tipResponse.ok) {
+      const tipData = await tipResponse.json();
+      cosmicTip = tipData.choices?.[0]?.message?.content || cosmicTip;
+    }
+
+    console.log('[Horoscope] Generated cosmic tip');
+
+    // Store the horoscope and cosmic tip for today
     const { error: insertError } = await supabaseClient
       .from('user_daily_horoscopes')
       .insert({
@@ -156,7 +187,8 @@ Keep it warm, inspiring, and under 150 words.`;
         for_date: today,
         zodiac: profile.zodiac_sign,
         horoscope_text: horoscope,
-        is_personalized: hasAdvancedDetails
+        is_personalized: hasAdvancedDetails,
+        cosmic_tip: cosmicTip
       });
 
     if (insertError) {
@@ -169,7 +201,8 @@ Keep it warm, inspiring, and under 150 words.`;
         horoscope,
         zodiac: profile.zodiac_sign,
         isPersonalized: hasAdvancedDetails,
-        date: today
+        date: today,
+        cosmicTip
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
