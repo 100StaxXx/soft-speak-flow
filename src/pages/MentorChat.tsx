@@ -87,9 +87,9 @@ export default function MentorChat() {
             variant="ghost" 
             size="icon" 
             onClick={() => navigate('/horoscope')} 
-            className="absolute top-4 right-4 z-10 bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
+            className="absolute top-4 right-4 z-10 bg-primary/90 backdrop-blur-sm hover:bg-primary rounded-full shadow-glow-lg border-2 border-primary/50"
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles className="w-5 h-5 text-primary-foreground" />
           </Button>
           
           {/* Title overlay */}
