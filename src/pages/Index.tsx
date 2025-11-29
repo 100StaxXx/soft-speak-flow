@@ -14,6 +14,8 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
+import { Moon, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 const Index = () => {
   const { user } = useAuth();
@@ -233,6 +235,87 @@ const Index = () => {
             <ErrorBoundary>
               <TodaysPepTalk />
             </ErrorBoundary>
+
+            {/* Cosmic Insight Section */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="relative overflow-hidden rounded-3xl cursor-pointer group mx-4"
+              onClick={() => navigate('/horoscope')}
+            >
+              {/* Animated background layers */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/30 via-blue-600/30 to-pink-600/30" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent animate-pulse" />
+              
+              {/* Content */}
+              <div className="relative p-8 backdrop-blur-sm bg-background/40 border-2 border-purple-500/40 group-hover:border-purple-400/60 transition-all duration-500">
+                <div className="flex items-center justify-center gap-4">
+                  {/* Glowing moon icon */}
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.15, 1],
+                      rotate: [0, 5, -5, 0],
+                    }}
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    className="relative"
+                  >
+                    <div className="absolute inset-0 bg-purple-500/40 blur-2xl rounded-full" />
+                    <div className="relative p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl">
+                      <Moon className="w-8 h-8 text-white" />
+                    </div>
+                  </motion.div>
+
+                  {/* Rainbow gradient text */}
+                  <div className="flex-1 text-center">
+                    <motion.h2
+                      className="text-3xl md:text-4xl font-black mb-2"
+                      style={{
+                        background: "linear-gradient(90deg, #a855f7, #ec4899, #f59e0b, #10b981, #3b82f6, #8b5cf6)",
+                        backgroundSize: "200% 100%",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}
+                      animate={{
+                        backgroundPosition: ["0% 50%", "200% 50%"],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                    >
+                      ✨ Cosmic Insight ✨
+                    </motion.h2>
+                    <p className="text-base text-foreground/90 font-medium">Discover your daily celestial guidance</p>
+                  </div>
+
+                  {/* Sparkle indicator */}
+                  <motion.div
+                    animate={{
+                      rotate: [0, 360],
+                    }}
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                  >
+                    <Sparkles className="w-8 h-8 text-purple-400" />
+                  </motion.div>
+                </div>
+              </div>
+
+              {/* Shine effect on hover */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+              </div>
+            </motion.div>
             
             <CompanionErrorBoundary>
               <ErrorBoundary>
