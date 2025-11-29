@@ -5,7 +5,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Crown, Sparkles, Lock } from "lucide-react";
+import { Crown, Sparkles, Lock, Moon, MessageCircle } from "lucide-react";
 
 export const SubscriptionGate = () => {
   const navigate = useNavigate();
@@ -73,6 +73,8 @@ export const SubscriptionGate = () => {
           <div className="space-y-3">
           {[
             { icon: Sparkles, text: "All 21 evolution stages unlocked" },
+            { icon: Moon, text: "Personalized Daily Cosmic Insight" },
+            { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
             { icon: Crown, text: "Pet Mode, Guild Stories & all premium features" },
             { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
           ].map((feature, idx) => (
