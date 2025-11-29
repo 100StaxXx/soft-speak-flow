@@ -35,18 +35,18 @@ interface ZodiacSelectorProps {
 }
 
 const zodiacSigns = [
-  { sign: "aries" as ZodiacSign, name: "Aries", dates: "March 21 - April 20" },
-  { sign: "taurus" as ZodiacSign, name: "Taurus", dates: "April 21 - May 20" },
+  { sign: "aries" as ZodiacSign, name: "Aries", dates: "March 21 - April 19" },
+  { sign: "taurus" as ZodiacSign, name: "Taurus", dates: "April 20 - May 20" },
   { sign: "gemini" as ZodiacSign, name: "Gemini", dates: "May 21 - June 20" },
   { sign: "cancer" as ZodiacSign, name: "Cancer", dates: "June 21 - July 22" },
   { sign: "leo" as ZodiacSign, name: "Leo", dates: "July 23 - Aug 22" },
   { sign: "virgo" as ZodiacSign, name: "Virgo", dates: "Aug 23 - Sep 22" },
   { sign: "libra" as ZodiacSign, name: "Libra", dates: "Sep 23 - Oct 22" },
   { sign: "scorpio" as ZodiacSign, name: "Scorpio", dates: "Oct 23 - Nov 21" },
-  { sign: "sagittarius" as ZodiacSign, name: "Sagittarius", dates: "Nov 23 - Dec 21" },
+  { sign: "sagittarius" as ZodiacSign, name: "Sagittarius", dates: "Nov 22 - Dec 21" },
   { sign: "capricorn" as ZodiacSign, name: "Capricorn", dates: "Dec 22 - Jan 19" },
-  { sign: "aquarius" as ZodiacSign, name: "Aquarius", dates: "Jan 20 - Feb 19" },
-  { sign: "pisces" as ZodiacSign, name: "Pisces", dates: "Feb 20 - March 20" },
+  { sign: "aquarius" as ZodiacSign, name: "Aquarius", dates: "Jan 20 - Feb 18" },
+  { sign: "pisces" as ZodiacSign, name: "Pisces", dates: "Feb 19 - March 20" },
 ];
 
 export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
