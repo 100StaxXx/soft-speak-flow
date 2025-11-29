@@ -207,18 +207,10 @@ const Profile = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="preferences">Preferences</TabsTrigger>
-              <TabsTrigger value="astrology">
-                <Moon className="h-4 w-4 mr-2" />
-                Astrology
-              </TabsTrigger>
-              <TabsTrigger value="referrals">
-                <Gift className="h-4 w-4 mr-2" />
-                Referrals
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="account" className="space-y-6">
@@ -347,6 +339,8 @@ const Profile = () => {
             <TabsContent value="preferences" className="space-y-6">
               <SoundSettings />
               
+              <AstrologySettings />
+              
               <Card>
                 <CardHeader>
                   <CardTitle>App Preferences</CardTitle>
@@ -357,17 +351,22 @@ const Profile = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-
-            <TabsContent value="astrology" className="space-y-6">
-              <AstrologySettings />
-            </TabsContent>
-
-            <TabsContent value="referrals" className="space-y-6">
-              <ReferralCodeRedeemCard />
-              <ReferralDashboard />
-              <CompanionSkins />
-            </TabsContent>
           </Tabs>
+
+          {/* Referrals Section */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <Gift className="h-6 w-6 text-primary" />
+              <div>
+                <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
+                <p className="text-sm text-muted-foreground">Share R-Evolution and unlock exclusive companion skins</p>
+              </div>
+            </div>
+            
+            <ReferralCodeRedeemCard />
+            <ReferralDashboard />
+            <CompanionSkins />
+          </div>
         </div>
       </div>
       <BottomNav />
