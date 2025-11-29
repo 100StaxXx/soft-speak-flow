@@ -2,29 +2,12 @@ import { BottomNav } from "@/components/BottomNav";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { ZodiacSymbols } from "@/assets/zodiac-symbols";
 
 const Search = () => {
   return (
     <PageTransition>
       {/* Cosmic Starfield Background */}
       <StarfieldBackground />
-      
-      {/* Zodiac Constellations */}
-      <div className="fixed top-20 left-8 w-32 h-32 text-primary/40 opacity-60 animate-pulse pointer-events-none z-0"
-           style={{ 
-             filter: 'drop-shadow(0 0 20px hsl(var(--primary)))', 
-             animation: 'pulse 4s ease-in-out infinite' 
-           }}>
-        {ZodiacSymbols.pisces}
-      </div>
-      <div className="fixed bottom-32 right-8 w-32 h-32 text-accent/40 opacity-60 animate-pulse pointer-events-none z-0"
-           style={{ 
-             filter: 'drop-shadow(0 0 20px hsl(var(--accent)))', 
-             animation: 'pulse 4s ease-in-out infinite 2s' 
-           }}>
-        {ZodiacSymbols.cancer}
-      </div>
       
       <div className="min-h-screen pb-24 relative">
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6">
