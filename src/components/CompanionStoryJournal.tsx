@@ -5,19 +5,16 @@ import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Share2, Grid3x3 } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { ShareableStoryCard } from "./ShareableStoryCard";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
   
   // Debounce stage changes to prevent race conditions
   useEffect(() => {
@@ -117,9 +114,6 @@ export const CompanionStoryJournal = () => {
       </Card>
     );
   }
-
-  // Companion name for card
-  const companionName = companion?.spirit_animal || "Your Companion";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">{showGallery && (
@@ -275,27 +269,12 @@ export const CompanionStoryJournal = () => {
         {/* Story Display */}
         {isStageUnlocked && story ? (
           <div className="space-y-6">
-            {/* Chapter Title & Share */}
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 text-center space-y-2">
-                  <h2 className="text-2xl font-bold">
-                    {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: {story.chapter_title}
-                  </h2>
-                  <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
-                </div>
-                {evolutionImage && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowShareDialog(true)}
-                    className="flex-shrink-0"
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Create Story Card
-                  </Button>
-                )}
-              </div>
+            {/* Chapter Title */}
+            <div className="space-y-2 text-center">
+              <h2 className="text-2xl font-bold">
+                {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: {story.chapter_title}
+              </h2>
+              <p className="text-lg text-muted-foreground italic">"{story.intro_line}"</p>
             </div>
 
             <Separator />
@@ -371,23 +350,6 @@ export const CompanionStoryJournal = () => {
           </Card>
         ) : null}
       </Card>
-
-      {/* Share Dialog */}
-      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Share Your Story</DialogTitle>
-          </DialogHeader>
-          {story && evolutionImage && (
-            <ShareableStoryCard
-              story={story}
-              companionImage={evolutionImage}
-              companionName={companionName}
-              stage={debouncedStage}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
