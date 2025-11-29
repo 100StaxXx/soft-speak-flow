@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,11 +30,19 @@ const Profile = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
   const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | null>(null);
+
+  // Check if we should open a specific tab from navigation state
+  useEffect(() => {
+    if (location.state?.openTab) {
+      setActiveTab(location.state.openTab);
+    }
+  }, [location.state]);
 
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
     queryKey: ["adaptive-push-settings", user?.id],
