@@ -93,6 +93,8 @@ export default function MentorChat() {
         </div>
 
         <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+          <TodaysPepTalk />
+          
           {/* Cosmic Insight Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -197,7 +199,6 @@ export default function MentorChat() {
             </div>
           </motion.div>
 
-          <TodaysPepTalk />
           <AskMentorChat
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
