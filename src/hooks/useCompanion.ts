@@ -8,7 +8,7 @@ import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
-import type { CompleteReferralStage3Result } from "@/types/referral-functions";
+import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsArgs, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 
 export interface Companion {
   id: string;
@@ -161,7 +161,7 @@ export const useCompanion = () => {
       console.log("Image generated successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
-        const result = await supabase.rpc('create_companion_if_not_exists', {
+        const result = await supabase.rpc<CreateCompanionIfNotExistsResult[]>('create_companion_if_not_exists', {
           p_user_id: user.id,
           p_favorite_color: data.favoriteColor,
           p_spirit_animal: data.spiritAnimal,
@@ -171,7 +171,7 @@ export const useCompanion = () => {
           p_initial_image_url: imageData.imageUrl,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
-        });
+        } as CreateCompanionIfNotExistsArgs);
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
@@ -454,7 +454,7 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const { data, error } = await (supabase.rpc as any)(
+          const { data, error } = await supabase.rpc<CompleteReferralStage3Result>(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,
