@@ -17,23 +17,45 @@ const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validToken, setValidToken] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a valid recovery token
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    
-    if (!accessToken) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Link",
-        description: "This password reset link is invalid or has expired",
-      });
-      navigate("/auth");
-    }
-  }, [navigate, toast]);
+    const checkRecoveryToken = async () => {
+      // Check if we have a valid recovery token in the URL hash
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+      
+      if (!accessToken || type !== 'recovery') {
+        toast({
+          variant: "destructive",
+          title: "Invalid Link",
+          description: "This password reset link is invalid or has expired",
+        });
+        navigate("/auth");
+        return;
+      }
+
+      // Verify the session is valid
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your reset link has expired. Please request a new one.",
+        });
+        navigate("/auth");
+        return;
+      }
+
+      setValidToken(true);
+    };
+
+    checkRecoveryToken();
+  }, [navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +109,17 @@ const ResetPassword = () => {
       setLoading(false);
     }
   };
+
+  if (!validToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
+        <div className="text-center space-y-4">
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Verifying reset link...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">

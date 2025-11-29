@@ -202,7 +202,9 @@ const Auth = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email) {
+    const sanitizedEmail = email.trim().toLowerCase();
+    
+    if (!sanitizedEmail) {
       toast({
         variant: "destructive",
         title: "Email Required",
@@ -211,10 +213,21 @@ const Auth = () => {
       return;
     }
 
+    // Validate email format
+    const emailValidation = z.string().email().safeParse(sanitizedEmail);
+    if (!emailValidation.success) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
