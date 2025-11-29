@@ -13,10 +13,12 @@ import { Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Trophy, 
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+type ChallengeTab = "active" | "available";
+
 export default function Challenges() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"active" | "available">("active");
+  const [activeTab, setActiveTab] = useState<ChallengeTab>("active");
 
   // Fetch available challenges
   const { data: availableChallenges } = useQuery({
@@ -128,7 +130,7 @@ export default function Challenges() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ChallengeTab)} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-card/50 backdrop-blur-xl border border-border/50">
             <TabsTrigger
               value="active"

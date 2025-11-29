@@ -188,7 +188,7 @@ export const useCompanion = () => {
         throw new Error("Failed to create companion record. Please try again.");
       }
 
-      const companionData = companionResult[0];
+      const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
       const isNewCompanion = companionData.is_new;
 
       logger.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
