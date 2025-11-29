@@ -189,8 +189,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in google-native-auth:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error?.message || 'Unknown error occurred' }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

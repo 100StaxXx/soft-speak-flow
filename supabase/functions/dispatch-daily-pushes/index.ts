@@ -165,7 +165,8 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`Error dispatching push ${push.id}:`, error);
-        errors.push({ pushId: push.id, error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push({ pushId: push.id, error: errorMessage });
       }
     }
 
@@ -183,8 +184,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Fatal error in dispatch:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

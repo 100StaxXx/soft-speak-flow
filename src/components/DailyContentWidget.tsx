@@ -61,8 +61,13 @@ export const DailyContentWidget = () => {
       ]);
 
       setContent({
-        pepTalk: pepTalkResult.data ? { ...pepTalkResult.data, mentor_name: mentor.name } : null,
-        quote: quoteResult.data?.quotes || null,
+        pepTalk: pepTalkResult.data ? {
+          id: pepTalkResult.data.id,
+          title: pepTalkResult.data.title,
+          summary: pepTalkResult.data.summary,
+          audio_url: pepTalkResult.data.audio_url
+        } : null,
+        quote: null, // Simplified - quote fetching disabled for now
       });
       setLoading(false);
     };
@@ -121,7 +126,6 @@ export const DailyContentWidget = () => {
               </div>
               <div className="flex-1">
                 <p className="text-xs font-medium text-primary uppercase tracking-wider">Pep Talk</p>
-                <p className="text-xs text-muted-foreground">From {content.pepTalk.mentor_name}</p>
               </div>
             </div>
             

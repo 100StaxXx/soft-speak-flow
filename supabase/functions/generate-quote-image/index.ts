@@ -125,10 +125,12 @@ CRITICAL: The text must be spelled EXACTLY as written above with perfect accurac
     );
   } catch (error) {
     console.error("Error generating quote image:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to generate quote image";
+    const errorDetails = error instanceof Error ? error.toString() : String(error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Failed to generate quote image",
-        details: error.toString(),
+        error: errorMessage,
+        details: errorDetails,
       }),
       {
         status: 500,
