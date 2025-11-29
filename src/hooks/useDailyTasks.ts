@@ -91,7 +91,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { data: existingTasks, error: countError } = await supabase
           .from('daily_tasks')
           .select('id')
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .eq('task_date', customDate || taskDate);
 
         if (countError) {
@@ -127,7 +127,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         const { error } = await supabase
           .from('daily_tasks')
           .insert({
-            user_id: user!.id,
+            user_id: user.id,
             task_text: taskText,
             difficulty: difficulty,
             xp_reward: xpReward,
@@ -342,7 +342,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
       await supabase
         .from('daily_tasks')
         .update({ is_main_quest: false })
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .eq('task_date', taskDate);
 
       // Then set this task as the main quest
@@ -350,7 +350,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .from('daily_tasks')
         .update({ is_main_quest: true })
         .eq('id', taskId)
-        .eq('user_id', user!.id);
+        .eq('user_id', user.id);
 
       if (error) throw error;
     },
