@@ -75,3 +75,6 @@ verify_jwt = false
 [functions.generate-daily-horoscope]
 verify_jwt = true
 
+[functions.calculate-cosmic-profile]
+verify_jwt = true
+

@@ -8,12 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Sun, Moon } from "lucide-react";
+import { CosmicProfileSection } from "./astrology/CosmicProfileSection";
+import { CosmicProfileReveal } from "./astrology/CosmicProfileReveal";
 
 export const AstrologySettings = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [revealing, setRevealing] = useState(false);
 
   // Parse existing birth time (HH:mm format)
   const [birthTime, setBirthTime] = useState(profile?.birth_time || "");
@@ -51,6 +54,35 @@ export const AstrologySettings = () => {
   };
 
   const hasAdvancedDetails = !!(profile?.birth_time && profile?.birth_location);
+  const hasCosmicProfile = !!(profile?.moon_sign && profile?.rising_sign);
+
+  const handleRevealCosmicProfile = async () => {
+    if (!user || !hasAdvancedDetails) return;
+    
+    setRevealing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
+
+      if (error) throw error;
+
+      toast({
+        title: "✨ Cosmic Profile Revealed!",
+        description: "Your celestial map has been calculated from the stars.",
+      });
+
+      // Refresh profile to show new data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error calculating cosmic profile:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to calculate cosmic profile",
+        variant: "destructive",
+      });
+    } finally {
+      setRevealing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -148,6 +180,31 @@ export const AstrologySettings = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Cosmic Profile Section */}
+      {hasAdvancedDetails && !hasCosmicProfile && (
+        <Card className="border-accent-purple/50 bg-gradient-to-br from-purple-900/20 to-pink-900/20">
+          <CardContent className="p-0">
+            <CosmicProfileReveal 
+              onReveal={handleRevealCosmicProfile}
+              isRevealing={revealing}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {hasCosmicProfile && profile && (
+        <CosmicProfileSection 
+          profile={{
+            zodiac_sign: profile.zodiac_sign || '',
+            moon_sign: profile.moon_sign || '',
+            rising_sign: profile.rising_sign || '',
+            mercury_sign: profile.mercury_sign || '',
+            mars_sign: profile.mars_sign || '',
+            venus_sign: profile.venus_sign || '',
+          }}
+        />
+      )}
     </div>
   );
 };

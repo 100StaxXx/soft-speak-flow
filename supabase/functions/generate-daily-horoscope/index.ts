@@ -31,7 +31,7 @@ serve(async (req) => {
     // Fetch user profile with zodiac and optional birth details
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('zodiac_sign, birth_time, birth_location, selected_mentor_id')
+      .select('zodiac_sign, birth_time, birth_location, selected_mentor_id, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign')
       .eq('id', user.id)
       .single();
 
@@ -57,6 +57,7 @@ serve(async (req) => {
     // Use local date instead of UTC to avoid timezone issues
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
     const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
+    const hasCosmicProfile = !!(profile.moon_sign && profile.rising_sign);
 
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
@@ -105,7 +106,30 @@ serve(async (req) => {
     let systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
-    if (hasAdvancedDetails) {
+    if (hasCosmicProfile) {
+      // Full cosmic profile available - use all 6 placements
+      userPrompt = `Generate a deeply personalized daily horoscope for ${today}.
+
+Their Cosmic Profile:
+☀️ Sun: ${profile.zodiac_sign}
+🌙 Moon: ${profile.moon_sign}
+⬆️ Rising: ${profile.rising_sign}
+💭 Mercury: ${profile.mercury_sign}
+🔥 Mars: ${profile.mars_sign}
+💗 Venus: ${profile.venus_sign}
+
+Birth Time: ${profile.birth_time}
+Birth Location: ${profile.birth_location}
+
+Weave together:
+- How their Big Three (Sun/Moon/Rising) interact with today's cosmic energy
+- Mercury's influence on their mind and communication today
+- Mars energy affecting their drive and body
+- Venus coloring their relationships and soul connections
+- Specific actionable guidance that feels personal to this exact cosmic combination
+
+Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
+    } else if (hasAdvancedDetails) {
       userPrompt = `Generate a personalized daily horoscope for ${profile.zodiac_sign} for ${today}.
 
 Birth Time: ${profile.birth_time}
