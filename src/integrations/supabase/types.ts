@@ -1406,6 +1406,62 @@ export type Database = {
         }
         Relationships: []
       }
+      guild_stories: {
+        Row: {
+          bond_lesson: string
+          chapter_number: number
+          chapter_title: string
+          climax_moment: string
+          companion_spotlights: Json
+          created_at: string | null
+          epic_id: string
+          generated_at: string | null
+          id: string
+          intro_line: string
+          main_story: string
+          next_hook: string | null
+          trigger_type: string
+        }
+        Insert: {
+          bond_lesson: string
+          chapter_number?: number
+          chapter_title: string
+          climax_moment: string
+          companion_spotlights?: Json
+          created_at?: string | null
+          epic_id: string
+          generated_at?: string | null
+          id?: string
+          intro_line: string
+          main_story: string
+          next_hook?: string | null
+          trigger_type: string
+        }
+        Update: {
+          bond_lesson?: string
+          chapter_number?: number
+          chapter_title?: string
+          climax_moment?: string
+          companion_spotlights?: Json
+          created_at?: string | null
+          epic_id?: string
+          generated_at?: string | null
+          id?: string
+          intro_line?: string
+          main_story?: string
+          next_hook?: string | null
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_stories_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       habit_completions: {
         Row: {
           completed_at: string | null

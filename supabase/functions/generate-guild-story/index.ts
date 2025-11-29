@@ -1,0 +1,273 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface CompanionData {
+  user_id: string;
+  user_name: string;
+  spirit_animal: string;
+  core_element: string;
+  mind: number;
+  body: number;
+  soul: number;
+  eye_color: string;
+  fur_color: string;
+  current_stage: number;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { epicId, userId } = await req.json();
+
+    if (!epicId) {
+      throw new Error("epicId is required");
+    }
+
+    console.log("Generating guild story for epic:", epicId);
+
+    // Verify user is a member of this epic
+    const { data: membership } = await supabase
+      .from('epic_members')
+      .select('*')
+      .eq('epic_id', epicId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!membership) {
+      const { data: epicOwner } = await supabase
+        .from('epics')
+        .select('user_id')
+        .eq('id', epicId)
+        .single();
+
+      if (epicOwner?.user_id !== userId) {
+        throw new Error("User is not a member of this epic");
+      }
+    }
+
+    // Rate limit check: 1 manual story per 24 hours per guild
+    const { data: recentStories } = await supabase
+      .from('guild_stories')
+      .select('*')
+      .eq('epic_id', epicId)
+      .eq('trigger_type', 'manual')
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (recentStories && recentStories.length > 0) {
+      throw new Error("A story was already generated in the last 24 hours. Please wait before creating another.");
+    }
+
+    // Fetch epic details
+    const { data: epic } = await supabase
+      .from('epics')
+      .select('*')
+      .eq('id', epicId)
+      .single();
+
+    if (!epic) {
+      throw new Error("Epic not found");
+    }
+
+    // Fetch all guild members and their companions
+    const { data: members } = await supabase
+      .from('epic_members')
+      .select(`
+        user_id,
+        profiles!inner(display_name)
+      `)
+      .eq('epic_id', epicId);
+
+    if (!members || members.length < 2) {
+      throw new Error("Guild must have at least 2 members to generate a collaborative story");
+    }
+
+    // Fetch companions for all members
+    const memberIds = members.map(m => m.user_id);
+    const { data: companions } = await supabase
+      .from('user_companion')
+      .select('*')
+      .in('user_id', memberIds);
+
+    if (!companions || companions.length === 0) {
+      throw new Error("No companions found for guild members");
+    }
+
+    // Build companion data array
+    const companionData: CompanionData[] = companions.map(c => {
+      const member = members.find(m => m.user_id === c.user_id);
+      return {
+        user_id: c.user_id,
+        user_name: (member?.profiles as any)?.display_name || 'Adventurer',
+        spirit_animal: c.spirit_animal || 'Unknown',
+        core_element: c.core_element || 'None',
+        mind: c.mind || 0,
+        body: c.body || 0,
+        soul: c.soul || 0,
+        eye_color: c.eye_color || 'unknown',
+        fur_color: c.fur_color || 'unknown',
+        current_stage: c.current_stage || 0
+      };
+    });
+
+    // Get chapter number (count existing stories + 1)
+    const { count } = await supabase
+      .from('guild_stories')
+      .select('*', { count: 'exact', head: true })
+      .eq('epic_id', epicId);
+
+    const chapterNumber = (count || 0) + 1;
+
+    // Build AI prompt
+    const companionDescriptions = companionData.map((c, idx) => `
+${idx + 1}. ${c.spirit_animal} (${c.core_element} Element) - Stage ${c.current_stage}
+   Owner: ${c.user_name}
+   Attributes: Mind ${c.mind}, Body ${c.body}, Soul ${c.soul}
+   Appearance: ${c.eye_color} eyes, ${c.fur_color} fur/feathers/scales
+   Power Level: ${c.current_stage < 5 ? 'Emerging' : c.current_stage < 10 ? 'Growing' : c.current_stage < 15 ? 'Powerful' : 'Legendary'}
+`).join('\n');
+
+    const prompt = `You are GUILD STORY ENGINE — generating epic collaborative adventures featuring multiple companions from different users, all part of the same guild.
+
+GUILD: ${epic.title}
+GUILD GOAL: ${epic.description || 'Unite and grow together'}
+THEME: ${epic.theme_color || 'heroic'}
+
+COMPANIONS IN THIS ADVENTURE:
+${companionDescriptions}
+
+CHAPTER: ${chapterNumber === 1 ? 'First Meeting' : `Chapter ${chapterNumber}`}
+
+STORY REQUIREMENTS:
+• Feature ALL companions playing meaningful roles based on their species and element
+• Create dynamic interactions between different species and elements
+• Highlight how different powers/attributes complement each other
+• Give each companion at least one moment to shine based on their strengths
+• Build toward a shared climax that requires teamwork from all companions
+• End with a lesson about unity, growth, and collective strength
+• Keep the tone ${epic.theme_color === 'warrior' ? 'bold and action-packed' : epic.theme_color === 'mystic' ? 'mysterious and magical' : epic.theme_color === 'nature' ? 'harmonious and natural' : 'heroic and inspiring'}
+
+Generate a collaborative story in this EXACT JSON format:
+{
+  "chapter_title": "An engaging chapter title",
+  "intro_line": "A captivating opening line that sets the scene",
+  "main_story": "The full narrative (800-1200 words) featuring all companions working together. Use vivid descriptions and show each companion's personality through their actions.",
+  "climax_moment": "The pivotal moment where all companions unite their powers",
+  "bond_lesson": "The wisdom gained from this shared experience",
+  "next_hook": "A teaser for the next chapter",
+  "companion_spotlights": [
+    {
+      "user_id": "uuid",
+      "companion_name": "species name",
+      "role_played": "Brief description of their heroic contribution"
+    }
+  ]
+}`;
+
+    console.log("Calling Lovable AI for story generation...");
+
+    // Call Lovable AI
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a creative storytelling AI that generates collaborative adventures. Always respond with valid JSON matching the requested format.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.9,
+        max_tokens: 3000,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('Lovable AI error:', aiResponse.status, errorText);
+      throw new Error(`AI generation failed: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const content = aiData.choices[0].message.content;
+
+    console.log("AI response received, parsing...");
+
+    // Parse JSON response
+    let storyData;
+    try {
+      // Try to extract JSON from markdown code blocks if present
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+      storyData = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('Failed to parse AI response:', content);
+      throw new Error('Failed to parse AI-generated story');
+    }
+
+    // Insert guild story into database
+    const { data: insertedStory, error: insertError } = await supabase
+      .from('guild_stories')
+      .insert({
+        epic_id: epicId,
+        chapter_number: chapterNumber,
+        chapter_title: storyData.chapter_title,
+        intro_line: storyData.intro_line,
+        main_story: storyData.main_story,
+        companion_spotlights: storyData.companion_spotlights,
+        climax_moment: storyData.climax_moment,
+        bond_lesson: storyData.bond_lesson,
+        next_hook: storyData.next_hook,
+        trigger_type: 'manual',
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Database insert error:', insertError);
+      throw insertError;
+    }
+
+    console.log("Guild story generated successfully:", insertedStory.id);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        story: insertedStory 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error in generate-guild-story:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+});

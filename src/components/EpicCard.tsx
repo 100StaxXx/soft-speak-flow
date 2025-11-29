@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { EpicLeaderboard } from "./EpicLeaderboard";
 import { EpicDiscordSection } from "./EpicDiscordSection";
+import { GuildStorySection } from "./GuildStorySection";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -264,7 +265,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         )}
 
         {/* Community Features for Shared Epics */}
-        <div className="mt-4 pt-4 border-t border-border space-y-3">
+        <div className="mt-4 pt-4 border-t border-border space-y-4">
+          <GuildStorySection epicId={epic.id} memberCount={memberCount} />
           <EpicDiscordSection 
             epic={{
               id: epic.id,
