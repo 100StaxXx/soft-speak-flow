@@ -24,6 +24,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
+  // NOTE: Using local device date. This works for most users but has edge cases:
+  // - Users who travel across timezones may see incorrect "today"
+  // - Users with wrong device time will get wrong date
+  // - Daily reset happens at device midnight, not server midnight
+  // Future enhancement: Use UTC or user's timezone preference from profile
   const taskDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -40,10 +45,13 @@ export const useDailyTasks = (selectedDate?: Date) => {
         .eq('task_date', taskDate)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to fetch daily tasks:', error);
+        throw error;
+      }
       return data || [];
     },
-    enabled: !!user,
+    enabled: !!user?.id,
     staleTime: 2 * 60 * 1000, // 2 minutes - tasks change frequently but not every second
     refetchOnWindowFocus: false, // Don't refetch when user switches tabs
   });
@@ -178,21 +186,31 @@ export const useDailyTasks = (selectedDate?: Date) => {
     }
 
     try {
-      const { data: epicHabits } = await supabase
+      const { data: epicHabits, error: epicError } = await supabase
         .from('epic_habits')
         .select('epic_id, epics!inner(is_public, status)')
         .eq('epics.status', 'active')
         .eq('epics.is_public', true);
 
+      if (epicError) {
+        console.error('Failed to fetch epic habits:', epicError);
+        return { bonusXP: 0, toastReason: 'Task Complete!' };
+      }
+
       if (!epicHabits || epicHabits.length === 0) {
         return { bonusXP: 0, toastReason: 'Task Complete!' };
       }
 
-      const { data: memberships } = await supabase
+      const { data: memberships, error: memberError } = await supabase
         .from('epic_members')
         .select('epic_id')
         .eq('user_id', user.id)
         .in('epic_id', epicHabits.map((eh: { epic_id: string }) => eh.epic_id));
+
+      if (memberError) {
+        console.error('Failed to fetch memberships:', memberError);
+        return { bonusXP: 0, toastReason: 'Task Complete!' };
+      }
 
       if (memberships && memberships.length > 0) {
         const rawBonus = Math.round(baseXP * 0.1);
@@ -200,7 +218,7 @@ export const useDailyTasks = (selectedDate?: Date) => {
         return { bonusXP, toastReason: `Task Complete! +${bonusXP} Guild Bonus (10%) 🎯` };
       }
     } catch (error) {
-      console.error('Failed to compute guild bonus:', error);
+      console.error('Unexpected error computing guild bonus:', error);
     }
 
     return { bonusXP: 0, toastReason: 'Task Complete!' };
@@ -322,12 +340,20 @@ export const useDailyTasks = (selectedDate?: Date) => {
         throw new Error('User not authenticated');
       }
       
+      if (!taskId) {
+        throw new Error('Invalid task ID');
+      }
+      
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
         .eq('id', taskId)
         .eq('user_id', user.id);
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Failed to delete task:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -340,21 +366,49 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
-      // First, unset any existing main quest for today
-      await supabase
-        .from('daily_tasks')
-        .update({ is_main_quest: false })
-        .eq('user_id', user.id)
-        .eq('task_date', taskDate);
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
 
-      // Then set this task as the main quest
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update({ is_main_quest: true })
-        .eq('id', taskId)
-        .eq('user_id', user.id);
+      // Use database function for atomic main quest update
+      const { data, error } = await supabase.rpc('set_main_quest_for_day', {
+        p_user_id: user.id,
+        p_task_id: taskId,
+        p_task_date: taskDate
+      });
 
-      if (error) throw error;
+      if (error) {
+        // If RPC doesn't exist, fall back to two-step update with safeguards
+        console.warn('RPC not available, using fallback method:', error);
+        
+        // Verify task exists and belongs to user
+        const { data: task, error: fetchError } = await supabase
+          .from('daily_tasks')
+          .select('id, user_id, task_date')
+          .eq('id', taskId)
+          .eq('user_id', user.id)
+          .eq('task_date', taskDate)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!task) throw new Error('Task not found or access denied');
+
+        // First, unset any existing main quest for today
+        await supabase
+          .from('daily_tasks')
+          .update({ is_main_quest: false })
+          .eq('user_id', user.id)
+          .eq('task_date', taskDate);
+
+        // Then set this task as the main quest
+        const { error: updateError } = await supabase
+          .from('daily_tasks')
+          .update({ is_main_quest: true })
+          .eq('id', taskId)
+          .eq('user_id', user.id);
+
+        if (updateError) throw updateError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });

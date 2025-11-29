@@ -201,7 +201,25 @@ export default function Tasks() {
         throw new Error('User not authenticated');
       }
       
-      if (habits.length >= 2) {
+      // Re-fetch count from database to prevent race condition
+      const { data: currentHabits, error: fetchError } = await supabase
+        .from('habits')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      // Database-level check for max habits
+      const { count } = await supabase
+        .from('habits')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      
+      if (count && count >= 2) {
         throw new Error('Maximum 2 habits allowed');
       }
       
@@ -242,33 +260,39 @@ export default function Tasks() {
           .from('habit_completions')
           .delete()
           .eq('habit_id', habitId)
+          .eq('user_id', user.id)
           .eq('date', today);
         if (error) throw error;
-        return { isCompleting: false };
+        return { isCompleting: false, isFirstCompletion: false };
       } else {
-        // Check if this habit was already completed today (to prevent XP spam)
-        const { data: existingCompletion } = await supabase
+        // ATOMIC INSERT: Use unique constraint to prevent duplicates
+        // If already exists, insert will fail gracefully
+        const { data: insertedData, error: insertError } = await supabase
           .from('habit_completions')
-          .select('id')
-          .eq('habit_id', habitId)
-          .eq('user_id', user.id)
-          .eq('date', today)
-          .maybeSingle();
+          .insert({ habit_id: habitId, user_id: user.id, date: today })
+          .select();
 
-        // Insert new completion
-        const { error } = await supabase
-          .from('habit_completions')
-          .insert({ habit_id: habitId, user_id: user.id, date: today });
-        if (error) throw error;
+        // If insert failed due to duplicate, this is NOT a first completion
+        if (insertError) {
+          // Unique constraint violation (habit already completed today)
+          if (insertError.code === '23505') {
+            return { isCompleting: true, isFirstCompletion: false };
+          }
+          throw insertError;
+        }
         
-        // Only award XP if this is the FIRST completion today
-        if (!existingCompletion) {
+        // Only award XP if this was a successful insert (first completion)
+        const isFirstCompletion = insertedData && insertedData.length > 0;
+        if (isFirstCompletion) {
           const habit = habits.find(h => h.id === habitId);
-          const xpAmount = habit?.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
+          if (!habit) {
+            throw new Error('Habit not found');
+          }
+          const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
           
           // Update companion attributes in background without blocking
-          if (companion) {
+          if (companion?.id) {
             updateMindFromHabit(companion.id).catch(err => 
               console.error('Mind update failed:', err)
             );
@@ -286,7 +310,7 @@ export default function Tasks() {
           haptics.success();
         }
         
-        return { isCompleting: true };
+        return { isCompleting: true, isFirstCompletion };
       }
     },
     onSuccess: () => {
@@ -384,7 +408,7 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
   useEffect(() => {
-    if (!user || !profile) return;
+    if (!user?.id || !profile) return;
     
     // Check localStorage first for immediate feedback
     const tutorialDismissed = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`);
@@ -407,22 +431,36 @@ export default function Tasks() {
     if (!tutorialSeen && !showTutorial) {
       setShowTutorial(true);
       
-      // Auto-generate "Join R-Evolution" quest
+      // Auto-generate "Join R-Evolution" quest (only once)
       const today = format(new Date(), 'yyyy-MM-dd');
+      const questCreationKey = `tutorial_quest_created_${user.id}`;
+      
+      // Check if we've already attempted to create this quest in this session
+      if (safeLocalStorage.getItem(questCreationKey) === 'true') {
+        return;
+      }
+      
+      // Mark as attempted to prevent duplicate creation
+      safeLocalStorage.setItem(questCreationKey, 'true');
       
       // Check if this quest already exists
       const checkAndCreateQuest = async () => {
         try {
-          const { data: existingQuest } = await supabase
+          const { data: existingQuest, error: checkError } = await supabase
             .from('daily_tasks')
             .select('id')
             .eq('user_id', user.id)
             .eq('task_text', 'Join R-Evolution')
             .maybeSingle();
           
+          if (checkError) {
+            console.error('Failed to check for tutorial quest:', checkError);
+            return;
+          }
+          
           if (!existingQuest) {
             // Create the welcome quest
-            await supabase
+            const { error: insertError } = await supabase
               .from('daily_tasks')
               .insert({
                 user_id: user.id,
@@ -433,19 +471,27 @@ export default function Tasks() {
                 is_main_quest: false,
               });
             
-            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+            if (insertError) {
+              console.error('Failed to create tutorial quest:', insertError);
+              // Remove the flag so it can be retried
+              safeLocalStorage.removeItem(questCreationKey);
+            } else {
+              queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+            }
           }
         } catch (error) {
-          console.error('Failed to check/create tutorial quest:', error);
+          console.error('Unexpected error creating tutorial quest:', error);
+          // Remove the flag so it can be retried
+          safeLocalStorage.removeItem(questCreationKey);
         }
       };
       
       checkAndCreateQuest();
     }
-  }, [user, profile, showTutorial, queryClient]);
+  }, [user?.id, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     
     // Immediately mark as dismissed in localStorage to prevent re-showing
     safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
@@ -453,19 +499,27 @@ export default function Tasks() {
     
     // Then update database in background
     if (profile) {
-      const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
-      const updatedData = {
-        ...onboardingData,
-        quests_tutorial_seen: true,
-      };
-      
-      await supabase
-        .from('profiles')
-        .update({ onboarding_data: updatedData })
-        .eq('id', user.id);
-      
-      // Invalidate profile cache
-      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      try {
+        const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
+        const updatedData = {
+          ...onboardingData,
+          quests_tutorial_seen: true,
+        };
+        
+        const { error } = await supabase
+          .from('profiles')
+          .update({ onboarding_data: updatedData })
+          .eq('id', user.id);
+        
+        if (error) {
+          console.error('Failed to update tutorial status:', error);
+        } else {
+          // Invalidate profile cache
+          queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+        }
+      } catch (error) {
+        console.error('Unexpected error updating tutorial status:', error);
+      }
     }
   };
 

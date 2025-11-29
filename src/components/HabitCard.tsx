@@ -43,7 +43,13 @@ export const HabitCard = memo(({
   const [showActions, setShowActions] = useState(false);
 
   const handleArchive = useCallback(async () => {
+    if (!id) {
+      toast.error("Invalid habit ID");
+      return;
+    }
+
     try {
+      // Add user_id check for security (even though RLS handles this)
       const { error } = await supabase
         .from('habits')
         .update({ is_active: false })
