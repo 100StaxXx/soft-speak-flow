@@ -6,13 +6,15 @@ interface CosmicCardProps {
   className?: string;
   glowColor?: "purple" | "pink" | "blue" | "gold";
   intensity?: "subtle" | "medium" | "strong";
+  animated?: boolean;
 }
 
 export const CosmicCard = ({ 
   children, 
   className,
   glowColor = "purple",
-  intensity = "medium"
+  intensity = "medium",
+  animated = false
 }: CosmicCardProps) => {
   const glowColorMap = {
     purple: "hsl(var(--cosmic-glow))",
@@ -30,13 +32,14 @@ export const CosmicCard = ({
   return (
     <div
       className={cn(
-        "cosmic-glass relative overflow-hidden rounded-xl p-6",
+        animated ? "cosmic-card-enhanced" : "cosmic-glass",
+        "relative overflow-hidden rounded-xl p-6",
         "transition-all duration-300",
         "hover:scale-[1.01] active:scale-[0.99]",
         className
       )}
       style={{
-        borderColor: `${glowColorMap[glowColor]}/${intensityMap[intensity]}`,
+        borderColor: animated ? undefined : `${glowColorMap[glowColor]}/${intensityMap[intensity]}`,
       }}
     >
       {/* Subtle constellation pattern overlay */}
