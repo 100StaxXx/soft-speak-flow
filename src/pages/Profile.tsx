@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,7 @@ import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
+import { AstrologySettings } from "@/components/AstrologySettings";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -198,10 +199,14 @@ const Profile = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="preferences">Preferences</TabsTrigger>
+              <TabsTrigger value="astrology">
+                <Moon className="h-4 w-4 mr-2" />
+                Astrology
+              </TabsTrigger>
               <TabsTrigger value="referrals">
                 <Gift className="h-4 w-4 mr-2" />
                 Referrals
@@ -343,6 +348,10 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground">More preferences coming soon...</p>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="astrology" className="space-y-6">
+              <AstrologySettings />
             </TabsContent>
 
             <TabsContent value="referrals" className="space-y-6">

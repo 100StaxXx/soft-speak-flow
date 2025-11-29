@@ -49,6 +49,7 @@ const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const BattleArena = lazy(() => import("./pages/BattleArena"));
+const Horoscope = lazy(() => import("./pages/Horoscope"));
 
 
 // Create query client outside component for better performance and stability
@@ -163,6 +164,7 @@ const AppContent = memo(() => {
           <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
           <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+          <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
