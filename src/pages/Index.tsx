@@ -294,7 +294,7 @@ const Index = () => {
                         ease: "linear",
                       }}
                     >
-                      Cosmiq Insight
+                      ✨ Cosmic Insight ✨
                     </motion.h2>
                     <p className="text-base text-foreground/90 font-medium">Discover your daily celestial guidance</p>
                   </div>
