@@ -94,7 +94,7 @@ serve(async (req) => {
     }
 
     // Build prompt based on whether user has advanced astrology details
-    let systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''}`;
+    let systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
     if (hasAdvancedDetails) {
@@ -109,7 +109,7 @@ Include:
 - Specific guidance for mind, body, and soul
 - One actionable cosmic insight for today
 
-Keep it conversational, inspiring, and under 200 words.`;
+Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
     } else {
       userPrompt = `Generate a daily horoscope for ${profile.zodiac_sign} for ${today}.
 
@@ -119,7 +119,7 @@ Focus on:
 - One cosmic insight or affirmation
 - Encouragement aligned with their zodiac strengths
 
-Keep it warm, inspiring, and under 150 words.`;
+Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for emphasis - use plain text only.`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -171,11 +171,11 @@ Keep it warm, inspiring, and under 150 words.`;
         messages: [
           { 
             role: 'system', 
-            content: `You are a cosmic guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}.` 
+            content: `You are a cosmic guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.` 
           },
           { 
             role: 'user', 
-            content: `Generate a single daily cosmic tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmic energy. Keep it under 50 words and make it unique and inspiring.` 
+            content: `Generate a single daily cosmic tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmic energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.` 
           }
         ],
       }),
