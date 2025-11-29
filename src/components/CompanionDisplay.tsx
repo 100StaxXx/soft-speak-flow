@@ -149,10 +149,11 @@ export const CompanionDisplay = memo(() => {
         }}
       />
 
-      <Card className="relative overflow-hidden shadow-glow-lg border-primary/40 hover:border-primary/70 transition-all duration-500 hover:shadow-neon animate-scale-in bg-gradient-to-br from-card via-card to-secondary/50">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 opacity-60" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.15),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--accent)/0.15),transparent_50%)]" />
+      <Card className="relative overflow-hidden cosmic-glass border-celestial-blue/40 hover:border-nebula-pink/60 transition-all duration-500 animate-scale-in">
+        {/* Nebula background gradients */}
+        <div className="absolute inset-0 bg-gradient-to-br from-nebula-pink/10 via-celestial-blue/10 to-cosmic-glow/10 opacity-60 animate-nebula-shift" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--celestial-blue)/0.2),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--nebula-pink)/0.2),transparent_50%)]" />
         
         <div className="relative p-6 space-y-6">
           {/* Stage Badge */}
@@ -175,17 +176,19 @@ export const CompanionDisplay = memo(() => {
 
           {/* Companion Image */}
           <div className="flex justify-center py-8 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
-            {/* Body-based glow effect */}
+            {/* Cosmic orbital glow effect */}
             <div 
-              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`}
+              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--primary) / ${(companion.body ?? 100) / 200}), hsl(var(--accent) / ${(companion.body ?? 100) / 200}), transparent)`,
+                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(companion.body ?? 100) / 200}), hsl(var(--nebula-pink) / ${(companion.body ?? 100) / 200}), transparent)`,
               }}
               aria-hidden="true" 
             />
-            <div className={`absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
+            <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmic-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div className="relative">
-              <div className={`absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-[breathe_4s_ease-in-out_infinite]' : ''}`} aria-hidden="true" />
+              {/* Twinkling star particles around companion */}
+              <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
+              <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
               {!imageLoaded && !imageError && (
                 <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading companion image">
                   <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
