@@ -26,6 +26,7 @@ import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushN
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Quotes = lazy(() => import("./pages/Quotes"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -149,6 +150,7 @@ const AppContent = memo(() => {
           <EvolutionAwareContent />
           <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
