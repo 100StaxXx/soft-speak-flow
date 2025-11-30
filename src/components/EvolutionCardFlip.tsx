@@ -193,7 +193,7 @@ export function EvolutionCardFlip({ card }: Props) {
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden">
-                  <div className={`h-full rounded-2xl border-[6px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
+                  <div className={`h-full rounded-2xl border-[6px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-visible relative`}>
                     <div className="h-full rounded-xl relative overflow-hidden">
                       {/* Full Card Image Background */}
                       {card.image_url ? (
@@ -240,7 +240,7 @@ export function EvolutionCardFlip({ card }: Props) {
                       </div>
 
                       {/* Bottom Section - Name & Rarity */}
-                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-2">
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-2 pb-8">
                         <h3 className="font-bold text-2xl text-center text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wide">
                           ★ {card.creature_name.toUpperCase()} ★
                         </h3>
@@ -250,9 +250,12 @@ export function EvolutionCardFlip({ card }: Props) {
                       </div>
                     </div>
                     
-                    {/* Cosmiq Branding - Bottom Right Border Overlay */}
-                    <div className="absolute bottom-0 right-0 z-20 bg-gradient-to-tl from-black via-black/80 to-transparent px-4 py-2 rounded-tl-2xl border-l-2 border-t-2 border-primary/50">
-                      <span className="text-xs font-bold tracking-widest text-primary drop-shadow-lg">
+                    {/* Cosmiq Branding - Part of Border Frame (Bottom Right) */}
+                    <div className="absolute bottom-1 right-1 z-20 rounded-br-xl px-3 py-1.5" style={{ 
+                      background: 'inherit',
+                      backgroundClip: 'padding-box'
+                    }}>
+                      <span className="text-[10px] font-bold tracking-widest text-white drop-shadow-lg">
                         ✦ COSMIQ
                       </span>
                     </div>
