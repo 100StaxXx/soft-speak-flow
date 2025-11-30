@@ -150,6 +150,20 @@ const Horoscope = () => {
       });
       return;
     }
+
+    // Check if profile was already generated today
+    if (profile.cosmic_profile_generated_at) {
+      const generatedDate = new Date(profile.cosmic_profile_generated_at);
+      const today = new Date();
+      if (generatedDate.toDateString() === today.toDateString()) {
+        toast({
+          title: "Already Generated",
+          description: "You can only generate one cosmic profile per day",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     setRevealing(true);
     try {
@@ -364,7 +378,8 @@ const Horoscope = () => {
             </motion.div>
           </div>
 
-          {/* Main Horoscope Card */}
+          {/* Main Horoscope Card - Only for users without advanced details */}
+          {!hasAdvancedDetails && (
           <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
             {loading ? (
               <div className="space-y-4">
@@ -413,6 +428,7 @@ const Horoscope = () => {
               </div>
             )}
           </Card>
+          )}
         </motion.div>
 
         {/* Birth Details Form - Show when no advanced details */}
@@ -519,29 +535,6 @@ const Horoscope = () => {
                 venus_sign: profile.venus_sign || '',
               }}
             />
-            
-            {/* Recalculate Option */}
-            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-white mb-1">
-                    Update Your Cosmic Profile
-                  </h4>
-                  <p className="text-xs text-gray-400">
-                    Changed your birth details? Recalculate your profile to reflect the updates.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleRevealCosmicProfile}
-                  disabled={revealing}
-                  variant="outline"
-                  size="sm"
-                  className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white flex-shrink-0"
-                >
-                  {revealing ? 'Calculating...' : 'Recalculate'}
-                </Button>
-              </div>
-            </Card>
           </motion.div>
         )}
 
