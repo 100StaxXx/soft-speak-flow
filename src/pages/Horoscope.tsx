@@ -59,7 +59,7 @@ const Horoscope = () => {
   const [saving, setSaving] = useState(false);
   const [revealing, setRevealing] = useState(false);
 
-  const hasAdvancedDetails = !!(profile?.birth_time && profile?.birth_location);
+  const hasAdvancedDetails = !!(profile?.birthdate && profile?.birth_time && profile?.birth_location);
   const hasCosmiqProfile = !!(profile?.moon_sign && profile?.rising_sign);
 
   // Check if user has visited Cosmiq Insight before
