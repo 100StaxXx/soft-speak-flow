@@ -31,7 +31,7 @@ serve(async (req) => {
     // Fetch user profile with zodiac and optional birth details
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('zodiac_sign, birth_time, birth_location, selected_mentor_id, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign')
+      .select('zodiac_sign, birthdate, birth_time, birth_location, selected_mentor_id, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign')
       .eq('id', user.id)
       .single();
 
@@ -61,8 +61,10 @@ serve(async (req) => {
 
     // Use local date instead of UTC to avoid timezone issues
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
-    const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
+    const hasAdvancedDetails = !!(profile.birthdate && profile.birth_time && profile.birth_location);
     const hasCosmiqProfile = !!(profile.moon_sign && profile.rising_sign);
+    
+    console.log('[Horoscope] User has advanced details:', hasAdvancedDetails, '| Has cosmiq profile:', hasCosmiqProfile);
 
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
