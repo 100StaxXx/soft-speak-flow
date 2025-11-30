@@ -4,7 +4,7 @@
 
 ## 1. Introduction
 
-Welcome to Soft Speak Flow ("we," "our," or "us"). We respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
+Welcome to Cosmiq ("we," "our," or "us"). We respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and services.
 
 **Please read this Privacy Policy carefully.** By using the App, you agree to the collection and use of information in accordance with this policy.
 
@@ -218,7 +218,7 @@ You have the following rights regarding your personal information:
 You have the right to request deletion of your personal data and account. We provide multiple ways to delete your data:
 
 **Option 1: In-App Account Deletion**
-1. Open the Soft Speak Flow app
+1. Open the Cosmiq app
 2. Navigate to Profile → Account tab
 3. Scroll to the bottom of the page
 4. Tap "Delete Account" or contact support for assistance
@@ -415,7 +415,7 @@ For CCPA requests: Please specify that your request relates to CCPA compliance.
 
 ## 18. Consent
 
-By using Soft Speak Flow, you consent to:
+By using Cosmiq, you consent to:
 - The collection and use of information as described in this Privacy Policy
 - The transfer of your information as described
 - The use of cookies and tracking technologies
@@ -427,4 +427,4 @@ You may withdraw consent at any time by:
 
 ---
 
-**Thank you for trusting Soft Speak Flow with your wellness journey. Your privacy matters to us.**
+**Thank you for trusting Cosmiq with your wellness journey. Your privacy matters to us.**
