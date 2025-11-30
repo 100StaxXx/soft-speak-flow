@@ -27,11 +27,13 @@ export const AstrologySettings = () => {
   
   const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
+  const [birthdate, setBirthdate] = useState(profile?.birthdate || "");
 
   // Update state when profile changes
   useEffect(() => {
     setBirthTime(normalizeBirthTime(profile?.birth_time));
     setBirthLocation(profile?.birth_location || "");
+    setBirthdate(profile?.birthdate || "");
   }, [profile]);
 
   const handleSave = async () => {
@@ -70,6 +72,7 @@ export const AstrologySettings = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
+          birthdate: birthdate?.trim() || null,
           birth_time: normalizedBirthTime,
           birth_location: birthLocation?.trim() || null,
         })
@@ -202,7 +205,24 @@ export const AstrologySettings = () => {
 
           <div className="p-3 bg-steel/5 rounded-lg border border-steel/20 mb-4">
             <p className="text-xs text-steel">
-              💡 Your birth date is estimated from your zodiac sign ({profile?.zodiac_sign}). Add the details below for a personalized cosmic profile.
+              💡 Add your exact birth details below for a personalized cosmic profile. Birth date is estimated from your zodiac sign ({profile?.zodiac_sign}) if not provided.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="birthdate" className="text-sm">
+              Birth Date (optional)
+            </Label>
+            <Input
+              id="birthdate"
+              type="date"
+              value={birthdate}
+              onChange={(e) => setBirthdate(e.target.value)}
+              className="bg-obsidian/50 border-royal-purple/30"
+              max={new Date().toISOString().split('T')[0]}
+            />
+            <p className="text-xs text-steel">
+              Your exact birth date for more accurate calculations
             </p>
           </div>
 
