@@ -25,6 +25,16 @@ export const AstrologySettings = () => {
   const handleSave = async () => {
     if (!user) return;
     
+    // Validate birth time format if provided
+    if (birthTime && !/^\d{1,2}:\d{2}$/.test(birthTime)) {
+      toast({
+        title: "Invalid Format",
+        description: "Birth time must be in HH:mm format (e.g., 14:30)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setSaving(true);
     try {
       const { error } = await supabase
@@ -58,6 +68,16 @@ export const AstrologySettings = () => {
 
   const handleRevealCosmicProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
+    
+    // Validate birth_time format before calling edge function
+    if (profile?.birth_time && !/^\d{1,2}:\d{2}$/.test(profile.birth_time)) {
+      toast({
+        title: "Invalid Format",
+        description: "Please re-enter your birth time in HH:mm format (e.g., 14:30)",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setRevealing(true);
     try {
