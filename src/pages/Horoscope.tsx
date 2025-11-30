@@ -477,43 +477,46 @@ const Horoscope = () => {
               
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="birthdate" className="text-sm text-gray-300">
-                    Birth Date
+                  <Label htmlFor="birthdate" className="text-sm font-medium text-gray-200">
+                    Birth Date *
                   </Label>
                   <Input
                     id="birthdate"
                     type="date"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
-                    className="bg-gray-950/50 border-purple-500/30 text-white"
+                    className="bg-gray-800 border-2 border-purple-500/50 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50"
                     max={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="birthtime" className="text-sm text-gray-300">
-                    Birth Time
+                  <Label htmlFor="birthtime" className="text-sm font-medium text-gray-200">
+                    Birth Time *
                   </Label>
                   <Input
                     id="birthtime"
                     type="time"
                     value={birthTime}
                     onChange={(e) => setBirthTime(e.target.value)}
-                    className="bg-gray-950/50 border-purple-500/30 text-white"
+                    className="bg-gray-800 border-2 border-purple-500/50 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50"
+                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="birthlocation" className="text-sm text-gray-300">
-                    Birth Location
+                  <Label htmlFor="birthlocation" className="text-sm font-medium text-gray-200">
+                    Birth Location *
                   </Label>
                   <Input
                     id="birthlocation"
                     type="text"
                     value={birthLocation}
                     onChange={(e) => setBirthLocation(e.target.value)}
-                    placeholder="New York, USA"
-                    className="bg-gray-950/50 border-purple-500/30 text-white"
+                    placeholder="e.g., New York, USA"
+                    className="bg-gray-800 border-2 border-purple-500/50 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50"
+                    required
                   />
                 </div>
 
