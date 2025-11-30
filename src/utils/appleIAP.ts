@@ -1,19 +1,13 @@
 import { Capacitor } from '@capacitor/core';
+import { NativePurchases } from '@capgo/native-purchases';
 
-// Type definitions for IAP plugin
-interface IAPTransactionResult {
-  state: 'purchased' | 'restored' | 'deferred' | 'failed' | 'cancelled';
+// Type definitions for IAP plugin responses
+interface IAPPurchase {
   productId?: string;
   transactionId?: string;
+  transactionDate?: number;
   receipt?: string;
-}
-
-interface IAPRestoreResult {
-  purchases: Array<{
-    productId?: string;
-    state?: string;
-    transactionId?: string;
-  }>;
+  transactionReceipt?: string;
 }
 
 interface IAPProduct {
@@ -23,25 +17,6 @@ interface IAPProduct {
   price: string;
   priceAsDecimal: number;
   currency: string;
-}
-
-interface IAPPlugin {
-  buy: (options: { productIdentifier: string }) => Promise<IAPTransactionResult>;
-  restorePurchases: () => Promise<IAPRestoreResult>;
-  getProducts: (options: { productIdentifiers: string[] }) => Promise<{ products: IAPProduct[] }>;
-}
-
-interface CapacitorInAppPurchasesPlugin {
-  buy: (options: { productIdentifier: string }) => Promise<any>;
-  restorePurchases: () => Promise<any>;
-  getProducts: (options: { productIdentifiers: string[] }) => Promise<any>;
-}
-
-let InAppPurchase: CapacitorInAppPurchasesPlugin | null = null;
-try {
-  InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: CapacitorInAppPurchasesPlugin }).CapacitorInAppPurchases || null;
-} catch (e) {
-  console.warn('In-App Purchase plugin not loaded');
 }
 
 // Apple IAP Product IDs - configure these in App Store Connect
@@ -56,39 +31,17 @@ export const isIAPAvailable = (): boolean => {
 };
 
 // Purchase a product
-export const purchaseProduct = async (productId: string): Promise<IAPTransactionResult> => {
+export const purchaseProduct = async (productId: string): Promise<IAPPurchase> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
 
   try {
-    if (!InAppPurchase) {
-      throw new Error('In-App Purchase plugin not available');
-    }
-    
-    const result = await InAppPurchase.buy({
+    const result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
     });
 
-    // Check transaction state - handle different purchase states
-    if (result.state === 'deferred') {
-      throw new Error('Purchase is pending approval. Please check with the account owner.');
-    }
-    
-    if (result.state === 'failed') {
-      throw new Error('Purchase failed. Please try again.');
-    }
-    
-    if (result.state === 'cancelled') {
-      throw new Error('Purchase was cancelled.');
-    }
-    
-    // Only return if purchase was successful or restored
-    if (result.state !== 'purchased' && result.state !== 'restored') {
-      throw new Error(`Unexpected transaction state: ${result.state}`);
-    }
-
-    return result;
+    return result as IAPPurchase;
   } catch (error) {
     console.error('Purchase failed:', error);
     throw error;
@@ -96,27 +49,14 @@ export const purchaseProduct = async (productId: string): Promise<IAPTransaction
 };
 
 // Restore purchases
-export const restorePurchases = async (): Promise<IAPRestoreResult> => {
+export const restorePurchases = async (): Promise<IAPPurchase[]> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
 
   try {
-    if (!InAppPurchase) {
-      throw new Error('In-App Purchase plugin not available');
-    }
-    
-    const result = await InAppPurchase.restorePurchases();
-    
-    // Validate restored purchases - filter to only valid states
-    const validatedResult: IAPRestoreResult = {
-      purchases: result.purchases.filter((purchase) => {
-        // Only include purchases that are in valid states
-        return purchase.state === 'purchased' || purchase.state === 'restored';
-      })
-    };
-    
-    return validatedResult;
+    const result = await NativePurchases.restorePurchases();
+    return (result as any) || [];
   } catch (error) {
     console.error('Restore failed:', error);
     throw error;
@@ -130,16 +70,11 @@ export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> =
   }
 
   try {
-    if (!InAppPurchase) {
-      console.warn('In-App Purchase plugin not available');
-      return [];
-    }
-    
-    const result = await InAppPurchase.getProducts({
+    const result = await NativePurchases.getProducts({
       productIdentifiers: productIds,
     });
 
-    return result.products || [];
+    return (result as any).products || [];
   } catch (error) {
     console.error('Get products failed:', error);
     return [];
