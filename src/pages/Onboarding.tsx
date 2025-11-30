@@ -11,6 +11,7 @@ import { LegalAcceptance } from "@/components/LegalAcceptance";
 import { ZodiacSelector } from "@/components/ZodiacSelector";
 import { ZodiacReveal } from "@/components/ZodiacReveal";
 import { ReferralCodeInput } from "@/components/ReferralCodeInput";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -625,7 +626,8 @@ export default function Onboarding() {
   };
 
   return (
-    <>
+    <div className="min-h-screen relative">
+      <StarfieldBackground />
       {stage === "legal" && (
         <LegalAcceptance onAccept={handleLegalAccept} />
       )}
@@ -674,7 +676,7 @@ export default function Onboarding() {
       )}
 
       {stage === "browse" && mentors.length > 0 && (
-        <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
+        <div className="min-h-screen py-16 px-4 md:px-8 relative z-10">
           <div className="max-w-7xl mx-auto space-y-16">
             <div className="text-center space-y-6 animate-fade-in">
               <div className="h-1 w-24 bg-royal-purple mx-auto animate-scale-in" />
@@ -703,6 +705,6 @@ export default function Onboarding() {
           isLoading={createCompanion.isPending}
         />
       )}
-    </>
+    </div>
   );
 }

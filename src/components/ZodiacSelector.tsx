@@ -61,30 +61,7 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 relative overflow-hidden flex items-center justify-center p-4 md:p-8">
-      {/* Cosmiq stars background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(100)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              opacity: Math.random() * 0.7 + 0.3,
-            }}
-            animate={{
-              opacity: [0.3, 1, 0.3],
-              scale: [1, 1.5, 1],
-            }}
-            transition={{
-              duration: 2 + Math.random() * 3,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 md:p-8 z-10">
 
       <div className="relative z-10 w-full max-w-7xl">
         <motion.div

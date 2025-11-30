@@ -29,7 +29,7 @@ export const LegalAcceptance = ({ onAccept }: LegalAcceptanceProps) => {
 
   return (
     <>
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
         <Card className="max-w-2xl w-full">
           <CardHeader className="text-center space-y-3">
             <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">

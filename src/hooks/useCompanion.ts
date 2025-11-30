@@ -172,7 +172,7 @@ export const useCompanion = () => {
           p_initial_image_url: imageData.imageUrl,
           p_eye_color: eyeColor,
           p_fur_color: furColor,
-        });
+        }) as { data: CreateCompanionIfNotExistsResult[] | null; error: Error | null };
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
@@ -459,13 +459,15 @@ export const useCompanion = () => {
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const { data, error } = await (supabase.rpc as any)(
+          const response = await (supabase.rpc as unknown as (name: string, params: any) => Promise<{ data: any; error: any }>)(
             'complete_referral_stage3',
             { 
               p_referee_id: user.id,
               p_referrer_id: profile.referred_by
             }
           );
+          
+          const { data, error } = response as { data: CompleteReferralStage3Result | null; error: Error | null };
 
           if (error) throw error;
           if (!data) throw new Error("No data returned from referral completion");

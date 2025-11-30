@@ -36,6 +36,15 @@ let InAppPurchase: IAPPlugin | null = null;
 try {
   // @ts-expect-error - Dynamic import for optional plugin
   InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: IAPPlugin }).CapacitorInAppPurchases ?? null;
+interface CapacitorInAppPurchasesPlugin {
+  buy: (options: { productIdentifier: string }) => Promise<any>;
+  restorePurchases: () => Promise<any>;
+  getProducts: (options: { productIdentifiers: string[] }) => Promise<any>;
+}
+
+let InAppPurchase: CapacitorInAppPurchasesPlugin | null = null;
+try {
+  InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: CapacitorInAppPurchasesPlugin }).CapacitorInAppPurchases || null;
 } catch (e) {
   console.warn('In-App Purchase plugin not loaded');
 }

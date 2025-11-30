@@ -67,7 +67,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   const isComplete = selectedColor && selectedAnimal && selectedElement && selectedTone;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center">
+    <div className="min-h-screen p-4 flex items-center justify-center relative z-10">
       <Card className="max-w-2xl w-full p-8 space-y-8 shadow-glow animate-scale-in">
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">

@@ -296,7 +296,7 @@ async function deleteNativePushToken(userId: string): Promise<void> {
     .eq('user_id', userId)
     .eq('platform', platform);
 
-  if (result.error) {
+  if (result?.error) {
     console.error('Error deleting native push token:', result.error);
     throw result.error;
   }
