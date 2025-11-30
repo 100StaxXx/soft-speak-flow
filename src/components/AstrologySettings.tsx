@@ -18,8 +18,14 @@ export const AstrologySettings = () => {
   const [saving, setSaving] = useState(false);
   const [revealing, setRevealing] = useState(false);
 
-  // Parse existing birth time (HH:mm format)
-  const [birthTime, setBirthTime] = useState(profile?.birth_time || "");
+  // Parse existing birth time and normalize to HH:mm format (strip seconds if present)
+  const normalizeBirthTime = (time: string | null | undefined) => {
+    if (!time) return "";
+    // Strip seconds if present (database stores HH:mm:ss, we need HH:mm)
+    return time.substring(0, 5);
+  };
+  
+  const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
 
   const handleSave = async () => {
@@ -69,11 +75,12 @@ export const AstrologySettings = () => {
   const handleRevealCosmicProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
     
-    // Validate birth_time format before calling edge function (HH:mm with leading zeros)
-    if (profile?.birth_time && !/^\d{2}:\d{2}$/.test(profile.birth_time)) {
+    // Normalize birth_time to HH:mm before validation (database stores HH:mm:ss)
+    const normalizedBirthTime = normalizeBirthTime(profile?.birth_time);
+    if (!normalizedBirthTime || !/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
       toast({
         title: "Invalid Format",
-        description: "Please re-enter your birth time in HH:mm format (e.g., 14:30)",
+        description: "Please re-save your birth time in the Advanced Astrology section above",
         variant: "destructive",
       });
       return;
