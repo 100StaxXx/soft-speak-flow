@@ -114,7 +114,8 @@ const Horoscope = () => {
     setBirthLocation(profile?.birth_location || "");
   }, [profile]);
 
-  const handleSave = async () => {
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!user) return;
     
     const normalizedBirthTime = birthTime?.trim() || null;
@@ -475,7 +476,7 @@ const Horoscope = () => {
                 Add your birth details to reveal your rising sign and planetary influences
               </p>
               
-              <div className="space-y-4">
+              <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="birthdate" className="text-sm font-medium text-gray-200">
                     Birth Date *
@@ -521,13 +522,13 @@ const Horoscope = () => {
                 </div>
 
                 <Button
-                  onClick={handleSave}
+                  type="submit"
                   disabled={saving}
                   className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                 >
                   {saving ? 'Saving...' : 'Save Details'}
                 </Button>
-              </div>
+              </form>
             </Card>
           </motion.div>
         )}
