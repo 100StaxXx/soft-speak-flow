@@ -290,13 +290,13 @@ async function saveNativePushToken(userId: string, token: string): Promise<void>
 async function deleteNativePushToken(userId: string): Promise<void> {
   const platform = Capacitor.getPlatform();
   
-  const result = await supabase
+  const result = await (supabase as any)
     .from('push_subscriptions')
     .delete()
     .eq('user_id', userId)
     .eq('platform', platform);
 
-  if (result.error) {
+  if (result?.error) {
     console.error('Error deleting native push token:', result.error);
     throw result.error;
   }
