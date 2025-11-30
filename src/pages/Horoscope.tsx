@@ -9,8 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
-import { CosmicProfileSection } from "@/components/astrology/CosmicProfileSection";
-import { CosmicProfileReveal } from "@/components/astrology/CosmicProfileReveal";
+import { CosmiqProfileSection } from "@/components/astrology/CosmicProfileSection";
+import { CosmiqProfileReveal } from "@/components/astrology/CosmicProfileReveal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
@@ -152,8 +152,8 @@ const Horoscope = () => {
     }
 
     // Check if profile was already generated today
-    if (profile.cosmiq_profile_generated_at) {
-      const generatedDate = new Date(profile.cosmiq_profile_generated_at);
+    if (profile.cosmic_profile_generated_at) {
+      const generatedDate = new Date(profile.cosmic_profile_generated_at);
       const today = new Date();
       if (generatedDate.toDateString() === today.toDateString()) {
         toast({

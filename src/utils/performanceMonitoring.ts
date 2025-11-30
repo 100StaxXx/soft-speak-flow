@@ -9,6 +9,16 @@
  * initPerformanceMonitoring();
  */
 
+// Performance API types
+interface LayoutShift extends PerformanceEntry {
+  value: number;
+  hadRecentInput: boolean;
+}
+
+interface PerformanceEventTiming extends PerformanceEntry {
+  processingStart: number;
+}
+
 interface PerformanceMetric {
   name: string;
   value: number;
@@ -106,8 +116,8 @@ const measureFID = () => {
   try {
     if ('PerformanceObserver' in window) {
       const observer = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        entries.forEach((entry: any) => {
+        const entries = list.getEntries() as PerformanceEventTiming[];
+        entries.forEach((entry) => {
           const fid = entry.processingStart - entry.startTime;
           
           logMetric({
@@ -139,8 +149,9 @@ const measureCLS = () => {
       
       const observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            clsValue += (entry as any).value;
+          const layoutShift = entry as LayoutShift;
+          if (!layoutShift.hadRecentInput) {
+            clsValue += layoutShift.value;
           }
         }
         
