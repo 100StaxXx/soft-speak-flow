@@ -48,7 +48,7 @@ export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionna
 
   if (currentStep === 'welcome') {
     return (
-      <div className="min-h-screen bg-obsidian flex items-center justify-center p-6 relative">
+      <div className="min-h-screen flex items-center justify-center p-6 relative z-10">
         {/* Back button to zodiac selection */}
         {onBack && (
           <button
@@ -92,7 +92,7 @@ export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionna
   const progress = ((questionIndex + 1) / QUESTIONNAIRE.length) * 100;
 
   return (
-    <div className="min-h-screen bg-obsidian flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative z-10">
       <div className="w-full max-w-3xl space-y-8 animate-fade-in">
         {/* Progress */}
         <div className="space-y-3">

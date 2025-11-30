@@ -33,7 +33,7 @@ export const ReferralCodeInput = ({ onSubmit, onSkip }: ReferralCodeInputProps) 
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="text-center space-y-3">
           <div className="flex justify-center">
