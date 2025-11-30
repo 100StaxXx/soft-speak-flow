@@ -86,7 +86,7 @@ serve(async (req) => {
       .from('profiles')
       .select('current_habit_streak')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     const streak = profile?.current_habit_streak || 0;
 
