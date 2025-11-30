@@ -3,10 +3,20 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { toast } from 'sonner';
 
+interface ShareOptions {
+  title?: string;
+  text?: string;
+  dialogTitle?: string;
+}
+
 /**
  * Download or share an image, with iOS native support
  */
-export const downloadImage = async (imageUrl: string, filename: string) => {
+export const downloadImage = async (
+  imageUrl: string, 
+  filename: string,
+  shareOptions?: ShareOptions
+) => {
   try {
     if (Capacitor.isNativePlatform()) {
       // Native iOS/Android: Use Filesystem + Share
@@ -23,10 +33,10 @@ export const downloadImage = async (imageUrl: string, filename: string) => {
 
       // Share the file using native share sheet
       await Share.share({
-        title: 'Companion Image',
-        text: 'Check out my companion!',
+        title: shareOptions?.title || 'Companion Card',
+        text: shareOptions?.text || 'Check out my companion!',
         url: savedFile.uri,
-        dialogTitle: 'Share Companion Image',
+        dialogTitle: shareOptions?.dialogTitle || 'Share Companion Card',
       });
 
       toast.success('Image ready to share!');
