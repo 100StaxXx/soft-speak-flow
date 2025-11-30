@@ -87,7 +87,8 @@ serve(async (req) => {
             zodiac: existingHoroscope.zodiac,
             isPersonalized: existingHoroscope.is_personalized,
             date: existingHoroscope.for_date,
-            cosmicTip: existingHoroscope.cosmic_tip
+            cosmicTip: existingHoroscope.cosmic_tip,
+            energyForecast: existingHoroscope.energy_forecast || null
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,6 +112,8 @@ serve(async (req) => {
     const systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
+    let energyPrompt = '';
+    
     if (hasCosmicProfile) {
       // Full cosmic profile available - use all 6 placements
       userPrompt = `Generate a deeply personalized daily horoscope for ${today}.
@@ -134,6 +137,22 @@ Weave together:
 - Specific actionable guidance that feels personal to this exact cosmic combination
 
 Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
+
+      energyPrompt = `Based on this person's cosmic profile for ${today}, generate an energy forecast:
+
+Cosmic Profile:
+Sun: ${profile.zodiac_sign}, Moon: ${profile.moon_sign}, Rising: ${profile.rising_sign}
+Mercury: ${profile.mercury_sign}, Mars: ${profile.mars_sign}, Venus: ${profile.venus_sign}
+
+Respond with a JSON object containing:
+{
+  "planetaryWeather": "One sentence describing today's general cosmic energy in simple terms",
+  "mindEnergy": "One sentence about mental/intellectual energy today (1-10 scale implied)",
+  "bodyEnergy": "One sentence about physical/action energy today", 
+  "soulEnergy": "One sentence about emotional/spiritual energy today"
+}
+
+Keep each sentence under 20 words. Use plain language. No asterisks.`;
     } else if (hasAdvancedDetails) {
       userPrompt = `Generate a personalized daily horoscope for ${profile.zodiac_sign} for ${today}.
 
@@ -226,6 +245,38 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
 
     console.log('[Horoscope] Generated cosmic tip');
 
+    // Generate energy forecast for advanced profiles
+    let energyForecast = null;
+    if (hasCosmicProfile && energyPrompt) {
+      try {
+        const energyResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are a cosmic guide. Return only valid JSON.' },
+              { role: 'user', content: energyPrompt }
+            ],
+          }),
+        });
+
+        if (energyResponse.ok) {
+          const energyData = await energyResponse.json();
+          let energyText = energyData.choices?.[0]?.message?.content || '';
+          energyText = energyText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          energyForecast = JSON.parse(energyText);
+          console.log('[Horoscope] Generated energy forecast');
+        }
+      } catch (error) {
+        console.error('[Horoscope] Error generating energy forecast:', error);
+        // Non-critical, continue without it
+      }
+    }
+
     // Store the horoscope and cosmic tip for today
     const { error: insertError } = await supabaseClient
       .from('user_daily_horoscopes')
@@ -235,7 +286,8 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
         zodiac: profile.zodiac_sign,
         horoscope_text: horoscope,
         is_personalized: hasAdvancedDetails,
-        cosmic_tip: cosmicTip
+        cosmic_tip: cosmicTip,
+        energy_forecast: energyForecast
       });
 
     if (insertError) {
@@ -249,7 +301,8 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
         zodiac: profile.zodiac_sign,
         isPersonalized: hasAdvancedDetails,
         date: today,
-        cosmicTip
+        cosmicTip,
+        energyForecast
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

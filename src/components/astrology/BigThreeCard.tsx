@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Sun, Moon, ArrowUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -42,6 +43,11 @@ const cardConfig = {
 export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCardProps) => {
   const config = cardConfig[type];
   const Icon = config.icon;
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    navigate(`/cosmic/${type}/${sign.toLowerCase()}`);
+  };
 
   return (
     <motion.div
@@ -53,6 +59,8 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
         type: "spring",
         stiffness: 100,
       }}
+      onClick={handleClick}
+      className="cursor-pointer"
     >
       <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} hover:scale-105 transition-transform duration-300`}>
         {/* Animated cosmic background */}
@@ -110,6 +118,9 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
           <div className="pt-4 border-t border-royal-purple/30">
             <p className="text-sm text-cloud-white leading-relaxed text-center">
               {description}
+            </p>
+            <p className="text-xs text-accent-purple text-center mt-2 font-medium">
+              Tap to learn more →
             </p>
           </div>
 

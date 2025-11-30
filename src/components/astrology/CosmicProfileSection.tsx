@@ -39,6 +39,9 @@ export const CosmicProfileSection = ({ profile }: CosmicProfileSectionProps) => 
         <p className="text-cloud-white text-sm max-w-2xl mx-auto">
           The celestial map of your soul - six cosmic forces that shape your journey through the stars
         </p>
+        <p className="text-xs text-accent-purple font-medium mt-2">
+          💫 Tap any card to dive deeper into what it means for you
+        </p>
       </div>
 
       {/* Big Three - Prominent Display */}

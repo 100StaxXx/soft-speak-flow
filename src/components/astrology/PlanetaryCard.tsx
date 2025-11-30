@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Brain, Zap, Heart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,14 +41,21 @@ const planetConfig = {
 export const PlanetaryCard = ({ planet, sign, description, delay = 0 }: PlanetaryCardProps) => {
   const config = planetConfig[planet];
   const Icon = config.icon;
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    navigate(`/cosmic/${planet}/${sign.toLowerCase()}`);
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay }}
+      onClick={handleClick}
+      className="cursor-pointer"
     >
-      <Card className="bg-obsidian/60 border-royal-purple/30 hover:border-royal-purple/50 transition-all hover:shadow-lg hover:shadow-accent-purple/10">
+      <Card className="bg-obsidian/60 border-royal-purple/30 hover:border-royal-purple/50 transition-all hover:shadow-lg hover:shadow-accent-purple/10 hover:scale-[1.02]">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
             {/* Icon */}
@@ -77,6 +85,9 @@ export const PlanetaryCard = ({ planet, sign, description, delay = 0 }: Planetar
 
               <p className="text-sm text-cloud-white leading-relaxed">
                 {description}
+              </p>
+              <p className="text-xs text-accent-purple mt-2 font-medium">
+                Tap to explore →
               </p>
             </div>
           </div>
