@@ -245,18 +245,18 @@ export function EvolutionCardFlip({ card }: Props) {
                       </div>
 
                       {/* Compact Stats Row - Top Left */}
-                      <div className="absolute top-16 left-3 z-10 flex gap-2">
-                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
-                          <span>🧠</span>
-                          <span className="font-semibold">{stats.mind || 0}</span>
+                      <div className="absolute top-14 left-2 z-10 flex gap-1.5">
+                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
+                          <span className="text-[10px]">🧠</span>
+                          <span className="font-medium">{stats.mind || 0}</span>
                         </div>
-                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
-                          <span>💪</span>
-                          <span className="font-semibold">{stats.body || 0}</span>
+                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
+                          <span className="text-[10px]">💪</span>
+                          <span className="font-medium">{stats.body || 0}</span>
                         </div>
-                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
-                          <span>🔥</span>
-                          <span className="font-semibold">{stats.soul || 0}</span>
+                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
+                          <span className="text-[10px]">🔥</span>
+                          <span className="font-medium">{stats.soul || 0}</span>
                         </div>
                       </div>
 
