@@ -193,7 +193,7 @@ export function EvolutionCardFlip({ card }: Props) {
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden">
-                  <div className={`h-full rounded-2xl border-[6px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden`}>
+                  <div className={`h-full rounded-2xl border-[6px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
                     <div className="h-full rounded-xl relative overflow-hidden">
                       {/* Full Card Image Background */}
                       {card.image_url ? (
@@ -223,7 +223,23 @@ export function EvolutionCardFlip({ card }: Props) {
                         </Badge>
                       </div>
 
-                      {/* Bottom Section - Name, Rarity & Branding */}
+                      {/* Compact Stats Row - Top Left */}
+                      <div className="absolute top-16 left-3 z-10 flex gap-2">
+                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
+                          <span>🧠</span>
+                          <span className="font-semibold">{stats.mind || 0}</span>
+                        </div>
+                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
+                          <span>💪</span>
+                          <span className="font-semibold">{stats.body || 0}</span>
+                        </div>
+                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-xs border border-white/20">
+                          <span>🔥</span>
+                          <span className="font-semibold">{stats.soul || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Section - Name & Rarity */}
                       <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-2">
                         <h3 className="font-bold text-2xl text-center text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wide">
                           ★ {card.creature_name.toUpperCase()} ★
@@ -231,12 +247,14 @@ export function EvolutionCardFlip({ card }: Props) {
                         <div className="text-sm text-center text-white/90 drop-shadow-lg">
                           Stage {card.evolution_stage} • {card.rarity}
                         </div>
-                        <div className="text-center pt-3 border-t-2 border-white/30">
-                          <span className="text-lg font-bold tracking-widest text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                            ✦ COSMIQ ✦
-                          </span>
-                        </div>
                       </div>
+                    </div>
+                    
+                    {/* Cosmiq Branding - Bottom Right Border Overlay */}
+                    <div className="absolute bottom-0 right-0 z-20 bg-gradient-to-tl from-black via-black/80 to-transparent px-4 py-2 rounded-tl-2xl border-l-2 border-t-2 border-primary/50">
+                      <span className="text-xs font-bold tracking-widest text-primary drop-shadow-lg">
+                        ✦ COSMIQ
+                      </span>
                     </div>
                   </div>
                 </div>
