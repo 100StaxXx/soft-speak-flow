@@ -31,7 +31,7 @@ serve(async (req) => {
     // Fetch user profile with cosmic_profile_generated_at for daily limit check
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('zodiac_sign, birthdate, birth_time, birth_location, cosmiq_profile_generated_at')
+      .select('zodiac_sign, birthdate, birth_time, birth_location, cosmic_profile_generated_at')
       .eq('id', user.id)
       .single();
 
@@ -41,8 +41,8 @@ serve(async (req) => {
     }
 
     // Check if profile was already generated today (database-level check)
-    if (profile?.cosmiq_profile_generated_at) {
-      const generatedDate = new Date(profile.cosmiq_profile_generated_at);
+    if (profile?.cosmic_profile_generated_at) {
+      const generatedDate = new Date(profile.cosmic_profile_generated_at);
       const today = new Date();
       
       // Compare dates (same day check)
