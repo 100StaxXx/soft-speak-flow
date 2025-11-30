@@ -444,12 +444,16 @@ export const useCompanion = () => {
 
     try {
       // Check if user was referred by someone
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("referred_by")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
+      if (profileError) {
+        console.error("Error fetching profile for referral validation:", profileError);
+        return;
+      }
       if (!profile?.referred_by) return;
 
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety

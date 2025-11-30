@@ -88,7 +88,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
           .from('epics')
           .select('discord_ready')
           .eq('id', epic.id)
-          .single();
+          .maybeSingle();
         
         if (currentEpic && !currentEpic.discord_ready) {
           await supabase

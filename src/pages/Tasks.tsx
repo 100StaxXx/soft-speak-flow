@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
@@ -132,12 +132,14 @@ export default function Tasks() {
     reminderMinutesBefore: number;
   } | null>(null);
   
-  // Calculate total XP for the day
-  const totalXP = tasks.reduce((sum, task) => {
-    if (!task.completed) return sum;
-    const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward;
-    return sum + reward;
-  }, 0);
+  // Calculate total XP for the day (memoized to prevent unnecessary recalculations)
+  const totalXP = useMemo(() => {
+    return tasks.reduce((sum, task) => {
+      if (!task.completed) return sum;
+      const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward;
+      return sum + reward;
+    }, 0);
+  }, [tasks]);
 
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);

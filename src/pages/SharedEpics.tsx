@@ -37,7 +37,7 @@ export default function SharedEpics() {
     mutationFn: async (epicId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data: originalEpic } = await supabase
+      const { data: originalEpic, error: fetchError } = await supabase
         .from('epics')
         .select(`
           *,
@@ -46,8 +46,9 @@ export default function SharedEpics() {
           )
         `)
         .eq('id', epicId)
-        .single();
+        .maybeSingle();
 
+      if (fetchError) throw fetchError;
       if (!originalEpic) throw new Error('Epic not found');
 
       // Create copy for user

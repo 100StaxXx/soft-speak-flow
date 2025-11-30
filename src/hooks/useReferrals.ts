@@ -19,9 +19,14 @@ export const useReferrals = () => {
         .from("profiles")
         .select("referral_code, referral_count, referred_by")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      // Profile should always exist for authenticated user, but handle gracefully
+      if (!data) {
+        console.warn('Profile not found for user:', user.id);
+        return null;
+      }
       return data;
     },
     enabled: !!user,
