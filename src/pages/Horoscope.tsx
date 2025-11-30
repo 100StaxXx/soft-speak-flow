@@ -300,7 +300,7 @@ const Horoscope = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/mentor-chat')}
+            onClick={() => navigate('/')}
             className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
           >
             <ArrowLeft className="w-5 h-5" />
