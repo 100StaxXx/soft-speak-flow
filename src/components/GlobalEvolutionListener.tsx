@@ -34,22 +34,45 @@ export const GlobalEvolutionListener = () => {
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
-          const newData = payload.new as any;
-          const oldData = payload.old as any;
+          // Type guard for payload structure
+          const newData = payload.new as Record<string, unknown> | null;
+          const oldData = payload.old as Record<string, unknown> | null;
+
+          // Validate required fields exist and are numbers
+          if (!newData || !oldData) {
+            console.warn('Evolution listener: Missing payload data');
+            return;
+          }
+
+          const newStage = typeof newData.current_stage === 'number' ? newData.current_stage : null;
+          const oldStage = typeof oldData.current_stage === 'number' ? oldData.current_stage : null;
+
+          if (newStage === null || oldStage === null) {
+            console.warn('Evolution listener: Invalid stage values');
+            return;
+          }
 
           // Check if stage changed (evolution happened)
-          if (oldData && newData.current_stage > oldData.current_stage) {
+          if (newStage > oldStage) {
+            // Validate companion id exists
+            const companionId = typeof newData.id === 'string' ? newData.id : null;
+            if (!companionId) {
+              console.warn('Evolution listener: Missing companion id');
+              return;
+            }
+
             // Fetch the latest evolution record to ensure we have the correct image
             const { data: evolutionRecord } = await supabase
               .from('companion_evolutions')
               .select('image_url')
-              .eq('companion_id', newData.id)
-              .eq('stage', newData.current_stage)
+              .eq('companion_id', companionId)
+              .eq('stage', newStage)
               .order('evolved_at', { ascending: false })
               .limit(1)
               .maybeSingle();
 
-            const imageUrl = evolutionRecord?.image_url || newData.current_image_url || "";
+            const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
+            const imageUrl = evolutionRecord?.image_url || currentImageUrl;
 
             // Fetch mentor slug if we have a selected mentor
             let mentorSlug: string | undefined;
@@ -63,9 +86,9 @@ export const GlobalEvolutionListener = () => {
               mentorSlug = mentor?.slug;
             }
 
-            setPreviousStage(oldData.current_stage);
+            setPreviousStage(oldStage);
             setEvolutionData({
-              stage: newData.current_stage,
+              stage: newStage,
               imageUrl,
               mentorSlug,
             });

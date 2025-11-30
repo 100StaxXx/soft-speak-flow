@@ -42,27 +42,35 @@ const DailyMissionsContent = () => {
   
   const handleComplete = async (id: string) => {
     haptics.medium();
-    await completeMission(id);
     
-    // Check if this completion makes all missions complete
-    const updatedMissions = missions.map(m => 
-      m.id === id ? { ...m, completed: true } : m
-    );
-    const allWillBeComplete = updatedMissions.every(m => m.completed);
-    
-    if (allWillBeComplete) {
-      // Big celebration for completing all missions
-      setTimeout(() => {
-        confetti({
-          particleCount: 150,
-          spread: 120,
-          origin: { y: 0.6 },
-          colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
-          ticks: 400,
-          gravity: 0.6,
-          scalar: 1.5,
-        });
-      }, 500);
+    try {
+      await completeMission(id);
+      
+      // Check if this completion makes all missions complete
+      const updatedMissions = missions.map(m => 
+        m.id === id ? { ...m, completed: true } : m
+      );
+      const allWillBeComplete = updatedMissions.every(m => m.completed);
+      
+      if (allWillBeComplete) {
+        // Big celebration for completing all missions
+        setTimeout(() => {
+          confetti({
+            particleCount: 150,
+            spread: 120,
+            origin: { y: 0.6 },
+            colors: ['#A76CFF', '#C084FC', '#E879F9', '#FFD700', '#FFA500'],
+            ticks: 400,
+            gravity: 0.6,
+            scalar: 1.5,
+          });
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Failed to complete mission:', error);
+      // Error handling is done in useDailyMissions hook via toast
+      // Haptic feedback for error
+      haptics.light();
     }
   };
 

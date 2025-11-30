@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 
 export default function MentorChat() {
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
@@ -31,8 +31,8 @@ export default function MentorChat() {
     enabled: !!profile?.selected_mentor_id,
   });
 
-  // Show loading state
-  if (!user || mentorLoading) {
+  // Show loading state while profile or mentor is loading
+  if (!user || profileLoading || mentorLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3">

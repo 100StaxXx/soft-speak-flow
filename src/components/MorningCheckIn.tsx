@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -25,7 +25,8 @@ const MorningCheckInContent = () => {
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pollStartTime, setPollStartTime] = useState<number | null>(null);
+  // Use ref for pollStartTime to avoid stale closure in refetchInterval callback
+  const pollStartTimeRef = useRef<number | null>(null);
 
   const today = new Date().toLocaleDateString('en-CA');
   const MAX_POLL_DURATION = 30000; // 30 seconds max polling
@@ -48,8 +49,9 @@ const MorningCheckInContent = () => {
     // Poll every 2 seconds if check-in exists but mentor response is still pending
     refetchInterval: (data: any) => {
       if (data?.completed_at && !data?.mentor_response) {
-        // Check if we've exceeded max poll duration
-        if (pollStartTime && Date.now() - pollStartTime > MAX_POLL_DURATION) {
+        // Check if we've exceeded max poll duration (use ref to avoid stale closure)
+        const startTime = pollStartTimeRef.current;
+        if (startTime && Date.now() - startTime > MAX_POLL_DURATION) {
           console.warn('Mentor response polling timeout exceeded');
           return false; // Stop polling after 30 seconds
         }
@@ -129,8 +131,8 @@ const MorningCheckInContent = () => {
         await checkFirstTimeAchievements('checkin');
       }
 
-      // Start polling timer
-      setPollStartTime(Date.now());
+      // Start polling timer (using ref to avoid stale closure)
+      pollStartTimeRef.current = Date.now();
 
       // Generate mentor response in background with error handling
       try {
@@ -195,7 +197,7 @@ const MorningCheckInContent = () => {
                       <p className="text-sm italic text-foreground/90 leading-relaxed">
                         "{existingCheckIn.mentor_response}"
                       </p>
-                    ) : pollStartTime && Date.now() - pollStartTime > MAX_POLL_DURATION ? (
+                    ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
                       <p className="text-sm text-foreground/80 italic leading-relaxed">
                         "Great work on setting your intention today. Stay focused and crush it."
                       </p>

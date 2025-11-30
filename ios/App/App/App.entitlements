@@ -7,7 +7,7 @@
 		<string>Default</string>
 	</array>
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 	<key>com.apple.developer.in-app-payments</key>
 	<array>
 		<string>merchant.com.revolutions.app</string>

@@ -32,9 +32,10 @@ export const useEpics = () => {
   const { showXPToast } = useXPToast();
 
   // Fetch all epics for the user
-  const { data: epics, isLoading } = useQuery({
+  const { data: epics, isLoading, error: epicsError } = useQuery({
     queryKey: ["epics", user?.id],
     queryFn: async () => {
+      // Double-check user exists (defensive - enabled should prevent this)
       if (!user?.id) return [];
       
       const { data, error } = await supabase
@@ -58,6 +59,7 @@ export const useEpics = () => {
     enabled: !!user?.id,
     staleTime: 3 * 60 * 1000, // 3 minutes - epics don't change frequently
     refetchOnWindowFocus: false,
+    retry: 2, // Retry failed requests up to 2 times
   });
 
   // Create new epic
@@ -357,6 +359,7 @@ export const useEpics = () => {
     activeEpics,
     completedEpics,
     isLoading,
+    error: epicsError,
     createEpic: createEpic.mutate,
     isCreating: createEpic.isPending,
     updateEpicStatus: updateEpicStatus.mutate,

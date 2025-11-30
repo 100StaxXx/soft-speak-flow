@@ -35,7 +35,11 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
         .eq("stage", stage)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      // maybeSingle() returns null for no rows - only throw on actual errors
+      if (error) {
+        console.error('Failed to fetch companion story:', error);
+        throw error;
+      }
       return data as CompanionStory | null;
     },
     enabled: !!companionId && stage !== undefined,
