@@ -380,54 +380,54 @@ const Horoscope = () => {
 
           {/* Main Horoscope Card - Only for users without advanced details */}
           {!hasAdvancedDetails && (
-          <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
-            {loading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-6 w-32 bg-gray-700/50" />
-                <Skeleton className="h-4 w-full bg-gray-700/50" />
-                <Skeleton className="h-4 w-full bg-gray-700/50" />
-                <Skeleton className="h-4 w-3/4 bg-gray-700/50" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Zodiac Badge */}
-                <motion.div
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-full" />
-                    {getZodiacIcon()}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-white capitalize">
-                      {zodiac}
-                    </h2>
-                    <p className="text-xs text-gray-400">
-                      {isPersonalized ? '✨ Personalized Reading' : '🌙 Daily Overview'}
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
+              {loading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-6 w-32 bg-gray-700/50" />
+                  <Skeleton className="h-4 w-full bg-gray-700/50" />
+                  <Skeleton className="h-4 w-full bg-gray-700/50" />
+                  <Skeleton className="h-4 w-3/4 bg-gray-700/50" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Zodiac Badge */}
+                  <motion.div
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-full" />
+                      {getZodiacIcon()}
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-white capitalize">
+                        {zodiac}
+                      </h2>
+                      <p className="text-xs text-gray-400">
+                        {isPersonalized ? '✨ Personalized Reading' : '🌙 Daily Overview'}
+                      </p>
+                    </div>
+                  </motion.div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+
+                  {/* Horoscope Content */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="prose prose-invert max-w-none"
+                  >
+                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap text-lg">
+                      {horoscope}
                     </p>
-                  </div>
-                </motion.div>
+                  </motion.div>
 
-                {/* Divider */}
-                <div className="h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
-
-                {/* Horoscope Content */}
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="prose prose-invert max-w-none"
-                >
-                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap text-lg">
-                    {horoscope}
-                  </p>
-                </motion.div>
-
-              </div>
-            )}
-          </Card>
+                </div>
+              )}
+            </Card>
           )}
         </motion.div>
 
