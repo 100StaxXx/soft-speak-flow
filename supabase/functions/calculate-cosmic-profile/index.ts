@@ -28,16 +28,30 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Fetch user profile
+    // Fetch user profile with cosmic_profile_generated_at for daily limit check
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('zodiac_sign, birthdate, birth_time, birth_location')
+      .select('zodiac_sign, birthdate, birth_time, birth_location, cosmiq_profile_generated_at')
       .eq('id', user.id)
       .single();
 
     if (profileError) {
       console.error('Error fetching profile:', profileError);
       throw profileError;
+    }
+
+    // Check if profile was already generated today (database-level check)
+    if (profile?.cosmiq_profile_generated_at) {
+      const generatedDate = new Date(profile.cosmiq_profile_generated_at);
+      const today = new Date();
+      
+      // Compare dates (same day check)
+      if (generatedDate.toDateString() === today.toDateString()) {
+        return new Response(
+          JSON.stringify({ error: 'Cosmiq profile already generated today. You can generate once per 24 hours.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Validate all required fields
@@ -185,7 +199,7 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
         mercury_sign: placements.mercurySign.toLowerCase(),
         mars_sign: placements.marsSign.toLowerCase(),
         venus_sign: placements.venusSign.toLowerCase(),
-        cosmiq_profile_generated_at: new Date().toISOString(),
+        cosmic_profile_generated_at: new Date().toISOString(),
       })
       .eq('id', user.id);
 
