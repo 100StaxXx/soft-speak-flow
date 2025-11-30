@@ -75,9 +75,17 @@ serve(async (req) => {
     const birthDate = new Date(profile.birthdate);
     
     // Normalize birth_time to HH:mm (database stores HH:mm:ss, strip seconds)
+    // Convert to string first to handle any type from database
+    const birthTimeStr = String(profile.birth_time || '').trim();
+    
+    console.log('[Cosmiq Profile] Original birth_time:', profile.birth_time);
+    console.log('[Cosmiq Profile] Birth time type:', typeof profile.birth_time);
+    console.log('[Cosmiq Profile] Birth time as string:', birthTimeStr);
+    
+    // Extract HH:mm from various possible formats (HH:mm:ss, HH:mm, or other)
     let normalizedBirthTime = '';
-    if (typeof profile.birth_time === 'string') {
-      normalizedBirthTime = profile.birth_time.length > 5 ? profile.birth_time.substring(0, 5) : profile.birth_time;
+    if (birthTimeStr.length >= 5) {
+      normalizedBirthTime = birthTimeStr.substring(0, 5);
     } else {
       return new Response(
         JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
@@ -85,15 +93,14 @@ serve(async (req) => {
       );
     }
     
-    console.log('[Cosmiq Profile] Original birth_time:', profile.birth_time);
     console.log('[Cosmiq Profile] Normalized birth_time:', normalizedBirthTime);
     
     // Validate birth_time format (HH:mm)
     const timeMatch = normalizedBirthTime.match(/^(\d{2}):(\d{2})$/);
     if (!timeMatch) {
-      console.error('[Cosmiq Profile] Failed to match birth_time format:', normalizedBirthTime);
+      console.error('[Cosmiq Profile] Failed to match birth_time format. Expected HH:mm, got:', normalizedBirthTime);
       return new Response(
-        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
+        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm (e.g., 14:30)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -102,8 +109,9 @@ serve(async (req) => {
     const minutes = parseInt(timeMatch[2], 10);
     
     if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      console.error('[Cosmiq Profile] Invalid time values. Hours:', hours, 'Minutes:', minutes);
       return new Response(
-        JSON.stringify({ error: 'Invalid birth time values. Hours must be 0-23, minutes 0-59' }),
+        JSON.stringify({ error: `Invalid time values. Please use 24-hour format (00:00 to 23:59)` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
