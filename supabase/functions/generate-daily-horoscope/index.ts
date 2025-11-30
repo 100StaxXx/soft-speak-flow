@@ -67,7 +67,7 @@ serve(async (req) => {
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
       .from('user_daily_horoscopes')
-      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip')
+      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip, energy_forecast')
       .eq('user_id', user.id)
       .eq('for_date', today)
       .maybeSingle();
