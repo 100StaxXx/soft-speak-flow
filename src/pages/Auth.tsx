@@ -25,7 +25,17 @@ const authSchema = z.object({
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .max(100, "Password too long")
-    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character")
+    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character"),
+  confirmPassword: z.string().optional()
+}).refine((data) => {
+  // Only validate password match during signup (when confirmPassword is provided)
+  if (data.confirmPassword !== undefined) {
+    return data.password === data.confirmPassword;
+  }
+  return true;
+}, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
 });
 
 
@@ -34,6 +44,7 @@ const Auth = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -146,7 +157,11 @@ const Auth = () => {
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
-    const result = authSchema.safeParse({ email: sanitizedEmail, password });
+    const result = authSchema.safeParse({ 
+      email: sanitizedEmail, 
+      password,
+      confirmPassword: isLogin ? undefined : confirmPassword 
+    });
     if (!result.success) {
       toast({
         title: "Validation Error",
@@ -550,6 +565,20 @@ const Auth = () => {
                     </button>
                   )}
                 </div>
+                {!isLogin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword" className="text-steel text-sm uppercase tracking-wide">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      className="bg-obsidian/50 border-royal-purple/30 text-pure-white h-12 focus:border-royal-purple"
+                    />
+                  </div>
+                )}
                 <Button
                   type="submit"
                   className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
@@ -569,6 +598,7 @@ const Auth = () => {
                     setEmail("");
                   } else {
                     setIsLogin(!isLogin);
+                    setConfirmPassword(""); // Clear confirm password when switching modes
                   }
                 }}
                 className="text-royal-purple hover:text-accent-purple"
