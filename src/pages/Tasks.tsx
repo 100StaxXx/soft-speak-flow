@@ -555,7 +555,7 @@ export default function Tasks() {
 
   return (
     <div className="min-h-screen pb-20 relative">
-      {/* Cosmic Starfield Background */}
+      {/* Cosmiq Starfield Background */}
       <StarfieldBackground />
       
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />

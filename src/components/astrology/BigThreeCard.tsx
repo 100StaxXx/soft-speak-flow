@@ -63,7 +63,7 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
       className="cursor-pointer"
     >
       <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} hover:scale-105 transition-transform duration-300`}>
-        {/* Animated cosmic background */}
+        {/* Animated cosmiq background */}
         <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-30`}>
           <motion.div
             className="absolute inset-0"

@@ -5,13 +5,13 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, BookOpen } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
-const CosmicAcademy = () => {
+const CosmiqAcademy = () => {
   const navigate = useNavigate();
 
   const academyTopics = [
     {
       title: "Understanding Your Big Three",
-      description: "Learn about the most important trio in your cosmic profile: Sun, Moon, and Rising",
+      description: "Learn about the most important trio in your cosmiq profile: Sun, Moon, and Rising",
       icon: Sparkles,
       gradient: "from-purple-500/20 to-pink-500/20"
     },
@@ -55,7 +55,7 @@ const CosmicAcademy = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
-      {/* Cosmic background */}
+      {/* Cosmiq background */}
       <div className="absolute inset-0">
         {[...Array(50)].map((_, i) => (
           <motion.div
@@ -95,10 +95,10 @@ const CosmicAcademy = () => {
           >
             <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
               <BookOpen className="w-8 h-8 text-purple-400" />
-              Cosmic Academy
+              Cosmiq Academy
             </h1>
             <p className="text-gray-400 text-sm mt-1">
-              Deepen your understanding of your cosmic blueprint
+              Deepen your understanding of your cosmiq blueprint
             </p>
           </motion.div>
           <div className="w-10" /> {/* Spacer for centering */}
@@ -114,7 +114,7 @@ const CosmicAcademy = () => {
             <div className="space-y-3">
               <h2 className="text-xl font-bold text-white">What is Astrology?</h2>
               <p className="text-gray-200 leading-relaxed">
-                Astrology is the study of how celestial bodies influence our lives. Your birth chart is like a snapshot of the sky at the exact moment you were born - a cosmic fingerprint that's uniquely yours.
+                Astrology is the study of how celestial bodies influence our lives. Your birth chart is like a snapshot of the sky at the exact moment you were born - a cosmiq fingerprint that's uniquely yours.
               </p>
               <p className="text-gray-200 leading-relaxed">
                 Each planet represents different aspects of your personality and life experience. Their positions in different zodiac signs color how those planetary energies express themselves through you.
@@ -180,4 +180,4 @@ const CosmicAcademy = () => {
   );
 };
 
-export default CosmicAcademy;
+export default CosmiqAcademy;

@@ -2,7 +2,7 @@ import { BigThreeCard } from "./BigThreeCard";
 import { PlanetaryCard } from "./PlanetaryCard";
 import { Sparkles } from "lucide-react";
 
-interface CosmicProfileSectionProps {
+interface CosmiqProfileSectionProps {
   profile: {
     zodiac_sign: string;
     moon_sign: string;
@@ -23,21 +23,21 @@ const getDescription = (planet: string, sign: string) => {
     mars: `Mars in ${sign} drives your physical energy and determination - the fuel behind every habit you build.`,
     venus: `Venus in ${sign} colors your values and connections, guiding what brings you joy and fulfillment on your journey.`,
   };
-  return descriptions[planet] || `Your ${sign} placement shapes this aspect of your cosmic identity.`;
+  return descriptions[planet] || `Your ${sign} placement shapes this aspect of your cosmiq identity.`;
 };
 
-export const CosmicProfileSection = ({ profile }: CosmicProfileSectionProps) => {
+export const CosmiqProfileSection = ({ profile }: CosmiqProfileSectionProps) => {
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Sparkles className="w-6 h-6 text-accent-purple" />
-          <h2 className="text-3xl font-bold text-pure-white">Your Cosmic Profile</h2>
+          <h2 className="text-3xl font-bold text-pure-white">Your Cosmiq Profile</h2>
           <Sparkles className="w-6 h-6 text-accent-purple" />
         </div>
         <p className="text-cloud-white text-sm max-w-2xl mx-auto">
-          The celestial map of your soul - six cosmic forces that shape your journey through the stars
+          The celestial map of your soul - six cosmiq forces that shape your journey through the stars
         </p>
         <p className="text-xs text-accent-purple font-medium mt-2">
           💫 Tap any card to dive deeper into what it means for you

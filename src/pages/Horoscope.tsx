@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
-  const [cosmicTip, setCosmicTip] = useState<string | null>(null);
+  const [cosmiqTip, setCosmiqTip] = useState<string | null>(null);
   const [zodiac, setZodiac] = useState<string | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [date, setDate] = useState<string>("");
@@ -43,7 +43,7 @@ const Horoscope = () => {
   const [revealing, setRevealing] = useState(false);
 
   const hasAdvancedDetails = !!(profile?.birth_time && profile?.birth_location);
-  const hasCosmicProfile = !!(profile?.moon_sign && profile?.rising_sign);
+  const hasCosmiqProfile = !!(profile?.moon_sign && profile?.rising_sign);
 
   // Check if user has visited Cosmiq Insight before
   useEffect(() => {
@@ -65,7 +65,7 @@ const Horoscope = () => {
       setZodiac(data.zodiac);
       setIsPersonalized(data.isPersonalized);
       setDate(data.date);
-      setCosmicTip(data.cosmicTip || null);
+      setCosmiqTip(data.cosmiqTip || null);
       setEnergyForecast(data.energyForecast || null);
       setPlacementInsights(data.placementInsights || null);
     } catch (error) {
@@ -76,7 +76,7 @@ const Horoscope = () => {
         variant: "destructive",
       });
       // Set fallback content so UI doesn't break
-      setHoroscope("Unable to load your cosmic insights at this moment. Please try again later.");
+      setHoroscope("Unable to load your cosmiq insights at this moment. Please try again later.");
       setZodiac(profile?.zodiac_sign || "");
       setIsPersonalized(false);
       setDate(new Date().toLocaleDateString('en-CA'));
@@ -139,7 +139,7 @@ const Horoscope = () => {
     }
   };
 
-  const handleRevealCosmicProfile = async () => {
+  const handleRevealCosmiqProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
     
     if (!profile?.birthdate) {
@@ -152,13 +152,13 @@ const Horoscope = () => {
     }
 
     // Check if profile was already generated today
-    if (profile.cosmic_profile_generated_at) {
-      const generatedDate = new Date(profile.cosmic_profile_generated_at);
+    if (profile.cosmiq_profile_generated_at) {
+      const generatedDate = new Date(profile.cosmiq_profile_generated_at);
       const today = new Date();
       if (generatedDate.toDateString() === today.toDateString()) {
         toast({
-          title: "Already Generated",
-          description: "You can only generate one cosmic profile per day",
+        title: "Already Generated",
+        description: "You can only generate one cosmiq profile per day",
           variant: "destructive",
         });
         return;
@@ -167,7 +167,7 @@ const Horoscope = () => {
     
     setRevealing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
+      const { data, error } = await supabase.functions.invoke('calculate-cosmiq-profile');
 
       if (error) throw error;
       if (data && typeof data === 'object' && 'error' in data) {
@@ -175,7 +175,7 @@ const Horoscope = () => {
       }
 
       toast({
-        title: "✨ Cosmic Profile Revealed!",
+        title: "✨ Cosmiq Profile Revealed!",
         description: "Your celestial map has been calculated.",
       });
 
@@ -186,7 +186,7 @@ const Horoscope = () => {
       console.error('Error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to calculate cosmic profile",
+        description: error instanceof Error ? error.message : "Failed to calculate cosmiq profile",
         variant: "destructive",
       });
     } finally {
@@ -233,7 +233,7 @@ const Horoscope = () => {
           />
         ))}
         
-        {/* Cosmic nebula */}
+        {/* Cosmiq nebula */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
       </div>
@@ -253,7 +253,7 @@ const Horoscope = () => {
                 <div>
                   <h3 className="font-bold text-white mb-1">Welcome to Cosmiq Insight! ✨</h3>
                   <p className="text-sm text-gray-100">
-                    Your daily cosmic guidance based on your zodiac sign. Add birth details below to unlock your rising sign and planetary influences for deeper insights.
+                    Your daily cosmiq guidance based on your zodiac sign. Add birth details below to unlock your rising sign and planetary influences for deeper insights.
                   </p>
                 </div>
               </div>
@@ -296,7 +296,7 @@ const Horoscope = () => {
               >
                 <Moon className="w-8 h-8 text-purple-400" />
               </motion.div>
-              Cosmic Insight
+              Cosmiq Insight
             </h1>
             <p className="text-gray-400 text-sm mt-1">
               {date ? formatDate(date) : 'Loading...'}
@@ -441,7 +441,7 @@ const Horoscope = () => {
             <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Sun className="w-5 h-5 text-yellow-400" />
-                <h3 className="text-lg font-bold text-white">Unlock Your Cosmic Profile</h3>
+                <h3 className="text-lg font-bold text-white">Unlock Your Cosmiq Profile</h3>
               </div>
               <p className="text-sm text-gray-300 mb-6">
                 Add your birth details to reveal your rising sign and planetary influences
@@ -501,31 +501,31 @@ const Horoscope = () => {
           </motion.div>
         )}
 
-        {/* Cosmic Profile Reveal - Show when has advanced details but no profile */}
-        {hasAdvancedDetails && !hasCosmicProfile && (
+        {/* Cosmiq Profile Reveal - Show when has advanced details but no profile */}
+        {hasAdvancedDetails && !hasCosmiqProfile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
             <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden">
-              <CosmicProfileReveal 
-                onReveal={handleRevealCosmicProfile}
+              <CosmiqProfileReveal 
+                onReveal={handleRevealCosmiqProfile}
                 isRevealing={revealing}
               />
             </Card>
           </motion.div>
         )}
 
-        {/* Cosmic Profile Display - Show when profile exists */}
-        {hasCosmicProfile && profile && (
+        {/* Cosmiq Profile Display - Show when profile exists */}
+        {hasCosmiqProfile && profile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
             className="space-y-4"
           >
-            <CosmicProfileSection 
+            <CosmiqProfileSection 
               profile={{
                 zodiac_sign: profile.zodiac_sign || '',
                 moon_sign: profile.moon_sign || '',
@@ -591,7 +591,7 @@ const Horoscope = () => {
               </div>
             </Card>
 
-            {/* Learn More about Your Cosmic Profile */}
+            {/* Learn More about Your Cosmiq Profile */}
             <Card className="bg-gradient-to-br from-purple-900/30 via-pink-900/30 to-blue-900/30 border border-purple-500/30 backdrop-blur-sm p-5">
               <div className="flex items-start gap-3">
                 <Star className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" />
@@ -605,7 +605,7 @@ const Horoscope = () => {
                     onClick={() => navigate('/cosmic-academy')}
                     className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
                   >
-                    Explore Cosmic Academy →
+                    Explore Cosmiq Academy →
                   </Button>
                 </div>
               </div>
@@ -613,7 +613,7 @@ const Horoscope = () => {
           </motion.div>
         )}
 
-        {/* Cosmic Tip */}
+        {/* Cosmiq Tip */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -635,13 +635,13 @@ const Horoscope = () => {
               </motion.div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-white mb-1">
-                  ✨ Cosmic Tip
+                  ✨ Cosmiq Tip
                 </h3>
                 {loading ? (
                   <Skeleton className="h-4 w-full bg-white/20" />
                 ) : (
                   <p className="text-sm text-white/90">
-                    {cosmicTip || 'The stars guide those who listen. Trust your inner compass today.'}
+                    {cosmiqTip || 'The stars guide those who listen. Trust your inner compass today.'}
                   </p>
                 )}
               </div>

@@ -6,7 +6,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 const Search = () => {
   return (
     <PageTransition>
-      {/* Cosmic Starfield Background */}
+      {/* Cosmiq Starfield Background */}
       <StarfieldBackground />
       
       <div className="min-h-screen pb-24 relative">

@@ -43,19 +43,19 @@ serve(async (req) => {
     // Validate all required fields
     if (!profile?.birthdate) {
       return new Response(
-        JSON.stringify({ error: 'Birthdate is required for cosmic profile calculation' }),
+        JSON.stringify({ error: 'Birthdate is required for cosmiq profile calculation' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!profile?.birth_time || !profile?.birth_location) {
       return new Response(
-        JSON.stringify({ error: 'Birth time and location required for cosmic profile calculation' }),
+        JSON.stringify({ error: 'Birth time and location required for cosmiq profile calculation' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[Cosmic Profile] Calculating for user:', user.id);
+    console.log('[Cosmiq Profile] Calculating for user:', user.id);
 
     // Parse and validate birthdate and time
     const birthDate = new Date(profile.birthdate);
@@ -71,13 +71,13 @@ serve(async (req) => {
       );
     }
     
-    console.log('[Cosmic Profile] Original birth_time:', profile.birth_time);
-    console.log('[Cosmic Profile] Normalized birth_time:', normalizedBirthTime);
+    console.log('[Cosmiq Profile] Original birth_time:', profile.birth_time);
+    console.log('[Cosmiq Profile] Normalized birth_time:', normalizedBirthTime);
     
     // Validate birth_time format (HH:mm)
     const timeMatch = normalizedBirthTime.match(/^(\d{2}):(\d{2})$/);
     if (!timeMatch) {
-      console.error('[Cosmic Profile] Failed to match birth_time format:', normalizedBirthTime);
+      console.error('[Cosmiq Profile] Failed to match birth_time format:', normalizedBirthTime);
       return new Response(
         JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -161,8 +161,8 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
     try {
       placements = JSON.parse(placementsText);
     } catch (parseError) {
-      console.error('[Cosmic Profile] JSON parse error:', parseError);
-      console.error('[Cosmic Profile] Raw response:', placementsText);
+      console.error('[Cosmiq Profile] JSON parse error:', parseError);
+      console.error('[Cosmiq Profile] Raw response:', placementsText);
       throw new Error('Failed to parse astrological calculations. Please try again.');
     }
     
@@ -170,11 +170,11 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
     const requiredFields = ['moonSign', 'risingSign', 'mercurySign', 'marsSign', 'venusSign'];
     const missingFields = requiredFields.filter(field => !placements[field]);
     if (missingFields.length > 0) {
-      console.error('[Cosmic Profile] Missing fields:', missingFields);
+      console.error('[Cosmiq Profile] Missing fields:', missingFields);
       throw new Error('Incomplete astrological calculations. Please try again.');
     }
 
-    console.log('[Cosmic Profile] Calculated placements:', placements);
+    console.log('[Cosmiq Profile] Calculated placements:', placements);
 
     // Update profile with calculated placements
     const { error: updateError } = await supabaseClient
@@ -185,21 +185,21 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
         mercury_sign: placements.mercurySign.toLowerCase(),
         mars_sign: placements.marsSign.toLowerCase(),
         venus_sign: placements.venusSign.toLowerCase(),
-        cosmic_profile_generated_at: new Date().toISOString(),
+        cosmiq_profile_generated_at: new Date().toISOString(),
       })
       .eq('id', user.id);
 
     if (updateError) {
-      console.error('[Cosmic Profile] Error updating profile:', updateError);
+      console.error('[Cosmiq Profile] Error updating profile:', updateError);
       throw updateError;
     }
 
-    console.log('[Cosmic Profile] Successfully stored placements');
+    console.log('[Cosmiq Profile] Successfully stored placements');
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        cosmicProfile: {
+        cosmiqProfile: {
           sunSign: profile.zodiac_sign,
           moonSign: placements.moonSign.toLowerCase(),
           risingSign: placements.risingSign.toLowerCase(),
@@ -215,7 +215,7 @@ Respond ONLY with a JSON object in this exact format (no markdown, no explanatio
     );
 
   } catch (error) {
-    console.error('[Cosmic Profile] Error:', error);
+    console.error('[Cosmiq Profile] Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 

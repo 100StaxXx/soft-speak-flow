@@ -341,8 +341,8 @@ STRUCTURE FOR EACH CHAPTER:
    • escalate danger appropriate to stage tier:
        ∙ Stages 0–5: local/natural threats
        ∙ Stages 6–10: named foes or magical dangers
-       ∙ Stages 11–14: ancient/legendary forces
-       ∙ Stages 15–20: cosmic/titanic threats
+      ∙ Stages 11–14: ancient/legendary forces
+      ∙ Stages 15–20: cosmiq/titanic threats
    • deepen the bond between user and creature
    • feel like part of a larger mythic arc
 

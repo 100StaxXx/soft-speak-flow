@@ -28,7 +28,7 @@ const placementColors = {
   venus: "from-pink-500/20 to-rose-500/20",
 };
 
-interface CosmicContent {
+interface CosmiqContent {
   title: string;
   tagline: string;
   overview: string;
@@ -41,11 +41,11 @@ interface CosmicContent {
   daily_practice: string;
 }
 
-const CosmicDeepDive = () => {
+const CosmiqDeepDive = () => {
   const { placement, sign } = useParams<{ placement: string; sign: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [content, setContent] = useState<CosmicContent | null>(null);
+  const [content, setContent] = useState<CosmiqContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
 
@@ -65,10 +65,10 @@ const CosmicDeepDive = () => {
 
         setContent(data);
       } catch (error) {
-        console.error('Error fetching cosmic content:', error);
+        console.error('Error fetching cosmiq content:', error);
         toast({
           title: "Error",
-          description: "Failed to load cosmic insights",
+          description: "Failed to load cosmiq insights",
           variant: "destructive",
         });
       } finally {
@@ -97,7 +97,7 @@ const CosmicDeepDive = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
-      {/* Cosmic background */}
+      {/* Cosmiq background */}
       <div className="absolute inset-0">
         {[...Array(50)].map((_, i) => (
           <motion.div
@@ -338,7 +338,7 @@ const CosmicDeepDive = () => {
                       className="text-sm text-gray-400 italic"
                     >
                       {quizAnswer
-                        ? "Amazing! Your cosmic blueprint is speaking to you. 🌟"
+                        ? "Amazing! Your cosmiq blueprint is speaking to you. 🌟"
                         : "That's okay! Every placement expresses differently based on your whole chart. Keep exploring!"}
                     </motion.p>
                   )}
@@ -358,4 +358,4 @@ const CosmicDeepDive = () => {
   );
 };
 
-export default CosmicDeepDive;
+export default CosmiqDeepDive;

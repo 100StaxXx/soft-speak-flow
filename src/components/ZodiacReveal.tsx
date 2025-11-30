@@ -55,7 +55,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950">
-      {/* Enhanced cosmic background with multiple star layers */}
+      {/* Enhanced cosmiq background with multiple star layers */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Large glowing stars */}
         {[...Array(30)].map((_, i) => (
@@ -120,7 +120,7 @@ export const ZodiacReveal = ({ zodiacSign, mentorName, onComplete }: ZodiacRevea
           />
         ))}
 
-        {/* Cosmic dust particles */}
+        {/* Cosmiq dust particles */}
         {[...Array(40)].map((_, i) => (
           <motion.div
             key={`dust-${i}`}
