@@ -201,7 +201,7 @@ const Horoscope = () => {
     
     setRevealing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-cosmiq-profile');
+      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
 
       if (error) throw error;
       if (data && typeof data === 'object' && 'error' in data) {
