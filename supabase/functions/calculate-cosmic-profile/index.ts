@@ -52,8 +52,11 @@ serve(async (req) => {
     // Parse and validate birthdate and time
     const birthDate = profile.birthdate ? new Date(profile.birthdate) : new Date();
     
+    // Normalize birth_time to HH:mm (database stores HH:mm:ss, strip seconds)
+    const normalizedBirthTime = profile.birth_time.substring(0, 5);
+    
     // Validate birth_time format (HH:mm)
-    const timeMatch = profile.birth_time.match(/^(\d{1,2}):(\d{2})$/);
+    const timeMatch = normalizedBirthTime.match(/^(\d{1,2}):(\d{2})$/);
     if (!timeMatch) {
       return new Response(
         JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
@@ -82,7 +85,7 @@ serve(async (req) => {
 
     const calculatePrompt = `Calculate the following astrological placements for someone born:
 - Date: ${birthDate.toDateString()}
-- Time: ${profile.birth_time}
+- Time: ${normalizedBirthTime}
 - Location: ${profile.birth_location}
 - Known Sun Sign: ${profile.zodiac_sign}
 
