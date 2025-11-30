@@ -24,6 +24,7 @@ const Horoscope = () => {
   const [energyForecast, setEnergyForecast] = useState<any>(null);
   const [placementInsights, setPlacementInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile } = useProfile();
@@ -43,6 +44,15 @@ const Horoscope = () => {
 
   const hasAdvancedDetails = !!(profile?.birth_time && profile?.birth_location);
   const hasCosmicProfile = !!(profile?.moon_sign && profile?.rising_sign);
+
+  // Check if user has visited Cosmiq Insight before
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('cosmiq_insight_visited');
+    if (!hasVisited) {
+      setShowWelcomeTooltip(true);
+      localStorage.setItem('cosmiq_insight_visited', 'true');
+    }
+  }, []);
 
   const generateHoroscope = async () => {
     setLoading(true);
@@ -215,6 +225,34 @@ const Horoscope = () => {
       </div>
 
       <div className="relative max-w-2xl mx-auto p-6 space-y-6">
+        {/* Welcome Tooltip for first-time visitors */}
+        {showWelcomeTooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-gradient-to-r from-purple-600/90 via-pink-600/90 to-blue-600/90 backdrop-blur-md p-4 rounded-xl border border-purple-400/50 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 flex-1">
+                <Sparkles className="w-5 h-5 text-yellow-300 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-white mb-1">Welcome to Cosmiq Insight! ✨</h3>
+                  <p className="text-sm text-gray-100">
+                    Your daily cosmic guidance based on your zodiac sign. Add birth details below to unlock your rising sign and planetary influences for deeper insights.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWelcomeTooltip(false)}
+                className="text-white/80 hover:text-white flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button
