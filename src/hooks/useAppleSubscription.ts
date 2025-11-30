@@ -27,8 +27,8 @@ export function useAppleSubscription() {
         throw new Error("Purchase returned no data");
       }
       
-      // Verify receipt with backend - safely access receipt fields
-      const receipt = purchase.transactionReceipt ?? purchase.receipt;
+      // Verify receipt with backend
+      const receipt = purchase.receipt;
       if (!receipt) {
         throw new Error("No receipt data available");
       }
