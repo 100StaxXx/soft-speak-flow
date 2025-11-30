@@ -116,9 +116,6 @@ export const SoundSettings = () => {
               <Music className="w-4 h-4 text-primary" />
               Ambient Music
             </h4>
-            <p className="text-xs text-muted-foreground">
-              Calming background music plays continuously in the background, like MTG Arena and Pokémon TCG. It automatically ducks when other audio plays.
-            </p>
           </div>
 
           <div className="space-y-3">
