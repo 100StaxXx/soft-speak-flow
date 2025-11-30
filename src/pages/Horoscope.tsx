@@ -149,11 +149,17 @@ const Horoscope = () => {
       // Immediately regenerate horoscope with new advanced details
       await generateHoroscope();
 
-      // Auto-trigger cosmic profile calculation for first-time users
+      // Auto-trigger cosmic profile calculation for first-time users (only if not generated today)
       if (!hasCosmiqProfile) {
-        setTimeout(() => {
-          handleRevealCosmiqProfile();
-        }, 500);
+        const alreadyGeneratedToday = profile?.cosmic_profile_generated_at 
+          ? new Date(profile.cosmic_profile_generated_at).toDateString() === new Date().toDateString()
+          : false;
+        
+        if (!alreadyGeneratedToday) {
+          setTimeout(() => {
+            handleRevealCosmiqProfile();
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('Error saving:', error);
