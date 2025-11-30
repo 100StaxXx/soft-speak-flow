@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
-import { X } from "lucide-react";
+import { X, Share2 } from "lucide-react";
+import { downloadImage } from "@/utils/imageDownload";
 
 interface EvolutionCard {
   id: string;
@@ -47,20 +48,10 @@ const ELEMENT_SYMBOLS: Record<string, string> = {
   light: "✨",
 };
 
-const fallbackEnergyCost = (stage: number) => {
-  if (stage <= 9) return 1;
-  if (stage <= 14) return 2;
-  return 3;
-};
-
 export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
-
-  const stats = card.stats as { mind?: number; body?: number; soul?: number };
-  const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
-  const bondLevel = card.bond_level ?? null;
 
   const handleCardClick = () => {
     tap();
@@ -74,65 +65,68 @@ export function EvolutionCardFlip({ card }: Props) {
     setIsFlipped(!isFlipped);
   };
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!card.image_url) return;
+    
+    await downloadImage(
+      card.image_url,
+      `cosmiq-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
+      {
+        title: `${card.creature_name} - Cosmiq`,
+        text: `Check out my ${card.creature_name}! ✨ #Cosmiq`,
+        dialogTitle: 'Share Companion Card'
+      }
+    );
+  };
+
   return (
     <>
-      {/* Small Card Preview */}
+      {/* Small Card Preview - Trading Card Style */}
       <div 
-        className="relative h-[280px] cursor-pointer rounded-xl overflow-hidden"
+        className="relative aspect-[2.5/3.5] w-full max-w-[320px] cursor-pointer rounded-xl overflow-hidden"
         onClick={handleCardClick}
       >
-        <div className={`h-full rounded-xl border-2 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-[2px] shadow-lg`}>
-          <div className="h-full rounded-lg bg-card relative overflow-hidden">
-            {card.image_url ? (
-              <img
-                src={card.image_url}
-                alt={card.creature_name}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center text-muted-foreground text-xs">
-                No Image
-              </div>
-            )}
-            
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-            
-            <Badge className="absolute top-2 left-2 bg-background/90 backdrop-blur-sm text-xs">
-              {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"}
-            </Badge>
-            
-            <Badge className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm text-xs">
-              Stage {card.evolution_stage}
-            </Badge>
+        <div className={`h-full rounded-xl border-4 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-1 shadow-lg`}>
+          <div className="h-full rounded-lg bg-gradient-to-b from-background via-background to-background/95 relative overflow-hidden flex flex-col">
+            {/* Top Bar - Element & Stage */}
+            <div className="relative z-10 flex items-center justify-between p-2">
+              <Badge className="bg-background/90 backdrop-blur-sm text-xs">
+                {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"} {card.element}
+              </Badge>
+              <Badge className="bg-background/90 backdrop-blur-sm text-xs">
+                Stage {card.evolution_stage}
+              </Badge>
+            </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
-              <h3 className="font-bold text-sm text-white drop-shadow-lg">{card.creature_name}</h3>
-              <div className="flex items-center justify-between text-[10px] text-white/80 bg-black/30 rounded-md px-2 py-1">
-                <span className="flex items-center gap-1">
-                  ⚡<span className="font-semibold">{energyCost}</span>
-                </span>
-                {bondLevel !== null && (
-                  <span className="flex items-center gap-1">
-                    🤝 <span className="font-semibold">{bondLevel}</span>
-                  </span>
-                )}
+            {/* Companion Image - Full Size */}
+            <div className="relative flex-1 overflow-hidden">
+              {card.image_url ? (
+                <img
+                  src={card.image_url}
+                  alt={card.creature_name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center text-muted-foreground text-xs">
+                  No Image
+                </div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            </div>
+
+            {/* Bottom Section - Name & Branding */}
+            <div className="relative z-10 p-3 space-y-1 bg-gradient-to-t from-background to-background/95">
+              <h3 className="font-bold text-base text-center text-foreground drop-shadow-lg">
+                ★ {card.creature_name.toUpperCase()} ★
+              </h3>
+              <div className="text-xs text-center text-muted-foreground">
+                {card.rarity}
               </div>
-              
-              <div className="grid grid-cols-3 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
-                <div className="flex flex-col items-center text-white/90">
-                  <span>🧠</span>
-                  <span className="font-semibold">{stats.mind || 0}</span>
-                </div>
-                <div className="flex flex-col items-center text-white/90">
-                  <span>💪</span>
-                  <span className="font-semibold">{stats.body || 0}</span>
-                </div>
-                <div className="flex flex-col items-center text-white/90">
-                  <span>🔥</span>
-                  <span className="font-semibold">{stats.soul || 0}</span>
-                </div>
+              <div className="text-center pt-2 border-t border-border/30">
+                <span className="text-xs font-bold tracking-wider text-primary">✦ COSMIQ ✦</span>
               </div>
             </div>
           </div>
@@ -150,6 +144,15 @@ export function EvolutionCardFlip({ card }: Props) {
             Detailed view of {card.creature_name}, a {card.rarity} {card.element} {card.species} at evolution stage {card.evolution_stage}
           </span>
           <div className="relative w-full h-[80vh] flex items-center justify-center">
+            {/* Share Button */}
+            <button
+              onClick={handleShare}
+              className="absolute top-4 right-16 z-50 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+            >
+              <Share2 className="w-6 h-6" />
+            </button>
+            
+            {/* Close Button */}
             <button
               onClick={() => setIsOpen(false)}
               className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
@@ -158,7 +161,7 @@ export function EvolutionCardFlip({ card }: Props) {
             </button>
 
             <div 
-              className="relative w-full max-w-md h-[600px] cursor-pointer perspective-1000"
+              className="relative w-full max-w-[320px] aspect-[2.5/3.5] cursor-pointer perspective-1000"
               onClick={handleFlip}
             >
               <motion.div
@@ -166,61 +169,50 @@ export function EvolutionCardFlip({ card }: Props) {
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.6, type: "spring" }}
               >
-                {/* Front */}
+                {/* Front - Trading Card Style */}
                 <div className="absolute w-full h-full backface-hidden">
-                  <div className={`h-full rounded-2xl border-4 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-1 shadow-2xl`}>
-                    <div className="h-full rounded-xl bg-card relative overflow-hidden">
-                      {card.image_url ? (
-                        <img
-                          src={card.image_url}
-                          alt={card.creature_name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">
-                          No Image
-                        </div>
-                      )}
-                      
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                      
-                      <Badge className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-base px-3 py-1">
-                        {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"} {card.element}
-                      </Badge>
-                      
-                      <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-base px-3 py-1">
-                        Stage {card.evolution_stage}
-                      </Badge>
-                      <div className="absolute top-20 right-4 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold flex items-center gap-1">
-                        ⚡ {energyCost}
+                  <div className={`h-full rounded-2xl border-[6px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-1 shadow-2xl`}>
+                    <div className="h-full rounded-xl bg-gradient-to-b from-background via-background to-background/95 relative overflow-hidden flex flex-col">
+                      {/* Top Bar - Element & Stage */}
+                      <div className="relative z-10 flex items-center justify-between p-3">
+                        <Badge className="bg-background/90 backdrop-blur-sm text-sm px-3 py-1">
+                          {ELEMENT_SYMBOLS[card.element.toLowerCase()] || "✨"} {card.element}
+                        </Badge>
+                        <Badge className="bg-background/90 backdrop-blur-sm text-sm px-3 py-1">
+                          Stage {card.evolution_stage}
+                        </Badge>
                       </div>
-                      {bondLevel !== null && (
-                        <div className="absolute top-32 right-4 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold flex items-center gap-1">
-                          🤝 {bondLevel}
-                        </div>
-                      )}
 
-                      <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
-                        <h3 className="font-bold text-2xl text-white drop-shadow-lg">{card.creature_name}</h3>
-                        
-                        <div className="grid grid-cols-3 gap-3 text-base bg-black/50 backdrop-blur-sm rounded-xl p-4">
-                          <div className="flex flex-col items-center text-white">
-                            <span className="text-2xl mb-1">🧠</span>
-                            <span className="text-xs opacity-80">Mind</span>
-                            <span className="font-bold text-lg">{stats.mind || 0}</span>
+                      {/* Companion Image - Full Size */}
+                      <div className="relative flex-1 overflow-hidden mx-2">
+                        {card.image_url ? (
+                          <img
+                            src={card.image_url}
+                            alt={card.creature_name}
+                            className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center rounded-lg">
+                            No Image
                           </div>
-                          <div className="flex flex-col items-center text-white">
-                            <span className="text-2xl mb-1">💪</span>
-                            <span className="text-xs opacity-80">Body</span>
-                            <span className="font-bold text-lg">{stats.body || 0}</span>
-                          </div>
-                          <div className="flex flex-col items-center text-white">
-                            <span className="text-2xl mb-1">🔥</span>
-                            <span className="text-xs opacity-80">Soul</span>
-                            <span className="font-bold text-lg">{stats.soul || 0}</span>
-                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent rounded-lg" />
+                      </div>
+
+                      {/* Bottom Section - Name, Rarity & Branding */}
+                      <div className="relative z-10 p-4 space-y-2 bg-gradient-to-t from-background to-background/95">
+                        <h3 className="font-bold text-xl text-center text-foreground drop-shadow-lg tracking-wide">
+                          ★ {card.creature_name.toUpperCase()} ★
+                        </h3>
+                        <div className="text-sm text-center text-muted-foreground">
+                          Stage {card.evolution_stage} • {card.rarity}
+                        </div>
+                        <div className="text-center pt-3 border-t-2 border-primary/30">
+                          <span className="text-base font-bold tracking-widest bg-gradient-to-r from-primary via-primary to-primary bg-clip-text text-transparent drop-shadow-lg">
+                            ✦ COSMIQ ✦
+                          </span>
                         </div>
                       </div>
                     </div>
