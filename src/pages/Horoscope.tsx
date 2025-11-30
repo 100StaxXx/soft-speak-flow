@@ -143,8 +143,18 @@ const Horoscope = () => {
 
       toast({
         title: "Saved!",
-        description: "Your birth details have been updated.",
+        description: "Your birth details have been updated. Generating your fresh Cosmiq reading...",
       });
+
+      // Immediately regenerate horoscope with new advanced details
+      await generateHoroscope();
+
+      // Auto-trigger cosmic profile calculation for first-time users
+      if (!hasCosmiqProfile) {
+        setTimeout(() => {
+          handleRevealCosmiqProfile();
+        }, 500);
+      }
     } catch (error) {
       console.error('Error saving:', error);
       toast({
