@@ -59,9 +59,17 @@ const CosmiqDeepDive = () => {
           .select('*')
           .eq('placement', placement.toLowerCase())
           .eq('sign', sign.toLowerCase())
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
+
+        if (!data) {
+          toast({
+            title: "Content Not Found",
+            description: `No insights available for ${sign} ${placement} yet`,
+            variant: "destructive",
+          });
+        }
 
         setContent(data);
       } catch (error) {

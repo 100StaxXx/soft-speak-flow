@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -15,14 +15,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 
+// Type definitions for horoscope data
+interface EnergyForecast {
+  planetaryWeather: string;
+  mindEnergy: string;
+  bodyEnergy: string;
+  soulEnergy: string;
+}
+
+interface PlacementInsights {
+  sun: string;
+  moon: string;
+  rising: string;
+  mercury: string;
+  mars: string;
+  venus: string;
+}
+
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
   const [cosmiqTip, setCosmiqTip] = useState<string | null>(null);
   const [zodiac, setZodiac] = useState<string | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [date, setDate] = useState<string>("");
-  const [energyForecast, setEnergyForecast] = useState<any>(null);
-  const [placementInsights, setPlacementInsights] = useState<any>(null);
+  const [energyForecast, setEnergyForecast] = useState<EnergyForecast | null>(null);
+  const [placementInsights, setPlacementInsights] = useState<PlacementInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(false);
   const { toast } = useToast();
@@ -100,7 +117,7 @@ const Horoscope = () => {
   const handleSave = async () => {
     if (!user) return;
     
-    let normalizedBirthTime = birthTime?.trim() || null;
+    const normalizedBirthTime = birthTime?.trim() || null;
     if (normalizedBirthTime && !/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
       toast({
         title: "Invalid Format",
@@ -208,27 +225,38 @@ const Horoscope = () => {
     return <Sparkles className="w-6 h-6 text-royal-purple" />;
   };
 
+  // Memoize star positions to prevent recreation on every render
+  const starPositions = useMemo(() => {
+    return Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      duration: 2 + Math.random() * 3,
+      delay: Math.random() * 2,
+    }));
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
       {/* Animated constellation background */}
       <div className="absolute inset-0">
         {/* Stars */}
-        {[...Array(50)].map((_, i) => (
+        {starPositions.map((star) => (
           <motion.div
-            key={i}
+            key={star.id}
             className="absolute w-1 h-1 bg-white rounded-full"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
+              top: `${star.top}%`,
+              left: `${star.left}%`,
             }}
             animate={{
               opacity: [0.1, 1, 0.1],
               scale: [1, 1.5, 1],
             }}
             transition={{
-              duration: 2 + Math.random() * 3,
+              duration: star.duration,
               repeat: Infinity,
-              delay: Math.random() * 2,
+              delay: star.delay,
             }}
           />
         ))}

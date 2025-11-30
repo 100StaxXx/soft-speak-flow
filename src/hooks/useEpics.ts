@@ -4,6 +4,28 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useXPToast } from "@/contexts/XPContext";
 
+// Type for habits created during epic creation
+interface CreatedHabit {
+  id: string;
+  user_id: string;
+  title: string;
+  difficulty: string;
+  frequency: string;
+  custom_days: number[] | null;
+}
+
+// Type for epic record
+interface CreatedEpic {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  target_days: number;
+  is_public: boolean;
+  xp_reward: number;
+  invite_code: string;
+}
+
 export const useEpics = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -63,8 +85,8 @@ export const useEpics = () => {
         throw new Error("Target days must be between 1 and 365");
       }
 
-      let createdHabits: any[] = [];
-      let createdEpic: any = null;
+      let createdHabits: CreatedHabit[] = [];
+      let createdEpic: CreatedEpic | null = null;
 
       try {
         // Create habits first

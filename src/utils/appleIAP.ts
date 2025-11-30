@@ -1,6 +1,41 @@
 import { Capacitor } from '@capacitor/core';
 
+// Type definitions for IAP plugin
+interface IAPTransactionResult {
+  state: 'purchased' | 'restored' | 'deferred' | 'failed' | 'cancelled';
+  productId?: string;
+  transactionId?: string;
+  receipt?: string;
+}
+
+interface IAPRestoreResult {
+  purchases: Array<{
+    productId?: string;
+    state?: string;
+    transactionId?: string;
+  }>;
+}
+
+interface IAPProduct {
+  productId: string;
+  title: string;
+  description: string;
+  price: string;
+  priceAsDecimal: number;
+  currency: string;
+}
+
+interface IAPPlugin {
+  buy: (options: { productIdentifier: string }) => Promise<IAPTransactionResult>;
+  restorePurchases: () => Promise<IAPRestoreResult>;
+  getProducts: (options: { productIdentifiers: string[] }) => Promise<{ products: IAPProduct[] }>;
+}
+
 // Dynamically import IAP plugin to avoid build errors if not installed
+let InAppPurchase: IAPPlugin | null = null;
+try {
+  // @ts-expect-error - Dynamic import for optional plugin
+  InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: IAPPlugin }).CapacitorInAppPurchases ?? null;
 interface CapacitorInAppPurchasesPlugin {
   buy: (options: { productIdentifier: string }) => Promise<any>;
   restorePurchases: () => Promise<any>;
@@ -21,12 +56,12 @@ export const IAP_PRODUCTS = {
 };
 
 // Check if IAP is available (iOS native only)
-export const isIAPAvailable = () => {
+export const isIAPAvailable = (): boolean => {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 };
 
 // Purchase a product
-export const purchaseProduct = async (productId: string): Promise<any> => {
+export const purchaseProduct = async (productId: string): Promise<IAPTransactionResult> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
@@ -66,7 +101,7 @@ export const purchaseProduct = async (productId: string): Promise<any> => {
 };
 
 // Restore purchases
-export const restorePurchases = async (): Promise<any> => {
+export const restorePurchases = async (): Promise<IAPRestoreResult> => {
   if (!isIAPAvailable()) {
     throw new Error('In-App Purchases are only available on iOS');
   }
@@ -78,15 +113,15 @@ export const restorePurchases = async (): Promise<any> => {
     
     const result = await InAppPurchase.restorePurchases();
     
-    // Validate restored purchases
-    if (result.purchases) {
-      result.purchases = result.purchases.filter((purchase: { productId?: string; state?: string }) => {
+    // Validate restored purchases - filter to only valid states
+    const validatedResult: IAPRestoreResult = {
+      purchases: result.purchases.filter((purchase) => {
         // Only include purchases that are in valid states
         return purchase.state === 'purchased' || purchase.state === 'restored';
-      });
-    }
+      })
+    };
     
-    return result;
+    return validatedResult;
   } catch (error) {
     console.error('Restore failed:', error);
     throw error;
@@ -94,7 +129,7 @@ export const restorePurchases = async (): Promise<any> => {
 };
 
 // Get product info
-export const getProducts = async (productIds: string[]): Promise<any> => {
+export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> => {
   if (!isIAPAvailable()) {
     return [];
   }
