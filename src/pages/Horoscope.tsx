@@ -669,25 +669,6 @@ const Horoscope = () => {
               </div>
             </Card>
 
-            {/* Learn More about Your Cosmiq Profile */}
-            <Card className="bg-gradient-to-br from-purple-900/30 via-pink-900/30 to-blue-900/30 border border-purple-500/30 backdrop-blur-sm p-5">
-              <div className="flex items-start gap-3">
-                <Star className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm text-gray-200 mb-3 font-medium">
-                    Want to understand what all this means for you?
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate('/cosmic-academy')}
-                    className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
-                  >
-                    Explore Cosmiq Academy →
-                  </Button>
-                </div>
-              </div>
-            </Card>
           </motion.div>
         )}
 
