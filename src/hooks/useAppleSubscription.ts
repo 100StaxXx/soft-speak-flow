@@ -73,7 +73,7 @@ export function useAppleSubscription() {
     try {
       const restored = await restorePurchases();
       
-      if (!restored?.purchases || restored.purchases.length === 0) {
+      if (!restored || !Array.isArray(restored) || restored.length === 0) {
         toast({
           title: "No Purchases Found",
           description: "No previous purchases to restore",
@@ -92,7 +92,7 @@ export function useAppleSubscription() {
       };
 
       // Sort by date, newest first
-      const sortedPurchases = [...restored.purchases]
+      const sortedPurchases = [...restored]
         .filter(isValidPurchase)
         .sort((a, b) => {
           const dateA = a.transactionDate || 0;
