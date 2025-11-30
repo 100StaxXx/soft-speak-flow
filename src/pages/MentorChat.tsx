@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 
 export default function MentorChat() {
   const { user } = useAuth();
-  const { profile, isLoading: profileLoading } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
