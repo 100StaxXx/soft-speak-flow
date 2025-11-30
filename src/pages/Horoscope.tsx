@@ -9,8 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
-import { PlacementInsightCard } from "@/components/astrology/PlacementInsightCard";
-import { AstrologyTermTooltip } from "@/components/astrology/AstrologyTermTooltip";
+import { CosmicProfileSection } from "@/components/astrology/CosmicProfileSection";
+import { CosmicProfileReveal } from "@/components/astrology/CosmicProfileReveal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
@@ -24,6 +27,22 @@ const Horoscope = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile } = useProfile();
+  const { user } = useAuth();
+
+  // Birth details state
+  const normalizeBirthTime = (time: string | null | undefined) => {
+    if (!time) return "";
+    return time.substring(0, 5);
+  };
+
+  const [birthDate, setBirthDate] = useState(profile?.birthdate || "");
+  const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
+  const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
+  const [saving, setSaving] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+
+  const hasAdvancedDetails = !!(profile?.birth_time && profile?.birth_location);
+  const hasCosmicProfile = !!(profile?.moon_sign && profile?.rising_sign);
 
   const generateHoroscope = async () => {
     setLoading(true);
@@ -60,6 +79,96 @@ const Horoscope = () => {
     generateHoroscope();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
+
+  // Update birth details when profile changes
+  useEffect(() => {
+    setBirthDate(profile?.birthdate || "");
+    setBirthTime(normalizeBirthTime(profile?.birth_time));
+    setBirthLocation(profile?.birth_location || "");
+  }, [profile]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    let normalizedBirthTime = birthTime?.trim() || null;
+    if (normalizedBirthTime && !/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
+      toast({
+        title: "Invalid Format",
+        description: "Birth time must be in HH:mm format (e.g., 14:30)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          birthdate: birthDate?.trim() || null,
+          birth_time: normalizedBirthTime,
+          birth_location: birthLocation?.trim() || null,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Saved!",
+        description: "Your birth details have been updated.",
+      });
+    } catch (error) {
+      console.error('Error saving:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save birth details",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevealCosmicProfile = async () => {
+    if (!user || !hasAdvancedDetails) return;
+    
+    if (!profile?.birthdate) {
+      toast({
+        title: "Missing Information",
+        description: "Please add your birthdate above",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setRevealing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
+
+      if (error) throw error;
+      if (data && typeof data === 'object' && 'error' in data) {
+        throw new Error(data.error as string);
+      }
+
+      toast({
+        title: "✨ Cosmic Profile Revealed!",
+        description: "Your celestial map has been calculated.",
+      });
+
+      setTimeout(() => {
+        window.location.href = window.location.pathname;
+      }, 1000);
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to calculate cosmic profile",
+        variant: "destructive",
+      });
+    } finally {
+      setRevealing(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -263,123 +372,114 @@ const Horoscope = () => {
                   </p>
                 </motion.div>
 
-                {/* Unlock Advanced Astrology CTA */}
-                {!isPersonalized && (
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="mt-6 p-5 rounded-xl bg-gradient-to-br from-purple-900/30 via-pink-900/30 to-blue-900/30 border border-purple-500/30 backdrop-blur-sm"
-                  >
-                    <div className="flex items-start gap-3">
-                      <motion.div
-                        animate={{
-                          rotate: [0, 360],
-                        }}
-                        transition={{
-                          duration: 8,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                      >
-                        <Sun className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" />
-                      </motion.div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-200 mb-3 font-medium">
-                          🌟 Unlock deeper cosmic insights with your rising sign and planetary transits
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate('/profile', { state: { openTab: 'preferences' } })}
-                          className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
-                        >
-                          Add Birth Details →
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
               </div>
             )}
           </Card>
         </motion.div>
 
-        {/* Big Three & Planetary Influences (only for personalized profiles) */}
-        {isPersonalized && profile && placementInsights && (
+        {/* Birth Details Form - Show when no advanced details */}
+        {!hasAdvancedDetails && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="space-y-4"
           >
-            {/* Big Three Section */}
-            <div>
-              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                <AstrologyTermTooltip term="sun" sign={profile.zodiac_sign || ''}>
-                  <span>🌟 Your Big Three</span>
-                </AstrologyTermTooltip>
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {profile.zodiac_sign && (
-                  <PlacementInsightCard
-                    placement="sun"
-                    sign={profile.zodiac_sign}
-                    dailyInsight={placementInsights.sun}
-                    delay={0}
-                  />
-                )}
-                {profile.moon_sign && (
-                  <PlacementInsightCard
-                    placement="moon"
-                    sign={profile.moon_sign}
-                    dailyInsight={placementInsights.moon}
-                    delay={0.1}
-                  />
-                )}
-                {profile.rising_sign && (
-                  <PlacementInsightCard
-                    placement="rising"
-                    sign={profile.rising_sign}
-                    dailyInsight={placementInsights.rising}
-                    delay={0.2}
-                  />
-                )}
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Sun className="w-5 h-5 text-yellow-400" />
+                <h3 className="text-lg font-bold text-white">Unlock Your Cosmic Profile</h3>
               </div>
-            </div>
+              <p className="text-sm text-gray-300 mb-6">
+                Add your birth details to reveal your rising sign and planetary influences
+              </p>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="birthdate" className="text-sm text-gray-300">
+                    Birth Date
+                  </Label>
+                  <Input
+                    id="birthdate"
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="bg-gray-950/50 border-purple-500/30 text-white"
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
 
-            {/* Planetary Influences Section */}
-            <div>
-              <h3 className="text-lg font-bold text-white mb-3">
-                ✨ Planetary Influences
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                {profile.mercury_sign && (
-                  <PlacementInsightCard
-                    placement="mercury"
-                    sign={profile.mercury_sign}
-                    dailyInsight={placementInsights.mercury}
-                    delay={0}
+                <div className="space-y-2">
+                  <Label htmlFor="birthtime" className="text-sm text-gray-300">
+                    Birth Time
+                  </Label>
+                  <Input
+                    id="birthtime"
+                    type="time"
+                    value={birthTime}
+                    onChange={(e) => setBirthTime(e.target.value)}
+                    className="bg-gray-950/50 border-purple-500/30 text-white"
                   />
-                )}
-                {profile.mars_sign && (
-                  <PlacementInsightCard
-                    placement="mars"
-                    sign={profile.mars_sign}
-                    dailyInsight={placementInsights.mars}
-                    delay={0.1}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="birthlocation" className="text-sm text-gray-300">
+                    Birth Location
+                  </Label>
+                  <Input
+                    id="birthlocation"
+                    type="text"
+                    value={birthLocation}
+                    onChange={(e) => setBirthLocation(e.target.value)}
+                    placeholder="New York, USA"
+                    className="bg-gray-950/50 border-purple-500/30 text-white"
                   />
-                )}
-                {profile.venus_sign && (
-                  <PlacementInsightCard
-                    placement="venus"
-                    sign={profile.venus_sign}
-                    dailyInsight={placementInsights.venus}
-                    delay={0.2}
-                  />
-                )}
+                </div>
+
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                >
+                  {saving ? 'Saving...' : 'Save Details'}
+                </Button>
               </div>
-            </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Cosmic Profile Reveal - Show when has advanced details but no profile */}
+        {hasAdvancedDetails && !hasCosmicProfile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl overflow-hidden">
+              <CosmicProfileReveal 
+                onReveal={handleRevealCosmicProfile}
+                isRevealing={revealing}
+              />
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Cosmic Profile Display - Show when profile exists */}
+        {hasCosmicProfile && profile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <CosmicProfileSection 
+              profile={{
+                zodiac_sign: profile.zodiac_sign || '',
+                moon_sign: profile.moon_sign || '',
+                rising_sign: profile.rising_sign || '',
+                mercury_sign: profile.mercury_sign || '',
+                mars_sign: profile.mars_sign || '',
+                venus_sign: profile.venus_sign || '',
+              }}
+            />
           </motion.div>
         )}
 
