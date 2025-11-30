@@ -25,6 +25,7 @@ export const AstrologySettings = () => {
     return time.substring(0, 5);
   };
   
+  const [birthDate, setBirthDate] = useState(profile?.birthdate || "");
   const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
   const [birthdate, setBirthdate] = useState(profile?.birthdate || "");
@@ -101,6 +102,16 @@ export const AstrologySettings = () => {
 
   const handleRevealCosmicProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
+    
+    // Validate all required fields
+    if (!profile?.birthdate) {
+      toast({
+        title: "Missing Information",
+        description: "Please set your birthdate in your profile first",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Normalize birth_time to HH:mm before validation (database stores HH:mm:ss)
     const normalizedBirthTime = normalizeBirthTime(profile?.birth_time);
@@ -223,6 +234,22 @@ export const AstrologySettings = () => {
             />
             <p className="text-xs text-steel">
               Your exact birth date for more accurate calculations
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="birth-date" className="text-sm">
+              Birth Date (optional)
+            </Label>
+            <Input
+              id="birth-date"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              className="bg-obsidian/50 border-royal-purple/30"
+            />
+            <p className="text-xs text-steel">
+              Your birth date for accurate cosmic calculations
             </p>
           </div>
 
