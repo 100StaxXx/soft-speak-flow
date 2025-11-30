@@ -14,6 +14,7 @@ import { CosmiqProfileReveal } from "@/components/astrology/CosmicProfileReveal"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -46,6 +47,7 @@ const Horoscope = () => {
   const navigate = useNavigate();
   const { profile } = useProfile();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Birth details state
   const normalizeBirthTime = (time: string | null | undefined) => {
@@ -141,10 +143,16 @@ const Horoscope = () => {
 
       if (error) throw error;
 
+      // Invalidate profile cache to trigger immediate refetch
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+
       toast({
         title: "Saved!",
         description: "Your birth details have been updated. Generating your fresh Cosmiq reading...",
       });
+
+      // Wait for profile to refetch before proceeding
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Immediately regenerate horoscope with new advanced details
       await generateHoroscope();
