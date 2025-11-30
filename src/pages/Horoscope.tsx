@@ -211,9 +211,31 @@ const Horoscope = () => {
     try {
       const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
 
-      if (error) throw error;
+      if (error) {
+        // Handle rate limit (429) specifically
+        if (error.message?.includes('already generated today') || error.message?.includes('once per 24 hours')) {
+          toast({
+            title: "Already Generated",
+            description: "You can only generate one cosmiq profile per day",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
+      
       if (data && typeof data === 'object' && 'error' in data) {
-        throw new Error(data.error as string);
+        const errorMsg = data.error as string;
+        // Handle rate limit from response data
+        if (errorMsg.includes('already generated today') || errorMsg.includes('once per 24 hours')) {
+          toast({
+            title: "Already Generated",
+            description: "You can only generate one cosmiq profile per day",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(errorMsg);
       }
 
       toast({
