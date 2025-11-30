@@ -54,10 +54,13 @@ serve(async (req) => {
     
     // Normalize birth_time to HH:mm (database stores HH:mm:ss, strip seconds)
     const normalizedBirthTime = profile.birth_time.substring(0, 5);
+    console.log('[Cosmic Profile] Original birth_time:', profile.birth_time);
+    console.log('[Cosmic Profile] Normalized birth_time:', normalizedBirthTime);
     
     // Validate birth_time format (HH:mm)
     const timeMatch = normalizedBirthTime.match(/^(\d{1,2}):(\d{2})$/);
     if (!timeMatch) {
+      console.error('[Cosmic Profile] Failed to match birth_time format:', normalizedBirthTime);
       return new Response(
         JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
