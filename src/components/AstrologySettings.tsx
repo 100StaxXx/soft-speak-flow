@@ -27,13 +27,11 @@ export const AstrologySettings = () => {
   
   const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
-  const [birthdate, setBirthdate] = useState(profile?.birthdate || "");
 
   // Update state when profile changes
   useEffect(() => {
     setBirthTime(normalizeBirthTime(profile?.birth_time));
     setBirthLocation(profile?.birth_location || "");
-    setBirthdate(profile?.birthdate || "");
   }, [profile]);
 
   const handleSave = async () => {
@@ -72,7 +70,6 @@ export const AstrologySettings = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          birthdate: birthdate?.trim() || null,
           birth_time: normalizedBirthTime,
           birth_location: birthLocation?.trim() || null,
         })
@@ -101,16 +98,6 @@ export const AstrologySettings = () => {
 
   const handleRevealCosmicProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
-    
-    // Validate birthdate exists
-    if (!profile?.birthdate) {
-      toast({
-        title: "Missing Information",
-        description: "Please set your birthdate in your profile first",
-        variant: "destructive",
-      });
-      return;
-    }
     
     // Normalize birth_time to HH:mm before validation (database stores HH:mm:ss)
     const normalizedBirthTime = normalizeBirthTime(profile?.birth_time);
@@ -213,20 +200,9 @@ export const AstrologySettings = () => {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="birthdate" className="text-sm">
-              Birth Date (required for cosmic profile)
-            </Label>
-            <Input
-              id="birthdate"
-              type="date"
-              value={birthdate}
-              onChange={(e) => setBirthdate(e.target.value)}
-              className="bg-obsidian/50 border-royal-purple/30"
-              max={new Date().toISOString().split('T')[0]}
-            />
+          <div className="p-3 bg-steel/5 rounded-lg border border-steel/20 mb-4">
             <p className="text-xs text-steel">
-              Your exact birth date (needed for calculating your cosmic profile)
+              💡 Your birth date is estimated from your zodiac sign ({profile?.zodiac_sign}). Add the details below for a personalized cosmic profile.
             </p>
           </div>
 

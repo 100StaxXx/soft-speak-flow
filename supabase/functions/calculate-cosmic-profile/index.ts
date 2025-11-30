@@ -49,20 +49,55 @@ serve(async (req) => {
 
     console.log('[Cosmic Profile] Calculating for user:', user.id);
 
-    // Parse and validate birthdate
-    if (!profile.birthdate) {
-      return new Response(
-        JSON.stringify({ error: 'Birthdate is required for cosmic profile calculation' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Parse and validate birthdate - derive from zodiac sign if not explicitly set
+    let birthDate: Date;
     
-    const birthDate = new Date(profile.birthdate);
-    if (isNaN(birthDate.getTime())) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid birthdate format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!profile.birthdate) {
+      // If no exact birthdate, we need to estimate from zodiac sign
+      // For cosmic profile calculation, we need at least the year and approximate date
+      console.log('[Cosmic Profile] No birthdate set, will use zodiac midpoint');
+      
+      // Use zodiac sign to get approximate birth date (middle of zodiac period)
+      // This is less accurate but allows calculation if user only selected zodiac
+      const zodiacMidpoints: Record<string, string> = {
+        'aries': '04-05',       // April 5
+        'taurus': '05-05',      // May 5
+        'gemini': '06-05',      // June 5
+        'cancer': '07-05',      // July 5
+        'leo': '08-05',         // August 5
+        'virgo': '09-05',       // September 5
+        'libra': '10-05',       // October 5
+        'scorpio': '11-05',     // November 5
+        'sagittarius': '12-05', // December 5
+        'capricorn': '01-05',   // January 5
+        'aquarius': '02-05',    // February 5
+        'pisces': '03-05',      // March 5
+      };
+      
+      const midpoint = zodiacMidpoints[profile.zodiac_sign.toLowerCase()];
+      if (!midpoint) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Unable to determine birth date. Please contact support with your zodiac sign.' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Use current year minus 25 as default age (reasonable estimate)
+      const currentYear = new Date().getFullYear();
+      const estimatedYear = currentYear - 25;
+      birthDate = new Date(`${estimatedYear}-${midpoint}`);
+      
+      console.log('[Cosmic Profile] Using estimated birthdate:', birthDate.toISOString().split('T')[0]);
+    } else {
+      birthDate = new Date(profile.birthdate);
+      if (isNaN(birthDate.getTime())) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid birthdate format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
     
     // Normalize birth_time to HH:mm (database stores time as HH:mm:ss, strip seconds if present)
