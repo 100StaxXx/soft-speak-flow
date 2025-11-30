@@ -10,7 +10,8 @@ class SoundManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.audioContext = AudioContextClass ? new AudioContextClass() : null;
       this.loadSoundPreferences();
       
       // Cleanup all intervals on page unload

@@ -1,10 +1,15 @@
 import { Capacitor } from '@capacitor/core';
 
 // Dynamically import IAP plugin to avoid build errors if not installed
-let InAppPurchase: any = null;
+interface CapacitorInAppPurchasesPlugin {
+  buy: (options: { productIdentifier: string }) => Promise<any>;
+  restorePurchases: () => Promise<any>;
+  getProducts: (options: { productIdentifiers: string[] }) => Promise<any>;
+}
+
+let InAppPurchase: CapacitorInAppPurchasesPlugin | null = null;
 try {
-  // @ts-ignore - Dynamic import for optional plugin
-  InAppPurchase = (window as any).CapacitorInAppPurchases;
+  InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: CapacitorInAppPurchasesPlugin }).CapacitorInAppPurchases || null;
 } catch (e) {
   console.warn('In-App Purchase plugin not loaded');
 }
