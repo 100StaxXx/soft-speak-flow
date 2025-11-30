@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
+import { PlacementInsightCard } from "@/components/astrology/PlacementInsightCard";
+import { AstrologyTermTooltip } from "@/components/astrology/AstrologyTermTooltip";
 
 const Horoscope = () => {
   const [horoscope, setHoroscope] = useState<string | null>(null);
@@ -17,6 +19,7 @@ const Horoscope = () => {
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [date, setDate] = useState<string>("");
   const [energyForecast, setEnergyForecast] = useState<any>(null);
+  const [placementInsights, setPlacementInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -35,6 +38,7 @@ const Horoscope = () => {
       setDate(data.date);
       setCosmicTip(data.cosmicTip || null);
       setEnergyForecast(data.energyForecast || null);
+      setPlacementInsights(data.placementInsights || null);
     } catch (error) {
       console.error('Error generating horoscope:', error);
       toast({
@@ -300,6 +304,84 @@ const Horoscope = () => {
             )}
           </Card>
         </motion.div>
+
+        {/* Big Three & Planetary Influences (only for personalized profiles) */}
+        {isPersonalized && profile && placementInsights && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="space-y-4"
+          >
+            {/* Big Three Section */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <AstrologyTermTooltip term="sun" sign={profile.zodiac_sign || ''}>
+                  <span>🌟 Your Big Three</span>
+                </AstrologyTermTooltip>
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {profile.zodiac_sign && (
+                  <PlacementInsightCard
+                    placement="sun"
+                    sign={profile.zodiac_sign}
+                    dailyInsight={placementInsights.sun}
+                    delay={0}
+                  />
+                )}
+                {profile.moon_sign && (
+                  <PlacementInsightCard
+                    placement="moon"
+                    sign={profile.moon_sign}
+                    dailyInsight={placementInsights.moon}
+                    delay={0.1}
+                  />
+                )}
+                {profile.rising_sign && (
+                  <PlacementInsightCard
+                    placement="rising"
+                    sign={profile.rising_sign}
+                    dailyInsight={placementInsights.rising}
+                    delay={0.2}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Planetary Influences Section */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-3">
+                ✨ Planetary Influences
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {profile.mercury_sign && (
+                  <PlacementInsightCard
+                    placement="mercury"
+                    sign={profile.mercury_sign}
+                    dailyInsight={placementInsights.mercury}
+                    delay={0}
+                  />
+                )}
+                {profile.mars_sign && (
+                  <PlacementInsightCard
+                    placement="mars"
+                    sign={profile.mars_sign}
+                    dailyInsight={placementInsights.mars}
+                    delay={0.1}
+                  />
+                )}
+                {profile.venus_sign && (
+                  <PlacementInsightCard
+                    placement="venus"
+                    sign={profile.venus_sign}
+                    dailyInsight={placementInsights.venus}
+                    delay={0.2}
+                  />
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Planetary Weather (only for advanced profiles) */}
         {energyForecast && (
