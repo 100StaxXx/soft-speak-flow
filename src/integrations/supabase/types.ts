@@ -2755,6 +2755,7 @@ export type Database = {
           horoscope_text: string
           id: string
           is_personalized: boolean
+          placement_insights: Json | null
           user_id: string
           zodiac: string
         }
@@ -2766,6 +2767,7 @@ export type Database = {
           horoscope_text: string
           id?: string
           is_personalized?: boolean
+          placement_insights?: Json | null
           user_id: string
           zodiac: string
         }
@@ -2777,6 +2779,7 @@ export type Database = {
           horoscope_text?: string
           id?: string
           is_personalized?: boolean
+          placement_insights?: Json | null
           user_id?: string
           zodiac?: string
         }

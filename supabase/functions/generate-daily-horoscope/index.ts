@@ -67,7 +67,7 @@ serve(async (req) => {
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
       .from('user_daily_horoscopes')
-      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip, energy_forecast')
+      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip, energy_forecast, placement_insights')
       .eq('user_id', user.id)
       .eq('for_date', today)
       .maybeSingle();
@@ -88,7 +88,8 @@ serve(async (req) => {
             isPersonalized: existingHoroscope.is_personalized,
             date: existingHoroscope.for_date,
             cosmicTip: existingHoroscope.cosmic_tip,
-            energyForecast: existingHoroscope.energy_forecast || null
+            energyForecast: existingHoroscope.energy_forecast || null,
+            placementInsights: existingHoroscope.placement_insights || null
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -277,6 +278,60 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
       }
     }
 
+    // Generate placement-specific insights for personalized profiles
+    let placementInsights = null;
+    if (hasCosmicProfile) {
+      try {
+        const placementPrompt = `Generate brief daily insights for each astrological placement for ${today}:
+
+Cosmic Profile:
+- Sun in ${profile.zodiac_sign}: Core identity and life force
+- Moon in ${profile.moon_sign}: Emotions and inner world
+- Rising in ${profile.rising_sign}: Outer persona and first impressions
+- Mercury in ${profile.mercury_sign}: Communication and thought processes
+- Mars in ${profile.mars_sign}: Energy and action
+- Venus in ${profile.venus_sign}: Values and relationships
+
+For each placement, write ONE brief sentence (under 15 words) about how that specific placement's energy shows up TODAY. Make it conversational and actionable.
+
+Respond with JSON:
+{
+  "sun": "brief insight about Sun in ${profile.zodiac_sign} today",
+  "moon": "brief insight about Moon in ${profile.moon_sign} today",
+  "rising": "brief insight about Rising in ${profile.rising_sign} today",
+  "mercury": "brief insight about Mercury in ${profile.mercury_sign} today",
+  "mars": "brief insight about Mars in ${profile.mars_sign} today",
+  "venus": "brief insight about Venus in ${profile.venus_sign} today"
+}`;
+
+        const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are a cosmic guide. Return only valid JSON with no markdown formatting.' },
+              { role: 'user', content: placementPrompt }
+            ],
+          }),
+        });
+
+        if (placementResponse.ok) {
+          const placementData = await placementResponse.json();
+          let placementText = placementData.choices?.[0]?.message?.content || '';
+          placementText = placementText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          placementInsights = JSON.parse(placementText);
+          console.log('[Horoscope] Generated placement insights');
+        }
+      } catch (error) {
+        console.error('[Horoscope] Error generating placement insights:', error);
+        // Non-critical, continue without it
+      }
+    }
+
     // Store the horoscope and cosmic tip for today
     const { error: insertError } = await supabaseClient
       .from('user_daily_horoscopes')
@@ -287,7 +342,8 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
         horoscope_text: horoscope,
         is_personalized: hasAdvancedDetails,
         cosmic_tip: cosmicTip,
-        energy_forecast: energyForecast
+        energy_forecast: energyForecast,
+        placement_insights: placementInsights
       });
 
     if (insertError) {
@@ -302,7 +358,8 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
         isPersonalized: hasAdvancedDetails,
         date: today,
         cosmicTip,
-        energyForecast
+        energyForecast,
+        placementInsights
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
