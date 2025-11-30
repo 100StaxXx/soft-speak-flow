@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
-import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -115,8 +114,6 @@ export default function MentorChat() {
         </div>
 
         <div className="container max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-          <TodaysPepTalk />
-
           <AskMentorChat
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
