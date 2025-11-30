@@ -110,60 +110,73 @@ serve(async (req) => {
     }
 
     // Build prompt based on whether user has advanced astrology details
-    const systemPrompt = `You are a personal cosmic guide. Write like a wise friend who truly knows this person - warm, direct, conversational. No fluff or generic astrology speak. Make it feel like you're speaking directly to them about their unique day ahead. ${mentor?.tone_description || ''} Never use asterisks or technical jargon.`;
+    const systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
     let energyPrompt = '';
     
     if (hasCosmicProfile) {
       // Full cosmic profile available - use all 6 placements
-      userPrompt = `Write a personal daily reading for someone born on ${today}.
+      userPrompt = `Generate a deeply personalized daily horoscope for ${today}.
 
-Their cosmic blueprint:
-Sun ${profile.zodiac_sign} / Moon ${profile.moon_sign} / Rising ${profile.rising_sign}
-Mercury ${profile.mercury_sign} / Mars ${profile.mars_sign} / Venus ${profile.venus_sign}
+Their Cosmic Profile:
+☀️ Sun: ${profile.zodiac_sign}
+🌙 Moon: ${profile.moon_sign}
+⬆️ Rising: ${profile.rising_sign}
+💭 Mercury: ${profile.mercury_sign}
+🔥 Mars: ${profile.mars_sign}
+💗 Venus: ${profile.venus_sign}
 
-Born at ${profile.birth_time} in ${profile.birth_location}
+Birth Time: ${profile.birth_time}
+Birth Location: ${profile.birth_location}
 
-Write this like you're texting a friend. Focus on:
-- What today will actually feel like for THEM specifically (not generic zodiac stuff)
-- One specific thing they should pay attention to
-- One action they can take
-- How their unique combo of signs shapes today's experience
+Weave together:
+- How their Big Three (Sun/Moon/Rising) interact with today's cosmic energy
+- Mercury's influence on their mind and communication today
+- Mars energy affecting their drive and body
+- Venus coloring their relationships and soul connections
+- Specific actionable guidance that feels personal to this exact cosmic combination
 
-Keep it real, personal, and under 150 words. No generic horoscope phrases. Make them feel seen.`;
+Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
 
-      energyPrompt = `For someone with Sun ${profile.zodiac_sign}, Moon ${profile.moon_sign}, Rising ${profile.rising_sign}, Mercury ${profile.mercury_sign}, Mars ${profile.mars_sign}, Venus ${profile.venus_sign} - what's their energy vibe for ${today}?
+      energyPrompt = `Based on this person's cosmic profile for ${today}, generate an energy forecast:
 
-Return JSON:
+Cosmic Profile:
+Sun: ${profile.zodiac_sign}, Moon: ${profile.moon_sign}, Rising: ${profile.rising_sign}
+Mercury: ${profile.mercury_sign}, Mars: ${profile.mars_sign}, Venus: ${profile.venus_sign}
+
+Respond with a JSON object containing:
 {
-  "planetaryWeather": "What the cosmic energy feels like today in one simple sentence",
-  "mindEnergy": "How clear/foggy their head will be - practical note",
-  "bodyEnergy": "Physical energy level and what to do with it", 
-  "soulEnergy": "Emotional weather and how to work with it"
+  "planetaryWeather": "One sentence describing today's general cosmic energy in simple terms",
+  "mindEnergy": "One sentence about mental/intellectual energy today (1-10 scale implied)",
+  "bodyEnergy": "One sentence about physical/action energy today", 
+  "soulEnergy": "One sentence about emotional/spiritual energy today"
 }
 
-Write like a friend checking in. Each 12-15 words max. No fluff.`;
+Keep each sentence under 20 words. Use plain language. No asterisks.`;
     } else if (hasAdvancedDetails) {
-      userPrompt = `Write a personal reading for a ${profile.zodiac_sign} born at ${profile.birth_time} in ${profile.birth_location} for ${today}.
+      userPrompt = `Generate a personalized daily horoscope for ${profile.zodiac_sign} for ${today}.
 
-Consider their unique birth chart placement. Focus on:
-- What today will actually feel like for them
-- One specific insight about their rising sign's influence
-- One thing they should focus on
-- Simple action they can take
+Birth Time: ${profile.birth_time}
+Birth Location: ${profile.birth_location}
 
-Write it like texting a friend - warm, direct, personal. Under 130 words. No generic astrology speak.`;
+Include:
+- Rising sign influence (calculate based on birth time/location)
+- Current planetary transits affecting their chart
+- Specific guidance for mind, body, and soul
+- One actionable cosmic insight for today
+
+Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
     } else {
-      userPrompt = `Write a personal daily message for someone who's a ${profile.zodiac_sign} for ${today}.
+      userPrompt = `Generate a daily horoscope for ${profile.zodiac_sign} for ${today}.
 
-Make it feel personal and specific:
-- What's the real energy of their day going to be like?
-- One thing to watch out for or lean into
-- One small action aligned with who they are
-- Brief encouragement that feels genuine
+Focus on:
+- General energy and themes for ${profile.zodiac_sign} today
+- Guidance for personal growth
+- One cosmic insight or affirmation
+- Encouragement aligned with their zodiac strengths
 
-Write like you're checking in on a friend. Warm, real, direct. Under 120 words. No generic horoscope phrases.`;
+Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for emphasis - use plain text only.`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -215,17 +228,17 @@ Write like you're checking in on a friend. Warm, real, direct. Under 120 words. 
         messages: [
           { 
             role: 'system', 
-            content: `You're a wise friend sharing a quick piece of cosmic wisdom. Keep it real and practical. ${mentor?.tone_description || ''} No asterisks or mystical fluff.` 
+            content: `You are a cosmic guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.` 
           },
           { 
             role: 'user', 
-            content: `Share one small cosmic insight for a ${profile.zodiac_sign} today. Something simple they can actually use. 30 words max. Make it feel personal, not generic.` 
+            content: `Generate a single daily cosmic tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmic energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.` 
           }
         ],
       }),
     });
 
-    let cosmicTip = 'Trust your gut today. Your intuition is sharper than you think.';
+    let cosmicTip = 'The stars guide those who listen. Trust your inner compass today.';
     if (tipResponse.ok) {
       const tipData = await tipResponse.json();
       cosmicTip = tipData.choices?.[0]?.message?.content || cosmicTip;
@@ -269,21 +282,26 @@ Write like you're checking in on a friend. Warm, real, direct. Under 120 words. 
     let placementInsights = null;
     if (hasCosmicProfile) {
       try {
-        const placementPrompt = `Quick daily notes for someone with these placements on ${today}:
+        const placementPrompt = `Generate brief daily insights for each astrological placement for ${today}:
 
-Sun ${profile.zodiac_sign} / Moon ${profile.moon_sign} / Rising ${profile.rising_sign}
-Mercury ${profile.mercury_sign} / Mars ${profile.mars_sign} / Venus ${profile.venus_sign}
+Cosmic Profile:
+- Sun in ${profile.zodiac_sign}: Core identity and life force
+- Moon in ${profile.moon_sign}: Emotions and inner world
+- Rising in ${profile.rising_sign}: Outer persona and first impressions
+- Mercury in ${profile.mercury_sign}: Communication and thought processes
+- Mars in ${profile.mars_sign}: Energy and action
+- Venus in ${profile.venus_sign}: Values and relationships
 
-For each, write ONE super short note about how it shows up today. 10-12 words each. Skip the astrology textbook stuff - just what they need to know.
+For each placement, write ONE brief sentence (under 15 words) about how that specific placement's energy shows up TODAY. Make it conversational and actionable.
 
-Return JSON:
+Respond with JSON:
 {
-  "sun": "how their core ${profile.zodiac_sign} energy plays out today",
-  "moon": "what their ${profile.moon_sign} emotions are doing",
-  "rising": "how they're coming across to others today",
-  "mercury": "what's up with their ${profile.mercury_sign} mind/communication",
-  "mars": "where their ${profile.mars_sign} drive/energy goes",
-  "venus": "how ${profile.venus_sign} affects connections/pleasure today"
+  "sun": "brief insight about Sun in ${profile.zodiac_sign} today",
+  "moon": "brief insight about Moon in ${profile.moon_sign} today",
+  "rising": "brief insight about Rising in ${profile.rising_sign} today",
+  "mercury": "brief insight about Mercury in ${profile.mercury_sign} today",
+  "mars": "brief insight about Mars in ${profile.mars_sign} today",
+  "venus": "brief insight about Venus in ${profile.venus_sign} today"
 }`;
 
         const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -295,7 +313,7 @@ Return JSON:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'Return only valid JSON. Write like a friend texting quick notes.' },
+              { role: 'system', content: 'You are a cosmic guide. Return only valid JSON with no markdown formatting.' },
               { role: 'user', content: placementPrompt }
             ],
           }),

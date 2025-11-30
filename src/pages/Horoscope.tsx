@@ -507,6 +507,7 @@ const Horoscope = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
+            className="space-y-4"
           >
             <CosmicProfileSection 
               profile={{
@@ -518,6 +519,29 @@ const Horoscope = () => {
                 venus_sign: profile.venus_sign || '',
               }}
             />
+            
+            {/* Recalculate Option */}
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-white mb-1">
+                    Update Your Cosmic Profile
+                  </h4>
+                  <p className="text-xs text-gray-400">
+                    Changed your birth details? Recalculate your profile to reflect the updates.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleRevealCosmicProfile}
+                  disabled={revealing}
+                  variant="outline"
+                  size="sm"
+                  className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white flex-shrink-0"
+                >
+                  {revealing ? 'Calculating...' : 'Recalculate'}
+                </Button>
+              </div>
+            </Card>
           </motion.div>
         )}
 
