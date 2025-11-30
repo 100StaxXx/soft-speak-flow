@@ -49,20 +49,48 @@ serve(async (req) => {
 
     console.log('[Cosmic Profile] Calculating for user:', user.id);
 
-    // Parse and validate birthdate and time
-    const birthDate = profile.birthdate ? new Date(profile.birthdate) : new Date();
+    // Parse and validate birthdate
+    if (!profile.birthdate) {
+      return new Response(
+        JSON.stringify({ error: 'Birthdate is required for cosmic profile calculation' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
-    // Normalize birth_time to HH:mm (database stores HH:mm:ss, strip seconds)
-    const normalizedBirthTime = profile.birth_time.substring(0, 5);
+    const birthDate = new Date(profile.birthdate);
+    if (isNaN(birthDate.getTime())) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid birthdate format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Normalize birth_time to HH:mm (database stores time as HH:mm:ss, strip seconds if present)
+    // Handle both HH:mm and HH:mm:ss formats
+    let normalizedBirthTime = '';
+    if (typeof profile.birth_time === 'string') {
+      // If it contains seconds (HH:mm:ss), take first 5 chars
+      // If it's already HH:mm, use as-is
+      normalizedBirthTime = profile.birth_time.length > 5 
+        ? profile.birth_time.substring(0, 5) 
+        : profile.birth_time;
+    } else {
+      console.error('[Cosmic Profile] birth_time is not a string:', typeof profile.birth_time, profile.birth_time);
+      return new Response(
+        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     console.log('[Cosmic Profile] Original birth_time:', profile.birth_time);
     console.log('[Cosmic Profile] Normalized birth_time:', normalizedBirthTime);
     
-    // Validate birth_time format (HH:mm)
-    const timeMatch = normalizedBirthTime.match(/^(\d{1,2}):(\d{2})$/);
+    // Validate birth_time format (HH:mm with exactly 2 digits for hours and minutes)
+    const timeMatch = normalizedBirthTime.match(/^(\d{2}):(\d{2})$/);
     if (!timeMatch) {
       console.error('[Cosmic Profile] Failed to match birth_time format:', normalizedBirthTime);
       return new Response(
-        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm' }),
+        JSON.stringify({ error: 'Invalid birth time format. Expected HH:mm (e.g., 14:30)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

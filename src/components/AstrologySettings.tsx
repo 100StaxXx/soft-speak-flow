@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,18 +27,44 @@ export const AstrologySettings = () => {
   
   const [birthTime, setBirthTime] = useState(normalizeBirthTime(profile?.birth_time));
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
+  const [birthdate, setBirthdate] = useState(profile?.birthdate || "");
+
+  // Update state when profile changes
+  useEffect(() => {
+    setBirthTime(normalizeBirthTime(profile?.birth_time));
+    setBirthLocation(profile?.birth_location || "");
+    setBirthdate(profile?.birthdate || "");
+  }, [profile]);
 
   const handleSave = async () => {
     if (!user) return;
     
-    // Validate birth time format if provided (HH:mm with leading zeros)
-    if (birthTime && !/^\d{2}:\d{2}$/.test(birthTime)) {
-      toast({
-        title: "Invalid Format",
-        description: "Birth time must be in HH:mm format (e.g., 14:30)",
-        variant: "destructive",
-      });
-      return;
+    // Validate and normalize birth time format if provided
+    let normalizedBirthTime = birthTime?.trim() || null;
+    if (normalizedBirthTime) {
+      // Ensure it matches HH:mm format (exactly 2 digits for hours and minutes)
+      if (!/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
+        toast({
+          title: "Invalid Format",
+          description: "Birth time must be in HH:mm format (e.g., 14:30 or 09:15)",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate the actual time values
+      const [hoursStr, minutesStr] = normalizedBirthTime.split(':');
+      const hours = parseInt(hoursStr, 10);
+      const minutes = parseInt(minutesStr, 10);
+      
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        toast({
+          title: "Invalid Time",
+          description: "Hours must be 0-23 and minutes must be 0-59",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     setSaving(true);
@@ -46,8 +72,9 @@ export const AstrologySettings = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          birth_time: birthTime || null,
-          birth_location: birthLocation || null,
+          birthdate: birthdate?.trim() || null,
+          birth_time: normalizedBirthTime,
+          birth_location: birthLocation?.trim() || null,
         })
         .eq("id", user.id);
 
@@ -75,6 +102,16 @@ export const AstrologySettings = () => {
   const handleRevealCosmicProfile = async () => {
     if (!user || !hasAdvancedDetails) return;
     
+    // Validate birthdate exists
+    if (!profile?.birthdate) {
+      toast({
+        title: "Missing Information",
+        description: "Please set your birthdate in your profile first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Normalize birth_time to HH:mm before validation (database stores HH:mm:ss)
     const normalizedBirthTime = normalizeBirthTime(profile?.birth_time);
     if (!normalizedBirthTime || !/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
@@ -90,7 +127,15 @@ export const AstrologySettings = () => {
     try {
       const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      // Check if the response contains an error field
+      if (data && typeof data === 'object' && 'error' in data) {
+        throw new Error(data.error as string);
+      }
 
       toast({
         title: "✨ Cosmic Profile Revealed!",
@@ -104,9 +149,18 @@ export const AstrologySettings = () => {
       }, 1000);
     } catch (error) {
       console.error('Error calculating cosmic profile:', error);
+      
+      // Extract error message
+      let errorMessage = "Failed to calculate cosmic profile";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String((error as any).message);
+      }
+      
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to calculate cosmic profile",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -158,6 +212,23 @@ export const AstrologySettings = () => {
               </p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="birthdate" className="text-sm">
+              Birth Date (required for cosmic profile)
+            </Label>
+            <Input
+              id="birthdate"
+              type="date"
+              value={birthdate}
+              onChange={(e) => setBirthdate(e.target.value)}
+              className="bg-obsidian/50 border-royal-purple/30"
+              max={new Date().toISOString().split('T')[0]}
+            />
+            <p className="text-xs text-steel">
+              Your exact birth date (needed for calculating your cosmic profile)
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="birth-time" className="text-sm">
