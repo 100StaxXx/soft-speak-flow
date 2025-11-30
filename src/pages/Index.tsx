@@ -192,7 +192,7 @@ const Index = () => {
   return (
     <>
       <PageTransition>
-        {/* Cosmic Starfield Background */}
+        {/* Cosmiq Starfield Background */}
         <StarfieldBackground />
         
         {/* Fixed Background Image */}
@@ -290,7 +290,7 @@ const Index = () => {
             
             <CompanionErrorBoundary>
               <ErrorBoundary>
-                <div className="cosmic-glass rounded-2xl">
+                <div className="cosmiq-glass rounded-2xl">
                   <MentorQuickChat />
                 </div>
               </ErrorBoundary>

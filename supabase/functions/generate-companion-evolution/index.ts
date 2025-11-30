@@ -60,7 +60,7 @@ Your goal is to balance CONTINUITY with MYTHIC ENHANCEMENT as the creature enter
 
 CONTINUITY RULES (80% preservation):
 1. Preserve 85% of the previous color palette.
-   - Same dominant colors, but can add divine/cosmic accent colors.
+   - Same dominant colors, but can add divine/cosmiq accent colors.
    - Allow increased glow, luminosity, and ethereal effects.
 
 2. Preserve 80% of the previous silhouette.
@@ -70,21 +70,21 @@ CONTINUITY RULES (80% preservation):
 
 3. Preserve species recognition (80%).
    - Must be recognizable as same species at first glance.
-   - Can add mythic features (divine horns, cosmic patterns, reality effects).
+   - Can add mythic features (divine horns, cosmiq patterns, reality effects).
    - Base anatomy remains but enhanced with legendary elements.
 
 4. Signature features evolve but persist.
    - Core markings, eye style, and defining traits preserved.
-   - Can become more elaborate, divine, or cosmic versions.
+   - Can become more elaborate, divine, or cosmiq versions.
 
 5. Elemental identity can expand.
    - Core element remains but can manifest in grander ways.
-   - Can add secondary cosmic/divine elemental effects.
+   - Can add secondary cosmiq/divine elemental effects.
 
 MYTHIC ENHANCEMENTS NOW ALLOWED:
 - Divine horns, antlers, or crowns (even if species didn't have them).
 - Ethereal energy wings or appendages.
-- Cosmic patterns, runes, or sacred geometry.
+- Cosmiq patterns, runes, or sacred geometry.
 - Halos, auras, or divine light effects.
 - Larger-than-life heroic proportions.
 - Reality-bending atmospheric effects.
@@ -92,46 +92,46 @@ MYTHIC ENHANCEMENTS NOW ALLOWED:
 You are creating a LEGENDARY version while maintaining the companion's core identity.`;
 
 const SYSTEM_PROMPT_LEGENDARY = `You generate evolved versions of a user's personal creature companion.
-This is the ULTIMATE EVOLUTION - a cosmic god-tier entity. Your goal is GRANDIOSE CREATIVITY while maintaining species ESSENCE.
+This is the ULTIMATE EVOLUTION - a cosmiq god-tier entity. Your goal is GRANDIOSE CREATIVITY while maintaining species ESSENCE.
 
 CREATIVE FREEDOM (Essence-Based):
 1. Color evolution is fluid.
-   - Core color theme should echo through cosmic form.
-   - Full freedom to add stellar, nebula, cosmic colors.
+   - Core color theme should echo through cosmiq form.
+   - Full freedom to add stellar, nebula, cosmiq colors.
    - Original palette visible in overall composition.
 
 2. Form transcends but echoes origin.
    - Species essence recognizable (this came from a wolf/eagle/dragon).
    - Can add: multiple forms, dimensional echoes, reality fragments.
-   - Silhouette can be broken by cosmic scale and divine additions.
+   - Silhouette can be broken by cosmiq scale and divine additions.
 
 3. Species soul is the anchor.
    - Viewer should sense what species this evolved from.
    - Core "spirit" of the animal maintained through chaos.
-   - Can be abstract, cosmic, reality-bending.
+   - Can be abstract, cosmiq, reality-bending.
 
 4. All features are malleable.
    - Signature features can transcend physical form.
-   - Can become cosmic constructs, energy patterns, dimensional rifts.
-   - Original traits visible in divine/cosmic interpretation.
+   - Can become cosmiq constructs, energy patterns, dimensional rifts.
+   - Original traits visible in divine/cosmiq interpretation.
 
-5. Elements become cosmic forces.
+5. Elements become cosmiq forces.
    - Element manifests at universe-scale.
-   - Can combine with stellar/cosmic phenomena.
+   - Can combine with stellar/cosmiq phenomena.
    - Original element evident in the chaos.
 
 LEGENDARY FREEDOM GRANTED:
 - Multiple heads, forms, or dimensional echoes.
-- Cosmic appendages: star-matter limbs, nebula wings, galaxy constructs.
+- Cosmiq appendages: star-matter limbs, nebula wings, galaxy constructs.
 - Reality-warping anatomy: impossible geometry, dimensional rifts, spacetime breaks.
 - Planet/universe scale: colossal beyond comprehension.
 - Divine constructs: halos of galaxies, crowns of stars, armor of reality itself.
-- Transcendent features: the creature IS the environment, IS the cosmos.
+- Transcendent features: the creature IS the environment, IS the cosmiq.
 
 GRANDIOSE MANDATE: Push creative boundaries. Make this LARGER THAN LIFE. A living god, a force of nature, 
 an entity that births universes. This is the pinnacle - absolute divine manifestation.
 
-Maintain the SOUL of the species while achieving cosmic transcendence.`;
+Maintain the SOUL of the species while achieving cosmiq transcendence.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -277,7 +277,7 @@ serve(async (req) => {
       
       userPrompt = `PHOTOREAL EPIC FANTASY - Stage 0 Divine Egg:
 
-SUBJECT: A monumental crystalline egg suspended in cosmic realm, containing the destiny of a legendary ${companion.spirit_animal} champion.
+SUBJECT: A monumental crystalline egg suspended in cosmiq realm, containing the destiny of a legendary ${companion.spirit_animal} champion.
 
 EGG CONSTRUCTION:
 - Massive scale suggesting the colossal being within
@@ -304,13 +304,13 @@ Through the mystical shell, a dark shadowy form of a FULLY EVOLVED ${companion.s
 
 ELEMENTAL & COLOR:
 - ${companion.core_element} energy radiating with realistic physics and particle effects
-- Divine ${companion.favorite_color} glow pulsing rhythmically like a cosmic heartbeat
+- Divine ${companion.favorite_color} glow pulsing rhythmically like a cosmiq heartbeat
 - Energy wisps and particles swirling with volumetric rendering
 - Light bleeding through shell showing internal power
 
 ENVIRONMENT & ATMOSPHERE:
-- Floating in ethereal cosmic realm with ${companion.favorite_color} nebula clouds
-- Distant stars and cosmic phenomena in background
+- Floating in ethereal cosmiq realm with ${companion.favorite_color} nebula clouds
+- Distant stars and cosmiq phenomena in background
 - Divine volumetric god rays (Sistine Chapel-style) piercing through mystical atmosphere
 - Atmospheric depth and scale perspective
 
@@ -519,8 +519,8 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
         if (stageLevel === 'realistic' || stageLevel === 'mythic') {
           aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY: This is an aquatic creature. NO LEGS OR LIMBS of any kind. Only fins, tail, and streamlined body. Absolutely no legs, arms, or terrestrial limbs. Maintain purely aquatic anatomy.';
         } else {
-          // Legendary tier - aquatic still maintained even at cosmic scale
-          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE: Even at cosmic/divine scale, this remains an AQUATIC entity. NO LEGS OR TERRESTRIAL LIMBS even in legendary form. Cosmic fins, nebula tail flukes, stellar streamlined form - but NEVER legs. The creature can be universe-scale but must remain recognizably aquatic in nature (fins, not limbs; flowing, not walking; oceanic movement even through space).';
+          // Legendary tier - aquatic still maintained even at cosmiq scale
+          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE: Even at cosmiq/divine scale, this remains an AQUATIC entity. NO LEGS OR TERRESTRIAL LIMBS even in legendary form. Cosmiq fins, nebula tail flukes, stellar streamlined form - but NEVER legs. The creature can be universe-scale but must remain recognizably aquatic in nature (fins, not limbs; flowing, not walking; oceanic movement even through space).';
         }
       }
       
@@ -557,7 +557,7 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
    - Core ${companion.spirit_animal} anatomy maintained: recognizable silhouette and proportions
    - Species recognizable: Should be identifiable as ${companion.spirit_animal} at first glance
    - Base limb structure: Original limb configuration preserved
-   - Mythic additions allowed: Divine horns, ethereal wings, cosmic patterns, energy constructs
+   - Mythic additions allowed: Divine horns, ethereal wings, cosmiq patterns, energy constructs
    - Size can exceed natural limits: Larger-than-life scale permitted
    - Proportions can be heroic/idealized while maintaining species characteristics
    - Elemental manifestations: Can add energy wings, particle limbs, astral features
@@ -566,13 +566,13 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       } else {
         speciesRequirements = `
 1. SPECIES ANATOMY (LEGENDARY CREATIVE FREEDOM):
-   THIS IS THE ULTIMATE ${companion.spirit_animal.toUpperCase()} - A cosmic god-entity with full creative liberty.
+   THIS IS THE ULTIMATE ${companion.spirit_animal.toUpperCase()} - A cosmiq god-entity with full creative liberty.
    
    - Base species recognition: ${companion.spirit_animal} essence visible through divine form
-   - FULL CREATIVE FREEDOM: Add cosmic wings, multiple forms, reality fragments, divine constructs
+   - FULL CREATIVE FREEDOM: Add cosmiq wings, multiple forms, reality fragments, divine constructs
    - Can transcend anatomy: Ethereal limbs, dimensional echoes, astral projections, ghost forms
    - Scale: Colossal, planetary, universe-breaking presence
-   - Divine enhancements unlimited: Halos, crowns, armor, multiple heads, cosmic appendages
+   - Divine enhancements unlimited: Halos, crowns, armor, multiple heads, cosmiq appendages
    - Reality-bending features: Spacetime distortions, dimensional rifts, universe-birthing energy
    - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
    - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
@@ -674,19 +674,19 @@ ${stageLevel === 'realistic' ? `✓ Species Identity: 100% match
 
 Generate an evolution that preserves the companion's exact identity while showing clear growth.` : stageLevel === 'mythic' ? `✓ Species Recognition: 80% match (mythic enhancements allowed)
 ✓ Core Markings: 80% match (can become divine versions)
-✓ Eye Character: 80% match (can gain cosmic properties)
-✓ Color Palette: 85% match (can add divine/cosmic accents)
+✓ Eye Character: 80% match (can gain cosmiq properties)
+✓ Color Palette: 85% match (can add divine/cosmiq accents)
 ✓ Silhouette: 80% match (heroic proportions and divine additions allowed)
-✓ Elemental Style: 80% match (can expand into cosmic manifestations)
+✓ Elemental Style: 80% match (can expand into cosmiq manifestations)
 
-Generate a LEGENDARY evolution that maintains core identity while adding mythic grandeur.` : `✓ Species Essence: Recognizable through cosmic form
-✓ Signature Elements: Visible in divine/cosmic interpretation
+Generate a LEGENDARY evolution that maintains core identity while adding mythic grandeur.` : `✓ Species Essence: Recognizable through cosmiq form
+✓ Signature Elements: Visible in divine/cosmiq interpretation
 ✓ Eye Soul: Core character maintained in transcendent form
 ✓ Color Theme: Original palette echoes through stellar composition
 ✓ Form Echo: Species origin evident in god-tier manifestation
 ✓ Elemental Soul: Core element visible in universe-scale phenomena
 
-Generate an ULTIMATE COSMIC EVOLUTION that achieves grandiose divinity while maintaining species essence.`}`;
+Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while maintaining species essence.`}`;
     }
 
     console.log("Generating evolution image...");
@@ -838,11 +838,11 @@ function getStageGuidance(stage: number): string {
     9: "Mythic warrior at absolute peak, battle-hardened yet elegant, aura of invincibility and wisdom",
     10: "Veteran legend, refined grace, every detail telling stories of countless victories, museum-quality perfection",
     11: "Transcendent being achieving weightlessness, gravitational defiance, ethereal trails and elevated consciousness",
-    12: "Ascended entity hovering in pure energy, species perfection enhanced by cosmic power, reality-bending presence",
-    13: "Ether-born avatar phasing between dimensions, sacred geometry manifesting, cosmic patterns on biological form",
+    12: "Ascended entity hovering in pure energy, species perfection enhanced by cosmiq power, reality-bending presence",
+    13: "Ether-born avatar phasing between dimensions, sacred geometry manifesting, cosmiq patterns on biological form",
     14: "Primordial aspect at titan scale, ancient power condensed into runic energy wrapping anatomically perfect form",
     15: "Colossal divine champion, monumental scale yet every detail pristine, environmental phenomena manifest its presence",
-    16: "Cosmic guardian merged with nebula and stars, eyes containing galaxies, biological perfection meets stellar phenomenon",
+    16: "Cosmiq guardian merged with nebula and stars, eyes containing galaxies, biological perfection meets stellar phenomenon",
     17: "Astral overlord transcending dimensions, multiple temporal echoes, reality fragmenting around ultimate power",
     18: "Universal sovereign at planetary scale, apocalyptic environmental forces, godlike yet anatomically unchanged",
     19: "Mythic apex standing as deity of its species, divine proportions, golden ratio perfection, worshipful grandeur",

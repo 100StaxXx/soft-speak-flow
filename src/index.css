@@ -37,7 +37,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Cosmiq - Cosmic Design System */
+    /* Cosmiq - Cosmiq Design System */
     
     /* Core Brand Colors - Deep Space Palette */
     --obsidian: 0 0% 5%;
@@ -52,12 +52,12 @@ All colors MUST be HSL.
     --electric-purple: 280 90% 70%;
     --neon-glow: 270 100% 75%;
     
-    /* Cosmic Color Additions */
+    /* Cosmiq Color Additions */
     --nebula-pink: 330 70% 55%;
     --celestial-blue: 210 80% 50%;
     --stardust-gold: 45 100% 65%;
     --deep-space: 240 15% 8%;
-    --cosmic-glow: 270 80% 65%;
+    --cosmiq-glow: 270 80% 65%;
     
     /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
@@ -591,13 +591,13 @@ All colors MUST be HSL.
     }
   }
 
-  /* Cosmic glow pulse */
-  @keyframes cosmic-pulse {
+  /* Cosmiq glow pulse */
+  @keyframes cosmiq-pulse {
     0%, 100% {
-      box-shadow: 0 0 20px hsl(var(--cosmic-glow) / 0.3);
+      box-shadow: 0 0 20px hsl(var(--cosmiq-glow) / 0.3);
     }
     50% {
-      box-shadow: 0 0 40px hsl(var(--cosmic-glow) / 0.6), 0 0 60px hsl(var(--cosmic-glow) / 0.3);
+      box-shadow: 0 0 40px hsl(var(--cosmiq-glow) / 0.6), 0 0 60px hsl(var(--cosmiq-glow) / 0.3);
     }
   }
 
@@ -618,8 +618,8 @@ All colors MUST be HSL.
     animation: warp 0.3s ease-in-out;
   }
 
-  .animate-cosmic-pulse {
-    animation: cosmic-pulse 2s ease-in-out infinite;
+  .animate-cosmiq-pulse {
+    animation: cosmiq-pulse 2s ease-in-out infinite;
   }
 
   .animate-fade-in {
@@ -738,8 +738,8 @@ All colors MUST be HSL.
 
   /* ========== COSMIQ GLASS-MORPHISM UTILITIES ========== */
   
-  /* Base cosmic glass effect */
-  .cosmic-glass {
+  /* Base cosmiq glass effect */
+  .cosmiq-glass {
     background: linear-gradient(
       135deg,
       hsl(var(--card) / 0.7),
@@ -747,50 +747,50 @@ All colors MUST be HSL.
     );
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--cosmic-glow) / 0.2);
+    border: 1px solid hsl(var(--cosmiq-glow) / 0.2);
     box-shadow: 
       0 8px 32px rgba(0, 0, 0, 0.4),
       inset 0 1px 0 hsl(var(--pure-white) / 0.1);
   }
 
-  /* Enhanced cosmic card with glow */
-  .cosmic-card {
-    @apply cosmic-glass;
+  /* Enhanced cosmiq card with glow */
+  .cosmiq-card {
+    @apply cosmiq-glass;
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .cosmic-card:hover {
-    border-color: hsl(var(--cosmic-glow) / 0.4);
+  .cosmiq-card:hover {
+    border-color: hsl(var(--cosmiq-glow) / 0.4);
     box-shadow: 
       0 8px 32px rgba(0, 0, 0, 0.4),
-      0 0 40px hsl(var(--cosmic-glow) / 0.2),
+      0 0 40px hsl(var(--cosmiq-glow) / 0.2),
       inset 0 1px 0 hsl(var(--pure-white) / 0.1);
     transform: translateY(-2px);
   }
 
-  /* Cosmic button with glow effect */
-  .cosmic-button {
-    @apply cosmic-glass;
+  /* Cosmiq button with glow effect */
+  .cosmiq-button {
+    @apply cosmiq-glass;
     position: relative;
     overflow: hidden;
   }
 
-  .cosmic-button::before {
+  .cosmiq-button::before {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(
       135deg,
       transparent,
-      hsl(var(--cosmic-glow) / 0.1),
+      hsl(var(--cosmiq-glow) / 0.1),
       transparent
     );
     transform: translateX(-100%);
     transition: transform 0.6s ease;
   }
 
-  .cosmic-button:hover::before {
+  .cosmiq-button:hover::before {
     transform: translateX(100%);
   }
 

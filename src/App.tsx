@@ -51,8 +51,8 @@ const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const BattleArena = lazy(() => import("./pages/BattleArena"));
 const Horoscope = lazy(() => import("./pages/Horoscope"));
-const CosmicAcademy = lazy(() => import("./pages/CosmicAcademy"));
-const CosmicDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
+const CosmiqAcademy = lazy(() => import("./pages/CosmicAcademy"));
+const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
 
 
 // Create query client outside component for better performance and stability
@@ -169,8 +169,8 @@ const AppContent = memo(() => {
           <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
           <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
           <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
-          <Route path="/cosmic-academy" element={<ProtectedRoute><CosmicAcademy /></ProtectedRoute>} />
-          <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmicDeepDive /></ProtectedRoute>} />
+          <Route path="/cosmic-academy" element={<ProtectedRoute><CosmiqAcademy /></ProtectedRoute>} />
+          <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
           <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
           <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />

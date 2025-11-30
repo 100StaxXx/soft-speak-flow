@@ -1,21 +1,21 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-interface CosmicCardProps {
+interface CosmiqCardProps {
   children: ReactNode;
   className?: string;
   glowColor?: "purple" | "pink" | "blue" | "gold";
   intensity?: "subtle" | "medium" | "strong";
 }
 
-export const CosmicCard = ({ 
+export const CosmiqCard = ({ 
   children, 
   className,
   glowColor = "purple",
   intensity = "medium"
-}: CosmicCardProps) => {
+}: CosmiqCardProps) => {
   const glowColorMap = {
-    purple: "hsl(var(--cosmic-glow))",
+    purple: "hsl(var(--cosmiq-glow))",
     pink: "hsl(var(--nebula-pink))",
     blue: "hsl(var(--celestial-blue))",
     gold: "hsl(var(--stardust-gold))",
@@ -30,7 +30,7 @@ export const CosmicCard = ({
   return (
     <div
       className={cn(
-        "cosmic-glass relative overflow-hidden rounded-xl p-6",
+        "cosmiq-glass relative overflow-hidden rounded-xl p-6",
         "transition-all duration-300",
         "hover:scale-[1.01] active:scale-[0.99]",
         className

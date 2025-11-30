@@ -2,12 +2,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Stars } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface CosmicProfileRevealProps {
+interface CosmiqProfileRevealProps {
   onReveal: () => void;
   isRevealing: boolean;
 }
 
-export const CosmicProfileReveal = ({ onReveal, isRevealing }: CosmicProfileRevealProps) => {
+export const CosmiqProfileReveal = ({ onReveal, isRevealing }: CosmiqProfileRevealProps) => {
   return (
     <AnimatePresence>
       <motion.div
@@ -16,7 +16,7 @@ export const CosmicProfileReveal = ({ onReveal, isRevealing }: CosmicProfileReve
         exit={{ opacity: 0, scale: 0.9 }}
         className="flex flex-col items-center justify-center min-h-[400px] space-y-8 p-8"
       >
-        {/* Animated cosmic circle */}
+        {/* Animated cosmiq circle */}
         <motion.div
           animate={{
             rotate: 360,
@@ -67,7 +67,7 @@ export const CosmicProfileReveal = ({ onReveal, isRevealing }: CosmicProfileReve
           >
             <Sparkles className="w-5 h-5 text-accent-purple" />
             <h2 className="text-2xl font-bold text-pure-white">
-              Reveal Your Cosmic Profile
+              Reveal Your Cosmiq Profile
             </h2>
             <Sparkles className="w-5 h-5 text-accent-purple" />
           </motion.div>
@@ -94,7 +94,7 @@ export const CosmicProfileReveal = ({ onReveal, isRevealing }: CosmicProfileReve
           ) : (
             <>
               <Sparkles className="w-5 h-5 mr-2" />
-              Reveal My Cosmic Profile
+              Reveal My Cosmiq Profile
             </>
           )}
         </Button>

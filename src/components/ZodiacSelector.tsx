@@ -62,7 +62,7 @@ export const ZodiacSelector = ({ onComplete }: ZodiacSelectorProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 relative overflow-hidden flex items-center justify-center p-4 md:p-8">
-      {/* Cosmic stars background */}
+      {/* Cosmiq stars background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(100)].map((_, i) => (
           <motion.div

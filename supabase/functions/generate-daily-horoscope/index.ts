@@ -62,12 +62,12 @@ serve(async (req) => {
     // Use local date instead of UTC to avoid timezone issues
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
     const hasAdvancedDetails = !!(profile.birth_time && profile.birth_location);
-    const hasCosmicProfile = !!(profile.moon_sign && profile.rising_sign);
+    const hasCosmiqProfile = !!(profile.moon_sign && profile.rising_sign);
 
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
       .from('user_daily_horoscopes')
-      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip, energy_forecast, placement_insights')
+      .select('horoscope_text, zodiac, is_personalized, for_date, cosmiq_tip, energy_forecast, placement_insights')
       .eq('user_id', user.id)
       .eq('for_date', today)
       .maybeSingle();
@@ -77,9 +77,9 @@ serve(async (req) => {
     }
 
     if (existingHoroscope) {
-      console.log('[Horoscope] Found existing horoscope for', today, 'has cosmic_tip:', !!existingHoroscope.cosmic_tip);
+      console.log('[Horoscope] Found existing horoscope for', today, 'has cosmiq_tip:', !!existingHoroscope.cosmiq_tip);
       
-      if (existingHoroscope.cosmic_tip) {
+      if (existingHoroscope.cosmiq_tip) {
         console.log('[Horoscope] Returning cached horoscope');
         return new Response(
           JSON.stringify({ 
@@ -87,7 +87,7 @@ serve(async (req) => {
             zodiac: existingHoroscope.zodiac,
             isPersonalized: existingHoroscope.is_personalized,
             date: existingHoroscope.for_date,
-            cosmicTip: existingHoroscope.cosmic_tip,
+            cosmiqTip: existingHoroscope.cosmiq_tip,
             energyForecast: existingHoroscope.energy_forecast || null,
             placementInsights: existingHoroscope.placement_insights || null
           }),
@@ -97,8 +97,8 @@ serve(async (req) => {
           }
         );
       } else {
-        // If cosmic_tip is missing, delete old record so we can regenerate
-        console.log('[Horoscope] Deleting incomplete horoscope to regenerate with cosmic tip');
+        // If cosmiq_tip is missing, delete old record so we can regenerate
+        console.log('[Horoscope] Deleting incomplete horoscope to regenerate with cosmiq tip');
         await supabaseClient
           .from('user_daily_horoscopes')
           .delete()
@@ -110,16 +110,16 @@ serve(async (req) => {
     }
 
     // Build prompt based on whether user has advanced astrology details
-    const systemPrompt = `You are a cosmic guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
+    const systemPrompt = `You are a cosmiq guide providing daily horoscope messages. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. ${mentor?.style_description || ''} IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
     
     let userPrompt = '';
     let energyPrompt = '';
     
-    if (hasCosmicProfile) {
-      // Full cosmic profile available - use all 6 placements
+    if (hasCosmiqProfile) {
+      // Full cosmiq profile available - use all 6 placements
       userPrompt = `Generate a deeply personalized daily horoscope for ${today}.
 
-Their Cosmic Profile:
+Their Cosmiq Profile:
 ☀️ Sun: ${profile.zodiac_sign}
 🌙 Moon: ${profile.moon_sign}
 ⬆️ Rising: ${profile.rising_sign}
@@ -131,23 +131,23 @@ Birth Time: ${profile.birth_time}
 Birth Location: ${profile.birth_location}
 
 Weave together:
-- How their Big Three (Sun/Moon/Rising) interact with today's cosmic energy
+- How their Big Three (Sun/Moon/Rising) interact with today's cosmiq energy
 - Mercury's influence on their mind and communication today
 - Mars energy affecting their drive and body
 - Venus coloring their relationships and soul connections
-- Specific actionable guidance that feels personal to this exact cosmic combination
+- Specific actionable guidance that feels personal to this exact cosmiq combination
 
 Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
 
-      energyPrompt = `Based on this person's cosmic profile for ${today}, generate an energy forecast:
+      energyPrompt = `Based on this person's cosmiq profile for ${today}, generate an energy forecast:
 
-Cosmic Profile:
+Cosmiq Profile:
 Sun: ${profile.zodiac_sign}, Moon: ${profile.moon_sign}, Rising: ${profile.rising_sign}
 Mercury: ${profile.mercury_sign}, Mars: ${profile.mars_sign}, Venus: ${profile.venus_sign}
 
 Respond with a JSON object containing:
 {
-  "planetaryWeather": "One sentence describing today's general cosmic energy in simple terms",
+  "planetaryWeather": "One sentence describing today's general cosmiq energy in simple terms",
   "mindEnergy": "One sentence about mental/intellectual energy today (1-10 scale implied)",
   "bodyEnergy": "One sentence about physical/action energy today", 
   "soulEnergy": "One sentence about emotional/spiritual energy today"
@@ -164,7 +164,7 @@ Include:
 - Rising sign influence (calculate based on birth time/location)
 - Current planetary transits affecting their chart
 - Specific guidance for mind, body, and soul
-- One actionable cosmic insight for today
+- One actionable cosmiq insight for today
 
 Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*) for emphasis - use plain text only.`;
     } else {
@@ -173,7 +173,7 @@ Keep it conversational, inspiring, and under 200 words. Do not use asterisks (*)
 Focus on:
 - General energy and themes for ${profile.zodiac_sign} today
 - Guidance for personal growth
-- One cosmic insight or affirmation
+- One cosmiq insight or affirmation
 - Encouragement aligned with their zodiac strengths
 
 Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for emphasis - use plain text only.`;
@@ -216,7 +216,7 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
 
     console.log('[Horoscope] Generated successfully');
 
-    // Generate cosmic tip
+    // Generate cosmiq tip
     const tipResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -228,27 +228,27 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
         messages: [
           { 
             role: 'system', 
-            content: `You are a cosmic guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.` 
+            content: `You are a cosmiq guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.` 
           },
           { 
             role: 'user', 
-            content: `Generate a single daily cosmic tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmic energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.` 
+            content: `Generate a single daily cosmiq tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmiq energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.` 
           }
         ],
       }),
     });
 
-    let cosmicTip = 'The stars guide those who listen. Trust your inner compass today.';
+    let cosmiqTip = 'The stars guide those who listen. Trust your inner compass today.';
     if (tipResponse.ok) {
       const tipData = await tipResponse.json();
-      cosmicTip = tipData.choices?.[0]?.message?.content || cosmicTip;
+      cosmiqTip = tipData.choices?.[0]?.message?.content || cosmiqTip;
     }
 
-    console.log('[Horoscope] Generated cosmic tip');
+    console.log('[Horoscope] Generated cosmiq tip');
 
     // Generate energy forecast for advanced profiles
     let energyForecast = null;
-    if (hasCosmicProfile && energyPrompt) {
+    if (hasCosmiqProfile && energyPrompt) {
       try {
         const energyResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -259,7 +259,7 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'You are a cosmic guide. Return only valid JSON.' },
+              { role: 'system', content: 'You are a cosmiq guide. Return only valid JSON.' },
               { role: 'user', content: energyPrompt }
             ],
           }),
@@ -280,11 +280,11 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
 
     // Generate placement-specific insights for personalized profiles
     let placementInsights = null;
-    if (hasCosmicProfile) {
+    if (hasCosmiqProfile) {
       try {
         const placementPrompt = `Generate brief daily insights for each astrological placement for ${today}:
 
-Cosmic Profile:
+Cosmiq Profile:
 - Sun in ${profile.zodiac_sign}: Core identity and life force
 - Moon in ${profile.moon_sign}: Emotions and inner world
 - Rising in ${profile.rising_sign}: Outer persona and first impressions
@@ -313,7 +313,7 @@ Respond with JSON:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'You are a cosmic guide. Return only valid JSON with no markdown formatting.' },
+              { role: 'system', content: 'You are a cosmiq guide. Return only valid JSON with no markdown formatting.' },
               { role: 'user', content: placementPrompt }
             ],
           }),
@@ -332,7 +332,7 @@ Respond with JSON:
       }
     }
 
-    // Store the horoscope and cosmic tip for today
+    // Store the horoscope and cosmiq tip for today
     const { error: insertError } = await supabaseClient
       .from('user_daily_horoscopes')
       .insert({
@@ -341,7 +341,7 @@ Respond with JSON:
         zodiac: profile.zodiac_sign,
         horoscope_text: horoscope,
         is_personalized: hasAdvancedDetails,
-        cosmic_tip: cosmicTip,
+        cosmiq_tip: cosmiqTip,
         energy_forecast: energyForecast,
         placement_insights: placementInsights
       });
@@ -357,7 +357,7 @@ Respond with JSON:
         zodiac: profile.zodiac_sign,
         isPersonalized: hasAdvancedDetails,
         date: today,
-        cosmicTip,
+        cosmiqTip,
         energyForecast,
         placementInsights
       }),

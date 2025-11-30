@@ -54,7 +54,7 @@ export const StarfieldBackground = () => {
           style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 25s ease-in-out infinite reverse' }}
         />
         <div 
-          className="absolute top-1/2 left-1/2 w-[400px] h-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] bg-gradient-to-br from-[hsl(var(--cosmic-glow))] to-transparent"
+          className="absolute top-1/2 left-1/2 w-[400px] h-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] bg-gradient-to-br from-[hsl(var(--cosmiq-glow))] to-transparent"
           style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 30s ease-in-out infinite' }}
         />
       </div>

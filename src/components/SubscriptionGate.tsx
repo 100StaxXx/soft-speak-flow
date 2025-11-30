@@ -73,7 +73,7 @@ export const SubscriptionGate = () => {
           <div className="space-y-3">
           {[
             { icon: Sparkles, text: "All 21 evolution stages unlocked" },
-            { icon: Moon, text: "Personalized Daily Cosmic Insight" },
+            { icon: Moon, text: "Personalized Daily Cosmiq Insight" },
             { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
             { icon: Crown, text: "Pet Mode, Guild Stories & all premium features" },
             { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },

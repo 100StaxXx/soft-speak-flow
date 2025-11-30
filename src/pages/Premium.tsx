@@ -94,7 +94,7 @@ export default function Premium() {
                 },
                 {
                   icon: Moon,
-                  title: "Personalized Cosmic Insight",
+                  title: "Personalized Cosmiq Insight",
                   description: "Daily horoscope with rising sign and planetary transit influences"
                 },
                 {

@@ -106,16 +106,16 @@ export const TaskCard = ({
       <Card
         className={cn(
           "relative overflow-hidden transition-all duration-300 cursor-pointer group",
-          // Main Quest Styling - Gold cosmic glow
+          // Main Quest Styling - Gold cosmiq glow
           isMainQuest && [
             "border-2 border-stardust-gold",
-            "cosmic-glass",
+            "cosmiq-glass",
             "shadow-[0_0_20px_hsl(var(--stardust-gold)/0.5),0_4px_16px_rgba(0,0,0,0.3)]",
             "hover:shadow-[0_0_30px_hsl(var(--stardust-gold)/0.7),0_8px_24px_rgba(0,0,0,0.4)]",
             "scale-[1.02]"
           ],
-          // Side Quest Styling - Subtle cosmic glass
-          !isMainQuest && "cosmic-glass hover:shadow-lg border-border/50",
+          // Side Quest Styling - Subtle cosmiq glass
+          !isMainQuest && "cosmiq-glass hover:shadow-lg border-border/50",
           // Completed state
           task.completed && "opacity-60"
         )}
