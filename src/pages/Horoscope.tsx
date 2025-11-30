@@ -301,7 +301,7 @@ const Horoscope = () => {
           </Card>
         </motion.div>
 
-        {/* Energy Forecast (only for advanced profiles) */}
+        {/* Planetary Weather (only for advanced profiles) */}
         {energyForecast && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -309,35 +309,67 @@ const Horoscope = () => {
             transition={{ delay: 0.5 }}
             className="space-y-3"
           >
-            <Card className="bg-obsidian/80 border-purple-500/30 p-5">
-              <h3 className="text-lg font-bold text-white mb-4">Today's Energy Forecast</h3>
+            {/* Today's Planetary Weather */}
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Moon className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-bold text-white">Today's Planetary Weather</h3>
+              </div>
+              <p className="text-gray-200 text-sm leading-relaxed">
+                {energyForecast.planetaryWeather}
+              </p>
+            </Card>
+
+            {/* Your Energy Forecast */}
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-5">
+              <h3 className="text-lg font-bold text-white mb-4">Your Energy Forecast</h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-cyan-300 font-bold text-xs">M</span>
                   </div>
-                  <div>
-                    <p className="text-xs text-steel uppercase mb-1">Mind</p>
-                    <p className="text-sm text-gray-200">{energyForecast.mindEnergy}</p>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400 uppercase mb-1 font-semibold">Mind</p>
+                    <p className="text-sm text-gray-200 leading-relaxed">{energyForecast.mindEnergy}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-red-300 font-bold text-xs">B</span>
                   </div>
-                  <div>
-                    <p className="text-xs text-steel uppercase mb-1">Body</p>
-                    <p className="text-sm text-gray-200">{energyForecast.bodyEnergy}</p>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400 uppercase mb-1 font-semibold">Body</p>
+                    <p className="text-sm text-gray-200 leading-relaxed">{energyForecast.bodyEnergy}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-pink-300 font-bold text-xs">S</span>
                   </div>
-                  <div>
-                    <p className="text-xs text-steel uppercase mb-1">Soul</p>
-                    <p className="text-sm text-gray-200">{energyForecast.soulEnergy}</p>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400 uppercase mb-1 font-semibold">Soul</p>
+                    <p className="text-sm text-gray-200 leading-relaxed">{energyForecast.soulEnergy}</p>
                   </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Learn More about Your Cosmic Profile */}
+            <Card className="bg-gradient-to-br from-purple-900/30 via-pink-900/30 to-blue-900/30 border border-purple-500/30 backdrop-blur-sm p-5">
+              <div className="flex items-start gap-3">
+                <Star className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-200 mb-3 font-medium">
+                    Want to understand what all this means for you?
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/cosmic-academy')}
+                    className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-white transition-all"
+                  >
+                    Explore Cosmic Academy →
+                  </Button>
                 </div>
               </div>
             </Card>
