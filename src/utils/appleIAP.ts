@@ -31,11 +31,6 @@ interface IAPPlugin {
   getProducts: (options: { productIdentifiers: string[] }) => Promise<{ products: IAPProduct[] }>;
 }
 
-// Dynamically import IAP plugin to avoid build errors if not installed
-let InAppPurchase: IAPPlugin | null = null;
-try {
-  // @ts-expect-error - Dynamic import for optional plugin
-  InAppPurchase = (window as unknown as { CapacitorInAppPurchases?: IAPPlugin }).CapacitorInAppPurchases ?? null;
 interface CapacitorInAppPurchasesPlugin {
   buy: (options: { productIdentifier: string }) => Promise<any>;
   restorePurchases: () => Promise<any>;
@@ -51,8 +46,8 @@ try {
 
 // Apple IAP Product IDs - configure these in App Store Connect
 export const IAP_PRODUCTS = {
-  MONTHLY: 'com.revolutions.app.premium.monthly',
-  YEARLY: 'com.revolutions.app.premium.yearly',
+  MONTHLY: 'com.darrylgraham.revolution.premium.monthly',
+  YEARLY: 'com.darrylgraham.revolution.premium.yearly',
 };
 
 // Check if IAP is available (iOS native only)

@@ -79,7 +79,7 @@ export const useActivityFeed = () => {
         .insert([{
           user_id: user.id,
           activity_type: type,
-          activity_data: data as Record<string, unknown>,
+          activity_data: data as any,
         }])
         .select()
         .maybeSingle();

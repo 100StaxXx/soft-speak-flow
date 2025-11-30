@@ -35,6 +35,7 @@ serve(async (req) => {
     const apnsTeamId = Deno.env.get('APNS_TEAM_ID');
     const apnsBundleId = Deno.env.get('APNS_BUNDLE_ID');
     const apnsKey = Deno.env.get('APNS_AUTH_KEY');
+    const apnsEnvironment = Deno.env.get('APNS_ENVIRONMENT') || 'sandbox'; // 'sandbox' for TestFlight, 'production' for App Store
 
     if (!apnsKeyId || !apnsTeamId || !apnsBundleId || !apnsKey) {
       console.error('Missing APNs configuration');
@@ -57,8 +58,13 @@ serve(async (req) => {
     // Generate JWT for APNs authentication
     const jwt = await generateAPNsJWT(apnsKeyId, apnsTeamId, apnsKey);
 
-    // Send to APNs
-    const apnsUrl = `https://api.push.apple.com/3/device/${deviceToken}`;
+    // Send to APNs (sandbox for TestFlight, production for App Store)
+    const apnsHost = apnsEnvironment === 'production' 
+      ? 'api.push.apple.com' 
+      : 'api.sandbox.push.apple.com';
+    const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`;
+    
+    console.log(`Sending push notification to ${apnsEnvironment} APNs:`, deviceToken);
     
     const apnsResponse = await fetch(apnsUrl, {
       method: 'POST',
