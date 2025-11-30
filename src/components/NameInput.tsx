@@ -62,13 +62,7 @@ export const NameInput = ({ onComplete, isLoading }: NameInputProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 p-4 flex items-center justify-center relative overflow-hidden">
-      {/* Decorative floating orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-primary/3 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
-      </div>
+    <div className="min-h-screen p-4 flex items-center justify-center relative overflow-hidden z-10">
       
       <Card className="max-w-md w-full p-8 space-y-8 shadow-glow animate-scale-in relative backdrop-blur-sm bg-card/90 border-primary/20">
         <div className="text-center space-y-4">
