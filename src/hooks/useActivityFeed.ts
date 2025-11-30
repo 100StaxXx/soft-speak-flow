@@ -87,9 +87,15 @@ export const useActivityFeed = () => {
       if (error) throw error;
       if (!activity) throw new Error("Failed to create activity");
 
-      // Trigger AI comment generation in background
+      // Trigger AI comment generation in background (non-blocking)
       supabase.functions.invoke('generate-activity-comment', {
         body: { activityId: activity.id }
+      }).then(({ error: invokeError }) => {
+        if (invokeError) {
+          console.error('Failed to generate activity comment:', invokeError);
+        }
+      }).catch((err) => {
+        console.error('Activity comment generation failed:', err);
       });
 
       return activity;

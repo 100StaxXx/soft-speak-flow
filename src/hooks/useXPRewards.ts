@@ -182,8 +182,14 @@ export const useXPRewards = () => {
   };
 
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
+    // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
-      console.warn('Companion not loaded yet, attempting XP award anyway');
+      console.warn('Cannot award XP: companion not loaded yet');
+      return;
+    }
+    if (awardXP.isPending) {
+      console.warn('Cannot award XP: previous award still in progress');
+      return;
     }
     if (displayReason) {
       showXPToast(xpAmount, displayReason);

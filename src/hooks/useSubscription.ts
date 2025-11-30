@@ -10,6 +10,18 @@ export interface Subscription {
   current_period_end?: string | null;
 }
 
+// Valid status values for type safety
+const VALID_STATUSES: Subscription["status"][] = ["active", "cancelled", "past_due", "trialing", "incomplete"];
+const VALID_PLANS: Subscription["plan"][] = ["monthly", "yearly"];
+
+function isValidStatus(status: unknown): status is Subscription["status"] {
+  return typeof status === "string" && VALID_STATUSES.includes(status as Subscription["status"]);
+}
+
+function isValidPlan(plan: unknown): plan is Subscription["plan"] {
+  return typeof plan === "string" && VALID_PLANS.includes(plan as Subscription["plan"]);
+}
+
 export function useSubscription() {
   const { user } = useAuth();
 
@@ -33,11 +45,31 @@ export function useSubscription() {
     refetchInterval: false, // Disable automatic refetching for better performance
   });
 
-  const subscription = useMemo(() => subscriptionData ? {
-    status: subscriptionData.status as Subscription["status"],
-    plan: subscriptionData.plan as Subscription["plan"],
-    current_period_end: subscriptionData.subscription_end,
-  } : null, [subscriptionData]);
+  const subscription = useMemo(() => {
+    if (!subscriptionData) return null;
+    
+    // Validate status and plan - default to safe values if invalid
+    const status = isValidStatus(subscriptionData.status) 
+      ? subscriptionData.status 
+      : "incomplete";
+    const plan = isValidPlan(subscriptionData.plan) 
+      ? subscriptionData.plan 
+      : "monthly";
+
+    // Log warning if values were unexpected (for debugging)
+    if (!isValidStatus(subscriptionData.status)) {
+      console.warn(`Unexpected subscription status: ${subscriptionData.status}`);
+    }
+    if (subscriptionData.plan && !isValidPlan(subscriptionData.plan)) {
+      console.warn(`Unexpected subscription plan: ${subscriptionData.plan}`);
+    }
+
+    return {
+      status,
+      plan,
+      current_period_end: subscriptionData.subscription_end,
+    };
+  }, [subscriptionData]);
 
   // Helper functions - memoized for performance
   const isActive = subscriptionData?.subscribed || false;
