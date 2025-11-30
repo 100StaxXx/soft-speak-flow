@@ -2750,6 +2750,7 @@ export type Database = {
         Row: {
           cosmic_tip: string | null
           created_at: string | null
+          energy_forecast: Json | null
           for_date: string
           horoscope_text: string
           id: string
@@ -2760,6 +2761,7 @@ export type Database = {
         Insert: {
           cosmic_tip?: string | null
           created_at?: string | null
+          energy_forecast?: Json | null
           for_date?: string
           horoscope_text: string
           id?: string
@@ -2770,6 +2772,7 @@ export type Database = {
         Update: {
           cosmic_tip?: string | null
           created_at?: string | null
+          energy_forecast?: Json | null
           for_date?: string
           horoscope_text?: string
           id?: string
@@ -3123,6 +3126,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      zodiac_sign_content: {
+        Row: {
+          challenges: string[]
+          compatible_signs: string[]
+          created_at: string | null
+          daily_practice: string
+          id: string
+          in_relationships: string
+          in_wellness: string
+          in_work: string
+          overview: string
+          placement: string
+          sign: string
+          strengths: string[]
+          tagline: string
+          title: string
+        }
+        Insert: {
+          challenges?: string[]
+          compatible_signs?: string[]
+          created_at?: string | null
+          daily_practice: string
+          id?: string
+          in_relationships: string
+          in_wellness: string
+          in_work: string
+          overview: string
+          placement: string
+          sign: string
+          strengths?: string[]
+          tagline: string
+          title: string
+        }
+        Update: {
+          challenges?: string[]
+          compatible_signs?: string[]
+          created_at?: string | null
+          daily_practice?: string
+          id?: string
+          in_relationships?: string
+          in_wellness?: string
+          in_work?: string
+          overview?: string
+          placement?: string
+          sign?: string
+          strengths?: string[]
+          tagline?: string
+          title?: string
+        }
+        Relationships: []
       }
     }
     Views: {

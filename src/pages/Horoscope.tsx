@@ -16,6 +16,7 @@ const Horoscope = () => {
   const [zodiac, setZodiac] = useState<string | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [date, setDate] = useState<string>("");
+  const [energyForecast, setEnergyForecast] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const Horoscope = () => {
       setIsPersonalized(data.isPersonalized);
       setDate(data.date);
       setCosmicTip(data.cosmicTip || null);
+      setEnergyForecast(data.energyForecast || null);
     } catch (error) {
       console.error('Error generating horoscope:', error);
       toast({
@@ -299,11 +301,54 @@ const Horoscope = () => {
           </Card>
         </motion.div>
 
+        {/* Energy Forecast (only for advanced profiles) */}
+        {energyForecast && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="space-y-3"
+          >
+            <Card className="bg-obsidian/80 border-purple-500/30 p-5">
+              <h3 className="text-lg font-bold text-white mb-4">Today's Energy Forecast</h3>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-cyan-300 font-bold text-xs">M</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-steel uppercase mb-1">Mind</p>
+                    <p className="text-sm text-gray-200">{energyForecast.mindEnergy}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-red-300 font-bold text-xs">B</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-steel uppercase mb-1">Body</p>
+                    <p className="text-sm text-gray-200">{energyForecast.bodyEnergy}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-pink-300 font-bold text-xs">S</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-steel uppercase mb-1">Soul</p>
+                    <p className="text-sm text-gray-200">{energyForecast.soulEnergy}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Cosmic Tip */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.6 }}
         >
           <Card className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 border-none p-6 shadow-glow-lg">
             <div className="flex items-start gap-3">
