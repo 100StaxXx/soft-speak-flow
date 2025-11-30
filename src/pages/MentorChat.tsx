@@ -117,6 +117,7 @@ export default function MentorChat() {
           <AskMentorChat
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
+            mentorId={mentor.id}
           />
         </div>
         <BottomNav />

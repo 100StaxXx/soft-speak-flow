@@ -19,6 +19,7 @@ interface Message {
 interface AskMentorChatProps {
   mentorName: string;
   mentorTone: string;
+  mentorId?: string;
   hasActiveHabits?: boolean;
   hasActiveChallenges?: boolean;
 }
@@ -62,6 +63,7 @@ const getSmartPrompts = (
 export const AskMentorChat = ({ 
   mentorName, 
   mentorTone,
+  mentorId,
   hasActiveHabits = false,
   hasActiveChallenges = false
 }: AskMentorChatProps) => {
@@ -126,8 +128,8 @@ export const AskMentorChat = ({
 
       // Save conversation history (non-blocking - don't fail if this errors)
       void supabase.from('mentor_chats').insert([
-        { user_id: currentUser.id, role: 'user', content: text },
-        { user_id: currentUser.id, role: 'assistant', content: data.response }
+        { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
+        { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
       ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
     } catch (error) {
       console.error("Mentor chat error:", error);
@@ -156,8 +158,8 @@ export const AskMentorChat = ({
 
       // Save both messages even with fallback (non-blocking)
       void supabase.from('mentor_chats').insert([
-        { user_id: currentUser.id, role: 'user', content: text },
-        { user_id: currentUser.id, role: 'assistant', content: fallback.content }
+        { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
+        { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
       ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
     } finally {
       setIsLoading(false);
