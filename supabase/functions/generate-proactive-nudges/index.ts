@@ -57,7 +57,7 @@ serve(async (req) => {
               .from('mentors')
               .select('name, tone_description')
               .eq('id', profile.selected_mentor_id)
-              .single()
+              .maybeSingle()
 
             if (mentor) {
               const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
@@ -117,7 +117,7 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
                 .from('mentors')
                 .select('name, tone_description')
                 .eq('id', profile.selected_mentor_id)
-                .single()
+                .maybeSingle()
 
               if (mentor) {
                 const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
@@ -163,7 +163,7 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
             .eq('user_id', profile.id)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single()
+            .maybeSingle()
 
           // Check if user has been quiet (no activity in last 6 hours)
           const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
@@ -174,7 +174,7 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
               .from('mentors')
               .select('name, tone_description')
               .eq('id', profile.selected_mentor_id)
-              .single()
+              .maybeSingle()
 
             if (mentor) {
               const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.

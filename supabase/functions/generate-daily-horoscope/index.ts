@@ -33,11 +33,18 @@ serve(async (req) => {
       .from('profiles')
       .select('zodiac_sign, birthdate, birth_time, birth_location, selected_mentor_id, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
-      console.error('Error fetching profile:', profileError);
+      console.error('[Horoscope] Error fetching profile:', profileError);
       throw profileError;
+    }
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({ error: 'Profile not found. Please complete onboarding.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!profile?.zodiac_sign) {

@@ -33,11 +33,18 @@ serve(async (req) => {
       .from('profiles')
       .select('zodiac_sign, birthdate, birth_time, birth_location, cosmic_profile_generated_at')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
       console.error('Error fetching profile:', profileError);
       throw profileError;
+    }
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({ error: 'Profile not found. Please complete onboarding.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Check if profile was already generated today (database-level check)

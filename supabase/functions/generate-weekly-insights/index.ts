@@ -51,7 +51,7 @@ serve(async (req) => {
       .from('profiles')
       .select('selected_mentor_id')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
 
     if (!profile?.selected_mentor_id) {
       throw new Error('No mentor selected')
@@ -61,7 +61,7 @@ serve(async (req) => {
       .from('mentors')
       .select('name, tone_description')
       .eq('id', profile.selected_mentor_id)
-      .single()
+      .maybeSingle()
 
     if (!mentor) throw new Error('Mentor not found')
 

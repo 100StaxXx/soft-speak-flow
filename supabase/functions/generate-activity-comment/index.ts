@@ -55,16 +55,17 @@ serve(async (req) => {
       .from('profiles')
       .select('selected_mentor_id')
       .eq('id', activity.user_id)
-      .single()
+      .maybeSingle()
 
     if (profileError) throw profileError
+    if (!profile?.selected_mentor_id) throw new Error('Profile or mentor not found')
 
     // Get mentor personality
     const { data: mentor } = await supabase
       .from('mentors')
       .select('name, tone_description')
       .eq('id', profile.selected_mentor_id)
-      .single()
+      .maybeSingle()
 
     if (!mentor) throw new Error('Mentor not found')
 
@@ -87,7 +88,7 @@ serve(async (req) => {
       .select('title, topic_category, emotional_triggers, summary')
       .eq('for_date', today)
       .limit(1)
-      .single()
+      .maybeSingle()
 
     // Check for milestone achievements
     let milestoneContext = ''

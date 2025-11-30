@@ -77,12 +77,12 @@ serve(async (req) => {
         .from('daily_check_ins')
         .select('*')
         .eq('id', checkInId)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('profiles')
         .select('selected_mentor_id')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
     ]);
 
     // Check both errors and provide detailed error message
@@ -116,7 +116,7 @@ serve(async (req) => {
       .from('mentors')
       .select('name, tone_description, slug')
       .eq('id', profile.selected_mentor_id)
-      .single()
+      .maybeSingle()
 
     if (mentorError || !mentor) {
       console.error('Mentor fetch error:', mentorError);
