@@ -143,18 +143,19 @@ const Horoscope = () => {
 
       if (error) throw error;
 
-      // Invalidate profile cache to trigger immediate refetch
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-
       toast({
         title: "Saved!",
         description: "Your birth details have been updated. Generating your fresh Cosmiq reading...",
       });
 
-      // Wait for profile to refetch before proceeding
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Invalidate and refetch profile immediately
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      
+      // Wait for profile state to update
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Immediately regenerate horoscope with new advanced details
+      // Regenerate horoscope with new advanced details
       await generateHoroscope();
 
       // Auto-trigger cosmic profile calculation for first-time users (only if not generated today)
