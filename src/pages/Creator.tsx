@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 
 export default function Creator() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -102,6 +104,20 @@ export default function Creator() {
               </h1>
               <p className="text-muted-foreground">
                 Start sharing and earn rewards when your followers subscribe
+              </p>
+            </div>
+
+            {/* Dashboard Button */}
+            <div className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg">
+              <Button
+                onClick={() => navigate(`/creator/dashboard?code=${result.code}`)}
+                className="w-full"
+                size="lg"
+              >
+                View Your Dashboard →
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Track your referrals and earnings
               </p>
             </div>
 
