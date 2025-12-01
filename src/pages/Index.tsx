@@ -282,7 +282,7 @@ const Index = () => {
                     ✨ Cosmiq Insight ✨
                   </motion.h2>
                   <p className="text-base text-foreground/90 font-medium">
-                    <span className="font-cinzel text-lg">click</span> to discover your daily celestial guidance
+                    Discover your daily celestial guidance
                   </p>
                 </div>
 
