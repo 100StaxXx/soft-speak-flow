@@ -165,19 +165,27 @@ export function EvolutionCardFlip({ card }: Props) {
           <span id="evolution-card-description" className="sr-only">
             Detailed view of {card.creature_name}, a {card.rarity} {card.element} {card.species} at evolution stage {card.evolution_stage}
           </span>
+          {/* Clickable backdrop to close */}
+          <div 
+            className="absolute inset-0 z-40"
+            onClick={() => setIsOpen(false)}
+          />
           <div className="relative w-full h-[80vh] flex items-center justify-center">
             {/* Share Button */}
             <button
               onClick={handleShare}
-              className="absolute top-4 right-16 z-50 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+              className="absolute top-4 right-20 z-50 p-3 rounded-full bg-black/70 backdrop-blur-sm text-white hover:bg-black/90 active:bg-black transition-colors touch-manipulation"
             >
               <Share2 className="w-6 h-6" />
             </button>
             
-            {/* Close Button */}
+            {/* Close Button - larger touch target */}
             <button
-              onClick={() => setIsOpen(false)}
-              className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="absolute top-4 right-4 z-50 p-3 rounded-full bg-black/70 backdrop-blur-sm text-white hover:bg-black/90 active:bg-black transition-colors touch-manipulation"
             >
               <X className="w-6 h-6" />
             </button>
