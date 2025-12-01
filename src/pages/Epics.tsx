@@ -12,10 +12,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
 
 const Epics = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [showPageInfo, setShowPageInfo] = useState(false);
   const { user } = useAuth();
   const {
     activeEpics,
@@ -48,8 +51,12 @@ const Epics = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 text-center"
+          className="mb-8 text-center relative"
         >
+          <PageInfoButton 
+            onClick={() => setShowPageInfo(true)} 
+            className="absolute right-0 top-0"
+          />
           <div className="inline-flex items-center gap-2 mb-3 bg-gradient-to-r from-primary/20 to-purple-500/20 px-4 py-2 rounded-full">
             <Sparkles className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium">Legendary Quests</span>

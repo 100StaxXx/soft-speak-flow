@@ -16,10 +16,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, TrendingUp, BookOpen, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
+import { useState } from "react";
 
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading } = useCompanion();
+  const [showPageInfo, setShowPageInfo] = useState(false);
 
   // Show loading state while companion is being fetched
   if (isLoading || !companion) {
@@ -49,12 +53,15 @@ const Companion = () => {
                 <Sparkles className="h-5 w-5 text-primary" />
                 <h1 className="font-heading font-black text-xl">Companion</h1>
               </div>
-              <div data-tour="companion-tooltip-anchor">
-                <CompanionBadge 
-                  element={companion.core_element}
-                  stage={companion.current_stage}
-                  showStage={true}
-                />
+              <div className="flex items-center gap-2">
+                <PageInfoButton onClick={() => setShowPageInfo(true)} />
+                <div data-tour="companion-tooltip-anchor">
+                  <CompanionBadge 
+                    element={companion.core_element}
+                    stage={companion.current_stage}
+                    showStage={true}
+                  />
+                </div>
               </div>
             </div>
           </header>

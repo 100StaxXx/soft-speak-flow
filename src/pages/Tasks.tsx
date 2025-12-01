@@ -55,6 +55,8 @@ import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
 
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -80,6 +82,9 @@ export default function Tasks() {
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
+  
+  // Page info state
+  const [showPageInfo, setShowPageInfo] = useState(false);
   
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -634,6 +639,7 @@ export default function Tasks() {
                     <CalendarIcon className="h-4 w-4" />
                     <span className="hidden sm:inline">Month</span>
                   </Button>
+                  <PageInfoButton onClick={() => setShowPageInfo(true)} />
                 </div>
               </div>
 
@@ -1114,6 +1120,22 @@ export default function Tasks() {
       <JoinEpicDialog
         open={joinEpicDialogOpen}
         onOpenChange={setJoinEpicDialogOpen}
+      />
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Quests"
+        icon={Swords}
+        description="Quests are your daily tasks that help you level up and grow your companion."
+        features={[
+          "Add quests throughout your day to build your routine",
+          "First 3 quests earn full XP, then rewards decrease",
+          "Main Quest gives you a 1.5x XP boost",
+          "Use advanced options to schedule quests with time blocking",
+          "Create Epics to link quests to long-term goals"
+        ]}
+        tip="Tap the calendar icon to see your weekly view and plan ahead!"
       />
 
       <BottomNav />

@@ -26,6 +26,8 @@ import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -37,6 +39,7 @@ const Profile = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
   const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | null>(null);
+  const [showPageInfo, setShowPageInfo] = useState(false);
 
   // Check if we should open a specific tab from navigation state
   useEffect(() => {
@@ -191,10 +194,15 @@ const Profile = () => {
       <div className="min-h-screen pb-24 relative">
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6">
           <div className="max-w-4xl mx-auto px-4 py-4 safe-area-top">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Profile
-            </h1>
-            <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Profile
+                </h1>
+                <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
+              </div>
+              <PageInfoButton onClick={() => setShowPageInfo(true)} />
+            </div>
           </div>
         </div>
 
@@ -388,6 +396,22 @@ const Profile = () => {
           documentType={viewingLegalDoc}
         />
       )}
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Your Profile"
+        icon={User}
+        description="Manage your account settings, notifications, and preferences all in one place."
+        features={[
+          "Update your account information and subscription",
+          "Change your mentor anytime to match your needs",
+          "Manage push notifications and daily reminders",
+          "Share your referral code to unlock companion skins",
+          "Customize app preferences and sound settings"
+        ]}
+        tip="Invite friends with your referral code to unlock exclusive companion skins!"
+      />
     </PageTransition>
   );
 };
