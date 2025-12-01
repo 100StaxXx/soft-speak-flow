@@ -12,6 +12,7 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { MessageCircle } from "lucide-react";
 import { useState } from "react";
+import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 
 
 export default function MentorChat() {
@@ -19,6 +20,7 @@ export default function MentorChat() {
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const haptics = useHapticFeedback();
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
     queryKey: ['mentor', profile?.selected_mentor_id],
@@ -109,7 +111,10 @@ export default function MentorChat() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <PageInfoButton onClick={() => setShowPageInfo(true)} />
+            <PageInfoButton onClick={() => {
+              haptics.tap();
+              setShowPageInfo(true);
+            }} />
           </div>
           
           {/* Title overlay */}
