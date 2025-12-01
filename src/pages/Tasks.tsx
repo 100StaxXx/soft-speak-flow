@@ -57,6 +57,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -782,13 +783,16 @@ export default function Tasks() {
 
             <Card className="p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 data-tour="today-quests-header" className="font-semibold">
-                    {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
-                  </p>
+                <div className="flex items-center">
+                  <div>
+                    <h3 data-tour="today-quests-header" className="font-semibold inline-flex items-center">
+                      {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
+                    </h3>
+                    <QuestSectionTooltip />
+                    <p className="text-sm text-muted-foreground">
+                      {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
+                    </p>
+                  </div>
                 </div>
                 <div className="text-sm font-medium text-primary">
                   {completedCount}/{totalCount}
