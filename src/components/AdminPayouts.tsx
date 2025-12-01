@@ -22,6 +22,7 @@ interface ReferralPayout {
   id: string;
   referrer_id: string;
   referee_id: string;
+  referral_code_id: string | null;
   amount: number;
   status: "pending" | "approved" | "paid" | "rejected";
   payout_type: "first_month" | "first_year";
@@ -32,21 +33,27 @@ interface ReferralPayout {
   rejected_at: string | null;
   admin_notes: string | null;
   paypal_transaction_id: string | null;
-  referrer: {
-    email: string;
-    display_name: string | null;
-    paypal_email: string | null;
-  };
+  referral_code: {
+    code: string;
+    owner_type: "user" | "influencer";
+    owner_user_id: string | null;
+    influencer_name: string | null;
+    influencer_email: string | null;
+    influencer_handle: string | null;
+    payout_identifier: string | null;
+  } | null;
   referee: {
     email: string;
-    display_name: string | null;
   };
 }
 
 interface ReferrerSummary {
-  referrer_id: string;
+  referral_code_id: string;
+  code: string;
+  owner_type: "user" | "influencer";
+  referrer_name: string;
   referrer_email: string;
-  referrer_name: string | null;
+  referrer_handle: string | null;
   paypal_email: string | null;
   total_pending: number;
   total_approved: number;
@@ -64,7 +71,7 @@ export const AdminPayouts = () => {
   const [adminNotes, setAdminNotes] = useState<string>("");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Fetch all payouts with referrer and referee info
+  // Fetch all payouts with referral code and referee info
   const { data: payouts, isLoading: payoutsLoading } = useQuery({
     queryKey: ["admin-referral-payouts"],
     queryFn: async () => {
@@ -72,8 +79,16 @@ export const AdminPayouts = () => {
         .from("referral_payouts")
         .select(`
           *,
-          referrer:profiles!referrer_id(email, display_name, paypal_email),
-          referee:profiles!referee_id(email, display_name)
+          referral_code:referral_codes!referral_code_id(
+            code,
+            owner_type,
+            owner_user_id,
+            influencer_name,
+            influencer_email,
+            influencer_handle,
+            payout_identifier
+          ),
+          referee:profiles!referee_id(email)
         `)
         .order("created_at", { ascending: false });
 
@@ -82,37 +97,50 @@ export const AdminPayouts = () => {
     },
   });
 
-  // Calculate referrer summaries
+  // Calculate referrer summaries by referral_code_id
   const referrerSummaries: ReferrerSummary[] = payouts
     ? Object.values(
-        payouts.reduce((acc, payout) => {
-          const id = payout.referrer_id;
-          if (!acc[id]) {
-            acc[id] = {
-              referrer_id: id,
-              referrer_email: payout.referrer?.email || "Unknown",
-              referrer_name: payout.referrer?.display_name,
-              paypal_email: payout.referrer?.paypal_email,
-              total_pending: 0,
-              total_approved: 0,
-              total_paid: 0,
-              pending_count: 0,
-              approved_count: 0,
-              paid_count: 0,
-            };
-          }
-          if (payout.status === "pending") {
-            acc[id].total_pending += Number(payout.amount);
-            acc[id].pending_count++;
-          } else if (payout.status === "approved") {
-            acc[id].total_approved += Number(payout.amount);
-            acc[id].approved_count++;
-          } else if (payout.status === "paid") {
-            acc[id].total_paid += Number(payout.amount);
-            acc[id].paid_count++;
-          }
-          return acc;
-        }, {} as Record<string, ReferrerSummary>)
+        payouts
+          .filter((p) => p.referral_code_id) // Only include payouts with referral codes
+          .reduce((acc, payout) => {
+            const id = payout.referral_code_id!;
+            if (!acc[id]) {
+              const rc = payout.referral_code;
+              acc[id] = {
+                referral_code_id: id,
+                code: rc?.code || "Unknown",
+                owner_type: rc?.owner_type || "user",
+                referrer_name:
+                  rc?.owner_type === "influencer"
+                    ? rc.influencer_name || "Unknown"
+                    : rc?.influencer_email || "Unknown",
+                referrer_email:
+                  rc?.owner_type === "influencer"
+                    ? rc.influencer_email || ""
+                    : rc?.influencer_email || "",
+                referrer_handle:
+                  rc?.owner_type === "influencer" ? rc.influencer_handle : null,
+                paypal_email: rc?.payout_identifier || null,
+                total_pending: 0,
+                total_approved: 0,
+                total_paid: 0,
+                pending_count: 0,
+                approved_count: 0,
+                paid_count: 0,
+              };
+            }
+            if (payout.status === "pending") {
+              acc[id].total_pending += Number(payout.amount);
+              acc[id].pending_count++;
+            } else if (payout.status === "approved") {
+              acc[id].total_approved += Number(payout.amount);
+              acc[id].approved_count++;
+            } else if (payout.status === "paid") {
+              acc[id].total_paid += Number(payout.amount);
+              acc[id].paid_count++;
+            }
+            return acc;
+          }, {} as Record<string, ReferrerSummary>)
       )
     : [];
 
@@ -205,11 +233,11 @@ export const AdminPayouts = () => {
     },
   });
 
-  // Bulk approve all pending payouts for a referrer
+  // Bulk approve all pending payouts for a referral code
   const bulkApproveMutation = useMutation({
-    mutationFn: async (referrerId: string) => {
+    mutationFn: async (referralCodeId: string) => {
       const pendingPayouts = payouts?.filter(
-        (p) => p.referrer_id === referrerId && p.status === "pending"
+        (p) => p.referral_code_id === referralCodeId && p.status === "pending"
       );
       if (!pendingPayouts || pendingPayouts.length === 0) return;
 
@@ -219,7 +247,7 @@ export const AdminPayouts = () => {
           status: "approved",
           approved_at: new Date().toISOString(),
         })
-        .eq("referrer_id", referrerId)
+        .eq("referral_code_id", referralCodeId)
         .eq("status", "pending");
 
       if (error) throw error;
@@ -235,11 +263,11 @@ export const AdminPayouts = () => {
   });
 
   const selectedReferrerPayouts = payouts?.filter(
-    (p) => p.referrer_id === selectedReferrer
+    (p) => p.referral_code_id === selectedReferrer
   );
 
   const selectedSummary = referrerSummaries.find(
-    (s) => s.referrer_id === selectedReferrer
+    (s) => s.referral_code_id === selectedReferrer
   );
 
   if (payoutsLoading) {
@@ -324,11 +352,11 @@ export const AdminPayouts = () => {
                 summary.total_paid;
               const readyForPayout =
                 summary.total_approved >= MINIMUM_PAYOUT_THRESHOLD;
-              const isSelected = selectedReferrer === summary.referrer_id;
+              const isSelected = selectedReferrer === summary.referral_code_id;
 
               return (
                 <div
-                  key={summary.referrer_id}
+                  key={summary.referral_code_id}
                   className={`p-4 rounded-lg border cursor-pointer transition-all ${
                     isSelected
                       ? "border-primary bg-primary/5"
@@ -336,17 +364,30 @@ export const AdminPayouts = () => {
                   }`}
                   onClick={() =>
                     setSelectedReferrer(
-                      isSelected ? null : summary.referrer_id
+                      isSelected ? null : summary.referral_code_id
                     )
                   }
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">
-                        {summary.referrer_name || summary.referrer_email}
-                      </p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium">{summary.referrer_name}</p>
+                        {summary.owner_type === "influencer" && (
+                          <Badge variant="secondary" className="text-xs">
+                            Influencer
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {summary.referrer_email}
+                      </p>
+                      {summary.referrer_handle && (
+                        <p className="text-xs text-primary">
+                          {summary.referrer_handle}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Code: {summary.code}
                       </p>
                       {summary.paypal_email && (
                         <p className="text-xs text-green-600">
@@ -398,7 +439,7 @@ export const AdminPayouts = () => {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              bulkApproveMutation.mutate(summary.referrer_id);
+                              bulkApproveMutation.mutate(summary.referral_code_id);
                             }}
                             disabled={bulkApproveMutation.isPending}
                           >
@@ -441,9 +482,7 @@ export const AdminPayouts = () => {
                                 </span>
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Referee:{" "}
-                                {payout.referee?.display_name ||
-                                  payout.referee?.email}
+                                Referee: {payout.referee?.email}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {new Date(payout.created_at).toLocaleDateString()}

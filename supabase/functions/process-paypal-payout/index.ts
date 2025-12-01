@@ -72,12 +72,17 @@ serve(async (req) => {
       });
     }
 
-    // Fetch payout details
+    // Fetch payout details with referral code info
     const { data: payout, error: payoutError } = await supabaseClient
       .from("referral_payouts")
       .select(`
         *,
-        referrer:profiles!referrer_id(paypal_email, email)
+        referral_code:referral_codes!referral_code_id(
+          code,
+          owner_type,
+          payout_identifier,
+          influencer_email
+        )
       `)
       .eq("id", payout_id)
       .single();
@@ -97,10 +102,10 @@ serve(async (req) => {
       });
     }
 
-    // Verify referrer has PayPal email
-    const paypalEmail = payout.referrer.paypal_email || payout.referrer.email;
+    // Get PayPal email from referral code
+    const paypalEmail = payout.referral_code?.payout_identifier;
     if (!paypalEmail) {
-      return new Response(JSON.stringify({ error: "Referrer has no PayPal email configured" }), {
+      return new Response(JSON.stringify({ error: "No PayPal email configured for this referral code" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

@@ -51,6 +51,7 @@ const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const BattleArena = lazy(() => import("./pages/BattleArena"));
 const Horoscope = lazy(() => import("./pages/Horoscope"));
+const Creator = lazy(() => import("./pages/Creator"));
 
 const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
 
@@ -153,6 +154,7 @@ const AppContent = memo(() => {
           <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/creator" element={<Creator />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
