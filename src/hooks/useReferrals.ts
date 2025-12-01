@@ -33,10 +33,7 @@ export const useReferrals = () => {
         .maybeSingle();
 
       if (profileError) throw profileError;
-      if (!profileData) {
-        console.warn('Profile not found for user:', user.id);
-        return null;
-      }
+      if (!profileData) return null;
 
       return {
         referral_code: codeData?.code || null,
