@@ -193,7 +193,7 @@ export function EvolutionCardFlip({ card }: Props) {
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden">
-                  <div className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-visible relative`}>
+                  <div className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
                     {/* Ornate Corner Decorations */}
                     <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-t-2 border-l-2 border-white/40 rounded-tl-xl" />
@@ -261,7 +261,7 @@ export function EvolutionCardFlip({ card }: Props) {
                       </div>
 
                       {/* Bottom Section - Name & Rarity */}
-                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-2 pb-12">
+                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-2 pb-12 backface-hidden">
                         <h3 className="font-bold text-2xl text-center text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wide">
                           ★ {card.creature_name.toUpperCase()} ★
                         </h3>
