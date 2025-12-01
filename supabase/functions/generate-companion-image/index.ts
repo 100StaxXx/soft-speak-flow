@@ -130,48 +130,44 @@ serve(async (req) => {
     
     // Stage 0 uses special silhouette prompt
     if (stage === 0) {
-      fullPrompt = `PHOTOREALISTIC CINEMATIC FANTASY ART - Ultra high quality, 8K detail:
+      fullPrompt = `STYLIZED ANIMATED FANTASY ART - Cute cartoon style, vibrant colors:
 
-SUBJECT: A monumental mystical egg suspended in a divine realm, radiating ${element} elemental power.
+SUBJECT: A magical mystical egg floating in a whimsical realm, glowing with ${element} elemental energy.
 
 EGG DETAILS:
-- Smooth opalescent surface with iridescent rainbow shimmer
-- Subtle ${favoriteColor} undertones with natural organic patterns
-- Semi-translucent crystalline shell with depth and thickness
-- Realistic material properties: subsurface scattering, refraction, reflection
-- Scale: Large enough to suggest the powerful creature within
+- Smooth glossy surface with sparkly iridescent shimmer
+- Beautiful ${favoriteColor} undertones with cute magical patterns
+- Semi-translucent crystalline shell that looks magical and precious
+- Soft cartoon shading with gentle gradients
+- Adorable size that looks like it holds something precious
 
-CRITICAL SILHOUETTE INSIDE:
-Deep within the translucent shell, there MUST be a dark shadowy silhouette:
-- The outline of a FULLY MATURE, powerful ${spiritAnimal.toUpperCase()} at peak adult form (Stage 15)
-- This is a PURE ${spiritAnimal} - NOT a hybrid, NOT a dragon, NOT any other species
-- Anatomically accurate silhouette showing correct ${spiritAnimal} proportions and features
-- Recognizable as a real ${spiritAnimal} from its silhouette alone (correct head shape, body proportions, limb count)
-- Curled in a regal sleeping position, muscles relaxed but defined
-- Shadow is mysterious but shows recognizable ${spiritAnimal} characteristics (ears, tail, body shape)
-- Completely dark and featureless (pure shadow/outline only)
-- Barely visible through shell creating mystical anticipation
-- The shadow suggests IMPRESSIVE SIZE and MAJESTIC PRESENCE
-- Real-world ${spiritAnimal} anatomy maintained even in shadow form
+SILHOUETTE INSIDE (CUTE STYLE):
+Within the translucent shell, a cute dark silhouette is visible:
+- The adorable outline of a ${spiritAnimal.toUpperCase()} curled up sleeping
+- Stylized cartoon proportions - recognizable but cute
+- Curled in a cozy sleeping position
+- Shadow shows recognizable ${spiritAnimal} features (ears, tail shape)
+- Mysterious but endearing - creates anticipation for a cute creature
+- Hints at the adorable companion waiting to hatch
 
 ELEMENTAL EFFECTS:
-${elementEffect}
-- Energy flowing around egg with realistic physics and volumetric rendering
-- Pulsing rhythmic glow in ${favoriteColor} tones suggesting heartbeat
-- Environmental interaction: floating particles, light refraction, atmospheric effects
+- Magical sparkles and gentle glowing particles
+- Soft ${element} energy swirling around the egg
+- Cute magical effects like stars, hearts, or element-themed particles
+- Pulsing gentle glow in ${favoriteColor} suggesting a heartbeat
 
 COMPOSITION & LIGHTING:
-- Dramatic three-quarter view showing egg volume and depth
-- Divine volumetric lighting with god rays piercing through mystical atmosphere
-- Cinematic depth of field with bokeh effects in background
-- Atmospheric perspective creating sense of scale and grandeur
-- Color grading: ethereal, magical, hint of ${favoriteColor} throughout
+- Warm inviting lighting with soft shadows
+- Magical sparkle effects throughout
+- Soft dreamy background with gentle blur
+- Whimsical atmosphere
 
 STYLE REFERENCES:
-- Photoreal rendering quality (Octane/Unreal Engine 5)
-- Fantasy concept art mastery (professional game cinematics)
-- Museum specimen photography meets epic fantasy
-- WETA Workshop creature design quality`;
+- Pixar/Disney animated movie quality
+- Cute mobile game art style
+- Anime-inspired magical objects
+- Pokemon egg aesthetics
+- NEVER photorealistic - always cute and stylized`;
     } else {
       const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
       
@@ -249,45 +245,60 @@ LEGENDARY CREATIVE FREEDOM:
 GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
       }
       
-      fullPrompt = `PHOTOREALISTIC FANTASY CREATURE - Professional concept art quality:
+      // Determine cuteness level based on stage
+      const cutenessLevel = stage <= 5 ? 'adorable' : stage <= 10 ? 'charming' : stage <= 15 ? 'majestic-cute' : 'epic-cute';
+      
+      fullPrompt = `STYLIZED ANIMATED FANTASY CREATURE - Cute cartoon art style, NOT photorealistic:
 
 CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
+
+CRITICAL STYLE DIRECTION:
+- ANIMATED CARTOON STYLE like Pixar, Disney, or high-quality mobile game art
+- CUTE and APPEALING with big expressive eyes and soft rounded features
+- NOT photorealistic - stylized, colorful, and charming
+- Think: adorable fantasy creature from an animated movie
+- Smooth gradients, soft shadows, vibrant saturated colors
+- ${cutenessLevel === 'adorable' ? 'Maximum cuteness - round shapes, big sparkly eyes, tiny paws, fluffy appearance' : 
+    cutenessLevel === 'charming' ? 'Very cute but growing stronger - still has big eyes and appealing features' :
+    cutenessLevel === 'majestic-cute' ? 'Majestic but still endearing - powerful yet lovable' :
+    'Epic scale but retains charm - awe-inspiring yet still has cute appeal'}
 
 BASE DESCRIPTION:
 ${basePrompt}
 ${speciesGuidance}
 
 COLOR PALETTE:
-- Primary colors: ${favoriteColor} tones
-- Eye color: ${eyeColor || favoriteColor}
-- Fur/Feathers/Scales: ${furColor || favoriteColor} with natural variation
-- Elemental glow: ${element} effects (${elementEffect})
+- Primary colors: Vibrant ${favoriteColor} tones with high saturation
+- Eye color: ${eyeColor || favoriteColor} - BIG SPARKLY EXPRESSIVE EYES
+- Fur/Feathers/Scales: ${furColor || favoriteColor} - soft, fluffy appearance
+- Elemental glow: ${element} effects with magical sparkles
 
-RENDERING QUALITY:
-- Photoreal textures with microscopic detail (fur strands, scale patterns, feather barbules)
-- Proper subsurface scattering on skin/scales
-- Realistic material properties (wet, dry, metallic, organic)
-- Accurate light interaction (reflection, refraction, absorption)
+RENDERING STYLE:
+- Smooth cartoon shading (cel-shaded or soft gradient style)
+- Rounded, appealing shapes - no harsh edges
+- Big expressive eyes with shine/sparkle highlights
+- Soft fluffy textures that look huggable
+- Clean linework with soft shadows
 
-CINEMATIC PRESENTATION:
-- Professional three-point lighting setup
-- Atmospheric effects and volumetric lighting
-- Depth of field with cinematic bokeh
-- Dynamic composition emphasizing power and grace
-- Color grading for emotional impact
+CUTE PRESENTATION:
+- Warm, inviting lighting
+- Sparkles and magical particles
+- Friendly approachable pose
+- Soft background with magical atmosphere
+- Emphasis on charm and personality
 
 ELEMENTAL INTEGRATION:
-- ${element} element manifesting naturally with creature's biology
-- Energy effects following anatomical contours
-- Environmental interaction showing elemental power
-- Balanced integration - enhancing not overwhelming
+- ${element} element as cute magical effects (sparkles, gentle glows, soft particles)
+- Energy effects that look magical and whimsical, not harsh
+- Colorful, vibrant elemental accents
 
 STYLE REFERENCES:
-- Photorealistic CGI (Unreal Engine 5 / Octane render quality)
-- Natural history museum specimen detail
-- Fantasy blockbuster VFX (WETA, ILM quality)
-- 8K ultra-high resolution
-- Professional creature design standards`;
+- Pixar/Disney animated movie quality
+- Mobile game character art (high quality)
+- Anime-inspired fantasy creatures
+- Pokemon/creature collector game aesthetics
+- Cute fantasy art with mass appeal
+- NEVER photorealistic - always stylized and animated`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
