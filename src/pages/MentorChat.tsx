@@ -8,12 +8,17 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
+import { MessageCircle } from "lucide-react";
+import { useState } from "react";
 
 
 export default function MentorChat() {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
+  const [showPageInfo, setShowPageInfo] = useState(false);
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
     queryKey: ['mentor', profile?.selected_mentor_id],
@@ -94,15 +99,18 @@ export default function MentorChat() {
             </div>
           )}
           
-          {/* Back button */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate('/')} 
-            className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          {/* Buttons Container */}
+          <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/')} 
+              className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <PageInfoButton onClick={() => setShowPageInfo(true)} />
+          </div>
           
           {/* Title overlay */}
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent p-6 pb-4">

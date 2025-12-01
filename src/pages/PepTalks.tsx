@@ -9,11 +9,15 @@ import { ArrowLeft, Headphones } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { EMOTIONAL_TRIGGERS, TOPIC_CATEGORIES } from "@/config/categories";
+import { PageInfoButton } from "@/components/PageInfoButton";
+import { PageInfoModal } from "@/components/PageInfoModal";
+import { Mic } from "lucide-react";
 
 export default function PepTalks() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
+  const [showPageInfo, setShowPageInfo] = useState(false);
 
   // Fetch pep talks with filters
   const { data: pepTalks, isLoading } = useQuery({
@@ -61,16 +65,19 @@ export default function PepTalks() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Mentor
           </Button>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Headphones className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Headphones className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-heading font-black">Pep Talks</h1>
+                <p className="text-muted-foreground">
+                  Browse motivational audio content
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-heading font-black">Pep Talks</h1>
-              <p className="text-muted-foreground">
-                Browse motivational audio content
-              </p>
-            </div>
+            <PageInfoButton onClick={() => setShowPageInfo(true)} />
           </div>
         </div>
 
@@ -187,6 +194,23 @@ export default function PepTalks() {
           )}
         </div>
       </div>
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Pep Talks"
+        icon={Mic}
+        description="Motivational audio content to inspire and uplift you throughout your day."
+        features={[
+          "Browse pep talks by emotional state or topic",
+          "Listen for XP when you complete 80% of an audio",
+          "Filter by what you're feeling or what you need",
+          "Get personalized content based on your zodiac",
+          "Save favorites to revisit when you need them"
+        ]}
+        tip="Listen to a pep talk each morning to start your day with the right energy!"
+      />
+      
       <BottomNav />
     </div>
   );
