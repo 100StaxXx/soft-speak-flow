@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { toast } from 'sonner';
+import { toPng } from 'html-to-image';
 
 interface ShareOptions {
   title?: string;
@@ -51,6 +52,61 @@ export const downloadImage = async (
   } catch (error) {
     console.error('Error downloading image:', error);
     toast.error('Failed to save image');
+  }
+};
+
+/**
+ * Capture a DOM element as an image and download/share it
+ */
+export const downloadCardElement = async (
+  element: HTMLElement,
+  filename: string,
+  shareOptions?: ShareOptions
+) => {
+  try {
+    toast.loading('Capturing card...');
+    
+    // Capture the element as PNG
+    const dataUrl = await toPng(element, {
+      quality: 1,
+      pixelRatio: 2, // Higher quality
+      backgroundColor: 'transparent',
+    });
+    
+    toast.dismiss();
+
+    if (Capacitor.isNativePlatform()) {
+      // Native iOS/Android: Use Filesystem + Share
+      const base64Data = dataUrl.split(',')[1];
+      
+      // Save to cache directory
+      const savedFile = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
+
+      // Share the file using native share sheet
+      await Share.share({
+        title: shareOptions?.title || 'Companion Card',
+        text: shareOptions?.text || 'Check out my companion!',
+        url: savedFile.uri,
+        dialogTitle: shareOptions?.dialogTitle || 'Share Companion Card',
+      });
+
+      toast.success('Card ready to share!');
+    } else {
+      // Web: Standard download
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      a.click();
+      toast.success('Card downloaded!');
+    }
+  } catch (error) {
+    toast.dismiss();
+    console.error('Error capturing card:', error);
+    toast.error('Failed to capture card');
   }
 };
 
