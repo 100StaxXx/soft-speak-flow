@@ -1,5 +1,11 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.process-referral]
+verify_jwt = false
+
+[functions.record-subscription]
+verify_jwt = false
+
 [functions.generate-guild-story]
 verify_jwt = true
 
