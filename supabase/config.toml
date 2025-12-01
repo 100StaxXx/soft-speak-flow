@@ -1,5 +1,8 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.generate-sample-card]
+verify_jwt = true
+
 [functions.process-referral]
 verify_jwt = false
 
