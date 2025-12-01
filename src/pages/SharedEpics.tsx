@@ -63,9 +63,10 @@ export default function SharedEpics() {
           is_public: false
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (epicError) throw epicError;
+      if (!newEpic) throw new Error('Failed to create epic copy');
 
       // Copy habits
       if (originalEpic.epic_habits && originalEpic.epic_habits.length > 0) {
@@ -80,7 +81,7 @@ export default function SharedEpics() {
               custom_days: epicHabit.habit.custom_days
             })
             .select()
-            .single();
+            .maybeSingle();
 
           if (newHabit) {
             await supabase

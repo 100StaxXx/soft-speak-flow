@@ -78,9 +78,17 @@ const InfluencerDashboard = () => {
         .select("*")
         .eq("code", verifiedCode)
         .eq("owner_type", "influencer")
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching influencer code:", error);
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error("Invalid or expired influencer code");
+      }
+      
       return data as ReferralCode;
     },
     enabled: !!verifiedCode,

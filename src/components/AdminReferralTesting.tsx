@@ -158,9 +158,10 @@ export const AdminReferralTesting = () => {
           status: 'pending'
         } as any)
         .select()
-        .single();
+        .maybeSingle();
 
       if (payoutError) throw payoutError;
+      if (!payout) throw new Error('Failed to create payout record');
 
       addResult("Payout created", 'success', `Payout ID: ${payout.id}, Amount: $${payoutAmount.toFixed(2)}`);
 
@@ -212,11 +213,13 @@ export const AdminReferralTesting = () => {
           .from('referral_codes')
           .select('code, influencer_name, payout_identifier')
           .eq('id', payout.referral_code_id)
-          .single();
+          .maybeSingle();
           
         if (codeData) {
           addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${codeData.code}`);
           addResult("Payout check", 'success', `Identifier: ${codeData.payout_identifier || 'Not set'}`);
+        } else {
+          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
         }
       } else {
         addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
@@ -269,7 +272,7 @@ export const AdminReferralTesting = () => {
           .from('referral_codes')
           .select('*')
           .eq('id', payout.referral_code_id)
-          .single();
+          .maybeSingle();
         codeData = data;
       }
         

@@ -73,14 +73,23 @@ serve(async (req) => {
     const cancellationDateMs = latestReceiptInfo.cancellation_date_ms;
 
     // Find user by transaction ID
-    const { data: subscription } = await supabaseClient
+    const { data: subscription, error: subscriptionError } = await supabaseClient
       .from("subscriptions")
       .select("user_id")
       .eq("stripe_subscription_id", originalTransactionId)
-      .single();
+      .maybeSingle();
+
+    if (subscriptionError) {
+      console.error("Error fetching subscription:", subscriptionError);
+      // Still return 200 to prevent Apple from retrying
+      return new Response("OK", { 
+        status: 200, 
+        headers: corsHeaders 
+      });
+    }
 
     if (!subscription) {
-      console.log("No subscription found for transaction:", originalTransactionId);
+      console.log("No subscription found for transaction:", originalTransactionId, "- This may be a new subscription being processed via verify-apple-receipt");
       // This might be a new subscription, return 200 to acknowledge
       return new Response("OK", { 
         status: 200, 

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Capacitor } from '@capacitor/core';
+import { IAP_PRODUCTS } from "@/utils/appleIAP";
 
 export function SubscriptionManagement() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export function SubscriptionManagement() {
   }
 
   const handleSubscribe = async () => {
-    const success = await handlePurchase('com.darrylgraham.revolution.premium.monthly');
+    const success = await handlePurchase(IAP_PRODUCTS.MONTHLY);
     if (success) {
       toast({
         title: "Success!",
