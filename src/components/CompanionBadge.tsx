@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Flame, Zap, Droplet, Wind, Leaf, Mountain, Star } from "lucide-react";
 import { getStageName } from "@/config/companionStages";
+import { AttributeTooltip } from "@/components/AttributeTooltip";
 
 interface CompanionBadgeProps {
   element: string;
@@ -55,6 +56,10 @@ export const CompanionBadge = ({ element, stage = 1, showStage = true, className
         <>
           <span className="text-xs opacity-50">•</span>
           <span className="text-xs font-medium">{stageName}</span>
+          <AttributeTooltip 
+            title="Stage" 
+            description="Your companion's current evolution stage. There are 21 stages total, from Egg to Ultimate. Earn XP to unlock the next stage!"
+          />
         </>
       )}
     </Badge>
