@@ -353,19 +353,31 @@ async function createReferralPayout(
   transactionId: string,
   plan: string
 ) {
-  // Check if user was referred by someone
+  // Check if user was referred by someone using referral code
   const { data: profile } = await supabase
     .from("profiles")
-    .select("referred_by")
+    .select("referred_by_code")
     .eq("id", userId)
     .single();
 
-  if (!profile?.referred_by) {
+  if (!profile?.referred_by_code) {
     console.log(`User ${userId} was not referred, no payout created`);
     return;
   }
 
-  const referrerId = profile.referred_by;
+  const referralCode = profile.referred_by_code;
+
+  // Find the referral_code record
+  const { data: codeData } = await supabase
+    .from("referral_codes")
+    .select("id, owner_type")
+    .eq("code", referralCode)
+    .single();
+
+  if (!codeData) {
+    console.error(`Referral code ${referralCode} not found`);
+    return;
+  }
 
   // Calculate payout amount based on plan
   const payoutAmount = plan === "yearly" ? 20.00 : 5.00; // 20% of $99.99 or 50% of $9.99
@@ -375,13 +387,13 @@ async function createReferralPayout(
   const { data: existingPayout } = await supabase
     .from("referral_payouts")
     .select("id")
-    .eq("referrer_id", referrerId)
+    .eq("referral_code_id", codeData.id)
     .eq("referee_id", userId)
     .eq("payout_type", payoutType)
     .single();
 
   if (existingPayout) {
-    console.log(`Payout already exists for referrer ${referrerId}, referee ${userId}`);
+    console.log(`Payout already exists for code ${referralCode}, referee ${userId}`);
     return;
   }
 
@@ -389,7 +401,7 @@ async function createReferralPayout(
   const { error } = await supabase
     .from("referral_payouts")
     .insert({
-      referrer_id: referrerId,
+      referral_code_id: codeData.id,
       referee_id: userId,
       amount: payoutAmount,
       status: "pending",
@@ -399,8 +411,8 @@ async function createReferralPayout(
     });
 
   if (error) {
-    console.error(`Failed to create payout for referrer ${referrerId}:`, error);
+    console.error(`Failed to create payout for code ${referralCode}:`, error);
   } else {
-    console.log(`Created ${payoutType} payout of $${payoutAmount} for referrer ${referrerId}`);
+    console.log(`Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`);
   }
 }

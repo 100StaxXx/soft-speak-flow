@@ -9,25 +9,40 @@ export const useReferrals = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch user's referral stats
+  // Fetch user's referral code from referral_codes table
   const { data: referralStats, isLoading } = useQuery({
     queryKey: ["referral-stats", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase
+      // Get user's referral code from referral_codes table
+      const { data: codeData, error: codeError } = await supabase
+        .from("referral_codes")
+        .select("code")
+        .eq("owner_user_id", user.id)
+        .eq("owner_type", "user")
+        .maybeSingle();
+
+      if (codeError) throw codeError;
+
+      // Get referral count from profiles
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("referral_code, referral_count, referred_by")
+        .select("referral_count, referred_by_code")
         .eq("id", user.id)
         .maybeSingle();
 
-      if (error) throw error;
-      // Profile should always exist for authenticated user, but handle gracefully
-      if (!data) {
+      if (profileError) throw profileError;
+      if (!profileData) {
         console.warn('Profile not found for user:', user.id);
         return null;
       }
-      return data;
+
+      return {
+        referral_code: codeData?.code || null,
+        referral_count: profileData.referral_count || 0,
+        referred_by: profileData.referred_by_code,
+      };
     },
     enabled: !!user,
   });
@@ -77,67 +92,32 @@ export const useReferrals = () => {
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
-      // Validate code exists and get referrer
-      const { data: referrer, error: referrerError } = await supabase
-        .from("profiles")
-        .select("id, referral_code")
-        .eq("referral_code", code)
+      // Validate code exists in referral_codes table
+      const { data: codeData, error: codeError } = await supabase
+        .from("referral_codes")
+        .select("id, code, owner_user_id, owner_type")
+        .eq("code", code)
+        .eq("is_active", true)
         .single();
 
-      if (referrerError || !referrer) {
+      if (codeError || !codeData) {
         throw new Error("Invalid referral code");
       }
 
-      // FIX Bugs #15, #18, #21, #24: Use atomic function with retry logic and type safety
-      const result = await retryWithBackoff<ApplyReferralCodeResult>(
-        async () => {
-          const response = await (supabase.rpc as unknown as (name: string, params: any) => Promise<{ data: any; error: any }>)(
-            'apply_referral_code_atomic',
-            {
-              p_user_id: user.id,
-              p_referrer_id: referrer.id,
-              p_referral_code: code
-            }
-          );
-
-          const { data, error } = response as { data: ApplyReferralCodeResult | null; error: Error | null };
-
-          if (error) throw error;
-          if (!data) throw new Error("No data returned from referral application");
-          
-          // Data from this RPC should match ApplyReferralCodeResult
-          return data as unknown as ApplyReferralCodeResult;
-        },
-        {
-          maxAttempts: 3,
-          initialDelay: 1000,
-          shouldRetry: (error: unknown) => {
-            const msg = error instanceof Error ? error.message : String(error);
-            
-            // Don't retry business logic errors
-            if (msg.includes('already_applied') ||
-                msg.includes('invalid_code') ||
-                msg.includes('self_referral')) {
-              return false;
-            }
-            
-            // Retry network/transient errors
-            return msg.includes('network') ||
-                   msg.includes('timeout') ||
-                   msg.includes('temporarily unavailable') ||
-                   msg.includes('connection') ||
-                   msg.includes('ECONNRESET') ||
-                   msg.includes('fetch');
-          }
-        }
-      );
-
-      if (!result || !result.success) {
-        // Get user-friendly error message from database
-        throw new Error(result?.message ?? "Failed to apply referral code");
+      // Prevent self-referral for user codes
+      if (codeData.owner_type === "user" && codeData.owner_user_id === user.id) {
+        throw new Error("Cannot use your own referral code");
       }
 
-      return referrer;
+      // Update profile with referred_by_code
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ referred_by_code: code })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      return codeData;
     },
     onSuccess: () => {
       // Invalidate queries to trigger refetch (UI updates asynchronously)

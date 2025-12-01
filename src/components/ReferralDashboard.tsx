@@ -31,19 +31,34 @@ export const ReferralDashboard = () => {
     }
   }, [profile?.paypal_email]);
 
-  // Fetch user's payouts
+  // Fetch user's payouts via their referral_code
   const { data: payouts } = useQuery({
-    queryKey: ["referral-payouts"],
+    queryKey: ["referral-payouts", profile?.id],
     queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      // First get the user's referral_code_id
+      const { data: codeData } = await supabase
+        .from("referral_codes")
+        .select("id")
+        .eq("owner_user_id", profile.id)
+        .eq("owner_type", "user")
+        .maybeSingle();
+
+      if (!codeData) return [];
+
+      // Then fetch payouts for that referral code
       const { data, error } = await supabase
         .from("referral_payouts")
         .select("*")
+        .eq("referral_code_id", codeData.id)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
       return data;
     },
     staleTime: 30000, // 30 seconds
+    enabled: !!profile?.id,
   });
 
   const handleSavePayPalEmail = async () => {
@@ -54,12 +69,23 @@ export const ReferralDashboard = () => {
 
     setIsSavingEmail(true);
     try {
-      const { error } = await supabase
+      // Update both profiles and referral_codes tables
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({ paypal_email: paypalEmail })
         .eq("id", profile?.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Also update the referral_codes payout_identifier
+      const { error: codeError } = await supabase
+        .from("referral_codes")
+        .update({ payout_identifier: paypalEmail })
+        .eq("owner_user_id", profile?.id)
+        .eq("owner_type", "user");
+
+      if (codeError) throw codeError;
+
       toast.success("PayPal email saved!");
     } catch (error) {
       console.error("Failed to save PayPal email:", error);

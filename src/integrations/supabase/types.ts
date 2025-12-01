@@ -2133,6 +2133,7 @@ export type Database = {
           referral_code: string | null
           referral_count: number | null
           referred_by: string | null
+          referred_by_code: string | null
           rising_sign: string | null
           selected_mentor_id: string | null
           stripe_customer_id: string | null
@@ -2173,6 +2174,7 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
           stripe_customer_id?: string | null
@@ -2213,6 +2215,7 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
           stripe_customer_id?: string | null
@@ -2432,6 +2435,48 @@ export type Database = {
           },
         ]
       }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          influencer_email: string | null
+          influencer_handle: string | null
+          influencer_name: string | null
+          is_active: boolean | null
+          owner_type: string
+          owner_user_id: string | null
+          payout_identifier: string | null
+          payout_method: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          influencer_email?: string | null
+          influencer_handle?: string | null
+          influencer_name?: string | null
+          is_active?: boolean | null
+          owner_type: string
+          owner_user_id?: string | null
+          payout_identifier?: string | null
+          payout_method?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          influencer_email?: string | null
+          influencer_handle?: string | null
+          influencer_name?: string | null
+          is_active?: boolean | null
+          owner_type?: string
+          owner_user_id?: string | null
+          payout_identifier?: string | null
+          payout_method?: string | null
+        }
+        Relationships: []
+      }
       referral_payouts: {
         Row: {
           admin_notes: string | null
@@ -2445,6 +2490,7 @@ export type Database = {
           paypal_payer_id: string | null
           paypal_transaction_id: string | null
           referee_id: string
+          referral_code_id: string | null
           referrer_id: string
           rejected_at: string | null
           status: string
@@ -2462,6 +2508,7 @@ export type Database = {
           paypal_payer_id?: string | null
           paypal_transaction_id?: string | null
           referee_id: string
+          referral_code_id?: string | null
           referrer_id: string
           rejected_at?: string | null
           status?: string
@@ -2479,6 +2526,7 @@ export type Database = {
           paypal_payer_id?: string | null
           paypal_transaction_id?: string | null
           referee_id?: string
+          referral_code_id?: string | null
           referrer_id?: string
           rejected_at?: string | null
           status?: string
@@ -2490,6 +2538,13 @@ export type Database = {
             columns: ["referee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_payouts_referral_code_id_fkey"
+            columns: ["referral_code_id"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
             referencedColumns: ["id"]
           },
           {
