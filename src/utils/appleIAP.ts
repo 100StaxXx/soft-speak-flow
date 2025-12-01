@@ -21,8 +21,8 @@ interface IAPProduct {
 
 // Apple IAP Product IDs - configure these in App Store Connect
 export const IAP_PRODUCTS = {
-  MONTHLY: 'com.darrylgraham.revolution.premium.monthly',
-  YEARLY: 'com.darrylgraham.revolution.premium.yearly',
+  MONTHLY: 'com.revolutions.app.premium.monthly',
+  YEARLY: 'com.revolutions.app.premium.yearly',
 };
 
 // Check if IAP is available (iOS native only)
