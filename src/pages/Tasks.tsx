@@ -1030,13 +1030,22 @@ export default function Tasks() {
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
             ) : activeEpics.length === 0 ? (
-              <EmptyState
-                icon={Trophy}
-                title="No Active Epics"
-                description="Create your first epic quest and link your habits to track legendary progress!"
-                actionLabel="Create Epic"
-                onAction={() => setCreateEpicDialogOpen(true)}
-              />
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Active Epics
+                  </h3>
+                  <EpicSectionTooltip />
+                </div>
+                <EmptyState
+                  icon={Trophy}
+                  title="No Active Epics"
+                  description="Create your first epic quest and link your habits to track legendary progress!"
+                  actionLabel="Create Epic"
+                  onAction={() => setCreateEpicDialogOpen(true)}
+                />
+              </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center">
