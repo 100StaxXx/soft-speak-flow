@@ -58,6 +58,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
+import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
 
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -1038,10 +1039,13 @@ export default function Tasks() {
               />
             ) : (
               <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Target className="h-5 w-5 text-primary" />
-                  Active Epics
-                </h3>
+                <div className="flex items-center">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Active Epics
+                  </h3>
+                  <EpicSectionTooltip />
+                </div>
                 {activeEpics.map((epic) => (
                   <EpicCard
                     key={epic.id}
