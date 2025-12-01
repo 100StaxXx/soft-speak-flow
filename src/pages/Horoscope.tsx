@@ -716,6 +716,21 @@ const Horoscope = () => {
         </motion.div>
       </div>
       <BottomNav />
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Cosmiq Insight"
+        icon={Moon}
+        description="Discover your daily horoscope and unlock deep personalized astrology insights."
+        features={[
+          "Read your daily horoscope based on your zodiac",
+          "Add birth details for personalized cosmic profile",
+          "Explore your Big Three (Sun, Moon, Rising)",
+          "Get energy forecasts for Mind, Body, and Soul"
+        ]}
+        tip="Enter your birth date, time, and location for the most accurate cosmic insights!"
+      />
     </div>
   );
 };

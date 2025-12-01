@@ -188,6 +188,21 @@ const Epics = () => {
           open={joinDialogOpen}
           onOpenChange={setJoinDialogOpen}
         />
+        
+        <PageInfoModal
+          open={showPageInfo}
+          onClose={() => setShowPageInfo(false)}
+          title="About Epics"
+          icon={Target}
+          description="Epics are long-term goals that link your daily habits together for massive growth."
+          features={[
+            "Create epics with target completion days",
+            "Link habits to track progress automatically",
+            "Join guilds to work toward goals with others",
+            "Earn bonus XP for completing epic-linked habits"
+          ]}
+          tip="Epics are perfect for 30-day challenges, fitness goals, or any long-term objective!"
+        />
       </div>
 
       <BottomNav />
