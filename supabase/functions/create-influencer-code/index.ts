@@ -77,7 +77,8 @@ serve(async (req) => {
 
     if (existingCode) {
       // Return existing code instead of creating duplicate
-      const appLink = `https://cosmiq.app/?ref=${existingCode.code}`;
+      const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.app";
+      const appLink = `${appUrl}/?ref=${existingCode.code}`;
       return new Response(
         JSON.stringify({
           code: existingCode.code,
@@ -137,7 +138,9 @@ serve(async (req) => {
       );
     }
 
-    const appLink = `https://cosmiq.app/?ref=${code}`;
+    // Use environment variable or fallback to default
+    const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.app";
+    const appLink = `${appUrl}/?ref=${code}`;
 
     console.log(`Created influencer code for ${name} (@${handle}): ${code}`);
 
@@ -145,7 +148,7 @@ serve(async (req) => {
       JSON.stringify({
         code,
         link: appLink,
-        promo_caption: `✨ Transform your habits into an epic journey with Cosmiq! Use my code ${code} or click: ${appLink}`,
+        promo_caption: `✨ Transform your habits into an epic journey! Use my code ${code} or click: ${appLink}`,
       }),
       {
         status: 200,
