@@ -12,7 +12,7 @@ export function SubscriptionManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan } = useSubscription();
-  const { handleRestore, loading: restoring } = useAppleSubscription();
+  const { handlePurchase, handleRestore, loading: purchasing, isAvailable } = useAppleSubscription();
 
   const handleManageSubscription = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -40,18 +40,51 @@ export function SubscriptionManagement() {
     );
   }
 
+  const handleSubscribe = async () => {
+    const success = await handlePurchase('com.darrylgraham.revolution.premium.monthly');
+    if (success) {
+      toast({
+        title: "Success!",
+        description: "Your subscription is now active",
+      });
+    }
+  };
+
   if (!subscription) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>No Active Subscription</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground mb-4">
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground">
             You don't have an active subscription.
           </p>
-          <Button onClick={() => navigate('/premium')}>
-            View Premium Plans
+          
+          {!isAvailable && (
+            <div className="bg-muted/30 rounded-lg p-3">
+              <p className="text-sm text-muted-foreground text-center">
+                In-App Purchases are only available on iOS devices
+              </p>
+            </div>
+          )}
+          
+          <Button 
+            onClick={handleSubscribe}
+            disabled={purchasing || !isAvailable}
+            className="w-full"
+          >
+            {purchasing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Crown className="mr-2 h-4 w-4" />
+                Subscribe to Premium ($9.99/month)
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -115,11 +148,11 @@ export function SubscriptionManagement() {
         </Button>
         <Button
           onClick={handleRestore}
-          disabled={restoring}
+          disabled={purchasing}
           variant="ghost"
           className="w-full"
         >
-          {restoring ? (
+          {purchasing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Restoring...
