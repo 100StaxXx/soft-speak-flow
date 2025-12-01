@@ -1,7 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
-import { AttributeTooltip } from "./AttributeTooltip";
 import { getStageName } from "@/config/companionStages";
 
 interface NextEvolutionPreviewProps {
@@ -58,13 +57,7 @@ export const NextEvolutionPreview = ({
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <div className="flex items-center">
-              <h3 className="font-heading font-bold text-sm">Next Evolution</h3>
-              <AttributeTooltip 
-                title="Stage" 
-                description="Your companion's evolution progress"
-              />
-            </div>
+            <h3 className="font-heading font-bold text-sm">Next Evolution</h3>
             <p className="text-xs text-muted-foreground">
               {nextStageName}
             </p>
