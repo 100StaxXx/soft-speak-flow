@@ -15,6 +15,7 @@ import { downloadImage } from "@/utils/imageDownload";
 import { AdminPayouts } from "@/components/AdminPayouts";
 import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { AdminReferralTesting } from "@/components/AdminReferralTesting";
+import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { Capacitor } from '@capacitor/core';
 
 interface PepTalk {
@@ -61,6 +62,22 @@ const Admin = () => {
   const [generatingCompanionImage, setGeneratingCompanionImage] = useState(false);
   const [generatedCompanionImage, setGeneratedCompanionImage] = useState<string | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
+  
+  // Sample Card Generator State
+  const [sampleCardData, setSampleCardData] = useState({
+    spiritAnimal: "wolf",
+    element: "fire",
+    stage: 5,
+    favoriteColor: "#FF6B35",
+    eyeColor: "#FFD700",
+    furColor: "#8B4513",
+    mind: 50,
+    body: 50,
+    soul: 50,
+    customName: "",
+  });
+  const [generatingSampleCard, setGeneratingSampleCard] = useState(false);
+  const [generatedSampleCard, setGeneratedSampleCard] = useState<any | null>(null);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -376,6 +393,38 @@ const Admin = () => {
       toast.error(error.message || "Failed to generate companion image");
     } finally {
       setGeneratingCompanionImage(false);
+    }
+  };
+
+  const handleGenerateSampleCard = async () => {
+    setGeneratingSampleCard(true);
+    setGeneratedSampleCard(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-sample-card", {
+        body: {
+          spiritAnimal: sampleCardData.spiritAnimal,
+          element: sampleCardData.element,
+          stage: sampleCardData.stage,
+          favoriteColor: sampleCardData.favoriteColor,
+          eyeColor: sampleCardData.eyeColor || undefined,
+          furColor: sampleCardData.furColor || undefined,
+          mind: sampleCardData.mind,
+          body: sampleCardData.body,
+          soul: sampleCardData.soul,
+          customName: sampleCardData.customName || undefined,
+        },
+      });
+
+      if (error) throw error;
+
+      setGeneratedSampleCard(data.card);
+      toast.success("Sample card generated!");
+    } catch (error: any) {
+      console.error("Error generating sample card:", error);
+      toast.error(error.message || "Failed to generate sample card");
+    } finally {
+      setGeneratingSampleCard(false);
     }
   };
 
@@ -705,6 +754,217 @@ const Admin = () => {
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Sample Card Generator */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">🃏 Sample Card Generator</h2>
+          <p className="text-muted-foreground mb-6">Generate complete trading cards with AI-generated images, names, traits, and lore</p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="cardSpiritAnimal">Spirit Animal</Label>
+                <select
+                  id="cardSpiritAnimal"
+                  value={sampleCardData.spiritAnimal}
+                  onChange={(e) => setSampleCardData({ ...sampleCardData, spiritAnimal: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="wolf">Wolf</option>
+                  <option value="lion">Lion</option>
+                  <option value="tiger">Tiger</option>
+                  <option value="eagle">Eagle</option>
+                  <option value="bear">Bear</option>
+                  <option value="phoenix">Phoenix</option>
+                  <option value="dragon">Dragon</option>
+                  <option value="shark">Shark</option>
+                  <option value="whale">Whale</option>
+                  <option value="dolphin">Dolphin</option>
+                  <option value="owl">Owl</option>
+                  <option value="fox">Fox</option>
+                  <option value="panther">Panther</option>
+                  <option value="hawk">Hawk</option>
+                  <option value="lynx">Lynx</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="cardElement">Element</Label>
+                <select
+                  id="cardElement"
+                  value={sampleCardData.element}
+                  onChange={(e) => setSampleCardData({ ...sampleCardData, element: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="fire">Fire</option>
+                  <option value="water">Water</option>
+                  <option value="earth">Earth</option>
+                  <option value="air">Air</option>
+                  <option value="lightning">Lightning</option>
+                  <option value="ice">Ice</option>
+                  <option value="light">Light</option>
+                  <option value="shadow">Shadow</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="cardStage">Evolution Stage: {sampleCardData.stage} - {getStageNameForAdmin(sampleCardData.stage)}</Label>
+              <input
+                type="range"
+                id="cardStage"
+                min="0"
+                max="20"
+                value={sampleCardData.stage}
+                onChange={(e) => setSampleCardData({ ...sampleCardData, stage: parseInt(e.target.value) })}
+                className="w-full h-10 cursor-pointer"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="cardFavoriteColor">Favorite Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="cardFavoriteColor"
+                    value={sampleCardData.favoriteColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, favoriteColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={sampleCardData.favoriteColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, favoriteColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="cardEyeColor">Eye Color (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="cardEyeColor"
+                    value={sampleCardData.eyeColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, eyeColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={sampleCardData.eyeColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, eyeColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="cardFurColor">Fur/Scale Color (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="cardFurColor"
+                    value={sampleCardData.furColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, furColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={sampleCardData.furColor}
+                    onChange={(e) => setSampleCardData({ ...sampleCardData, furColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Mind/Body/Soul Attributes */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-muted/50">
+              <div>
+                <Label htmlFor="cardMind">🧠 Mind: {sampleCardData.mind}</Label>
+                <input
+                  type="range"
+                  id="cardMind"
+                  min="0"
+                  max="100"
+                  value={sampleCardData.mind}
+                  onChange={(e) => setSampleCardData({ ...sampleCardData, mind: parseInt(e.target.value) })}
+                  className="w-full h-8 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="cardBody">💪 Body: {sampleCardData.body}</Label>
+                <input
+                  type="range"
+                  id="cardBody"
+                  min="0"
+                  max="100"
+                  value={sampleCardData.body}
+                  onChange={(e) => setSampleCardData({ ...sampleCardData, body: parseInt(e.target.value) })}
+                  className="w-full h-8 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="cardSoul">🔥 Soul: {sampleCardData.soul}</Label>
+                <input
+                  type="range"
+                  id="cardSoul"
+                  min="0"
+                  max="100"
+                  value={sampleCardData.soul}
+                  onChange={(e) => setSampleCardData({ ...sampleCardData, soul: parseInt(e.target.value) })}
+                  className="w-full h-8 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="cardCustomName">Custom Name (Optional - leave blank for AI-generated)</Label>
+              <Input
+                type="text"
+                id="cardCustomName"
+                value={sampleCardData.customName}
+                onChange={(e) => setSampleCardData({ ...sampleCardData, customName: e.target.value })}
+                placeholder="Leave blank for AI to generate a name"
+                className="rounded-2xl min-h-[44px] text-base"
+              />
+            </div>
+
+            <Button
+              onClick={handleGenerateSampleCard}
+              disabled={generatingSampleCard}
+              className="w-full rounded-2xl min-h-[48px] text-base"
+            >
+              {generatingSampleCard ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Generating Card... (this may take a moment)
+                </>
+              ) : (
+                "🃏 Generate Sample Card"
+              )}
+            </Button>
+
+            {generatedSampleCard && (
+              <div className="space-y-4 p-4 md:p-6 border rounded-2xl bg-card">
+                <div className="flex justify-center">
+                  <EvolutionCardFlip card={generatedSampleCard} />
+                </div>
+                <div className="text-center text-sm text-muted-foreground">
+                  Click the card to view full size • Click again to flip and see lore
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground bg-muted/30 rounded-xl p-3">
+                  <div>Rarity: <span className="font-semibold text-foreground">{generatedSampleCard.rarity}</span></div>
+                  <div>Energy Cost: <span className="font-semibold text-foreground">{generatedSampleCard.energy_cost}</span></div>
+                  <div>Bond Level: <span className="font-semibold text-foreground">{generatedSampleCard.bond_level}</span></div>
+                  <div>Card ID: <span className="font-mono text-xs text-foreground">{generatedSampleCard.card_id}</span></div>
                 </div>
               </div>
             )}
