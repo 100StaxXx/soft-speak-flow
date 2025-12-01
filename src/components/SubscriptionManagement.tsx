@@ -82,7 +82,7 @@ export function SubscriptionManagement() {
             ) : (
               <>
                 <Crown className="mr-2 h-4 w-4" />
-                Subscribe to Premium ($9.99/month)
+                Subscribe to Premium
               </>
             )}
           </Button>
