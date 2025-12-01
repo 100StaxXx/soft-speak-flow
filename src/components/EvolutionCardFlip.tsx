@@ -192,7 +192,7 @@ export function EvolutionCardFlip({ card }: Props) {
                 transition={{ duration: 0.6, type: "spring" }}
               >
                 {/* Front - Full Image Trading Card */}
-                <div className="absolute w-full h-full backface-hidden">
+                <div className="absolute w-full h-full backface-hidden" style={{ transform: 'rotateY(0deg)' }}>
                   <div className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
                     {/* Ornate Corner Decorations */}
                     <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
