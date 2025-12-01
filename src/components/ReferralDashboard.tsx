@@ -1,15 +1,65 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Share, Copy, Users, Gift } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Share, Copy, Users, Gift, DollarSign, Clock, CheckCircle2 } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
+import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import { useQuery } from "@tanstack/react-query";
 
 export const ReferralDashboard = () => {
   const { referralStats, availableSkins } = useReferrals();
+  const { profile } = useProfile();
   const [isSharing, setIsSharing] = useState(false);
+  const [paypalEmail, setPaypalEmail] = useState(profile?.paypal_email || "");
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+
+  // Fetch user's payouts
+  const { data: payouts } = useQuery({
+    queryKey: ["referral-payouts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("referral_payouts")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 30000, // 30 seconds
+  });
+
+  const handleSavePayPalEmail = async () => {
+    if (!paypalEmail || !paypalEmail.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setIsSavingEmail(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ paypal_email: paypalEmail })
+        .eq("id", profile?.id);
+
+      if (error) throw error;
+      toast.success("PayPal email saved!");
+    } catch (error) {
+      console.error("Failed to save PayPal email:", error);
+      toast.error("Failed to save PayPal email");
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  const totalEarnings = payouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const pendingAmount = payouts?.filter(p => p.status === "pending").reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const paidAmount = payouts?.filter(p => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
   const handleShare = async () => {
     if (!referralStats?.referral_code) return;
@@ -167,6 +217,88 @@ export const ReferralDashboard = () => {
             <p className="font-semibold">{nextMilestone.name}</p>
           </div>
         )}
+
+        {/* Cash Earnings Section */}
+        <div className="pt-4 border-t space-y-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            <h4 className="font-semibold">Cash Earnings</h4>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-secondary/30 rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Total</p>
+              <p className="text-lg font-bold text-green-500">${totalEarnings.toFixed(2)}</p>
+            </div>
+            <div className="bg-secondary/30 rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Pending</p>
+              <p className="text-lg font-bold text-yellow-500">${pendingAmount.toFixed(2)}</p>
+            </div>
+            <div className="bg-secondary/30 rounded-lg p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Paid</p>
+              <p className="text-lg font-bold text-blue-500">${paidAmount.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* PayPal Email Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">PayPal Email (for payouts)</label>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={paypalEmail}
+                onChange={(e) => setPaypalEmail(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleSavePayPalEmail}
+                disabled={isSavingEmail || !paypalEmail}
+                size="sm"
+              >
+                {isSavingEmail ? "Saving..." : "Save"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You earn 50% of first month ($5) or 20% of first year ($20) when friends subscribe. Minimum $50 for payout.
+            </p>
+          </div>
+
+          {/* Payout History */}
+          {payouts && payouts.length > 0 && (
+            <div className="space-y-2">
+              <h5 className="text-sm font-medium">Payout History</h5>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {payouts.map((payout) => (
+                  <div
+                    key={payout.id}
+                    className="flex items-center justify-between bg-secondary/20 rounded-lg p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      {payout.status === "paid" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                      {payout.status === "pending" && <Clock className="h-4 w-4 text-yellow-500" />}
+                      {payout.status === "approved" && <Clock className="h-4 w-4 text-blue-500" />}
+                      <div>
+                        <p className="text-sm font-medium">${Number(payout.amount).toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {payout.payout_type === "first_month" ? "Monthly" : "Yearly"} referral
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        payout.status === "paid" ? "default" :
+                        payout.status === "approved" ? "secondary" : "outline"
+                      }
+                    >
+                      {payout.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );

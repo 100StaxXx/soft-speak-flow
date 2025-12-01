@@ -99,9 +99,27 @@ serve(async (req) => {
     // Process notification based on type
     switch (notificationType) {
       case NotificationType.INITIAL_BUY:
+        // First-time subscription - handle activation AND referral payout
+        await handleActivation(
+          supabaseClient,
+          userId,
+          originalTransactionId,
+          plan,
+          expiresDateMs,
+          purchaseDateMs
+        );
+        // Create referral payout if user was referred
+        await createReferralPayout(
+          supabaseClient,
+          userId,
+          originalTransactionId,
+          plan
+        );
+        break;
+        
       case NotificationType.DID_RENEW:
       case NotificationType.DID_RECOVER:
-        // Subscription active or renewed
+        // Subscription renewed or recovered
         await handleActivation(
           supabaseClient,
           userId,
@@ -327,4 +345,62 @@ async function handleRefund(
   }).eq("stripe_payment_intent_id", transactionId);
 
   console.log(`Refund processed for user ${userId}`);
+}
+
+async function createReferralPayout(
+  supabase: any,
+  userId: string,
+  transactionId: string,
+  plan: string
+) {
+  // Check if user was referred by someone
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("referred_by")
+    .eq("id", userId)
+    .single();
+
+  if (!profile?.referred_by) {
+    console.log(`User ${userId} was not referred, no payout created`);
+    return;
+  }
+
+  const referrerId = profile.referred_by;
+
+  // Calculate payout amount based on plan
+  const payoutAmount = plan === "yearly" ? 20.00 : 5.00; // 20% of $99.99 or 50% of $9.99
+  const payoutType = plan === "yearly" ? "first_year" : "first_month";
+
+  // Check if payout already exists to avoid duplicates
+  const { data: existingPayout } = await supabase
+    .from("referral_payouts")
+    .select("id")
+    .eq("referrer_id", referrerId)
+    .eq("referee_id", userId)
+    .eq("payout_type", payoutType)
+    .single();
+
+  if (existingPayout) {
+    console.log(`Payout already exists for referrer ${referrerId}, referee ${userId}`);
+    return;
+  }
+
+  // Create pending payout
+  const { error } = await supabase
+    .from("referral_payouts")
+    .insert({
+      referrer_id: referrerId,
+      referee_id: userId,
+      amount: payoutAmount,
+      status: "pending",
+      payout_type: payoutType,
+      apple_transaction_id: transactionId,
+      created_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error(`Failed to create payout for referrer ${referrerId}:`, error);
+  } else {
+    console.log(`Created ${payoutType} payout of $${payoutAmount} for referrer ${referrerId}`);
+  }
 }
