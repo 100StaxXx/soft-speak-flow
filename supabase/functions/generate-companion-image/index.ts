@@ -194,6 +194,8 @@ CRITICAL SPECIES REQUIREMENTS:
 - Realistic muscle groups and bone structure for ${spiritAnimal} species
 - Species-appropriate posture, gait, and natural movement for ${spiritAnimal}${aquaticNote}
 
+CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - never generate multiple heads, extra faces, or duplicate body parts.
+
 REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.`;
       } else if (stageLevel === 'mythic') {
         speciesGuidance = `
@@ -209,6 +211,8 @@ ENHANCED SPECIES REQUIREMENTS:
 - Proportions can be heroic/idealized while maintaining ${spiritAnimal} identity
 - Elemental features can manifest as additional visual elements (energy wings, particle effects, auras)${aquaticNote}
 
+CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - never generate multiple heads, extra faces, or duplicate body parts.
+
 CREATIVE FREEDOM: You may add mythic/divine features that enhance the ${spiritAnimal} into a legendary form, BUT the creature must remain recognizable as a ${spiritAnimal}.`;
       } else {
         speciesGuidance = `
@@ -223,6 +227,8 @@ LEGENDARY CREATIVE FREEDOM:
 - Can transcend physical form: Ghost images, dimensional echoes, astral projections
 - Divine enhancements: Halos, crowns, divine armor, cosmiq patterns, universe-birthing energy
 - Reality-bending: Environment warps around the creature, space-time distortions, cosmiq phenomena${aquaticNote}
+
+CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multiple heads or extra faces. One head, one face.
 
 GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
       }
