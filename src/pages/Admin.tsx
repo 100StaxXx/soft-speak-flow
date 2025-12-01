@@ -536,9 +536,6 @@ const Admin = () => {
               </button>
             </div>
             
-            <AdminReferralCodes />
-            <AdminPayouts />
-            <AdminReferralTesting />
           </div>
         </div>
 
@@ -1353,6 +1350,13 @@ const Admin = () => {
             </div>
           </Card>
         )}
+
+        {/* Referral Codes Management */}
+        <div className="space-y-6 mb-8">
+          <AdminReferralCodes />
+          <AdminPayouts />
+          <AdminReferralTesting />
+        </div>
 
         {/* List */}
         <div className="space-y-4">
