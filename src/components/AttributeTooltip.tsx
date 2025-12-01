@@ -1,10 +1,9 @@
 import { HelpCircle } from "lucide-react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface AttributeTooltipProps {
   title: string;
@@ -23,25 +22,26 @@ export const AttributeTooltip = ({ title, description }: AttributeTooltipProps) 
   const info = ATTRIBUTE_INFO[title] || description;
 
   return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button 
-            type="button"
-            className="inline-flex items-center justify-center ml-1.5 opacity-60 hover:opacity-100 transition-opacity touch-manipulation active:scale-95"
-            aria-label={`More information about ${title}`}
-          >
-            <HelpCircle className="h-4 w-4" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
-          className="max-w-xs bg-popover/98 backdrop-blur-sm border-primary/30 shadow-lg z-50"
-          sideOffset={8}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button 
+          type="button"
+          className="inline-flex items-center justify-center ml-1.5 opacity-60 hover:opacity-100 transition-opacity touch-manipulation active:scale-95"
+          aria-label={`More information about ${title}`}
         >
-          <p className="text-sm leading-relaxed">{info}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <HelpCircle className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-80 cosmiq-glass border-primary/30 shadow-xl"
+        side="top"
+        sideOffset={8}
+      >
+        <div className="space-y-2">
+          <h4 className="font-semibold text-sm text-primary">{title}</h4>
+          <p className="text-sm leading-relaxed text-foreground/90">{info}</p>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
