@@ -14,6 +14,7 @@ import { AudioGenerator } from "@/components/AudioGenerator";
 import { downloadImage } from "@/utils/imageDownload";
 import { AdminPayouts } from "@/components/AdminPayouts";
 import { AdminReferralCodes } from "@/components/AdminReferralCodes";
+import { AdminReferralTesting } from "@/components/AdminReferralTesting";
 import { Capacitor } from '@capacitor/core';
 
 interface PepTalk {
