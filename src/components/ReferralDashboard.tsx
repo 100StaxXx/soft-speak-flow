@@ -1,23 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Share, Copy, Users, Gift, DollarSign, Clock, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Share, Copy, Users, Gift, DollarSign, Clock, CheckCircle2, Loader2, Send, AlertCircle } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+const MINIMUM_PAYOUT_THRESHOLD = 50; // $50 minimum
 
 export const ReferralDashboard = () => {
   const { referralStats, availableSkins } = useReferrals();
   const { profile } = useProfile();
+  const queryClient = useQueryClient();
   const [isSharing, setIsSharing] = useState(false);
   const [paypalEmail, setPaypalEmail] = useState(profile?.paypal_email || "");
   const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isRequestingPayout, setIsRequestingPayout] = useState(false);
+
+  // Update paypalEmail when profile loads
+  useEffect(() => {
+    if (profile?.paypal_email) {
+      setPaypalEmail(profile.paypal_email);
+    }
+  }, [profile?.paypal_email]);
 
   // Fetch user's payouts
   const { data: payouts } = useQuery({
@@ -57,9 +69,49 @@ export const ReferralDashboard = () => {
     }
   };
 
+  const handleRequestPayout = async () => {
+    if (!profile?.paypal_email && !paypalEmail) {
+      toast.error("Please set your PayPal email first");
+      return;
+    }
+
+    setIsRequestingPayout(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("request-referral-payout");
+
+      if (error) throw error;
+      
+      if (data.error) {
+        if (data.code === "BELOW_THRESHOLD") {
+          toast.error(`You need $${data.amount_needed.toFixed(2)} more to request a payout`);
+        } else if (data.code === "NO_PAYPAL_EMAIL") {
+          toast.error("Please set your PayPal email first");
+        } else if (data.code === "NO_PENDING_PAYOUTS") {
+          toast.info("No pending payouts to request");
+        } else {
+          toast.error(data.error);
+        }
+        return;
+      }
+
+      toast.success(data.message || "Payout request submitted!");
+      queryClient.invalidateQueries({ queryKey: ["referral-payouts"] });
+    } catch (error) {
+      console.error("Failed to request payout:", error);
+      toast.error("Failed to request payout. Please try again.");
+    } finally {
+      setIsRequestingPayout(false);
+    }
+  };
+
   const totalEarnings = payouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
   const pendingAmount = payouts?.filter(p => p.status === "pending").reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const approvedAmount = payouts?.filter(p => p.status === "approved").reduce((sum, p) => sum + Number(p.amount), 0) || 0;
   const paidAmount = payouts?.filter(p => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const availableForPayout = pendingAmount + approvedAmount;
+  const progressToThreshold = Math.min((availableForPayout / MINIMUM_PAYOUT_THRESHOLD) * 100, 100);
+  const canRequestPayout = pendingAmount >= MINIMUM_PAYOUT_THRESHOLD && (profile?.paypal_email || paypalEmail);
+  const hasRequestedPayout = payouts?.some(p => p.status === "pending" && p.admin_notes?.includes("Payout requested"));
 
   const handleShare = async () => {
     if (!referralStats?.referral_code) return;
@@ -238,6 +290,60 @@ export const ReferralDashboard = () => {
               <p className="text-xs text-muted-foreground mb-1">Paid</p>
               <p className="text-lg font-bold text-blue-500">${paidAmount.toFixed(2)}</p>
             </div>
+          </div>
+
+          {/* Payout Threshold Progress */}
+          <div className="bg-gradient-to-r from-primary/10 to-green-500/10 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Payout Progress</span>
+              <span className="text-sm text-muted-foreground">
+                ${availableForPayout.toFixed(2)} / ${MINIMUM_PAYOUT_THRESHOLD}
+              </span>
+            </div>
+            <Progress value={progressToThreshold} className="h-2" />
+            
+            {availableForPayout < MINIMUM_PAYOUT_THRESHOLD ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                ${(MINIMUM_PAYOUT_THRESHOLD - availableForPayout).toFixed(2)} more to reach minimum payout threshold
+              </p>
+            ) : hasRequestedPayout ? (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Payout requested! Our team will review your request soon.
+              </p>
+            ) : approvedAmount > 0 ? (
+              <p className="text-xs text-blue-600 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                ${approvedAmount.toFixed(2)} approved and being processed
+              </p>
+            ) : (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                You've reached the minimum! Request your payout below.
+              </p>
+            )}
+
+            {/* Request Payout Button */}
+            {canRequestPayout && !hasRequestedPayout && (
+              <Button
+                onClick={handleRequestPayout}
+                disabled={isRequestingPayout}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {isRequestingPayout ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Requesting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Request Payout (${pendingAmount.toFixed(2)})
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* PayPal Email Input */}
