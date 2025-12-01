@@ -130,44 +130,26 @@ serve(async (req) => {
     
     // Stage 0 uses special silhouette prompt
     if (stage === 0) {
-      fullPrompt = `STYLIZED ANIMATED FANTASY ART - Cute cartoon style, vibrant colors:
+      fullPrompt = `STYLIZED FANTASY ART - Digital painting style:
 
-SUBJECT: A magical mystical egg floating in a whimsical realm, glowing with ${element} elemental energy.
+SUBJECT: A mystical egg floating in ${element} elemental energy.
 
 EGG DETAILS:
-- Smooth glossy surface with sparkly iridescent shimmer
-- Beautiful ${favoriteColor} undertones with cute magical patterns
-- Semi-translucent crystalline shell that looks magical and precious
-- Soft cartoon shading with gentle gradients
-- Adorable size that looks like it holds something precious
+- Smooth opalescent surface with iridescent shimmer
+- ${favoriteColor} undertones with magical patterns
+- Semi-translucent crystalline shell
+- Soft painterly shading
 
-SILHOUETTE INSIDE (CUTE STYLE):
-Within the translucent shell, a cute dark silhouette is visible:
-- The adorable outline of a ${spiritAnimal.toUpperCase()} curled up sleeping
-- Stylized cartoon proportions - recognizable but cute
-- Curled in a cozy sleeping position
-- Shadow shows recognizable ${spiritAnimal} features (ears, tail shape)
-- Mysterious but endearing - creates anticipation for a cute creature
-- Hints at the adorable companion waiting to hatch
+SILHOUETTE INSIDE:
+Within the shell, a dark silhouette of a ${spiritAnimal.toUpperCase()} curled up sleeping.
+- Recognizable ${spiritAnimal} features in shadow form
+- Mysterious and magical
 
 ELEMENTAL EFFECTS:
-- Magical sparkles and gentle glowing particles
-- Soft ${element} energy swirling around the egg
-- Cute magical effects like stars, hearts, or element-themed particles
-- Pulsing gentle glow in ${favoriteColor} suggesting a heartbeat
+- ${element} energy and gentle particles around the egg
+- Soft glow in ${favoriteColor} tones
 
-COMPOSITION & LIGHTING:
-- Warm inviting lighting with soft shadows
-- Magical sparkle effects throughout
-- Soft dreamy background with gentle blur
-- Whimsical atmosphere
-
-STYLE REFERENCES:
-- Pixar/Disney animated movie quality
-- Cute mobile game art style
-- Anime-inspired magical objects
-- Pokemon egg aesthetics
-- NEVER photorealistic - always cute and stylized`;
+STYLE: Stylized digital fantasy art, painterly, NOT photorealistic`;
     } else {
       const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
       
@@ -245,60 +227,44 @@ LEGENDARY CREATIVE FREEDOM:
 GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
       }
       
-      // Determine cuteness level based on stage
-      const cutenessLevel = stage <= 5 ? 'adorable' : stage <= 10 ? 'charming' : stage <= 15 ? 'majestic-cute' : 'epic-cute';
-      
-      fullPrompt = `STYLIZED ANIMATED FANTASY CREATURE - Cute cartoon art style, NOT photorealistic:
+      fullPrompt = `STYLIZED FANTASY CREATURE - Digital painting style, appealing but not overly cute:
 
 CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
 
-CRITICAL STYLE DIRECTION:
-- ANIMATED CARTOON STYLE like Pixar, Disney, or high-quality mobile game art
-- CUTE and APPEALING with big expressive eyes and soft rounded features
-- NOT photorealistic - stylized, colorful, and charming
-- Think: adorable fantasy creature from an animated movie
-- Smooth gradients, soft shadows, vibrant saturated colors
-- ${cutenessLevel === 'adorable' ? 'Maximum cuteness - round shapes, big sparkly eyes, tiny paws, fluffy appearance' : 
-    cutenessLevel === 'charming' ? 'Very cute but growing stronger - still has big eyes and appealing features' :
-    cutenessLevel === 'majestic-cute' ? 'Majestic but still endearing - powerful yet lovable' :
-    'Epic scale but retains charm - awe-inspiring yet still has cute appeal'}
+STYLE DIRECTION:
+- Stylized digital fantasy art like high-quality game illustrations
+- Appealing and charming with expressive features
+- NOT photorealistic but NOT overly cartoonish either
+- Think: fantasy game art, digital painting, illustrated storybook quality
+- Soft painterly rendering with rich colors
 
 BASE DESCRIPTION:
 ${basePrompt}
 ${speciesGuidance}
 
 COLOR PALETTE:
-- Primary colors: Vibrant ${favoriteColor} tones with high saturation
-- Eye color: ${eyeColor || favoriteColor} - BIG SPARKLY EXPRESSIVE EYES
-- Fur/Feathers/Scales: ${furColor || favoriteColor} - soft, fluffy appearance
-- Elemental glow: ${element} effects with magical sparkles
+- Primary colors: Rich ${favoriteColor} tones
+- Eye color: ${eyeColor || favoriteColor} with expressive shine
+- Fur/Feathers/Scales: ${furColor || favoriteColor} with soft texture
+- Elemental glow: ${element} magical effects
 
 RENDERING STYLE:
-- Smooth cartoon shading (cel-shaded or soft gradient style)
-- Rounded, appealing shapes - no harsh edges
-- Big expressive eyes with shine/sparkle highlights
-- Soft fluffy textures that look huggable
-- Clean linework with soft shadows
-
-CUTE PRESENTATION:
-- Warm, inviting lighting
-- Sparkles and magical particles
-- Friendly approachable pose
-- Soft background with magical atmosphere
-- Emphasis on charm and personality
+- Painterly digital art style
+- Soft but defined edges
+- Expressive eyes with personality
+- Rich saturated colors
+- Smooth gradients and soft shadows
 
 ELEMENTAL INTEGRATION:
-- ${element} element as cute magical effects (sparkles, gentle glows, soft particles)
-- Energy effects that look magical and whimsical, not harsh
-- Colorful, vibrant elemental accents
+- ${element} element as magical glowing effects
+- Soft particle effects and gentle auras
+- Enhances the creature without overwhelming
 
 STYLE REFERENCES:
-- Pixar/Disney animated movie quality
-- Mobile game character art (high quality)
-- Anime-inspired fantasy creatures
-- Pokemon/creature collector game aesthetics
-- Cute fantasy art with mass appeal
-- NEVER photorealistic - always stylized and animated`;
+- High-quality fantasy game concept art
+- Digital painting / illustration style
+- Stylized but grounded fantasy creatures
+- NOT photorealistic, NOT hyper-cartoon`;
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
