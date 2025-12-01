@@ -2448,6 +2448,9 @@ export type Database = {
           owner_user_id: string | null
           payout_identifier: string | null
           payout_method: string | null
+          total_conversions: number | null
+          total_revenue: number | null
+          total_signups: number | null
         }
         Insert: {
           code: string
@@ -2461,6 +2464,9 @@ export type Database = {
           owner_user_id?: string | null
           payout_identifier?: string | null
           payout_method?: string | null
+          total_conversions?: number | null
+          total_revenue?: number | null
+          total_signups?: number | null
         }
         Update: {
           code?: string
@@ -2474,6 +2480,9 @@ export type Database = {
           owner_user_id?: string | null
           payout_identifier?: string | null
           payout_method?: string | null
+          total_conversions?: number | null
+          total_revenue?: number | null
+          total_signups?: number | null
         }
         Relationships: []
       }

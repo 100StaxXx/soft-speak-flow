@@ -73,7 +73,7 @@ export const AdminReferralTesting = () => {
       if (codeError) throw codeError;
       if (!codes) throw new Error("Code not found or inactive");
 
-      addResult("Code validation", 'success', `Code found: ${codes.code}, Uses: ${codes.total_uses}`);
+      addResult("Code validation", 'success', `Code found: ${codes.code}, Signups: ${codes.total_signups}`);
 
       // In a real scenario, this would happen during user onboarding
       // For testing, we'll manually increment the signup count
@@ -138,10 +138,9 @@ export const AdminReferralTesting = () => {
         .insert({
           referral_code_id: codeData.id,
           amount: payoutAmount,
-          currency: 'USD',
-          status: 'pending',
-          subscription_type: 'monthly'
-        })
+          payout_type: 'referral_commission',
+          status: 'pending'
+        } as any)
         .select()
         .single();
 
@@ -178,10 +177,7 @@ export const AdminReferralTesting = () => {
       // Get pending payouts
       const { data: payouts, error: fetchError } = await supabase
         .from('referral_payouts')
-        .select(`
-          *,
-          referral_codes!inner(code, influencer_name, paypal_email)
-        `)
+        .select('*')
         .eq('status', 'pending')
         .limit(1);
 
@@ -191,14 +187,22 @@ export const AdminReferralTesting = () => {
       }
 
       const payout = payouts[0];
-      addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
-
-      // Check if PayPal email exists
-      if (!payout.referral_codes.paypal_email) {
-        throw new Error("PayPal email not set for this influencer");
+      
+      // Get referral code info separately
+      if (payout.referral_code_id) {
+        const { data: codeData } = await supabase
+          .from('referral_codes')
+          .select('code, influencer_name, payout_identifier')
+          .eq('id', payout.referral_code_id)
+          .single();
+          
+        if (codeData) {
+          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${codeData.code}`);
+          addResult("Payout check", 'success', `Identifier: ${codeData.payout_identifier || 'Not set'}`);
+        }
+      } else {
+        addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
       }
-
-      addResult("PayPal check", 'success', `Email: ${payout.referral_codes.paypal_email}`);
 
       // Approve the payout
       const { error: approveError } = await supabase
@@ -229,10 +233,7 @@ export const AdminReferralTesting = () => {
       // Get an approved payout
       const { data: payouts, error: fetchError } = await supabase
         .from('referral_payouts')
-        .select(`
-          *,
-          referral_codes!inner(code, influencer_name, paypal_email)
-        `)
+        .select('*')
         .eq('status', 'approved')
         .limit(1);
 
@@ -242,6 +243,14 @@ export const AdminReferralTesting = () => {
       }
 
       const payout = payouts[0];
+      
+      // Get referral code separately
+      const { data: codeData } = await supabase
+        .from('referral_codes')
+        .select('*')
+        .eq('id', payout.referral_code_id)
+        .single();
+        
       addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
 
       // Call the PayPal payout function

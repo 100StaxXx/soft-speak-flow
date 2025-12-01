@@ -463,11 +463,35 @@ const Admin = () => {
           <p className="text-muted-foreground">Manage your pep talks</p>
         </div>
 
-        {/* Referral Codes Management */}
-        <AdminReferralCodes />
-
-        {/* Referral Payouts Management */}
-        <AdminPayouts />
+        {/* Tabs for Admin Features */}
+        <div className="mb-8">
+          <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-3xl p-6 shadow-soft">
+            <div className="flex gap-4 mb-6 border-b border-border/50 pb-2">
+              <button
+                onClick={() => {/* Toggle to referral codes */}}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground"
+              >
+                Referral Codes
+              </button>
+              <button
+                onClick={() => {/* Toggle to payouts */}}
+                className="px-4 py-2 rounded-xl hover:bg-muted"
+              >
+                Payouts
+              </button>
+              <button
+                onClick={() => {/* Toggle to testing */}}
+                className="px-4 py-2 rounded-xl hover:bg-muted"
+              >
+                Testing Suite
+              </button>
+            </div>
+            
+            <AdminReferralCodes />
+            <AdminPayouts />
+            <AdminReferralTesting />
+          </div>
+        </div>
 
         {/* Voice Preview Section */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">
