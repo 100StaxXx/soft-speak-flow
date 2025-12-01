@@ -195,25 +195,25 @@ export function EvolutionCardFlip({ card }: Props) {
                 <div className="absolute w-full h-full backface-hidden">
                   <div className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-visible relative`}>
                     {/* Ornate Corner Decorations */}
-                    <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none">
+                    <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-t-2 border-l-2 border-white/40 rounded-tl-xl" />
                       <div className="absolute top-1 left-1 w-8 h-8 border-t border-l border-white/20 rounded-tl-lg" />
                     </div>
-                    <div className="absolute top-0 right-0 w-12 h-12 z-30 pointer-events-none">
+                    <div className="absolute top-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-t-2 border-r-2 border-white/40 rounded-tr-xl" />
                       <div className="absolute top-1 right-1 w-8 h-8 border-t border-r border-white/20 rounded-tr-lg" />
                     </div>
-                    <div className="absolute bottom-0 left-0 w-12 h-12 z-30 pointer-events-none">
+                    <div className="absolute bottom-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-b-2 border-l-2 border-white/40 rounded-bl-xl" />
                       <div className="absolute bottom-1 left-1 w-8 h-8 border-b border-l border-white/20 rounded-bl-lg" />
                     </div>
-                    <div className="absolute bottom-0 right-0 w-12 h-12 z-30 pointer-events-none">
+                    <div className="absolute bottom-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-b-2 border-r-2 border-white/40 rounded-br-xl" />
                       <div className="absolute bottom-1 right-1 w-8 h-8 border-b border-r border-white/20 rounded-br-lg" />
                     </div>
                     
                     {/* Inner Frame Lines */}
-                    <div className="absolute inset-2 border border-white/20 rounded-lg z-20 pointer-events-none" />
+                    <div className="absolute inset-2 border border-white/20 rounded-lg z-20 pointer-events-none backface-hidden" />
                     
                     <div className="h-full rounded-xl relative overflow-hidden">
                       {/* Full Card Image Background */}
@@ -272,7 +272,7 @@ export function EvolutionCardFlip({ card }: Props) {
                     </div>
                     
                     {/* Cosmiq Branding - Centered at Bottom with Ornate Frame */}
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center">
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center backface-hidden">
                       <div className="relative px-6 py-2">
                         {/* Decorative side elements */}
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-gradient-to-r from-transparent to-white/60" />
