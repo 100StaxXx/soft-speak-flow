@@ -306,6 +306,21 @@ const Profile = () => {
                 </CardContent>
               </Card>
 
+              {/* Referrals Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <Gift className="h-6 w-6 text-primary" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
+                    <p className="text-sm text-muted-foreground">Share R-Evolution and unlock exclusive companion skins</p>
+                  </div>
+                </div>
+                
+                <ReferralCodeRedeemCard />
+                <ReferralDashboard />
+                <CompanionSkins />
+              </div>
+
             </TabsContent>
 
             <TabsContent value="notifications" className="space-y-6">
@@ -348,21 +363,6 @@ const Profile = () => {
               </Card>
             </TabsContent>
           </Tabs>
-
-          {/* Referrals Section */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <Gift className="h-6 w-6 text-primary" />
-              <div>
-                <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
-                <p className="text-sm text-muted-foreground">Share R-Evolution and unlock exclusive companion skins</p>
-              </div>
-            </div>
-            
-            <ReferralCodeRedeemCard />
-            <ReferralDashboard />
-            <CompanionSkins />
-          </div>
 
           {/* Sign Out Button */}
           <div className="mt-8 pb-6">
