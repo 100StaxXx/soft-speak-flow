@@ -33,15 +33,24 @@ export const AdminReferralTesting = () => {
     clearResults();
     
     try {
+      const testEmail = `${influencerName.toLowerCase().replace(/\s+/g, '')}@test.com`;
+      const testHandle = `@${influencerName.toLowerCase().replace(/\s+/g, '_')}`;
+      
       addResult("Creating influencer code", 'success', `Attempting to create code for: ${influencerName}`);
       
       const { data, error } = await supabase.functions.invoke('create-influencer-code', {
-        body: { influencerName }
+        body: { 
+          name: influencerName,
+          email: testEmail,
+          handle: testHandle,
+          paypal_email: testEmail
+        }
       });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      addResult("Influencer code created", 'success', `Code: ${data.code}, Type: ${data.type}`);
+      addResult("Influencer code created", 'success', `Code: ${data.code}, Link: ${data.link}`);
       setTestCode(data.code);
       toast.success("Influencer code created successfully!");
     } catch (error: any) {
@@ -132,13 +141,20 @@ export const AdminReferralTesting = () => {
       // Calculate payout (50% of first month)
       const payoutAmount = mockWebhookData.amount * 0.5;
 
+      // For testing, we need a valid user ID. Get current user or use a test ID
+      const { data: { user } } = await supabase.auth.getUser();
+      const testReferrerId = user?.id || '00000000-0000-0000-0000-000000000000';
+      const testRefereeId = user?.id || '00000000-0000-0000-0000-000000000000';
+
       // Create payout record
       const { data: payout, error: payoutError } = await supabase
         .from('referral_payouts')
         .insert({
           referral_code_id: codeData.id,
+          referrer_id: testReferrerId,
+          referee_id: testRefereeId,
           amount: payoutAmount,
-          payout_type: 'referral_commission',
+          payout_type: 'first_month',
           status: 'pending'
         } as any)
         .select()
@@ -261,7 +277,7 @@ export const AdminReferralTesting = () => {
 
       // Call the PayPal payout function
       const { data, error } = await supabase.functions.invoke('process-paypal-payout', {
-        body: { payoutId: payout.id }
+        body: { payout_id: payout.id }
       });
 
       if (error) throw error;
