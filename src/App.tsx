@@ -48,6 +48,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
+const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const BattleArena = lazy(() => import("./pages/BattleArena"));
 const Horoscope = lazy(() => import("./pages/Horoscope"));
@@ -182,6 +183,7 @@ const AppContent = memo(() => {
           <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
           <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
+          <Route path="/partners" element={<Partners />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<NotFound />} />
