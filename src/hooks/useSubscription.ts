@@ -46,7 +46,8 @@ export function useSubscription() {
   });
 
   const subscription = useMemo(() => {
-    if (!subscriptionData) return null;
+    // Return null if no data or user is not subscribed
+    if (!subscriptionData || !subscriptionData.subscribed) return null;
     
     // Validate status and plan - default to safe values if invalid
     const status = isValidStatus(subscriptionData.status) 
