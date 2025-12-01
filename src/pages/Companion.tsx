@@ -116,6 +116,21 @@ const Companion = () => {
         </div>
       </CompanionErrorBoundary>
       <BottomNav />
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Your Companion"
+        icon={Sparkles}
+        description="Your companion evolves as you complete quests and build habits. Watch it grow through 21 stages!"
+        features={[
+          "Earn XP from quests and habits to level up",
+          "Unlock trading cards at major evolution stages",
+          "Read unique stories for each evolution",
+          "Collect companion cards in your gallery"
+        ]}
+        tip="Your companion's element and personality are based on your zodiac sign and choices during onboarding."
+      />
     </PageTransition>
   );
 };

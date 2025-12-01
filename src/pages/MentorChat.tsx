@@ -129,6 +129,21 @@ export default function MentorChat() {
           />
         </div>
         <BottomNav />
+        
+        <PageInfoModal
+          open={showPageInfo}
+          onClose={() => setShowPageInfo(false)}
+          title="About Your Mentor"
+          icon={MessageCircle}
+          description="Your personal motivator is here to guide and support you on your journey."
+          features={[
+            "Ask questions and get personalized advice",
+            "Receive guidance tailored to your goals",
+            "Get encouragement when you need it most",
+            "Chat anytime for instant motivation"
+          ]}
+          tip="Your mentor's tone and style match your preferences from onboarding."
+        />
       </div>
   );
 }
