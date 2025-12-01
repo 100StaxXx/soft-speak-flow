@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download, Share } from "lucide-react";
 import { AudioGenerator } from "@/components/AudioGenerator";
 import { downloadImage } from "@/utils/imageDownload";
+import { AdminPayouts } from "@/components/AdminPayouts";
 import { Capacitor } from '@capacitor/core';
 
 interface PepTalk {
@@ -459,6 +460,9 @@ const Admin = () => {
           </h1>
           <p className="text-muted-foreground">Manage your pep talks</p>
         </div>
+
+        {/* Referral Payouts Management */}
+        <AdminPayouts />
 
         {/* Voice Preview Section */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">
