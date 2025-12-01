@@ -2128,6 +2128,7 @@ export type Database = {
           onboarding_completed: boolean | null
           onboarding_data: Json | null
           onboarding_step: string | null
+          paypal_email: string | null
           preferences: Json | null
           referral_code: string | null
           referral_count: number | null
@@ -2167,6 +2168,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
+          paypal_email?: string | null
           preferences?: Json | null
           referral_code?: string | null
           referral_count?: number | null
@@ -2206,6 +2208,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
+          paypal_email?: string | null
           preferences?: Json | null
           referral_code?: string | null
           referral_count?: number | null
@@ -2425,6 +2428,75 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_payouts: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          apple_transaction_id: string | null
+          approved_at: string | null
+          created_at: string | null
+          id: string
+          paid_at: string | null
+          payout_type: string
+          paypal_payer_id: string | null
+          paypal_transaction_id: string | null
+          referee_id: string
+          referrer_id: string
+          rejected_at: string | null
+          status: string
+          subscription_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          apple_transaction_id?: string | null
+          approved_at?: string | null
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          payout_type: string
+          paypal_payer_id?: string | null
+          paypal_transaction_id?: string | null
+          referee_id: string
+          referrer_id: string
+          rejected_at?: string | null
+          status?: string
+          subscription_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          apple_transaction_id?: string | null
+          approved_at?: string | null
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          payout_type?: string
+          paypal_payer_id?: string | null
+          paypal_transaction_id?: string | null
+          referee_id?: string
+          referrer_id?: string
+          rejected_at?: string | null
+          status?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_payouts_referee_id_fkey"
+            columns: ["referee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_payouts_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
