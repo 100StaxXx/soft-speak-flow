@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Star, Moon, Sun, Settings, ArrowLeft } from "lucide-react";
+import { Sparkles, Star, Moon, Sun, ArrowLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
@@ -15,8 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import { PageInfoButton } from "@/components/PageInfoButton";
-import { PageInfoModal } from "@/components/PageInfoModal";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -62,7 +60,6 @@ const Horoscope = () => {
   const [birthLocation, setBirthLocation] = useState(profile?.birth_location || "");
   const [saving, setSaving] = useState(false);
   const [revealing, setRevealing] = useState(false);
-  const [showPageInfo, setShowPageInfo] = useState(false);
 
   const hasAdvancedDetails = !!(profile?.birthdate && profile?.birth_time && profile?.birth_location);
   const hasCosmiqProfile = !!(profile?.moon_sign && profile?.rising_sign);
@@ -381,17 +378,6 @@ const Horoscope = () => {
               {date ? formatDate(date) : 'Loading...'}
             </p>
           </motion.div>
-          <div className="flex items-center gap-2">
-            <PageInfoButton onClick={() => setShowPageInfo(true)} />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/profile')}
-              className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-          </div>
         </div>
 
         {/* Constellation Zodiac Display */}
@@ -716,21 +702,6 @@ const Horoscope = () => {
         </motion.div>
       </div>
       <BottomNav />
-      
-      <PageInfoModal
-        open={showPageInfo}
-        onClose={() => setShowPageInfo(false)}
-        title="About Cosmiq Insight"
-        icon={Moon}
-        description="Discover your daily horoscope and unlock deep personalized astrology insights."
-        features={[
-          "Read your daily horoscope based on your zodiac",
-          "Add birth details for personalized cosmic profile",
-          "Explore your Big Three (Sun, Moon, Rising)",
-          "Get energy forecasts for Mind, Body, and Soul"
-        ]}
-        tip="Enter your birth date, time, and location for the most accurate cosmic insights!"
-      />
     </div>
   );
 };
