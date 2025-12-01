@@ -1,12 +1,15 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Lock, Check } from "lucide-react";
+import { Sparkles, Lock, Check, ChevronDown } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useState } from "react";
 
 export const CompanionSkins = () => {
   const { availableSkins, unlockedSkins, equipSkin, unequipSkin, referralStats } = useReferrals();
+  const [isOpen, setIsOpen] = useState(false);
 
   const isUnlocked = (skinId: string) => {
     return unlockedSkins?.some(us => us.skin_id === skinId);
@@ -26,18 +29,26 @@ export const CompanionSkins = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Companion Skins
-        </h3>
-        <div className="text-sm text-muted-foreground">
-          {unlockedSkins?.length || 0} / {availableSkins?.length || 0} Unlocked
-        </div>
-      </div>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card>
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between p-4 hover:bg-accent/5 transition-colors">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Companion Skins</h3>
+              <Badge variant="secondary">
+                {unlockedSkins?.length || 0} / {availableSkins?.length || 0}
+              </Badge>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-muted-foreground transition-transform",
+              isOpen && "rotate-180"
+            )} />
+          </div>
+        </CollapsibleTrigger>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CollapsibleContent>
+          <div className="p-4 pt-0 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {availableSkins?.map((skin) => {
           const unlocked = isUnlocked(skin.id);
           const equipped = isEquipped(skin.id);
@@ -108,7 +119,9 @@ export const CompanionSkins = () => {
             </Card>
           );
         })}
-      </div>
-    </div>
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 };
