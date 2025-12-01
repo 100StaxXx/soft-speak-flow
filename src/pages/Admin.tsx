@@ -13,6 +13,7 @@ import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download, Share } from "
 import { AudioGenerator } from "@/components/AudioGenerator";
 import { downloadImage } from "@/utils/imageDownload";
 import { AdminPayouts } from "@/components/AdminPayouts";
+import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { Capacitor } from '@capacitor/core';
 
 interface PepTalk {
@@ -460,6 +461,9 @@ const Admin = () => {
           </h1>
           <p className="text-muted-foreground">Manage your pep talks</p>
         </div>
+
+        {/* Referral Codes Management */}
+        <AdminReferralCodes />
 
         {/* Referral Payouts Management */}
         <AdminPayouts />
