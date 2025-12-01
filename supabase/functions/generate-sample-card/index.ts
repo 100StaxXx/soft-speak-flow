@@ -50,17 +50,28 @@ serve(async (req) => {
 
     console.log("Generating sample card:", { spiritAnimal, element, stage, mind, body, soul });
 
-    // Step 1: Generate companion image using the existing function
-    const imageResponse = await supabase.functions.invoke("generate-companion-image", {
-      body: { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor },
-    });
+    // Step 1: Generate companion image - call with user's auth token
+    const imageResponse = await fetch(
+      `${supabaseUrl}/functions/v1/generate-companion-image`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ spiritAnimal, element, stage, favoriteColor, eyeColor, furColor }),
+      }
+    );
 
-    if (imageResponse.error) {
-      console.error("Image generation failed:", imageResponse.error);
-      throw new Error(`Image generation failed: ${imageResponse.error.message}`);
+    if (!imageResponse.ok) {
+      const errorText = await imageResponse.text();
+      console.error("Image generation failed:", errorText);
+      throw new Error(`Image generation failed: ${imageResponse.status}`);
     }
 
-    const imageUrl = imageResponse.data?.imageUrl;
+    const imageData = await imageResponse.json();
+
+    const imageUrl = imageData?.imageUrl;
     console.log("Image generated:", imageUrl ? "success" : "no URL");
 
     // Step 2: Calculate stats
