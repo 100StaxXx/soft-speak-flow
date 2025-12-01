@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { X, Share2 } from "lucide-react";
-import { downloadImage } from "@/utils/imageDownload";
+import { downloadCardElement } from "@/utils/imageDownload";
 
 interface EvolutionCard {
   id: string;
@@ -58,6 +58,7 @@ export function EvolutionCardFlip({ card }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const stats = card.stats as { mind?: number; body?: number; soul?: number };
   const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
@@ -77,10 +78,10 @@ export function EvolutionCardFlip({ card }: Props) {
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!card.image_url) return;
+    if (!cardRef.current) return;
     
-    await downloadImage(
-      card.image_url,
+    await downloadCardElement(
+      cardRef.current,
       `cosmiq-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
       {
         title: `${card.creature_name} - Cosmiq`,
@@ -201,7 +202,7 @@ export function EvolutionCardFlip({ card }: Props) {
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden" style={{ transform: 'rotateY(0deg)' }}>
-                  <div className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
+                  <div ref={cardRef} className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
                     {/* Ornate Corner Decorations */}
                     <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
                       <div className="absolute inset-0 border-t-2 border-l-2 border-white/40 rounded-tl-xl" />
