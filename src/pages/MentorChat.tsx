@@ -102,7 +102,7 @@ export default function MentorChat() {
           )}
           
           {/* Buttons Container */}
-          <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
+          <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between safe-area-top">
             <Button 
               variant="ghost" 
               size="icon" 

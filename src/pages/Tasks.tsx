@@ -626,7 +626,7 @@ export default function Tasks() {
         onComplete={() => setShowCelebration({ ...showCelebration, show: false })}
       />
       
-      <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10">
+      <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10 safe-area-top">
         <BrandTagline />
 
         <div className="flex items-center gap-3">
