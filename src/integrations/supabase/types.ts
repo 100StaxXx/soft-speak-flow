@@ -2121,6 +2121,7 @@ export type Database = {
           email: string | null
           id: string
           is_premium: boolean | null
+          last_streak_freeze_used: string | null
           longest_habit_streak: number | null
           mars_sign: string | null
           mercury_sign: string | null
@@ -2136,6 +2137,8 @@ export type Database = {
           referred_by_code: string | null
           rising_sign: string | null
           selected_mentor_id: string | null
+          streak_freezes_available: number | null
+          streak_freezes_reset_at: string | null
           stripe_customer_id: string | null
           subscription_expires_at: string | null
           subscription_started_at: string | null
@@ -2162,6 +2165,7 @@ export type Database = {
           email?: string | null
           id: string
           is_premium?: boolean | null
+          last_streak_freeze_used?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -2177,6 +2181,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          streak_freezes_available?: number | null
+          streak_freezes_reset_at?: string | null
           stripe_customer_id?: string | null
           subscription_expires_at?: string | null
           subscription_started_at?: string | null
@@ -2203,6 +2209,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_premium?: boolean | null
+          last_streak_freeze_used?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -2218,6 +2225,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          streak_freezes_available?: number | null
+          streak_freezes_reset_at?: string | null
           stripe_customer_id?: string | null
           subscription_expires_at?: string | null
           subscription_started_at?: string | null
@@ -2776,10 +2785,13 @@ export type Database = {
           favorite_color: string
           fur_color: string | null
           id: string
+          inactive_days: number | null
           initial_image_url: string | null
+          last_activity_date: string | null
           last_energy_update: string | null
           last_mood_update: string | null
           mind: number | null
+          neglected_image_url: string | null
           soul: number | null
           spirit_animal: string
           story_tone: string
@@ -2798,10 +2810,13 @@ export type Database = {
           favorite_color: string
           fur_color?: string | null
           id?: string
+          inactive_days?: number | null
           initial_image_url?: string | null
+          last_activity_date?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
+          neglected_image_url?: string | null
           soul?: number | null
           spirit_animal: string
           story_tone?: string
@@ -2820,10 +2835,13 @@ export type Database = {
           favorite_color?: string
           fur_color?: string | null
           id?: string
+          inactive_days?: number | null
           initial_image_url?: string | null
+          last_activity_date?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
+          neglected_image_url?: string | null
           soul?: number | null
           spirit_animal?: string
           story_tone?: string
