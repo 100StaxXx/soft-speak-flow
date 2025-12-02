@@ -67,18 +67,66 @@ const CardsTab = memo(() => (
 CardsTab.displayName = 'CardsTab';
 
 const Companion = () => {
-  const { companion, nextEvolutionXP, progressToNext, isLoading } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Show error state if query failed
+  if (error) {
+    return (
+      <PageTransition>
+        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+          <div className="text-center space-y-4 p-6">
+            <Sparkles className="h-16 w-16 mx-auto text-destructive" />
+            <h2 className="text-2xl font-bold">Error Loading Companion</h2>
+            <p className="text-muted-foreground max-w-md">
+              {error instanceof Error ? error.message : 'Unable to load your companion data. Please try refreshing the page.'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+        <BottomNav />
+      </PageTransition>
+    );
+  }
+
   // Show loading state while companion is being fetched
-  if (isLoading || !companion) {
+  if (isLoading) {
     return (
       <PageTransition>
         <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
           <div className="text-center space-y-4">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             <p className="text-muted-foreground">Loading your companion...</p>
+          </div>
+        </div>
+        <BottomNav />
+      </PageTransition>
+    );
+  }
+
+  // If companion doesn't exist after loading, redirect to onboarding
+  if (!companion) {
+    return (
+      <PageTransition>
+        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+          <div className="text-center space-y-4 p-6">
+            <Sparkles className="h-16 w-16 mx-auto text-primary" />
+            <h2 className="text-2xl font-bold">No Companion Found</h2>
+            <p className="text-muted-foreground max-w-md">
+              It looks like you haven't created your companion yet. Please complete the onboarding process to get started.
+            </p>
+            <button
+              onClick={() => window.location.href = '/onboarding'}
+              className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              Start Onboarding
+            </button>
           </div>
         </div>
         <BottomNav />
