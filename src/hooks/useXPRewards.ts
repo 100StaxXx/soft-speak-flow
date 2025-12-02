@@ -1,9 +1,22 @@
 import { useCompanion, XP_REWARDS } from "@/hooks/useCompanion";
 import { useXPToast } from "@/contexts/XPContext";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+
+// Helper to mark user as active (resets companion decay)
+const markUserActive = async (userId: string) => {
+  const today = new Date().toISOString().split('T')[0];
+  await supabase
+    .from('user_companion')
+    .update({
+      last_activity_date: today,
+      inactive_days: 0,
+      current_mood: 'happy',
+    })
+    .eq('user_id', userId);
+};
 
 /**
  * Centralized XP reward system
@@ -13,6 +26,7 @@ export const useXPRewards = () => {
   const { user } = useAuth();
   const { companion, awardXP } = useCompanion();
   const { showXPToast } = useXPToast();
+  const queryClient = useQueryClient();
   const {
     updateBodyFromActivity,
     updateMindFromHabit,
@@ -39,6 +53,13 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
     
     try {
+      // Mark user as active (resets companion decay)
+      if (user?.id) {
+        markUserActive(user.id).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+        });
+      }
+      
       showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
       awardXP.mutate({
         eventType: "habit_complete",
@@ -50,11 +71,9 @@ export const useXPRewards = () => {
       if (companionId) {
         updateMindFromHabit(companionId).catch(err => {
           console.error('Mind update failed:', err);
-          // Non-critical - don't show toast to avoid spam
         });
         updateBodyFromActivity(companionId).catch(err => {
           console.error('Body update failed:', err);
-          // Non-critical - don't show toast to avoid spam
         });
       }
     } catch (error) {

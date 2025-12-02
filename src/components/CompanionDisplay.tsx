@@ -1,15 +1,17 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertTriangle, Heart } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
+import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
+import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { useState, useEffect, useMemo, memo } from "react";
 import { getStageName } from "@/config/companionStages";
 
@@ -68,12 +70,15 @@ export const CompanionDisplay = memo(() => {
   const { profile } = useProfile();
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
   const { unlockedSkins } = useReferrals();
+  const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false);
+  const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -129,8 +134,38 @@ export const CompanionDisplay = memo(() => {
     setIsEvolving(true);
   }, [evolveCompanion.isSuccess, evolveCompanion.data]);
 
+  // Show welcome back modal if user has been inactive
+  useEffect(() => {
+    if (needsWelcomeBack && !welcomeBackDismissed && companion) {
+      setShowWelcomeBack(true);
+    }
+  }, [needsWelcomeBack, welcomeBackDismissed, companion]);
+
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
+
+  // Determine which image to show based on mood state
+  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
+    ? health.neglectedImageUrl 
+    : companion.current_image_url;
+  
+  // Get mood-based filter styles
+  const moodStyles = getMoodFilterStyles(health.moodState);
+
+  // Get mood badge info
+  const getMoodBadge = () => {
+    switch (health.moodState) {
+      case 'worried':
+        return { emoji: '😟', label: 'Worried' };
+      case 'sad':
+        return { emoji: '😢', label: 'Missing you' };
+      case 'sick':
+        return { emoji: '💔', label: 'Needs attention' };
+      default:
+        return null;
+    }
+  };
+  const moodBadge = getMoodBadge();
 
   const stageName = getStageName(companion.current_stage);
   const colorName = getColorName(companion.favorite_color);
@@ -216,10 +251,10 @@ export const CompanionDisplay = memo(() => {
               )}
               <img
                 key={imageKey}
-                src={companion.current_image_url || ""}
-                alt={`${stageName} companion at stage ${companion.current_stage}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 ring-primary/30 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
-                style={skinStyles}
+                src={displayImageUrl || ""}
+                alt={`${stageName} companion at stage ${companion.current_stage}${health.moodState !== 'happy' ? ` (${health.moodState})` : ''}`}
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'}`}
+                style={{ ...skinStyles, ...moodStyles }}
                 onLoad={() => {
                   setImageLoaded(true);
                   setImageError(false); // Clear error on successful load
@@ -231,6 +266,13 @@ export const CompanionDisplay = memo(() => {
                 loading="lazy"
                 decoding="async"
               />
+              {/* Mood badge overlay */}
+              {moodBadge && (
+                <div className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 border border-destructive/50 shadow-lg">
+                  <span className="text-lg">{moodBadge.emoji}</span>
+                  <span className="text-xs font-medium text-destructive">{moodBadge.label}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -280,6 +322,15 @@ export const CompanionDisplay = memo(() => {
           }} />
         </div>
       </Card>
+
+      {/* Welcome Back Modal */}
+      <WelcomeBackModal 
+        isOpen={showWelcomeBack} 
+        onClose={() => {
+          setShowWelcomeBack(false);
+          setWelcomeBackDismissed(true);
+        }} 
+      />
     </>
   );
 });
