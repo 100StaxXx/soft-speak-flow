@@ -66,7 +66,7 @@ Intensity rules:
 
     const eventContextText = eventContext ? `\n\nEvent context:\n${eventContext}` : '';
 
-    const prompt = `Write a short 1-2 sentence motivational notification for the app 'R-Evolution'. Write in the voice of the given mentor, exactly matching their tone and style. The message must be concise, emotionally impactful, and suitable as a mobile push notification. Do not use emojis. Do not mention the word 'category' or 'trigger'. Do not repeat the mentor's signature line directly, but stay in character.
+    const prompt = `Write a short 1-2 sentence motivational notification for the app 'Cosmiq'. Write in the voice of the given mentor, exactly matching their tone and style. The message must be concise, emotionally impactful, and suitable as a mobile push notification. Do not use emojis. Do not mention the word 'category' or 'trigger'. Do not repeat the mentor's signature line directly, but stay in character.
 
 Mentor:
 - Name: ${mentor.name}

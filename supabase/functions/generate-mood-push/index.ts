@@ -28,7 +28,7 @@ serve(async (req) => {
     
     const mapping = moodMapping[mood] || moodMapping['Unmotivated'];
     
-    const systemPrompt = `You are a motivational coach for R-Evolution app. Create content for someone feeling "${mood}".
+    const systemPrompt = `You are a motivational coach for Cosmiq app. Create content for someone feeling "${mood}".
     
 Generate a response with:
 1. A powerful, short quote (1 sentence max)

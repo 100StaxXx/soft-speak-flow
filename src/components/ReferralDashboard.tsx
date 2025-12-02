@@ -15,14 +15,14 @@ export const ReferralDashboard = () => {
     if (!referralStats?.referral_code) return;
     setIsSharing(true);
 
-    const shareText = `Join me on R-Evolution and use my code: ${referralStats.referral_code}`;
+    const shareText = `Join me on Cosmiq and use my code: ${referralStats.referral_code}`;
 
     try {
       // Use native share on mobile
       if (Capacitor.isNativePlatform()) {
         try {
           await CapacitorShare.share({
-            title: "Join R-Evolution",
+            title: "Join Cosmiq",
             text: shareText,
             dialogTitle: "Share your referral code",
           });
@@ -45,7 +45,7 @@ export const ReferralDashboard = () => {
         if (navigator.share) {
           try {
             await navigator.share({
-              title: "Join R-Evolution",
+              title: "Join Cosmiq",
               text: shareText,
             });
           } catch (error) {
