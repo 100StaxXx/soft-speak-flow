@@ -3483,6 +3483,16 @@ export type Database = {
         Args: { current_stage: number; current_xp: number }
         Returns: boolean
       }
+      validate_referral_code: {
+        Args: { p_code: string }
+        Returns: {
+          code: string
+          id: string
+          is_active: boolean
+          owner_type: string
+          owner_user_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
