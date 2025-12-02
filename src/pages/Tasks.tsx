@@ -76,7 +76,7 @@ export default function Tasks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { profile } = useProfile();
-  const { companion, isLoading: companionLoading } = useCompanion();
+  const { companion, isLoading: companionLoading, error: companionError } = useCompanion();
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
@@ -549,14 +549,55 @@ export default function Tasks() {
     return false;
   };
 
-  // Show loading state while companion is being fetched OR if companion is not loaded yet
-  // This prevents crashes after onboarding when companion query is still loading
-  if (companionLoading || !companion) {
+  // Show error state if query failed
+  if (companionError) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="text-center space-y-4 p-6">
+          <Target className="h-16 w-16 mx-auto text-destructive" />
+          <h2 className="text-2xl font-bold">Error Loading Data</h2>
+          <p className="text-muted-foreground max-w-md">
+            {companionError instanceof Error ? companionError.message : 'Unable to load your companion data. Please try refreshing the page.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while companion is being fetched
+  if (companionLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
           <p className="text-muted-foreground">Loading your adventure...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If companion doesn't exist after loading, redirect to onboarding
+  if (!companion) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="text-center space-y-4 p-6">
+          <Target className="h-16 w-16 mx-auto text-primary" />
+          <h2 className="text-2xl font-bold">No Companion Found</h2>
+          <p className="text-muted-foreground max-w-md">
+            It looks like you haven't created your companion yet. Please complete the onboarding process to get started.
+          </p>
+          <button
+            onClick={() => navigate('/onboarding')}
+            className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            Start Onboarding
+          </button>
         </div>
       </div>
     );
