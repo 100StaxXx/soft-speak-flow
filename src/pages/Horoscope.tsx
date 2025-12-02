@@ -78,20 +78,22 @@ const Horoscope = () => {
     try {
       const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
 
-      // Check for error in response data (400 status returns error in body)
-      if (data?.error) {
-        console.log('Horoscope API returned error:', data.error);
-        // Handle missing zodiac sign - user hasn't completed onboarding
-        if (data.error.includes('zodiac sign') || data.error.includes('onboarding')) {
-          setHoroscope(null);
-          setZodiac(null);
-          setIsPersonalized(false);
-          setDate(new Date().toLocaleDateString('en-CA'));
-          return;
-        }
-        throw new Error(data.error);
+      // Handle missing zodiac sign - check both error object and data.error
+      const errorMessage = error?.message || data?.error || '';
+      if (errorMessage.toLowerCase().includes('zodiac sign') || errorMessage.toLowerCase().includes('onboarding')) {
+        console.log('User needs to complete zodiac selection:', errorMessage);
+        setHoroscope(null);
+        setZodiac(null);
+        setIsPersonalized(false);
+        setDate(new Date().toLocaleDateString('en-CA'));
+        setLoading(false);
+        return;
       }
 
+      // Check for other errors
+      if (data?.error) {
+        throw new Error(data.error);
+      }
       if (error) throw error;
 
       setHoroscope(data.horoscope);
