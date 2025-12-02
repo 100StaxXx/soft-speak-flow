@@ -1,21 +1,46 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, Sparkles, Zap, Bell, Download, Check, Moon } from "lucide-react";
+import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
+import { useTrialStatus } from "@/hooks/useTrialStatus";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import { cn } from "@/lib/utils";
+
+type PlanType = "monthly" | "yearly";
 
 export default function Premium() {
   const navigate = useNavigate();
   const { isActive } = useSubscription();
-  const { handlePurchase, loading, isAvailable } = useAppleSubscription();
+  const { handlePurchase, handleRestore, loading, isAvailable } = useAppleSubscription();
+  const { isInTrial, trialDaysRemaining } = useTrialStatus();
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
 
   const handleSubscribe = async () => {
-    const success = await handlePurchase(IAP_PRODUCTS.MONTHLY);
+    const productId = selectedPlan === "yearly" 
+      ? IAP_PRODUCTS.YEARLY 
+      : IAP_PRODUCTS.MONTHLY;
+    const success = await handlePurchase(productId);
     if (success) {
       navigate('/premium-success');
     }
+  };
+
+  const plans = {
+    monthly: {
+      price: "$9.99",
+      period: "/month",
+      savings: null,
+      description: "Billed monthly",
+    },
+    yearly: {
+      price: "$59.99",
+      period: "/year",
+      savings: "Save 50%",
+      description: "Just $4.99/month",
+    },
   };
 
   // Show premium user view
@@ -61,26 +86,65 @@ export default function Premium() {
             <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-5xl text-foreground">
-            Upgrade to Premium
+            {isInTrial ? "Upgrade to Premium" : "Subscribe to Continue"}
           </h1>
+          {isInTrial && trialDaysRemaining > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20">
+              <span className="text-sm font-medium text-foreground">
+                {trialDaysRemaining === 1 
+                  ? "1 day left in your free trial" 
+                  : `${trialDaysRemaining} days left in your free trial`}
+              </span>
+            </div>
+          )}
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            $9.99/month. Full access to all features.
+            Full access to all features. No commitment.
           </p>
+        </div>
+
+        {/* Plan Toggle Cards */}
+        <div className="flex gap-4 max-w-md mx-auto">
+          {(["monthly", "yearly"] as PlanType[]).map((plan) => (
+            <Card
+              key={plan}
+              onClick={() => setSelectedPlan(plan)}
+              className={cn(
+                "flex-1 cursor-pointer transition-all relative overflow-hidden",
+                selectedPlan === plan
+                  ? "border-2 border-primary bg-primary/5 shadow-glow"
+                  : "border border-border hover:border-primary/50"
+              )}
+            >
+              {plans[plan].savings && (
+                <div className="absolute top-0 right-0 bg-accent text-accent-foreground text-xs font-bold px-2 py-1 rounded-bl-lg">
+                  {plans[plan].savings}
+                </div>
+              )}
+              <CardContent className="p-5 text-center">
+                <p className="text-sm font-medium text-muted-foreground capitalize mb-2">
+                  {plan}
+                </p>
+                <p className="text-3xl font-bold text-foreground">
+                  {plans[plan].price}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {plans[plan].period}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {plans[plan].description}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Pricing Card */}
         <Card className="border-2 border-primary/20 shadow-2xl bg-card/80 backdrop-blur">
-          <CardHeader className="text-center pb-8">
-            <div className="space-y-2">
-              <CardTitle className="text-3xl font-bold text-foreground">R-Evolution Premium</CardTitle>
-              <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold text-foreground">$9.99</span>
-                <span className="text-xl text-muted-foreground">/month</span>
-              </div>
-              <CardDescription className="text-base">
-                Manage subscription via iOS Settings • Cancel anytime
-              </CardDescription>
-            </div>
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-2xl font-bold text-foreground">What's included</CardTitle>
+            <CardDescription className="text-base">
+              Everything you need for your self-improvement journey
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6">
@@ -155,8 +219,19 @@ export default function Premium() {
                   Processing...
                 </>
               ) : (
-                "Subscribe Now →"
+                `Subscribe ${selectedPlan === "yearly" ? "Yearly - $59.99" : "Monthly - $9.99"}`
               )}
+            </Button>
+
+            {/* Restore Purchases */}
+            <Button
+              variant="ghost"
+              onClick={handleRestore}
+              disabled={loading}
+              className="w-full text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Restore Purchases
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">

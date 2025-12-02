@@ -1,8 +1,10 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useTrialStatus } from "@/hooks/useTrialStatus";
 import { Progress } from "@/components/ui/progress";
+import { TrialExpiredPaywall } from "@/components/TrialExpiredPaywall";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,8 +12,9 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRouteProps) => {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const { needsPaywall, loading: trialLoading } = useTrialStatus();
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
 
@@ -26,7 +29,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (authLoading || profileLoading) {
+    if (authLoading || profileLoading || trialLoading) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -42,10 +45,10 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
         clearInterval(timer);
       }
     };
-  }, [authLoading, profileLoading]);
+  }, [authLoading, profileLoading, trialLoading]);
 
   // Show loading while checking auth
-  if (authLoading) {
+  if (authLoading || trialLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -61,6 +64,11 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
   // Don't render children until auth is confirmed
   if (!user) return null;
+
+  // Show hard paywall if trial expired and not subscribed
+  if (needsPaywall) {
+    return <TrialExpiredPaywall />;
+  }
 
   return <>{children}</>;
 };
