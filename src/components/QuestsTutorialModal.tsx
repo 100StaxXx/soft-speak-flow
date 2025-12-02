@@ -32,26 +32,26 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               or studying.
             </p>
             
-            <div className="bg-accent/20 rounded-lg p-4 space-y-2">
-              <div className="flex items-start gap-2">
+            <div className="bg-accent/20 rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   Add quests throughout your day
                 </p>
               </div>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   First 3 quests earn full XP, then rewards gradually decrease
                 </p>
               </div>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   Main Quest = 1.5x XP boost
                 </p>
               </div>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   Create Epics for long-term goals
