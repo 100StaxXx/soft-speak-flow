@@ -797,6 +797,39 @@ export type Database = {
           },
         ]
       }
+      companion_voice_templates: {
+        Row: {
+          concern_templates: string[] | null
+          created_at: string | null
+          encouragement_templates: string[] | null
+          greeting_templates: string[] | null
+          id: string
+          personality_traits: string[]
+          species: string
+          voice_style: string
+        }
+        Insert: {
+          concern_templates?: string[] | null
+          created_at?: string | null
+          encouragement_templates?: string[] | null
+          greeting_templates?: string[] | null
+          id?: string
+          personality_traits?: string[]
+          species: string
+          voice_style: string
+        }
+        Update: {
+          concern_templates?: string[] | null
+          created_at?: string | null
+          encouragement_templates?: string[] | null
+          greeting_templates?: string[] | null
+          id?: string
+          personality_traits?: string[]
+          species?: string
+          voice_style?: string
+        }
+        Relationships: []
+      }
       daily_check_ins: {
         Row: {
           check_in_date: string
@@ -2328,6 +2361,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      push_notification_queue: {
+        Row: {
+          body: string
+          context: Json | null
+          created_at: string | null
+          delivered: boolean | null
+          delivered_at: string | null
+          id: string
+          notification_type: string
+          scheduled_for: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          context?: Json | null
+          created_at?: string | null
+          delivered?: boolean | null
+          delivered_at?: string | null
+          id?: string
+          notification_type: string
+          scheduled_for: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          context?: Json | null
+          created_at?: string | null
+          delivered?: boolean | null
+          delivered_at?: string | null
+          id?: string
+          notification_type?: string
+          scheduled_for?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_notification_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
