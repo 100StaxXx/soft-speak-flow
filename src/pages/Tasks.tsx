@@ -626,16 +626,21 @@ export default function Tasks() {
         onComplete={() => setShowCelebration({ ...showCelebration, show: false })}
       />
       
-      <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10 safe-area-top">
-        <BrandTagline />
-
-        <div className="flex items-center gap-3">
-          <Target className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Quests & Epics</h1>
-            <p className="text-muted-foreground">Build your daily momentum</p>
+      {/* Sticky Header with iOS Safe Area */}
+      <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
+        <div className="max-w-2xl mx-auto px-6 py-4">
+          <BrandTagline />
+          <div className="flex items-center gap-3">
+            <Target className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold">Quests & Epics</h1>
+              <p className="text-muted-foreground">Build your daily momentum</p>
+            </div>
           </div>
         </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10">
 
         <Tabs defaultValue="quests" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
