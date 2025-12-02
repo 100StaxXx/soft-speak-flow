@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'R-Evolution - Your Personal AI Mentor',
-        short_name: 'R-Evolution',
+        name: 'Cosmiq - Your Personal AI Mentor',
+        short_name: 'Cosmiq',
         description: 'Your gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.',
         theme_color: '#000000',
         background_color: '#000000',

@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         content: discordMessage,
-        username: 'R-Evolution Bot',
+        username: 'Cosmiq Bot',
         avatar_url: 'https://tffrgsaawvletgiztfry.supabase.co/storage/v1/object/public/mentors-avatars/revolution-bot.png',
       }),
     });

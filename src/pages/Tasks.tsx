@@ -416,7 +416,7 @@ export default function Tasks() {
     ? completions.length / habits.length 
     : 0;
 
-  // Check if tutorial should be shown and auto-generate "Join R-Evolution" quest
+  // Check if tutorial should be shown and auto-generate "Join Cosmiq" quest
   useEffect(() => {
     if (!user?.id || !profile) return;
     
@@ -441,7 +441,7 @@ export default function Tasks() {
     if (!tutorialSeen && !showTutorial) {
       setShowTutorial(true);
       
-      // Auto-generate "Join R-Evolution" quest (only once)
+      // Auto-generate "Join Cosmiq" quest (only once)
       const today = format(new Date(), 'yyyy-MM-dd');
       const questCreationKey = `tutorial_quest_created_${user.id}`;
       
@@ -460,7 +460,7 @@ export default function Tasks() {
             .from('daily_tasks')
             .select('id')
             .eq('user_id', user.id)
-            .eq('task_text', 'Join R-Evolution')
+            .eq('task_text', 'Join Cosmiq')
             .maybeSingle();
           
           if (checkError) {
@@ -474,7 +474,7 @@ export default function Tasks() {
               .from('daily_tasks')
               .insert({
                 user_id: user.id,
-                task_text: 'Join R-Evolution',
+                task_text: 'Join Cosmiq',
                 difficulty: 'easy',
                 xp_reward: 10,
                 task_date: today,
@@ -890,7 +890,7 @@ export default function Tasks() {
                             onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
                             onDelete={() => deleteTask(mainQuest.id)}
                             isMainQuest={true}
-                            isTutorialQuest={mainQuest.task_text === 'Join R-Evolution'}
+                            isTutorialQuest={mainQuest.task_text === 'Join Cosmiq'}
                           />
                         </div>
                       )}
@@ -911,7 +911,7 @@ export default function Tasks() {
                                 onDelete={() => deleteTask(task.id)}
                                 onSetMainQuest={() => setMainQuest(task.id)}
                                 showPromoteButton={!mainQuest}
-                                isTutorialQuest={task.task_text === 'Join R-Evolution'}
+                                isTutorialQuest={task.task_text === 'Join Cosmiq'}
                               />
                             ))}
                           </div>

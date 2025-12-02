@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       const welcomeMessage = `🎉 **Welcome to the ${epic.title} Guild!** 🎉\n\n` +
         `This is your private space to coordinate, encourage each other, and celebrate victories together.\n\n` +
         `📋 **Epic Code:** \`${epic.invite_code}\`\n` +
-        `🌐 **Share:** Invite others using the code in the R-Evolution app!\n\n` +
+        `🌐 **Share:** Invite others using the code in the Cosmiq app!\n\n` +
         `Let's crush this epic together! 💪`;
 
       await fetch(

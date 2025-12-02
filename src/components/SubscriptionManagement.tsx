@@ -20,7 +20,7 @@ export function SubscriptionManagement() {
       // On iOS, direct users to Settings
       toast({
         title: "Manage Subscription",
-        description: "Open Settings > [Your Name] > Subscriptions to manage your R-Evolution subscription",
+        description: "Open Settings > [Your Name] > Subscriptions to manage your Cosmiq subscription",
       });
     } else {
       toast({
@@ -100,7 +100,7 @@ export function SubscriptionManagement() {
           Subscription Details
         </CardTitle>
         <CardDescription>
-          Manage your R-Evolution Premium subscription
+          Manage your Cosmiq Premium subscription
         </CardDescription>
       </CardHeader>
 

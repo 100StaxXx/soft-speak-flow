@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
                 Last Updated: November 21, 2025
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                R-Evolution LLC • alilrevolution@gmail.com
+                Cosmiq LLC • alilrevolution@gmail.com
               </p>
             </div>
           </CardHeader>
@@ -283,13 +283,13 @@ export default function PrivacyPolicy() {
                   If you have questions or concerns about this Privacy Policy or our data practices, please contact us:
                 </p>
                 <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-1">
-                  <p className="text-sm font-medium">R-Evolution LLC</p>
+                  <p className="text-sm font-medium">Cosmiq LLC</p>
                   <p className="text-sm text-muted-foreground">
                     Email:{" "}
                     <a
                       href="mailto:alilrevolution@gmail.com"
                       className="text-primary hover:underline"
-                      aria-label="Email R-Evolution LLC privacy team"
+                      aria-label="Email Cosmiq LLC privacy team"
                     >
                       alilrevolution@gmail.com
                     </a>

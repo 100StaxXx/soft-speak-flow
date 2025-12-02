@@ -320,7 +320,7 @@ const Profile = () => {
                   <Gift className="h-6 w-6 text-primary" />
                   <div>
                     <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
-                    <p className="text-sm text-muted-foreground">Share R-Evolution and unlock exclusive companion skins</p>
+                    <p className="text-sm text-muted-foreground">Share Cosmiq and unlock exclusive companion skins</p>
                   </div>
                 </div>
                 

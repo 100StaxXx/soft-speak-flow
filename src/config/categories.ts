@@ -1,4 +1,4 @@
-// Topic Categories for R-Evolution
+// Topic Categories for Cosmiq
 export const TOPIC_CATEGORIES = [
   { label: "Discipline", value: "discipline" },
   { label: "Confidence", value: "confidence" },
