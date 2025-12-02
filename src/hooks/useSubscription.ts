@@ -86,7 +86,7 @@ export function useSubscription() {
 
   // Format price based on plan - memoized
   const planPrice = useMemo(() => 
-    subscription?.plan === "yearly" ? "$99.99/year" : "$9.99/month",
+    subscription?.plan === "yearly" ? "$59.99/year" : "$9.99/month",
     [subscription?.plan]
   );
 

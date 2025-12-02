@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
 
 export function useAppleSubscription() {
-  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +38,9 @@ export function useAppleSubscription() {
       });
 
       if (error) throw error;
+
+      // Invalidate subscription cache to unlock app immediately
+      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
 
       toast({
         title: "Success!",
@@ -127,6 +130,9 @@ export function useAppleSubscription() {
       if (error) {
         throw error;
       }
+
+      // Invalidate subscription cache to unlock app immediately
+      await queryClient.invalidateQueries({ queryKey: ['subscription'] });
 
       toast({
         title: "Restored!",
