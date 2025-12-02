@@ -31,6 +31,8 @@ interface UserContext {
   } | null;
   currentStreak: number;
   lastActivityAt: string | null;
+  recentMilestone: 'streak_7' | 'streak_14' | 'streak_30' | 'evolution' | 'all_quests' | null;
+  lunarPhase: 'new_moon' | 'full_moon' | 'first_quarter' | 'last_quarter' | null;
 }
 
 interface VoiceTemplate {
@@ -42,17 +44,48 @@ interface VoiceTemplate {
   concernTemplates: string[];
 }
 
+// Calculate lunar phase (simplified)
+const getLunarPhase = (): 'new_moon' | 'full_moon' | 'first_quarter' | 'last_quarter' | null => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+  
+  // Known new moon: Jan 11, 2024 - lunar cycle ~29.53 days
+  const knownNewMoon = new Date(2024, 0, 11);
+  const daysSinceNew = Math.floor((now.getTime() - knownNewMoon.getTime()) / (1000 * 60 * 60 * 24));
+  const lunarDay = daysSinceNew % 29.53;
+  
+  // Check if today is a special lunar day (with 1-day tolerance)
+  if (lunarDay <= 1 || lunarDay >= 28.53) return 'new_moon';
+  if (lunarDay >= 13.5 && lunarDay <= 15.5) return 'full_moon';
+  if (lunarDay >= 6.5 && lunarDay <= 8.5) return 'first_quarter';
+  if (lunarDay >= 21.5 && lunarDay <= 23.5) return 'last_quarter';
+  
+  return null;
+};
+
 // Notification type selection based on context
 const selectNotificationType = (context: UserContext): string => {
   const now = new Date();
   const hour = now.getHours();
+  
+  // Priority 0: Milestone celebrations (duo notification)
+  if (context.recentMilestone) {
+    return 'duo_milestone';
+  }
   
   // Priority 1: Neglect escalation (critical)
   if (context.companion && context.companion.inactiveDays >= 1) {
     return 'neglect_escalation';
   }
   
-  // Priority 2: Mood follow-up (if check-in was 4-8 hours ago with concerning mood)
+  // Priority 2: Lunar phase special (cosmic event)
+  if (context.lunarPhase && (hour >= 7 && hour <= 10)) {
+    return 'cosmic_lunar';
+  }
+  
+  // Priority 3: Mood follow-up (if check-in was 4-8 hours ago with concerning mood)
   if (context.lastCheckIn) {
     const checkInTime = new Date(context.lastCheckIn.createdAt);
     const hoursSinceCheckIn = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
@@ -64,7 +97,7 @@ const selectNotificationType = (context: UserContext): string => {
     }
   }
   
-  // Priority 3: Streak protection (evening, if no activity today)
+  // Priority 4: Streak protection (evening, if no activity today)
   if (hour >= 19 && hour <= 21 && context.currentStreak > 0) {
     const lastActivity = context.lastActivityAt ? new Date(context.lastActivityAt) : null;
     const today = new Date().toLocaleDateString('en-CA');
@@ -75,7 +108,7 @@ const selectNotificationType = (context: UserContext): string => {
     }
   }
   
-  // Priority 4: Cosmic timing (if horoscope has high energy)
+  // Priority 5: Cosmic timing (if horoscope has high energy)
   if (context.horoscope?.energyForecast === 'high_energy' && hour >= 9 && hour <= 11) {
     return 'cosmic_timing';
   }
@@ -158,6 +191,55 @@ Cosmic tip: ${context.horoscope?.cosmicTip || 'The stars favor action today'}
 Make it feel like the companion is attuned to cosmic forces and sharing that insight.`;
       break;
       
+    case 'cosmic_lunar':
+      const lunarMessages: Record<string, string> = {
+        'new_moon': 'New moon energy favors fresh starts and setting intentions.',
+        'full_moon': 'Full moon energy amplifies emotions and manifestation power.',
+        'first_quarter': 'First quarter moon brings momentum and decisive action energy.',
+        'last_quarter': 'Last quarter moon favors reflection and releasing what no longer serves.',
+      };
+      userPrompt = `Generate a message about tonight's lunar energy.
+Moon phase: ${context.lunarPhase}
+Meaning: ${lunarMessages[context.lunarPhase || 'new_moon']}
+User's sign: ${context.zodiac || 'unknown'}
+Make the companion feel cosmically attuned, sharing this celestial wisdom as a gift.`;
+      break;
+      
+    case 'duo_milestone':
+      // Special: Both mentor and companion speak
+      const milestoneMessages: Record<string, { mentorLine: string; companionCue: string }> = {
+        'streak_7': {
+          mentorLine: "Seven days. That's not luck—that's the beginning of discipline.",
+          companionCue: "looks up at you with pride, tail wagging"
+        },
+        'streak_14': {
+          mentorLine: "Two weeks of showing up. You're becoming someone who keeps promises to themselves.",
+          companionCue: "nuzzles against you, feeling your growing strength"
+        },
+        'streak_30': {
+          mentorLine: "Thirty days. A month of consistency. This is who you are now.",
+          companionCue: "stands tall beside you, transformed by your journey together"
+        },
+        'evolution': {
+          mentorLine: "Your companion evolved. That's your dedication made visible.",
+          companionCue: "reveals their new form, energy crackling around them"
+        },
+        'all_quests': {
+          mentorLine: "Every quest completed. That's how legends are built.",
+          companionCue: "does a victory lap, pure joy radiating from them"
+        }
+      };
+      
+      const milestone = context.recentMilestone || 'streak_7';
+      const mentorName = context.mentor?.name || 'Your mentor';
+      const milestoneData = milestoneMessages[milestone];
+      
+      // For duo, we'll format the body specially
+      return {
+        title: `${mentorName} & ${capitalizedCompanion} celebrate you`,
+        body: `"${milestoneData.mentorLine}" — ${mentorName}\n\n*${capitalizedCompanion} ${milestoneData.companionCue}*`,
+      };
+      
     default:
       userPrompt = `Generate a general encouraging message. Current companion mood: ${context.companion?.currentMood || 'happy'}.`;
   }
@@ -195,6 +277,8 @@ Make it feel like the companion is attuned to cosmic forces and sharing that ins
       'neglect_escalation': `${capitalizedCompanion} misses you`,
       'streak_protection': `${context.currentStreak}-day streak at risk`,
       'cosmic_timing': `Cosmic energy alert`,
+      'cosmic_lunar': `${context.lunarPhase === 'full_moon' ? '🌕' : context.lunarPhase === 'new_moon' ? '🌑' : '🌙'} ${context.lunarPhase?.replace('_', ' ')} tonight`,
+      'duo_milestone': `Milestone celebration!`,
     };
     
     return {
@@ -340,6 +424,18 @@ serve(async (req) => {
             .maybeSingle(),
         ]);
 
+        // Detect recent milestones
+        const streak = profile.current_streak || profile.current_habit_streak || 0;
+        let recentMilestone: UserContext['recentMilestone'] = null;
+        
+        // Check for streak milestones (exact match for freshness)
+        if (streak === 7) recentMilestone = 'streak_7';
+        else if (streak === 14) recentMilestone = 'streak_14';
+        else if (streak === 30) recentMilestone = 'streak_30';
+        
+        // Get lunar phase
+        const lunarPhase = getLunarPhase();
+
         const userContext: UserContext = {
           userId: profile.id,
           displayName: profile.display_name,
@@ -363,8 +459,10 @@ serve(async (req) => {
             cosmicTip: horoscopeRes.data.cosmic_tip,
             energyForecast: horoscopeRes.data.energy_forecast,
           } : null,
-          currentStreak: profile.current_streak || profile.current_habit_streak || 0,
+          currentStreak: streak,
           lastActivityAt: activityRes.data?.created_at || null,
+          recentMilestone,
+          lunarPhase,
         };
 
         // Skip if no companion (core feature)
