@@ -78,44 +78,49 @@ const Horoscope = () => {
     try {
       const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
 
-      // Handle errors - check multiple places where error info might be
-      let errorMessage = '';
-      
-      // Check error object (FunctionsHttpError from non-2xx status)
+      // Handle FunctionsHttpError - extract actual error message from response
       if (error) {
-        errorMessage = error.message || '';
-        // Try to parse context if available (Supabase FunctionsHttpError)
+        let actualError = error.message || 'Unknown error';
+        
+        // For Supabase FunctionsHttpError, try to get the actual response body
         try {
-          if ((error as any).context) {
-            const context = await (error as any).context.json();
-            errorMessage = context?.error || errorMessage;
+          const context = (error as any).context;
+          if (context && typeof context.json === 'function') {
+            const body = await context.json();
+            if (body?.error) {
+              actualError = body.error;
+            }
           }
         } catch {
-          // Context parsing failed, use message
+          // Couldn't parse context, use original message
         }
-      }
-      
-      // Also check data.error for errors returned in body
-      if (!errorMessage && data?.error) {
-        errorMessage = data.error;
+
+        // Handle missing zodiac sign gracefully
+        if (actualError.toLowerCase().includes('zodiac') || actualError.toLowerCase().includes('onboarding')) {
+          console.log('User needs zodiac sign:', actualError);
+          setHoroscope(null);
+          setZodiac(null);
+          setIsPersonalized(false);
+          setDate(new Date().toLocaleDateString('en-CA'));
+          setLoading(false);
+          return;
+        }
+
+        throw new Error(actualError);
       }
 
-      // Handle missing zodiac sign gracefully - show onboarding prompt instead of error
-      if (errorMessage && (errorMessage.toLowerCase().includes('zodiac sign') || errorMessage.toLowerCase().includes('onboarding'))) {
-        console.log('User needs to complete zodiac selection:', errorMessage);
-        setHoroscope(null);
-        setZodiac(null);
-        setIsPersonalized(false);
-        setDate(new Date().toLocaleDateString('en-CA'));
-        setLoading(false);
-        return;
+      // Check for error in data body (shouldn't happen with 200 but just in case)
+      if (data?.error) {
+        if (data.error.toLowerCase().includes('zodiac') || data.error.toLowerCase().includes('onboarding')) {
+          setHoroscope(null);
+          setZodiac(null);
+          setIsPersonalized(false);
+          setDate(new Date().toLocaleDateString('en-CA'));
+          setLoading(false);
+          return;
+        }
+        throw new Error(data.error);
       }
-
-      // Throw other errors
-      if (errorMessage) {
-        throw new Error(errorMessage);
-      }
-      if (error) throw error;
 
       setHoroscope(data.horoscope);
       setZodiac(data.zodiac);
@@ -124,12 +129,12 @@ const Horoscope = () => {
       setCosmiqTip(data.cosmiqTip || null);
       setEnergyForecast(data.energyForecast || null);
       setPlacementInsights(data.placementInsights || null);
-    } catch (error) {
-      console.error('Error generating horoscope:', error);
+    } catch (err) {
+      console.error('Error generating horoscope:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
       
-      // Final check for zodiac/onboarding errors that might have bubbled up
-      const errMsg = error instanceof Error ? error.message : '';
-      if (errMsg.toLowerCase().includes('zodiac sign') || errMsg.toLowerCase().includes('onboarding')) {
+      // Final safety check for zodiac errors
+      if (errMsg.toLowerCase().includes('zodiac') || errMsg.toLowerCase().includes('onboarding')) {
         setHoroscope(null);
         setZodiac(null);
         setIsPersonalized(false);
@@ -143,7 +148,6 @@ const Horoscope = () => {
         description: errMsg || "Failed to load your horoscope",
         variant: "destructive",
       });
-      // Set fallback content so UI doesn't break
       setHoroscope("Unable to load your cosmiq insights at this moment. Please try again later.");
       setZodiac(profile?.zodiac_sign || "");
       setIsPersonalized(false);
