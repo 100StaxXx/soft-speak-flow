@@ -78,6 +78,20 @@ const Horoscope = () => {
     try {
       const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
 
+      // Check for error in response data (400 status returns error in body)
+      if (data?.error) {
+        console.log('Horoscope API returned error:', data.error);
+        // Handle missing zodiac sign - user hasn't completed onboarding
+        if (data.error.includes('zodiac sign') || data.error.includes('onboarding')) {
+          setHoroscope(null);
+          setZodiac(null);
+          setIsPersonalized(false);
+          setDate(new Date().toLocaleDateString('en-CA'));
+          return;
+        }
+        throw new Error(data.error);
+      }
+
       if (error) throw error;
 
       setHoroscope(data.horoscope);
@@ -446,8 +460,36 @@ const Horoscope = () => {
             </motion.div>
           </div>
 
+          {/* Missing Zodiac - Show onboarding prompt */}
+          {!loading && !zodiac && (
+            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
+              <div className="text-center space-y-6">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Sparkles className="w-16 h-16 text-purple-400 mx-auto" />
+                </motion.div>
+                <div>
+                  <h2 className="text-2xl font-black text-white mb-2">
+                    Discover Your Cosmic Path
+                  </h2>
+                  <p className="text-gray-300">
+                    Complete onboarding to reveal your zodiac sign and unlock personalized cosmiq insights.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => navigate('/onboarding')}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3"
+                >
+                  Start Your Journey
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* Main Horoscope Card - Only for users without advanced details */}
-          {!hasAdvancedDetails && (
+          {!hasAdvancedDetails && zodiac && (
             <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
               {loading ? (
                 <div className="space-y-4">
@@ -499,8 +541,8 @@ const Horoscope = () => {
           )}
         </motion.div>
 
-        {/* Birth Details Form - Show when no advanced details */}
-        {!hasAdvancedDetails && (
+        {/* Birth Details Form - Show when no advanced details but has zodiac */}
+        {!hasAdvancedDetails && zodiac && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
