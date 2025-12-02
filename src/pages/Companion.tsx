@@ -18,6 +18,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { StreakFreezeDisplay } from "@/components/StreakFreezeDisplay";
 import { useState } from "react";
 
 
@@ -99,6 +100,7 @@ const Companion = () => {
             </TabsContent>
 
             <TabsContent value="progress" className="space-y-6 mt-6">
+              <StreakFreezeDisplay />
               <HabitCalendar />
               <WeeklyInsights />
               <AchievementsPanel />
