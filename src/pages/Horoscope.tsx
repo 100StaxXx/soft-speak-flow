@@ -355,7 +355,7 @@ const Horoscope = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
       </div>
 
-      <div className="relative max-w-2xl mx-auto p-6 space-y-6">
+      <div className="relative max-w-2xl mx-auto p-6 space-y-6 safe-area-top">
         {/* Welcome Tooltip for first-time visitors */}
         {showWelcomeTooltip && (
           <motion.div
