@@ -23,6 +23,10 @@ interface Profile {
   longest_habit_streak: number | null;
   onboarding_completed: boolean | null;
   onboarding_data: Record<string, unknown> | null;
+  // Trial & subscription fields
+  trial_ends_at: string | null;
+  subscription_status: string | null;
+  subscription_expires_at: string | null;
   // Astrology fields
   zodiac_sign: string | null;
   birthdate: string | null;
