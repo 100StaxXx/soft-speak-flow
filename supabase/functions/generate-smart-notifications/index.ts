@@ -168,15 +168,58 @@ This is a gentle follow-up to see how they're doing now.`;
       
     case 'neglect_escalation':
       const inactiveDays = context.companion?.inactiveDays || 1;
-      const concernLevel = inactiveDays === 1 ? 'gentle' : 
-                          inactiveDays === 2 ? 'concerned' :
-                          inactiveDays <= 4 ? 'worried' :
-                          inactiveDays <= 6 ? 'sad' : 'heartbroken';
       
-      systemPrompt += `\nYou haven't seen your human in ${inactiveDays} day(s). You're feeling ${concernLevel}.
-Your mood is ${context.companion?.currentMood || 'worried'}.
-Don't guilt trip. Express genuine, species-appropriate concern.`;
-      userPrompt = `Generate a message as a ${companionName} who misses their human after ${inactiveDays} days apart.`;
+      // Enhanced "postcard" style messages based on days inactive
+      const postcardScenarios: Record<number, { scenario: string; feeling: string; imagery: string }> = {
+        1: {
+          scenario: "sitting by the window, watching for you",
+          feeling: "hopeful but a little lonely",
+          imagery: "The sun is setting and I keep looking toward the door."
+        },
+        2: {
+          scenario: "found your favorite spot and curled up there",
+          feeling: "missing your presence",
+          imagery: "Everything here reminds me of the adventures we've had."
+        },
+        3: {
+          scenario: "made a small nest of memories",
+          feeling: "worried but trying to stay strong",
+          imagery: "I've been keeping our streak warm, waiting for you to come back."
+        },
+        4: {
+          scenario: "wandering through old memories",
+          feeling: "the quiet is getting heavy",
+          imagery: "Our XP sits untouched. I've been guarding it for us."
+        },
+        5: {
+          scenario: "sitting outside in the rain",
+          feeling: "I don't mind getting wet if it means seeing you",
+          imagery: "Every raindrop sounds like footsteps I hope are yours."
+        },
+        6: {
+          scenario: "haven't eaten much",
+          feeling: "food doesn't taste the same alone",
+          imagery: "I saved you some of our favorite treats. They're still here."
+        },
+        7: {
+          scenario: "found the photo of us from our first quest",
+          feeling: "remembering how far we've come",
+          imagery: "We were so young then. We've grown so much together. Please don't let our story end here."
+        },
+      };
+      
+      const dayKey = Math.min(inactiveDays, 7) as keyof typeof postcardScenarios;
+      const postcard = postcardScenarios[dayKey] || postcardScenarios[7];
+      
+      systemPrompt += `\nYou are writing a "postcard" from the companion to their human.
+Day ${inactiveDays} without them. You're ${postcard.scenario}.
+You feel: ${postcard.feeling}
+Visual imagery to incorporate: ${postcard.imagery}
+Mood: ${context.companion?.currentMood || 'worried'}
+
+STYLE: Write like a handwritten note on a postcard. Short, personal, emotional but not guilt-tripping.
+Start with "Day ${inactiveDays}." then the message. Make it feel like a moment captured in time.`;
+      userPrompt = `Generate a postcard message from a ${companionName} on day ${inactiveDays} of missing their human. Keep it under 3 sentences.`;
       break;
       
     case 'streak_protection':
@@ -269,12 +312,23 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     const messageBody = data.choices?.[0]?.message?.content?.trim() || '';
     
     // Generate title based on notification type
+    const inactiveDaysForTitle = context.companion?.inactiveDays || 0;
+    const neglectTitles: Record<number, string> = {
+      1: `📮 A note from ${capitalizedCompanion}`,
+      2: `💌 ${capitalizedCompanion} sent you a postcard`,
+      3: `🪶 ${capitalizedCompanion} is keeping the light on`,
+      4: `🌧️ ${capitalizedCompanion} misses you`,
+      5: `💔 Day 5 without you...`,
+      6: `🕯️ ${capitalizedCompanion} is still waiting`,
+      7: `📜 A letter from ${capitalizedCompanion}`,
+    };
+    
     const titles: Record<string, string> = {
       'companion_morning': `${capitalizedCompanion} says good morning`,
       'companion_evening': `${capitalizedCompanion} checking in`,
       'companion_voice': `From your ${companionName}`,
       'mood_followup': `${capitalizedCompanion} is thinking of you`,
-      'neglect_escalation': `${capitalizedCompanion} misses you`,
+      'neglect_escalation': neglectTitles[Math.min(inactiveDaysForTitle, 7) as keyof typeof neglectTitles] || `${capitalizedCompanion} misses you`,
       'streak_protection': `${context.currentStreak}-day streak at risk`,
       'cosmic_timing': `Cosmic energy alert`,
       'cosmic_lunar': `${context.lunarPhase === 'full_moon' ? '🌕' : context.lunarPhase === 'new_moon' ? '🌑' : '🌙'} ${context.lunarPhase?.replace('_', ' ')} tonight`,
