@@ -93,3 +93,8 @@ verify_jwt = false
 [functions.generate-neglected-companion-image]
 verify_jwt = false
 
+[functions.generate-smart-notifications]
+verify_jwt = false
+
+[functions.deliver-scheduled-notifications]
+verify_jwt = false
