@@ -11,7 +11,7 @@ export const SubscriptionGate = () => {
   const navigate = useNavigate();
   const { companion } = useCompanion();
   const { isActive } = useSubscription();
-  const { isEvolvingLoading, setOnEvolutionComplete } = useEvolution();
+  const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
   const [hasShownPaywall, setHasShownPaywall] = useState(false);
   const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
@@ -67,7 +67,7 @@ export const SubscriptionGate = () => {
             Your Companion Has Evolved! 🎉
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-2">
-            Welcome to R-Evolution! You have <span className="font-semibold text-foreground">7 days of full access</span> to explore everything.
+            Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required.
           </DialogDescription>
         </DialogHeader>
 
@@ -75,10 +75,10 @@ export const SubscriptionGate = () => {
           {/* Features */}
           <div className="space-y-3">
           {[
-            { icon: Sparkles, text: "All 21 evolution stages unlocked" },
+            { icon: Sparkles, text: "All 21 evolution stages" },
             { icon: Moon, text: "Personalized Daily Cosmiq Insight" },
             { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
-            { icon: Crown, text: "Pet Mode, Guild Stories & all premium features" },
+            { icon: Crown, text: "Pet Mode, Guild Stories & all features" },
             { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
           ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-3 text-sm">
@@ -91,34 +91,34 @@ export const SubscriptionGate = () => {
           {/* Trial Info */}
           <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/20">
             <p className="text-sm font-semibold text-foreground mb-1">
-              What happens after 7 days?
+              After your free trial
             </p>
             <p className="text-xs text-muted-foreground">
-              Just $9.99/month to keep your companion and all features • Cancel anytime
+              Just $9.99/month or $59.99/year • Cancel anytime in iOS Settings
             </p>
           </div>
 
           {/* CTA */}
           <Button
-            onClick={() => {
-              setShowPaywall(false);
-              navigate("/premium");
-            }}
+            onClick={() => setShowPaywall(false)}
             className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            Set Up Payment (No Charge Now)
+            Start My Free Trial
           </Button>
 
           <Button
             variant="ghost"
-            onClick={() => setShowPaywall(false)}
+            onClick={() => {
+              setShowPaywall(false);
+              navigate("/premium");
+            }}
             className="w-full text-sm text-muted-foreground hover:text-foreground"
           >
-            I'll explore for now
+            View pricing details
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            Enjoy your companion! We'll remind you before the 7 days are up.
+            No credit card required. We'll remind you before the trial ends.
           </p>
         </div>
       </DialogContent>
