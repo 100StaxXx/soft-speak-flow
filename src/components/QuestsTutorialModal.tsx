@@ -19,7 +19,7 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
       // Only allow closing via the button, not by clicking outside or ESC
       if (!isOpen) return;
     }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <Swords className="h-6 w-6 text-primary" />
