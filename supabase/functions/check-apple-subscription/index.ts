@@ -71,18 +71,18 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error checking subscription:", error);
     
-    // Determine appropriate status code
-    const err = error as any;
+    // Determine appropriate status code based on error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     let statusCode = 500;
-    if (err.message === "Unauthorized") {
+    
+    if (errorMessage === "Unauthorized") {
       statusCode = 401;
-    } else if (err.message?.includes("not found")) {
+    } else if (errorMessage.includes("not found")) {
       statusCode = 404;
-    } else if (err.message?.includes("invalid") || err.message?.includes("required")) {
+    } else if (errorMessage.includes("invalid") || errorMessage.includes("required")) {
       statusCode = 400;
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {

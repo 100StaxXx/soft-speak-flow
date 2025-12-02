@@ -95,9 +95,14 @@ export const useReferrals = () => {
         .select("id, code, owner_user_id, owner_type")
         .eq("code", code)
         .eq("is_active", true)
-        .single();
+        .maybeSingle();
 
-      if (codeError || !codeData) {
+      if (codeError) {
+        console.error("Error fetching referral code:", codeError);
+        throw new Error("Unable to validate referral code. Please try again.");
+      }
+      
+      if (!codeData) {
         throw new Error("Invalid referral code");
       }
 

@@ -127,12 +127,26 @@ export const CompanionDisplay = memo(() => {
 
   useEffect(() => {
     if (!evolveCompanion.isSuccess || !evolveCompanion.data) return;
-    setEvolutionData({
-      stage: evolveCompanion.data.current_stage,
-      imageUrl: evolveCompanion.data.current_image_url || "",
-    });
-    setIsEvolving(true);
-  }, [evolveCompanion.isSuccess, evolveCompanion.data]);
+    
+    // The evolveCompanion mutation returns just the image URL string
+    // The companion query will be invalidated and refetched with new data
+    // For the evolution animation, we use the image URL from the mutation
+    // and the stage from the companion data after refetch
+    const imageUrl = typeof evolveCompanion.data === 'string' 
+      ? evolveCompanion.data 
+      : (evolveCompanion.data as any)?.current_image_url || "";
+    
+    // Use companion's current stage + 1 since mutation triggers after XP threshold
+    const newStage = companion ? companion.current_stage : 0;
+    
+    if (imageUrl) {
+      setEvolutionData({
+        stage: newStage,
+        imageUrl,
+      });
+      setIsEvolving(true);
+    }
+  }, [evolveCompanion.isSuccess, evolveCompanion.data, companion]);
 
   // Show welcome back modal if user has been inactive
   useEffect(() => {

@@ -24,16 +24,19 @@ export const SubscriptionGate = () => {
       return;
     }
 
-    // Queue paywall to show after evolution completes if companion is at stage 1+
-    if (companion && companion.current_stage >= 1 && !hasShownPaywall && !isEvolvingLoading) {
-      // If evolution is currently happening, queue it for after
-      if (isEvolvingLoading) {
+    // Don't trigger while evolution is in progress - wait for it to complete
+    if (isEvolvingLoading) {
+      // Queue paywall to show after evolution completes if companion is at stage 1+
+      if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
         setShouldShowAfterEvolution(true);
-      } else {
-        // Evolution already done, show immediately
-        setShowPaywall(true);
-        setHasShownPaywall(true);
       }
+      return;
+    }
+
+    // Show paywall if companion is at stage 1+ and we haven't shown it yet
+    if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
+      setShowPaywall(true);
+      setHasShownPaywall(true);
     }
   }, [companion, isActive, hasShownPaywall, isEvolvingLoading]);
 
