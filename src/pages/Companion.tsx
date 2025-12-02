@@ -1,30 +1,39 @@
 import { BottomNav } from "@/components/BottomNav";
-import { CompanionDisplay } from "@/components/CompanionDisplay";
-import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
-import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
-import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
-import { XPBreakdown } from "@/components/XPBreakdown";
-import { DailyMissions } from "@/components/DailyMissions";
-import { HabitCalendar } from "@/components/HabitCalendar";
-import { WeeklyInsights } from "@/components/WeeklyInsights";
-import { AchievementsPanel } from "@/components/AchievementsPanel";
-import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
-import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
-import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, TrendingUp, BookOpen, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { StreakFreezeDisplay } from "@/components/StreakFreezeDisplay";
-import { useState } from "react";
+import { CompanionBadge } from "@/components/CompanionBadge";
+import { useState, lazy, Suspense } from "react";
 
+// Lazy load heavy components to improve initial load time
+const CompanionDisplay = lazy(() => import("@/components/CompanionDisplay").then(m => ({ default: m.CompanionDisplay })));
+const NextEvolutionPreview = lazy(() => import("@/components/NextEvolutionPreview").then(m => ({ default: m.NextEvolutionPreview })));
+const DailyMissions = lazy(() => import("@/components/DailyMissions").then(m => ({ default: m.DailyMissions })));
+const XPBreakdown = lazy(() => import("@/components/XPBreakdown").then(m => ({ default: m.XPBreakdown })));
+const StreakFreezeDisplay = lazy(() => import("@/components/StreakFreezeDisplay").then(m => ({ default: m.StreakFreezeDisplay })));
+const HabitCalendar = lazy(() => import("@/components/HabitCalendar").then(m => ({ default: m.HabitCalendar })));
+const WeeklyInsights = lazy(() => import("@/components/WeeklyInsights").then(m => ({ default: m.WeeklyInsights })));
+const AchievementsPanel = lazy(() => import("@/components/AchievementsPanel").then(m => ({ default: m.AchievementsPanel })));
+const CompanionEvolutionHistory = lazy(() => import("@/components/CompanionEvolutionHistory").then(m => ({ default: m.CompanionEvolutionHistory })));
+const CompanionStoryJournal = lazy(() => import("@/components/CompanionStoryJournal").then(m => ({ default: m.CompanionStoryJournal })));
+const EvolutionCardGallery = lazy(() => import("@/components/EvolutionCardGallery").then(m => ({ default: m.EvolutionCardGallery })));
+const CompanionErrorBoundary = lazy(() => import("@/components/CompanionErrorBoundary").then(m => ({ default: m.CompanionErrorBoundary })));
+
+const TabSkeleton = () => (
+  <div className="space-y-4">
+    <div className="h-64 rounded-xl bg-muted/30 animate-pulse" />
+    <div className="h-32 rounded-xl bg-muted/30 animate-pulse" />
+  </div>
+);
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading } = useCompanion();
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Show loading state while companion is being fetched
   if (isLoading || !companion) {
@@ -43,80 +52,97 @@ const Companion = () => {
 
   return (
     <PageTransition>
-      <CompanionErrorBoundary>
-        <div className="min-h-screen pb-20 relative">
-          {/* Cosmiq Starfield Background */}
-          <StarfieldBackground />
-          
-          <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex items-center justify-between py-4 safe-area-top">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h1 className="font-heading font-black text-xl">Companion</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <PageInfoButton onClick={() => setShowPageInfo(true)} />
-                <div data-tour="companion-tooltip-anchor">
-                  <CompanionBadge 
-                    element={companion.core_element}
-                    stage={companion.current_stage}
-                    showStage={true}
-                  />
+      <Suspense fallback={<TabSkeleton />}>
+        <CompanionErrorBoundary>
+          <div className="min-h-screen pb-20 relative">
+            <StarfieldBackground />
+            
+            <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <div className="container flex items-center justify-between py-4 safe-area-top">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h1 className="font-heading font-black text-xl">Companion</h1>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PageInfoButton onClick={() => setShowPageInfo(true)} />
+                  <div data-tour="companion-tooltip-anchor">
+                    <CompanionBadge 
+                      element={companion.core_element}
+                      stage={companion.current_stage}
+                      showStage={true}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </header>
+            </header>
 
-          <Tabs defaultValue="overview" className="container py-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="progress">
-                <Trophy className="h-4 w-4 mr-2" />
-                Progress
-              </TabsTrigger>
-              <TabsTrigger value="story">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Story
-              </TabsTrigger>
-              <TabsTrigger value="cards">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Cards
-              </TabsTrigger>
-            </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="progress">
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Progress
+                </TabsTrigger>
+                <TabsTrigger value="story">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Story
+                </TabsTrigger>
+                <TabsTrigger value="cards">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Cards
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="overview" className="space-y-6 mt-6">
-              <CompanionDisplay />
-              <NextEvolutionPreview 
-                currentXP={companion?.current_xp || 0}
-                nextEvolutionXP={nextEvolutionXP || 0}
-                currentStage={companion?.current_stage || 0}
-                progressPercent={progressToNext}
-              />
-              <DailyMissions />
-              <XPBreakdown />
-            </TabsContent>
+              <TabsContent value="overview" className="space-y-6 mt-6">
+                {activeTab === "overview" && (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <CompanionDisplay />
+                    <NextEvolutionPreview 
+                      currentXP={companion?.current_xp || 0}
+                      nextEvolutionXP={nextEvolutionXP || 0}
+                      currentStage={companion?.current_stage || 0}
+                      progressPercent={progressToNext}
+                    />
+                    <DailyMissions />
+                    <XPBreakdown />
+                  </Suspense>
+                )}
+              </TabsContent>
 
-            <TabsContent value="progress" className="space-y-6 mt-6">
-              <StreakFreezeDisplay />
-              <HabitCalendar />
-              <WeeklyInsights />
-              <AchievementsPanel />
-              {companion && <CompanionEvolutionHistory companionId={companion.id} />}
-            </TabsContent>
+              <TabsContent value="progress" className="space-y-6 mt-6">
+                {activeTab === "progress" && (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <StreakFreezeDisplay />
+                    <HabitCalendar />
+                    <WeeklyInsights />
+                    <AchievementsPanel />
+                    <CompanionEvolutionHistory companionId={companion.id} />
+                  </Suspense>
+                )}
+              </TabsContent>
 
-            <TabsContent value="story" className="space-y-6 mt-6">
-              <CompanionStoryJournal />
-            </TabsContent>
+              <TabsContent value="story" className="space-y-6 mt-6">
+                {activeTab === "story" && (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <CompanionStoryJournal />
+                  </Suspense>
+                )}
+              </TabsContent>
 
-            <TabsContent value="cards" className="space-y-6 mt-6">
-              <EvolutionCardGallery />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </CompanionErrorBoundary>
+              <TabsContent value="cards" className="space-y-6 mt-6">
+                {activeTab === "cards" && (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <EvolutionCardGallery />
+                  </Suspense>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </CompanionErrorBoundary>
+      </Suspense>
       <BottomNav />
       
       <PageInfoModal
