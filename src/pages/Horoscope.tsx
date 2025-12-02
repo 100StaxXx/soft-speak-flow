@@ -78,38 +78,25 @@ const Horoscope = () => {
     try {
       const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
 
-      // Handle FunctionsHttpError - extract actual error message from response
-      if (error) {
-        let actualError = error.message || 'Unknown error';
-        
-        // For Supabase FunctionsHttpError, try to get the actual response body
-        try {
-          const context = (error as any).context;
-          if (context && typeof context.json === 'function') {
-            const body = await context.json();
-            if (body?.error) {
-              actualError = body.error;
-            }
-          }
-        } catch {
-          // Couldn't parse context, use original message
-        }
-
-        // Handle missing zodiac sign gracefully
-        if (actualError.toLowerCase().includes('zodiac') || actualError.toLowerCase().includes('onboarding')) {
-          console.log('User needs zodiac sign:', actualError);
-          setHoroscope(null);
-          setZodiac(null);
-          setIsPersonalized(false);
-          setDate(new Date().toLocaleDateString('en-CA'));
-          setLoading(false);
-          return;
-        }
-
-        throw new Error(actualError);
+      // Check for zodiac/onboarding error anywhere in the error object
+      // This handles the 400 response with "No zodiac sign found"
+      const errorString = JSON.stringify(error) + (error?.message || '');
+      if (error && (errorString.toLowerCase().includes('zodiac') || errorString.toLowerCase().includes('onboarding'))) {
+        console.log('User needs to complete onboarding - no zodiac sign');
+        setHoroscope(null);
+        setZodiac(null);
+        setIsPersonalized(false);
+        setDate(new Date().toLocaleDateString('en-CA'));
+        setLoading(false);
+        return;
       }
 
-      // Check for error in data body (shouldn't happen with 200 but just in case)
+      // Handle other errors
+      if (error) {
+        throw new Error(error.message || 'Failed to load horoscope');
+      }
+
+      // Check for error in data body
       if (data?.error) {
         if (data.error.toLowerCase().includes('zodiac') || data.error.toLowerCase().includes('onboarding')) {
           setHoroscope(null);
