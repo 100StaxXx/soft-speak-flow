@@ -89,13 +89,11 @@ export const useReferrals = () => {
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
-      // Validate code exists in referral_codes table
-      const { data: codeData, error: codeError } = await supabase
-        .from("referral_codes")
-        .select("id, code, owner_user_id, owner_type")
-        .eq("code", code)
-        .eq("is_active", true)
-        .maybeSingle();
+      // Validate code using secure RPC function (prevents full table scans)
+      const { data: codeResults, error: codeError } = await supabase
+        .rpc("validate_referral_code", { p_code: code });
+      
+      const codeData = codeResults?.[0] || null;
 
       if (codeError) {
         console.error("Error fetching referral code:", codeError);
