@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { CosmiqProfileSection } from "@/components/astrology/CosmicProfileSection";
 import { CosmiqProfileReveal } from "@/components/astrology/CosmicProfileReveal";
+import { ZodiacSelector } from "@/components/astrology/ZodiacSelector";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
@@ -486,32 +487,37 @@ const Horoscope = () => {
             </motion.div>
           </div>
 
-          {/* Missing Zodiac - Show onboarding prompt */}
+          {/* Missing Zodiac - Let user select sign directly */}
           {!loading && !zodiac && (
-            <Card className="bg-gray-900/80 border-purple-500/30 backdrop-blur-xl p-8 shadow-2xl">
-              <div className="text-center space-y-6">
-                <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <Sparkles className="w-16 h-16 text-purple-400 mx-auto" />
-                </motion.div>
-                <div>
-                  <h2 className="text-2xl font-black text-white mb-2">
-                    Discover Your Cosmic Path
-                  </h2>
-                  <p className="text-gray-300">
-                    Complete onboarding to reveal your zodiac sign and unlock personalized cosmiq insights.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => navigate('/onboarding')}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3"
-                >
-                  Start Your Journey
-                </Button>
-              </div>
-            </Card>
+            <ZodiacSelector 
+              onSelect={async (sign) => {
+                if (!user) return;
+                try {
+                  const { error } = await supabase
+                    .from('profiles')
+                    .update({ zodiac_sign: sign })
+                    .eq('id', user.id);
+                  
+                  if (error) throw error;
+                  
+                  // Invalidate profile and regenerate horoscope
+                  await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+                  await generateHoroscope();
+                  
+                  toast({
+                    title: "Zodiac Set!",
+                    description: `Welcome, ${sign.charAt(0).toUpperCase() + sign.slice(1)}! Loading your reading...`,
+                  });
+                } catch (err) {
+                  console.error('Error setting zodiac:', err);
+                  toast({
+                    title: "Error",
+                    description: "Failed to save zodiac sign",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            />
           )}
 
           {/* Main Horoscope Card - Only for users without advanced details */}
