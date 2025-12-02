@@ -73,9 +73,22 @@ export default function Onboarding() {
         .eq("id", user.id)
         .maybeSingle();
       
-      // If onboarding is already completed, redirect to tasks
+      // If onboarding is already completed, check if companion exists before redirecting
       if (profile?.onboarding_completed) {
-        navigate("/tasks", { replace: true });
+        const { data: existingCompanion } = await supabase
+          .from("user_companion")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        
+        // Only redirect if companion exists, otherwise let them create one
+        if (existingCompanion) {
+          navigate("/tasks", { replace: true });
+          return;
+        }
+        
+        // Companion missing but onboarding marked complete - go to companion stage
+        setStage('companion');
         return;
       }
       
