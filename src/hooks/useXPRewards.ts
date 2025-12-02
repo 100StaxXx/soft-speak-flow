@@ -92,6 +92,14 @@ export const useXPRewards = () => {
 
   const awardChallengeCompletion = () => {
     if (!companion) return;
+    
+    // Mark user as active (resets companion decay)
+    if (user?.id) {
+      markUserActive(user.id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+      });
+    }
+    
     showXPToast(XP_REWARDS.CHALLENGE_COMPLETE, "Challenge Complete!");
     awardXP.mutate({
       eventType: "challenge_complete",
@@ -101,6 +109,14 @@ export const useXPRewards = () => {
 
   const awardWeeklyChallengeCompletion = () => {
     if (!companion) return;
+    
+    // Mark user as active (resets companion decay)
+    if (user?.id) {
+      markUserActive(user.id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+      });
+    }
+    
     showXPToast(XP_REWARDS.WEEKLY_CHALLENGE, "Weekly Challenge Done!");
     awardXP.mutate({
       eventType: "weekly_challenge",
@@ -122,6 +138,13 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
 
     try {
+      // Mark user as active (resets companion decay)
+      if (user?.id) {
+        markUserActive(user.id).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+        });
+      }
+      
       showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
       awardXP.mutate({
         eventType: "check_in",
