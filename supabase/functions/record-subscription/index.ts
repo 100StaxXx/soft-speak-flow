@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 
 /**
  * Record Subscription from alilpush
@@ -18,14 +19,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
  * }
  */
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
 
   try {
@@ -45,30 +41,12 @@ serve(async (req) => {
 
     // Validate required fields
     if (!user_id || !referral_code || !plan || !amount) {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Missing required fields: user_id, referral_code, plan, amount" 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse(req, "Missing required fields: user_id, referral_code, plan, amount", 400);
     }
 
     // Validate plan
     if (plan !== "monthly" && plan !== "yearly") {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Invalid plan. Must be 'monthly' or 'yearly'" 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse(req, "Invalid plan. Must be 'monthly' or 'yearly'", 400);
     }
 
     // Look up referral_code_id
@@ -80,16 +58,7 @@ serve(async (req) => {
 
     if (codeError || !codeData) {
       console.error(`Referral code not found: ${referral_code}`);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Referral code not found" 
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse(req, "Referral code not found", 400);
     }
 
     // Check for duplicate payout (prevent double-counting)
@@ -103,17 +72,11 @@ serve(async (req) => {
 
       if (existingPayout) {
         console.log(`Payout already exists for transaction ${apple_transaction_id}`);
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: "Payout already recorded",
-            payout_id: existingPayout.id,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return jsonResponse(req, { 
+          success: true,
+          message: "Payout already recorded",
+          payout_id: existingPayout.id,
+        });
       }
     }
 
@@ -138,16 +101,7 @@ serve(async (req) => {
 
     if (payoutError) {
       console.error(`Failed to create payout:`, payoutError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: "Failed to create payout record" 
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse(req, "Failed to create payout record", 500);
     }
 
     // Get current metrics and increment them
@@ -177,33 +131,18 @@ serve(async (req) => {
 
     console.log(`Created ${payoutType} payout of $${payoutAmount.toFixed(2)} for code ${referral_code} from ${source_app || 'unknown'}`);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        payout_id: newPayout.id,
-        payout_amount: payoutAmount,
-        payout_type: payoutType,
-        status: "pending",
-        message: "Subscription recorded and payout created",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse(req, {
+      success: true,
+      payout_id: newPayout.id,
+      payout_amount: payoutAmount,
+      payout_type: payoutType,
+      status: "pending",
+      message: "Subscription recorded and payout created",
+    });
 
   } catch (error) {
     console.error("Error recording subscription:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: errorMessage 
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return errorResponse(req, errorMessage, 500);
   }
 });

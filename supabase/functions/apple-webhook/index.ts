@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * Apple Server-to-Server Notification Webhook
@@ -15,12 +16,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
  * 1. Go to App Information > App Store Server Notifications
  * 2. Add this URL as webhook endpoint
  * 3. Apple will send POST requests for subscription events
+ * 
+ * SECURITY NOTE: Apple webhooks don't send Origin headers, so CORS is permissive.
+ * The security comes from the signed JWT payload (TODO: implement signature verification).
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 // Notification types from Apple
 enum NotificationType {
@@ -39,7 +38,7 @@ enum NotificationType {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
 
   try {
@@ -84,7 +83,7 @@ serve(async (req) => {
       // Still return 200 to prevent Apple from retrying
       return new Response("OK", { 
         status: 200, 
-        headers: corsHeaders 
+        headers: getCorsHeaders(req),
       });
     }
 
@@ -93,7 +92,7 @@ serve(async (req) => {
       // This might be a new subscription, return 200 to acknowledge
       return new Response("OK", { 
         status: 200, 
-        headers: corsHeaders 
+        headers: getCorsHeaders(req),
       });
     }
 
@@ -197,7 +196,7 @@ serve(async (req) => {
     // Return 200 to acknowledge receipt
     return new Response("OK", {
       status: 200,
-      headers: corsHeaders,
+      headers: getCorsHeaders(req),
     });
 
   } catch (error) {
@@ -206,7 +205,7 @@ serve(async (req) => {
     // Still return 200 to prevent Apple from retrying
     return new Response("OK", {
       status: 200,
-      headers: corsHeaders,
+      headers: getCorsHeaders(req),
     });
   }
 });

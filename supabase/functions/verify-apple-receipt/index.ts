@@ -1,14 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders, handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
 
   try {
@@ -81,17 +77,13 @@ serve(async (req) => {
       
       if (sandboxData.status === 0) {
         await updateSubscription(supabaseClient, user.id, sandboxData);
-        return new Response(JSON.stringify({ success: true, data: sandboxData }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse(req, { success: true, data: sandboxData });
       }
     }
 
     if (verifyData.status === 0) {
       await updateSubscription(supabaseClient, user.id, verifyData);
-      return new Response(JSON.stringify({ success: true, data: verifyData }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(req, { success: true, data: verifyData });
     }
 
     throw new Error(`Receipt verification failed: ${verifyData.status}`);
@@ -110,13 +102,7 @@ serve(async (req) => {
       statusCode = 400;
     }
     
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: statusCode,
-      }
-    );
+    return errorResponse(req, errorMessage, statusCode);
   }
 });
 
