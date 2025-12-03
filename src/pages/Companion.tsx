@@ -10,7 +10,8 @@ import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Award, TrendingUp, BookOpen, Sparkles } from "lucide-react";
+import { Award, TrendingUp, BookOpen, Sparkles, MapPin } from "lucide-react";
+import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -55,6 +56,13 @@ const CardsTab = memo(() => (
   </div>
 ));
 CardsTab.displayName = 'CardsTab';
+
+const PostcardsTab = memo(() => (
+  <div className="space-y-6 mt-6">
+    <CompanionPostcards />
+  </div>
+));
+PostcardsTab.displayName = 'PostcardsTab';
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
@@ -150,22 +158,26 @@ const Companion = () => {
           </header>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Overview
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="overview" className="text-xs px-2">
+                <TrendingUp className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
-              <TabsTrigger value="badges">
-                <Award className="h-4 w-4 mr-2" />
-                Badges
+              <TabsTrigger value="badges" className="text-xs px-2">
+                <Award className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Badges</span>
               </TabsTrigger>
-              <TabsTrigger value="story">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Story
+              <TabsTrigger value="story" className="text-xs px-2">
+                <BookOpen className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Story</span>
               </TabsTrigger>
-              <TabsTrigger value="cards">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Cards
+              <TabsTrigger value="cards" className="text-xs px-2">
+                <Sparkles className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Cards</span>
+              </TabsTrigger>
+              <TabsTrigger value="postcards" className="text-xs px-2">
+                <MapPin className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Postcards</span>
               </TabsTrigger>
             </TabsList>
 
@@ -189,6 +201,10 @@ const Companion = () => {
 
             <TabsContent value="cards">
               {activeTab === "cards" && <CardsTab />}
+            </TabsContent>
+
+            <TabsContent value="postcards">
+              {activeTab === "postcards" && <PostcardsTab />}
             </TabsContent>
           </Tabs>
         </div>
