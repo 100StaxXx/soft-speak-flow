@@ -5,9 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
-import { Award, Lock, X } from "lucide-react";
+import { Award, Lock } from "lucide-react";
 import { BADGE_CATALOG, BadgeCategory, CATEGORY_LABELS, TIER_COLORS, BadgeDefinition } from "@/data/badgeCatalog";
-import { BadgesInfoTooltip } from "./BadgesInfoTooltip";
 import {
   Dialog,
   DialogContent,
@@ -72,12 +71,9 @@ export const BadgesCollectionPanel = () => {
     <div className="space-y-6 mt-6">
       {/* Header Stats */}
       <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <Award className="h-6 w-6 text-primary" />
-            <h3 className="text-lg font-semibold">Your Badges</h3>
-          </div>
-          <BadgesInfoTooltip />
+        <div className="flex items-center gap-3 mb-2">
+          <Award className="h-6 w-6 text-primary" />
+          <h3 className="text-lg font-semibold">Your Badges</h3>
         </div>
         <p className="text-2xl font-bold">
           <span className="text-primary">{totalEarned}</span>

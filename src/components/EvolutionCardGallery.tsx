@@ -5,7 +5,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EvolutionCardFlip } from "./EvolutionCardFlip";
-import { EvolutionCardsInfoTooltip } from "./EvolutionCardsInfoTooltip";
 
 interface EvolutionCard {
   id: string;
@@ -98,9 +97,8 @@ export const EvolutionCardGallery = () => {
   if (!cards || cards.length === 0) {
     return (
       <Card className="p-8 text-center">
-        <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="flex items-center justify-center mb-4">
           <Sparkles className="h-12 w-12 text-muted-foreground" />
-          <EvolutionCardsInfoTooltip />
         </div>
         <h3 className="text-lg font-semibold mb-2">No Evolution Cards Yet</h3>
         <p className="text-sm text-muted-foreground">
@@ -112,10 +110,7 @@ export const EvolutionCardGallery = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-foreground">Your Collection</h3>
-        <EvolutionCardsInfoTooltip />
-      </div>
+      <h3 className="font-semibold text-foreground">Your Collection</h3>
       <div className="grid grid-cols-3 gap-3">
         {cards.map((card) => (
           <EvolutionCardFlip key={card.id} card={card} />
