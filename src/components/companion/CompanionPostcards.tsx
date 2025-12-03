@@ -5,7 +5,6 @@ import { PostcardCard } from "./PostcardCard";
 import { PostcardFullscreen } from "./PostcardFullscreen";
 import { MapPin, Sparkles, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PostcardsInfoTooltip } from "../PostcardsInfoTooltip";
 
 // Mystery locations for uncollected postcards
 const mysteryLocations = [
@@ -44,7 +43,6 @@ export const CompanionPostcards = () => {
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground">Cosmic Postcards</h3>
-          <PostcardsInfoTooltip />
         </div>
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Sparkles className="w-4 h-4 text-yellow-400" />
