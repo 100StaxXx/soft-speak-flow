@@ -97,7 +97,7 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
           achievements.map((achievement) => (
             <AchievementBadge
               key={achievement.id}
-              tier={achievement.tier as any}
+              tier={achievement.tier as "bronze" | "silver" | "gold" | "platinum"}
               title={achievement.title}
               description={achievement.description}
               icon={achievement.icon}

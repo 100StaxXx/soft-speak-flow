@@ -55,8 +55,8 @@ export const restorePurchases = async (): Promise<IAPPurchase[]> => {
   }
 
   try {
-    const result = await NativePurchases.restorePurchases();
-    return (result as any) || [];
+    const result = await NativePurchases.restorePurchases() as unknown;
+    return ((result as { purchases?: IAPPurchase[] })?.purchases) || [];
   } catch (error) {
     console.error('Restore failed:', error);
     throw error;
@@ -72,9 +72,9 @@ export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> =
   try {
     const result = await NativePurchases.getProducts({
       productIdentifiers: productIds,
-    });
+    }) as unknown;
 
-    return (result as any).products || [];
+    return ((result as { products?: IAPProduct[] })?.products) || [];
   } catch (error) {
     console.error('Get products failed:', error);
     return [];

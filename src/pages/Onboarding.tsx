@@ -22,6 +22,7 @@ import { calculateMentorScores } from "@/utils/mentorScoring";
 import { generateMentorExplanation } from "@/utils/mentorExplanation";
 import { OnboardingData } from "@/types/profile";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
+import type { Json } from "@/integrations/supabase/types";
 
 interface Mentor {
   id: string;
@@ -521,7 +522,7 @@ export default function Onboarding() {
         .update({
           onboarding_completed: true,
           onboarding_step: 'complete',
-          onboarding_data: currentOnboardingData as any
+          onboarding_data: currentOnboardingData as unknown as Json
         })
         .eq('id', user.id)
         .select()

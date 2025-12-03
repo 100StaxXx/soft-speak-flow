@@ -30,8 +30,8 @@ export const useWelcomeMessage = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      const onboardingData = (profile?.onboarding_data as any) || {};
-      const userName = onboardingData.userName || user.email?.split('@')[0] || 'friend';
+      const onboardingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+      const userName = (onboardingData.userName as string) || user.email?.split('@')[0] || 'friend';
 
       // Create welcome message
       const welcomeMessages: Record<string, string> = {

@@ -94,7 +94,7 @@ export const isClipboardAvailable = (): boolean => {
  * @returns string - User-friendly error message
  */
 export const getClipboardErrorMessage = (error: unknown): string => {
-  const err = error as any;
+  const err = error as Error | null;
   const errorName = err?.name || '';
   const errorMessage = err?.message?.toLowerCase() || '';
   
