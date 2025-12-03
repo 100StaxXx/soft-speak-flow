@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Megaphone, Bell } from "lucide-react";
+import { ShoutsFeedInfoTooltip } from "./ShoutsFeedInfoTooltip";
 import { getShoutByKey, SHOUT_TYPE_CONFIG } from "@/data/shoutMessages";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
           <CardTitle className="text-lg flex items-center gap-2">
             <Megaphone className="h-5 w-5 text-primary" />
             Guild Shouts
+            <ShoutsFeedInfoTooltip />
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -72,6 +74,7 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
           <div className="flex items-center gap-2">
             <Megaphone className="h-5 w-5 text-primary" />
             Guild Shouts
+            <ShoutsFeedInfoTooltip />
           </div>
           {unreadCount > 0 && (
             <Badge variant="destructive" className="animate-pulse">
