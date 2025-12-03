@@ -261,8 +261,8 @@ class IOSAudioStateManager {
     
     // Then check each audio element
     for (const audio of this.audioElements) {
-      if (!audio.paused && !this.isMuted) {
-        // Audio was playing before, try to resume
+      if (audio.paused && !this.isMuted) {
+        // Audio was paused (possibly by iOS background), try to resume
         safePlay(audio);
       }
     }
