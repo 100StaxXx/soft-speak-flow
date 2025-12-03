@@ -5,6 +5,14 @@ import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
 import type { ApplyReferralCodeResult } from "@/types/referral-functions";
 
+interface ReferralCodeData {
+  id: string;
+  code: string;
+  owner_type: "user" | "influencer";
+  owner_user_id: string | null;
+  is_active: boolean;
+}
+
 export const useReferrals = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -79,11 +87,13 @@ export const useReferrals = () => {
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
+      const normalizedCode = code.trim().toUpperCase();
+
       // Validate code using secure RPC function (prevents full table scans)
       const { data: codeResults, error: codeError } = await supabase
-        .rpc("validate_referral_code", { p_code: code });
+        .rpc("validate_referral_code", { p_code: normalizedCode });
       
-      const codeData = codeResults?.[0] || null;
+      const codeData = (codeResults?.[0] as ReferralCodeData | undefined) || null;
 
       if (codeError) {
         console.error("Error fetching referral code:", codeError);
@@ -99,10 +109,33 @@ export const useReferrals = () => {
         throw new Error("Cannot use your own referral code");
       }
 
-      // Update profile with referred_by_code
+      if (codeData.owner_type === "user") {
+        if (!codeData.owner_user_id) {
+          throw new Error("Referral code is missing owner information");
+        }
+
+        const { data: applyResult, error: applyError } = await supabase
+          .rpc("apply_referral_code_atomic", {
+            p_user_id: user.id,
+            p_referrer_id: codeData.owner_user_id,
+            p_referral_code: normalizedCode,
+          });
+
+        if (applyError) {
+          console.error("Failed to apply referral code atomically:", applyError);
+          throw new Error("Failed to apply referral code. Please try again.");
+        }
+
+        const typedResult = applyResult as ApplyReferralCodeResult | null;
+        if (!typedResult?.success) {
+          throw new Error(typedResult?.message ?? "Failed to apply referral code");
+        }
+      }
+
+      // Update profile with referred_by_code for payout tracking
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ referred_by_code: code })
+        .update({ referred_by_code: normalizedCode })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
