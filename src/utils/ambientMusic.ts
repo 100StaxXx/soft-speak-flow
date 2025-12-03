@@ -1,5 +1,6 @@
 import { safeLocalStorage } from '@/utils/storage';
 import { globalAudio } from './globalAudio';
+import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from './iosAudio';
 
 // Custom event interfaces
 interface VolumeChangeEvent extends CustomEvent {
@@ -125,6 +126,11 @@ class AmbientMusicManager {
     
     // Clean up audio element (remove event listeners to prevent memory leaks)
     if (this.audio) {
+      // Unregister from iOS audio manager
+      if (isIOS) {
+        iosAudioManager.unregisterAudio(this.audio);
+      }
+      
       this.audio.pause();
       
       // Remove all audio event listeners
@@ -166,10 +172,16 @@ class AmbientMusicManager {
   }
 
   private initializeAudio() {
-    this.audio = new Audio();
+    // Use iOS-optimized audio element
+    this.audio = createIOSOptimizedAudio();
     this.audio.loop = true;
     this.audio.volume = this.isMuted ? 0 : this.volume;
     this.audio.preload = 'auto';
+    
+    // Register with iOS audio manager for coordinated control
+    if (isIOS) {
+      iosAudioManager.registerAudio(this.audio);
+    }
     
     // Add error handlers for audio element - store refs for cleanup
     this.errorHandler = (e) => {
@@ -228,11 +240,23 @@ class AmbientMusicManager {
       
       window.addEventListener('bg-music-volume-change', this.volumeChangeHandler);
       window.addEventListener('bg-music-mute-change', this.muteChangeHandler);
+      
+      // iOS-specific: listen for iOS audio manager mute changes
+      if (isIOS) {
+        window.addEventListener('ios-audio-mute-change', (e: Event) => {
+          const customEvent = e as CustomEvent<boolean>;
+          if (customEvent.detail) {
+            this.mute();
+          } else {
+            this.unmute();
+          }
+        });
+      }
     }
 
     // Auto-play on user interaction (browser requirement)
     const startOnInteraction = () => {
-      if (!this.isPlaying && !this.isMuted) {
+      if (!this.isPlaying && !this.isMuted && !this.isGloballyMuted) {
         this.play();
       }
       // Remove listeners after first interaction

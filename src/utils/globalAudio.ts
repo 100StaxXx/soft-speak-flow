@@ -1,4 +1,5 @@
 import { safeLocalStorage } from './storage';
+import { iosAudioManager, isIOS, resumeAudioContext, setupIOSAudioInteraction } from './iosAudio';
 
 /**
  * Global Audio Manager
@@ -8,6 +9,8 @@ import { safeLocalStorage } from './storage';
  * - Pep talk audio
  * - Evolution voices
  * - Any other audio playback
+ * 
+ * On iOS, coordinates with iosAudioManager for proper audio session handling
  */
 class GlobalAudioManager {
   private isMuted = false;
@@ -16,6 +19,19 @@ class GlobalAudioManager {
   constructor() {
     if (typeof window !== 'undefined') {
       this.loadPreferences();
+      
+      // Setup iOS audio interaction handling
+      setupIOSAudioInteraction();
+      
+      // Sync with iOS audio manager
+      if (isIOS) {
+        iosAudioManager.subscribe((muted) => {
+          if (this.isMuted !== muted) {
+            this.isMuted = muted;
+            this.notifyListeners();
+          }
+        });
+      }
     }
   }
 
@@ -24,6 +40,10 @@ class GlobalAudioManager {
       const savedMuted = safeLocalStorage.getItem('global_audio_muted');
       if (savedMuted) {
         this.isMuted = savedMuted === 'true';
+        // Sync iOS manager on load
+        if (isIOS) {
+          iosAudioManager.setMuted(this.isMuted);
+        }
       }
     } catch (e) {
       console.warn('Failed to load global audio preferences:', e);
@@ -60,6 +80,12 @@ class GlobalAudioManager {
   toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     this.savePreferences();
+    
+    // Sync with iOS audio manager
+    if (isIOS) {
+      iosAudioManager.setMuted(this.isMuted);
+    }
+    
     this.notifyListeners();
     return this.isMuted;
   }
@@ -71,6 +97,12 @@ class GlobalAudioManager {
     if (this.isMuted !== muted) {
       this.isMuted = muted;
       this.savePreferences();
+      
+      // Sync with iOS audio manager
+      if (isIOS) {
+        iosAudioManager.setMuted(muted);
+      }
+      
       this.notifyListeners();
     }
   }
@@ -95,9 +127,23 @@ class GlobalAudioManager {
 
   /**
    * Check if audio can play (not globally muted)
+   * On iOS, also checks if user interaction has occurred
    */
   canPlayAudio(): boolean {
+    if (isIOS) {
+      return !this.isMuted && iosAudioManager.canPlay();
+    }
     return !this.isMuted;
+  }
+  
+  /**
+   * Ensure audio is ready to play (especially on iOS)
+   * Call this before playing important audio
+   */
+  async ensureReady(): Promise<void> {
+    if (isIOS) {
+      await resumeAudioContext();
+    }
   }
 }
 

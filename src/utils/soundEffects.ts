@@ -1,5 +1,6 @@
 import { safeLocalStorage } from './storage';
 import { globalAudio } from './globalAudio';
+import { getSharedAudioContext, isIOS, resumeAudioContext } from './iosAudio';
 
 // Sound effects management system
 class SoundManager {
@@ -13,8 +14,8 @@ class SoundManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioContext = AudioContextClass ? new AudioContextClass() : null;
+      // Use shared audio context for iOS compatibility
+      this.audioContext = getSharedAudioContext();
       this.loadSoundPreferences();
       
       // Subscribe to global mute changes
@@ -39,6 +40,19 @@ class SoundManager {
   // Check if audio should be muted (either locally or globally)
   private shouldMute(): boolean {
     return this.isMuted || this.isGloballyMuted;
+  }
+  
+  // Ensure audio context is ready (especially for iOS)
+  private async ensureAudioContext(): Promise<AudioContext | null> {
+    if (!this.audioContext) {
+      this.audioContext = getSharedAudioContext();
+    }
+    
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      await resumeAudioContext();
+    }
+    
+    return this.audioContext;
   }
 
   private loadSoundPreferences() {
