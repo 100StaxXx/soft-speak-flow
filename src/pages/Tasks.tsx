@@ -73,6 +73,18 @@ import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
+type PendingTaskData = {
+  text: string;
+  difficulty: "easy" | "medium" | "hard";
+  date: string;
+  scheduledTime: string | null;
+  estimatedDuration: number | null;
+  recurrencePattern: string | null;
+  recurrenceDays: number[];
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
+};
+
 export default function Tasks() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -134,17 +146,8 @@ export default function Tasks() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
-  const [pendingTaskData, setPendingTaskData] = useState<{
-    text: string;
-    difficulty: "easy" | "medium" | "hard";
-    date: string;
-    scheduledTime: string | null;
-    estimatedDuration: number | null;
-    recurrencePattern: string | null;
-    recurrenceDays: number[];
-    reminderEnabled: boolean;
-    reminderMinutesBefore: number;
-  } | null>(null);
+  const [pendingTaskData, setPendingTaskData] = useState<PendingTaskData | null>(null);
+  const drawerActionHandledRef = useRef(false);
   
   // Calculate total XP for the day (memoized to prevent unnecessary recalculations)
   const totalXP = useMemo(() => {
@@ -351,7 +354,7 @@ export default function Tasks() {
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     // Create task data object
-    const taskData = {
+    const taskData: PendingTaskData = {
       text: newTaskText,
       difficulty: taskDifficulty,
       date: taskDate,
@@ -366,6 +369,7 @@ export default function Tasks() {
     // If no main quest exists, ask user BEFORE creating the task
     if (!hasMainQuest) {
       setPendingTaskData(taskData);
+      drawerActionHandledRef.current = false;
       setShowMainQuestPrompt(true);
     } else {
       // Main quest already exists, create as side quest immediately
@@ -373,7 +377,7 @@ export default function Tasks() {
     }
   };
   
-  const actuallyAddTask = async (isMainQuest: boolean, dataToAdd?: typeof pendingTaskData) => {
+  const actuallyAddTask = async (isMainQuest: boolean, dataToAdd?: PendingTaskData | null) => {
     if (!dataToAdd) return;
     
     try {
@@ -406,17 +410,33 @@ export default function Tasks() {
   };
   
   const handleMainQuestResponse = (makeMainQuest: boolean) => {
+    if (!pendingTaskData) {
+      setShowMainQuestPrompt(false);
+      return;
+    }
+
+    drawerActionHandledRef.current = true;
     setShowMainQuestPrompt(false);
-    // Clear pending data immediately to prevent duplicate creation
     const dataToAdd = pendingTaskData;
     setPendingTaskData(null);
     actuallyAddTask(makeMainQuest, dataToAdd);
   };
+
   const handleDrawerClose = () => {
-    // Only default to side quest if user dismissed without choosing
-    if (pendingTaskData && showMainQuestPrompt) {
-      handleMainQuestResponse(false);
+    setShowMainQuestPrompt(false);
+
+    if (drawerActionHandledRef.current) {
+      drawerActionHandledRef.current = false;
+      return;
     }
+
+    if (!pendingTaskData) {
+      return;
+    }
+
+    const dataToAdd = pendingTaskData;
+    setPendingTaskData(null);
+    actuallyAddTask(false, dataToAdd);
   };
 
   const handleAddHabit = () => {
@@ -1233,8 +1253,9 @@ export default function Tasks() {
         open={showMainQuestPrompt} 
         onOpenChange={(open) => {
           if (!open) {
-            // Small delay to ensure button click is processed first
-            setTimeout(handleDrawerClose, 50);
+            handleDrawerClose();
+          } else {
+            setShowMainQuestPrompt(true);
           }
         }}
       >
