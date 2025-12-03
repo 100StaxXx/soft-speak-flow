@@ -13,20 +13,19 @@ import {
 
 
 const ANIMALS = [
-  "Dragon", "Unicorn", "Wolf", "Tiger", "Lion",
-  "Phoenix", "Bear", "Shark", "Eagle", "Dolphin",
-  "Fox", "Panther", "Orca", "Cat", "Dog",
-  "Owl", "Pegasus", "Gorilla", "Cheetah", "Snake",
-  "Gryphon", "Jaguar", "Snow Leopard", "Falcon", "Hawk",
-  "Elephant", "Sea Turtle", "Octopus", "Kangaroo", "Penguin",
-  "Sloth", "Parrot", "Raven", "Kitsune", "Kraken",
-  "Hydra", "Basilisk", "Leviathan", "Hippo",
-  "Rhino", "Horse (Stallion)", "Puma / Cougar", "Lynx", "Hyena",
-  "Manta Ray", "Jellyfish", "Reindeer", "Mammoth", "Cerberus",
-  "Sphinx", "Tanuki", "Fenrir", "Wyvern", "Hippogriff",
-  "Blue Whale", "Butterfly", "Mechanical Dragon", "Thunderbird", "Crocodile",
-  "Wolverine", "Arctic Fox", "Fennec Fox", "Hummingbird", "T-Rex",
-  "Velociraptor",
+  "Arctic Fox", "Basilisk", "Bear", "Blue Whale", "Butterfly",
+  "Cat", "Cerberus", "Cheetah", "Crocodile", "Dog",
+  "Dolphin", "Dragon", "Eagle", "Elephant", "Falcon",
+  "Fennec Fox", "Fenrir", "Fox", "Gorilla", "Gryphon",
+  "Hawk", "Hippo", "Hippogriff", "Horse (Stallion)", "Hummingbird",
+  "Hydra", "Hyena", "Jaguar", "Jellyfish", "Kangaroo",
+  "Kitsune", "Kraken", "Leviathan", "Lion", "Lynx",
+  "Mammoth", "Manta Ray", "Mechanical Dragon", "Octopus", "Orca",
+  "Owl", "Panther", "Parrot", "Pegasus", "Penguin",
+  "Phoenix", "Puma / Cougar", "Raven", "Reindeer", "Rhino",
+  "Sea Turtle", "Shark", "Sloth", "Snake", "Snow Leopard",
+  "Sphinx", "T-Rex", "Tanuki", "Thunderbird", "Tiger",
+  "Unicorn", "Velociraptor", "Wolf", "Wolverine", "Wyvern",
 ];
 
 const ELEMENTS = [
