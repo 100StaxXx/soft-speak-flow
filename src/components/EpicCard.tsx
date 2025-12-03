@@ -6,9 +6,10 @@ import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-r
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { EpicLeaderboard } from "./EpicLeaderboard";
 import { EpicDiscordSection } from "./EpicDiscordSection";
 import { GuildStorySection } from "./GuildStorySection";
+import { GuildMembersSection } from "./GuildMembersSection";
+import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -266,6 +267,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
 
         {/* Community Features for Shared Epics */}
         <div className="mt-4 pt-4 border-t border-border space-y-4">
+          <GuildMembersSection epicId={epic.id} />
+          <GuildShoutsFeed epicId={epic.id} />
           <GuildStorySection epicId={epic.id} memberCount={memberCount} />
           <EpicDiscordSection 
             epic={{
@@ -277,7 +280,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             }} 
             memberCount={memberCount} 
           />
-          <EpicLeaderboard epicId={epic.id} />
         </div>
 
         {/* Action Buttons */}
