@@ -11,6 +11,7 @@ import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } 
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 
 interface CaptionWord {
   word: string;
@@ -68,6 +69,22 @@ export const TodaysPepTalk = memo(() => {
       window.removeEventListener('tutorial-step-change', handleTutorialChange);
     };
   }, []);
+
+  // Duck ambient music when playing pep talk
+  useEffect(() => {
+    if (isPlaying) {
+      duckAmbient();
+    } else {
+      unduckAmbient();
+    }
+
+    return () => {
+      // Only unduck if we were actually playing (and thus ducked the music)
+      if (isPlaying) {
+        unduckAmbient();
+      }
+    };
+  }, [isPlaying]);
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
