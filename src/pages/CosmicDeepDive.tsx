@@ -32,20 +32,33 @@ const placementColors = {
 interface CosmiqContent {
   title: string;
   tagline: string;
-  identity_insight?: string;  // Sun
-  emotional_insight?: string; // Moon
-  social_insight?: string;    // Rising
-  mental_insight?: string;    // Mercury
-  action_insight?: string;    // Mars
-  love_insight?: string;      // Venus
+  // Sun unique sections
+  core_identity?: string;
+  life_purpose?: string;
+  natural_strengths?: string[];
+  growth_areas?: string[];
+  // Moon unique sections
+  emotional_landscape?: string;
+  comfort_needs?: string;
+  intuitive_gifts?: string;
+  emotional_triggers?: string[];
+  // Rising unique sections
+  your_aura?: string;
+  first_impressions?: string;
+  social_superpowers?: string;
+  presentation_tips?: string[];
+  // Mercury/Mars/Venus single insights
+  mental_insight?: string;
+  action_insight?: string;
+  love_insight?: string;
   // Legacy fields
+  identity_insight?: string;
+  emotional_insight?: string;
+  social_insight?: string;
   overview?: string;
 }
 
 const insightLabels: Record<string, { title: string; icon: string }> = {
-  sun: { title: "Your Core Identity", icon: "☀️" },
-  moon: { title: "Your Emotional World", icon: "🌙" },
-  rising: { title: "Your First Impression", icon: "✨" },
   mercury: { title: "How You Think", icon: "💭" },
   mars: { title: "What Drives You", icon: "🔥" },
   venus: { title: "How You Love", icon: "💗" },
@@ -139,6 +152,7 @@ const CosmiqDeepDive = () => {
 
   const Icon = placementIcons[placement as keyof typeof placementIcons] || Sparkles;
   const gradient = placementColors[placement as keyof typeof placementColors];
+  const p = placement.toLowerCase();
 
   const placementNames: Record<string, string> = {
     sun: "Sun",
@@ -149,21 +163,259 @@ const CosmiqDeepDive = () => {
     venus: "Venus",
   };
 
-  // Get the insight for any placement
-  const getPlacementInsight = () => {
+  // Render Sun sections
+  const renderSunSections = () => {
     if (!content) return null;
-    const p = placement.toLowerCase();
-    if (p === 'sun') return content.identity_insight;
-    if (p === 'moon') return content.emotional_insight;
-    if (p === 'rising') return content.social_insight;
-    if (p === 'mercury') return content.mental_insight;
-    if (p === 'mars') return content.action_insight;
-    if (p === 'venus') return content.love_insight;
-    return content.overview; // Fallback for old data
+    return (
+      <>
+        {content.core_identity && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✨</span>
+                  <h3 className="text-base font-bold text-white">Your Core Identity</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.core_identity}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.life_purpose && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎯</span>
+                  <h3 className="text-base font-bold text-white">Life Purpose Themes</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.life_purpose}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.natural_strengths && content.natural_strengths.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💪</span>
+                  <h3 className="text-base font-bold text-white">Natural Strengths</h3>
+                </div>
+                <ul className="space-y-1.5">
+                  {content.natural_strengths.map((s, i) => (
+                    <li key={i} className="text-gray-200 text-sm flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5">•</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.growth_areas && content.growth_areas.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🌱</span>
+                  <h3 className="text-base font-bold text-white">Growth Edges</h3>
+                </div>
+                <ul className="space-y-1.5">
+                  {content.growth_areas.map((g, i) => (
+                    <li key={i} className="text-gray-200 text-sm flex items-start gap-2">
+                      <span className="text-amber-400 mt-0.5">•</span>
+                      <span>{g}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </>
+    );
   };
 
-  const insight = getPlacementInsight();
-  const label = insightLabels[placement.toLowerCase()];
+  // Render Moon sections
+  const renderMoonSections = () => {
+    if (!content) return null;
+    return (
+      <>
+        {content.emotional_landscape && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🌊</span>
+                  <h3 className="text-base font-bold text-white">Your Emotional Landscape</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.emotional_landscape}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.comfort_needs && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🏠</span>
+                  <h3 className="text-base font-bold text-white">What You Need to Feel Safe</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.comfort_needs}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.intuitive_gifts && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔮</span>
+                  <h3 className="text-base font-bold text-white">Intuitive Gifts</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.intuitive_gifts}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.emotional_triggers && content.emotional_triggers.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⚡</span>
+                  <h3 className="text-base font-bold text-white">Watch Out For</h3>
+                </div>
+                <ul className="space-y-1.5">
+                  {content.emotional_triggers.map((t, i) => (
+                    <li key={i} className="text-gray-200 text-sm flex items-start gap-2">
+                      <span className="text-rose-400 mt-0.5">•</span>
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </>
+    );
+  };
+
+  // Render Rising sections
+  const renderRisingSections = () => {
+    if (!content) return null;
+    return (
+      <>
+        {content.your_aura && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✨</span>
+                  <h3 className="text-base font-bold text-white">Your Aura & Energy</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.your_aura}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.first_impressions && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">👋</span>
+                  <h3 className="text-base font-bold text-white">How Others See You</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.first_impressions}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.social_superpowers && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🌟</span>
+                  <h3 className="text-base font-bold text-white">Social Superpowers</h3>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed">{content.social_superpowers}</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        {content.presentation_tips && content.presentation_tips.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💡</span>
+                  <h3 className="text-base font-bold text-white">Quick Tips</h3>
+                </div>
+                <ul className="space-y-1.5">
+                  {content.presentation_tips.map((tip, i) => (
+                    <li key={i} className="text-gray-200 text-sm flex items-start gap-2">
+                      <span className="text-purple-400 mt-0.5">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </>
+    );
+  };
+
+  // Render Mercury/Mars/Venus single insight
+  const renderSingleInsight = () => {
+    if (!content) return null;
+    
+    let insight: string | undefined;
+    if (p === 'mercury') insight = content.mental_insight;
+    else if (p === 'mars') insight = content.action_insight;
+    else if (p === 'venus') insight = content.love_insight;
+    
+    // Fallback for legacy data
+    if (!insight) {
+      if (p === 'mercury') insight = content.overview;
+      else if (p === 'mars') insight = content.overview;
+      else if (p === 'venus') insight = content.overview;
+    }
+    
+    const label = insightLabels[p];
+    
+    if (!insight || !label) return null;
+    
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{label.icon}</span>
+              <h3 className="text-base font-bold text-white">{label.title}</h3>
+            </div>
+            <p className="text-gray-200 text-sm leading-relaxed">{insight}</p>
+          </div>
+        </Card>
+      </motion.div>
+    );
+  };
+
+  // Determine which sections to render based on placement
+  const renderSections = () => {
+    if (p === 'sun') return renderSunSections();
+    if (p === 'moon') return renderMoonSections();
+    if (p === 'rising') return renderRisingSections();
+    return renderSingleInsight();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
@@ -187,7 +439,7 @@ const CosmiqDeepDive = () => {
         ))}
       </div>
 
-      <div className="relative max-w-3xl mx-auto p-6 space-y-6">
+      <div className="relative max-w-3xl mx-auto p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
@@ -228,6 +480,7 @@ const CosmiqDeepDive = () => {
           <div className="space-y-4">
             <Skeleton className="h-24 w-full bg-gray-800/50" />
             <Skeleton className="h-20 w-full bg-gray-800/50" />
+            <Skeleton className="h-20 w-full bg-gray-800/50" />
             <p className="text-center text-gray-400 text-sm animate-pulse">
               ✨ Generating your cosmic insight...
             </p>
@@ -240,38 +493,22 @@ const CosmiqDeepDive = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-6`}>
-                <div className="space-y-2 text-center">
-                  <h2 className="text-2xl font-black text-white">{content.title}</h2>
-                  <p className="text-lg text-gray-200 italic">{content.tagline}</p>
+              <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-5`}>
+                <div className="space-y-1 text-center">
+                  <h2 className="text-xl font-black text-white">{content.title}</h2>
+                  <p className="text-base text-gray-200 italic">{content.tagline}</p>
                 </div>
               </Card>
             </motion.div>
 
-            {/* Single Insight Card */}
-            {insight && label && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-              >
-                <Card className="bg-obsidian/80 border-royal-purple/30 p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{label.icon}</span>
-                      <h3 className="text-lg font-bold text-white">{label.title}</h3>
-                    </div>
-                    <p className="text-gray-200 leading-relaxed">{insight}</p>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
+            {/* Placement-specific sections */}
+            {renderSections()}
 
             {/* Feedback */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
+              transition={{ delay: 0.4 }}
             >
               <Card className="bg-obsidian/60 border-royal-purple/20 p-4">
                 <div className="flex items-center justify-between">

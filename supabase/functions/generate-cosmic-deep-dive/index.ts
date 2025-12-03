@@ -15,16 +15,6 @@ const placementDescriptions: Record<string, string> = {
   venus: "love style, values, beauty, and pleasure",
 };
 
-// Placement-specific focus areas
-const placementFocus: Record<string, { field: string; description: string }> = {
-  sun: { field: "identity_insight", description: "How this Sun placement shapes your core identity and life purpose (2-3 sentences)" },
-  moon: { field: "emotional_insight", description: "How this Moon placement colors your emotional world and inner needs (2-3 sentences)" },
-  rising: { field: "social_insight", description: "How this Rising sign shapes first impressions and your outward persona (2-3 sentences)" },
-  mercury: { field: "mental_insight", description: "How this Mercury placement affects your thinking and communication style (2-3 sentences)" },
-  mars: { field: "action_insight", description: "How this Mars placement drives your ambition, energy, and desires (2-3 sentences)" },
-  venus: { field: "love_insight", description: "How this Venus placement shapes your love language and values (2-3 sentences)" },
-};
-
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
@@ -66,18 +56,84 @@ function getLocalDate(timezoneOffset?: number): string {
   return now.toISOString().split('T')[0];
 }
 
+// Build placement-specific prompts
 function buildPrompt(placement: string, sign: string, userName: string, chartContext: string): string {
-  const focus = placementFocus[placement.toLowerCase()];
+  const p = placement.toLowerCase();
   
-  return `You are an expert astrologer creating a VERY BRIEF personalized cosmic insight.
+  if (p === 'sun') {
+    return `You are an expert astrologer creating personalized insights for ${userName}.
 
 ${chartContext}
 
-The ${placement} represents: ${placementDescriptions[placement.toLowerCase()] || 'an important placement'}.
+Generate 4 SHORT sections about their SUN in ${sign}. Each text section should be 2-3 sentences MAX. Lists should have 2-3 bullet points.
 
-Generate ONE focused insight for ${placement} in ${sign} for ${userName}.
+Return a JSON object with EXACTLY these fields:
+{
+  "title": "A creative title (3-5 words)",
+  "tagline": "A short phrase (under 10 words)",
+  "core_identity": "How this Sun shapes who they ARE at their core (2-3 sentences)",
+  "life_purpose": "What they're here to DO and express in life (2-3 sentences)",
+  "natural_strengths": ["strength 1", "strength 2", "strength 3"],
+  "growth_areas": ["growth edge 1", "growth edge 2"]
+}
 
-IMPORTANT: Keep this SHORT - just 2-3 sentences of meaningful, specific insight.
+Be warm, specific to ${sign}, and CONCISE.`;
+  }
+  
+  if (p === 'moon') {
+    return `You are an expert astrologer creating personalized insights for ${userName}.
+
+${chartContext}
+
+Generate 4 SHORT sections about their MOON in ${sign}. Each text section should be 2-3 sentences MAX. Lists should have 2-3 bullet points.
+
+Return a JSON object with EXACTLY these fields:
+{
+  "title": "A creative title (3-5 words)",
+  "tagline": "A short phrase (under 10 words)",
+  "emotional_landscape": "How they process and express emotions (2-3 sentences)",
+  "comfort_needs": "What they need to feel safe and nurtured (2-3 sentences)",
+  "intuitive_gifts": "Their emotional superpowers and intuitive abilities (2-3 sentences)",
+  "emotional_triggers": ["trigger 1", "trigger 2"]
+}
+
+Be warm, specific to ${sign}, and CONCISE.`;
+  }
+  
+  if (p === 'rising') {
+    return `You are an expert astrologer creating personalized insights for ${userName}.
+
+${chartContext}
+
+Generate 4 SHORT sections about their RISING in ${sign}. Each text section should be 2-3 sentences MAX. Lists should have 2-3 bullet points.
+
+Return a JSON object with EXACTLY these fields:
+{
+  "title": "A creative title (3-5 words)",
+  "tagline": "A short phrase (under 10 words)",
+  "your_aura": "The energy and vibe they radiate to others (2-3 sentences)",
+  "first_impressions": "How people perceive them when first meeting (2-3 sentences)",
+  "social_superpowers": "Their natural social gifts and how they navigate the world (2-3 sentences)",
+  "presentation_tips": ["tip 1", "tip 2"]
+}
+
+Be warm, specific to ${sign}, and CONCISE.`;
+  }
+  
+  // Mercury, Mars, Venus - single insight format
+  const insightFields: Record<string, { field: string; description: string }> = {
+    mercury: { field: "mental_insight", description: "How this Mercury affects their thinking and communication (2-3 sentences)" },
+    mars: { field: "action_insight", description: "How this Mars drives their ambition, energy, and desires (2-3 sentences)" },
+    venus: { field: "love_insight", description: "How this Venus shapes their love language and values (2-3 sentences)" },
+  };
+  
+  const focus = insightFields[p];
+  
+  return `You are an expert astrologer creating a personalized cosmic insight for ${userName}.
+
+${chartContext}
+
+Generate ONE focused insight for ${placement.toUpperCase()} in ${sign}.
 
 Return a JSON object with EXACTLY these fields:
 {
@@ -86,7 +142,7 @@ Return a JSON object with EXACTLY these fields:
   "${focus.field}": "${focus.description}"
 }
 
-Be warm, specific to their chart, and CONCISE. One powerful insight beats many generic ones.`;
+Be warm, specific to ${sign}, and CONCISE. One powerful insight beats many generic ones.`;
 }
 
 serve(async (req) => {
@@ -193,7 +249,7 @@ Viewing: ${placement.toUpperCase()} in ${sign.toUpperCase()}
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "You are an expert astrologer. Return ONLY valid JSON, no markdown. Keep responses VERY brief." },
+          { role: "system", content: "You are an expert astrologer. Return ONLY valid JSON, no markdown. Keep responses brief and specific." },
           { role: "user", content: prompt }
         ],
       }),
@@ -243,7 +299,7 @@ Viewing: ${placement.toUpperCase()} in ${sign.toUpperCase()}
       throw new Error('Missing required fields: title, tagline');
     }
 
-    // Cache the result
+    // Cache the result with all possible fields
     const cacheData: Record<string, unknown> = {
       user_id: user.id,
       placement: placement.toLowerCase(),
@@ -251,13 +307,29 @@ Viewing: ${placement.toUpperCase()} in ${sign.toUpperCase()}
       for_date: today,
       title: content.title,
       tagline: content.tagline,
-      identity_insight: content.identity_insight || null,
-      emotional_insight: content.emotional_insight || null,
-      social_insight: content.social_insight || null,
+      // Sun fields
+      core_identity: content.core_identity || null,
+      life_purpose: content.life_purpose || null,
+      natural_strengths: content.natural_strengths || null,
+      growth_areas: content.growth_areas || null,
+      // Moon fields
+      emotional_landscape: content.emotional_landscape || null,
+      comfort_needs: content.comfort_needs || null,
+      intuitive_gifts: content.intuitive_gifts || null,
+      emotional_triggers: content.emotional_triggers || null,
+      // Rising fields
+      your_aura: content.your_aura || null,
+      first_impressions: content.first_impressions || null,
+      social_superpowers: content.social_superpowers || null,
+      presentation_tips: content.presentation_tips || null,
+      // Mercury/Mars/Venus
       mental_insight: content.mental_insight || null,
       action_insight: content.action_insight || null,
       love_insight: content.love_insight || null,
       // Legacy fields
+      identity_insight: content.identity_insight || null,
+      emotional_insight: content.emotional_insight || null,
+      social_insight: content.social_insight || null,
       overview: null,
       strengths: [],
       challenges: [],
