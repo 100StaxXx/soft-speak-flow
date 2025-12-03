@@ -22,6 +22,7 @@ import { lockToPortrait } from "@/utils/orientationLock";
 import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
+import { logger } from "@/utils/logger";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -127,11 +128,11 @@ const AppContent = memo(() => {
       try {
         if (isNativePushSupported()) {
           initializeNativePush(session.user.id).catch(err => {
-            console.error('Failed to initialize native push:', err);
+            logger.error('Failed to initialize native push:', err);
           });
         }
       } catch (error) {
-        console.debug('Native push initialization skipped:', error);
+        logger.log('Native push initialization skipped:', error);
       }
     }
   }, [session]);
