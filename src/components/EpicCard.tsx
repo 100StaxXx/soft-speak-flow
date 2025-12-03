@@ -15,7 +15,6 @@ import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-r
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
-import { EpicDiscordSection } from "./EpicDiscordSection";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { GuildActivityFeed } from "./GuildActivityFeed";
@@ -59,9 +58,6 @@ interface Epic {
   is_public?: boolean;
   invite_code?: string;
   theme_color?: string;
-  discord_channel_id?: string | null;
-  discord_invite_url?: string | null;
-  discord_ready?: boolean;
   epic_habits?: Array<{
     habit_id: string;
     habits: {
@@ -80,7 +76,6 @@ interface EpicCardProps {
 
 export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
-  const [memberCount, setMemberCount] = useState(0);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -151,41 +146,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     // Update ref for next comparison
     previousProgressRef.current = currentProgress;
   }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
-
-  // Fetch member count for public epics (for Discord feature)
-  useEffect(() => {
-    if (epic.is_public && epic.id) {
-      const fetchMemberCount = async () => {
-        const { count } = await supabase
-          .from('epic_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('epic_id', epic.id);
-        
-        setMemberCount(count || 0);
-      };
-      
-      fetchMemberCount();
-      
-      // Subscribe to real-time updates
-      const channel = supabase
-        .channel(`epic-members-${epic.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'epic_members',
-            filter: `epic_id=eq.${epic.id}`
-          },
-          () => fetchMemberCount()
-        )
-        .subscribe();
-      
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [epic.is_public, epic.id]);
 
   const handleShareEpic = async () => {
     if (!epic.invite_code) return;
@@ -338,16 +298,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           <GuildMembersSection epicId={epic.id} />
           <GuildActivityFeed epicId={epic.id} />
           <GuildShoutsFeed epicId={epic.id} />
-          <EpicDiscordSection
-            epic={{
-              id: epic.id,
-              user_id: epic.user_id,
-              discord_ready: epic.discord_ready || false,
-              discord_channel_id: epic.discord_channel_id,
-              discord_invite_url: epic.discord_invite_url,
-            }} 
-            memberCount={memberCount} 
-          />
         </div>
 
         {/* Action Buttons */}
