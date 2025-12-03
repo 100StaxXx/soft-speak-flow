@@ -60,21 +60,20 @@ class AmbientMusicManager {
   private handleGlobalMuteChange(muted: boolean) {
     this.isGloballyMuted = muted;
     if (muted) {
-      // Global mute turned on - mute the ambient music
+      // Global mute turned on - mute the ambient music immediately
       if (this.audio && !this.isMuted) {
         // Clear any active fades first
         if (this.fadeInterval) {
           clearInterval(this.fadeInterval);
           this.fadeInterval = null;
         }
-        this.fadeOut(() => {
-          if (this.audio && !this.isStopped) this.audio.volume = 0;
-        }, 500);
+        this.audio.volume = 0;
       }
     } else {
       // Global mute turned off - restore ambient music if not locally muted
       if (this.audio && !this.isMuted && this.isPlaying) {
-        this.fadeIn(1000);
+        // Restore volume immediately
+        this.audio.volume = this.isDucked ? this.volume * 0.15 : this.volume;
       } else if (!this.isMuted && !this.isPlaying) {
         this.play();
       }
@@ -304,13 +303,10 @@ class AmbientMusicManager {
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
       }
-      this.fadeOut(() => {
-        if (this.audio && !this.isStopped) this.audio.volume = 0;
-        this.isMuting = false;
-      }, 1000);
-    } else {
-      this.isMuting = false;
+      // Mute immediately instead of fading
+      this.audio.volume = 0;
     }
+    this.isMuting = false;
   }
 
   unmute() {
