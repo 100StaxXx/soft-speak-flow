@@ -15,7 +15,9 @@ interface JoinEpicDialogProps {
 export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
   const [inviteCode, setInviteCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [epicLimitReached, setEpicLimitReached] = useState(false);
   const navigate = useNavigate();
+  const MAX_EPICS = 2;
 
   const handleJoinEpic = async () => {
     if (!inviteCode.trim()) {
@@ -45,10 +47,33 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
         return;
       }
 
-      // Check if already a member
+      // Check if user is logged in
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) {
         toast.error("Please sign in to join guilds");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check epic limit (owned + joined)
+      const { data: ownedEpics } = await supabase
+        .from('epics')
+        .select('id')
+        .eq('user_id', user.user.id)
+        .eq('status', 'active');
+      
+      const { data: joinedEpics } = await supabase
+        .from('epic_members')
+        .select('epic_id, epics!inner(user_id, status)')
+        .eq('user_id', user.user.id)
+        .neq('epics.user_id', user.user.id)
+        .eq('epics.status', 'active');
+
+      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
+      
+      if (totalActiveEpics >= MAX_EPICS) {
+        setEpicLimitReached(true);
+        toast.error(`You can only have ${MAX_EPICS} active epics at a time`);
         setIsLoading(false);
         return;
       }
@@ -169,13 +194,19 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
               You can paste the full link or just the code
             </p>
           </div>
-          <Button 
-            onClick={handleJoinEpic} 
-            disabled={isLoading || !inviteCode.trim()}
-            className="w-full"
-          >
-            {isLoading ? "Loading..." : "Join Epic"}
-          </Button>
+          {epicLimitReached ? (
+            <p className="text-sm text-amber-500 text-center py-2">
+              You can only have {MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.
+            </p>
+          ) : (
+            <Button 
+              onClick={handleJoinEpic} 
+              disabled={isLoading || !inviteCode.trim()}
+              className="w-full"
+            >
+              {isLoading ? "Loading..." : "Join Epic"}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
