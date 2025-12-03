@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
 
 export const BattleLeaderboard = () => {
   const { data: rankings, isLoading } = useQuery({
@@ -14,7 +15,8 @@ export const BattleLeaderboard = () => {
         .select(`
           *,
           profiles (
-            email
+            email,
+            onboarding_data
           )
         `)
         .order("rank_points", { ascending: false })
@@ -84,11 +86,11 @@ export const BattleLeaderboard = () => {
                 <div className="flex items-center gap-2 mb-1">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="text-xs">
-                      {player.profiles?.email?.charAt(0).toUpperCase() || "?"}
+                      {getInitials(getUserDisplayName(player.profiles))}
                     </AvatarFallback>
                   </Avatar>
                   <span className="font-semibold truncate">
-                    {player.profiles?.email?.split("@")[0] || "Anonymous"}
+                    {getUserDisplayName(player.profiles)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">

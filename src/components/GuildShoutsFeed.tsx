@@ -18,6 +18,7 @@ import { ShoutsFeedInfoTooltip } from "./ShoutsFeedInfoTooltip";
 import { getShoutByKey, SHOUT_TYPE_CONFIG } from "@/data/shoutMessages";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 interface GuildShoutsFeedProps {
   epicId: string;
@@ -102,8 +103,8 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
               const typeConfig = SHOUT_TYPE_CONFIG[shout.shout_type];
               const isForMe = shout.recipient_id === user?.id;
               const isFromMe = shout.sender_id === user?.id;
-              const senderName = shout.sender?.email?.split("@")[0] || "Someone";
-              const recipientName = shout.recipient?.email?.split("@")[0] || "Someone";
+              const senderName = getUserDisplayName(shout.sender);
+              const recipientName = getUserDisplayName(shout.recipient);
               const isSenderMuted = !isFromMe && isUserMuted(shout.sender_id);
 
               return (

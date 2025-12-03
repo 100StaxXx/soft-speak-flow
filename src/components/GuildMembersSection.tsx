@@ -13,6 +13,7 @@ import { GuildMembersInfoTooltip } from "./GuildMembersInfoTooltip";
 import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShoutType } from "@/data/shoutMessages";
+import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
 
 interface LeaderboardMember {
   user_id: string;
@@ -20,6 +21,7 @@ interface LeaderboardMember {
   joined_at: string;
   profile?: {
     email: string | null;
+    onboarding_data?: unknown;
   };
   companion?: {
     current_image_url: string | null;
@@ -61,13 +63,13 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
 
       // Batch fetch profiles and companions in parallel
       const [profilesRes, companionsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email").in("id", userIds),
+        supabase.from("profiles").select("id, email, onboarding_data").in("id", userIds),
         supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
       ]);
 
       // Create lookup maps for O(1) access
       const profilesMap = new Map(
-        (profilesRes.data || []).map(p => [p.id, { email: p.email }])
+        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data }])
       );
       const companionsMap = new Map(
         (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
@@ -109,10 +111,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
   };
 
   const getDisplayName = (member: LeaderboardMember) => {
-    if (member.profile?.email) {
-      return member.profile.email.split("@")[0];
-    }
-    return "Anonymous";
+    return getUserDisplayName(member.profile);
   };
 
   const handleOpenShoutDrawer = (member: LeaderboardMember) => {

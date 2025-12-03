@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 export const useWelcomeMessage = () => {
   const { user } = useAuth();
@@ -26,12 +27,11 @@ export const useWelcomeMessage = () => {
       // Get user's name from profile
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_data')
+        .select('email, onboarding_data')
         .eq('id', user.id)
         .maybeSingle();
 
-      const onboardingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      const userName = (onboardingData.userName as string) || user.email?.split('@')[0] || 'friend';
+      const userName = getUserDisplayName(profile) || 'friend';
 
       // Create welcome message
       const welcomeMessages: Record<string, string> = {
