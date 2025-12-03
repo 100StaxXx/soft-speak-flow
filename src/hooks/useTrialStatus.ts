@@ -34,16 +34,21 @@ export function useTrialStatus(): TrialStatus {
 
     const isSubscribed = isActive;
     
-    // Parse trial end date
-    const trialEndsAt = profile.trial_ends_at 
-      ? new Date(profile.trial_ends_at) 
-      : null;
+    // Parse trial end date with fallback to created_at + 7 days
+    let trialEndsAt: Date | null = null;
+    
+    if (profile.trial_ends_at) {
+      trialEndsAt = new Date(profile.trial_ends_at);
+    } else if (profile.created_at) {
+      // Fallback: use profile creation date + 7 days
+      trialEndsAt = new Date(new Date(profile.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
     
     const now = new Date();
     
-    // Calculate trial status
-    const trialExpired = trialEndsAt ? now > trialEndsAt : true;
-    const isInTrial = trialEndsAt ? now <= trialEndsAt : false;
+    // Calculate trial status - default to NOT expired if no date (benefit of doubt for new users)
+    const trialExpired = trialEndsAt ? now > trialEndsAt : false;
+    const isInTrial = trialEndsAt ? now <= trialEndsAt : true;
     
     // Calculate days remaining (round up to show "1 day" until it's actually expired)
     let trialDaysRemaining = 0;
