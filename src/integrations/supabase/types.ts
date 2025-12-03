@@ -702,6 +702,63 @@ export type Database = {
           },
         ]
       }
+      companion_postcards: {
+        Row: {
+          caption: string | null
+          companion_id: string
+          created_at: string
+          epic_id: string | null
+          generated_at: string
+          id: string
+          image_url: string
+          location_description: string
+          location_name: string
+          milestone_percent: number
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          companion_id: string
+          created_at?: string
+          epic_id?: string | null
+          generated_at?: string
+          id?: string
+          image_url: string
+          location_description: string
+          location_name: string
+          milestone_percent: number
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          companion_id?: string
+          created_at?: string
+          epic_id?: string | null
+          generated_at?: string
+          id?: string
+          image_url?: string
+          location_description?: string
+          location_name?: string
+          milestone_percent?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_postcards_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_postcards_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_skins: {
         Row: {
           created_at: string | null
