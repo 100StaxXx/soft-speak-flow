@@ -6,6 +6,9 @@ interface ConstellationTrailProps {
   progress: number; // 0-100
   targetDays: number;
   className?: string;
+  companionImageUrl?: string;
+  companionMood?: string;
+  showCompanion?: boolean;
 }
 
 // Generate star positions along a curved path
@@ -24,10 +27,35 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
+// Calculate position along the wave path for any progress percentage
+const getPositionOnPath = (progress: number) => {
+  const t = Math.max(0, Math.min(100, progress)) / 100;
+  const x = 10 + t * 80;
+  const y = 50 + Math.sin(t * Math.PI * 1.5) * 25;
+  return { x, y };
+};
+
+// Get mood-based filter styles
+const getMoodStyles = (mood?: string) => {
+  switch (mood) {
+    case 'sick':
+      return 'saturate-50 brightness-75';
+    case 'sad':
+      return 'saturate-75 brightness-90';
+    case 'worried':
+      return 'saturate-90';
+    default:
+      return '';
+  }
+};
+
 export const ConstellationTrail = ({ 
   progress, 
   targetDays,
-  className 
+  className,
+  companionImageUrl,
+  companionMood,
+  showCompanion = true
 }: ConstellationTrailProps) => {
   // Create milestone checkpoints (start, 25%, 50%, 75%, 100%)
   const milestones = useMemo(() => [0, 25, 50, 75, 100], []);
@@ -188,6 +216,63 @@ export const ConstellationTrail = ({
           </motion.div>
         );
       })}
+
+      {/* Companion Avatar on Trail */}
+      {showCompanion && companionImageUrl && (
+        <motion.div
+          className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
+          style={{
+            left: `${getPositionOnPath(progress).x}%`,
+            top: `${getPositionOnPath(progress).y}%`,
+          }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ 
+            scale: 1, 
+            opacity: 1,
+            y: [0, -4, 0],
+          }}
+          transition={{
+            scale: { duration: 0.5 },
+            opacity: { duration: 0.5 },
+            y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+          }}
+        >
+          {/* Glow ring */}
+          <motion.div
+            className="absolute inset-0 rounded-full bg-primary/40"
+            style={{
+              width: 36,
+              height: 36,
+              marginLeft: -4,
+              marginTop: -4,
+              filter: "blur(6px)",
+            }}
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.4, 0.7, 0.4],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          
+          {/* Companion image */}
+          <div 
+            className={cn(
+              "w-7 h-7 rounded-full border-2 border-primary overflow-hidden bg-background shadow-lg",
+              getMoodStyles(companionMood)
+            )}
+          >
+            <img 
+              src={companionImageUrl} 
+              alt="Companion" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </motion.div>
+      )}
 
       {/* Progress indicator */}
       <div className="absolute bottom-2 right-3 flex items-center gap-1.5">

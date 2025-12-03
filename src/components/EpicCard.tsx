@@ -22,6 +22,8 @@ import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompanion } from "@/hooks/useCompanion";
+import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<EpicTheme, string> = {
@@ -77,6 +79,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [memberCount, setMemberCount] = useState(0);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+  const { companion } = useCompanion();
+  const { health } = useCompanionHealth();
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
@@ -200,6 +204,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           progress={epic.progress_percentage} 
           targetDays={epic.target_days}
           className="mb-4"
+          companionImageUrl={health?.imageUrl || companion?.current_image_url}
+          companionMood={health?.moodState}
+          showCompanion={true}
         />
 
         {/* Stats Grid */}
