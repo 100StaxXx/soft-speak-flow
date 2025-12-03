@@ -17,6 +17,7 @@ import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { AdminReferralTesting } from "@/components/AdminReferralTesting";
 import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { Capacitor } from '@capacitor/core';
+import { globalAudio } from "@/utils/globalAudio";
 
 interface PepTalk {
   id?: string;
@@ -342,13 +343,17 @@ const Admin = () => {
 
       if (error) throw error;
 
-      // Play the audio
-      const audio = new Audio(data.audioUrl);
-      audio.play().catch(err => console.error('Audio play failed:', err));
+      // Play the audio (unless globally muted)
+      if (!globalAudio.getMuted()) {
+        const audio = new Audio(data.audioUrl);
+        audio.play().catch(err => console.error('Audio play failed:', err));
 
-      audio.onended = () => {
+        audio.onended = () => {
+          setPreviewingVoice(null);
+        };
+      } else {
         setPreviewingVoice(null);
-      };
+      }
     } catch (error) {
       console.error("Error previewing voice:", error);
       toast.error(error.message || "Failed to preview voice");

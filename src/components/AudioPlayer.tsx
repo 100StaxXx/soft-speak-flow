@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
+import { globalAudio } from "@/utils/globalAudio";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -15,6 +16,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   // Duck ambient music when playing
   useEffect(() => {
@@ -30,6 +32,23 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
         unduckAmbient();
       }
     };
+  }, [isPlaying]);
+
+  // Listen for global mute changes
+  useEffect(() => {
+    const unsubscribe = globalAudio.subscribe((muted) => {
+      setIsGloballyMuted(muted);
+      // Pause playback if globally muted
+      if (muted && isPlaying) {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.pause();
+          setIsPlaying(false);
+        }
+      }
+    });
+
+    return unsubscribe;
   }, [isPlaying]);
 
   useEffect(() => {
@@ -61,10 +80,15 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
 
     if (isPlaying) {
       audio.pause();
+      setIsPlaying(false);
     } else {
+      // Don't play if globally muted
+      if (globalAudio.getMuted()) {
+        return;
+      }
       audio.play().catch(err => console.error('Audio play failed:', err));
+      setIsPlaying(true);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (value: number[]) => {

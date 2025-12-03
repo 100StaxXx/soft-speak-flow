@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { globalAudio } from "@/utils/globalAudio";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
@@ -133,6 +134,11 @@ export const ActivityTimeline = () => {
   const handlePlayVoice = (url: string, activityId: string) => {
     if (playingAudio === activityId) {
       setPlayingAudio(null);
+      return;
+    }
+    
+    // Don't play if globally muted
+    if (globalAudio.getMuted()) {
       return;
     }
     
