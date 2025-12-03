@@ -141,6 +141,33 @@ serve(async (req) => {
       return email.split('@')[0];
     };
 
+    // Helper to convert hex color to readable name
+    const hexToColorName = (hex: string | null): string => {
+      if (!hex || !hex.startsWith('#')) return hex || 'unknown';
+      const colorMap: Record<string, string> = {
+        '#000000': 'black', '#ffffff': 'white', '#ff0000': 'red', '#00ff00': 'green',
+        '#0000ff': 'blue', '#ffff00': 'yellow', '#ff00ff': 'magenta', '#00ffff': 'cyan',
+        '#ffa500': 'orange', '#800080': 'purple', '#ffc0cb': 'pink', '#a52a2a': 'brown',
+        '#808080': 'gray', '#c0c0c0': 'silver', '#ffd700': 'gold', '#f5f5dc': 'beige',
+        '#9333ea': 'violet', '#22c55e': 'emerald', '#3b82f6': 'sapphire', '#ef4444': 'crimson',
+        '#f97316': 'amber', '#eab308': 'golden', '#14b8a6': 'teal', '#8b5cf6': 'amethyst',
+      };
+      const lower = hex.toLowerCase();
+      if (colorMap[lower]) return colorMap[lower];
+      // Approximate color based on RGB values
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      if (r > 200 && g > 200 && b > 200) return 'pale';
+      if (r < 50 && g < 50 && b < 50) return 'dark';
+      if (r > g && r > b) return r > 200 ? 'bright red' : 'deep red';
+      if (g > r && g > b) return g > 200 ? 'bright green' : 'forest green';
+      if (b > r && b > g) return b > 200 ? 'sky blue' : 'deep blue';
+      if (r > 150 && g > 100 && b < 100) return 'golden';
+      if (r > 150 && b > 150 && g < 100) return 'purple';
+      return 'unique';
+    };
+
     for (const member of members) {
       const companion = companions.find(c => c.user_id === member.user_id);
       const profilesData = member.profiles as unknown as { email: string | null }[] | { email: string | null } | null;
@@ -159,8 +186,8 @@ serve(async (req) => {
         mind: companion.mind || 0,
         body: companion.body || 0,
         soul: companion.soul || 0,
-        eye_color: companion.eye_color || 'unknown',
-        fur_color: companion.fur_color || 'unknown',
+        eye_color: hexToColorName(companion.eye_color),
+        fur_color: hexToColorName(companion.fur_color),
         current_stage: companion.current_stage || 0
       });
     }
