@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
+import { globalAudio } from "@/utils/globalAudio";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
 
@@ -153,8 +154,8 @@ const CompanionEvolutionContent = ({
       haptics.success();
       playEvolutionSuccess();
       
-      // Play voice if available
-      if (audioRef.current && !isLoadingVoice) {
+      // Play voice if available and not globally muted
+      if (audioRef.current && !isLoadingVoice && !globalAudio.getMuted()) {
         audioRef.current.play().catch(err => console.error('Audio play failed:', err));
       }
 

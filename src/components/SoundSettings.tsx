@@ -7,12 +7,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Volume2, VolumeX, Music, Bell, Sparkles } from "lucide-react";
 import { soundManager } from "@/utils/soundEffects";
+import { globalAudio } from "@/utils/globalAudio";
 
 export const SoundSettings = () => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.15);
   const [bgMusicMuted, setBgMusicMuted] = useState(false);
+  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   useEffect(() => {
     const savedVolume = safeLocalStorage.getItem('sound_volume');
@@ -34,6 +36,13 @@ export const SoundSettings = () => {
       }
     }
     if (savedBgMuted) setBgMusicMuted(savedBgMuted === 'true');
+    
+    // Subscribe to global mute changes
+    const unsubscribe = globalAudio.subscribe((muted) => {
+      setIsGloballyMuted(muted);
+    });
+    
+    return unsubscribe;
   }, []);
 
   const handleVolumeChange = (values: number[]) => {
@@ -65,6 +74,11 @@ export const SoundSettings = () => {
     soundFn();
   };
 
+  const handleGlobalMuteToggle = () => {
+    const newMuted = globalAudio.toggleMute();
+    setIsGloballyMuted(newMuted);
+  };
+
   return (
     <Card className="p-6 space-y-6">
       <div className="space-y-2">
@@ -78,12 +92,30 @@ export const SoundSettings = () => {
       </div>
 
       <div className="space-y-4">
-        {/* Master Volume */}
-        <div className="space-y-3">
+        {/* Global Mute Toggle - Controls ALL audio */}
+        <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="space-y-0.5">
+            <Label htmlFor="global-mute" className="flex items-center gap-2 text-base font-medium">
+              {isGloballyMuted ? <VolumeX className="w-5 h-5 text-destructive" /> : <Volume2 className="w-5 h-5 text-primary" />}
+              Mute All Audio
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Mutes everything: music, sound effects, and pep talks
+            </p>
+          </div>
+          <Switch
+            id="global-mute"
+            checked={isGloballyMuted}
+            onCheckedChange={handleGlobalMuteToggle}
+          />
+        </div>
+
+        {/* Sound Effects Volume */}
+        <div className={`space-y-3 transition-opacity ${isGloballyMuted ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              Master Volume
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+              Sound Effects Volume
             </Label>
             <span className="text-sm text-muted-foreground">
               {Math.round(volume * 100)}%
@@ -94,23 +126,24 @@ export const SoundSettings = () => {
             onValueChange={handleVolumeChange}
             max={1}
             step={0.1}
-            disabled={isMuted}
+            disabled={isMuted || isGloballyMuted}
             className="w-full"
           />
         </div>
 
-        {/* Mute Toggle */}
-        <div className="flex items-center justify-between py-2">
-          <Label htmlFor="mute">Mute All Sounds</Label>
+        {/* Sound Effects Mute Toggle */}
+        <div className={`flex items-center justify-between py-2 transition-opacity ${isGloballyMuted ? 'opacity-50 pointer-events-none' : ''}`}>
+          <Label htmlFor="mute">Mute Sound Effects</Label>
           <Switch
             id="mute"
             checked={isMuted}
             onCheckedChange={handleMuteToggle}
+            disabled={isGloballyMuted}
           />
         </div>
 
         {/* Background Music Section */}
-        <div className="pt-6 mt-6 border-t space-y-4">
+        <div className={`pt-6 mt-6 border-t space-y-4 transition-opacity ${isGloballyMuted ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="space-y-2">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <Music className="w-4 h-4 text-primary" />
@@ -133,7 +166,7 @@ export const SoundSettings = () => {
               onValueChange={handleBgMusicVolumeChange}
               max={0.4}
               step={0.01}
-              disabled={bgMusicMuted}
+              disabled={bgMusicMuted || isGloballyMuted}
               className="w-full"
             />
             <p className="text-xs text-muted-foreground">
@@ -152,6 +185,7 @@ export const SoundSettings = () => {
               id="bg-mute"
               checked={bgMusicMuted}
               onCheckedChange={handleBgMusicMuteToggle}
+              disabled={isGloballyMuted}
             />
           </div>
         </div>

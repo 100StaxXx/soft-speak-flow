@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { ambientMusic } from "@/utils/ambientMusic";
+import { globalAudio } from "@/utils/globalAudio";
 import { Music, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const AmbientMusicPlayer = () => {
   const [state, setState] = useState(ambientMusic.getState());
+  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   useEffect(() => {
     // Start playing ambient music on mount (will wait for user interaction)
@@ -19,13 +21,22 @@ export const AmbientMusicPlayer = () => {
     const updateState = () => {
       setState(ambientMusic.getState());
     };
+    
+    // Update state when global mute changes
+    const updateGlobalMute = (e: Event) => {
+      const customEvent = e as CustomEvent<boolean>;
+      setIsGloballyMuted(customEvent.detail);
+      setState(ambientMusic.getState());
+    };
 
     window.addEventListener('bg-music-volume-change', updateState);
     window.addEventListener('bg-music-mute-change', updateState);
+    window.addEventListener('global-audio-mute-change', updateGlobalMute);
 
     return () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
+      window.removeEventListener('global-audio-mute-change', updateGlobalMute);
     };
   }, []); // Only run on mount, not when state changes
 
@@ -56,10 +67,13 @@ export const AmbientMusicPlayer = () => {
   }, []);
 
   const handleToggle = () => {
-    const newMutedState = ambientMusic.toggleMute();
-    // Dispatch window event to notify all listeners (including this component)
-    window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMutedState }));
+    // Toggle global mute which affects ALL audio (ambient music, sound effects, pep talks, etc.)
+    const newMutedState = globalAudio.toggleMute();
+    setIsGloballyMuted(newMutedState);
   };
+
+  // Use global mute state for display (covers all audio)
+  const isMuted = isGloballyMuted;
 
   return (
     <Button
@@ -68,11 +82,11 @@ export const AmbientMusicPlayer = () => {
       onClick={handleToggle}
       className={cn(
         "fixed top-4 right-4 z-40 rounded-full bg-background/80 backdrop-blur-md border border-border/50 shadow-lg transition-all duration-300 hover:scale-110",
-        state.isPlaying && !state.isMuted && "animate-pulse"
+        state.isPlaying && !isMuted && "animate-pulse"
       )}
-      aria-label={state.isMuted ? "Unmute ambient music" : "Mute ambient music"}
+      aria-label={isMuted ? "Unmute all audio" : "Mute all audio"}
     >
-      {state.isMuted ? (
+      {isMuted ? (
         <VolumeX className="h-5 w-5 text-muted-foreground" />
       ) : (
         <div className="relative">

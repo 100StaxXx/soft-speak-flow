@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
+import { globalAudio } from "@/utils/globalAudio";
 
 interface CaptionWord {
   word: string;
@@ -52,6 +53,24 @@ export const TodaysPepTalk = memo(() => {
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
+  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
+
+  // Listen for global mute changes
+  useEffect(() => {
+    const unsubscribe = globalAudio.subscribe((muted) => {
+      setIsGloballyMuted(muted);
+      // Pause playback if globally muted
+      if (muted && isPlaying) {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.pause();
+          setIsPlaying(false);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [isPlaying]);
 
   // Track walkthrough state
   useEffect(() => {
@@ -296,6 +315,10 @@ export const TodaysPepTalk = memo(() => {
       audio.pause();
       setIsPlaying(false);
     } else {
+      // Don't play if globally muted
+      if (globalAudio.getMuted()) {
+        return;
+      }
       try {
         console.log('Attempting to play audio from:', pepTalk?.audio_url);
         await audio.play();

@@ -1,4 +1,5 @@
 import { safeLocalStorage } from '@/utils/storage';
+import { globalAudio } from './globalAudio';
 
 // Custom event interfaces
 interface VolumeChangeEvent extends CustomEvent {
@@ -14,6 +15,7 @@ class AmbientMusicManager {
   private audio: HTMLAudioElement | null = null;
   private volume = 0.15; // Subtle background volume (15%) - like MTG Arena/Pokemon TCG
   private isMuted = false;
+  private isGloballyMuted = false; // Track global mute state
   private isPlaying = false;
   private fadeInterval: NodeJS.Timeout | null = null;
   private isPausedForEvent = false; // Track if paused for major events
@@ -26,6 +28,8 @@ class AmbientMusicManager {
   private pendingVolumeTimeout: NodeJS.Timeout | null = null; // Track pending volume change
   private volumeChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
   private muteChangeHandler: ((e: Event) => void) | null = null; // Store handler for cleanup
+  private globalMuteHandler: ((e: Event) => void) | null = null; // Store global mute handler for cleanup
+  private globalMuteUnsubscribe: (() => void) | null = null; // Unsubscribe from global mute
   private playTimeout: NodeJS.Timeout | null = null; // Timeout for play() promise
   private errorHandler: ((e: Event) => void) | null = null; // Audio error handler
   private stalledHandler: (() => void) | null = null; // Audio stalled handler
@@ -39,11 +43,47 @@ class AmbientMusicManager {
       this.loadPreferences();
       this.initializeAudio();
       
+      // Subscribe to global mute changes
+      this.isGloballyMuted = globalAudio.getMuted();
+      this.globalMuteUnsubscribe = globalAudio.subscribe((muted) => {
+        this.handleGlobalMuteChange(muted);
+      });
+      
       // Clean up on page unload to prevent timer leaks
       window.addEventListener('beforeunload', () => {
         this.cleanup();
       });
     }
+  }
+  
+  // Handle global mute state changes
+  private handleGlobalMuteChange(muted: boolean) {
+    this.isGloballyMuted = muted;
+    if (muted) {
+      // Global mute turned on - mute the ambient music
+      if (this.audio && !this.isMuted) {
+        // Clear any active fades first
+        if (this.fadeInterval) {
+          clearInterval(this.fadeInterval);
+          this.fadeInterval = null;
+        }
+        this.fadeOut(() => {
+          if (this.audio && !this.isStopped) this.audio.volume = 0;
+        }, 500);
+      }
+    } else {
+      // Global mute turned off - restore ambient music if not locally muted
+      if (this.audio && !this.isMuted && this.isPlaying) {
+        this.fadeIn(1000);
+      } else if (!this.isMuted && !this.isPlaying) {
+        this.play();
+      }
+    }
+  }
+  
+  // Check if audio should be muted (either locally or globally)
+  private shouldMute(): boolean {
+    return this.isMuted || this.isGloballyMuted;
   }
   
   // Clean up all timers, listeners, and state
@@ -72,6 +112,16 @@ class AmbientMusicManager {
         window.removeEventListener('bg-music-mute-change', this.muteChangeHandler);
         this.muteChangeHandler = null;
       }
+      if (this.globalMuteHandler) {
+        window.removeEventListener('global-audio-mute-change', this.globalMuteHandler);
+        this.globalMuteHandler = null;
+      }
+    }
+    
+    // Unsubscribe from global mute
+    if (this.globalMuteUnsubscribe) {
+      this.globalMuteUnsubscribe();
+      this.globalMuteUnsubscribe = null;
     }
     
     // Clean up audio element (remove event listeners to prevent memory leaks)
@@ -313,7 +363,7 @@ class AmbientMusicManager {
       this.audio.src = this.trackUrl;
     }
 
-    if (!this.isMuted) {
+    if (!this.shouldMute()) {
       this.isStopped = false;
       this.audio.volume = 0;
       
@@ -337,7 +387,7 @@ class AmbientMusicManager {
             clearTimeout(this.playTimeout);
             this.playTimeout = null;
           }
-          if (!this.isStopped && !this.isMuted) {
+          if (!this.isStopped && !this.shouldMute()) {
             this.isPlaying = true;
             this.fadeIn();
           }
@@ -395,7 +445,7 @@ class AmbientMusicManager {
     this.isPausedForEvent = false;
     this.isStopped = false; // Clear stopped flag when resuming from event
     
-    if (!this.isMuted) {
+    if (!this.shouldMute()) {
       this.audio.volume = 0;
       
       // Set timeout for resume
@@ -415,7 +465,7 @@ class AmbientMusicManager {
             clearTimeout(this.playTimeout);
             this.playTimeout = null;
           }
-          if (!this.isStopped && !this.isMuted) {
+          if (!this.isStopped && !this.shouldMute()) {
             this.isPlaying = true;
             this.fadeIn(1500); // Gentle fade back in
           }
@@ -465,7 +515,7 @@ class AmbientMusicManager {
   }
 
   private fadeIn(duration = 2000) {
-    if (!this.audio || this.isMuted || this.isStopped) return;
+    if (!this.audio || this.shouldMute() || this.isStopped) return;
     
     // Prevent very small durations that could cause issues
     duration = Math.max(duration, 100);
@@ -536,7 +586,7 @@ class AmbientMusicManager {
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
-    if (!this.audio || this.isDucked || this.isDucking || this.isMuted || !this.isPlaying) return;
+    if (!this.audio || this.isDucked || this.isDucking || this.shouldMute() || !this.isPlaying) return;
     
     this.isDucking = true;
     this.isDucked = true;
@@ -633,7 +683,9 @@ class AmbientMusicManager {
   getState() {
     return {
       isPlaying: this.isPlaying,
-      isMuted: this.isMuted,
+      isMuted: this.shouldMute(), // Return effective mute state (local OR global)
+      isLocallyMuted: this.isMuted,
+      isGloballyMuted: this.isGloballyMuted,
       volume: this.volume,
       isPausedForEvent: this.isPausedForEvent,
     };

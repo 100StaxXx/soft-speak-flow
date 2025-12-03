@@ -1,12 +1,15 @@
 import { safeLocalStorage } from './storage';
+import { globalAudio } from './globalAudio';
 
 // Sound effects management system
 class SoundManager {
   private audioContext: AudioContext | null = null;
   private masterVolume = 0.5;
   private isMuted = false;
+  private isGloballyMuted = false;
   private sounds: Map<string, HTMLAudioElement> = new Map();
   private activeIntervals: Set<NodeJS.Timeout> = new Set();
+  private globalMuteUnsubscribe: (() => void) | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -14,11 +17,28 @@ class SoundManager {
       this.audioContext = AudioContextClass ? new AudioContextClass() : null;
       this.loadSoundPreferences();
       
+      // Subscribe to global mute changes
+      this.isGloballyMuted = globalAudio.getMuted();
+      this.globalMuteUnsubscribe = globalAudio.subscribe((muted) => {
+        this.isGloballyMuted = muted;
+        if (muted) {
+          this.stopAllAmbientSounds();
+        }
+      });
+      
       // Cleanup all intervals on page unload
       window.addEventListener('beforeunload', () => {
         this.stopAllAmbientSounds();
+        if (this.globalMuteUnsubscribe) {
+          this.globalMuteUnsubscribe();
+        }
       });
     }
+  }
+  
+  // Check if audio should be muted (either locally or globally)
+  private shouldMute(): boolean {
+    return this.isMuted || this.isGloballyMuted;
   }
 
   private loadSoundPreferences() {
@@ -49,7 +69,7 @@ class SoundManager {
   }
 
   private createOscillator(frequency: number, duration: number, type: OscillatorType = 'sine'): AudioBufferSourceNode | null {
-    if (!this.audioContext || this.isMuted) return null;
+    if (!this.audioContext || this.shouldMute()) return null;
 
     const oscillator = this.audioContext.createOscillator();
     const gainNode = this.audioContext.createGain();
@@ -71,7 +91,7 @@ class SoundManager {
 
   // Evolution sounds
   playEvolutionStart() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Create powerful ascending magical tones with harmonics
     const frequencies = [220, 277, 330, 440, 554, 659, 880, 1108];
@@ -85,7 +105,7 @@ class SoundManager {
   }
 
   playEvolutionSuccess() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Create an epic triumphant fanfare with bass and harmonics
     const bassTones = [130.81, 164.81, 196.00]; // C3, E3, G3
@@ -116,7 +136,7 @@ class SoundManager {
   }
 
   playSparkle() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     const freq = 1500 + Math.random() * 1000;
     this.createOscillator(freq, 0.15, 'sine');
@@ -124,7 +144,7 @@ class SoundManager {
 
   // UI interaction sounds
   playHabitComplete() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Satisfying click-ding
     this.createOscillator(800, 0.1, 'triangle');
@@ -134,7 +154,7 @@ class SoundManager {
   }
 
   playXPGain() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Quick ascending notes
     const notes = [440, 554.37, 659.25]; // A, C#, E
@@ -146,7 +166,7 @@ class SoundManager {
   }
 
   playMissionComplete() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Achievement sound
     this.createOscillator(523.25, 0.15, 'triangle');
@@ -159,7 +179,7 @@ class SoundManager {
   }
 
   playLessonComplete() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Gentle, satisfying completion chime
     this.createOscillator(659.25, 0.2, 'sine');
@@ -172,7 +192,7 @@ class SoundManager {
   }
 
   playAchievementUnlock() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Epic achievement fanfare
     const melody = [
@@ -190,13 +210,13 @@ class SoundManager {
   }
 
   playButtonClick() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     this.createOscillator(300, 0.05, 'square');
   }
 
   playNotification() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Gentle notification chime
     this.createOscillator(660, 0.15, 'sine');
@@ -206,7 +226,7 @@ class SoundManager {
   }
 
   playStreakMilestone() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Celebratory sequence
     const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C, E, G, C, E
@@ -219,7 +239,7 @@ class SoundManager {
 
   // Ambient sounds (simple versions)
   playAmbientNature() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Create gentle nature ambience with multiple oscillators
     const frequencies = [100, 150, 200, 250];
@@ -229,7 +249,7 @@ class SoundManager {
 
     // Repeat periodically
     const interval = setInterval(() => {
-      if (this.isMuted) {
+      if (this.shouldMute()) {
         clearInterval(interval);
         this.activeIntervals.delete(interval);
         return;
@@ -249,7 +269,7 @@ class SoundManager {
   }
 
   playCalming() {
-    if (!this.audioContext || this.isMuted) return;
+    if (!this.audioContext || this.shouldMute()) return;
 
     // Calming tones for meditation
     this.createOscillator(220, 3, 'sine');
