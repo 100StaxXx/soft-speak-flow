@@ -425,22 +425,60 @@ export default function Tasks() {
     ? completions.length / habits.length 
     : 0;
 
+  // Ref to prevent race conditions in tutorial check
+  const tutorialCheckRef = useRef(false);
+  
   // Check if tutorial should be shown and auto-generate "Join Cosmiq" quest
   useEffect(() => {
-    if (!user?.id || !profile) return;
+    // Debug logging for tutorial visibility
+    console.log('[Tutorial Debug] Effect triggered', {
+      userId: user?.id,
+      hasProfile: !!profile,
+      profileLoading: !profile && !!user?.id,
+      showTutorial,
+      tutorialCheckRef: tutorialCheckRef.current
+    });
+    
+    if (!user?.id) {
+      console.log('[Tutorial Debug] No user ID, skipping');
+      return;
+    }
+    
+    if (!profile) {
+      console.log('[Tutorial Debug] Profile not loaded yet, waiting...');
+      return;
+    }
+    
+    // Prevent multiple simultaneous checks
+    if (tutorialCheckRef.current) {
+      console.log('[Tutorial Debug] Already processing tutorial check, skipping');
+      return;
+    }
     
     // Check localStorage first for immediate feedback
     const tutorialDismissed = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`);
+    console.log('[Tutorial Debug] localStorage check', { tutorialDismissed });
+    
     if (tutorialDismissed === 'true') {
-      if (showTutorial) setShowTutorial(false);
+      if (showTutorial) {
+        console.log('[Tutorial Debug] Closing tutorial - localStorage says dismissed');
+        setShowTutorial(false);
+      }
       return;
     }
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
     
+    console.log('[Tutorial Debug] Profile onboarding_data check', {
+      onboardingData,
+      tutorialSeen,
+      profileCreatedAt: profile.created_at
+    });
+    
     // If database says tutorial was seen, mark localStorage and close
     if (tutorialSeen) {
+      console.log('[Tutorial Debug] Tutorial already seen in database, syncing to localStorage');
       safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
       if (showTutorial) setShowTutorial(false);
       return;
@@ -448,6 +486,8 @@ export default function Tasks() {
     
     // Only show tutorial once when not seen
     if (!tutorialSeen && !showTutorial) {
+      console.log('[Tutorial Debug] ✅ SHOWING TUTORIAL for new user');
+      tutorialCheckRef.current = true;
       setShowTutorial(true);
       
       // Auto-generate "Join Cosmiq" quest (only once)
@@ -455,7 +495,11 @@ export default function Tasks() {
       const questCreationKey = `tutorial_quest_created_${user.id}`;
       
       // Check if we've already attempted to create this quest in this session
-      if (safeLocalStorage.getItem(questCreationKey) === 'true') {
+      const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
+      console.log('[Tutorial Debug] Quest creation check', { questCreationKey, questAlreadyCreated });
+      
+      if (questAlreadyCreated) {
+        tutorialCheckRef.current = false;
         return;
       }
       
@@ -473,9 +517,12 @@ export default function Tasks() {
             .maybeSingle();
           
           if (checkError) {
-            console.error('Failed to check for tutorial quest:', checkError);
+            console.error('[Tutorial Debug] Failed to check for tutorial quest:', checkError);
+            tutorialCheckRef.current = false;
             return;
           }
+          
+          console.log('[Tutorial Debug] Existing quest check', { existingQuest });
           
           if (!existingQuest) {
             // Create the welcome quest
@@ -491,21 +538,26 @@ export default function Tasks() {
               });
             
             if (insertError) {
-              console.error('Failed to create tutorial quest:', insertError);
+              console.error('[Tutorial Debug] Failed to create tutorial quest:', insertError);
               // Remove the flag so it can be retried
               safeLocalStorage.removeItem(questCreationKey);
             } else {
+              console.log('[Tutorial Debug] ✅ Tutorial quest created successfully');
               queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
             }
           }
         } catch (error) {
-          console.error('Unexpected error creating tutorial quest:', error);
+          console.error('[Tutorial Debug] Unexpected error creating tutorial quest:', error);
           // Remove the flag so it can be retried
           safeLocalStorage.removeItem(questCreationKey);
+        } finally {
+          tutorialCheckRef.current = false;
         }
       };
       
       checkAndCreateQuest();
+    } else {
+      console.log('[Tutorial Debug] Not showing tutorial', { tutorialSeen, showTutorial });
     }
   }, [user?.id, profile, showTutorial, queryClient]);
 
