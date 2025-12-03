@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompanion } from "@/hooks/useCompanion";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,15 @@ import { Crown, Sparkles, Lock, Moon, MessageCircle } from "lucide-react";
 export const SubscriptionGate = () => {
   const navigate = useNavigate();
   const { companion } = useCompanion();
-  const { isActive } = useSubscription();
+  const { hasAccess, isInTrial, trialDaysRemaining } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
   const [hasShownPaywall, setHasShownPaywall] = useState(false);
   const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
 
   useEffect(() => {
-    // Don't show if already subscribed
-    if (isActive) {
+    // Don't show if already subscribed (not just in trial)
+    if (hasAccess && !isInTrial) {
       setShowPaywall(false);
       setShouldShowAfterEvolution(false);
       return;
@@ -33,12 +33,12 @@ export const SubscriptionGate = () => {
       return;
     }
 
-    // Show paywall if companion is at stage 1+ and we haven't shown it yet
+    // Show modal if companion is at stage 1+ and we haven't shown it yet
     if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
       setShowPaywall(true);
       setHasShownPaywall(true);
     }
-  }, [companion, isActive, hasShownPaywall, isEvolvingLoading]);
+  }, [companion, hasAccess, isInTrial, hasShownPaywall, isEvolvingLoading]);
 
   // Listen for evolution completion
   useEffect(() => {
@@ -67,7 +67,15 @@ export const SubscriptionGate = () => {
             Your Companion Has Evolved! 🎉
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-2">
-            Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required.
+            {isInTrial && trialDaysRemaining > 0 ? (
+              <>
+                You're enjoying your <span className="font-semibold text-foreground">free trial</span> — {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} remaining!
+              </>
+            ) : (
+              <>
+                Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -90,12 +98,25 @@ export const SubscriptionGate = () => {
 
           {/* Trial Info */}
           <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/20">
-            <p className="text-sm font-semibold text-foreground mb-1">
-              After your free trial
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Just $9.99/month or $59.99/year • Cancel anytime in iOS Settings
-            </p>
+            {isInTrial && trialDaysRemaining > 0 ? (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-1">
+                  Your free trial is active
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Subscribe anytime: $9.99/month or $59.99/year • Cancel anytime
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-1">
+                  After your free trial
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Just $9.99/month or $59.99/year • Cancel anytime in iOS Settings
+                </p>
+              </>
+            )}
           </div>
 
           {/* CTA */}
@@ -103,7 +124,7 @@ export const SubscriptionGate = () => {
             onClick={() => setShowPaywall(false)}
             className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            Start My Free Trial
+            {isInTrial && trialDaysRemaining > 0 ? "Continue to App" : "Start My Free Trial"}
           </Button>
 
           <Button
@@ -117,9 +138,11 @@ export const SubscriptionGate = () => {
             View pricing details
           </Button>
 
-          <p className="text-xs text-center text-muted-foreground">
-            No credit card required. We'll remind you before the trial ends.
-          </p>
+          {!isInTrial && (
+            <p className="text-xs text-center text-muted-foreground">
+              No credit card required. We'll remind you before the trial ends.
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

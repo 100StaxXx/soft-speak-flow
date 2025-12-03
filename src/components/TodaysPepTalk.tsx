@@ -493,11 +493,12 @@ export const TodaysPepTalk = memo(() => {
             ref={audioRef} 
             src={pepTalk.audio_url} 
             preload="metadata"
-            onError={(e) => {
-              logger.error('Audio loading error:', e);
-              logger.error('Audio URL:', pepTalk.audio_url);
-              logger.error('Audio error code:', audioRef.current?.error?.code);
-              logger.error('Audio error message:', audioRef.current?.error?.message);
+            onError={() => {
+              logger.error('Audio loading error', { 
+                audioUrl: pepTalk.audio_url,
+                errorCode: audioRef.current?.error?.code,
+                errorMessage: audioRef.current?.error?.message 
+              });
             }}
             onLoadedMetadata={() => {
               logger.log('Audio loaded successfully');
