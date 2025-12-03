@@ -431,8 +431,8 @@ export default function Onboarding() {
 
       console.log("Profile updated successfully:", data);
 
-      // Invalidate profile cache
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      // Force immediate refetch to ensure mentor selection is reflected
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
 
       toast({
         title: "Mentor Selected!",
@@ -539,9 +539,9 @@ export default function Onboarding() {
       
       console.log("Onboarding marked complete");
       
-      // CRITICAL: Invalidate caches to force refetch with new data
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-      await queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
+      // CRITICAL: Force immediate refetch (not just invalidate) to ensure fresh data
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
       
       // Prefetch companion data to ensure it's loaded before navigation
       console.log("Prefetching companion data...");
