@@ -65,7 +65,11 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   }, [open, user?.id, fetchTodayCompletions]);
 
   const handleToggleHabit = async (habitId: string, checked: boolean) => {
-    if (!user?.id) return;
+    console.log('[EpicCheckIn] handleToggleHabit called', { habitId, checked, userId: user?.id });
+    if (!user?.id) {
+      console.log('[EpicCheckIn] No user ID, returning early');
+      return;
+    }
     
     // Optimistically update UI
     const previousState = new Set(completedToday);
@@ -267,8 +271,15 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
+                      onClick={() => {
+                        console.log('[EpicCheckIn] Row clicked', { habitId: habit.id, isCompleted, submitting });
+                        if (!submitting) {
+                          handleToggleHabit(habit.id, !isCompleted);
+                        }
+                      }}
+                      style={{ touchAction: 'manipulation' }}
                       className={cn(
-                        "flex items-center gap-3 p-4 rounded-xl transition-all",
+                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer",
                         "bg-secondary/30 border border-border/50",
                         isCompleted && "bg-primary/10 border-primary/30"
                       )}
@@ -278,10 +289,12 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                         checked={isCompleted}
                         disabled={submitting}
                         onCheckedChange={(checked) => handleToggleHabit(habit.id, checked as boolean)}
+                        onClick={(e) => e.stopPropagation()}
                         className={cn(
                           "h-6 w-6 rounded-full border-2",
                           isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
                         )}
+                        style={{ touchAction: 'manipulation' }}
                       />
                       <label
                         htmlFor={habit.id}
