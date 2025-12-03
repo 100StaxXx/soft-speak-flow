@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,8 +16,16 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
   const [inviteCode, setInviteCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [epicLimitReached, setEpicLimitReached] = useState(false);
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const MAX_EPICS = 2;
+
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setEpicLimitReached(false);
+      setInviteCode("");
+    }
+  }, [open]);
 
   const handleJoinEpic = async () => {
     if (!inviteCode.trim()) {
@@ -135,8 +143,9 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       onOpenChange(false);
       setInviteCode("");
       
-      // Refresh epics list
-      navigate('/epics');
+      // Refresh epics and habits queries
+      queryClient.invalidateQueries({ queryKey: ["epics"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
     } catch (error) {
       console.error('Error joining epic:', error);
       toast.error("Failed to join guild. Please try again.");
