@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -72,25 +72,7 @@ const CosmiqDeepDive = () => {
   const { user } = useAuth();
   const [content, setContent] = useState<CosmiqContent | null>(null);
   const [loading, setLoading] = useState(true);
-  const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
-
-  const handleQuizAnswer = async (resonates: boolean) => {
-    setQuizAnswer(resonates);
-    
-    if (user && placement && sign) {
-      try {
-        await supabase.from('cosmic_deep_dive_feedback').insert({
-          user_id: user.id,
-          placement: placement.toLowerCase(),
-          sign: sign.toLowerCase(),
-          resonates,
-        });
-      } catch (error) {
-        console.error('Failed to save feedback:', error);
-      }
-    }
-  };
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -507,41 +489,6 @@ const CosmiqDeepDive = () => {
 
             {/* Placement-specific sections */}
             {renderSections()}
-
-            {/* Feedback */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="bg-obsidian/60 border-royal-purple/20 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">Does this resonate?</span>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleQuizAnswer(true)}
-                      variant={quizAnswer === true ? "default" : "outline"}
-                      size="sm"
-                      className={quizAnswer === true ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-                      disabled={quizAnswer !== null}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-1" />
-                      Yes
-                    </Button>
-                    <Button
-                      onClick={() => handleQuizAnswer(false)}
-                      variant={quizAnswer === false ? "default" : "outline"}
-                      size="sm"
-                      className={quizAnswer === false ? "bg-rose-600 hover:bg-rose-700" : ""}
-                      disabled={quizAnswer !== null}
-                    >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      No
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
           </>
         ) : null}
       </div>
