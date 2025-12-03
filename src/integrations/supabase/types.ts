@@ -3761,6 +3761,7 @@ export type Database = {
       }
     }
     Functions: {
+      count_user_epics: { Args: { p_user_id: string }; Returns: number }
       create_companion_if_not_exists: {
         Args: {
           p_core_element: string
