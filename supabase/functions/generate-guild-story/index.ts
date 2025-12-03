@@ -143,7 +143,8 @@ serve(async (req) => {
 
     for (const member of members) {
       const companion = companions.find(c => c.user_id === member.user_id);
-      const memberEmail = (member.profiles as { email: string | null })?.email;
+      const profilesData = member.profiles as unknown as { email: string | null }[] | { email: string | null } | null;
+      const memberEmail: string | null = Array.isArray(profilesData) ? (profilesData[0]?.email ?? null) : (profilesData?.email ?? null);
       
       if (!companion) {
         membersWithoutCompanions.push(getDisplayName(memberEmail));
