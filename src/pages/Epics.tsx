@@ -37,6 +37,9 @@ const Epics = () => {
     updateEpicStatus,
   } = useEpics();
 
+  const MAX_EPICS = 2;
+  const hasReachedLimit = activeEpics.length >= MAX_EPICS;
+
   const handleCreateEpic = (data: {
     title: string;
     description?: string;
@@ -116,17 +119,23 @@ const Epics = () => {
           transition={{ delay: 0.15 }}
           className="mb-6"
         >
-          <Button
-            onClick={() => {
-              setSelectedTemplate(null);
-              setCreateDialogOpen(true);
-            }}
-            className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 h-14 text-lg"
-            size="lg"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Create Custom Epic
-          </Button>
+          {hasReachedLimit ? (
+            <div className="w-full h-14 flex items-center justify-center bg-secondary/30 rounded-lg border border-border/50 text-muted-foreground text-sm">
+              You can only have {MAX_EPICS} active epics at a time
+            </div>
+          ) : (
+            <Button
+              onClick={() => {
+                setSelectedTemplate(null);
+                setCreateDialogOpen(true);
+              }}
+              className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 h-14 text-lg"
+              size="lg"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Create Custom Epic
+            </Button>
+          )}
         </motion.div>
 
         {/* Epics Tabs */}
@@ -166,12 +175,14 @@ const Epics = () => {
                     <Sparkles className="w-4 h-4 mr-2" />
                     Star Paths
                   </Button>
-                  <Button
-                    onClick={() => setCreateDialogOpen(true)}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Custom
-                  </Button>
+                  {!hasReachedLimit && (
+                    <Button
+                      onClick={() => setCreateDialogOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Custom
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             ) : (
