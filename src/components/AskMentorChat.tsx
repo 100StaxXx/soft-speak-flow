@@ -16,6 +16,9 @@ interface Message {
   isFallback?: boolean;
 }
 
+// Maximum dots to show in the visual indicator to prevent layout issues
+const MAX_VISUAL_INDICATOR_DOTS = 15;
+
 interface AskMentorChatProps {
   mentorName: string;
   mentorTone: string;
@@ -80,6 +83,10 @@ export const AskMentorChat = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
+  
+  // Use ref for messages to avoid stale closure in sendMessage callback
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
@@ -104,12 +111,15 @@ export const AskMentorChat = ({
     setIsLoading(true);
 
     try {
+      // Use ref to get fresh conversation history (avoids stale closure)
+      const currentMessages = messagesRef.current;
+      
       const { data, error } = await supabase.functions.invoke("mentor-chat", {
         body: {
           message: text,
           mentorName,
           mentorTone,
-          conversationHistory: messages.slice(-10)
+          conversationHistory: currentMessages.slice(-10)
         },
       });
 
@@ -135,10 +145,13 @@ export const AskMentorChat = ({
       }
 
       // Save conversation history (non-blocking - don't fail if this errors)
-      void supabase.from('mentor_chats').insert([
-        { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-        { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
-      ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
+      // Only save if mentorId is defined to maintain data integrity
+      if (mentorId) {
+        void supabase.from('mentor_chats').insert([
+          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
+          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
+        ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
+      }
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -165,17 +178,21 @@ export const AskMentorChat = ({
       setDailyMessageCount(prev => prev + 1);
 
       // Save both messages even with fallback (non-blocking)
-      void supabase.from('mentor_chats').insert([
-        { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-        { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
-      ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
+      // Only save if mentorId is defined to maintain data integrity
+      if (mentorId) {
+        void supabase.from('mentor_chats').insert([
+          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
+          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
+        ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, messages, isOnline]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
 
   useEffect(() => {
-    // Check today's message count
+    // Check today's message count on mount only
+    // The count is updated via server response in sendMessage, no need to recheck after each message
     const checkDailyLimit = async () => {
       if (!user) return;
 
@@ -193,7 +210,7 @@ export const AskMentorChat = ({
       setDailyMessageCount(count || 0);
     };
     checkDailyLimit();
-  }, [messages, user]);
+  }, [user]); // Only run on mount and user change, not on every message
 
   useEffect(() => {
     setSuggestedPrompts(getSmartPrompts(mentorTone, hasActiveHabits, hasActiveChallenges));
@@ -259,7 +276,7 @@ export const AskMentorChat = ({
             Daily messages: {dailyMessageCount}/{dailyLimit}
           </span>
           <div className="flex gap-1">
-            {Array.from({ length: dailyLimit }).map((_, i) => (
+            {Array.from({ length: Math.min(dailyLimit, MAX_VISUAL_INDICATOR_DOTS) }).map((_, i) => (
               <div
                 key={i}
                 className={cn(

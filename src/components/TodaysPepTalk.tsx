@@ -183,31 +183,38 @@ export const TodaysPepTalk = memo(() => {
         const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
           body: { id: pepTalk.id }
         });
-      if (!error && data?.script) {
-        setPepTalk((prev: DailyPepTalk | null) => {
-          if (!prev) return prev;
-          
-          // Validate transcript from sync response
-          let validatedTranscript: CaptionWord[] = [];
-          if (Array.isArray(data.transcript)) {
-            validatedTranscript = (data.transcript as unknown as CaptionWord[]).filter(
-              (word): word is CaptionWord => 
-                word && 
-                typeof word === 'object' &&
-                typeof word.word === 'string' &&
-                typeof word.start === 'number' &&
-                typeof word.end === 'number'
-            );
-          }
-          
-          const shouldUpdate = data.script !== prev.script || JSON.stringify(validatedTranscript) !== JSON.stringify(prev.transcript);
-          return shouldUpdate ? { 
-            ...prev, 
-            script: data.script,
-            transcript: validatedTranscript
-          } : prev;
-        });
-      }
+        
+        // Handle edge function error
+        if (error) {
+          console.warn('Transcript sync returned error:', error);
+          return; // Silent fail - transcript sync is optional enhancement
+        }
+        
+        if (data?.script) {
+          setPepTalk((prev: DailyPepTalk | null) => {
+            if (!prev) return prev;
+            
+            // Validate transcript from sync response
+            let validatedTranscript: CaptionWord[] = [];
+            if (Array.isArray(data.transcript)) {
+              validatedTranscript = (data.transcript as unknown as CaptionWord[]).filter(
+                (word): word is CaptionWord => 
+                  word && 
+                  typeof word === 'object' &&
+                  typeof word.word === 'string' &&
+                  typeof word.start === 'number' &&
+                  typeof word.end === 'number'
+              );
+            }
+            
+            const shouldUpdate = data.script !== prev.script || JSON.stringify(validatedTranscript) !== JSON.stringify(prev.transcript);
+            return shouldUpdate ? { 
+              ...prev, 
+              script: data.script,
+              transcript: validatedTranscript
+            } : prev;
+          });
+        }
       } catch (error) {
         console.error('Transcript sync failed:', error);
         // silent fail; avoid blocking UI if sync fails
