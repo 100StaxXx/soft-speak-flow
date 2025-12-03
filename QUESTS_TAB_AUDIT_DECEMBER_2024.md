@@ -1,8 +1,33 @@
-# Quests Tab Comprehensive Audit - December 2024
+# Quests Tab Comprehensive Audit - December 2024 (Updated)
 
 ## Executive Summary
 
 This audit covers the complete Quests tab functionality including Daily Quests, Habits, Epics (Guilds), Calendar Views, Star Paths (templates), and related systems. The codebase is generally well-structured with good error handling, proper RLS implementation, and atomic operations for XP awards. Several issues from a previous audit have been fixed, but some remain.
+
+**Audit Date:** December 3, 2024  
+**Status:** Second pass complete - additional issues found
+
+---
+
+## Quick Summary - All Issues Found
+
+| # | Severity | Issue | File | Status |
+|---|----------|-------|------|--------|
+| 1 | 🔴 CRITICAL | SharedEpics creates copies instead of joining guilds | `SharedEpics.tsx` | Open |
+| 2 | ⚠️ MEDIUM | EpicCheckInDrawer dependency array issue | `EpicCheckInDrawer.tsx` | Open |
+| 3 | ⚠️ MEDIUM | Schedule Power-Ups shows XP but doesn't award it | `SchedulePowerUps.tsx` | Open |
+| 4 | ⚠️ MEDIUM | Quest limit mismatch (4 vs 10) in DB | Migrations | Open |
+| 5 | 🟡 LOW | Dead `toReferenceTime` in SchedulePowerUps | `SchedulePowerUps.tsx` | Open |
+| 6 | 🟡 LOW | Dead `toReferenceTime` in TimeConflictDetector | `TimeConflictDetector.tsx` | Open |
+| 7 | 🟡 LOW | Dead `toReferenceTime` in CalendarMonthView | `CalendarMonthView.tsx` | Open |
+| 8 | 🟡 LOW | Recurrence patterns stored but not auto-created | `useDailyTasks.ts` | Open |
+| 9 | 🟡 LOW | EpicLeaderboard fetchLeaderboard not in useCallback | `EpicLeaderboard.tsx` | Open |
+
+### Previously Fixed ✅
+- JoinEpic.tsx epic limit check
+- HabitCard.tsx user_id verification  
+- CalendarWeekView.tsx conflict toast
+- TaskCard.tsx initial mount tracking
 
 ---
 
@@ -161,7 +186,57 @@ return {
 
 ---
 
-### 6. **LOW: Recurrence Pattern Not Fully Implemented**
+### 6. **MEDIUM: Quest Limit Mismatch Between Database Functions**
+
+**Files:** 
+- `supabase/migrations/20251125103000_add_daily_task_helpers.sql` (Line 32)
+- `supabase/migrations/20251129040100_enforce_quest_limits.sql` (Line 18)
+
+Two different quest limits are defined:
+
+```sql
+-- In add_daily_task helper function (not used by client)
+IF existing_count >= 4 THEN
+  RAISE EXCEPTION 'MAX_TASKS_REACHED';
+
+-- In enforce_daily_quest_limit trigger (active)
+IF quest_count >= 10 THEN
+  RAISE EXCEPTION 'Maximum quest limit reached...';
+```
+
+**Impact:** 
+- The client uses direct INSERT, so the 10-quest limit applies
+- The `add_daily_task` function with 4-quest limit is unused
+- Creates confusion about actual limits
+
+**Fix:** Remove or align the unused function's limit with the trigger.
+
+---
+
+### 7. **LOW: Dead `toReferenceTime` Function in CalendarMonthView**
+
+**File:** `src/components/CalendarMonthView.tsx`  
+**Lines:** 28-33
+
+Same pattern of unused helper function found in another calendar component.
+
+---
+
+### 8. **LOW: EpicLeaderboard Uses Deprecated eslint-disable Comment**
+
+**File:** `src/components/EpicLeaderboard.tsx`  
+**Line:** 100-101
+
+```typescript
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [epicId]); // fetchLeaderboard is stable and depends on epicId indirectly
+```
+
+While the comment explains the reasoning, the function `fetchLeaderboard` is recreated on every render since it's not wrapped in `useCallback`. This is a minor performance issue.
+
+---
+
+### 9. **LOW: Recurrence Pattern Not Fully Implemented**
 
 **File:** `src/hooks/useDailyTasks.ts`  
 **Lines:** 137-154
@@ -287,15 +362,17 @@ const totalXP = useMemo(() => {
 | Issue | File | Effort | Impact |
 |-------|------|--------|--------|
 | SharedEpics copies instead of joins | `SharedEpics.tsx` | Medium | High |
+| Quest limit mismatch (4 vs 10) | Migrations | Low | Medium |
 | EpicCheckInDrawer dependency array | `EpicCheckInDrawer.tsx` | Low | Medium |
 
 ### Medium Priority Cleanup
 
 | Issue | File | Effort |
 |-------|------|--------|
-| Remove dead `toReferenceTime` functions | Multiple | Low |
+| Remove dead `toReferenceTime` functions | `SchedulePowerUps.tsx`, `TimeConflictDetector.tsx`, `CalendarMonthView.tsx` | Low |
 | Clarify Schedule Power-Ups XP (visual only) | `SchedulePowerUps.tsx` | Low |
 | Consider consolidating Epics.tsx with Tasks.tsx | Multiple | Medium |
+| Wrap fetchLeaderboard in useCallback | `EpicLeaderboard.tsx` | Low |
 
 ### Low Priority / Future Enhancements
 
@@ -303,6 +380,7 @@ const totalXP = useMemo(() => {
 2. Add drag preview ghost for week view
 3. Consider UTC-based date handling for travelers
 4. Add undo capability for accidental quest completion (with XP reversal)
+5. Remove or use the `add_daily_task` database function
 
 ---
 
@@ -346,6 +424,9 @@ const totalXP = useMemo(() => {
 - ✅ `src/hooks/useDailyTasks.ts`
 - ✅ `src/hooks/useEpics.ts`
 - ✅ `src/hooks/useCalendarTasks.ts`
+- ✅ `src/hooks/useEpicTemplates.ts`
+- ✅ `src/hooks/useXPRewards.ts`
+- ✅ `src/hooks/useGuildActivity.ts`
 
 ### Components
 - ✅ `src/components/TaskCard.tsx`
@@ -353,21 +434,33 @@ const totalXP = useMemo(() => {
 - ✅ `src/components/CreateEpicDialog.tsx`
 - ✅ `src/components/JoinEpicDialog.tsx`
 - ✅ `src/components/CalendarWeekView.tsx`
+- ⚠️ `src/components/CalendarMonthView.tsx` (dead code)
 - ✅ `src/components/QuestDragCard.tsx`
 - ✅ `src/components/QuestDropZone.tsx`
 - ✅ `src/components/AdvancedQuestOptions.tsx`
 - ✅ `src/components/QuestsTutorialModal.tsx`
-- ⚠️ `src/components/SchedulePowerUps.tsx`
-- ⚠️ `src/components/TimeConflictDetector.tsx`
-- ⚠️ `src/components/EpicCheckInDrawer.tsx`
+- ⚠️ `src/components/SchedulePowerUps.tsx` (dead code, XP not awarded)
+- ⚠️ `src/components/TimeConflictDetector.tsx` (dead code)
+- ⚠️ `src/components/EpicCheckInDrawer.tsx` (dependency array issue)
+- ⚠️ `src/components/EpicLeaderboard.tsx` (useCallback missing)
+- ✅ `src/components/EpicActivityFeed.tsx`
+- ✅ `src/components/GuildMembersSection.tsx`
+- ✅ `src/components/GuildActivityFeed.tsx`
+- ✅ `src/components/GuildShoutsFeed.tsx`
 - ✅ `src/components/HabitCard.tsx`
+- ✅ `src/components/HabitTemplates.tsx`
+- ✅ `src/components/FrequencyPicker.tsx`
+- ✅ `src/components/StarPathsBrowser.tsx`
+- ✅ `src/components/ConstellationTrail.tsx`
+- ✅ `src/components/EmptyState.tsx`
 
 ### Config/Utils
 - ✅ `src/config/xpRewards.ts`
 - ✅ `src/utils/questCategorization.ts`
 
 ### Database
-- ✅ `supabase/migrations/20251129040100_enforce_quest_limits.sql`
+- ⚠️ `supabase/migrations/20251129040100_enforce_quest_limits.sql` (limit mismatch)
+- ⚠️ `supabase/migrations/20251125103000_add_daily_task_helpers.sql` (unused function)
 - ✅ `supabase/migrations/20251124225200_add_quest_completion_transaction.sql`
 
 ---
