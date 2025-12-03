@@ -12,6 +12,7 @@ import { SendShoutDrawer } from "./SendShoutDrawer";
 import { GuildMembersInfoTooltip } from "./GuildMembersInfoTooltip";
 import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ShoutType } from "@/data/shoutMessages";
 
 interface LeaderboardMember {
   user_id: string;
@@ -119,11 +120,11 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
     setShoutDrawerOpen(true);
   };
 
-  const handleSendShout = (shoutType: string, messageKey: string) => {
+  const handleSendShout = (shoutType: ShoutType, messageKey: string) => {
     if (!selectedMember) return;
     sendShout.mutate({
       recipientId: selectedMember.user_id,
-      shoutType: shoutType as any,
+      shoutType,
       messageKey,
     });
   };

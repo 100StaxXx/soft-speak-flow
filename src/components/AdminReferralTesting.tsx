@@ -154,9 +154,9 @@ export const AdminReferralTesting = () => {
           referrer_id: testReferrerId,
           referee_id: testRefereeId,
           amount: payoutAmount,
-          payout_type: 'first_month',
-          status: 'pending'
-        } as any)
+          payout_type: 'first_month' as const,
+          status: 'pending' as const
+        })
         .select()
         .maybeSingle();
 

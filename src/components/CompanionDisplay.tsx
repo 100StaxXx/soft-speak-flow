@@ -134,7 +134,7 @@ export const CompanionDisplay = memo(() => {
     // and the stage from the companion data after refetch
     const imageUrl = typeof evolveCompanion.data === 'string' 
       ? evolveCompanion.data 
-      : (evolveCompanion.data as any)?.current_image_url || "";
+      : (evolveCompanion.data as { current_image_url?: string } | undefined)?.current_image_url || "";
     
     // Use companion's current stage + 1 since mutation triggers after XP threshold
     const newStage = companion ? companion.current_stage : 0;

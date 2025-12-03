@@ -237,7 +237,7 @@ const Admin = () => {
       }
       toast.success("Pep talk updated successfully");
     } else {
-      const { error } = await supabase.from("pep_talks").insert([pepTalkData as any]);
+      const { error } = await supabase.from("pep_talks").insert([pepTalkData]);
 
       if (error) {
         toast.error("Failed to create pep talk");

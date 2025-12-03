@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import type { Json } from "@/integrations/supabase/types";
 
 // Define activity data types based on activity types
 export interface HabitActivityData {
@@ -79,7 +80,7 @@ export const useActivityFeed = () => {
         .insert([{
           user_id: user.id,
           activity_type: type,
-          activity_data: data as any,
+          activity_data: data as Json,
         }])
         .select()
         .maybeSingle();
