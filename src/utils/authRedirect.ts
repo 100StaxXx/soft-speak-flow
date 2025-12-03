@@ -44,11 +44,16 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   if (!existing) {
-    // Create new profile with user's timezone
+    // Create new profile with user's timezone and 7-day trial
+    // CRITICAL: Set trial_ends_at explicitly to ensure 7-day trial is granted
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+    
     const { error } = await supabase.from("profiles").upsert({
       id: userId,
       email: email ?? null,
       timezone: userTimezone,
+      trial_ends_at: trialEndsAt.toISOString(),
     }, {
       onConflict: 'id'
     });

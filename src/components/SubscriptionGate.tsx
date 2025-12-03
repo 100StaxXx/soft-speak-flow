@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ export const SubscriptionGate = () => {
   const navigate = useNavigate();
   const { companion } = useCompanion();
   const { isActive } = useSubscription();
+  const { isInTrial, trialDaysRemaining } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
   const [hasShownPaywall, setHasShownPaywall] = useState(false);
@@ -67,7 +69,13 @@ export const SubscriptionGate = () => {
             Your Companion Has Evolved! 🎉
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-2">
-            Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required.
+            {isInTrial ? (
+              <span>
+                You have <span className="font-semibold text-foreground">{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} left</span> of full access
+              </span>
+            ) : (
+              <span>Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required</span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -103,7 +111,7 @@ export const SubscriptionGate = () => {
             onClick={() => setShowPaywall(false)}
             className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            Start My Free Trial
+            {isInTrial ? "Continue Exploring" : "Start My Free Trial"}
           </Button>
 
           <Button
@@ -114,11 +122,14 @@ export const SubscriptionGate = () => {
             }}
             className="w-full text-sm text-muted-foreground hover:text-foreground"
           >
-            View pricing details
+            {isInTrial ? "Upgrade to Premium" : "View pricing details"}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            No credit card required. We'll remind you before the trial ends.
+            {isInTrial 
+              ? "Enjoying your trial? Upgrade anytime for continued access."
+              : "No credit card required. We'll remind you before the trial ends."
+            }
           </p>
         </div>
       </DialogContent>

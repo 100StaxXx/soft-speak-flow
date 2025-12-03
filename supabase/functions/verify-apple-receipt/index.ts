@@ -106,6 +106,22 @@ serve(async (req) => {
   }
 });
 
+/**
+ * Update Subscription Record
+ * 
+ * This function creates/updates a subscription record when an Apple IAP receipt is verified.
+ * 
+ * IMPORTANT: When a user subscribes:
+ * 1. This creates a record in the subscriptions table
+ * 2. The trigger updates profiles.is_premium = true
+ * 3. Trial becomes irrelevant - subscription takes precedence
+ * 
+ * Trial -> Subscription Transition:
+ * - User starts with 7-day trial (profiles.trial_ends_at set on account creation)
+ * - When they subscribe during trial, subscription overrides trial
+ * - Frontend checks: subscription > trial > free (in that priority order)
+ * - No special migration needed; subscription simply takes over
+ */
 async function updateSubscription(supabase: any, userId: string, receiptData: any) {
   const latestReceipt = receiptData.latest_receipt_info?.[0];
   
