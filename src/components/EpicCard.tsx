@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
@@ -10,9 +9,9 @@ import { EpicDiscordSection } from "./EpicDiscordSection";
 import { GuildStorySection } from "./GuildStorySection";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
+import { ConstellationTrail } from "./ConstellationTrail";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<EpicTheme, string> = {
@@ -111,14 +110,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     }
   }, [epic.is_public, epic.id]);
 
-  const getMilestoneColor = (progress: number) => {
-    if (progress >= 100) return "text-yellow-400";
-    if (progress >= 75) return "text-purple-400";
-    if (progress >= 50) return "text-blue-400";
-    if (progress >= 25) return "text-green-400";
-    return "text-muted-foreground";
-  };
-
   const handleShareEpic = async () => {
     if (!epic.invite_code) return;
     
@@ -193,32 +184,12 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         </div>
 
-        {/* Progress Bar with Milestones */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Epic Progress</span>
-            <span className={`text-sm font-bold ${getMilestoneColor(epic.progress_percentage)}`}>
-              {epic.progress_percentage}%
-            </span>
-          </div>
-          <Progress value={epic.progress_percentage} className="h-3 bg-secondary" />
-          
-          {/* Milestone Markers */}
-          <div className="flex justify-between mt-1 px-1">
-            {[25, 50, 75, 100].map((milestone) => (
-              <div key={milestone} className="text-center">
-                <div
-                  className={`w-1 h-2 mx-auto rounded ${
-                    epic.progress_percentage >= milestone
-                      ? "bg-primary"
-                      : "bg-muted"
-                  }`}
-                />
-                <span className="text-xs text-muted-foreground">{milestone}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Constellation Trail Progress */}
+        <ConstellationTrail 
+          progress={epic.progress_percentage} 
+          targetDays={epic.target_days}
+          className="mb-4"
+        />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-3 mb-4">
