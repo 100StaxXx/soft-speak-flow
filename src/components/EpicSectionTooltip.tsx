@@ -43,6 +43,13 @@ export const EpicSectionTooltip = () => {
               </div>
             </div>
             <div className="flex items-start gap-2">
+              <span className="text-xs font-semibold text-yellow-400 mt-0.5">⭐</span>
+              <div>
+                <p className="text-xs font-semibold text-yellow-400">Star Paths</p>
+                <p className="text-xs text-muted-foreground">Browse curated epic templates to get started quickly</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
               <span className="text-xs font-semibold text-orange-400 mt-0.5">⚡</span>
               <div>
                 <p className="text-xs font-semibold text-orange-400">Guild Bonus</p>
