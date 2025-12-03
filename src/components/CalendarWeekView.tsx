@@ -8,6 +8,7 @@ import { QuestDragCard } from "./QuestDragCard";
 import { QuestDropZone } from "./QuestDropZone";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
+import { toast } from "sonner";
 
 interface Task {
   id: string;
@@ -151,6 +152,9 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                           onTaskDrop(taskId, day, time);
                         } else {
                           playSound('error');
+                          toast.error("Time conflict!", {
+                            description: "There's already a quest scheduled at this time. Resolve the conflict first."
+                          });
                         }
                         setDraggedTask(null);
                       }}
