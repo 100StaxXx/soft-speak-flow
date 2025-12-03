@@ -113,8 +113,7 @@ class AmbientMusicManager {
         this.muteChangeHandler = null;
       }
       if (this.globalMuteHandler) {
-        window.removeEventListener('global-audio-mute-change', this.globalMuteHandler);
-        // Also remove from iOS-specific event if on iOS
+        // globalMuteHandler is only used on iOS for ios-audio-mute-change
         if (isIOS) {
           window.removeEventListener('ios-audio-mute-change', this.globalMuteHandler);
         }
