@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
+import { logger } from "@/utils/logger";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -53,7 +54,7 @@ const MorningCheckInContent = () => {
         // Check if we've exceeded max poll duration (use ref to avoid stale closure)
         const startTime = pollStartTimeRef.current;
         if (startTime && Date.now() - startTime > MAX_POLL_DURATION) {
-          console.warn('Mentor response polling timeout exceeded');
+          logger.warn('Mentor response polling timeout exceeded');
           return false; // Stop polling after 30 seconds
         }
         return 2000; // Poll every 2 seconds
@@ -115,7 +116,7 @@ const MorningCheckInContent = () => {
         .maybeSingle();
 
       if (error) {
-        console.error('Check-in error:', error);
+        logger.error('Check-in error:', error);
         throw error;
       }
 
@@ -142,17 +143,17 @@ const MorningCheckInContent = () => {
         });
         
         if (invocationError) {
-          console.error('Edge function invocation error:', invocationError);
+          logger.error('Edge function invocation error:', invocationError);
           // Don't block the UI - mentor response is optional
         }
       } catch (error) {
-        console.error('Edge function invocation failed:', error);
+        logger.error('Edge function invocation failed:', error);
         // Don't block the UI - mentor response is optional
       }
 
       queryClient.invalidateQueries({ queryKey: ['morning-check-in'] });
     } catch (error) {
-      console.error('Check-in save error:', error);
+      logger.error('Check-in save error:', error);
       toast({ 
         title: "Error", 
         description: error instanceof Error ? error.message : "Failed to save check-in", 

@@ -4,6 +4,7 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/utils/logger";
 
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async (userId: string) => {
@@ -70,14 +71,14 @@ export const useXPRewards = () => {
       const companionId = companion.id;
       if (companionId) {
         updateMindFromHabit(companionId).catch(err => {
-          console.error('Mind update failed:', err);
+          logger.error('Mind update failed:', err);
         });
         updateBodyFromActivity(companionId).catch(err => {
-          console.error('Body update failed:', err);
+          logger.error('Body update failed:', err);
         });
       }
     } catch (error) {
-      console.error('Error awarding habit completion:', error);
+      logger.error('Error awarding habit completion:', error);
     }
   };
 
@@ -155,16 +156,14 @@ export const useXPRewards = () => {
       const companionId = companion.id;
       if (companionId) {
         updateSoulFromReflection(companionId).catch(err => {
-          console.error('Soul update failed:', err);
-          // Non-critical - don't show toast to avoid spam
+          logger.error('Soul update failed:', err);
         });
         updateBodyFromActivity(companionId).catch(err => {
-          console.error('Body update failed:', err);
-          // Non-critical - don't show toast to avoid spam
+          logger.error('Body update failed:', err);
         });
       }
     } catch (error) {
-      console.error('Error awarding check-in:', error);
+      logger.error('Error awarding check-in:', error);
     }
   };
 
@@ -185,10 +184,10 @@ export const useXPRewards = () => {
         updateSoulFromStreak({
           companionId,
           streakDays: milestone,
-        }).catch(err => console.error('Soul streak update failed:', err));
+        }).catch(err => logger.error('Soul streak update failed:', err));
       }
     } catch (error) {
-      console.error('Error awarding streak milestone:', error);
+      logger.error('Error awarding streak milestone:', error);
     }
   };
 
@@ -206,11 +205,11 @@ export const useXPRewards = () => {
       const companionId = companion.id;
       if (companionId) {
         updateSoulFromReflection(companionId).catch(err => 
-          console.error('Soul update failed:', err)
+          logger.error('Soul update failed:', err)
         );
       }
     } catch (error) {
-      console.error('Error awarding reflection:', error);
+      logger.error('Error awarding reflection:', error);
     }
   };
 
@@ -226,11 +225,11 @@ export const useXPRewards = () => {
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
     // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
-      console.warn('Cannot award XP: companion not loaded yet');
+      logger.warn('Cannot award XP: companion not loaded yet');
       return;
     }
     if (awardXP.isPending) {
-      console.warn('Cannot award XP: previous award still in progress');
+      logger.warn('Cannot award XP: previous award still in progress');
       return;
     }
     if (displayReason) {

@@ -6,6 +6,7 @@
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 /**
  * Check if native push notifications are supported
@@ -14,7 +15,7 @@ export function isNativePushSupported(): boolean {
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
   } catch (error) {
-    console.debug('Native push not available:', error);
+    logger.info('Native push not available:', error);
     return false;
   }
 }
@@ -24,7 +25,7 @@ export function isNativePushSupported(): boolean {
  */
 export async function initializeNativePush(userId: string): Promise<void> {
   if (!isNativePushSupported()) {
-    console.debug('Native push not supported on this platform');
+    logger.info('Native push not supported on this platform');
     return;
   }
 
@@ -33,7 +34,7 @@ export async function initializeNativePush(userId: string): Promise<void> {
     const permission = await PushNotifications.requestPermissions();
     
     if (permission.receive !== 'granted') {
-      console.log('Push notification permission denied');
+      logger.log('Push notification permission denied');
       return;
     }
 
@@ -42,7 +43,7 @@ export async function initializeNativePush(userId: string): Promise<void> {
 
     // Listen for registration success
     await PushNotifications.addListener('registration', async (token) => {
-      console.log('Push registration success, token:', token.value);
+      logger.log('Push registration success, token:', token.value);
       
       // Save device token to database
       await saveDeviceToken(userId, token.value);
@@ -50,18 +51,18 @@ export async function initializeNativePush(userId: string): Promise<void> {
 
     // Listen for registration errors
     await PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', error);
+      logger.error('Push registration error:', error);
     });
 
     // Listen for push notifications received
     await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('Push notification received:', notification);
+      logger.log('Push notification received:', notification);
       // Notification is displayed automatically by iOS
     });
 
     // Listen for push notification actions
     await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('Push notification action performed:', notification);
+      logger.log('Push notification action performed:', notification);
       // Handle notification tap - navigate to appropriate screen
       const data = notification.notification.data;
       if (data?.url) {
@@ -70,7 +71,7 @@ export async function initializeNativePush(userId: string): Promise<void> {
     });
 
   } catch (error) {
-    console.error('Error initializing native push:', error);
+    logger.error('Error initializing native push:', error);
     throw error;
   }
 }
@@ -92,13 +93,13 @@ async function saveDeviceToken(userId: string, deviceToken: string): Promise<voi
       });
 
     if (error) {
-      console.error('Error saving device token:', error);
+      logger.error('Error saving device token:', error);
       throw error;
     }
 
-    console.log('Device token saved successfully');
+    logger.log('Device token saved successfully');
   } catch (error) {
-    console.error('Error saving device token:', error);
+    logger.error('Error saving device token:', error);
     throw error;
   }
 }
@@ -117,7 +118,7 @@ export async function unregisterNativePush(userId: string): Promise<void> {
     
     // Get current device token before unregistering
     const deliveredNotifications = await PushNotifications.getDeliveredNotifications();
-    console.log('Delivered notifications:', deliveredNotifications);
+    logger.log('Delivered notifications:', deliveredNotifications);
 
     // Delete device token from database
     const { error } = await supabase
@@ -127,11 +128,11 @@ export async function unregisterNativePush(userId: string): Promise<void> {
       .eq('platform', 'ios');
 
     if (error) {
-      console.error('Error deleting device token:', error);
+      logger.error('Error deleting device token:', error);
     }
 
   } catch (error) {
-    console.error('Error unregistering from push:', error);
+    logger.error('Error unregistering from push:', error);
     throw error;
   }
 }
@@ -151,7 +152,7 @@ export async function hasActiveNativePushSubscription(userId: string): Promise<b
     if (error) throw error;
     return (data?.length || 0) > 0;
   } catch (error) {
-    console.error('Error checking native push subscription:', error);
+    logger.error('Error checking native push subscription:', error);
     return false;
   }
 }
