@@ -78,12 +78,12 @@ export const StarfieldBackground = () => {
         />
       ))}
 
-      {/* Occasional shooting star */}
+      {/* Rare shooting star */}
       {!prefersReducedMotion && (
         <div
           className="absolute w-[2px] h-[2px] bg-white rounded-full"
           style={{
-            animation: 'shooting-star 3s ease-out 5s infinite',
+            animation: 'shooting-star 2s ease-out 45s infinite',
             boxShadow: '0 0 4px 2px rgba(255, 255, 255, 0.8)',
           }}
         />
