@@ -4,11 +4,12 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, CheckCircle2, XCircle, Star, Calendar } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
 
 const placementIcons = {
   sun: Sun,
@@ -39,21 +40,47 @@ interface CosmiqContent {
   in_wellness: string;
   compatible_signs: string[];
   daily_practice: string;
+  chart_synergy?: string;
+  todays_focus?: string;
 }
 
 const CosmiqDeepDive = () => {
   const { placement, sign } = useParams<{ placement: string; sign: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [content, setContent] = useState<CosmiqContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
+  const [isPersonalized, setIsPersonalized] = useState(false);
 
   useEffect(() => {
     const fetchContent = async () => {
       if (!placement || !sign) return;
+      setLoading(true);
 
       try {
+        // If user is logged in, try to get personalized content
+        if (user) {
+          const { data: personalizedData, error: personalizedError } = await supabase.functions.invoke(
+            'generate-cosmic-deep-dive',
+            { body: { placement: placement.toLowerCase(), sign: sign.toLowerCase() } }
+          );
+
+          if (!personalizedError && personalizedData && !personalizedData.error) {
+            setContent(personalizedData);
+            setIsPersonalized(true);
+            setLoading(false);
+            return;
+          }
+
+          // Log error but fall back to static content
+          if (personalizedError || personalizedData?.error) {
+            console.log('Falling back to static content:', personalizedError || personalizedData?.error);
+          }
+        }
+
+        // Fall back to static content from zodiac_sign_content
         const { data, error } = await supabase
           .from('zodiac_sign_content')
           .select('*')
@@ -72,6 +99,7 @@ const CosmiqDeepDive = () => {
         }
 
         setContent(data);
+        setIsPersonalized(false);
       } catch (error) {
         console.error('Error fetching cosmiq content:', error);
         toast({
@@ -85,7 +113,7 @@ const CosmiqDeepDive = () => {
     };
 
     fetchContent();
-  }, [placement, sign, toast]);
+  }, [placement, sign, toast, user]);
 
   if (!placement || !sign) {
     return <div>Invalid placement or sign</div>;
@@ -147,11 +175,21 @@ const CosmiqDeepDive = () => {
               <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center border border-royal-purple/30`}>
                 <Icon className="w-5 h-5 text-pure-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-black text-white capitalize">
-                  {sign} {placementNames[placement]}
-                </h1>
-                <p className="text-sm text-gray-400">Understanding your placement</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black text-white capitalize">
+                    {sign} {placementNames[placement]}
+                  </h1>
+                  {isPersonalized && (
+                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs border-none">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Personalized
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-gray-400">
+                  {isPersonalized ? "Generated for your unique chart" : "Understanding your placement"}
+                </p>
               </div>
             </div>
           </motion.div>
@@ -162,6 +200,9 @@ const CosmiqDeepDive = () => {
             <Skeleton className="h-32 w-full bg-gray-800/50" />
             <Skeleton className="h-48 w-full bg-gray-800/50" />
             <Skeleton className="h-48 w-full bg-gray-800/50" />
+            <p className="text-center text-gray-400 text-sm animate-pulse">
+              ✨ Generating your personalized cosmic insights...
+            </p>
           </div>
         ) : content ? (
           <>
@@ -178,6 +219,47 @@ const CosmiqDeepDive = () => {
                 </div>
               </Card>
             </motion.div>
+
+            {/* Today's Focus - Only for personalized content */}
+            {isPersonalized && content.todays_focus && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <Card className="bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-pink-600/30 border-purple-500/40 p-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-purple-300" />
+                      <h3 className="text-lg font-bold text-purple-200">Today's Focus</h3>
+                      <Badge className="bg-purple-500/20 text-purple-200 text-xs border-purple-500/30">
+                        {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-100 leading-relaxed">{content.todays_focus}</p>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Chart Synergy - Only for personalized content */}
+            {isPersonalized && content.chart_synergy && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 }}
+              >
+                <Card className="bg-gradient-to-br from-violet-950/50 to-fuchsia-950/50 border-violet-500/30 p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-5 h-5 text-violet-300" />
+                      <h3 className="text-lg font-bold text-violet-200">In Your Chart</h3>
+                    </div>
+                    <p className="text-gray-200 leading-relaxed">{content.chart_synergy}</p>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
 
             {/* What is this placement? */}
             <motion.div
@@ -319,7 +401,9 @@ const CosmiqDeepDive = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold text-white">Does this resonate with you?</h3>
                   <p className="text-gray-300 text-sm">
-                    Astrology is a tool for self-reflection, not a rigid definition. How well does this description match your experience?
+                    {isPersonalized 
+                      ? "This reading was generated specifically for your chart. How well does it match your experience?"
+                      : "Astrology is a tool for self-reflection, not a rigid definition. How well does this description match your experience?"}
                   </p>
                   <div className="flex gap-3">
                     <Button
