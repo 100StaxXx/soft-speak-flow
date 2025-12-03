@@ -29,9 +29,8 @@
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogContext {
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LogContext = Record<string, any>;
 
 interface LogEntry {
   level: LogLevel;

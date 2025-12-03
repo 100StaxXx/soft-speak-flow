@@ -2465,6 +2465,7 @@ export type Database = {
           subscription_status: string | null
           timezone: string | null
           trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string | null
           venus_sign: string | null
           zodiac_sign: string | null
@@ -2511,6 +2512,7 @@ export type Database = {
           subscription_status?: string | null
           timezone?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string | null
           venus_sign?: string | null
           zodiac_sign?: string | null
@@ -2557,6 +2559,7 @@ export type Database = {
           subscription_status?: string | null
           timezone?: string | null
           trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string | null
           venus_sign?: string | null
           zodiac_sign?: string | null
