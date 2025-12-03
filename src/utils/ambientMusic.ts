@@ -114,6 +114,10 @@ class AmbientMusicManager {
       }
       if (this.globalMuteHandler) {
         window.removeEventListener('global-audio-mute-change', this.globalMuteHandler);
+        // Also remove from iOS-specific event if on iOS
+        if (isIOS) {
+          window.removeEventListener('ios-audio-mute-change', this.globalMuteHandler);
+        }
         this.globalMuteHandler = null;
       }
     }
@@ -243,14 +247,15 @@ class AmbientMusicManager {
       
       // iOS-specific: listen for iOS audio manager mute changes
       if (isIOS) {
-        window.addEventListener('ios-audio-mute-change', (e: Event) => {
+        this.globalMuteHandler = (e: Event) => {
           const customEvent = e as CustomEvent<boolean>;
           if (customEvent.detail) {
             this.mute();
           } else {
             this.unmute();
           }
-        });
+        };
+        window.addEventListener('ios-audio-mute-change', this.globalMuteHandler);
       }
     }
 
