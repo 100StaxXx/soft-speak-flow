@@ -2,7 +2,7 @@ import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowRight
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface TaskCardProps {
   task: {
@@ -35,6 +35,7 @@ export const TaskCard = ({
 }: TaskCardProps) => {
   const [showXP, setShowXP] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const isInitialMount = useRef(true);
 
   const difficultyColors = {
     easy: "text-green-500",
@@ -73,6 +74,12 @@ export const TaskCard = ({
   };
 
   useEffect(() => {
+    // Skip XP animation on initial mount (for already-completed tasks)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
     if (task.completed && !justCompleted) {
       setJustCompleted(true);
       setShowXP(true);

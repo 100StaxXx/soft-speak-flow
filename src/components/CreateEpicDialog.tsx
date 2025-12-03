@@ -98,7 +98,7 @@ export const CreateEpicDialog = ({
       setTargetDays(template.target_days);
       setThemeColor(template.theme_color as EpicTheme || 'heroic');
       
-      // Convert template habits to NewHabit format
+      // Convert template habits to NewHabit format (max 2 habits per epic)
       const templateHabits: NewHabit[] = template.habits.slice(0, 2).map(h => ({
         title: h.title,
         difficulty: h.difficulty as "easy" | "medium" | "hard",
@@ -106,6 +106,11 @@ export const CreateEpicDialog = ({
         custom_days: h.frequency === 'daily' ? [] : [0, 1, 2, 3, 4, 5, 6],
       }));
       setNewHabits(templateHabits);
+      
+      // Warn if template had more habits than allowed
+      if (template.habits.length > 2) {
+        console.info(`Template "${template.name}" has ${template.habits.length} habits, truncated to 2`);
+      }
     }
   }, [template, open]);
 

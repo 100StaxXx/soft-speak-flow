@@ -50,10 +50,32 @@ const JoinEpic = () => {
     enabled: !!code,
   });
 
+  const MAX_EPICS = 2;
+
   // Join epic mutation
   const joinEpic = useMutation({
     mutationFn: async () => {
       if (!user || !epic) throw new Error("Not authenticated or epic not found");
+
+      // Check epic limit (owned + joined)
+      const { data: ownedEpics } = await supabase
+        .from('epics')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      
+      const { data: joinedEpics } = await supabase
+        .from('epic_members')
+        .select('epic_id, epics!inner(user_id, status)')
+        .eq('user_id', user.id)
+        .neq('epics.user_id', user.id)
+        .eq('epics.status', 'active');
+
+      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
+      
+      if (totalActiveEpics >= MAX_EPICS) {
+        throw new Error(`You can only have ${MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.`);
+      }
 
       // Check if already a member
       const { data: existingMember } = await supabase

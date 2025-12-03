@@ -156,8 +156,8 @@ export const useDailyTasks = (selectedDate?: Date) => {
 
         if (error) {
           addInProgress.current = false; // Reset on error
-          if (error.message && error.message.includes('MAX_TASKS_REACHED')) {
-            throw new Error('Maximum 4 tasks per day');
+          if (error.message && (error.message.includes('MAX_TASKS_REACHED') || error.message.includes('Maximum quest limit'))) {
+            throw new Error('Maximum quest limit reached for today');
           }
           throw error;
         }

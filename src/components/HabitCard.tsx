@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HabitCardProps {
   id: string;
@@ -40,6 +41,7 @@ export const HabitCard = memo(({
   onComplete,
 }: HabitCardProps) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [showActions, setShowActions] = useState(false);
 
   const handleArchive = useCallback(async () => {
@@ -48,12 +50,18 @@ export const HabitCard = memo(({
       return;
     }
 
+    if (!user?.id) {
+      toast.error("Please sign in to archive habits");
+      return;
+    }
+
     try {
-      // Add user_id check for security (even though RLS handles this)
+      // Explicit user_id check for defense-in-depth (RLS also enforces this)
       const { error } = await supabase
         .from('habits')
         .update({ is_active: false })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       
       if (error) {
         console.error('Failed to archive habit:', error);
@@ -67,7 +75,7 @@ export const HabitCard = memo(({
       console.error('Unexpected error archiving habit:', error);
       toast.error("An unexpected error occurred. Please try again.");
     }
-  }, [id, queryClient]);
+  }, [id, user?.id, queryClient]);
 
   const getStreakTier = useCallback(() => {
     if (currentStreak === 0) return { color: "text-muted-foreground", message: "Start your streak today", badge: null };
