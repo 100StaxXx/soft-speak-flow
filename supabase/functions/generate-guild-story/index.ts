@@ -29,15 +29,38 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
 
-    const { epicId, userId } = await req.json();
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    // Verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser) {
+      console.error('Authentication failed:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
+    const { epicId } = await req.json();
+    const userId = authUser.id; // Use authenticated user ID, not from request body
 
     if (!epicId) {
       throw new Error("epicId is required");
     }
 
-    console.log("Generating guild story for epic:", epicId);
+    console.log("Generating guild story for epic:", epicId, "by user:", userId);
 
     // Verify user is a member of this epic
     const { data: membership } = await supabase
@@ -89,7 +112,7 @@ serve(async (req) => {
       .from('epic_members')
       .select(`
         user_id,
-        profiles!inner(display_name)
+        profiles!inner(email)
       `)
       .eq('epic_id', epicId);
 
@@ -112,19 +135,24 @@ serve(async (req) => {
     const companionData: CompanionData[] = [];
     const membersWithoutCompanions: string[] = [];
 
+    // Helper to get display name from email
+    const getDisplayName = (email: string | null): string => {
+      if (!email) return 'Adventurer';
+      return email.split('@')[0];
+    };
+
     for (const member of members) {
       const companion = companions.find(c => c.user_id === member.user_id);
+      const memberEmail = (member.profiles as { email: string | null })?.email;
       
       if (!companion) {
-        membersWithoutCompanions.push(
-          (member.profiles as any)?.display_name || 'Unknown'
-        );
+        membersWithoutCompanions.push(getDisplayName(memberEmail));
         continue;
       }
       
       companionData.push({
         user_id: companion.user_id,
-        user_name: (member.profiles as any)?.display_name || 'Adventurer',
+        user_name: getDisplayName(memberEmail),
         spirit_animal: companion.spirit_animal || 'Unknown',
         core_element: companion.core_element || 'None',
         mind: companion.mind || 0,

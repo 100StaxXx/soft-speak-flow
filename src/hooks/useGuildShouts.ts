@@ -62,6 +62,11 @@ export const useGuildShouts = (epicId?: string) => {
     }) => {
       if (!user || !epicId) throw new Error("Not authenticated or no epic");
 
+      // Prevent sending shouts to yourself
+      if (recipientId === user.id) {
+        throw new Error("You cannot send a shout to yourself");
+      }
+
       const { data, error } = await supabase
         .from("guild_shouts")
         .insert({

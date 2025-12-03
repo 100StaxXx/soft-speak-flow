@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useCallback } from "react";
 
 export interface CompanionPostcard {
   id: string;
@@ -87,41 +88,45 @@ export const useCompanionPostcards = () => {
     },
   });
 
-  const checkAndGeneratePostcard = async (
-    epicId: string,
-    currentProgress: number,
-    previousProgress: number,
-    companionId: string,
-    companionData: {
-      spirit_animal?: string;
-      favorite_color?: string;
-      core_element?: string;
-      eye_color?: string;
-      fur_color?: string;
-    }
-  ) => {
-    const milestones = [25, 50, 75, 100];
-    
-    for (const milestone of milestones) {
-      // Check if we just crossed this milestone
-      if (previousProgress < milestone && currentProgress >= milestone) {
-        // Check if postcard already exists
-        const existingPostcard = postcards?.find(
-          p => p.epic_id === epicId && p.milestone_percent === milestone
-        );
-        
-        if (!existingPostcard) {
-          generatePostcard.mutate({
-            companionId,
-            epicId,
-            milestonePercent: milestone,
-            companionData,
-          });
-          break; // Only generate one at a time
+  const checkAndGeneratePostcard = useCallback(
+    async (
+      epicId: string,
+      currentProgress: number,
+      previousProgress: number,
+      companionId: string,
+      companionData: {
+        spirit_animal?: string;
+        favorite_color?: string;
+        core_element?: string;
+        eye_color?: string;
+        fur_color?: string;
+      }
+    ) => {
+      const milestones = [25, 50, 75, 100];
+      
+      for (const milestone of milestones) {
+        // Check if we just crossed this milestone
+        if (previousProgress < milestone && currentProgress >= milestone) {
+          // Check if postcard already exists in cached data
+          // Note: Server-side also checks for duplicates as a safety net
+          const existingPostcard = postcards?.find(
+            p => p.epic_id === epicId && p.milestone_percent === milestone
+          );
+          
+          if (!existingPostcard) {
+            generatePostcard.mutate({
+              companionId,
+              epicId,
+              milestonePercent: milestone,
+              companionData,
+            });
+            break; // Only generate one at a time
+          }
         }
       }
-    }
-  };
+    },
+    [postcards, generatePostcard]
+  );
 
   return {
     postcards: postcards || [],

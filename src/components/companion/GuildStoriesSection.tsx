@@ -87,34 +87,37 @@ export const GuildStoriesSection = () => {
 
       if (allEpicIds.size === 0) return [];
 
-      // Fetch stories and member counts for all epics
-      const results: EpicWithStories[] = [];
+      // Fetch stories and member counts for all epics in parallel
+      const epicIdsArray = Array.from(allEpicIds);
+      
+      const results = await Promise.all(
+        epicIdsArray.map(async (epicId) => {
+          const epic = epicMap.get(epicId);
+          if (!epic) return null;
 
-      for (const epicId of allEpicIds) {
-        const epic = epicMap.get(epicId);
-        if (!epic) continue;
+          const [{ data: stories }, { count: memberCount }] = await Promise.all([
+            supabase
+              .from("guild_stories")
+              .select("*")
+              .eq("epic_id", epicId)
+              .order("chapter_number", { ascending: true }),
+            supabase
+              .from("epic_members")
+              .select("*", { count: "exact", head: true })
+              .eq("epic_id", epicId),
+          ]);
 
-        const [{ data: stories }, { count: memberCount }] = await Promise.all([
-          supabase
-            .from("guild_stories")
-            .select("*")
-            .eq("epic_id", epicId)
-            .order("chapter_number", { ascending: true }),
-          supabase
-            .from("epic_members")
-            .select("*", { count: "exact", head: true })
-            .eq("epic_id", epicId),
-        ]);
+          return {
+            id: epic.id,
+            title: epic.title,
+            memberCount: memberCount || 0,
+            stories: (stories || []) as GuildStory[],
+          };
+        })
+      );
 
-        results.push({
-          id: epic.id,
-          title: epic.title,
-          memberCount: memberCount || 0,
-          stories: (stories || []) as GuildStory[],
-        });
-      }
-
-      return results;
+      // Filter out null results
+      return results.filter((r): r is EpicWithStories => r !== null);
     },
     enabled: !!user?.id,
   });
@@ -129,7 +132,7 @@ export const GuildStoriesSection = () => {
       const { data, error } = await supabase.functions.invoke(
         "generate-guild-story",
         {
-          body: { epicId, userId: user.id },
+          body: { epicId }, // userId is derived from JWT on server
         }
       );
 

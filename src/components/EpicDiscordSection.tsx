@@ -92,7 +92,7 @@ export const EpicDiscordSection = ({ epic, memberCount }: EpicDiscordSectionProp
     );
   }
 
-  // State 3: Channel created (all members)
+  // State 3: Channel created with invite URL (all members)
   if (epic.discord_channel_id && epic.discord_invite_url) {
     return (
       <div className="flex items-center justify-between py-2">
@@ -109,6 +109,16 @@ export const EpicDiscordSection = ({ epic, memberCount }: EpicDiscordSectionProp
           <span>Open Chat</span>
           <ExternalLink className="w-3 h-3 ml-1" />
         </Button>
+      </div>
+    );
+  }
+
+  // State 3b: Channel created but invite URL missing (fallback)
+  if (epic.discord_channel_id && !epic.discord_invite_url) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+        <MessageSquare className="w-3 h-3 text-yellow-500" />
+        <span>Discord channel created - Join link unavailable. Check the Discord server directly.</span>
       </div>
     );
   }
