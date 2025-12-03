@@ -239,9 +239,9 @@ class IOSAudioStateManager {
   registerAudio(audio: HTMLAudioElement) {
     this.audioElements.add(audio);
     
-    // Apply current mute state
+    // Apply current mute state using muted property (proper iOS support)
     if (this.isMuted) {
-      audio.volume = 0;
+      audio.muted = true;
     }
   }
   
@@ -284,12 +284,9 @@ class IOSAudioStateManager {
     this.isMuted = muted;
     this.saveState();
     
-    // Apply to all registered audio elements
+    // Apply to all registered audio elements using muted property (proper iOS support)
     for (const audio of this.audioElements) {
-      if (muted) {
-        audio.volume = 0;
-      }
-      // Note: We don't restore volume here - that's handled by each audio manager
+      audio.muted = muted;
     }
     
     // Notify listeners

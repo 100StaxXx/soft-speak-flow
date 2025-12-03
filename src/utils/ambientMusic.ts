@@ -60,23 +60,27 @@ class AmbientMusicManager {
   // Handle global mute state changes
   private handleGlobalMuteChange(muted: boolean) {
     this.isGloballyMuted = muted;
-    if (muted) {
-      // Global mute turned on - mute the ambient music immediately
-      if (this.audio && !this.isMuted) {
-        // Clear any active fades first
-        if (this.fadeInterval) {
-          clearInterval(this.fadeInterval);
-          this.fadeInterval = null;
+    if (this.audio) {
+      // Use muted property for proper iOS support
+      this.audio.muted = muted || this.isMuted;
+      
+      if (muted) {
+        // Global mute turned on - mute the ambient music immediately
+        if (!this.isMuted) {
+          // Clear any active fades first
+          if (this.fadeInterval) {
+            clearInterval(this.fadeInterval);
+            this.fadeInterval = null;
+          }
         }
-        this.audio.volume = 0;
-      }
-    } else {
-      // Global mute turned off - restore ambient music if not locally muted
-      if (this.audio && !this.isMuted && this.isPlaying) {
-        // Restore volume immediately
-        this.audio.volume = this.isDucked ? this.volume * 0.15 : this.volume;
-      } else if (!this.isMuted && !this.isPlaying) {
-        this.play();
+      } else {
+        // Global mute turned off - restore ambient music if not locally muted
+        if (!this.isMuted && this.isPlaying) {
+          // Restore volume immediately (muted property already set above)
+          this.audio.volume = this.isDucked ? this.volume * 0.15 : this.volume;
+        } else if (!this.isMuted && !this.isPlaying) {
+          this.play();
+        }
       }
     }
   }
@@ -178,7 +182,8 @@ class AmbientMusicManager {
     // Use iOS-optimized audio element
     this.audio = createIOSOptimizedAudio();
     this.audio.loop = true;
-    this.audio.volume = this.isMuted ? 0 : this.volume;
+    this.audio.volume = this.volume;
+    this.audio.muted = this.isMuted || this.isGloballyMuted; // Use muted property for proper iOS support
     this.audio.preload = 'auto';
     
     // Register with iOS audio manager for coordinated control
@@ -331,8 +336,8 @@ class AmbientMusicManager {
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
       }
-      // Mute immediately instead of fading
-      this.audio.volume = 0;
+      // Use muted property for proper iOS support
+      this.audio.muted = this.isMuted || this.isGloballyMuted;
     }
     this.isMuting = false;
   }
@@ -352,6 +357,11 @@ class AmbientMusicManager {
     if (this.wasDuckedBeforeMute) {
       this.isDucked = true;
       this.wasDuckedBeforeMute = false;
+    }
+    
+    if (this.audio) {
+      // Update muted property (respects global mute state)
+      this.audio.muted = this.isMuted || this.isGloballyMuted;
     }
     
     if (!this.isPlaying) {
@@ -395,6 +405,8 @@ class AmbientMusicManager {
 
     if (!this.shouldMute()) {
       this.isStopped = false;
+      // Ensure audio is not muted for fade-in to work
+      this.audio.muted = false;
       this.audio.volume = 0;
       
       // Clear any existing play timeout
@@ -476,6 +488,8 @@ class AmbientMusicManager {
     this.isStopped = false; // Clear stopped flag when resuming from event
     
     if (!this.shouldMute()) {
+      // Ensure audio is not muted for fade-in to work
+      this.audio.muted = false;
       this.audio.volume = 0;
       
       // Set timeout for resume
