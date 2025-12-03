@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Swords, CheckCircle2 } from "lucide-react";
+import { Swords, CheckCircle2, Sparkles } from "lucide-react";
 
 interface QuestsTutorialModalProps {
   open: boolean;
@@ -55,6 +55,12 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
                   Create Epics for long-term goals
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-foreground">
+                  Browse Star Paths for curated habit journeys
                 </p>
               </div>
             </div>
