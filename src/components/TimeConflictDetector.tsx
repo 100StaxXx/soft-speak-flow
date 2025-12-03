@@ -22,13 +22,6 @@ interface Conflict {
 }
 
 export const TimeConflictDetector = ({ tasks, className }: TimeConflictDetectorProps) => {
-  const toReferenceTime = (time: string) => {
-    const [hours, minutes = "0"] = time.split(":");
-    const h = Number(hours) || 0;
-    const m = Number(minutes) || 0;
-    return new Date(2000, 0, 1, h, m, 0, 0);
-  };
-
   const detectConflicts = (): Conflict[] => {
     const conflicts: Conflict[] = [];
     const scheduledTasks = tasks.filter(t => t.scheduled_time && t.estimated_duration);
