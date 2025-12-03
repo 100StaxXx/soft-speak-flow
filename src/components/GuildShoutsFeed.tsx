@@ -43,7 +43,8 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
         return () => clearTimeout(timer);
       }
     }
-  }, [shouts, unreadCount, user?.id]);
+    // Note: markAsRead.mutate is a stable reference from useMutation, safe to include
+  }, [shouts, unreadCount, user?.id, markAsRead]);
 
   if (isLoading) {
     return (

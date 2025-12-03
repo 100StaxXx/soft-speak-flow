@@ -58,7 +58,7 @@ export const useGuildStories = (epicId?: string) => {
       const { data, error } = await supabase.functions.invoke(
         "generate-guild-story",
         {
-          body: { epicId, userId: user.id },
+          body: { epicId }, // userId is derived from JWT on server
         }
       );
 

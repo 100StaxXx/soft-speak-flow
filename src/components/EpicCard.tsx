@@ -83,7 +83,10 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
-  const previousProgressRef = useRef<number>(epic.progress_percentage);
+  // Initialize to -1 on first render to catch any milestones that may have been
+  // crossed before this component mounted. Server handles duplicate prevention.
+  const previousProgressRef = useRef<number>(-1);
+  const hasInitializedRef = useRef<boolean>(false);
   
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -101,7 +104,32 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     const currentProgress = epic.progress_percentage;
     const previousProgress = previousProgressRef.current;
     
-    // Only check if progress increased
+    // On first render, set the baseline for future comparisons
+    // This allows catching milestones crossed during initial load
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      // Check from 0 to current progress on first load to catch any missed milestones
+      // The server-side duplicate check will prevent regenerating existing postcards
+      if (currentProgress > 0) {
+        checkAndGeneratePostcard(
+          epic.id,
+          currentProgress,
+          0, // Start from 0 on first render
+          companion.id,
+          {
+            spirit_animal: companion.spirit_animal,
+            favorite_color: companion.favorite_color,
+            core_element: companion.core_element,
+            eye_color: companion.eye_color,
+            fur_color: companion.fur_color,
+          }
+        );
+      }
+      previousProgressRef.current = currentProgress;
+      return;
+    }
+    
+    // Only check if progress increased on subsequent renders
     if (currentProgress > previousProgress) {
       checkAndGeneratePostcard(
         epic.id,

@@ -55,21 +55,29 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
         return;
       }
 
-      // Fetch profiles and companions
-      const enrichedMembers = await Promise.all(
-        membersData.map(async (member) => {
-          const [profileRes, companionRes] = await Promise.all([
-            supabase.from("profiles").select("email").eq("id", member.user_id).single(),
-            supabase.from("user_companion").select("current_image_url, spirit_animal").eq("user_id", member.user_id).single(),
-          ]);
+      // Extract all user IDs for batch queries (avoid N+1 problem)
+      const userIds = membersData.map(m => m.user_id);
 
-          return {
-            ...member,
-            profile: profileRes.data || undefined,
-            companion: companionRes.data || undefined,
-          };
-        })
+      // Batch fetch profiles and companions in parallel
+      const [profilesRes, companionsRes] = await Promise.all([
+        supabase.from("profiles").select("id, email").in("id", userIds),
+        supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
+      ]);
+
+      // Create lookup maps for O(1) access
+      const profilesMap = new Map(
+        (profilesRes.data || []).map(p => [p.id, { email: p.email }])
       );
+      const companionsMap = new Map(
+        (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
+      );
+
+      // Enrich members with profile and companion data
+      const enrichedMembers = membersData.map(member => ({
+        ...member,
+        profile: profilesMap.get(member.user_id),
+        companion: companionsMap.get(member.user_id),
+      }));
 
       setMembers(enrichedMembers);
       setIsLoading(false);

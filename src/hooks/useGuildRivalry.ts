@@ -45,6 +45,11 @@ export const useGuildRivalry = (epicId?: string) => {
     mutationFn: async (rivalId: string) => {
       if (!user || !epicId) throw new Error("Not authenticated or no epic");
 
+      // Prevent self-rivalry
+      if (rivalId === user.id) {
+        throw new Error("You cannot set yourself as a rival");
+      }
+
       // Upsert rivalry (replace if exists)
       const { data, error } = await supabase
         .from("guild_rivalries")

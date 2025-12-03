@@ -61,14 +61,20 @@ export const ConstellationTrail = ({
   const milestones = useMemo(() => [0, 25, 50, 75, 100], []);
   const starPositions = useMemo(() => generateStarPositions(5), []);
   
-  // Background stars for ambiance
+  // Background stars for ambiance - use seeded pseudo-random for consistency
   const bgStars = useMemo(() => {
+    // Simple seeded random function for consistent star positions across renders
+    const seededRandom = (seed: number) => {
+      const x = Math.sin(seed * 9999) * 10000;
+      return x - Math.floor(x);
+    };
+    
     return Array.from({ length: 20 }, (_, i) => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: 1 + Math.random() * 2,
-      delay: Math.random() * 3,
-      duration: 2 + Math.random() * 2,
+      x: seededRandom(i * 1) * 100,
+      y: seededRandom(i * 2 + 0.5) * 100,
+      size: 1 + seededRandom(i * 3 + 0.7) * 2,
+      delay: seededRandom(i * 4 + 0.3) * 3,
+      duration: 2 + seededRandom(i * 5 + 0.9) * 2,
     }));
   }, []);
 

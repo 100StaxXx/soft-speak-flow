@@ -69,6 +69,7 @@ export const useEpics = () => {
       description?: string;
       target_days: number;
       is_public?: boolean;
+      theme_color?: string;
       habits: Array<{
         title: string;
         difficulty: string;
@@ -130,6 +131,7 @@ export const useEpics = () => {
             is_public: true,
             xp_reward: Math.floor(epicData.target_days * 10),
             invite_code: inviteCode,
+            theme_color: epicData.theme_color || 'heroic',
           })
           .select()
           .single();

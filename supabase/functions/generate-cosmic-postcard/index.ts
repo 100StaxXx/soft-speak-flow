@@ -98,7 +98,7 @@ Aspect ratio: 4:3 landscape orientation. High detail, cinematic lighting.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.5-flash-image",
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"]
       })
@@ -124,10 +124,39 @@ Aspect ratio: 4:3 landscape orientation. High detail, cinematic lighting.`;
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const rawImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!rawImageUrl) {
       throw new Error("Failed to generate image - no image URL in response");
+    }
+
+    // Upload image to Supabase Storage for permanent storage
+    let permanentImageUrl = rawImageUrl;
+    try {
+      // Check if it's a base64 data URL
+      if (rawImageUrl.startsWith('data:image')) {
+        const base64Data = rawImageUrl.split(',')[1];
+        const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        const filePath = `postcards/${userId}/postcard_${epicId}_${milestonePercent}_${Date.now()}.png`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('mentors-avatars')
+          .upload(filePath, binaryData, { contentType: 'image/png', upsert: false });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          // Fall back to raw URL if upload fails
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('mentors-avatars')
+            .getPublicUrl(filePath);
+          permanentImageUrl = publicUrl;
+          console.log('Postcard image uploaded to storage:', permanentImageUrl);
+        }
+      }
+    } catch (uploadErr) {
+      console.error('Error uploading postcard image:', uploadErr);
+      // Continue with raw URL as fallback
     }
 
     // Generate a caption
@@ -143,7 +172,7 @@ Aspect ratio: 4:3 landscape orientation. High detail, cinematic lighting.`;
         milestone_percent: milestonePercent,
         location_name: location.name,
         location_description: location.description,
-        image_url: imageUrl,
+        image_url: permanentImageUrl,
         caption: caption,
       })
       .select()
