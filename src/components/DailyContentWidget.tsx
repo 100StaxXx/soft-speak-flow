@@ -60,6 +60,9 @@ export const DailyContentWidget = () => {
           .maybeSingle()
       ]);
 
+      // Extract quote from the daily_quotes join result
+      const quoteData = quoteResult.data?.quotes;
+      
       setContent({
         pepTalk: pepTalkResult.data ? {
           id: pepTalkResult.data.id,
@@ -67,7 +70,11 @@ export const DailyContentWidget = () => {
           summary: pepTalkResult.data.summary,
           audio_url: pepTalkResult.data.audio_url
         } : null,
-        quote: null, // Simplified - quote fetching disabled for now
+        quote: quoteData ? {
+          text: quoteData.text,
+          author: quoteData.author || 'Unknown',
+          category: quoteData.category
+        } : null,
       });
       setLoading(false);
     };

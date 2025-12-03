@@ -48,9 +48,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
     const { type, value, includeImage = false } = await req.json() as QuoteRequest;
 
     console.log('Getting single quote for:', { type, value, includeImage });

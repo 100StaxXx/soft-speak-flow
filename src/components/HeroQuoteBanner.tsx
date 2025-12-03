@@ -62,15 +62,23 @@ export const HeroQuoteBanner = memo(() => {
 
       if (dailyPepTalk) {
         // Fetch a quote that matches the pep talk's themes
-        const { data: quote } = await supabase
-          .from("quotes")
-          .select("*")
-          .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (quote) {
-          setTodaysQuote(quote);
+        // Build the query safely - first try matching by category, then fall back
+        let quoteQuery = supabase.from("quotes").select("*");
+        
+        if (dailyPepTalk.topic_category) {
+          quoteQuery = quoteQuery.eq("category", dailyPepTalk.topic_category);
+        }
+        
+        const { data: quotes } = await quoteQuery.limit(10);
+        
+        if (quotes && quotes.length > 0) {
+          // If we have emotional triggers, try to find a matching quote
+          const triggers = dailyPepTalk.emotional_triggers || [];
+          const matchingQuote = quotes.find(q => 
+            q.emotional_triggers?.some((t: string) => triggers.includes(t))
+          ) || quotes[0];
+          
+          setTodaysQuote(matchingQuote);
         }
       }
       

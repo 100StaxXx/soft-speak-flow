@@ -75,13 +75,6 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
 
   return (
     <div className="relative bg-gradient-to-br from-petal-pink/30 to-lavender-mist/20 rounded-3xl p-6 shadow-soft border border-petal-pink/20">
-      {is_premium && (
-        <div className="absolute top-4 right-4">
-          <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
-            Premium
-          </span>
-        </div>
-      )}
       <button
         onClick={toggleFavorite}
         disabled={loading}
@@ -91,7 +84,12 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
           className={`h-5 w-5 ${isFavorited ? "fill-blush-rose text-blush-rose" : "text-warm-charcoal/40"}`}
         />
       </button>
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        {is_premium && (
+          <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
+            Premium
+          </span>
+        )}
         <ShareButton
           title="Motivational Quote"
           text={`"${text}"${author ? ` - ${author}` : ''}`}
