@@ -249,18 +249,8 @@ class AmbientMusicManager {
       window.addEventListener('bg-music-volume-change', this.volumeChangeHandler);
       window.addEventListener('bg-music-mute-change', this.muteChangeHandler);
       
-      // iOS-specific: listen for iOS audio manager mute changes
-      if (isIOS) {
-        this.globalMuteHandler = (e: Event) => {
-          const customEvent = e as CustomEvent<boolean>;
-          if (customEvent.detail) {
-            this.mute();
-          } else {
-            this.unmute();
-          }
-        };
-        window.addEventListener('ios-audio-mute-change', this.globalMuteHandler);
-      }
+      // iOS global mute is handled by globalAudio.subscribe() -> handleGlobalMuteChange()
+      // No separate iOS event handler needed - it was causing double-handling and localStorage bugs
     }
 
     // Auto-play on user interaction (browser requirement)
