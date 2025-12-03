@@ -61,7 +61,7 @@ export const DailyContentWidget = () => {
       ]);
 
       // Extract quote from the daily_quotes join result
-      const quoteData = quoteResult.data?.quotes;
+      const quoteData = quoteResult.data?.quotes as unknown as { text: string; author: string | null; category: string | null } | null;
       
       setContent({
         pepTalk: pepTalkResult.data ? {
@@ -73,7 +73,7 @@ export const DailyContentWidget = () => {
         quote: quoteData ? {
           text: quoteData.text,
           author: quoteData.author || 'Unknown',
-          category: quoteData.category
+          category: quoteData.category || undefined
         } : null,
       });
       setLoading(false);
