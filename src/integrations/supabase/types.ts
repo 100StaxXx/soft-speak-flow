@@ -3352,79 +3352,115 @@ export type Database = {
           action_insight: string | null
           challenges: string[]
           chart_synergy: string | null
+          comfort_needs: string | null
           compatible_signs: string[]
+          core_identity: string | null
           created_at: string
           daily_practice: string
           emotional_insight: string | null
+          emotional_landscape: string | null
+          emotional_triggers: string[] | null
+          first_impressions: string | null
           for_date: string
+          growth_areas: string[] | null
           id: string
           identity_insight: string | null
           in_relationships: string
           in_wellness: string
           in_work: string
+          intuitive_gifts: string | null
+          life_purpose: string | null
           love_insight: string | null
           mental_insight: string | null
+          natural_strengths: string[] | null
           overview: string
           placement: string
+          presentation_tips: string[] | null
           sign: string
           social_insight: string | null
+          social_superpowers: string | null
           strengths: string[]
           tagline: string
           title: string
           todays_focus: string | null
           user_id: string
+          your_aura: string | null
         }
         Insert: {
           action_insight?: string | null
           challenges?: string[]
           chart_synergy?: string | null
+          comfort_needs?: string | null
           compatible_signs?: string[]
+          core_identity?: string | null
           created_at?: string
           daily_practice: string
           emotional_insight?: string | null
+          emotional_landscape?: string | null
+          emotional_triggers?: string[] | null
+          first_impressions?: string | null
           for_date: string
+          growth_areas?: string[] | null
           id?: string
           identity_insight?: string | null
           in_relationships: string
           in_wellness: string
           in_work: string
+          intuitive_gifts?: string | null
+          life_purpose?: string | null
           love_insight?: string | null
           mental_insight?: string | null
+          natural_strengths?: string[] | null
           overview: string
           placement: string
+          presentation_tips?: string[] | null
           sign: string
           social_insight?: string | null
+          social_superpowers?: string | null
           strengths?: string[]
           tagline: string
           title: string
           todays_focus?: string | null
           user_id: string
+          your_aura?: string | null
         }
         Update: {
           action_insight?: string | null
           challenges?: string[]
           chart_synergy?: string | null
+          comfort_needs?: string | null
           compatible_signs?: string[]
+          core_identity?: string | null
           created_at?: string
           daily_practice?: string
           emotional_insight?: string | null
+          emotional_landscape?: string | null
+          emotional_triggers?: string[] | null
+          first_impressions?: string | null
           for_date?: string
+          growth_areas?: string[] | null
           id?: string
           identity_insight?: string | null
           in_relationships?: string
           in_wellness?: string
           in_work?: string
+          intuitive_gifts?: string | null
+          life_purpose?: string | null
           love_insight?: string | null
           mental_insight?: string | null
+          natural_strengths?: string[] | null
           overview?: string
           placement?: string
+          presentation_tips?: string[] | null
           sign?: string
           social_insight?: string | null
+          social_superpowers?: string | null
           strengths?: string[]
           tagline?: string
           title?: string
           todays_focus?: string | null
           user_id?: string
+          your_aura?: string | null
         }
         Relationships: []
       }
