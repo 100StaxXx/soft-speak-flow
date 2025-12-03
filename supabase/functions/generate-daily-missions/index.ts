@@ -197,15 +197,30 @@ serve(async (req) => {
       is_bonus: false,
     }));
 
-    // Insert missions
-    const { data: created, error } = await supabase
+    // Insert missions with conflict handling to prevent race condition duplicates
+    // Uses unique index on (user_id, mission_date, category)
+    const { error: insertError } = await supabase
       .from('daily_missions')
-      .insert(missionsToInsert)
-      .select();
+      .upsert(missionsToInsert, { 
+        onConflict: 'user_id,mission_date,category',
+        ignoreDuplicates: true 
+      });
 
-    if (error) {
-      console.error('Error inserting missions:', error);
-      throw error;
+    if (insertError) {
+      console.error('Error inserting missions:', insertError);
+      throw insertError;
+    }
+
+    // Fetch the actual missions (in case some were skipped due to conflict)
+    const { data: created, error: fetchError } = await supabase
+      .from('daily_missions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('mission_date', today);
+
+    if (fetchError) {
+      console.error('Error fetching missions:', fetchError);
+      throw fetchError;
     }
 
     console.log(`Generated ${created?.length || 0} missions for user ${userId}`);
