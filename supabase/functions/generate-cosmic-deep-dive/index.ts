@@ -15,16 +15,16 @@ const placementDescriptions: Record<string, string> = {
   venus: "love style, values, beauty, and pleasure",
 };
 
-// Placement-specific focus areas for non-sun placements
-const placementFocus: Record<string, string> = {
-  moon: "emotional_insight",
-  rising: "social_insight", 
-  mercury: "mental_insight",
-  mars: "action_insight",
-  venus: "love_insight",
+// Placement-specific focus areas
+const placementFocus: Record<string, { field: string; description: string }> = {
+  sun: { field: "identity_insight", description: "How this Sun placement shapes your core identity and life purpose (2-3 sentences)" },
+  moon: { field: "emotional_insight", description: "How this Moon placement colors your emotional world and inner needs (2-3 sentences)" },
+  rising: { field: "social_insight", description: "How this Rising sign shapes first impressions and your outward persona (2-3 sentences)" },
+  mercury: { field: "mental_insight", description: "How this Mercury placement affects your thinking and communication style (2-3 sentences)" },
+  mars: { field: "action_insight", description: "How this Mars placement drives your ambition, energy, and desires (2-3 sentences)" },
+  venus: { field: "love_insight", description: "How this Venus placement shapes your love language and values (2-3 sentences)" },
 };
 
-// Retry helper with exponential backoff
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
@@ -42,7 +42,6 @@ async function fetchWithRetry(
       
       if (response.status >= 500 || response.status === 429) {
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Attempt ${attempt + 1} failed with ${response.status}, retrying in ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -51,7 +50,6 @@ async function fetchWithRetry(
     } catch (error) {
       lastError = error as Error;
       const delay = Math.pow(2, attempt) * 1000;
-      console.log(`Attempt ${attempt + 1} failed with network error, retrying in ${delay}ms:`, error);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -68,45 +66,10 @@ function getLocalDate(timezoneOffset?: number): string {
   return now.toISOString().split('T')[0];
 }
 
-// Build prompt based on placement type
-function buildPrompt(placement: string, sign: string, userName: string, chartContext: string, today: string): string {
-  const isSun = placement.toLowerCase() === 'sun';
+function buildPrompt(placement: string, sign: string, userName: string, chartContext: string): string {
+  const focus = placementFocus[placement.toLowerCase()];
   
-  if (isSun) {
-    return `You are an expert astrologer creating a CONCISE personalized cosmic reading.
-
-${chartContext}
-
-The Sun represents: ${placementDescriptions.sun}.
-
-Generate a SHORT reading for Sun in ${sign} for ${userName}.
-Today's date is ${today}.
-
-IMPORTANT: Keep ALL content very brief - a few sentences each, NOT paragraphs.
-
-Return a JSON object with EXACTLY these fields:
-{
-  "title": "A creative title (3-5 words)",
-  "tagline": "A short phrase (under 10 words)",
-  "todays_focus": "1-2 sentences about today's cosmic energy",
-  "chart_synergy": "1-2 sentences about how Sun interacts with other placements",
-  "overview": "3-4 sentences max explaining Sun in ${sign}",
-  "strengths": ["short phrase", "short phrase"],
-  "challenges": ["short phrase", "short phrase"]
-}
-
-Be warm but CONCISE. Quality over quantity.`;
-  } else {
-    const focusField = placementFocus[placement.toLowerCase()] || 'insight';
-    const focusDescriptions: Record<string, string> = {
-      emotional_insight: "How this Moon placement colors your emotional world and inner needs (2-3 sentences)",
-      social_insight: "How this Rising sign shapes first impressions and your outward persona (2-3 sentences)",
-      mental_insight: "How this Mercury placement affects your thinking and communication style (2-3 sentences)",
-      action_insight: "How this Mars placement drives your ambition, energy, and desires (2-3 sentences)",
-      love_insight: "How this Venus placement shapes your love language and values (2-3 sentences)",
-    };
-
-    return `You are an expert astrologer creating a VERY BRIEF personalized cosmic insight.
+  return `You are an expert astrologer creating a VERY BRIEF personalized cosmic insight.
 
 ${chartContext}
 
@@ -114,17 +77,16 @@ The ${placement} represents: ${placementDescriptions[placement.toLowerCase()] ||
 
 Generate ONE focused insight for ${placement} in ${sign} for ${userName}.
 
-IMPORTANT: This should be SHORT - just 2-3 sentences of meaningful insight.
+IMPORTANT: Keep this SHORT - just 2-3 sentences of meaningful, specific insight.
 
 Return a JSON object with EXACTLY these fields:
 {
   "title": "A creative title (3-5 words)",
   "tagline": "A short phrase (under 10 words)",
-  "${focusField}": "${focusDescriptions[focusField] || '2-3 sentences of focused insight'}"
+  "${focus.field}": "${focus.description}"
 }
 
-Be warm, specific, and CONCISE. One powerful insight is better than many generic ones.`;
-  }
+Be warm, specific to their chart, and CONCISE. One powerful insight beats many generic ones.`;
 }
 
 serve(async (req) => {
@@ -173,7 +135,6 @@ serve(async (req) => {
     }
 
     const today = getLocalDate(timezoneOffset);
-    console.log('Using date:', today, 'with timezone offset:', timezoneOffset);
 
     // Check cache first
     const { data: cached } = await supabaseService
@@ -186,7 +147,6 @@ serve(async (req) => {
       .maybeSingle();
 
     if (cached) {
-      console.log('Returning cached deep dive for', placement, sign);
       return new Response(JSON.stringify(cached), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -200,7 +160,6 @@ serve(async (req) => {
       .single();
 
     if (profileError) {
-      console.error('Profile fetch error:', profileError);
       return new Response(JSON.stringify({ error: 'Profile not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -220,15 +179,10 @@ User's Cosmiq Profile:
 🔥 Mars: ${profile.mars_sign || 'Unknown'}
 💗 Venus: ${profile.venus_sign || 'Unknown'}
 
-This user is viewing their ${placement.toUpperCase()} in ${sign.toUpperCase()}.
-` : `
-User has Sun in ${profile.zodiac_sign || sign}.
-They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
-`;
+Viewing: ${placement.toUpperCase()} in ${sign.toUpperCase()}
+` : `Sun in ${profile.zodiac_sign || sign}. Viewing: ${placement.toUpperCase()} in ${sign.toUpperCase()}.`;
 
-    const prompt = buildPrompt(placement.toLowerCase(), sign, userName, chartContext, today);
-
-    console.log('Generating personalized deep dive for', user.id, placement, sign);
+    const prompt = buildPrompt(placement.toLowerCase(), sign, userName, chartContext);
 
     const aiResponse = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -239,10 +193,7 @@ They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          {
-            role: "system",
-            content: "You are an expert astrologer. Return ONLY valid JSON, no markdown formatting or code blocks. Keep responses CONCISE."
-          },
+          { role: "system", content: "You are an expert astrologer. Return ONLY valid JSON, no markdown. Keep responses VERY brief." },
           { role: "user", content: prompt }
         ],
       }),
@@ -288,12 +239,11 @@ They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
       throw new Error('Failed to parse AI response');
     }
 
-    // Validate required fields based on placement
     if (!content.title || !content.tagline) {
       throw new Error('Missing required fields: title, tagline');
     }
 
-    // Cache the result with simplified structure
+    // Cache the result
     const cacheData: Record<string, unknown> = {
       user_id: user.id,
       placement: placement.toLowerCase(),
@@ -301,24 +251,23 @@ They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
       for_date: today,
       title: content.title,
       tagline: content.tagline,
-      // Sun-specific fields
-      overview: content.overview || null,
-      strengths: Array.isArray(content.strengths) ? content.strengths : [],
-      challenges: Array.isArray(content.challenges) ? content.challenges : [],
-      chart_synergy: content.chart_synergy || null,
-      todays_focus: content.todays_focus || null,
-      // Placement-specific insights
+      identity_insight: content.identity_insight || null,
       emotional_insight: content.emotional_insight || null,
       social_insight: content.social_insight || null,
       mental_insight: content.mental_insight || null,
       action_insight: content.action_insight || null,
       love_insight: content.love_insight || null,
-      // Legacy fields (empty for new format)
-      in_relationships: content.in_relationships || null,
-      in_work: content.in_work || null,
-      in_wellness: content.in_wellness || null,
+      // Legacy fields
+      overview: null,
+      strengths: [],
+      challenges: [],
+      chart_synergy: null,
+      todays_focus: null,
+      in_relationships: null,
+      in_work: null,
+      in_wellness: null,
       compatible_signs: [],
-      daily_practice: content.daily_practice || null,
+      daily_practice: null,
     };
 
     const { error: insertError } = await supabaseService
@@ -328,8 +277,6 @@ They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
     if (insertError) {
       console.error('Failed to cache deep dive:', insertError);
     }
-
-    console.log('Generated and cached deep dive for', user.id, placement, sign);
 
     return new Response(JSON.stringify(cacheData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

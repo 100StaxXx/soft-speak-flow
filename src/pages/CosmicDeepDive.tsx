@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, CheckCircle2, XCircle, Star, Calendar } from "lucide-react";
+import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,25 +32,24 @@ const placementColors = {
 interface CosmiqContent {
   title: string;
   tagline: string;
-  // Sun-specific
+  identity_insight?: string;  // Sun
+  emotional_insight?: string; // Moon
+  social_insight?: string;    // Rising
+  mental_insight?: string;    // Mercury
+  action_insight?: string;    // Mars
+  love_insight?: string;      // Venus
+  // Legacy fields
   overview?: string;
-  strengths?: string[];
-  challenges?: string[];
-  chart_synergy?: string;
-  todays_focus?: string;
-  // Placement-specific insights
-  emotional_insight?: string;  // Moon
-  social_insight?: string;     // Rising
-  mental_insight?: string;     // Mercury
-  action_insight?: string;     // Mars
-  love_insight?: string;       // Venus
-  // Legacy fields (may exist in old cached data)
-  in_relationships?: string;
-  in_work?: string;
-  in_wellness?: string;
-  compatible_signs?: string[];
-  daily_practice?: string;
 }
+
+const insightLabels: Record<string, { title: string; icon: string }> = {
+  sun: { title: "Your Core Identity", icon: "☀️" },
+  moon: { title: "Your Emotional World", icon: "🌙" },
+  rising: { title: "Your First Impression", icon: "✨" },
+  mercury: { title: "How You Think", icon: "💭" },
+  mars: { title: "What Drives You", icon: "🔥" },
+  venus: { title: "How You Love", icon: "💗" },
+};
 
 const CosmiqDeepDive = () => {
   const { placement, sign } = useParams<{ placement: string; sign: string }>();
@@ -98,10 +97,6 @@ const CosmiqDeepDive = () => {
             setLoading(false);
             return;
           }
-
-          if (personalizedError || personalizedData?.error) {
-            console.log('Falling back to static content:', personalizedError || personalizedData?.error);
-          }
         }
 
         const { data, error } = await supabase
@@ -144,7 +139,6 @@ const CosmiqDeepDive = () => {
 
   const Icon = placementIcons[placement as keyof typeof placementIcons] || Sparkles;
   const gradient = placementColors[placement as keyof typeof placementColors];
-  const isSunPlacement = placement.toLowerCase() === 'sun';
 
   const placementNames: Record<string, string> = {
     sun: "Sun",
@@ -155,31 +149,27 @@ const CosmiqDeepDive = () => {
     venus: "Venus",
   };
 
-  // Get the relevant insight for non-sun placements
+  // Get the insight for any placement
   const getPlacementInsight = () => {
     if (!content) return null;
     const p = placement.toLowerCase();
+    if (p === 'sun') return content.identity_insight;
     if (p === 'moon') return content.emotional_insight;
     if (p === 'rising') return content.social_insight;
     if (p === 'mercury') return content.mental_insight;
     if (p === 'mars') return content.action_insight;
     if (p === 'venus') return content.love_insight;
-    return null;
+    return content.overview; // Fallback for old data
   };
 
-  const insightLabels: Record<string, { title: string; icon: string }> = {
-    moon: { title: "Your Emotional World", icon: "🌙" },
-    rising: { title: "Your First Impression", icon: "✨" },
-    mercury: { title: "How You Think & Communicate", icon: "💭" },
-    mars: { title: "What Drives You", icon: "🔥" },
-    venus: { title: "How You Love", icon: "💗" },
-  };
+  const insight = getPlacementInsight();
+  const label = insightLabels[placement.toLowerCase()];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
-      {/* Cosmiq background */}
+      {/* Stars background */}
       <div className="absolute inset-0">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white rounded-full"
@@ -187,9 +177,7 @@ const CosmiqDeepDive = () => {
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
             }}
-            animate={{
-              opacity: [0.1, 1, 0.1],
-            }}
+            animate={{ opacity: [0.1, 1, 0.1] }}
             transition={{
               duration: 2 + Math.random() * 3,
               repeat: Infinity,
@@ -239,7 +227,7 @@ const CosmiqDeepDive = () => {
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-24 w-full bg-gray-800/50" />
-            <Skeleton className="h-32 w-full bg-gray-800/50" />
+            <Skeleton className="h-20 w-full bg-gray-800/50" />
             <p className="text-center text-gray-400 text-sm animate-pulse">
               ✨ Generating your cosmic insight...
             </p>
@@ -260,170 +248,35 @@ const CosmiqDeepDive = () => {
               </Card>
             </motion.div>
 
-            {/* SUN PLACEMENT - Show 4 sections */}
-            {isSunPlacement ? (
-              <>
-                {/* Today's Focus */}
-                {isPersonalized && content.todays_focus && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                  >
-                    <Card className="bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-pink-600/30 border-purple-500/40 p-5">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-purple-300" />
-                          <h3 className="text-base font-bold text-purple-200">Today's Focus</h3>
-                        </div>
-                        <p className="text-gray-100 text-sm leading-relaxed">{content.todays_focus}</p>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* In Your Chart */}
-                {isPersonalized && content.chart_synergy && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <Card className="bg-gradient-to-br from-violet-950/50 to-fuchsia-950/50 border-violet-500/30 p-5">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Star className="w-4 h-4 text-violet-300" />
-                          <h3 className="text-base font-bold text-violet-200">In Your Chart</h3>
-                        </div>
-                        <p className="text-gray-200 text-sm leading-relaxed">{content.chart_synergy}</p>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* Overview */}
-                {content.overview && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                  >
-                    <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
-                      <div className="space-y-2">
-                        <h3 className="text-base font-bold text-accent-purple">
-                          What is Sun in {sign.charAt(0).toUpperCase() + sign.slice(1)}?
-                        </h3>
-                        <p className="text-gray-200 text-sm leading-relaxed">{content.overview}</p>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* Strengths & Challenges */}
-                {(content.strengths?.length || content.challenges?.length) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="grid grid-cols-2 gap-3"
-                  >
-                    {content.strengths && content.strengths.length > 0 && (
-                      <Card className="bg-emerald-950/30 border-emerald-500/30 p-4">
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4" />
-                            Strengths
-                          </h3>
-                          <ul className="space-y-1">
-                            {content.strengths.map((strength, i) => (
-                              <li key={i} className="text-gray-200 text-xs flex items-start gap-1">
-                                <span className="text-emerald-400">•</span>
-                                <span>{strength}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </Card>
-                    )}
-
-                    {content.challenges && content.challenges.length > 0 && (
-                      <Card className="bg-rose-950/30 border-rose-500/30 p-4">
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-bold text-rose-300 flex items-center gap-1">
-                            <XCircle className="w-4 h-4" />
-                            Growth Areas
-                          </h3>
-                          <ul className="space-y-1">
-                            {content.challenges.map((challenge, i) => (
-                              <li key={i} className="text-gray-200 text-xs flex items-start gap-1">
-                                <span className="text-rose-400">•</span>
-                                <span>{challenge}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </Card>
-                    )}
-                  </motion.div>
-                )}
-              </>
-            ) : (
-              /* OTHER PLACEMENTS - Show single focused insight */
-              <>
-                {(() => {
-                  const insight = getPlacementInsight();
-                  const label = insightLabels[placement.toLowerCase()];
-                  
-                  if (insight && label) {
-                    return (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
-                      >
-                        <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-6`}>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl">{label.icon}</span>
-                              <h3 className="text-lg font-bold text-white">{label.title}</h3>
-                            </div>
-                            <p className="text-gray-100 leading-relaxed">{insight}</p>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    );
-                  }
-                  
-                  // Fallback for old cached data without new insight fields
-                  if (content.overview) {
-                    return (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
-                      >
-                        <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
-                          <p className="text-gray-200 text-sm leading-relaxed">{content.overview}</p>
-                        </Card>
-                      </motion.div>
-                    );
-                  }
-                  
-                  return null;
-                })()}
-              </>
+            {/* Single Insight Card */}
+            {insight && label && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <Card className="bg-obsidian/80 border-royal-purple/30 p-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{label.icon}</span>
+                      <h3 className="text-lg font-bold text-white">{label.title}</h3>
+                    </div>
+                    <p className="text-gray-200 leading-relaxed">{insight}</p>
+                  </div>
+                </Card>
+              </motion.div>
             )}
 
-            {/* Feedback Quiz */}
+            {/* Feedback */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.25 }}
             >
-              <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
-                <div className="space-y-3">
-                  <h3 className="text-base font-bold text-white">Does this resonate?</h3>
-                  <div className="flex gap-3">
+              <Card className="bg-obsidian/60 border-royal-purple/20 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">Does this resonate?</span>
+                  <div className="flex gap-2">
                     <Button
                       onClick={() => handleQuizAnswer(true)}
                       variant={quizAnswer === true ? "default" : "outline"}
@@ -432,7 +285,7 @@ const CosmiqDeepDive = () => {
                       disabled={quizAnswer !== null}
                     >
                       <CheckCircle2 className="w-4 h-4 mr-1" />
-                      Yes!
+                      Yes
                     </Button>
                     <Button
                       onClick={() => handleQuizAnswer(false)}
@@ -442,16 +295,9 @@ const CosmiqDeepDive = () => {
                       disabled={quizAnswer !== null}
                     >
                       <XCircle className="w-4 h-4 mr-1" />
-                      Not quite
+                      No
                     </Button>
                   </div>
-                  {quizAnswer !== null && (
-                    <p className="text-gray-400 text-xs">
-                      {quizAnswer 
-                        ? "Thanks for the feedback! ✨" 
-                        : "Thanks! We'll keep refining your insights."}
-                    </p>
-                  )}
                 </div>
               </Card>
             </motion.div>
