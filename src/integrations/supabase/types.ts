@@ -3358,6 +3358,7 @@ export type Database = {
           emotional_insight: string | null
           for_date: string
           id: string
+          identity_insight: string | null
           in_relationships: string
           in_wellness: string
           in_work: string
@@ -3383,6 +3384,7 @@ export type Database = {
           emotional_insight?: string | null
           for_date: string
           id?: string
+          identity_insight?: string | null
           in_relationships: string
           in_wellness: string
           in_work: string
@@ -3408,6 +3410,7 @@ export type Database = {
           emotional_insight?: string | null
           for_date?: string
           id?: string
+          identity_insight?: string | null
           in_relationships?: string
           in_wellness?: string
           in_work?: string
