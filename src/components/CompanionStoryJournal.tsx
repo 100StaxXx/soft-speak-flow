@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3 } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Users } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
+import { GuildStoriesSection } from "./companion/GuildStoriesSection";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
@@ -350,6 +352,9 @@ export const CompanionStoryJournal = () => {
           </Card>
         ) : null}
       </Card>
+
+      {/* Guild Stories Section */}
+      <GuildStoriesSection />
     </div>
   );
 };
