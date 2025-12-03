@@ -33,10 +33,9 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [loadingCompletions, setLoadingCompletions] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const habitIds = habits.map(h => h.id);
   
-  // Memoize habitIds to create a stable dependency for useCallback
-  const habitIdsKey = useMemo(() => habitIds.sort().join(','), [habitIds]);
+  // Memoize habitIds to create a stable reference
+  const habitIds = useMemo(() => habits.map(h => h.id), [habits]);
 
   const fetchTodayCompletions = useCallback(async () => {
     if (!user?.id || habitIds.length === 0) return;
@@ -56,7 +55,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     } finally {
       setLoadingCompletions(false);
     }
-  }, [user?.id, habitIdsKey, today, habitIds]);
+  }, [user?.id, habitIds, today]);
 
   // Fetch today's completions when drawer opens
   useEffect(() => {
