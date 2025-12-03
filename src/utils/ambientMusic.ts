@@ -68,12 +68,20 @@ class AmbientMusicManager {
           clearInterval(this.fadeInterval);
           this.fadeInterval = null;
         }
-        this.audio.volume = 0;
+        // Use muted property on iOS for reliable control
+        if (isIOS) {
+          this.audio.muted = true;
+        } else {
+          this.audio.volume = 0;
+        }
       }
     } else {
       // Global mute turned off - restore ambient music if not locally muted
       if (this.audio && !this.isMuted && this.isPlaying) {
-        // Restore volume immediately
+        // Unmute and restore volume
+        if (isIOS) {
+          this.audio.muted = false;
+        }
         this.audio.volume = this.isDucked ? this.volume * 0.15 : this.volume;
       } else if (!this.isMuted && !this.isPlaying) {
         this.play();
@@ -178,7 +186,14 @@ class AmbientMusicManager {
     // Use iOS-optimized audio element
     this.audio = createIOSOptimizedAudio();
     this.audio.loop = true;
-    this.audio.volume = this.isMuted ? 0 : this.volume;
+    
+    // Set initial mute state using muted property on iOS
+    if (isIOS) {
+      this.audio.muted = this.shouldMute();
+      this.audio.volume = this.volume; // Set volume separately on iOS
+    } else {
+      this.audio.volume = this.shouldMute() ? 0 : this.volume;
+    }
     this.audio.preload = 'auto';
     
     // Register with iOS audio manager for coordinated control
@@ -331,8 +346,13 @@ class AmbientMusicManager {
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
       }
-      // Mute immediately instead of fading
-      this.audio.volume = 0;
+      // Use muted property on iOS for reliable control
+      if (isIOS) {
+        this.audio.muted = true;
+      } else {
+        // Mute immediately instead of fading on non-iOS
+        this.audio.volume = 0;
+      }
     }
     this.isMuting = false;
   }
@@ -358,6 +378,11 @@ class AmbientMusicManager {
       this.play();
       this.isMuting = false;
     } else if (this.audio) {
+      // Unmute the audio element on iOS
+      if (isIOS) {
+        this.audio.muted = false;
+      }
+      
       // If ducked, don't fade in to full volume - let duck state manage volume
       if (!this.isDucked) {
         this.fadeIn(2000);
@@ -395,6 +420,11 @@ class AmbientMusicManager {
 
     if (!this.shouldMute()) {
       this.isStopped = false;
+      
+      // Ensure audio is unmuted before playing
+      if (isIOS) {
+        this.audio.muted = false;
+      }
       this.audio.volume = 0;
       
       // Clear any existing play timeout
@@ -476,6 +506,10 @@ class AmbientMusicManager {
     this.isStopped = false; // Clear stopped flag when resuming from event
     
     if (!this.shouldMute()) {
+      // Ensure audio is unmuted before resuming
+      if (isIOS) {
+        this.audio.muted = false;
+      }
       this.audio.volume = 0;
       
       // Set timeout for resume

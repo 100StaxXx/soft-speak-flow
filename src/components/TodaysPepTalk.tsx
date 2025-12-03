@@ -14,6 +14,7 @@ import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
 import { logger } from "@/utils/logger";
+import { createIOSOptimizedAudio, isIOS, iosAudioManager, safePlay } from "@/utils/iosAudio";
 
 interface CaptionWord {
   word: string;
@@ -50,11 +51,55 @@ export const TodaysPepTalk = memo(() => {
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [hasAwardedXP, setHasAwardedXP] = useState(false);
   const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
+
+  // Initialize audio element with iOS optimizations
+  useEffect(() => {
+    if (!pepTalk?.audio_url) return;
+    
+    const audio = createIOSOptimizedAudio(pepTalk.audio_url);
+    audio.preload = 'metadata';
+    audioRef.current = audio;
+    
+    // Register with iOS audio manager for coordinated control
+    if (isIOS) {
+      iosAudioManager.registerAudio(audio);
+    }
+    
+    // Set up event listeners
+    const handleError = () => {
+      logger.error('Audio loading error', { 
+        audioUrl: pepTalk.audio_url,
+        errorCode: audio.error?.code,
+        errorMessage: audio.error?.message 
+      });
+    };
+    
+    const handleLoadedMetadata = () => {
+      logger.log('Audio loaded successfully');
+      logger.log('Duration:', audio.duration);
+      setDuration(audio.duration);
+    };
+    
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeEventListener('error', handleError);
+        audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        if (isIOS) {
+          iosAudioManager.unregisterAudio(audioRef.current);
+        }
+        audioRef.current.src = '';
+      }
+    };
+  }, [pepTalk?.audio_url]);
 
   // Listen for global mute changes
   useEffect(() => {
@@ -327,19 +372,20 @@ export const TodaysPepTalk = memo(() => {
       if (globalAudio.getMuted()) {
         return;
       }
-      try {
-        console.log('Attempting to play audio from:', pepTalk?.audio_url);
-        await audio.play();
+      
+      console.log('Attempting to play audio from:', pepTalk?.audio_url);
+      // Use iOS-safe play function
+      const success = await safePlay(audio);
+      if (success) {
         setIsPlaying(true);
-      } catch (err) {
-        console.error('Audio play failed:', err);
+      } else {
         // Reload the audio element and try again
         audio.load();
-        try {
-          await audio.play();
+        const retrySuccess = await safePlay(audio);
+        if (retrySuccess) {
           setIsPlaying(true);
-        } catch (retryErr) {
-          console.error('Audio play retry failed:', retryErr);
+        } else {
+          console.error('Audio play failed after retry');
         }
       }
     }
@@ -488,23 +534,7 @@ export const TodaysPepTalk = memo(() => {
             </p>
           </div>
 
-          {/* Audio Player */}
-          <audio 
-            ref={audioRef} 
-            src={pepTalk.audio_url} 
-            preload="metadata"
-            onError={() => {
-              logger.error('Audio loading error', { 
-                audioUrl: pepTalk.audio_url,
-                errorCode: audioRef.current?.error?.code,
-                errorMessage: audioRef.current?.error?.message 
-              });
-            }}
-            onLoadedMetadata={() => {
-              logger.log('Audio loaded successfully');
-              logger.log('Duration:', audioRef.current?.duration);
-            }}
-          />
+          {/* Audio element is created programmatically for iOS compatibility */}
           
           <div className="space-y-4">
             {/* Large central play button */}
