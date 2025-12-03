@@ -26,14 +26,25 @@ interface MentorGridProps {
   isSelecting?: boolean;
 }
 
+// Preferred display order - new mentors will appear after these
 const MENTOR_ORDER = ['atlas', 'darius', 'kai', 'eli', 'nova', 'sienna', 'lumi', 'stryker', 'solace'];
 
 export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommendedMentorId, isSelecting = false }: MentorGridProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
 
-  const orderedMentors = MENTOR_ORDER.map(slug => 
-    mentors.find(m => m.slug === slug)
-  ).filter(Boolean) as Mentor[];
+  // Order mentors: first by MENTOR_ORDER, then any unlisted mentors alphabetically
+  const orderedMentors = (() => {
+    const orderedBySlug = MENTOR_ORDER.map(slug => 
+      mentors.find(m => m.slug === slug)
+    ).filter(Boolean) as Mentor[];
+    
+    // Find any mentors not in MENTOR_ORDER and add them at the end
+    const unlistedMentors = mentors
+      .filter(m => !MENTOR_ORDER.includes(m.slug))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    return [...orderedBySlug, ...unlistedMentors];
+  })();
 
   const handleMentorClick = (mentorId: string) => {
     setSelectedMentor(mentorId);

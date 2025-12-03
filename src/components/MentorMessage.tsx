@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,9 +9,28 @@ interface MentorMessageProps {
   className?: string;
 }
 
+// Generate a stable pseudo-random index based on seed string
+// This ensures the same mentor + type + day combination returns the same message
+const getStableRandomIndex = (seed: string, arrayLength: number): number => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash) % arrayLength;
+};
+
 export const MentorMessage = ({ mentorId, type = "motivation", className = "" }: MentorMessageProps) => {
   const [message, setMessage] = useState("");
   const [mentorName, setMentorName] = useState("Your Motivator");
+  
+  // Create a stable seed based on mentorId, type, and today's date
+  // This ensures consistent message selection for the same inputs on the same day
+  const messageSeed = useMemo(() => {
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    return `${mentorId}-${type}-${today}`;
+  }, [mentorId, type]);
 
   useEffect(() => {
     const fetchMessage = async () => {
@@ -32,13 +51,13 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
               setMessage(mentor.welcome_message || `Welcome back. Let's push forward.`);
               break;
             case "success":
-              setMessage(getSuccessMessage(mentor.tone_description));
+              setMessage(getSuccessMessage(mentor.tone_description, messageSeed));
               break;
             case "habit":
-              setMessage(getHabitMessage(mentor.tone_description));
+              setMessage(getHabitMessage(mentor.tone_description, messageSeed));
               break;
             default:
-              setMessage(getMotivationMessage(mentor.tone_description));
+              setMessage(getMotivationMessage(mentor.tone_description, messageSeed));
           }
         }
       } catch (error) {
@@ -47,9 +66,9 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
     };
 
     fetchMessage();
-  }, [mentorId, type]);
+  }, [mentorId, type, messageSeed]);
 
-  const getMotivationMessage = (tone: string) => {
+  const getMotivationMessage = (tone: string, seed: string) => {
     const isTough = /tough|direct|discipline/i.test(tone);
     const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
     
@@ -61,7 +80,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "Focus. Execute. Dominate.",
         "Comfort is the enemy. Level up.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'motivation-tough', messages.length)];
     }
     
     if (isEmpathetic) {
@@ -72,7 +91,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "Progress, not perfection.",
         "You're stronger than you know.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'motivation-empathetic', messages.length)];
     }
     
     const messages = [
@@ -82,10 +101,10 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
       "Focus on what matters.",
       "Your potential is limitless.",
     ];
-    return messages[Math.floor(Math.random() * messages.length)];
+    return messages[getStableRandomIndex(seed + 'motivation-default', messages.length)];
   };
 
-  const getSuccessMessage = (tone: string) => {
+  const getSuccessMessage = (tone: string, seed: string) => {
     const isTough = /tough|direct|discipline/i.test(tone);
     const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
     
@@ -97,7 +116,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "This is who you are. A winner.",
         "Momentum is everything. Don't stop.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'success-tough', messages.length)];
     }
     
     if (isEmpathetic) {
@@ -108,7 +127,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "This is beautiful progress.",
         "Your effort is paying off.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'success-empathetic', messages.length)];
     }
     
     const messages = [
@@ -118,10 +137,10 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
       "Progress. That's what matters.",
       "One step closer to greatness.",
     ];
-    return messages[Math.floor(Math.random() * messages.length)];
+    return messages[getStableRandomIndex(seed + 'success-default', messages.length)];
   };
 
-  const getHabitMessage = (tone: string) => {
+  const getHabitMessage = (tone: string, seed: string) => {
     const isTough = /tough|direct|discipline/i.test(tone);
     const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
     
@@ -133,7 +152,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "Consistency separates winners from dreamers.",
         "No days off from greatness.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'habit-tough', messages.length)];
     }
     
     if (isEmpathetic) {
@@ -144,7 +163,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
         "Be proud - this is real growth.",
         "You're becoming who you want to be.",
       ];
-      return messages[Math.floor(Math.random() * messages.length)];
+      return messages[getStableRandomIndex(seed + 'habit-empathetic', messages.length)];
     }
     
     const messages = [
@@ -154,7 +173,7 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
       "Consistency is your superpower.",
       "Small wins create big transformations.",
     ];
-    return messages[Math.floor(Math.random() * messages.length)];
+    return messages[getStableRandomIndex(seed + 'habit-default', messages.length)];
   };
 
   if (!mentorId || !message) return null;

@@ -66,7 +66,12 @@ serve(async (req) => {
       // Continue without mentor context - use defaults
     }
 
-    // Use local date instead of UTC to avoid timezone issues
+    // TIMEZONE NOTE: Uses server's local date (en-CA format for yyyy-MM-dd).
+    // Edge functions run in UTC timezone on most cloud providers.
+    // This means a user in PST at 11pm will see "tomorrow's" horoscope.
+    // This is intentional - horoscopes are generated once per calendar day (server time)
+    // and cached for all users requesting on that server day.
+    // For true user-local dates, the client would need to pass their timezone.
     const today = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd format
     const hasAdvancedDetails = !!(profile.birthdate && profile.birth_time && profile.birth_location);
     const hasCosmiqProfile = !!(profile.moon_sign && profile.rising_sign);

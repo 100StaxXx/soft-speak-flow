@@ -161,14 +161,32 @@ const Horoscope = () => {
     if (e) e.preventDefault();
     if (!user) return;
     
-    const normalizedBirthTime = birthTime?.trim() || null;
-    if (normalizedBirthTime && !/^\d{2}:\d{2}$/.test(normalizedBirthTime)) {
-      toast({
-        title: "Invalid Format",
-        description: "Birth time must be in HH:mm format (e.g., 14:30)",
-        variant: "destructive",
-      });
-      return;
+    // Normalize birth time - extract HH:mm from any format (HH:mm or HH:mm:ss)
+    const normalizedBirthTime = birthTime?.trim() ? birthTime.trim().substring(0, 5) : null;
+    
+    if (normalizedBirthTime) {
+      // Validate HH:mm format
+      const timeMatch = normalizedBirthTime.match(/^(\d{2}):(\d{2})$/);
+      if (!timeMatch) {
+        toast({
+          title: "Invalid Format",
+          description: "Birth time must be in HH:mm format (e.g., 14:30)",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate hour/minute ranges (matching server-side validation)
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        toast({
+          title: "Invalid Time",
+          description: "Please use 24-hour format (00:00 to 23:59)",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     setSaving(true);
