@@ -76,11 +76,10 @@ export const AskMentorChat = ({
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [dailyMessageCount, setDailyMessageCount] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [dailyLimit, setDailyLimit] = useState(10); // Server provides the actual limit
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
-
-  const DAILY_MESSAGE_LIMIT = 10;
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
@@ -91,10 +90,10 @@ export const AskMentorChat = ({
     }
 
     // Check daily limit
-    if (dailyMessageCount >= DAILY_MESSAGE_LIMIT) {
+    if (dailyMessageCount >= dailyLimit) {
       toast({ 
         title: "Daily limit reached", 
-        description: `You've reached your daily limit of ${DAILY_MESSAGE_LIMIT} messages. Reset tomorrow!`,
+        description: `You've reached your daily limit of ${dailyLimit} messages. Reset tomorrow!`,
         variant: "destructive" 
       });
       return;
@@ -123,8 +122,17 @@ export const AskMentorChat = ({
       const assistantMsg: Message = { role: "assistant", content: data.response };
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // Increment daily count
-      setDailyMessageCount(prev => prev + 1);
+      // Update limit from server if provided
+      if (data.dailyLimit) {
+        setDailyLimit(data.dailyLimit);
+      }
+      
+      // Use server's count if available, otherwise increment locally
+      if (data.messagesUsed !== undefined) {
+        setDailyMessageCount(data.messagesUsed);
+      } else {
+        setDailyMessageCount(prev => prev + 1);
+      }
 
       // Save conversation history (non-blocking - don't fail if this errors)
       void supabase.from('mentor_chats').insert([
@@ -164,7 +172,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, toast, mentorName, mentorTone, messages, DAILY_MESSAGE_LIMIT, isOnline]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, messages, isOnline]);
 
   useEffect(() => {
     // Check today's message count
@@ -248,10 +256,10 @@ export const AskMentorChat = ({
       <div className="px-4 pt-3 pb-2 border-b border-border/50 bg-muted/30">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">
-            Daily messages: {dailyMessageCount}/{DAILY_MESSAGE_LIMIT}
+            Daily messages: {dailyMessageCount}/{dailyLimit}
           </span>
           <div className="flex gap-1">
-            {Array.from({ length: DAILY_MESSAGE_LIMIT }).map((_, i) => (
+            {Array.from({ length: dailyLimit }).map((_, i) => (
               <div
                 key={i}
                 className={cn(

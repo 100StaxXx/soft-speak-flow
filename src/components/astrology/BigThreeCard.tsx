@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import { Sun, Moon, ArrowUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface BigThreeCardProps {
   type: 'sun' | 'moon' | 'rising';
@@ -19,6 +26,7 @@ const cardConfig = {
     borderColor: "border-amber-500/50",
     iconColor: "text-amber-400",
     glowColor: "shadow-amber-500/20",
+    deepDive: "Your Sun sign is the foundation of who you are. It represents your ego, your life force, and your primary motivations. When you express your Sun sign fully, you feel alive and authentic. This is the energy you radiate most powerfully when you're living in alignment with your true self.",
   },
   moon: {
     icon: Moon,
@@ -28,6 +36,7 @@ const cardConfig = {
     borderColor: "border-blue-400/50",
     iconColor: "text-blue-300",
     glowColor: "shadow-blue-500/20",
+    deepDive: "Your Moon sign reveals your inner emotional landscape - the part of you that few people see. It governs your instinctual reactions, emotional needs, and how you nurture yourself and others. Understanding your Moon helps you honor your emotional truth and find genuine comfort.",
   },
   rising: {
     icon: ArrowUp,
@@ -37,19 +46,17 @@ const cardConfig = {
     borderColor: "border-purple-400/50",
     iconColor: "text-purple-300",
     glowColor: "shadow-purple-500/20",
+    deepDive: "Your Rising sign, also called your Ascendant, is the mask you wear when meeting the world. It shapes first impressions and how you naturally approach new situations. While your Sun is who you are, your Rising is how you present yourself - your personal style and the energy you project outward.",
   },
 };
 
 export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCardProps) => {
   const config = cardConfig[type];
   const Icon = config.icon;
-  const navigate = useNavigate();
-
-  const handleClick = () => {
-    navigate(`/cosmic/${type}/${sign.toLowerCase()}`);
-  };
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -59,7 +66,7 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
         type: "spring",
         stiffness: 100,
       }}
-      onClick={handleClick}
+      onClick={() => setIsOpen(true)}
       className="cursor-pointer"
     >
       <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} hover:scale-105 transition-transform duration-300`}>
@@ -152,5 +159,36 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
         </CardContent>
       </Card>
     </motion.div>
+
+    {/* Deep Dive Dialog */}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className={`bg-obsidian/95 border-2 ${config.borderColor} backdrop-blur-xl max-w-md`}>
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center border ${config.borderColor}`}>
+              <Icon className={`w-6 h-6 ${config.iconColor}`} />
+            </div>
+            <div>
+              <DialogTitle className="text-pure-white text-xl">{config.title}</DialogTitle>
+              <p className="text-sm text-accent-purple">{config.subtitle}</p>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-center py-4">
+            <p className="text-3xl font-bold text-pure-white capitalize">{sign}</p>
+          </div>
+          <p className="text-cloud-white leading-relaxed text-sm">
+            {description}
+          </p>
+          <div className="pt-4 border-t border-royal-purple/30">
+            <p className="text-steel text-sm leading-relaxed">
+              {config.deepDive}
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };

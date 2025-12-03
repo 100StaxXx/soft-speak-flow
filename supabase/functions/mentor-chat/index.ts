@@ -200,7 +200,11 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ response: assistantMessage }),
+      JSON.stringify({ 
+        response: assistantMessage,
+        dailyLimit: DAILY_MESSAGE_LIMIT,
+        messagesUsed: (messagesToday || 0) + 1
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
