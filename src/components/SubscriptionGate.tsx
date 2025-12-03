@@ -6,6 +6,11 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Lock, Moon, MessageCircle } from "lucide-react";
+import { safeLocalStorage } from "@/utils/storage";
+
+const SUBSCRIPTION_MODAL_LAST_SHOWN_KEY = "subscription_modal_last_shown";
+
+const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 
 export const SubscriptionGate = () => {
   const navigate = useNavigate();
@@ -13,7 +18,10 @@ export const SubscriptionGate = () => {
   const { hasAccess, isInTrial, trialDaysRemaining } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
-  const [hasShownPaywall, setHasShownPaywall] = useState(false);
+  const [hasShownPaywall, setHasShownPaywall] = useState(() => {
+    const lastShown = safeLocalStorage.getItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY);
+    return lastShown === getTodayDateString();
+  });
   const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
 
   useEffect(() => {
@@ -37,6 +45,7 @@ export const SubscriptionGate = () => {
     if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
       setShowPaywall(true);
       setHasShownPaywall(true);
+      safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, getTodayDateString());
     }
   }, [companion, hasAccess, isInTrial, hasShownPaywall, isEvolvingLoading]);
 
@@ -47,6 +56,7 @@ export const SubscriptionGate = () => {
       const timer = setTimeout(() => {
         setShowPaywall(true);
         setHasShownPaywall(true);
+        safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, getTodayDateString());
         setShouldShowAfterEvolution(false);
       }, 500);
       
