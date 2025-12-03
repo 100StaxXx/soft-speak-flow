@@ -1,11 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGuildShouts } from "@/hooks/useGuildShouts";
 import { useAuth } from "@/hooks/useAuth";
+import { useMutedUsers } from "@/hooks/useMutedUsers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Megaphone, Bell } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Megaphone, Bell, MoreHorizontal, VolumeX, Volume2 } from "lucide-react";
 import { ShoutsFeedInfoTooltip } from "./ShoutsFeedInfoTooltip";
 import { getShoutByKey, SHOUT_TYPE_CONFIG } from "@/data/shoutMessages";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +26,7 @@ interface GuildShoutsFeedProps {
 export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
   const { user } = useAuth();
   const { shouts, unreadCount, markAsRead, isLoading } = useGuildShouts(epicId);
+  const { isUserMuted, muteUser, unmuteUser } = useMutedUsers(epicId);
 
   // Mark visible shouts as read
   useEffect(() => {
@@ -87,13 +96,14 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
       <CardContent>
         <ScrollArea className="h-[250px] pr-4">
           <AnimatePresence mode="popLayout">
-            {shouts.slice(0, 20).map((shout, index) => {
+              {shouts.slice(0, 20).map((shout, index) => {
               const message = getShoutByKey(shout.message_key);
               const typeConfig = SHOUT_TYPE_CONFIG[shout.shout_type];
               const isForMe = shout.recipient_id === user?.id;
               const isFromMe = shout.sender_id === user?.id;
               const senderName = shout.sender?.email?.split("@")[0] || "Someone";
               const recipientName = shout.recipient?.email?.split("@")[0] || "Someone";
+              const isSenderMuted = !isFromMe && isUserMuted(shout.sender_id);
 
               return (
                 <motion.div
@@ -106,7 +116,8 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
                     "mb-3 p-3 rounded-lg border transition-colors",
                     isForMe && !shout.is_read 
                       ? "bg-primary/10 border-primary/30" 
-                      : "bg-muted/30 border-border/50"
+                      : "bg-muted/30 border-border/50",
+                    isSenderMuted && "opacity-50"
                   )}
                 >
                   <div className="flex items-start gap-2">
@@ -115,6 +126,7 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm">
                           {isFromMe ? "You" : senderName}
+                          {isSenderMuted && <VolumeX className="inline h-3 w-3 ml-1 text-muted-foreground" />}
                         </span>
                         <span className="text-xs text-muted-foreground">→</span>
                         <span className="font-medium text-sm">
@@ -132,6 +144,33 @@ export const GuildShoutsFeed = ({ epicId }: GuildShoutsFeedProps) => {
                         {formatDistanceToNow(new Date(shout.created_at), { addSuffix: true })}
                       </p>
                     </div>
+                    {/* Mute/Unmute dropdown for shouts from others */}
+                    {!isFromMe && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isSenderMuted ? (
+                            <DropdownMenuItem 
+                              onClick={() => unmuteUser.mutate({ mutedUserId: shout.sender_id, epicId })}
+                            >
+                              <Volume2 className="h-4 w-4 mr-2" />
+                              Unmute {senderName}
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => muteUser.mutate({ mutedUserId: shout.sender_id, epicId })}
+                            >
+                              <VolumeX className="h-4 w-4 mr-2" />
+                              Mute {senderName}
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </motion.div>
               );

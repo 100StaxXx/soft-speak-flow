@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -119,6 +119,39 @@ export const GuildStoriesSection = () => {
     enabled: !!user?.id,
   });
 
+  // Mark story as read
+  const markStoryAsRead = useMutation({
+    mutationFn: async (storyId: string) => {
+      if (!user?.id) return;
+
+      const { error } = await supabase
+        .from("guild_story_reads")
+        .upsert({
+          user_id: user.id,
+          story_id: storyId,
+        }, {
+          onConflict: 'user_id,story_id',
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unread-guild-stories"] });
+    },
+  });
+
+  const selectedEpic = epicsWithStories?.find(e => e.id === selectedEpicId);
+
+  // Mark stories as read when viewing
+  useEffect(() => {
+    if (!selectedEpic || !user?.id) return;
+
+    // Mark all stories for the selected epic as read
+    selectedEpic.stories.forEach(story => {
+      markStoryAsRead.mutate(story.id);
+    });
+  }, [selectedEpicId, selectedEpic?.stories.length]);
+
   // Generate new guild story
   const generateStory = useMutation({
     mutationFn: async (epicId: string) => {
@@ -158,7 +191,6 @@ export const GuildStoriesSection = () => {
     },
   });
 
-  const selectedEpic = epicsWithStories?.find(e => e.id === selectedEpicId);
   const latestStory = selectedEpic?.stories?.[selectedEpic.stories.length - 1];
   const canGenerateStory = selectedEpic && selectedEpic.memberCount >= 2;
 
