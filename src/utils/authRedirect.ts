@@ -45,8 +45,9 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
 
   if (!existing) {
     // Create new profile with user's timezone and 7-day trial
-    // CRITICAL: Set trial_ends_at explicitly to ensure 7-day trial is granted
-    const trialEndsAt = new Date();
+    // CRITICAL: Set trial_ends_at and trial_started_at explicitly to ensure 7-day trial is granted
+    const now = new Date();
+    const trialEndsAt = new Date(now);
     trialEndsAt.setDate(trialEndsAt.getDate() + 7);
     
     const { error } = await supabase.from("profiles").upsert({
@@ -54,6 +55,7 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
       email: email ?? null,
       timezone: userTimezone,
       trial_ends_at: trialEndsAt.toISOString(),
+      trial_started_at: now.toISOString(),
     }, {
       onConflict: 'id'
     });

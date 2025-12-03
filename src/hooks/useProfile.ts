@@ -61,8 +61,9 @@ export const useProfile = () => {
 
       if (!data) {
         // Auto-create profile on first login if missing (upsert prevents race conditions)
-        // CRITICAL: Set trial_ends_at explicitly to ensure 7-day trial is granted
-        const trialEndsAt = new Date();
+        // CRITICAL: Set trial_ends_at and trial_started_at explicitly to ensure 7-day trial is granted
+        const now = new Date();
+        const trialEndsAt = new Date(now);
         trialEndsAt.setDate(trialEndsAt.getDate() + 7);
         
         const { data: inserted, error: insertError } = await supabase
@@ -71,6 +72,7 @@ export const useProfile = () => {
             id: user.id,
             email: user.email ?? null,
             trial_ends_at: trialEndsAt.toISOString(),
+            trial_started_at: now.toISOString(),
           }, {
             onConflict: 'id',
             ignoreDuplicates: false
