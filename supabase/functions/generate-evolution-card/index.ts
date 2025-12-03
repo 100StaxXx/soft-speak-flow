@@ -136,14 +136,20 @@ CREATURE ATTRIBUTES:
 - Rarity: ${rarity}
 
 NAME GENERATION RULES:
+• Create a PROPER CHARACTER NAME - like naming a protagonist in a fantasy novel
 • 1-2 words maximum
 • Must be mythic, elegant, and slightly otherworldly
 • Easy to pronounce
+• ABSOLUTELY NO generic animal words: pup, puppy, cub, wolf, fox, dragon, tiger, kitten, bird, hound, beast, etc.
+• ABSOLUTELY NO descriptive/stage words: baby, young, elder, ancient, little, big, small, tiny
+• NO element + species combos (e.g., "Fire Wolf", "Storm Tiger", "Lightning Pup")
 • NO references to Pokémon, Digimon, Marvel, Warcraft, or mythology
 • NO real-world names
 • NO numbers
-• Must feel ORIGINAL and fresh
-• Should evoke the creature's element, species, and personality
+• Must feel ORIGINAL and fresh - a unique fantasy NAME, not a description
+
+GOOD EXAMPLES: Zephyros, Voltrix, Lumara, Aelion, Nyxara, Embris, Kaelthos, Seraphis, Thalox, Veyra
+BAD EXAMPLES: Fire Pup, Storm Wolf, Lightning Cub, Shadow Fox, Flame Dragon, Thunder Beast, Fulmen Pup
 
 Generate a card with these exact fields in JSON:
 
