@@ -15,6 +15,15 @@ const placementDescriptions: Record<string, string> = {
   venus: "love style, values, beauty, and pleasure",
 };
 
+// Placement-specific focus areas for non-sun placements
+const placementFocus: Record<string, string> = {
+  moon: "emotional_insight",
+  rising: "social_insight", 
+  mercury: "mental_insight",
+  mars: "action_insight",
+  venus: "love_insight",
+};
+
 // Retry helper with exponential backoff
 async function fetchWithRetry(
   url: string,
@@ -27,14 +36,12 @@ async function fetchWithRetry(
     try {
       const response = await fetch(url, options);
       
-      // Don't retry on client errors (4xx) except rate limits
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         return response;
       }
       
-      // Retry on 5xx or 429 after delay
       if (response.status >= 500 || response.status === 429) {
-        const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        const delay = Math.pow(2, attempt) * 1000;
         console.log(`Attempt ${attempt + 1} failed with ${response.status}, retrying in ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
@@ -52,16 +59,72 @@ async function fetchWithRetry(
   throw lastError || new Error('Max retries exceeded');
 }
 
-// Get local date from timezone offset
 function getLocalDate(timezoneOffset?: number): string {
   const now = new Date();
   if (timezoneOffset !== undefined) {
-    // timezoneOffset is in minutes, positive for west of UTC
     const localTime = new Date(now.getTime() - timezoneOffset * 60 * 1000);
     return localTime.toISOString().split('T')[0];
   }
-  // Fallback to UTC
   return now.toISOString().split('T')[0];
+}
+
+// Build prompt based on placement type
+function buildPrompt(placement: string, sign: string, userName: string, chartContext: string, today: string): string {
+  const isSun = placement.toLowerCase() === 'sun';
+  
+  if (isSun) {
+    return `You are an expert astrologer creating a CONCISE personalized cosmic reading.
+
+${chartContext}
+
+The Sun represents: ${placementDescriptions.sun}.
+
+Generate a SHORT reading for Sun in ${sign} for ${userName}.
+Today's date is ${today}.
+
+IMPORTANT: Keep ALL content very brief - a few sentences each, NOT paragraphs.
+
+Return a JSON object with EXACTLY these fields:
+{
+  "title": "A creative title (3-5 words)",
+  "tagline": "A short phrase (under 10 words)",
+  "todays_focus": "1-2 sentences about today's cosmic energy",
+  "chart_synergy": "1-2 sentences about how Sun interacts with other placements",
+  "overview": "3-4 sentences max explaining Sun in ${sign}",
+  "strengths": ["short phrase", "short phrase"],
+  "challenges": ["short phrase", "short phrase"]
+}
+
+Be warm but CONCISE. Quality over quantity.`;
+  } else {
+    const focusField = placementFocus[placement.toLowerCase()] || 'insight';
+    const focusDescriptions: Record<string, string> = {
+      emotional_insight: "How this Moon placement colors your emotional world and inner needs (2-3 sentences)",
+      social_insight: "How this Rising sign shapes first impressions and your outward persona (2-3 sentences)",
+      mental_insight: "How this Mercury placement affects your thinking and communication style (2-3 sentences)",
+      action_insight: "How this Mars placement drives your ambition, energy, and desires (2-3 sentences)",
+      love_insight: "How this Venus placement shapes your love language and values (2-3 sentences)",
+    };
+
+    return `You are an expert astrologer creating a VERY BRIEF personalized cosmic insight.
+
+${chartContext}
+
+The ${placement} represents: ${placementDescriptions[placement.toLowerCase()] || 'an important placement'}.
+
+Generate ONE focused insight for ${placement} in ${sign} for ${userName}.
+
+IMPORTANT: This should be SHORT - just 2-3 sentences of meaningful insight.
+
+Return a JSON object with EXACTLY these fields:
+{
+  "title": "A creative title (3-5 words)",
+  "tagline": "A short phrase (under 10 words)",
+  "${focusField}": "${focusDescriptions[focusField] || '2-3 sentences of focused insight'}"
+}
+
+Be warm, specific, and CONCISE. One powerful insight is better than many generic ones.`;
+  }
 }
 
 serve(async (req) => {
@@ -87,12 +150,10 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    // Create client with user's token to get their profile
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Create service client for writing cache
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
@@ -111,7 +172,6 @@ serve(async (req) => {
       });
     }
 
-    // Use local date based on user's timezone
     const today = getLocalDate(timezoneOffset);
     console.log('Using date:', today, 'with timezone offset:', timezoneOffset);
 
@@ -132,10 +192,10 @@ serve(async (req) => {
       });
     }
 
-    // Fetch user's full cosmic profile
+    // Fetch user's profile
     const { data: profile, error: profileError } = await supabaseUser
       .from('profiles')
-      .select('zodiac_sign, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign, email')
+      .select('zodiac_sign, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign, onboarding_data')
       .eq('id', user.id)
       .single();
 
@@ -148,12 +208,11 @@ serve(async (req) => {
     }
 
     const hasAdvancedProfile = profile?.moon_sign && profile?.rising_sign;
-    // Use first part of email as fallback name
-    const userName = profile?.email?.split('@')[0] || 'you';
+    const onboardingData = profile?.onboarding_data as Record<string, unknown> | null;
+    const userName = (onboardingData?.userName as string) || 'you';
 
-    // Build the personalized prompt
     const chartContext = hasAdvancedProfile ? `
-User's Full Cosmiq Profile:
+User's Cosmiq Profile:
 ☀️ Sun: ${profile.zodiac_sign || 'Unknown'}
 🌙 Moon: ${profile.moon_sign || 'Unknown'}
 ⬆️ Rising: ${profile.rising_sign || 'Unknown'}
@@ -162,44 +221,12 @@ User's Full Cosmiq Profile:
 💗 Venus: ${profile.venus_sign || 'Unknown'}
 
 This user is viewing their ${placement.toUpperCase()} in ${sign.toUpperCase()}.
-Generate content that explains how this ${placement} placement specifically interacts with and is colored by their OTHER placements.
-Make it feel uniquely written for THIS person's chart.
-
-The "chart_synergy" field should explain concrete ways this placement interacts with their specific Big Three and planets.
-For example, if they have Moon in Libra and Sun in Scorpio, explain how Libra's need for harmony softens Scorpio's intensity.
 ` : `
-User has a basic profile with Sun in ${profile.zodiac_sign || sign}.
+User has Sun in ${profile.zodiac_sign || sign}.
 They are viewing ${placement.toUpperCase()} in ${sign.toUpperCase()}.
-Generate insightful content for this placement, but make it feel warm and personalized.
 `;
 
-    const prompt = `You are an expert astrologer creating a deeply personalized cosmic deep dive.
-
-${chartContext}
-
-The ${placement} represents: ${placementDescriptions[placement.toLowerCase()] || 'an important astrological placement'}.
-
-Generate a comprehensive, personalized reading for ${placement} in ${sign}. 
-Make it feel like it was written specifically for ${userName}, not generic content.
-Today's date is ${today} - include a fresh "todays_focus" insight relevant to current cosmic energy.
-
-Return a JSON object with EXACTLY these fields:
-{
-  "title": "A creative, evocative title for this placement (e.g., 'The Diplomatic Heart' for Moon in Libra)",
-  "tagline": "A short, memorable phrase capturing the essence",
-  "overview": "2-3 paragraphs explaining what this placement means in ${userName}'s chart specifically. Reference their other placements if available.",
-  "strengths": ["strength 1", "strength 2", "strength 3", "strength 4"],
-  "challenges": ["challenge 1", "challenge 2", "challenge 3"],
-  "in_relationships": "How this placement affects ${userName}'s relationships, with specific examples",
-  "in_work": "How this placement shows up in ${userName}'s career and work style",
-  "in_wellness": "Self-care and wellness practices that support this placement",
-  "compatible_signs": ["sign1", "sign2", "sign3"],
-  "daily_practice": "A specific ritual or practice for today",
-  "chart_synergy": "How this ${placement} in ${sign} specifically interacts with ${userName}'s other placements. Be concrete and specific.",
-  "todays_focus": "A fresh, actionable insight for TODAY (${today}) based on current cosmic energy"
-}
-
-Be warm, insightful, and make it feel like a conversation with a wise friend who knows their chart intimately.`;
+    const prompt = buildPrompt(placement.toLowerCase(), sign, userName, chartContext, today);
 
     console.log('Generating personalized deep dive for', user.id, placement, sign);
 
@@ -214,7 +241,7 @@ Be warm, insightful, and make it feel like a conversation with a wise friend who
         messages: [
           {
             role: "system",
-            content: "You are an expert astrologer. Return ONLY valid JSON, no markdown formatting or code blocks."
+            content: "You are an expert astrologer. Return ONLY valid JSON, no markdown formatting or code blocks. Keep responses CONCISE."
           },
           { role: "user", content: prompt }
         ],
@@ -248,7 +275,6 @@ Be warm, insightful, and make it feel like a conversation with a wise friend who
       throw new Error('No content in AI response');
     }
 
-    // Parse JSON from response (handle potential markdown wrapping)
     let content;
     try {
       const jsonMatch = contentText.match(/\{[\s\S]*\}/);
@@ -262,33 +288,37 @@ Be warm, insightful, and make it feel like a conversation with a wise friend who
       throw new Error('Failed to parse AI response');
     }
 
-    // Validate required fields
-    const requiredFields = ['title', 'tagline', 'overview', 'strengths', 'challenges', 
-                          'in_relationships', 'in_work', 'in_wellness', 'daily_practice'];
-    for (const field of requiredFields) {
-      if (!content[field]) {
-        throw new Error(`Missing required field: ${field}`);
-      }
+    // Validate required fields based on placement
+    if (!content.title || !content.tagline) {
+      throw new Error('Missing required fields: title, tagline');
     }
 
-    // Cache the result
-    const cacheData = {
+    // Cache the result with simplified structure
+    const cacheData: Record<string, unknown> = {
       user_id: user.id,
       placement: placement.toLowerCase(),
       sign: sign.toLowerCase(),
       for_date: today,
       title: content.title,
       tagline: content.tagline,
-      overview: content.overview,
+      // Sun-specific fields
+      overview: content.overview || null,
       strengths: Array.isArray(content.strengths) ? content.strengths : [],
       challenges: Array.isArray(content.challenges) ? content.challenges : [],
-      in_relationships: content.in_relationships,
-      in_work: content.in_work,
-      in_wellness: content.in_wellness,
-      compatible_signs: Array.isArray(content.compatible_signs) ? content.compatible_signs : [],
-      daily_practice: content.daily_practice,
       chart_synergy: content.chart_synergy || null,
       todays_focus: content.todays_focus || null,
+      // Placement-specific insights
+      emotional_insight: content.emotional_insight || null,
+      social_insight: content.social_insight || null,
+      mental_insight: content.mental_insight || null,
+      action_insight: content.action_insight || null,
+      love_insight: content.love_insight || null,
+      // Legacy fields (empty for new format)
+      in_relationships: content.in_relationships || null,
+      in_work: content.in_work || null,
+      in_wellness: content.in_wellness || null,
+      compatible_signs: [],
+      daily_practice: content.daily_practice || null,
     };
 
     const { error: insertError } = await supabaseService
@@ -297,7 +327,6 @@ Be warm, insightful, and make it feel like a conversation with a wise friend who
 
     if (insertError) {
       console.error('Failed to cache deep dive:', insertError);
-      // Don't fail the request, just log the error
     }
 
     console.log('Generated and cached deep dive for', user.id, placement, sign);

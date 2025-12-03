@@ -3349,19 +3349,24 @@ export type Database = {
       }
       user_cosmic_deep_dives: {
         Row: {
+          action_insight: string | null
           challenges: string[]
           chart_synergy: string | null
           compatible_signs: string[]
           created_at: string
           daily_practice: string
+          emotional_insight: string | null
           for_date: string
           id: string
           in_relationships: string
           in_wellness: string
           in_work: string
+          love_insight: string | null
+          mental_insight: string | null
           overview: string
           placement: string
           sign: string
+          social_insight: string | null
           strengths: string[]
           tagline: string
           title: string
@@ -3369,19 +3374,24 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_insight?: string | null
           challenges?: string[]
           chart_synergy?: string | null
           compatible_signs?: string[]
           created_at?: string
           daily_practice: string
+          emotional_insight?: string | null
           for_date: string
           id?: string
           in_relationships: string
           in_wellness: string
           in_work: string
+          love_insight?: string | null
+          mental_insight?: string | null
           overview: string
           placement: string
           sign: string
+          social_insight?: string | null
           strengths?: string[]
           tagline: string
           title: string
@@ -3389,19 +3399,24 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_insight?: string | null
           challenges?: string[]
           chart_synergy?: string | null
           compatible_signs?: string[]
           created_at?: string
           daily_practice?: string
+          emotional_insight?: string | null
           for_date?: string
           id?: string
           in_relationships?: string
           in_wellness?: string
           in_work?: string
+          love_insight?: string | null
+          mental_insight?: string | null
           overview?: string
           placement?: string
           sign?: string
+          social_insight?: string | null
           strengths?: string[]
           tagline?: string
           title?: string

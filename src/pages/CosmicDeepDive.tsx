@@ -32,16 +32,24 @@ const placementColors = {
 interface CosmiqContent {
   title: string;
   tagline: string;
-  overview: string;
-  strengths: string[];
-  challenges: string[];
-  in_relationships: string;
-  in_work: string;
-  in_wellness: string;
-  compatible_signs: string[];
-  daily_practice: string;
+  // Sun-specific
+  overview?: string;
+  strengths?: string[];
+  challenges?: string[];
   chart_synergy?: string;
   todays_focus?: string;
+  // Placement-specific insights
+  emotional_insight?: string;  // Moon
+  social_insight?: string;     // Rising
+  mental_insight?: string;     // Mercury
+  action_insight?: string;     // Mars
+  love_insight?: string;       // Venus
+  // Legacy fields (may exist in old cached data)
+  in_relationships?: string;
+  in_work?: string;
+  in_wellness?: string;
+  compatible_signs?: string[];
+  daily_practice?: string;
 }
 
 const CosmiqDeepDive = () => {
@@ -54,7 +62,6 @@ const CosmiqDeepDive = () => {
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
 
-  // Save quiz feedback to database
   const handleQuizAnswer = async (resonates: boolean) => {
     setQuizAnswer(resonates);
     
@@ -78,9 +85,7 @@ const CosmiqDeepDive = () => {
       setLoading(true);
 
       try {
-        // If user is logged in, try to get personalized content
         if (user) {
-          // Send timezone offset so backend uses correct local date
           const timezoneOffset = new Date().getTimezoneOffset();
           const { data: personalizedData, error: personalizedError } = await supabase.functions.invoke(
             'generate-cosmic-deep-dive',
@@ -94,13 +99,11 @@ const CosmiqDeepDive = () => {
             return;
           }
 
-          // Log error but fall back to static content
           if (personalizedError || personalizedData?.error) {
             console.log('Falling back to static content:', personalizedError || personalizedData?.error);
           }
         }
 
-        // Fall back to static content from zodiac_sign_content
         const { data, error } = await supabase
           .from('zodiac_sign_content')
           .select('*')
@@ -141,6 +144,7 @@ const CosmiqDeepDive = () => {
 
   const Icon = placementIcons[placement as keyof typeof placementIcons] || Sparkles;
   const gradient = placementColors[placement as keyof typeof placementColors];
+  const isSunPlacement = placement.toLowerCase() === 'sun';
 
   const placementNames: Record<string, string> = {
     sun: "Sun",
@@ -151,11 +155,31 @@ const CosmiqDeepDive = () => {
     venus: "Venus",
   };
 
+  // Get the relevant insight for non-sun placements
+  const getPlacementInsight = () => {
+    if (!content) return null;
+    const p = placement.toLowerCase();
+    if (p === 'moon') return content.emotional_insight;
+    if (p === 'rising') return content.social_insight;
+    if (p === 'mercury') return content.mental_insight;
+    if (p === 'mars') return content.action_insight;
+    if (p === 'venus') return content.love_insight;
+    return null;
+  };
+
+  const insightLabels: Record<string, { title: string; icon: string }> = {
+    moon: { title: "Your Emotional World", icon: "🌙" },
+    rising: { title: "Your First Impression", icon: "✨" },
+    mercury: { title: "How You Think & Communicate", icon: "💭" },
+    mars: { title: "What Drives You", icon: "🔥" },
+    venus: { title: "How You Love", icon: "💗" },
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
       {/* Cosmiq background */}
       <div className="absolute inset-0">
-        {[...Array(50)].map((_, i) => (
+        {[...Array(30)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white rounded-full"
@@ -175,7 +199,7 @@ const CosmiqDeepDive = () => {
         ))}
       </div>
 
-      <div className="relative max-w-3xl mx-auto p-6 space-y-8">
+      <div className="relative max-w-3xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
@@ -207,264 +231,232 @@ const CosmiqDeepDive = () => {
                     </Badge>
                   )}
                 </div>
-                <p className="text-sm text-gray-400">
-                  {isPersonalized ? "Generated for your unique chart" : "Understanding your placement"}
-                </p>
               </div>
             </div>
           </motion.div>
         </div>
 
         {loading ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full bg-gray-800/50" />
             <Skeleton className="h-32 w-full bg-gray-800/50" />
-            <Skeleton className="h-48 w-full bg-gray-800/50" />
-            <Skeleton className="h-48 w-full bg-gray-800/50" />
             <p className="text-center text-gray-400 text-sm animate-pulse">
-              ✨ Generating your personalized cosmic insights...
+              ✨ Generating your cosmic insight...
             </p>
           </div>
         ) : content ? (
           <>
-            {/* Main Title Card */}
+            {/* Title Card */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-8`}>
-                <div className="space-y-3 text-center">
-                  <h2 className="text-3xl font-black text-white">{content.title}</h2>
-                  <p className="text-xl text-gray-200 italic">{content.tagline}</p>
+              <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-6`}>
+                <div className="space-y-2 text-center">
+                  <h2 className="text-2xl font-black text-white">{content.title}</h2>
+                  <p className="text-lg text-gray-200 italic">{content.tagline}</p>
                 </div>
               </Card>
             </motion.div>
 
-            {/* Today's Focus - Only for personalized content */}
-            {isPersonalized && content.todays_focus && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-              >
-                <Card className="bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-pink-600/30 border-purple-500/40 p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-purple-300" />
-                      <h3 className="text-lg font-bold text-purple-200">Today's Focus</h3>
-                      <Badge className="bg-purple-500/20 text-purple-200 text-xs border-purple-500/30">
-                        {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Badge>
-                    </div>
-                    <p className="text-gray-100 leading-relaxed">{content.todays_focus}</p>
-                  </div>
-                </Card>
-              </motion.div>
+            {/* SUN PLACEMENT - Show 4 sections */}
+            {isSunPlacement ? (
+              <>
+                {/* Today's Focus */}
+                {isPersonalized && content.todays_focus && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                  >
+                    <Card className="bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-pink-600/30 border-purple-500/40 p-5">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-purple-300" />
+                          <h3 className="text-base font-bold text-purple-200">Today's Focus</h3>
+                        </div>
+                        <p className="text-gray-100 text-sm leading-relaxed">{content.todays_focus}</p>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* In Your Chart */}
+                {isPersonalized && content.chart_synergy && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <Card className="bg-gradient-to-br from-violet-950/50 to-fuchsia-950/50 border-violet-500/30 p-5">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Star className="w-4 h-4 text-violet-300" />
+                          <h3 className="text-base font-bold text-violet-200">In Your Chart</h3>
+                        </div>
+                        <p className="text-gray-200 text-sm leading-relaxed">{content.chart_synergy}</p>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Overview */}
+                {content.overview && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                  >
+                    <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+                      <div className="space-y-2">
+                        <h3 className="text-base font-bold text-accent-purple">
+                          What is Sun in {sign.charAt(0).toUpperCase() + sign.slice(1)}?
+                        </h3>
+                        <p className="text-gray-200 text-sm leading-relaxed">{content.overview}</p>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Strengths & Challenges */}
+                {(content.strengths?.length || content.challenges?.length) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    {content.strengths && content.strengths.length > 0 && (
+                      <Card className="bg-emerald-950/30 border-emerald-500/30 p-4">
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Strengths
+                          </h3>
+                          <ul className="space-y-1">
+                            {content.strengths.map((strength, i) => (
+                              <li key={i} className="text-gray-200 text-xs flex items-start gap-1">
+                                <span className="text-emerald-400">•</span>
+                                <span>{strength}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </Card>
+                    )}
+
+                    {content.challenges && content.challenges.length > 0 && (
+                      <Card className="bg-rose-950/30 border-rose-500/30 p-4">
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-bold text-rose-300 flex items-center gap-1">
+                            <XCircle className="w-4 h-4" />
+                            Growth Areas
+                          </h3>
+                          <ul className="space-y-1">
+                            {content.challenges.map((challenge, i) => (
+                              <li key={i} className="text-gray-200 text-xs flex items-start gap-1">
+                                <span className="text-rose-400">•</span>
+                                <span>{challenge}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </Card>
+                    )}
+                  </motion.div>
+                )}
+              </>
+            ) : (
+              /* OTHER PLACEMENTS - Show single focused insight */
+              <>
+                {(() => {
+                  const insight = getPlacementInsight();
+                  const label = insightLabels[placement.toLowerCase()];
+                  
+                  if (insight && label) {
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                      >
+                        <Card className={`bg-gradient-to-br ${gradient} border-royal-purple/30 p-6`}>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{label.icon}</span>
+                              <h3 className="text-lg font-bold text-white">{label.title}</h3>
+                            </div>
+                            <p className="text-gray-100 leading-relaxed">{insight}</p>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  }
+                  
+                  // Fallback for old cached data without new insight fields
+                  if (content.overview) {
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                      >
+                        <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
+                          <p className="text-gray-200 text-sm leading-relaxed">{content.overview}</p>
+                        </Card>
+                      </motion.div>
+                    );
+                  }
+                  
+                  return null;
+                })()}
+              </>
             )}
 
-            {/* Chart Synergy - Only for personalized content */}
-            {isPersonalized && content.chart_synergy && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18 }}
-              >
-                <Card className="bg-gradient-to-br from-violet-950/50 to-fuchsia-950/50 border-violet-500/30 p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Star className="w-5 h-5 text-violet-300" />
-                      <h3 className="text-lg font-bold text-violet-200">In Your Chart</h3>
-                    </div>
-                    <p className="text-gray-200 leading-relaxed">{content.chart_synergy}</p>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* What is this placement? */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="bg-obsidian/80 border-royal-purple/30 p-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-accent-purple">
-                    What is {placementNames[placement]} in {sign.charAt(0).toUpperCase() + sign.slice(1)}?
-                  </h3>
-                  <p className="text-gray-200 leading-relaxed">{content.overview}</p>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Strengths & Challenges */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-            >
-              <Card className="bg-emerald-950/30 border-emerald-500/30 p-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-emerald-300 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                    Your Strengths
-                  </h3>
-                  <ul className="space-y-2">
-                    {content.strengths.map((strength, i) => (
-                      <li key={i} className="text-gray-200 flex items-start gap-2">
-                        <span className="text-emerald-400 mt-1">•</span>
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-
-              <Card className="bg-rose-950/30 border-rose-500/30 p-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-rose-300 flex items-center gap-2">
-                    <XCircle className="w-5 h-5" />
-                    Growth Areas
-                  </h3>
-                  <ul className="space-y-2">
-                    {content.challenges.map((challenge, i) => (
-                      <li key={i} className="text-gray-200 flex items-start gap-2">
-                        <span className="text-rose-400 mt-1">•</span>
-                        <span>{challenge}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* How It Shows Up */}
+            {/* Feedback Quiz */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="space-y-4"
             >
-              <h3 className="text-2xl font-bold text-white text-center">How It Shows Up</h3>
-
-              <Card className="bg-pink-950/30 border-pink-500/30 p-6">
+              <Card className="bg-obsidian/80 border-royal-purple/30 p-5">
                 <div className="space-y-3">
-                  <h4 className="text-lg font-bold text-pink-300">💕 In Relationships</h4>
-                  <p className="text-gray-200 leading-relaxed">{content.in_relationships}</p>
-                </div>
-              </Card>
-
-              <Card className="bg-amber-950/30 border-amber-500/30 p-6">
-                <div className="space-y-3">
-                  <h4 className="text-lg font-bold text-amber-300">💼 In Work</h4>
-                  <p className="text-gray-200 leading-relaxed">{content.in_work}</p>
-                </div>
-              </Card>
-
-              <Card className="bg-blue-950/30 border-blue-500/30 p-6">
-                <div className="space-y-3">
-                  <h4 className="text-lg font-bold text-blue-300">🌿 In Wellness</h4>
-                  <p className="text-gray-200 leading-relaxed">{content.in_wellness}</p>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Compatible Signs */}
-            {content.compatible_signs.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Card className="bg-obsidian/80 border-royal-purple/30 p-6">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-accent-purple">
-                      Compatible with these signs
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {content.compatible_signs.map((compatSign) => (
-                        <Badge key={compatSign} className="bg-purple-500/20 text-purple-300 border-purple-500/30 capitalize">
-                          {compatSign}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* Daily Practice */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 border-none p-6">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-white" />
-                    <h3 className="text-lg font-bold text-white">Daily Practice</h3>
-                  </div>
-                  <p className="text-white/90 leading-relaxed">{content.daily_practice}</p>
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* Interactive Quiz */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-            >
-              <Card className="bg-obsidian/80 border-royal-purple/30 p-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-white">Does this resonate with you?</h3>
-                  <p className="text-gray-300 text-sm">
-                    {isPersonalized 
-                      ? "This reading was generated specifically for your chart. How well does it match your experience?"
-                      : "Astrology is a tool for self-reflection, not a rigid definition. How well does this description match your experience?"}
-                  </p>
+                  <h3 className="text-base font-bold text-white">Does this resonate?</h3>
                   <div className="flex gap-3">
                     <Button
                       onClick={() => handleQuizAnswer(true)}
                       variant={quizAnswer === true ? "default" : "outline"}
+                      size="sm"
                       className={quizAnswer === true ? "bg-emerald-600 hover:bg-emerald-700" : ""}
                       disabled={quizAnswer !== null}
                     >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Yes, that's me!
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      Yes!
                     </Button>
                     <Button
                       onClick={() => handleQuizAnswer(false)}
                       variant={quizAnswer === false ? "default" : "outline"}
+                      size="sm"
                       className={quizAnswer === false ? "bg-rose-600 hover:bg-rose-700" : ""}
                       disabled={quizAnswer !== null}
                     >
-                      <XCircle className="w-4 h-4 mr-2" />
+                      <XCircle className="w-4 h-4 mr-1" />
                       Not quite
                     </Button>
                   </div>
                   {quizAnswer !== null && (
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-sm text-gray-400 italic"
-                    >
-                      {quizAnswer
-                        ? "Amazing! Your cosmiq blueprint is speaking to you. 🌟"
-                        : "That's okay! Every placement expresses differently based on your whole chart. Keep exploring!"}
-                    </motion.p>
+                    <p className="text-gray-400 text-xs">
+                      {quizAnswer 
+                        ? "Thanks for the feedback! ✨" 
+                        : "Thanks! We'll keep refining your insights."}
+                    </p>
                   )}
                 </div>
               </Card>
             </motion.div>
           </>
-        ) : (
-          <Card className="bg-obsidian/80 border-royal-purple/30 p-8 text-center">
-            <p className="text-gray-400">Content not found for this placement.</p>
-          </Card>
-        )}
+        ) : null}
       </div>
 
       <BottomNav />
