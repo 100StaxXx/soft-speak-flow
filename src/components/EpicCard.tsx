@@ -14,7 +14,7 @@ import {
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { EpicDiscordSection } from "./EpicDiscordSection";
 import { GuildStorySection } from "./GuildStorySection";
 import { GuildMembersSection } from "./GuildMembersSection";
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<EpicTheme, string> = {
@@ -81,6 +82,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
+  const { checkAndGeneratePostcard } = useCompanionPostcards();
+  const previousProgressRef = useRef<number>(epic.progress_percentage);
+  
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
@@ -89,6 +93,34 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const theme = (epic.theme_color || 'heroic') as EpicTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
+
+  // Check for milestone crossings and trigger postcard generation
+  useEffect(() => {
+    if (!companion?.id || !isActive) return;
+    
+    const currentProgress = epic.progress_percentage;
+    const previousProgress = previousProgressRef.current;
+    
+    // Only check if progress increased
+    if (currentProgress > previousProgress) {
+      checkAndGeneratePostcard(
+        epic.id,
+        currentProgress,
+        previousProgress,
+        companion.id,
+        {
+          spirit_animal: companion.spirit_animal,
+          favorite_color: companion.favorite_color,
+          core_element: companion.core_element,
+          eye_color: companion.eye_color,
+          fur_color: companion.fur_color,
+        }
+      );
+    }
+    
+    // Update ref for next comparison
+    previousProgressRef.current = currentProgress;
+  }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 
   // Fetch member count for public epics (for Discord feature)
   useEffect(() => {
