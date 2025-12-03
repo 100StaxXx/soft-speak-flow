@@ -84,19 +84,21 @@ serve(async (req) => {
     // Fetch user's full cosmic profile
     const { data: profile, error: profileError } = await supabaseUser
       .from('profiles')
-      .select('zodiac_sign, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign, name')
+      .select('zodiac_sign, moon_sign, rising_sign, mercury_sign, mars_sign, venus_sign, email')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
       return new Response(JSON.stringify({ error: 'Profile not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const hasAdvancedProfile = profile.moon_sign && profile.rising_sign;
-    const userName = profile.name || 'you';
+    const hasAdvancedProfile = profile?.moon_sign && profile?.rising_sign;
+    // Use first part of email as fallback name
+    const userName = profile?.email?.split('@')[0] || 'you';
 
     // Build the personalized prompt
     const chartContext = hasAdvancedProfile ? `
