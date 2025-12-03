@@ -21,6 +21,7 @@ export const StoryJournalInfoTooltip = () => {
             <li>• AI-generated stories unique to your journey</li>
             <li>• Learn life lessons through your companion's tale</li>
             <li>• Prologue + 20 chapters to unlock</li>
+            <li>• Guild Chronicles feature companions from your guild</li>
           </ul>
         </div>
       </PopoverContent>
