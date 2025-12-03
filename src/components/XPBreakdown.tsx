@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+import { XPBreakdownInfoTooltip } from "./XPBreakdownInfoTooltip";
 
 export const XPBreakdown = () => {
   const { user } = useAuth();
@@ -55,14 +56,17 @@ export const XPBreakdown = () => {
   return (
     <Card className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5">
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-heading font-black text-lg">Today's XP</h3>
+              <p className="text-2xl font-bold text-primary">{todayXP?.total || 0} XP</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-heading font-black text-lg">Today's XP</h3>
-            <p className="text-2xl font-bold text-primary">{todayXP?.total || 0} XP</p>
-          </div>
+          <XPBreakdownInfoTooltip />
         </div>
 
         {/* Streak Info */}

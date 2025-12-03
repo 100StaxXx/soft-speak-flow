@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Star, Moon, Sun, ArrowLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HoroscopeInfoTooltip } from "@/components/HoroscopeInfoTooltip";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
@@ -429,9 +430,10 @@ const Horoscope = () => {
                   ease: "easeInOut",
                 }}
               >
-                <Moon className="w-8 h-8 text-purple-400" />
+              <Moon className="w-8 h-8 text-purple-400" />
               </motion.div>
               Cosmiq Insight
+              <HoroscopeInfoTooltip />
             </h1>
             <p className="text-gray-400 text-sm mt-1">
               {date ? formatDate(date) : 'Loading...'}

@@ -10,6 +10,7 @@ import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MissionErrorFallback } from "@/components/ErrorFallback";
+import { DailyMissionsInfoTooltip } from "@/components/DailyMissionsInfoTooltip";
 
 
 const DailyMissionsContent = () => {
@@ -83,12 +84,13 @@ const DailyMissionsContent = () => {
             <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
               <Target className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
             </div>
-            <div>
+            <div className="flex items-center gap-1">
               <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                {completedCount}/{totalCount} complete
-              </p>
+              <DailyMissionsInfoTooltip />
             </div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              {completedCount}/{totalCount} complete
+            </p>
           </div>
           {allComplete && (
             <div className="text-[10px] sm:text-xs font-bold text-green-500 animate-pulse">
