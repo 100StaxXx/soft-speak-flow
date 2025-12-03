@@ -305,11 +305,13 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           <div className="mb-4">
             <EpicCheckInDrawer
               epicId={epic.id}
-              habits={epic.epic_habits.map(eh => ({
-                id: eh.habit_id,
-                title: eh.habits.title,
-                difficulty: eh.habits.difficulty,
-              }))}
+              habits={epic.epic_habits
+                .filter(eh => eh.habits) // Filter out deleted habits
+                .map(eh => ({
+                  id: eh.habit_id,
+                  title: eh.habits.title,
+                  difficulty: eh.habits.difficulty || 'medium',
+                }))}
               isActive={isActive}
             />
             
@@ -319,11 +321,13 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 Contributing Habits
               </div>
               <div className="flex flex-wrap gap-2">
-                {epic.epic_habits.map((eh) => (
-                  <Badge key={eh.habit_id} variant="outline" className="text-xs">
-                    {eh.habits.title}
-                  </Badge>
-                ))}
+                {epic.epic_habits
+                  .filter(eh => eh.habits) // Filter out deleted habits
+                  .map((eh) => (
+                    <Badge key={eh.habit_id} variant="outline" className="text-xs">
+                      {eh.habits.title}
+                    </Badge>
+                  ))}
               </div>
             </div>
           </div>

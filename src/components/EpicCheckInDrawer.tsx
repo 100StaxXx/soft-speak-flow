@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Star, CheckCircle2 } from "lucide-react";
+import { Sparkles, Star, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,34 +30,52 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [completedToday, setCompletedToday] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [loadingCompletions, setLoadingCompletions] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
+  const habitIds = habits.map(h => h.id);
+
+  const fetchTodayCompletions = useCallback(async () => {
+    if (!user?.id || habitIds.length === 0) return;
+    
+    setLoadingCompletions(true);
+    try {
+      const { data } = await supabase
+        .from('habit_completions')
+        .select('habit_id')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .in('habit_id', habitIds);
+      
+      if (data) {
+        setCompletedToday(new Set(data.map(d => d.habit_id).filter(Boolean)));
+      }
+    } finally {
+      setLoadingCompletions(false);
+    }
+  }, [user?.id, habitIds.join(','), today]);
 
   // Fetch today's completions when drawer opens
   useEffect(() => {
     if (open && user?.id) {
       fetchTodayCompletions();
     }
-  }, [open, user?.id]);
-
-  const fetchTodayCompletions = async () => {
-    if (!user?.id) return;
-    
-    const habitIds = habits.map(h => h.id);
-    const { data } = await supabase
-      .from('habit_completions')
-      .select('habit_id')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .in('habit_id', habitIds);
-    
-    if (data) {
-      setCompletedToday(new Set(data.map(d => d.habit_id)));
-    }
-  };
+  }, [open, user?.id, fetchTodayCompletions]);
 
   const handleToggleHabit = async (habitId: string, checked: boolean) => {
     if (!user?.id) return;
+    
+    // Optimistically update UI
+    const previousState = new Set(completedToday);
+    if (checked) {
+      setCompletedToday(prev => new Set([...prev, habitId]));
+    } else {
+      setCompletedToday(prev => {
+        const next = new Set(prev);
+        next.delete(habitId);
+        return next;
+      });
+    }
     
     setSubmitting(true);
     try {
@@ -72,28 +90,24 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           });
         
         if (error && error.code !== '23505') throw error; // Ignore duplicate errors
-        
-        setCompletedToday(prev => new Set([...prev, habitId]));
       } else {
         // Uncomplete habit
-        await supabase
+        const { error } = await supabase
           .from('habit_completions')
           .delete()
           .eq('user_id', user.id)
           .eq('habit_id', habitId)
           .eq('date', today);
         
-        setCompletedToday(prev => {
-          const next = new Set(prev);
-          next.delete(habitId);
-          return next;
-        });
+        if (error) throw error;
       }
       
       // Invalidate queries to refresh progress
       queryClient.invalidateQueries({ queryKey: ['epics'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
     } catch (err) {
+      // Rollback on error
+      setCompletedToday(previousState);
       console.error('Error toggling habit:', err);
       toast.error('Failed to update habit');
     } finally {
@@ -190,7 +204,11 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           </DrawerHeader>
           
           <AnimatePresence mode="wait">
-            {showSuccess ? (
+            {loadingCompletions ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : showSuccess ? (
               <motion.div
                 key="success"
                 initial={{ opacity: 0, scale: 0.8 }}
