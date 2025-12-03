@@ -241,7 +241,14 @@ export const CreateEpicDialog = ({
               min={1}
               max={365}
               value={targetDays}
-              onChange={(e) => setTargetDays(parseInt(e.target.value) || 30)}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value) && value >= 1 && value <= 365) {
+                  setTargetDays(value);
+                } else if (e.target.value === "") {
+                  setTargetDays(1); // Reset to minimum if cleared
+                }
+              }}
               className="mt-2"
             />
           </div>
