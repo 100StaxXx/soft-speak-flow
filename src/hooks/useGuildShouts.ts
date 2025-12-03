@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import { getShoutByKey, ShoutType } from "@/data/shoutMessages";
+import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 export interface GuildShout {
   id: string;
@@ -16,9 +17,11 @@ export interface GuildShout {
   created_at: string;
   sender?: {
     email: string | null;
+    onboarding_data?: unknown;
   };
   recipient?: {
     email: string | null;
+    onboarding_data?: unknown;
   };
 }
 
@@ -36,8 +39,8 @@ export const useGuildShouts = (epicId?: string) => {
         .from("guild_shouts")
         .select(`
           *,
-          sender:profiles!guild_shouts_sender_id_fkey(email),
-          recipient:profiles!guild_shouts_recipient_id_fkey(email)
+          sender:profiles!guild_shouts_sender_id_fkey(email, onboarding_data),
+          recipient:profiles!guild_shouts_recipient_id_fkey(email, onboarding_data)
         `)
         .eq("epic_id", epicId)
         .order("created_at", { ascending: false })
@@ -83,8 +86,15 @@ export const useGuildShouts = (epicId?: string) => {
 
       // Trigger push notification (fire and forget)
       const message = getShoutByKey(messageKey);
-      const senderEmail = user.email || 'Someone';
-      const senderName = senderEmail.split('@')[0];
+      
+      // Fetch current user's profile to get their display name
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("email, onboarding_data")
+        .eq("id", user.id)
+        .single();
+      
+      const senderName = getUserDisplayName(userProfile);
       
       supabase.functions.invoke('send-shout-notification', {
         body: {

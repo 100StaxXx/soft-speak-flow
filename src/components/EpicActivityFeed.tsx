@@ -5,6 +5,7 @@ import { CheckCircle2, Flame, UserPlus, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
 
 interface ActivityItem {
   id: string;
@@ -14,6 +15,7 @@ interface ActivityItem {
   created_at: string;
   profiles?: {
     email?: string;
+    onboarding_data?: unknown;
   };
 }
 
@@ -41,7 +43,7 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
         const userIds = [...new Set(data.map(a => a.user_id))];
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, email")
+          .select("id, email, onboarding_data")
           .in("id", userIds);
         
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
@@ -107,7 +109,7 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
   };
 
   const getActivityText = (activity: ActivityItem) => {
-    const userName = activity.profiles?.email?.split("@")[0] || "Someone";
+    const userName = getUserDisplayName(activity.profiles);
     
     switch (activity.activity_type) {
       case "habit_completed":
@@ -123,9 +125,9 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
     }
   };
 
-  const getInitials = (email?: string) => {
-    if (!email) return "?";
-    return email.substring(0, 2).toUpperCase();
+  const getActivityInitials = (profile?: { email?: string; onboarding_data?: unknown }) => {
+    const name = getUserDisplayName(profile);
+    return getInitials(name);
   };
 
   if (isLoading) {
@@ -173,7 +175,7 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
             >
               <Avatar className="h-8 w-8 mt-0.5">
                 <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                  {getInitials(activity.profiles?.email)}
+                  {getActivityInitials(activity.profiles)}
                 </AvatarFallback>
               </Avatar>
 
