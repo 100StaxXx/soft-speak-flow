@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ambientMusic } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
+import { isIOS, setupIOSAudioInteraction } from "@/utils/iosAudio";
 import { Music, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,11 @@ export const AmbientMusicPlayer = () => {
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   useEffect(() => {
+    // Setup iOS audio interaction on mount
+    if (isIOS) {
+      setupIOSAudioInteraction();
+    }
+    
     // Start playing ambient music on mount (will wait for user interaction)
     // Get fresh state instead of using potentially stale state
     const currentState = ambientMusic.getState();
@@ -32,11 +38,19 @@ export const AmbientMusicPlayer = () => {
     window.addEventListener('bg-music-volume-change', updateState);
     window.addEventListener('bg-music-mute-change', updateState);
     window.addEventListener('global-audio-mute-change', updateGlobalMute);
+    
+    // iOS-specific: listen for audio mute changes
+    if (isIOS) {
+      window.addEventListener('ios-audio-mute-change', updateGlobalMute);
+    }
 
     return () => {
       window.removeEventListener('bg-music-volume-change', updateState);
       window.removeEventListener('bg-music-mute-change', updateState);
       window.removeEventListener('global-audio-mute-change', updateGlobalMute);
+      if (isIOS) {
+        window.removeEventListener('ios-audio-mute-change', updateGlobalMute);
+      }
     };
   }, []); // Only run on mount, not when state changes
 

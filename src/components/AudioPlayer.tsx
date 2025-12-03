@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
+import { safePlay, createIOSOptimizedAudio, isIOS, iosAudioManager } from "@/utils/iosAudio";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -12,11 +13,32 @@ interface AudioPlayerProps {
 }
 
 export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
+
+  // Initialize audio element with iOS optimizations
+  useEffect(() => {
+    const audio = createIOSOptimizedAudio(audioUrl);
+    audioRef.current = audio;
+    
+    // Register with iOS audio manager for coordinated control
+    if (isIOS) {
+      iosAudioManager.registerAudio(audio);
+    }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        if (isIOS) {
+          iosAudioManager.unregisterAudio(audioRef.current);
+        }
+      }
+    };
+  }, [audioUrl]);
 
   // Duck ambient music when playing
   useEffect(() => {
@@ -74,7 +96,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     };
   }, [audioUrl, onTimeUpdate]);
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -86,8 +108,12 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       if (globalAudio.getMuted()) {
         return;
       }
-      audio.play().catch(err => console.error('Audio play failed:', err));
-      setIsPlaying(true);
+      
+      // Use iOS-safe play function
+      const success = await safePlay(audio);
+      if (success) {
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -113,7 +139,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
 
   return (
     <div className="w-full bg-card rounded-3xl p-6 shadow-soft">
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      {/* Audio element is created programmatically for iOS compatibility */}
       
       <div className="space-y-4">
         <div className="flex items-center justify-center gap-4">
