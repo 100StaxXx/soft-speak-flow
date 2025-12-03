@@ -1,6 +1,16 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -66,6 +76,7 @@ interface EpicCardProps {
 export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [memberCount, setMemberCount] = useState(0);
+  const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
@@ -174,7 +185,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             </Badge>
             {isActive && (
               <button
-                onClick={onAbandon}
+                onClick={() => setShowAbandonDialog(true)}
                 className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
                 title="Abandon epic"
               >
@@ -266,6 +277,26 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         )}
       </Card>
+
+      <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Abandon this epic?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to abandon "{epic.title}"? Your progress will be lost and you won't earn the XP reward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onAbandon}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Abandon Epic
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 };
