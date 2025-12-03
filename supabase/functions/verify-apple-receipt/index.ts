@@ -107,7 +107,10 @@ serve(async (req) => {
 });
 
 async function updateSubscription(supabase: any, userId: string, receiptData: any) {
-  const latestReceipt = receiptData.latest_receipt_info?.[0];
+  const receiptEntries = Array.isArray(receiptData.latest_receipt_info)
+    ? receiptData.latest_receipt_info
+    : [];
+  const latestReceipt = receiptEntries[receiptEntries.length - 1];
   
   if (!latestReceipt) {
     throw new Error("No subscription info in receipt");

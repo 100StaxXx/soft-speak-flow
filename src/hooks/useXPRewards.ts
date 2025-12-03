@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
+import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async (userId: string) => {
@@ -28,12 +29,18 @@ export const useXPRewards = () => {
   const { companion, awardXP } = useCompanion();
   const { showXPToast } = useXPToast();
   const queryClient = useQueryClient();
+  const { multiplier: streakMultiplier } = useStreakMultiplier();
   const {
     updateBodyFromActivity,
     updateMindFromHabit,
     updateSoulFromReflection,
     updateSoulFromStreak,
   } = useCompanionAttributes();
+
+  const applyStreakMultiplier = (baseAmount: number) => {
+    const normalizedMultiplier = streakMultiplier ?? 1;
+    return Math.round(baseAmount * normalizedMultiplier);
+  };
 
   // Fetch current habit streak for resilience updates
   const { data: profile } = useQuery({
@@ -61,10 +68,11 @@ export const useXPRewards = () => {
         });
       }
       
-      showXPToast(XP_REWARDS.HABIT_COMPLETE, "Habit Completed!");
+      const reward = applyStreakMultiplier(XP_REWARDS.HABIT_COMPLETE);
+      showXPToast(reward, "Habit Completed!");
       awardXP.mutate({
         eventType: "habit_complete",
-        xpAmount: XP_REWARDS.HABIT_COMPLETE,
+        xpAmount: reward,
       });
       
       // Update attributes in background without waiting - verify companion exists at call time
@@ -84,10 +92,11 @@ export const useXPRewards = () => {
 
   const awardAllHabitsComplete = () => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.ALL_HABITS_COMPLETE, "All Habits Complete!");
+    const reward = applyStreakMultiplier(XP_REWARDS.ALL_HABITS_COMPLETE);
+    showXPToast(reward, "All Habits Complete!");
     awardXP.mutate({
       eventType: "all_habits_complete",
-      xpAmount: XP_REWARDS.ALL_HABITS_COMPLETE,
+      xpAmount: reward,
     });
   };
 
@@ -101,10 +110,11 @@ export const useXPRewards = () => {
       });
     }
     
-    showXPToast(XP_REWARDS.CHALLENGE_COMPLETE, "Challenge Complete!");
+    const reward = applyStreakMultiplier(XP_REWARDS.CHALLENGE_COMPLETE);
+    showXPToast(reward, "Challenge Complete!");
     awardXP.mutate({
       eventType: "challenge_complete",
-      xpAmount: XP_REWARDS.CHALLENGE_COMPLETE,
+      xpAmount: reward,
     });
   };
 
@@ -118,19 +128,21 @@ export const useXPRewards = () => {
       });
     }
     
-    showXPToast(XP_REWARDS.WEEKLY_CHALLENGE, "Weekly Challenge Done!");
+    const reward = applyStreakMultiplier(XP_REWARDS.WEEKLY_CHALLENGE);
+    showXPToast(reward, "Weekly Challenge Done!");
     awardXP.mutate({
       eventType: "weekly_challenge",
-      xpAmount: XP_REWARDS.WEEKLY_CHALLENGE,
+      xpAmount: reward,
     });
   };
 
   const awardPepTalkListened = (metadata?: Record<string, string | number | boolean | undefined>) => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Pep Talk Listened!");
+    const reward = applyStreakMultiplier(XP_REWARDS.PEP_TALK_LISTEN);
+    showXPToast(reward, "Pep Talk Listened!");
     awardXP.mutate({
       eventType: "pep_talk_listen",
-      xpAmount: XP_REWARDS.PEP_TALK_LISTEN,
+      xpAmount: reward,
       metadata,
     });
   };
@@ -146,10 +158,11 @@ export const useXPRewards = () => {
         });
       }
       
-      showXPToast(XP_REWARDS.CHECK_IN, "Check-In Complete!");
+      const reward = applyStreakMultiplier(XP_REWARDS.CHECK_IN);
+      showXPToast(reward, "Check-In Complete!");
       awardXP.mutate({
         eventType: "check_in",
-        xpAmount: XP_REWARDS.CHECK_IN,
+        xpAmount: reward,
       });
       
       // Update attributes in background without waiting - verify companion exists at call time
@@ -171,10 +184,11 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
     
     try {
-      showXPToast(XP_REWARDS.STREAK_MILESTONE, `${milestone} Day Streak!`);
+      const reward = applyStreakMultiplier(XP_REWARDS.STREAK_MILESTONE);
+      showXPToast(reward, `${milestone} Day Streak!`);
       awardXP.mutate({
         eventType: "streak_milestone",
-        xpAmount: XP_REWARDS.STREAK_MILESTONE,
+        xpAmount: reward,
         metadata: { milestone },
       });
       
@@ -195,10 +209,11 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
     
     try {
-      showXPToast(XP_REWARDS.CHECK_IN, "Reflection Saved!");
+      const reward = applyStreakMultiplier(XP_REWARDS.CHECK_IN);
+      showXPToast(reward, "Reflection Saved!");
       awardXP.mutate({
         eventType: "reflection",
-        xpAmount: XP_REWARDS.CHECK_IN,
+        xpAmount: reward,
       });
       
       // Update soul in background without waiting - verify companion exists at call time
@@ -215,10 +230,11 @@ export const useXPRewards = () => {
 
   const awardQuoteShared = () => {
     if (!companion) return;
-    showXPToast(XP_REWARDS.PEP_TALK_LISTEN, "Quote Shared!");
+    const reward = applyStreakMultiplier(XP_REWARDS.PEP_TALK_LISTEN);
+    showXPToast(reward, "Quote Shared!");
     awardXP.mutate({
       eventType: "quote_shared",
-      xpAmount: XP_REWARDS.PEP_TALK_LISTEN,
+      xpAmount: reward,
     });
   };
 
