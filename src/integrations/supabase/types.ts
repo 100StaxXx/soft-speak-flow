@@ -887,6 +887,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cosmic_deep_dive_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          placement: string
+          resonates: boolean
+          sign: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          placement: string
+          resonates: boolean
+          sign: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          placement?: string
+          resonates?: boolean
+          sign?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_check_ins: {
         Row: {
           check_in_date: string

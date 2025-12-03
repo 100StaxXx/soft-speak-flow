@@ -15,6 +15,55 @@ const placementDescriptions: Record<string, string> = {
   venus: "love style, values, beauty, and pleasure",
 };
 
+// Retry helper with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Don't retry on client errors (4xx) except rate limits
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        return response;
+      }
+      
+      // Retry on 5xx or 429 after delay
+      if (response.status >= 500 || response.status === 429) {
+        const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        console.log(`Attempt ${attempt + 1} failed with ${response.status}, retrying in ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`Attempt ${attempt + 1} failed with network error, retrying in ${delay}ms:`, error);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
+// Get local date from timezone offset
+function getLocalDate(timezoneOffset?: number): string {
+  const now = new Date();
+  if (timezoneOffset !== undefined) {
+    // timezoneOffset is in minutes, positive for west of UTC
+    const localTime = new Date(now.getTime() - timezoneOffset * 60 * 1000);
+    return localTime.toISOString().split('T')[0];
+  }
+  // Fallback to UTC
+  return now.toISOString().split('T')[0];
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -54,7 +103,7 @@ serve(async (req) => {
       });
     }
 
-    const { placement, sign } = await req.json();
+    const { placement, sign, timezoneOffset } = await req.json();
     if (!placement || !sign) {
       return new Response(JSON.stringify({ error: 'placement and sign required' }), {
         status: 400,
@@ -62,7 +111,9 @@ serve(async (req) => {
       });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date based on user's timezone
+    const today = getLocalDate(timezoneOffset);
+    console.log('Using date:', today, 'with timezone offset:', timezoneOffset);
 
     // Check cache first
     const { data: cached } = await supabaseService
@@ -152,7 +203,7 @@ Be warm, insightful, and make it feel like a conversation with a wise friend who
 
     console.log('Generating personalized deep dive for', user.id, placement, sign);
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
