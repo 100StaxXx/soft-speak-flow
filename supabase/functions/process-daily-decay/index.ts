@@ -218,24 +218,62 @@ async function handleStreakFreeze(supabase: any, userId: string) {
   // Get user profile with streak info
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("current_habit_streak, streak_freezes_available")
+    .select("current_habit_streak, streak_freezes_available, streak_at_risk, streak_at_risk_since")
     .eq("id", userId)
     .maybeSingle();
 
   if (error || !profile) return;
 
-  // If user has a streak and freezes available, use one to protect streak
-  if ((profile.current_habit_streak ?? 0) > 0 && (profile.streak_freezes_available ?? 0) > 0) {
-    console.log(`[Streak Freeze] Using freeze for user ${userId} to protect ${profile.current_habit_streak} day streak`);
+  // If user has no streak, nothing to protect
+  if ((profile.current_habit_streak ?? 0) <= 0) return;
+
+  // Check if streak_at_risk was set more than 24 hours ago (auto-resolve)
+  if (profile.streak_at_risk && profile.streak_at_risk_since) {
+    const riskSince = new Date(profile.streak_at_risk_since);
+    const hoursSinceRisk = (Date.now() - riskSince.getTime()) / (1000 * 60 * 60);
     
-    await supabase
-      .from("profiles")
-      .update({
-        streak_freezes_available: Math.max(0, (profile.streak_freezes_available ?? 1) - 1),
-        last_streak_freeze_used: new Date().toISOString(),
-      })
-      .eq("id", userId);
+    if (hoursSinceRisk >= 24) {
+      // User didn't decide within 24 hours - auto-consume freeze if available, else reset
+      if ((profile.streak_freezes_available ?? 0) > 0) {
+        console.log(`[Streak Freeze] Auto-consuming freeze for user ${userId} (24h timeout)`);
+        await supabase
+          .from("profiles")
+          .update({
+            streak_at_risk: false,
+            streak_at_risk_since: null,
+            streak_freezes_available: Math.max(0, (profile.streak_freezes_available ?? 1) - 1),
+            last_streak_freeze_used: new Date().toISOString(),
+          })
+          .eq("id", userId);
+      } else {
+        console.log(`[Streak Freeze] Auto-resetting streak for user ${userId} (24h timeout, no freezes)`);
+        await supabase
+          .from("profiles")
+          .update({
+            streak_at_risk: false,
+            streak_at_risk_since: null,
+            current_habit_streak: 0,
+          })
+          .eq("id", userId);
+      }
+      return;
+    }
+    
+    // Streak is already at risk, user hasn't decided yet - don't do anything more
+    return;
   }
+
+  // First miss: set streak_at_risk instead of auto-consuming freeze
+  // This gives user a chance to decide when they return
+  console.log(`[Streak Freeze] Setting streak at risk for user ${userId} (${profile.current_habit_streak} day streak)`);
+  
+  await supabase
+    .from("profiles")
+    .update({
+      streak_at_risk: true,
+      streak_at_risk_since: new Date().toISOString(),
+    })
+    .eq("id", userId);
 }
 
 async function resetExpiredStreakFreezes(supabase: any, today: string) {

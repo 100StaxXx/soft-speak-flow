@@ -102,3 +102,6 @@ verify_jwt = false
 
 [functions.deliver-scheduled-notifications]
 verify_jwt = false
+
+[functions.resolve-streak-freeze]
+verify_jwt = true
