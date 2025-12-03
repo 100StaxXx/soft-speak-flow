@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundaryRoute } from "@/components/RouteErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay";
@@ -154,39 +155,152 @@ const AppContent = memo(() => {
         <Suspense fallback={<LoadingFallback />}>
           <EvolutionAwareContent />
           <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/auth/reset-password" element={<ResetPassword />} />
-          <Route path="/creator" element={<Creator />} />
-          <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
-          <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          {/* Public routes */}
+          <Route path="/auth" element={<ErrorBoundaryRoute name="Auth"><Auth /></ErrorBoundaryRoute>} />
+          <Route path="/auth/reset-password" element={<ErrorBoundaryRoute name="Reset Password"><ResetPassword /></ErrorBoundaryRoute>} />
+          <Route path="/creator" element={<ErrorBoundaryRoute name="Creator"><Creator /></ErrorBoundaryRoute>} />
+          <Route path="/creator/dashboard" element={<ErrorBoundaryRoute name="Influencer Dashboard"><InfluencerDashboard /></ErrorBoundaryRoute>} />
+          <Route path="/partners" element={<ErrorBoundaryRoute name="Partners"><Partners /></ErrorBoundaryRoute>} />
+          <Route path="/terms" element={<ErrorBoundaryRoute name="Terms"><TermsOfService /></ErrorBoundaryRoute>} />
+          <Route path="/privacy" element={<ErrorBoundaryRoute name="Privacy"><PrivacyPolicy /></ErrorBoundaryRoute>} />
           
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-          <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
-          <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
-          <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
-          <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
-          <Route path="/join/:code" element={<JoinEpic />} />
-          <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-          <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
-          <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-          <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
+          {/* Protected routes with error boundaries */}
+          <Route path="/onboarding" element={
+            <ErrorBoundaryRoute name="Onboarding">
+              <ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
           
-          <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
-          <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-          <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
-          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
+          <Route path="/" element={
+            <ErrorBoundaryRoute name="Home">
+              <ProtectedRoute><Index /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/profile" element={
+            <ErrorBoundaryRoute name="Profile">
+              <ProtectedRoute><Profile /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/premium" element={
+            <ErrorBoundaryRoute name="Premium">
+              <ProtectedRoute><Premium /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/premium/success" element={
+            <ErrorBoundaryRoute name="Premium Success">
+              <ProtectedRoute><PremiumSuccess /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/pep-talk/:id" element={
+            <ErrorBoundaryRoute name="Pep Talk">
+              <ProtectedRoute><PepTalkDetail /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/mentor-selection" element={
+            <ErrorBoundaryRoute name="Mentor Selection">
+              <ProtectedRoute><MentorSelection /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/admin" element={
+            <ErrorBoundaryRoute name="Admin">
+              <ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          {/* Core features with error boundaries */}
+          <Route path="/tasks" element={
+            <ErrorBoundaryRoute name="Tasks">
+              <ProtectedRoute><Tasks /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/epics" element={
+            <ErrorBoundaryRoute name="Epics">
+              <ProtectedRoute><Epics /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/join/:code" element={
+            <ErrorBoundaryRoute name="Join Epic">
+              <JoinEpic />
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/shared-epics" element={
+            <ErrorBoundaryRoute name="Shared Epics">
+              <ProtectedRoute><SharedEpics /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/battle-arena" element={
+            <ErrorBoundaryRoute name="Battle Arena">
+              <ProtectedRoute><BattleArena /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/mentor-chat" element={
+            <ErrorBoundaryRoute name="Mentor Chat">
+              <ProtectedRoute><MentorChat /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/horoscope" element={
+            <ErrorBoundaryRoute name="Horoscope">
+              <ProtectedRoute><Horoscope /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/cosmic/:placement/:sign" element={
+            <ErrorBoundaryRoute name="Cosmic Deep Dive">
+              <ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/challenges" element={
+            <ErrorBoundaryRoute name="Challenges">
+              <ProtectedRoute><Challenges /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/reflection" element={
+            <ErrorBoundaryRoute name="Reflection">
+              <ProtectedRoute><Reflection /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/library" element={
+            <ErrorBoundaryRoute name="Library">
+              <ProtectedRoute><Library /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/pep-talks" element={
+            <ErrorBoundaryRoute name="Pep Talks">
+              <ProtectedRoute><PepTalks /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
           <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
-          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-          <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
-          <Route path="/partners" element={<Partners />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="*" element={<NotFound />} />
+          
+          <Route path="/search" element={
+            <ErrorBoundaryRoute name="Search">
+              <ProtectedRoute><Search /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="/companion" element={
+            <ErrorBoundaryRoute name="Companion">
+              <ProtectedRoute><Companion /></ProtectedRoute>
+            </ErrorBoundaryRoute>
+          } />
+          
+          <Route path="*" element={<ErrorBoundaryRoute name="Not Found"><NotFound /></ErrorBoundaryRoute>} />
           </Routes>
         </Suspense>
       </XPProvider>

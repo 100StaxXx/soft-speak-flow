@@ -9,7 +9,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useProfile } from "@/hooks/useProfile";
 import { useRef } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
-import { format } from "date-fns";
+import { getTodayInTimezone, formatDateForStorage } from "@/utils/dateUtils";
 
 export const useDailyTasks = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -24,12 +24,12 @@ export const useDailyTasks = (selectedDate?: Date) => {
   const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
-  // NOTE: Using local device date. This works for most users but has edge cases:
-  // - Users who travel across timezones may see incorrect "today"
-  // - Users with wrong device time will get wrong date
-  // - Daily reset happens at device midnight, not server midnight
-  // Future enhancement: Use UTC or user's timezone preference from profile
-  const taskDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+  // Use timezone-aware date handling
+  // Tasks are tied to user's local date, preventing timezone bugs
+  const userTimezone = profile?.timezone || undefined;
+  const taskDate = selectedDate 
+    ? formatDateForStorage(selectedDate, userTimezone)
+    : getTodayInTimezone(userTimezone);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['daily-tasks', user?.id, taskDate],

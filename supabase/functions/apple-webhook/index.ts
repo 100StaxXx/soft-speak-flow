@@ -72,6 +72,31 @@ serve(async (req) => {
     const purchaseDateMs = latestReceiptInfo.purchase_date_ms;
     const cancellationDateMs = latestReceiptInfo.cancellation_date_ms;
 
+    // CRITICAL: Check if this webhook was already processed (idempotency)
+    const { data: alreadyProcessed } = await supabaseClient.rpc(
+      'check_webhook_processed',
+      {
+        p_transaction_id: originalTransactionId,
+        p_notification_type: notificationType,
+      }
+    );
+
+    if (alreadyProcessed) {
+      console.log(`Webhook already processed: ${notificationType} for transaction ${originalTransactionId}`);
+      
+      // Return 200 OK to acknowledge (don't let Apple retry)
+      return new Response(JSON.stringify({ 
+        status: 'already_processed',
+        transaction_id: originalTransactionId,
+        notification_type: notificationType
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Processing new webhook: ${notificationType} for transaction ${originalTransactionId}`);
+
     // Find user by transaction ID
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from("subscriptions")
@@ -106,25 +131,29 @@ serve(async (req) => {
     }
 
     // Process notification based on type
-    switch (notificationType) {
-      case NotificationType.INITIAL_BUY:
-        // First-time subscription - handle activation AND referral payout
-        await handleActivation(
-          supabaseClient,
-          userId,
-          originalTransactionId,
-          plan,
-          expiresDateMs,
-          purchaseDateMs
-        );
-        // Create referral payout if user was referred
-        await createReferralPayout(
-          supabaseClient,
-          userId,
-          originalTransactionId,
-          plan
-        );
-        break;
+    let processingStatus = 'success';
+    let errorMessage = null;
+
+    try {
+      switch (notificationType) {
+        case NotificationType.INITIAL_BUY:
+          // First-time subscription - handle activation AND referral payout
+          await handleActivation(
+            supabaseClient,
+            userId,
+            originalTransactionId,
+            plan,
+            expiresDateMs,
+            purchaseDateMs
+          );
+          // Create referral payout if user was referred
+          await createReferralPayout(
+            supabaseClient,
+            userId,
+            originalTransactionId,
+            plan
+          );
+          break;
         
       case NotificationType.DID_RENEW:
       case NotificationType.DID_RECOVER:
@@ -190,23 +219,66 @@ serve(async (req) => {
         );
         break;
 
-      default:
-        console.log("Unhandled notification type:", notificationType);
+        default:
+          console.log("Unhandled notification type:", notificationType);
+      }
+    } catch (processingError) {
+      console.error("Error during notification processing:", processingError);
+      processingStatus = 'failed';
+      errorMessage = processingError instanceof Error 
+        ? processingError.message 
+        : String(processingError);
+      
+      // Don't throw - still log the event and return 200
+    }
+
+    // Log webhook event for idempotency and audit trail
+    try {
+      await supabaseClient.rpc('log_webhook_event', {
+        p_transaction_id: originalTransactionId,
+        p_notification_type: notificationType,
+        p_product_id: productId,
+        p_user_id: userId || null,
+        p_raw_payload: payload,
+        p_processing_status: processingStatus,
+        p_error_message: errorMessage,
+      });
+    } catch (logError) {
+      console.error("Failed to log webhook event:", logError);
+      // Don't fail the webhook - processing already happened
     }
 
     // Return 200 to acknowledge receipt
-    return new Response("OK", {
+    return new Response(JSON.stringify({ 
+      status: processingStatus,
+      transaction_id: originalTransactionId,
+      notification_type: notificationType
+    }), {
       status: 200,
-      headers: corsHeaders,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error("Error processing Apple notification:", error);
+    console.error("Critical error processing Apple notification:", error);
     
-    // Still return 200 to prevent Apple from retrying
-    return new Response("OK", {
+    // Log error for monitoring
+    const errorDetails = {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error("Error details:", JSON.stringify(errorDetails));
+    
+    // Still return 200 to prevent Apple from retrying (avoid infinite retry loop)
+    // We'll handle recovery through manual intervention or background jobs
+    return new Response(JSON.stringify({
+      status: 'error',
+      error: 'Internal server error',
+      details: errorDetails.error,
+    }), {
       status: 200,
-      headers: corsHeaders,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

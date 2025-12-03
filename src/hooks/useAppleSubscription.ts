@@ -3,10 +3,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
+import { useAuth } from './useAuth';
+import { retryWithBackoff } from '@/utils/retry';
+import { logger } from '@/utils/logger';
 
 export function useAppleSubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const handlePurchase = async (productId: string) => {
@@ -20,6 +24,10 @@ export function useAppleSubscription() {
     }
 
     setLoading(true);
+    
+    // Track original subscription state for rollback
+    const originalSubscriptionData = queryClient.getQueryData(['subscription', user?.id]);
+    
     try {
       const purchase = await purchaseProduct(productId);
       
@@ -32,24 +40,59 @@ export function useAppleSubscription() {
       if (!receipt) {
         throw new Error("No receipt data available");
       }
-      
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
 
-      if (error) throw error;
+      // OPTIMISTIC UPDATE: Set subscription active immediately for better UX
+      queryClient.setQueryData(['subscription', user?.id], (old: any) => ({
+        ...old,
+        subscribed: true,
+        status: 'active',
+        plan: productId.includes('yearly') ? 'yearly' : 'monthly',
+      }));
 
-      // Invalidate subscription cache to unlock app immediately
+      logger.info('Apple IAP purchase completed, verifying receipt...', { productId });
+
+      // Verify receipt with retry logic (network issues are common on mobile)
+      const { error } = await retryWithBackoff(
+        () => supabase.functions.invoke('verify-apple-receipt', {
+          body: { receipt },
+        }),
+        {
+          maxAttempts: 3,
+          initialDelay: 1000,
+          shouldRetry: (error: unknown) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            // Retry on network errors, timeout errors
+            return errorMessage.includes('fetch') || 
+                   errorMessage.includes('network') ||
+                   errorMessage.includes('timeout');
+          }
+        }
+      );
+
+      if (error) {
+        // Rollback optimistic update on verification failure
+        queryClient.setQueryData(['subscription', user?.id], originalSubscriptionData);
+        throw error;
+      }
+
+      // Force immediate refetch to get server state (includes subscription_end, etc.)
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.refetchQueries({ queryKey: ['subscription', user?.id] });
+
+      logger.info('Apple IAP verification successful', { productId });
 
       toast({
-        title: "Success!",
+        title: "Success! 🎉",
         description: "Your subscription is now active",
       });
 
       return true;
     } catch (error) {
-      console.error('Purchase error:', error);
+      logger.error('Apple IAP purchase error:', error);
+      
+      // Rollback optimistic update on error
+      queryClient.setQueryData(['subscription', user?.id], originalSubscriptionData);
+      
       const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Purchase Failed",
@@ -73,6 +116,10 @@ export function useAppleSubscription() {
     }
 
     setLoading(true);
+    
+    // Track original state for rollback
+    const originalSubscriptionData = queryClient.getQueryData(['subscription', user?.id]);
+    
     try {
       const restored = await restorePurchases();
       
@@ -122,24 +169,48 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available for subscription");
       }
 
-      // Verify with backend
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
+      // OPTIMISTIC UPDATE: Set active immediately
+      queryClient.setQueryData(['subscription', user?.id], (old: any) => ({
+        ...old,
+        subscribed: true,
+        status: 'active',
+      }));
+
+      logger.info('Restoring Apple IAP purchase...');
+
+      // Verify with backend with retry
+      const { error } = await retryWithBackoff(
+        () => supabase.functions.invoke('verify-apple-receipt', {
+          body: { receipt },
+        }),
+        {
+          maxAttempts: 3,
+          initialDelay: 1000,
+        }
+      );
 
       if (error) {
+        // Rollback on error
+        queryClient.setQueryData(['subscription', user?.id], originalSubscriptionData);
         throw error;
       }
 
-      // Invalidate subscription cache to unlock app immediately
+      // Force refetch to get complete server state
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      await queryClient.refetchQueries({ queryKey: ['subscription', user?.id] });
+
+      logger.info('Apple IAP restore successful');
 
       toast({
-        title: "Restored!",
+        title: "Restored! 🎉",
         description: "Your subscription has been restored",
       });
     } catch (error) {
-      console.error('Restore error:', error);
+      logger.error('Apple IAP restore error:', error);
+      
+      // Rollback on error
+      queryClient.setQueryData(['subscription', user?.id], originalSubscriptionData);
+      
       const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Restore Failed",

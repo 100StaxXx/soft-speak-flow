@@ -1,7 +1,7 @@
 import { useAuth } from "./useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
@@ -24,6 +24,35 @@ function isValidPlan(plan: unknown): plan is Subscription["plan"] {
 
 export function useSubscription() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Listen for real-time subscription changes (from webhooks or other devices)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`subscription-changes-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Profile updated (likely subscription status changed via webhook)
+          // Invalidate and refetch subscription status
+          queryClient.invalidateQueries({ queryKey: ['subscription', user.id] });
+          queryClient.refetchQueries({ queryKey: ['subscription', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   const { data: subscriptionData, isLoading, error, refetch } = useQuery({
     queryKey: ["subscription", user?.id],

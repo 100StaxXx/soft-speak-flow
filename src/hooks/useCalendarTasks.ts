@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { useProfile } from "./useProfile";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { formatDateForStorage } from "@/utils/dateUtils";
 
 export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "week") => {
   const { user } = useAuth();
+  const { profile } = useProfile();
+
+  // Use timezone-aware date handling
+  const userTimezone = profile?.timezone || undefined;
 
   const getDateRange = () => {
     if (view === "month") {
@@ -26,8 +32,8 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
   };
 
   const { start, end } = getDateRange();
-  const startDate = format(start, 'yyyy-MM-dd');
-  const endDate = format(end, 'yyyy-MM-dd');
+  const startDate = formatDateForStorage(start, userTimezone);
+  const endDate = formatDateForStorage(end, userTimezone);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
