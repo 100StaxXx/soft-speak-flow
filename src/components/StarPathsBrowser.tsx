@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EpicTemplatesInfoTooltip } from "./EpicTemplatesInfoTooltip";
-import { Target, Clock, Zap, Users, Sparkles, ChevronRight, Flame } from "lucide-react";
+import { StarPathsInfoTooltip } from "./StarPathsInfoTooltip";
+import { Target, Clock, Users, Sparkles, ChevronRight, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface EpicTemplatesBrowserProps {
+interface StarPathsBrowserProps {
   onSelectTemplate: (template: EpicTemplate) => void;
 }
 
@@ -27,7 +26,7 @@ const THEME_COLORS: Record<string, string> = {
   solar: 'from-yellow-500/20 to-amber-600/10 border-yellow-500/30',
 };
 
-export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserProps) => {
+export const StarPathsBrowser = ({ onSelectTemplate }: StarPathsBrowserProps) => {
   const { templates, featuredTemplates, isLoading, incrementPopularity } = useEpicTemplates();
   const [filter, setFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
 
@@ -50,17 +49,17 @@ export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserP
 
   return (
     <div className="space-y-6">
-      {/* Featured Templates */}
+      {/* Featured Star Paths */}
       {featuredTemplates.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Flame className="h-5 w-5 text-orange-500" />
-            <h3 className="font-semibold">Featured Epics</h3>
-            <EpicTemplatesInfoTooltip />
+            <Star className="h-5 w-5 text-yellow-500" />
+            <h3 className="font-semibold">Featured Star Paths</h3>
+            <StarPathsInfoTooltip />
           </div>
           <div className="grid gap-3">
             {featuredTemplates.slice(0, 3).map((template) => (
-              <TemplateCard 
+              <StarPathCard 
                 key={template.id} 
                 template={template} 
                 onSelect={handleSelectTemplate}
@@ -81,7 +80,7 @@ export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserP
         </TabsList>
       </Tabs>
 
-      {/* All Templates */}
+      {/* All Star Paths */}
       <div className="grid gap-3">
         {filteredTemplates.map((template, index) => (
           <motion.div
@@ -90,7 +89,7 @@ export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserP
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <TemplateCard 
+            <StarPathCard 
               template={template} 
               onSelect={handleSelectTemplate}
             />
@@ -101,20 +100,20 @@ export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserP
       {filteredTemplates.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>No templates found for this difficulty</p>
+          <p>No star paths found for this difficulty</p>
         </div>
       )}
     </div>
   );
 };
 
-interface TemplateCardProps {
+interface StarPathCardProps {
   template: EpicTemplate;
   onSelect: (template: EpicTemplate) => void;
   featured?: boolean;
 }
 
-const TemplateCard = ({ template, onSelect, featured }: TemplateCardProps) => {
+const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
   const difficultyConfig = DIFFICULTY_CONFIG[template.difficulty_tier];
   const themeGradient = THEME_COLORS[template.theme_color] || THEME_COLORS.heroic;
 

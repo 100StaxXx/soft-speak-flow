@@ -56,7 +56,7 @@ export const BadgesCollectionPanel = () => {
   const totalEarned = BADGE_CATALOG.filter(b => earnedTypes.has(b.achievementType)).length;
   const totalAvailable = BADGE_CATALOG.length;
 
-  const filterCategories: FilterCategory[] = ['all', 'streaks', 'companion', 'epics', 'firsts', 'special'];
+  const filterCategories: FilterCategory[] = ['all', 'streaks', 'companion', 'starpaths', 'firsts', 'special'];
 
   if (isLoading) {
     return (

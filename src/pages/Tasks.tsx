@@ -41,7 +41,7 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
-import { EpicTemplatesBrowser } from "@/components/EpicTemplatesBrowser";
+import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { useEpics } from "@/hooks/useEpics";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { Sliders } from "lucide-react";
@@ -1081,8 +1081,8 @@ export default function Tasks() {
                   variant="outline"
                   className="flex-1 h-auto py-3 text-sm font-medium"
                 >
-                  <BookOpen className="h-4 w-4 mr-1.5" />
-                  Templates
+                  <Star className="h-4 w-4 mr-1.5" />
+                  Star Paths
                 </Button>
                 <Button
                   onClick={() => setJoinEpicDialogOpen(true)}
@@ -1165,16 +1165,16 @@ export default function Tasks() {
               template={selectedTemplate}
             />
             
-            {/* Epic Templates Dialog */}
+            {/* Star Paths Dialog */}
             <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
               <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-primary" />
-                    Epic Templates
+                    <Star className="w-5 h-5 text-primary" />
+                    Star Paths
                   </DialogTitle>
                 </DialogHeader>
-                <EpicTemplatesBrowser onSelectTemplate={handleSelectTemplate} />
+                <StarPathsBrowser onSelectTemplate={handleSelectTemplate} />
               </DialogContent>
             </Dialog>
           </TabsContent>

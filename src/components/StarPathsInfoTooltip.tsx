@@ -5,14 +5,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export const EpicTemplatesInfoTooltip = () => {
+export const StarPathsInfoTooltip = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button 
           type="button"
           className="inline-flex items-center justify-center ml-2 opacity-60 hover:opacity-100 transition-opacity touch-manipulation active:scale-95"
-          aria-label="Learn about Epic Templates"
+          aria-label="Learn about Star Paths"
         >
           <HelpCircle className="h-5 w-5 text-primary" />
         </button>
@@ -23,7 +23,7 @@ export const EpicTemplatesInfoTooltip = () => {
         sideOffset={8}
       >
         <div className="space-y-3">
-          <h4 className="font-heading font-bold text-base text-primary">Epic Templates</h4>
+          <h4 className="font-heading font-bold text-base text-primary">⭐ Star Paths</h4>
           <p className="text-sm leading-relaxed text-foreground/90">
             Pre-built epic journeys with curated habits to help you start your wellness adventure instantly!
           </p>

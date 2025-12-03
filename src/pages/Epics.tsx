@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { EpicTemplatesBrowser } from "@/components/EpicTemplatesBrowser";
+import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
 import {
   Dialog,
@@ -104,8 +104,8 @@ const Epics = () => {
             variant="outline"
             className="h-12"
           >
-            <BookOpen className="w-4 h-4 mr-2" />
-            Browse Templates
+            <Sparkles className="w-4 h-4 mr-2" />
+            Star Paths
           </Button>
         </motion.div>
 
@@ -156,15 +156,15 @@ const Epics = () => {
                 <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">No Active Epics</h3>
                 <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
-                  Begin your first legendary quest! Browse templates or create your own epic.
+                  Begin your first legendary quest! Browse star paths or create your own epic.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 justify-center">
                   <Button
                     onClick={() => setTemplatesDialogOpen(true)}
                     variant="outline"
                   >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Browse Templates
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Star Paths
                   </Button>
                   <Button
                     onClick={() => setCreateDialogOpen(true)}
@@ -224,16 +224,16 @@ const Epics = () => {
           onOpenChange={setJoinDialogOpen}
         />
 
-        {/* Templates Browser Dialog */}
+        {/* Star Paths Browser Dialog */}
         <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
           <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-primary" />
-                Epic Templates
+                <Sparkles className="w-5 h-5 text-primary" />
+                Star Paths
               </DialogTitle>
             </DialogHeader>
-            <EpicTemplatesBrowser onSelectTemplate={handleSelectTemplate} />
+            <StarPathsBrowser onSelectTemplate={handleSelectTemplate} />
           </DialogContent>
         </Dialog>
         
