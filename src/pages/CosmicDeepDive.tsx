@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { PlacementAnimation } from "@/components/astrology/PlacementAnimation";
 
 const placementIcons = {
   sun: Sun,
@@ -419,6 +420,9 @@ const CosmiqDeepDive = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
+      {/* Placement-specific animation */}
+      <PlacementAnimation placement={p} />
+
       {/* Stars background */}
       <div className="absolute inset-0">
         {[...Array(20)].map((_, i) => (
