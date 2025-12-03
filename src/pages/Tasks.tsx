@@ -85,6 +85,7 @@ export default function Tasks() {
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
+  const tutorialCheckRef = useRef(false); // Ref to prevent race conditions
   
   // Page info state
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -425,9 +426,6 @@ export default function Tasks() {
     ? completions.length / habits.length 
     : 0;
 
-  // Ref to prevent race conditions in tutorial check
-  const tutorialCheckRef = useRef(false);
-  
   // Check if tutorial should be shown and auto-generate "Join Cosmiq" quest
   useEffect(() => {
     // Debug logging for tutorial visibility
