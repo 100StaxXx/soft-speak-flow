@@ -2,14 +2,15 @@ import { createRoot } from "react-dom/client";
 import { Suspense, lazy, useEffect } from "react";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
+import { logger } from "./utils/logger";
 
 // Global error tracking for unhandled errors
 window.addEventListener('error', (event) => {
-  console.error('Unhandled error:', event.error);
+  logger.error('Unhandled error:', event.error);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
+  logger.error('Unhandled promise rejection:', event.reason);
 });
 
 // Register service worker for PWA with optimized caching
