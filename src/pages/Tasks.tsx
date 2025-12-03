@@ -8,6 +8,8 @@ import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { SchedulePowerUps } from "@/components/SchedulePowerUps";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
+import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
+import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 import { Button } from "@/components/ui/button";
 import { safeLocalStorage } from "@/utils/storage";
 import { Input } from "@/components/ui/input";
@@ -82,6 +84,9 @@ export default function Tasks() {
   const { awardCustomXP, awardAllHabitsComplete, XP_REWARDS } = useXPRewards();
   const { checkStreakAchievements, checkFirstTimeAchievements } = useAchievements();
   const { activeEpics, completedEpics, isLoading: epicsLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
+  
+  // Streak freeze prompt state
+  const { needsStreakDecision, currentStreak, freezesAvailable, useFreeze, resetStreak, isResolving } = useStreakAtRisk();
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -1284,6 +1289,16 @@ export default function Tasks() {
           "Create Epics to link quests to long-term goals"
         ]}
         tip="Tap the calendar icon to see your weekly view and plan ahead!"
+      />
+
+      {/* Streak Freeze Prompt Modal */}
+      <StreakFreezePromptModal
+        open={needsStreakDecision}
+        currentStreak={currentStreak}
+        freezesAvailable={freezesAvailable}
+        onUseFreeze={useFreeze}
+        onResetStreak={resetStreak}
+        isResolving={isResolving}
       />
 
       <BottomNav />

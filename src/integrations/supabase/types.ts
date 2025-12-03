@@ -2455,6 +2455,8 @@ export type Database = {
           referred_by_code: string | null
           rising_sign: string | null
           selected_mentor_id: string | null
+          streak_at_risk: boolean | null
+          streak_at_risk_since: string | null
           streak_freezes_available: number | null
           streak_freezes_reset_at: string | null
           stripe_customer_id: string | null
@@ -2499,6 +2501,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          streak_at_risk?: boolean | null
+          streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
           streak_freezes_reset_at?: string | null
           stripe_customer_id?: string | null
@@ -2543,6 +2547,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          streak_at_risk?: boolean | null
+          streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
           streak_freezes_reset_at?: string | null
           stripe_customer_id?: string | null
