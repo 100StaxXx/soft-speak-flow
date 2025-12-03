@@ -701,15 +701,15 @@ export default function Tasks() {
 
       <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10">
 
-        <Tabs defaultValue="quests" className="w-full">
+        <Tabs defaultValue="epics" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
-              <Swords className="h-4 w-4" />
-              Daily Quests
-            </TabsTrigger>
             <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
               <Trophy className="h-4 w-4" />
               Epics
+            </TabsTrigger>
+            <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
+              <Swords className="h-4 w-4" />
+              Daily Quests
             </TabsTrigger>
           </TabsList>
 
@@ -1113,19 +1113,19 @@ export default function Tasks() {
             <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
               <div className="flex gap-2">
                 <Button
-                  onClick={() => setCreateEpicDialogOpen(true)}
-                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
-                >
-                  <Castle className="h-4 w-4 mr-1.5" />
-                  Create
-                </Button>
-                <Button
                   onClick={() => setTemplatesDialogOpen(true)}
-                  variant="outline"
-                  className="flex-1 h-auto py-3 text-sm font-medium"
+                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
                 >
                   <Star className="h-4 w-4 mr-1.5" />
                   Star Paths
+                </Button>
+                <Button
+                  onClick={() => setCreateEpicDialogOpen(true)}
+                  variant="outline"
+                  className="flex-1 h-auto py-3 text-sm font-medium"
+                >
+                  <Castle className="h-4 w-4 mr-1.5" />
+                  Create
                 </Button>
                 <Button
                   onClick={() => setJoinEpicDialogOpen(true)}
