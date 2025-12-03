@@ -5,20 +5,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
-import { Award, Lock } from "lucide-react";
+import { Award, Lock, X } from "lucide-react";
 import { BADGE_CATALOG, BadgeCategory, CATEGORY_LABELS, TIER_COLORS, BadgeDefinition } from "@/data/badgeCatalog";
 import { BadgesInfoTooltip } from "./BadgesInfoTooltip";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./ui/tooltip";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 type FilterCategory = 'all' | BadgeCategory;
 
 export const BadgesCollectionPanel = () => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
+  const [selectedBadge, setSelectedBadge] = useState<{ badge: BadgeDefinition; earned: boolean } | null>(null);
 
   const { data: earnedAchievements, isLoading } = useQuery({
     queryKey: ["achievements", user?.id],
@@ -108,7 +110,7 @@ export const BadgesCollectionPanel = () => {
           </h4>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {earnedBadges.map((badge) => (
-              <BadgeCard key={badge.id} badge={badge} earned />
+              <BadgeCard key={badge.id} badge={badge} earned onSelect={(b) => setSelectedBadge({ badge: b, earned: true })} />
             ))}
           </div>
         </div>
@@ -122,7 +124,7 @@ export const BadgesCollectionPanel = () => {
           </h4>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {lockedBadges.map((badge) => (
-              <BadgeCard key={badge.id} badge={badge} earned={false} />
+              <BadgeCard key={badge.id} badge={badge} earned={false} onSelect={(b) => setSelectedBadge({ badge: b, earned: false })} />
             ))}
           </div>
         </div>
@@ -134,6 +136,39 @@ export const BadgesCollectionPanel = () => {
           <p className="text-muted-foreground">No badges in this category yet</p>
         </Card>
       )}
+
+      {/* Badge Detail Dialog */}
+      <Dialog open={!!selectedBadge} onOpenChange={() => setSelectedBadge(null)}>
+        <DialogContent className="max-w-[300px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              {selectedBadge?.earned ? selectedBadge.badge.title : 'Locked Badge'}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBadge && (
+            <div className="text-center space-y-4 py-2">
+              <div className={`text-6xl ${selectedBadge.earned ? '' : 'grayscale'}`}>
+                {selectedBadge.earned ? selectedBadge.badge.icon : '🔒'}
+              </div>
+              {selectedBadge.earned ? (
+                <>
+                  <p className="text-muted-foreground">{selectedBadge.badge.description}</p>
+                  <Badge 
+                    className={`capitalize bg-gradient-to-br ${TIER_COLORS[selectedBadge.badge.tier]} text-white border-0`}
+                  >
+                    {selectedBadge.badge.tier}
+                  </Badge>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">How to unlock:</p>
+                  <p className="text-muted-foreground">{selectedBadge.badge.unlockHint}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -141,53 +176,35 @@ export const BadgesCollectionPanel = () => {
 interface BadgeCardProps {
   badge: BadgeDefinition;
   earned: boolean;
+  onSelect: (badge: BadgeDefinition) => void;
 }
 
-const BadgeCard = ({ badge, earned }: BadgeCardProps) => {
+const BadgeCard = ({ badge, earned, onSelect }: BadgeCardProps) => {
   const tierGradient = TIER_COLORS[badge.tier];
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Card
-          className={`relative p-3 text-center transition-all cursor-pointer ${
-            earned
-              ? 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30 hover:border-primary/50'
-              : 'bg-secondary/30 border-border/50 opacity-60 hover:opacity-80'
-          }`}
-        >
-          {/* Badge Icon */}
-          <div
-            className={`text-3xl mb-2 ${earned ? '' : 'grayscale'}`}
-          >
-            {earned ? badge.icon : '🔒'}
-          </div>
+    <Card
+      onClick={() => onSelect(badge)}
+      className={`relative p-3 text-center transition-all cursor-pointer active:scale-95 ${
+        earned
+          ? 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30 hover:border-primary/50'
+          : 'bg-secondary/30 border-border/50 opacity-60 hover:opacity-80'
+      }`}
+    >
+      {/* Badge Icon */}
+      <div className={`text-3xl mb-2 ${earned ? '' : 'grayscale'}`}>
+        {earned ? badge.icon : '🔒'}
+      </div>
 
-          {/* Badge Title */}
-          <p className={`text-xs font-medium line-clamp-2 ${earned ? 'text-foreground' : 'text-muted-foreground'}`}>
-            {earned ? badge.title : '???'}
-          </p>
+      {/* Badge Title */}
+      <p className={`text-xs font-medium line-clamp-2 ${earned ? 'text-foreground' : 'text-muted-foreground'}`}>
+        {earned ? badge.title : '???'}
+      </p>
 
-          {/* Tier Indicator */}
-          {earned && (
-            <div className={`absolute top-1 right-1 w-2 h-2 rounded-full bg-gradient-to-br ${tierGradient}`} />
-          )}
-        </Card>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[200px]">
-        {earned ? (
-          <div className="space-y-1">
-            <p className="font-semibold">{badge.title}</p>
-            <p className="text-xs text-muted-foreground">{badge.description}</p>
-            <Badge variant="secondary" className="text-xs capitalize">{badge.tier}</Badge>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <p className="font-semibold text-muted-foreground">Locked Badge</p>
-            <p className="text-xs">{badge.unlockHint}</p>
-          </div>
-        )}
-      </TooltipContent>
-    </Tooltip>
+      {/* Tier Indicator */}
+      {earned && (
+        <div className={`absolute top-1 right-1 w-2 h-2 rounded-full bg-gradient-to-br ${tierGradient}`} />
+      )}
+    </Card>
   );
 };
