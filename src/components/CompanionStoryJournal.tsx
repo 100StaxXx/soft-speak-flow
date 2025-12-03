@@ -11,6 +11,7 @@ import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
 import { GuildStoriesSection } from "./companion/GuildStoriesSection";
+import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 
 export const CompanionStoryJournal = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
@@ -169,9 +170,12 @@ export const CompanionStoryJournal = () => {
       )}
       {/* Header */}
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-          Story Journal
-        </h1>
+        <div className="flex items-center justify-center gap-2">
+          <h1 className="text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+            Story Journal
+          </h1>
+          <StoryJournalInfoTooltip />
+        </div>
         <p className="text-muted-foreground">
           Your companion's epic journey - unlock new chapters as they evolve
         </p>
