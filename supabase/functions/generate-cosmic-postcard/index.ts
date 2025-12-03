@@ -6,33 +6,142 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Cosmic locations organized by milestone tier
-const cosmicLocations = {
+// Species type preferences for location matching
+type SpeciesTag = 'aquatic' | 'flying' | 'land' | 'mythic' | 'all';
+
+interface CosmicLocation {
+  name: string;
+  description: string;
+  tags?: SpeciesTag[];
+}
+
+// Cosmic locations organized by milestone tier with species tags
+const cosmicLocations: Record<number, CosmicLocation[]> = {
   25: [
-    { name: "Nebula Gardens", description: "A swirling nursery of newborn stars, where cosmic dust paints the void in purple and gold" },
-    { name: "Crystal Moon", description: "An ice moon with towering crystal formations reflecting starlight in rainbow hues" },
-    { name: "Aurora Valley", description: "A mystical valley where dancing auroras cascade from twin suns" },
-    { name: "Comet's Tail", description: "Riding the brilliant tail of an ancient comet as it streaks through the cosmos" },
+    { name: "Nebula Gardens", description: "A swirling star nursery painted in purple and gold cosmic dust clouds, with newborn stars glittering within", tags: ['all'] },
+    { name: "Crystal Moon", description: "A frozen moon with colossal radiant crystal towers reflecting starlight in rainbow hues", tags: ['land', 'flying'] },
+    { name: "Aurora Valley", description: "Twin suns casting endless auroras over rolling violet fields of cosmic grass", tags: ['land'] },
+    { name: "Comet's Tail Drift", description: "Riding glowing streams of comet dust through the vastness of space", tags: ['flying', 'mythic'] },
+    { name: "The Luminous Prairie", description: "Galactic grasslands shimmering with bioluminescent petals under a canopy of stars", tags: ['land'] },
+    { name: "Whispering Meteor Plains", description: "Flatlands dotted with ancient meteor shards that hum softly with cosmic energy", tags: ['land'] },
+    { name: "Star Lantern Marsh", description: "Floating star-orbs drifting over misty cosmic wetlands with glowing lily pads", tags: ['aquatic', 'land'] },
+    { name: "Velvet Cloud Terrace", description: "Soft, floating cloud islands glowing pink and lavender in eternal sunset light", tags: ['flying'] },
+    { name: "Halcyon Reef", description: "An ocean of floating coral clusters drifting in low gravity, teeming with stellar fish", tags: ['aquatic'] },
+    { name: "Sapphire Breeze Ridge", description: "A windy blue cliff world surrounded by drifting mini-moons and cosmic butterflies", tags: ['flying', 'land'] },
   ],
   50: [
-    { name: "Quantum Falls", description: "A waterfall of pure energy cascading between dimensions, shimmering with possibility" },
-    { name: "Stellar Archipelago", description: "A chain of floating islands orbiting a gentle dwarf star" },
-    { name: "The Mirror Sea", description: "An ocean of liquid silver reflecting infinite galaxies above" },
-    { name: "Phosphor Woods", description: "A bioluminescent forest on a tidally locked world, eternally twilit" },
+    { name: "Quantum Falls", description: "A waterfall of pure shimmering energy cascading across dimensions, rainbow light refracting everywhere", tags: ['aquatic', 'all'] },
+    { name: "Stellar Archipelago", description: "A chain of floating islands orbiting a warm dwarf sun, connected by light bridges", tags: ['flying', 'land'] },
+    { name: "The Mirror Sea", description: "A perfect silver ocean reflecting infinite galaxies, calm and impossibly beautiful", tags: ['aquatic'] },
+    { name: "Phosphor Woods", description: "Glowing teal forests on a twilight-locked planet, mushrooms pulsing with soft light", tags: ['land'] },
+    { name: "Plasma Vine Canyon", description: "Vast red canyons wrapped in glowing plasma vines that pulse with energy", tags: ['land', 'flying'] },
+    { name: "Titan Petal Desert", description: "Golden dunes where gigantic flower petals fall from the sky like gentle snow", tags: ['land'] },
+    { name: "Symphony Ridge", description: "Floating mountains that emit musical harmonics, resonating with the cosmos", tags: ['flying', 'mythic'] },
+    { name: "Ecliptic Lake", description: "A circular lake perfectly carved by orbital lines, its waters reflecting cosmic alignments", tags: ['aquatic', 'land'] },
+    { name: "Astral Greenhouse", description: "A giant spherical biodome drifting through space, filled with alien flora", tags: ['all'] },
+    { name: "Ion Orchard", description: "A grove of trees made from crackling electric arcs, sparking with gentle energy", tags: ['mythic', 'flying'] },
   ],
   75: [
-    { name: "Dragon Nebula Core", description: "The fiery heart of a dragon-shaped nebula, where stars are forged" },
-    { name: "Chrono Spire", description: "An ancient tower at the edge of a black hole where time flows like honey" },
-    { name: "The Singing Rings", description: "Saturn-like rings that resonate with cosmic harmonies" },
-    { name: "Void Blossom Garden", description: "Flowers of pure light blooming in the absolute darkness between galaxies" },
+    { name: "Dragon Nebula Core", description: "A star-forge shaped like a colossal cosmic dragon, where new stars are forged in fire", tags: ['mythic', 'flying'] },
+    { name: "Chrono Spire", description: "A spiraling ancient tower at the event horizon of a black hole where time flows like honey", tags: ['mythic'] },
+    { name: "The Singing Rings", description: "Vast planetary rings vibrating with celestial sound and harmonic frequencies", tags: ['flying', 'all'] },
+    { name: "Void Blossom Garden", description: "Light-flowers blooming in total intergalactic darkness, each petal a tiny star", tags: ['all'] },
+    { name: "Riftstep Plateau", description: "A stone mesa split by dimensional tears of blue fire, reality rippling at the edges", tags: ['land', 'mythic'] },
+    { name: "Stormforge Citadel", description: "A floating fortress generating endless cosmic thunderstorms of purple lightning", tags: ['flying', 'mythic'] },
+    { name: "Ember Star Wasteland", description: "A scorched world lit by a dying red giant's embers, beautiful in its twilight", tags: ['land'] },
+    { name: "Glass Horizon Fields", description: "Miles of reflective glass plains catching starlight, each step creating ripples of light", tags: ['land'] },
+    { name: "Aether Serpent Trench", description: "A deep canyon shaped by an invisible cosmic serpent, energy coiling through it", tags: ['aquatic', 'mythic'] },
+    { name: "Cosmic Whale Graveyard", description: "Ancient giant astral whale skeletons drifting in silence, hauntingly beautiful", tags: ['aquatic', 'mythic'] },
   ],
   100: [
-    { name: "Galactic Throne", description: "The radiant center of the galaxy, surrounded by a crown of a million stars" },
-    { name: "Genesis Point", description: "The mythical origin of all creation, where reality shimmers into existence" },
-    { name: "Cosmic Apex", description: "The highest peak of the universe, overlooking the tapestry of all existence" },
-    { name: "Eternal Dawn", description: "A place where the first light of creation still glows, timeless and magnificent" },
+    // Grand/Transcendent locations
+    { name: "Galactic Throne", description: "A luminous seat of starlight at the galaxy's heart, surrounded by a crown of a million stars", tags: ['mythic'] },
+    { name: "Genesis Point", description: "Where new universes spark into existence, reality shimmering with infinite possibility", tags: ['mythic', 'all'] },
+    { name: "Cosmic Apex", description: "The highest cosmic peak overlooking all reality, where you can see the entire universe", tags: ['flying', 'land'] },
+    { name: "Eternal Dawn", description: "Where the universe's first light endlessly rises, golden and magnificent forever", tags: ['all'] },
+    { name: "Halo of the First Star", description: "A radiant ringworld orbiting the first star ever born, ancient and sacred", tags: ['flying', 'mythic'] },
+    { name: "Infinity Bridge", description: "A glowing walkway stretching infinitely through time, connecting all moments", tags: ['all'] },
+    { name: "Celestial Crown Realm", description: "A cluster of golden star-crowns orbiting a brilliant white sun", tags: ['flying', 'mythic'] },
+    { name: "The Prism Citadel", description: "A crystal palace refracting reality into colors unseen by mortal eyes", tags: ['mythic'] },
+    { name: "Prime Singularity Gardens", description: "Tranquil gardens grown around stabilized black holes, gravity creating impossible beauty", tags: ['all'] },
+    { name: "The Ascendant Sea", description: "A massive ocean made of liquid cosmic consciousness, shimmering with wisdom", tags: ['aquatic', 'mythic'] },
+    // Cozy/Intimate alternatives for variety
+    { name: "The Eternal Hearth", description: "A cozy cosmic cottage where stardust settles like snow and nebulas glow like firelight", tags: ['all'] },
+    { name: "Starlight Sanctuary", description: "A peaceful garden where the gentlest stars come to rest, warm and welcoming", tags: ['all'] },
+    { name: "The Dreamer's Alcove", description: "A soft hammock of woven starlight suspended in a pocket of peaceful cosmos", tags: ['all'] },
+    { name: "Aurora's Embrace", description: "A warm valley where auroras wrap around you like a blanket of light", tags: ['land', 'all'] },
   ],
 };
+
+// Bonus pool of ultra-unique locations that can supplement any tier
+const bonusLocations: CosmicLocation[] = [
+  { name: "Neon Lotus Orbit", description: "Giant neon lotus flowers floating serenely in space, petals glowing pink and cyan", tags: ['aquatic', 'flying'] },
+  { name: "Frostwave Cathedral", description: "A frozen temple echoing with time vibrations, ice pillars singing ancient songs", tags: ['land', 'mythic'] },
+  { name: "Carbon Spire Expanse", description: "Jet-black obelisks rising from glowing sand, mysterious and majestic", tags: ['land'] },
+  { name: "Aurora Coral Sanctuary", description: "Coral reefs made of pure aurora light, shifting colors constantly", tags: ['aquatic'] },
+  { name: "Dustwind Monastery", description: "A silent monk temple on a drifting asteroid, peaceful and timeless", tags: ['land', 'flying'] },
+  { name: "Sapphire Nebula Caverns", description: "Cave systems filled with glowing blue fog and crystalline formations", tags: ['land', 'aquatic'] },
+  { name: "Ethereal Clockwork Plains", description: "Planet-sized gears turning beneath the ground, the machinery of time itself", tags: ['land', 'mythic'] },
+  { name: "Sunforge Bridge", description: "A golden bridge suspended across two stars, warmth radiating from both sides", tags: ['flying'] },
+  { name: "Shadow Pearl Archipelago", description: "Dark islands orbiting a pale moon, mysterious yet beautiful", tags: ['aquatic', 'land'] },
+  { name: "The Living Constellation", description: "A land shaped from stars forming creatures, the sky come alive", tags: ['mythic', 'all'] },
+  { name: "Featherfall Expanse", description: "Gravity-defying cosmic feathers raining gently from the sky", tags: ['flying'] },
+  { name: "Dreamwave Hollow", description: "A valley where thoughts manifest as fog shapes, imagination made visible", tags: ['all'] },
+  { name: "Hologram Wildlands", description: "Terrain constantly glitching into new beautiful forms, reality shifting", tags: ['mythic'] },
+  { name: "The Spiral Observatory", description: "A floating stairway leading to a cosmic observatory among the stars", tags: ['flying', 'mythic'] },
+  { name: "Riftfire Marsh", description: "Marshes lit by blue and pink dimension flames, otherworldly and serene", tags: ['aquatic', 'land'] },
+  { name: "Starbreath Canyon", description: "A canyon exhaling starlight like warm fog, gentle and mystical", tags: ['land'] },
+  { name: "Ion Prism Fields", description: "Rainbow polygons floating like flowers in low gravity, kaleidoscopic beauty", tags: ['flying', 'all'] },
+  { name: "Golden Spore Woods", description: "Forest releasing glowing floating spores that drift like fireflies", tags: ['land'] },
+  { name: "Skyvine Citadel", description: "A giant tree fortress reaching into space, roots in stars and branches in nebulas", tags: ['land', 'flying'] },
+  { name: "Pulse Ocean", description: "A sea that beats with the heartbeat of the universe, rhythmic and alive", tags: ['aquatic'] },
+];
+
+// Determine species type from spirit animal
+function getSpeciesType(spiritAnimal: string): SpeciesTag {
+  const animal = spiritAnimal?.toLowerCase() || '';
+  
+  // Aquatic creatures
+  if (['whale', 'dolphin', 'shark', 'fish', 'octopus', 'jellyfish', 'seahorse', 'turtle', 'seal', 'otter', 'penguin', 'ray', 'eel'].some(a => animal.includes(a))) {
+    return 'aquatic';
+  }
+  
+  // Flying creatures
+  if (['eagle', 'hawk', 'owl', 'phoenix', 'dragon', 'butterfly', 'hummingbird', 'raven', 'crow', 'falcon', 'dove', 'swan', 'bat', 'moth', 'firefly', 'parrot', 'crane', 'heron'].some(a => animal.includes(a))) {
+    return 'flying';
+  }
+  
+  // Mythic creatures (that aren't primarily flying/aquatic)
+  if (['unicorn', 'griffin', 'chimera', 'sphinx', 'basilisk', 'hydra', 'cerberus', 'pegasus', 'thunderbird'].some(a => animal.includes(a))) {
+    return 'mythic';
+  }
+  
+  // Default to land
+  return 'land';
+}
+
+// Select a location weighted by species compatibility
+function selectLocation(locations: CosmicLocation[], speciesType: SpeciesTag): CosmicLocation {
+  // Filter to locations that match species type or are tagged 'all'
+  const compatibleLocations = locations.filter(loc => 
+    !loc.tags || loc.tags.length === 0 || loc.tags.includes(speciesType) || loc.tags.includes('all')
+  );
+  
+  // If we have compatible locations, use those; otherwise fall back to all locations
+  const pool = compatibleLocations.length > 0 ? compatibleLocations : locations;
+  
+  // 20% chance to include a bonus location for variety
+  if (Math.random() < 0.2) {
+    const compatibleBonus = bonusLocations.filter(loc => 
+      !loc.tags || loc.tags.length === 0 || loc.tags.includes(speciesType) || loc.tags.includes('all')
+    );
+    if (compatibleBonus.length > 0) {
+      return compatibleBonus[Math.floor(Math.random() * compatibleBonus.length)];
+    }
+  }
+  
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -96,9 +205,13 @@ serve(async (req) => {
 
     console.log(`[Cosmic Postcard] Using companion image for ${companion.spirit_animal}`);
 
-    // Select random location for this milestone tier
-    const locations = cosmicLocations[milestonePercent as keyof typeof cosmicLocations] || cosmicLocations[25];
-    const location = locations[Math.floor(Math.random() * locations.length)];
+    // Determine species type for location matching
+    const speciesType = getSpeciesType(companion.spirit_animal);
+    console.log(`[Cosmic Postcard] Species type: ${speciesType}`);
+
+    // Select location weighted by species compatibility
+    const tierLocations = cosmicLocations[milestonePercent as keyof typeof cosmicLocations] || cosmicLocations[25];
+    const location = selectLocation(tierLocations, speciesType);
 
     console.log(`[Cosmic Postcard] Selected location: ${location.name}`);
 
