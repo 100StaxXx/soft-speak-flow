@@ -6,19 +6,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { useEpics } from "@/hooks/useEpics";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Target, Trophy, Plus, Sparkles, Users } from "lucide-react";
+import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { EpicTemplatesBrowser } from "@/components/EpicTemplatesBrowser";
+import { EpicTemplate } from "@/hooks/useEpicTemplates";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Epics = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
   const { user } = useAuth();
   const {
     activeEpics,
@@ -42,6 +50,13 @@ const Epics = () => {
   }) => {
     createEpic(data);
     setCreateDialogOpen(false);
+    setSelectedTemplate(null);
+  };
+
+  const handleSelectTemplate = (template: EpicTemplate) => {
+    setSelectedTemplate(template);
+    setTemplatesDialogOpen(false);
+    setCreateDialogOpen(true);
   };
 
   return (
@@ -69,20 +84,28 @@ const Epics = () => {
           </p>
         </motion.div>
 
-        {/* Join Epic Button */}
+        {/* Action Buttons */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="mb-4"
+          className="grid grid-cols-2 gap-3 mb-4"
         >
           <Button
             onClick={() => setJoinDialogOpen(true)}
             variant="outline"
-            className="w-full h-12"
+            className="h-12"
           >
-            <Users className="w-5 h-5 mr-2" />
+            <Users className="w-4 h-4 mr-2" />
             Join Guild
+          </Button>
+          <Button
+            onClick={() => setTemplatesDialogOpen(true)}
+            variant="outline"
+            className="h-12"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Browse Templates
           </Button>
         </motion.div>
 
@@ -94,12 +117,15 @@ const Epics = () => {
           className="mb-6"
         >
           <Button
-            onClick={() => setCreateDialogOpen(true)}
+            onClick={() => {
+              setSelectedTemplate(null);
+              setCreateDialogOpen(true);
+            }}
             className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 h-14 text-lg"
             size="lg"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Create New Epic
+            Create Custom Epic
           </Button>
         </motion.div>
 
@@ -130,15 +156,23 @@ const Epics = () => {
                 <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">No Active Epics</h3>
                 <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
-                  Begin your first legendary quest! Create an epic and link your habits to track progress.
+                  Begin your first legendary quest! Browse templates or create your own epic.
                 </p>
-                <Button
-                  onClick={() => setCreateDialogOpen(true)}
-                  variant="outline"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Epic
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <Button
+                    onClick={() => setTemplatesDialogOpen(true)}
+                    variant="outline"
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Browse Templates
+                  </Button>
+                  <Button
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Custom
+                  </Button>
+                </div>
               </motion.div>
             ) : (
               activeEpics.map((epic) => (
@@ -181,6 +215,7 @@ const Epics = () => {
           onOpenChange={setCreateDialogOpen}
           onCreateEpic={handleCreateEpic}
           isCreating={isCreating}
+          template={selectedTemplate}
         />
         
         {/* Join Epic Dialog */}
@@ -188,6 +223,19 @@ const Epics = () => {
           open={joinDialogOpen}
           onOpenChange={setJoinDialogOpen}
         />
+
+        {/* Templates Browser Dialog */}
+        <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-primary" />
+                Epic Templates
+              </DialogTitle>
+            </DialogHeader>
+            <EpicTemplatesBrowser onSelectTemplate={handleSelectTemplate} />
+          </DialogContent>
+        </Dialog>
         
         <PageInfoModal
           open={showPageInfo}
@@ -199,9 +247,10 @@ const Epics = () => {
             "Create epics with target completion days",
             "Link habits to track progress automatically",
             "Join guilds to work toward goals with others",
+            "Compete with rivals and send shouts to motivate",
             "Earn bonus XP for completing epic-linked habits"
           ]}
-          tip="Epics are perfect for 30-day challenges, fitness goals, or any long-term objective!"
+          tip="Try a template like 'Detox Warrior' for a dopamine detox challenge with pre-built habits!"
         />
       </div>
 

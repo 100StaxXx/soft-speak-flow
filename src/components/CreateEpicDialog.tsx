@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Target, Zap, Plus, Trash2, Swords, Sparkles, Leaf, Sun } from "lucide-react";
-import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
-import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { Badge } from "@/components/ui/badge";
+import { Target, Zap, Plus, Swords, Sparkles, Leaf, Sun } from "lucide-react";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
 import { cn } from "@/lib/utils";
+import { EpicTemplate } from "@/hooks/useEpicTemplates";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -71,6 +71,7 @@ interface CreateEpicDialogProps {
     theme_color?: EpicTheme;
   }) => void;
   isCreating: boolean;
+  template?: EpicTemplate | null;
 }
 
 export const CreateEpicDialog = ({
@@ -78,6 +79,7 @@ export const CreateEpicDialog = ({
   onOpenChange,
   onCreateEpic,
   isCreating,
+  template,
 }: CreateEpicDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -87,6 +89,25 @@ export const CreateEpicDialog = ({
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [currentHabitDays, setCurrentHabitDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+
+  // Pre-fill from template when selected
+  useEffect(() => {
+    if (template && open) {
+      setTitle(template.name);
+      setDescription(template.description);
+      setTargetDays(template.target_days);
+      setThemeColor(template.theme_color as EpicTheme || 'heroic');
+      
+      // Convert template habits to NewHabit format
+      const templateHabits: NewHabit[] = template.habits.slice(0, 2).map(h => ({
+        title: h.title,
+        difficulty: h.difficulty as "easy" | "medium" | "hard",
+        frequency: h.frequency || 'daily',
+        custom_days: h.frequency === 'daily' ? [] : [0, 1, 2, 3, 4, 5, 6],
+      }));
+      setNewHabits(templateHabits);
+    }
+  }, [template, open]);
 
   const addHabit = useCallback(() => {
     if (!currentHabitTitle.trim() || newHabits.length >= 2) return;
@@ -120,6 +141,10 @@ export const CreateEpicDialog = ({
     });
 
     // Reset form
+    resetForm();
+  }, [title, description, targetDays, newHabits, themeColor, onCreateEpic]);
+
+  const resetForm = () => {
     setTitle("");
     setDescription("");
     setTargetDays(30);
@@ -128,20 +153,37 @@ export const CreateEpicDialog = ({
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  }, [title, description, targetDays, newHabits, themeColor, onCreateEpic]);
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      resetForm();
+    }
+    onOpenChange(isOpen);
+  };
 
   const calculateXPReward = useCallback(() => targetDays * 10, [targetDays]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
+            {template?.badge_icon && <span className="text-xl">{template.badge_icon}</span>}
             <Target className="w-5 h-5 text-primary" />
-            Create Legendary Epic
+            {template ? `Start: ${template.name}` : "Create Legendary Epic"}
           </DialogTitle>
           <DialogDescription>
-            Create an epic and add habits to track your progress.
+            {template ? (
+              <span className="flex items-center gap-2">
+                Starting from template
+                <Badge variant="secondary" className="text-xs">
+                  {template.difficulty_tier}
+                </Badge>
+              </span>
+            ) : (
+              "Create an epic and add habits to track your progress."
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -175,7 +217,7 @@ export const CreateEpicDialog = ({
           <div className="space-y-2">
             <Label htmlFor="target-days">Epic Duration (Days)</Label>
             <div className="flex gap-2">
-              {[7, 14, 30, 60, 90].map((days) => (
+              {[7, 14, 21, 30, 60].map((days) => (
                 <Button
                   key={days}
                   type="button"
@@ -231,9 +273,9 @@ export const CreateEpicDialog = ({
             </div>
           </div>
 
-          {/* Create Habits */}
+          {/* Habits */}
           <div className="space-y-3">
-            <Label>Epic Habits (Required)</Label>
+            <Label>Epic Habits {template ? "(from template)" : "(Required)"}</Label>
             
             <EpicHabitList habits={newHabits} onRemove={removeHabit} />
             
@@ -273,7 +315,7 @@ export const CreateEpicDialog = ({
             disabled={!title.trim() || newHabits.length === 0 || isCreating}
             className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
           >
-            {isCreating ? "Creating Epic..." : "Begin Epic Quest! 🎯"}
+            {isCreating ? "Creating Epic..." : template ? `Start ${template.name}! 🎯` : "Begin Epic Quest! 🎯"}
           </Button>
         </div>
       </DialogContent>

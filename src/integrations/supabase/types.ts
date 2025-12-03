@@ -1331,6 +1331,51 @@ export type Database = {
           },
         ]
       }
+      epic_templates: {
+        Row: {
+          badge_icon: string | null
+          badge_name: string | null
+          created_at: string | null
+          description: string
+          difficulty_tier: string
+          habits: Json
+          id: string
+          is_featured: boolean | null
+          name: string
+          popularity_count: number | null
+          target_days: number
+          theme_color: string
+        }
+        Insert: {
+          badge_icon?: string | null
+          badge_name?: string | null
+          created_at?: string | null
+          description: string
+          difficulty_tier?: string
+          habits?: Json
+          id?: string
+          is_featured?: boolean | null
+          name: string
+          popularity_count?: number | null
+          target_days?: number
+          theme_color?: string
+        }
+        Update: {
+          badge_icon?: string | null
+          badge_name?: string | null
+          created_at?: string | null
+          description?: string
+          difficulty_tier?: string
+          habits?: Json
+          id?: string
+          is_featured?: boolean | null
+          name?: string
+          popularity_count?: number | null
+          target_days?: number
+          theme_color?: string
+        }
+        Relationships: []
+      }
       epics: {
         Row: {
           completed_at: string | null
@@ -1438,6 +1483,107 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      guild_rivalries: {
+        Row: {
+          created_at: string | null
+          epic_id: string
+          id: string
+          rival_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          epic_id: string
+          id?: string
+          rival_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          epic_id?: string
+          id?: string
+          rival_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_rivalries_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_rivalries_rival_id_fkey"
+            columns: ["rival_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_rivalries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_shouts: {
+        Row: {
+          created_at: string | null
+          epic_id: string
+          id: string
+          is_read: boolean | null
+          message_key: string
+          recipient_id: string
+          sender_id: string
+          shout_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          epic_id: string
+          id?: string
+          is_read?: boolean | null
+          message_key: string
+          recipient_id: string
+          sender_id: string
+          shout_type: string
+        }
+        Update: {
+          created_at?: string | null
+          epic_id?: string
+          id?: string
+          is_read?: boolean | null
+          message_key?: string
+          recipient_id?: string
+          sender_id?: string
+          shout_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_shouts_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_shouts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_shouts_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       guild_stories: {
         Row: {
