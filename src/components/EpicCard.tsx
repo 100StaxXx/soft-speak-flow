@@ -16,7 +16,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { EpicDiscordSection } from "./EpicDiscordSection";
-import { GuildStorySection } from "./GuildStorySection";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
@@ -290,7 +289,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         <div className="mt-4 pt-4 border-t border-border space-y-4">
           <GuildMembersSection epicId={epic.id} />
           <GuildShoutsFeed epicId={epic.id} />
-          <GuildStorySection epicId={epic.id} memberCount={memberCount} />
           <EpicDiscordSection 
             epic={{
               id: epic.id,
