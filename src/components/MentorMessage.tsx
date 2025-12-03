@@ -50,17 +50,67 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
   }, [mentorId, type]);
 
   const getMotivationMessage = (tone: string) => {
+    const isTough = /tough|direct|discipline/i.test(tone);
+    const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
+    
+    if (isTough) {
+      const messages = [
+        "No excuses. Time to execute.",
+        "Push through. Weakness is temporary.",
+        "Your grind defines you. Get after it.",
+        "Focus. Execute. Dominate.",
+        "Comfort is the enemy. Level up.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
+    if (isEmpathetic) {
+      const messages = [
+        "You're doing great. Keep going.",
+        "Every step forward counts.",
+        "I believe in you. You've got this.",
+        "Progress, not perfection.",
+        "You're stronger than you know.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
     const messages = [
       "Time to level up.",
       "Push through. You've got this.",
       "Every rep counts. Keep going.",
-      "Focus. Execute. Dominate.",
-      "Your grind defines you.",
+      "Focus on what matters.",
+      "Your potential is limitless.",
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
   const getSuccessMessage = (tone: string) => {
+    const isTough = /tough|direct|discipline/i.test(tone);
+    const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
+    
+    if (isTough) {
+      const messages = [
+        "That's what I'm talking about.",
+        "Keep that intensity up.",
+        "One down. Keep stacking wins.",
+        "This is who you are. A winner.",
+        "Momentum is everything. Don't stop.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
+    if (isEmpathetic) {
+      const messages = [
+        "I'm so proud of you!",
+        "You did it! Celebrate this win.",
+        "See? You're capable of amazing things.",
+        "This is beautiful progress.",
+        "Your effort is paying off.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
     const messages = [
       "That's how it's done!",
       "Crushing it. Keep that momentum.",
@@ -72,6 +122,31 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
   };
 
   const getHabitMessage = (tone: string) => {
+    const isTough = /tough|direct|discipline/i.test(tone);
+    const isEmpathetic = /empathetic|supportive|gentle/i.test(tone);
+    
+    if (isTough) {
+      const messages = [
+        "Discipline over motivation. Always.",
+        "You showed up. That's non-negotiable.",
+        "Habits build empires. Keep stacking.",
+        "Consistency separates winners from dreamers.",
+        "No days off from greatness.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
+    if (isEmpathetic) {
+      const messages = [
+        "You showed up for yourself today.",
+        "Building habits takes courage. You have it.",
+        "Every time you show up, you grow.",
+        "Be proud - this is real growth.",
+        "You're becoming who you want to be.",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
     const messages = [
       "Locked in. This is the way.",
       "Building discipline, one day at a time.",

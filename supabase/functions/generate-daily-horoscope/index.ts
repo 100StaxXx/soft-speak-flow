@@ -195,20 +195,27 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
 
     console.log('[Horoscope] Generating for zodiac:', profile.zodiac_sign, 'Advanced:', hasAdvancedDetails);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-      }),
-    });
+    // Helper function for AI calls
+    const callAI = async (systemContent: string, userContent: string) => {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemContent },
+            { role: 'user', content: userContent }
+          ],
+        }),
+      });
+      return response;
+    };
+
+    // Generate main horoscope (required)
+    const response = await callAI(systemPrompt, userPrompt);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -223,75 +230,13 @@ Keep it warm, inspiring, and under 150 words. Do not use asterisks (*) for empha
       throw new Error('No horoscope content generated');
     }
 
-    console.log('[Horoscope] Generated successfully');
+    console.log('[Horoscope] Generated horoscope successfully');
 
-    // Generate cosmiq tip
-    const tipResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { 
-            role: 'system', 
-            content: `You are a cosmiq guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.` 
-          },
-          { 
-            role: 'user', 
-            content: `Generate a single daily cosmiq tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmiq energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.` 
-          }
-        ],
-      }),
-    });
+    // Prepare prompts for parallel generation
+    const tipSystemPrompt = `You are a cosmiq guide sharing mystical wisdom. Your tone is ${mentor?.tone_description || 'warm, insightful, and empowering'}. IMPORTANT: Do not use asterisks (*) for emphasis or formatting. Use plain text only.`;
+    const tipUserPrompt = `Generate a single daily cosmiq tip or mystical insight for ${profile.zodiac_sign}. This should be a brief, actionable piece of wisdom about astrology, spirituality, or cosmiq energy. Keep it under 50 words and make it unique and inspiring. Do not use asterisks (*) - use plain text only.`;
 
-    let cosmiqTip = 'The stars guide those who listen. Trust your inner compass today.';
-    if (tipResponse.ok) {
-      const tipData = await tipResponse.json();
-      cosmiqTip = tipData.choices?.[0]?.message?.content || cosmiqTip;
-    }
-
-    console.log('[Horoscope] Generated cosmiq tip');
-
-    // Generate energy forecast for advanced profiles
-    let energyForecast = null;
-    if (hasCosmiqProfile && energyPrompt) {
-      try {
-        const energyResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              { role: 'system', content: 'You are a cosmiq guide. Return only valid JSON.' },
-              { role: 'user', content: energyPrompt }
-            ],
-          }),
-        });
-
-        if (energyResponse.ok) {
-          const energyData = await energyResponse.json();
-          let energyText = energyData.choices?.[0]?.message?.content || '';
-          energyText = energyText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-          energyForecast = JSON.parse(energyText);
-          console.log('[Horoscope] Generated energy forecast');
-        }
-      } catch (error) {
-        console.error('[Horoscope] Error generating energy forecast:', error);
-        // Non-critical, continue without it
-      }
-    }
-
-    // Generate placement-specific insights for personalized profiles
-    let placementInsights = null;
-    if (hasCosmiqProfile) {
-      try {
-        const placementPrompt = `Generate brief daily insights for each astrological placement for ${today}:
+    const placementPrompt = hasCosmiqProfile ? `Generate brief daily insights for each astrological placement for ${today}:
 
 Cosmiq Profile:
 - Sun in ${profile.zodiac_sign}: Core identity and life force
@@ -311,33 +256,67 @@ Respond with JSON:
   "mercury": "brief insight about Mercury in ${profile.mercury_sign} today",
   "mars": "brief insight about Mars in ${profile.mars_sign} today",
   "venus": "brief insight about Venus in ${profile.venus_sign} today"
-}`;
+}` : null;
 
-        const placementResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              { role: 'system', content: 'You are a cosmiq guide. Return only valid JSON with no markdown formatting.' },
-              { role: 'user', content: placementPrompt }
-            ],
-          }),
-        });
+    // Generate supplementary content in parallel for better performance
+    const parallelPromises: Promise<Response | null>[] = [
+      // Cosmiq tip (always)
+      callAI(tipSystemPrompt, tipUserPrompt),
+    ];
 
-        if (placementResponse.ok) {
-          const placementData = await placementResponse.json();
-          let placementText = placementData.choices?.[0]?.message?.content || '';
-          placementText = placementText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-          placementInsights = JSON.parse(placementText);
-          console.log('[Horoscope] Generated placement insights');
-        }
+    // Add energy forecast and placement insights for cosmiq profiles
+    if (hasCosmiqProfile && energyPrompt) {
+      parallelPromises.push(callAI('You are a cosmiq guide. Return only valid JSON.', energyPrompt));
+    } else {
+      parallelPromises.push(Promise.resolve(null));
+    }
+
+    if (hasCosmiqProfile && placementPrompt) {
+      parallelPromises.push(callAI('You are a cosmiq guide. Return only valid JSON with no markdown formatting.', placementPrompt));
+    } else {
+      parallelPromises.push(Promise.resolve(null));
+    }
+
+    console.log('[Horoscope] Generating supplementary content in parallel...');
+    const [tipResponse, energyResponse, placementResponse] = await Promise.all(parallelPromises);
+
+    // Process cosmiq tip
+    let cosmiqTip = 'The stars guide those who listen. Trust your inner compass today.';
+    if (tipResponse && tipResponse.ok) {
+      try {
+        const tipData = await tipResponse.json();
+        cosmiqTip = tipData.choices?.[0]?.message?.content || cosmiqTip;
+        console.log('[Horoscope] Generated cosmiq tip');
+      } catch (e) {
+        console.error('[Horoscope] Error parsing cosmiq tip:', e);
+      }
+    }
+
+    // Process energy forecast
+    let energyForecast = null;
+    if (energyResponse && energyResponse.ok) {
+      try {
+        const energyData = await energyResponse.json();
+        let energyText = energyData.choices?.[0]?.message?.content || '';
+        energyText = energyText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        energyForecast = JSON.parse(energyText);
+        console.log('[Horoscope] Generated energy forecast');
       } catch (error) {
-        console.error('[Horoscope] Error generating placement insights:', error);
-        // Non-critical, continue without it
+        console.error('[Horoscope] Error parsing energy forecast:', error);
+      }
+    }
+
+    // Process placement insights
+    let placementInsights = null;
+    if (placementResponse && placementResponse.ok) {
+      try {
+        const placementData = await placementResponse.json();
+        let placementText = placementData.choices?.[0]?.message?.content || '';
+        placementText = placementText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        placementInsights = JSON.parse(placementText);
+        console.log('[Horoscope] Generated placement insights');
+      } catch (error) {
+        console.error('[Horoscope] Error parsing placement insights:', error);
       }
     }
 
