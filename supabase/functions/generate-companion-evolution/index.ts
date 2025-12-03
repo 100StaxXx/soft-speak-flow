@@ -121,10 +121,11 @@ CREATIVE FREEDOM (Essence-Based):
    - Original element evident in the chaos.
 
 LEGENDARY FREEDOM GRANTED:
-- Multiple heads, forms, or dimensional echoes.
+- Multiple forms or dimensional echoes (but SINGLE HEAD only - no multi-headed creatures).
 - Cosmiq appendages: star-matter limbs, nebula wings, galaxy constructs.
 - Reality-warping anatomy: impossible geometry, dimensional rifts, spacetime breaks.
 - Planet/universe scale: colossal beyond comprehension.
+- CRITICAL: Even at legendary tier, the creature must have ONE HEAD ONLY. No multi-headed creatures.
 - Divine constructs: halos of galaxies, crowns of stars, armor of reality itself.
 - Transcendent features: the creature IS the environment, IS the cosmiq.
 
@@ -340,7 +341,7 @@ MOOD: Legendary destiny sealed within, unstoppable divine potential, the champio
       console.log("Creating stage 1 hatchling emergence");
       
       // Special handling for aquatic creatures to prevent legs
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
       const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a baby aquatic creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Underwater environment with water physics and bubbles' : '';
       
@@ -510,7 +511,7 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
       const stageLevel = nextStage <= 10 ? 'realistic' : nextStage <= 14 ? 'mythic' : 'legendary';
       
       // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
       
       // Stage-appropriate aquatic enforcement
@@ -572,8 +573,9 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
    - FULL CREATIVE FREEDOM: Add cosmiq wings, multiple forms, reality fragments, divine constructs
    - Can transcend anatomy: Ethereal limbs, dimensional echoes, astral projections, ghost forms
    - Scale: Colossal, planetary, universe-breaking presence
-   - Divine enhancements unlimited: Halos, crowns, armor, multiple heads, cosmiq appendages
+   - Divine enhancements unlimited: Halos, crowns, armor, cosmiq appendages, energy constructs
    - Reality-bending features: Spacetime distortions, dimensional rifts, universe-birthing energy
+   - CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multiple heads or extra faces. One head, one face.
    - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
    - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
       }

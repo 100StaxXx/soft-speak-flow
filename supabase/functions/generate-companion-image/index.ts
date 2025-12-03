@@ -160,7 +160,7 @@ STYLE: Stylized digital fantasy art, painterly, NOT photorealistic`;
       const stageLevel = stage <= 10 ? 'realistic' : stage <= 14 ? 'mythic' : 'legendary';
       
       // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid'];
+      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
       const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
       
       // Stage-appropriate aquatic enforcement
