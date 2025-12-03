@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EpicTemplatesInfoTooltip } from "./EpicTemplatesInfoTooltip";
 import { Target, Clock, Zap, Users, Sparkles, ChevronRight, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ export const EpicTemplatesBrowser = ({ onSelectTemplate }: EpicTemplatesBrowserP
           <div className="flex items-center gap-2">
             <Flame className="h-5 w-5 text-orange-500" />
             <h3 className="font-semibold">Featured Epics</h3>
+            <EpicTemplatesInfoTooltip />
           </div>
           <div className="grid gap-3">
             {featuredTemplates.slice(0, 3).map((template) => (

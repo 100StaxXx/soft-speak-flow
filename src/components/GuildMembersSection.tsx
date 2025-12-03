@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SendShoutDrawer } from "./SendShoutDrawer";
+import { GuildMembersInfoTooltip } from "./GuildMembersInfoTooltip";
 import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -161,6 +162,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
             <div className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
               Guild Leaderboard
+              <GuildMembersInfoTooltip />
             </div>
             <Badge variant="outline" className="text-xs">
               {members.length} members
