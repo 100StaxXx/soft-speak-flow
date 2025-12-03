@@ -271,10 +271,16 @@ class AmbientMusicManager {
       console.warn('Failed to save volume preference:', e);
     }
     
-    // Only update audio volume if not muted and not ducked and not in active fade
-    // If ducked or fading, the volume will be managed by those operations
-    if (this.audio && !this.isMuted && !this.isDucked && !this.fadeInterval) {
-      this.audio.volume = this.volume;
+    // Cancel any active fade when user manually adjusts volume
+    if (this.fadeInterval) {
+      clearInterval(this.fadeInterval);
+      this.fadeInterval = null;
+    }
+    
+    // Apply volume immediately if not muted
+    if (this.audio && !this.shouldMute()) {
+      // If ducked, apply ducked ratio, otherwise full volume
+      this.audio.volume = this.isDucked ? this.volume * 0.15 : this.volume;
     }
   }
 
