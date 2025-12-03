@@ -706,15 +706,15 @@ export default function Tasks() {
 
       <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10">
 
-        <Tabs defaultValue="epics" className="w-full">
+        <Tabs defaultValue="quests" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
-              <Trophy className="h-4 w-4" />
-              Epics
-            </TabsTrigger>
             <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
               <Swords className="h-4 w-4" />
               Daily Quests
+            </TabsTrigger>
+            <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
+              <Trophy className="h-4 w-4" />
+              Epics
             </TabsTrigger>
           </TabsList>
 
