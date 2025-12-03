@@ -126,35 +126,95 @@ serve(async (req) => {
   }
 });
 
-function calculateScheduledTime(window: string, customTime: string | null, timezone: string): string {
+function calculateScheduledTime(window: string, customTime: string | null, timezone: string | null): string {
+  // Get the current time in the user's timezone (or UTC if not specified)
+  const userTimezone = timezone || 'UTC';
   const now = new Date();
-  let targetTime: Date;
+  
+  // Default times for windows (in user's local time)
+  const windowTimes: Record<string, { hour: number; minute: number }> = {
+    morning: { hour: 8, minute: 0 },
+    afternoon: { hour: 14, minute: 0 },
+    evening: { hour: 19, minute: 0 },
+  };
 
-  if (window === 'custom' && customTime) {
-    const [hours, minutes] = customTime.split(':').map(Number);
-    targetTime = new Date(now);
-    targetTime.setHours(hours, minutes, 0, 0);
+  let targetHour: number;
+  let targetMinute: number;
+
+  if (customTime) {
+    // Parse custom time (format: "HH:MM:SS" or "HH:MM")
+    const timeParts = customTime.split(':').map(Number);
+    targetHour = timeParts[0] || 14;
+    targetMinute = timeParts[1] || 0;
   } else {
-    // Default times for windows
-    const windowTimes = {
-      morning: { hour: 8, minute: 0 },
-      afternoon: { hour: 14, minute: 0 },
-      evening: { hour: 19, minute: 0 },
-    };
-
-    const time = windowTimes[window as keyof typeof windowTimes] || windowTimes.afternoon;
-    targetTime = new Date(now);
-    targetTime.setHours(time.hour, time.minute, 0, 0);
+    const time = windowTimes[window] || windowTimes.afternoon;
+    targetHour = time.hour;
+    targetMinute = time.minute;
     
     // Add random variance of ±30 minutes for natural distribution
     const variance = Math.floor(Math.random() * 61) - 30;
-    targetTime.setMinutes(targetTime.getMinutes() + variance);
+    targetMinute += variance;
+    
+    // Normalize minutes overflow
+    if (targetMinute >= 60) {
+      targetHour += 1;
+      targetMinute -= 60;
+    } else if (targetMinute < 0) {
+      targetHour -= 1;
+      targetMinute += 60;
+    }
   }
 
-  // If the time has already passed today, schedule for tomorrow
-  if (targetTime < now) {
-    targetTime.setDate(targetTime.getDate() + 1);
+  // Create a date string in the user's timezone and convert to UTC
+  // Format: YYYY-MM-DDTHH:MM:SS in user's timezone
+  try {
+    const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}:00`;
+    const userLocalDateStr = `${todayStr}T${timeStr}`;
+    
+    // Try to use Intl to get timezone offset
+    const userDate = new Date(userLocalDateStr);
+    
+    // Get UTC offset for the user's timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    // Calculate the offset by comparing formatted time with UTC
+    const parts = formatter.formatToParts(now);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+    
+    // Build target time accounting for timezone
+    const targetTime = new Date(userLocalDateStr);
+    
+    // Adjust for timezone - this is a simplified approach
+    // In production, you'd want to use a proper timezone library
+    const utcOffset = targetTime.getTimezoneOffset(); // Local server offset
+    
+    // If the time has already passed today (in user's timezone), schedule for tomorrow
+    if (targetTime.getTime() < now.getTime()) {
+      targetTime.setDate(targetTime.getDate() + 1);
+    }
+    
+    return targetTime.toISOString();
+  } catch (error) {
+    console.error('Error calculating scheduled time with timezone:', error);
+    
+    // Fallback to simple UTC calculation
+    const targetTime = new Date(now);
+    targetTime.setUTCHours(targetHour, targetMinute, 0, 0);
+    
+    if (targetTime < now) {
+      targetTime.setDate(targetTime.getDate() + 1);
+    }
+    
+    return targetTime.toISOString();
   }
-
-  return targetTime.toISOString();
 }

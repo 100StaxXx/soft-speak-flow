@@ -54,16 +54,34 @@ export const QuoteImageGenerator = ({
     }
   };
 
-  const downloadImage = () => {
+  const downloadImage = async () => {
     if (!generatedImage) return;
 
-    const link = document.createElement("a");
-    link.href = generatedImage;
-    link.download = `quote-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Image downloaded!");
+    try {
+      // Fetch the image and convert to blob to handle cross-origin images
+      const response = await fetch(generatedImage);
+      const blob = await response.blob();
+      
+      // Create a blob URL that we can download
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `quote-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      URL.revokeObjectURL(blobUrl);
+      
+      toast.success("Image downloaded!");
+    } catch (error) {
+      console.error("Error downloading image:", error);
+      // Fallback: open in new tab if download fails
+      window.open(generatedImage, '_blank');
+      toast.info("Image opened in new tab - right-click to save");
+    }
   };
 
   return (

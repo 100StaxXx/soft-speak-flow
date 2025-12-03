@@ -70,21 +70,36 @@ export const getRandomQuote = async () => {
 
 /**
  * Get quote of the day (deterministic based on current date)
+ * Uses a consistent ordering to ensure the same quote is returned for the same date
  */
 export const getQuoteOfTheDay = async () => {
   const today = new Date().toLocaleDateString("en-CA");
-  const seed = today.split("-").reduce((acc, val) => acc + parseInt(val), 0);
+  // Create a more robust seed from the date (YYYY-MM-DD format)
+  const [year, month, day] = today.split("-").map(Number);
+  const seed = year * 10000 + month * 100 + day;
 
+  // First, get the total count of quotes
+  const { count, error: countError } = await supabase
+    .from("quotes")
+    .select("*", { count: 'exact', head: true });
+
+  if (countError || !count || count === 0) {
+    return null;
+  }
+
+  // Calculate which quote to fetch based on the seed
+  const index = seed % count;
+
+  // Fetch just that one quote using consistent ordering by id
   const { data, error } = await supabase
     .from("quotes")
     .select("*")
-    .limit(100);
+    .order("id", { ascending: true })
+    .range(index, index);
 
   if (error || !data || data.length === 0) {
     return null;
   }
 
-  // Use date as seed for consistent daily quote
-  const index = seed % data.length;
-  return data[index];
+  return data[0];
 };

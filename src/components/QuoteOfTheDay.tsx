@@ -3,11 +3,11 @@ import { Card } from "@/components/ui/card";
 import { SkeletonQuote } from "@/components/SkeletonCard";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Quote, Sparkles } from "lucide-react";
+import { Quote as QuoteIcon, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { format } from "date-fns";
 
-interface Quote {
+interface QuoteData {
   id: string;
   text: string;
   author: string | null;
@@ -17,7 +17,7 @@ interface Quote {
 export const QuoteOfTheDay = () => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
-  const [todaysQuote, setTodaysQuote] = useState<Quote | null>(null);
+  const [todaysQuote, setTodaysQuote] = useState<QuoteData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,15 +51,23 @@ export const QuoteOfTheDay = () => {
 
       if (dailyPepTalk) {
         // Fetch a quote that matches the pep talk's themes
-        const { data: quote } = await supabase
-          .from("quotes")
-          .select("*")
-          .or(`emotional_triggers.ov.{${dailyPepTalk.emotional_triggers?.join(',') || ''}},category.eq.${dailyPepTalk.topic_category}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (quote) {
-          setTodaysQuote(quote);
+        // Build the query safely - first try matching by category, then fall back
+        let quoteQuery = supabase.from("quotes").select("*");
+        
+        if (dailyPepTalk.topic_category) {
+          quoteQuery = quoteQuery.eq("category", dailyPepTalk.topic_category);
+        }
+        
+        const { data: quotes } = await quoteQuery.limit(10);
+        
+        if (quotes && quotes.length > 0) {
+          // If we have emotional triggers, try to find a matching quote
+          const triggers = dailyPepTalk.emotional_triggers || [];
+          const matchingQuote = quotes.find(q => 
+            q.emotional_triggers?.some((t: string) => triggers.includes(t))
+          ) || quotes[0];
+          
+          setTodaysQuote(matchingQuote);
         }
       }
       
@@ -87,7 +95,7 @@ export const QuoteOfTheDay = () => {
           <div className="relative flex-shrink-0">
             <div className="absolute inset-0 bg-accent/30 blur-md rounded-full animate-pulse" />
             <div className="relative p-3 bg-gradient-to-br from-accent/30 to-accent/10 rounded-full border border-accent/20">
-              <Quote className="h-6 w-6 text-accent" />
+              <QuoteIcon className="h-6 w-6 text-accent" />
             </div>
           </div>
           
