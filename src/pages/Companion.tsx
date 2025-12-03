@@ -1,24 +1,20 @@
 import { BottomNav } from "@/components/BottomNav";
 import { CompanionDisplay } from "@/components/CompanionDisplay";
-import { CompanionEvolutionHistory } from "@/components/CompanionEvolutionHistory";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
-import { HabitCalendar } from "@/components/HabitCalendar";
-import { WeeklyInsights } from "@/components/WeeklyInsights";
-import { AchievementsPanel } from "@/components/AchievementsPanel";
+import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
 import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
 import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, TrendingUp, BookOpen, Sparkles } from "lucide-react";
+import { Award, TrendingUp, BookOpen, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { StreakFreezeDisplay } from "@/components/StreakFreezeDisplay";
 import { useState, memo } from "react";
 
 // Memoized tab content to prevent unnecessary re-renders
@@ -41,16 +37,10 @@ const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: {
 ));
 OverviewTab.displayName = 'OverviewTab';
 
-const ProgressTab = memo(({ companionId }: { companionId: string }) => (
-  <div className="space-y-6 mt-6">
-    <StreakFreezeDisplay />
-    <HabitCalendar />
-    <WeeklyInsights />
-    <AchievementsPanel />
-    <CompanionEvolutionHistory companionId={companionId} />
-  </div>
+const BadgesTab = memo(() => (
+  <BadgesCollectionPanel />
 ));
-ProgressTab.displayName = 'ProgressTab';
+BadgesTab.displayName = 'BadgesTab';
 
 const StoryTab = memo(() => (
   <div className="space-y-6 mt-6">
@@ -165,9 +155,9 @@ const Companion = () => {
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="progress">
-                <Trophy className="h-4 w-4 mr-2" />
-                Progress
+              <TabsTrigger value="badges">
+                <Award className="h-4 w-4 mr-2" />
+                Badges
               </TabsTrigger>
               <TabsTrigger value="story">
                 <BookOpen className="h-4 w-4 mr-2" />
@@ -189,8 +179,8 @@ const Companion = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="progress">
-              {activeTab === "progress" && <ProgressTab companionId={companion.id} />}
+            <TabsContent value="badges">
+              {activeTab === "badges" && <BadgesTab />}
             </TabsContent>
 
             <TabsContent value="story">
