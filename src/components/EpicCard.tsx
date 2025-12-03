@@ -20,11 +20,13 @@ import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { GuildActivityFeed } from "./GuildActivityFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
+import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<EpicTheme, string> = {
@@ -298,18 +300,31 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         </div>
 
-        {/* Linked Habits */}
+        {/* Check In Button */}
         {epic.epic_habits && epic.epic_habits.length > 0 && (
           <div className="mb-4">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              Contributing Habits
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {epic.epic_habits.map((eh) => (
-                <Badge key={eh.habit_id} variant="outline" className="text-xs">
-                  {eh.habits.title}
-                </Badge>
-              ))}
+            <EpicCheckInDrawer
+              epicId={epic.id}
+              habits={epic.epic_habits.map(eh => ({
+                id: eh.habit_id,
+                title: eh.habits.title,
+                difficulty: eh.habits.difficulty,
+              }))}
+              isActive={isActive}
+            />
+            
+            {/* Linked Habits as badges */}
+            <div className="mt-3">
+              <div className="text-xs font-medium text-muted-foreground mb-2">
+                Contributing Habits
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {epic.epic_habits.map((eh) => (
+                  <Badge key={eh.habit_id} variant="outline" className="text-xs">
+                    {eh.habits.title}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
         )}
