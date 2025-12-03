@@ -192,7 +192,7 @@ Aspect ratio: 4:3 landscape orientation. High detail, cinematic lighting.`;
           id: postcard.id,
           location_name: location.name,
           location_description: location.description,
-          image_url: imageUrl,
+          image_url: permanentImageUrl,
           caption: caption,
           milestone_percent: milestonePercent,
         }
