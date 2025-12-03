@@ -79,6 +79,24 @@ const Admin = () => {
   });
   const [generatingSampleCard, setGeneratingSampleCard] = useState(false);
   const [generatedSampleCard, setGeneratedSampleCard] = useState<any | null>(null);
+
+  // Postcard Generator State
+  const [postcardTestData, setPostcardTestData] = useState({
+    spiritAnimal: "wolf",
+    element: "fire",
+    favoriteColor: "#FF6B35",
+    eyeColor: "#FFD700",
+    furColor: "#8B4513",
+    milestonePercent: 50,
+    sourceImageUrl: "",
+  });
+  const [generatingPostcard, setGeneratingPostcard] = useState(false);
+  const [generatedPostcard, setGeneratedPostcard] = useState<{
+    imageUrl: string;
+    locationName: string;
+    locationDescription: string;
+    caption: string;
+  } | null>(null);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -430,6 +448,65 @@ const Admin = () => {
       toast.error(error.message || "Failed to generate sample card");
     } finally {
       setGeneratingSampleCard(false);
+    }
+  };
+
+  const handleGeneratePostcard = async () => {
+    setGeneratingPostcard(true);
+    setGeneratedPostcard(null);
+
+    try {
+      let sourceImageUrl = postcardTestData.sourceImageUrl;
+      
+      // If no source image provided, generate a companion image first
+      if (!sourceImageUrl) {
+        toast.info("Generating companion image first...");
+        const { data: companionData, error: companionError } = await supabase.functions.invoke("generate-companion-image", {
+          body: {
+            spiritAnimal: postcardTestData.spiritAnimal,
+            element: postcardTestData.element,
+            stage: 5,
+            favoriteColor: postcardTestData.favoriteColor,
+            eyeColor: postcardTestData.eyeColor,
+            furColor: postcardTestData.furColor,
+          },
+        });
+
+        if (companionError) throw companionError;
+        sourceImageUrl = companionData.imageUrl;
+        toast.success("Companion image generated!");
+      }
+
+      toast.info("Generating cosmic postcard...");
+      
+      const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard-test", {
+        body: {
+          milestonePercent: postcardTestData.milestonePercent,
+          sourceImageUrl,
+          companionData: {
+            spirit_animal: postcardTestData.spiritAnimal,
+            core_element: postcardTestData.element,
+            favorite_color: postcardTestData.favoriteColor,
+            eye_color: postcardTestData.eyeColor,
+            fur_color: postcardTestData.furColor,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      setGeneratedPostcard({
+        imageUrl: data.imageUrl,
+        locationName: data.locationName,
+        locationDescription: data.locationDescription,
+        caption: data.caption,
+      });
+      toast.success(`Postcard generated at ${data.locationName}!`);
+    } catch (error: any) {
+      console.error("Error generating postcard:", error);
+      toast.error(error.message || "Failed to generate postcard");
+    } finally {
+      setGeneratingPostcard(false);
     }
   };
 
@@ -967,6 +1044,192 @@ const Admin = () => {
                   <div>Energy Cost: <span className="font-semibold text-foreground">{generatedSampleCard.energy_cost}</span></div>
                   <div>Bond Level: <span className="font-semibold text-foreground">{generatedSampleCard.bond_level}</span></div>
                   <div>Card ID: <span className="font-mono text-xs text-foreground">{generatedSampleCard.card_id}</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Cosmic Postcard Generator */}
+        <Card className="p-4 md:p-6 mb-8 rounded-3xl shadow-soft bg-card">
+          <h2 className="font-heading text-xl font-semibold mb-2">📸 Cosmic Postcard Tester</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Test the cosmic postcard generation system. Optionally provide a source image URL, or leave blank to generate a companion image first.
+          </p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="postcardAnimal">Spirit Animal</Label>
+                <select
+                  id="postcardAnimal"
+                  value={postcardTestData.spiritAnimal}
+                  onChange={(e) => setPostcardTestData({ ...postcardTestData, spiritAnimal: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="wolf">Wolf</option>
+                  <option value="fox">Fox</option>
+                  <option value="tiger">Tiger</option>
+                  <option value="lion">Lion</option>
+                  <option value="bear">Bear</option>
+                  <option value="eagle">Eagle</option>
+                  <option value="owl">Owl</option>
+                  <option value="dragon">Dragon</option>
+                  <option value="phoenix">Phoenix</option>
+                  <option value="dolphin">Dolphin</option>
+                  <option value="whale">Whale</option>
+                  <option value="rabbit">Rabbit</option>
+                  <option value="deer">Deer</option>
+                  <option value="cat">Cat</option>
+                  <option value="dog">Dog</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="postcardElement">Element</Label>
+                <select
+                  id="postcardElement"
+                  value={postcardTestData.element}
+                  onChange={(e) => setPostcardTestData({ ...postcardTestData, element: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="fire">Fire</option>
+                  <option value="water">Water</option>
+                  <option value="earth">Earth</option>
+                  <option value="air">Air</option>
+                  <option value="lightning">Lightning</option>
+                  <option value="ice">Ice</option>
+                  <option value="light">Light</option>
+                  <option value="shadow">Shadow</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="postcardMilestone">Milestone: {postcardTestData.milestonePercent}%</Label>
+              <div className="flex gap-2 mt-2">
+                {[25, 50, 75, 100].map((milestone) => (
+                  <Button
+                    key={milestone}
+                    variant={postcardTestData.milestonePercent === milestone ? "default" : "outline"}
+                    onClick={() => setPostcardTestData({ ...postcardTestData, milestonePercent: milestone })}
+                    className="flex-1 rounded-xl"
+                  >
+                    {milestone}%
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="postcardFavoriteColor">Favorite Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="postcardFavoriteColor"
+                    value={postcardTestData.favoriteColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, favoriteColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={postcardTestData.favoriteColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, favoriteColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="postcardEyeColor">Eye Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="postcardEyeColor"
+                    value={postcardTestData.eyeColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, eyeColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={postcardTestData.eyeColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, eyeColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="postcardFurColor">Fur/Scale Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    id="postcardFurColor"
+                    value={postcardTestData.furColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, furColor: e.target.value })}
+                    className="w-16 h-12 rounded-2xl cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={postcardTestData.furColor}
+                    onChange={(e) => setPostcardTestData({ ...postcardTestData, furColor: e.target.value })}
+                    className="flex-1 rounded-2xl min-h-[44px] text-base"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="postcardSourceUrl">Source Image URL (Optional - leave blank to generate companion first)</Label>
+              <Input
+                type="text"
+                id="postcardSourceUrl"
+                value={postcardTestData.sourceImageUrl}
+                onChange={(e) => setPostcardTestData({ ...postcardTestData, sourceImageUrl: e.target.value })}
+                placeholder="https://... or leave blank"
+                className="rounded-2xl min-h-[44px] text-base"
+              />
+            </div>
+
+            <Button
+              onClick={handleGeneratePostcard}
+              disabled={generatingPostcard}
+              className="w-full rounded-2xl min-h-[48px] text-base"
+            >
+              {generatingPostcard ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Generating Postcard... (this may take a moment)
+                </>
+              ) : (
+                "📸 Generate Cosmic Postcard"
+              )}
+            </Button>
+
+            {generatedPostcard && (
+              <div className="space-y-4 p-4 md:p-6 border rounded-2xl bg-card">
+                <div className="relative aspect-[4/3] rounded-xl overflow-hidden">
+                  <img
+                    src={generatedPostcard.imageUrl}
+                    alt={`Postcard from ${generatedPostcard.locationName}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">{generatedPostcard.locationName}</h3>
+                  <p className="text-sm text-muted-foreground">{generatedPostcard.locationDescription}</p>
+                  <p className="text-sm italic">{generatedPostcard.caption}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => downloadImage(generatedPostcard.imageUrl, `postcard-${generatedPostcard.locationName.replace(/\s+/g, '-').toLowerCase()}.png`)}
+                    className="flex-1 rounded-xl"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
                 </div>
               </div>
             )}
