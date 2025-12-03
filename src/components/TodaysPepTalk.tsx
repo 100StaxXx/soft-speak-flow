@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
+import { logger } from "@/utils/logger";
 
 interface CaptionWord {
   word: string;
@@ -493,14 +494,14 @@ export const TodaysPepTalk = memo(() => {
             src={pepTalk.audio_url} 
             preload="metadata"
             onError={(e) => {
-              console.error('Audio loading error:', e);
-              console.error('Audio URL:', pepTalk.audio_url);
-              console.error('Audio error code:', audioRef.current?.error?.code);
-              console.error('Audio error message:', audioRef.current?.error?.message);
+              logger.error('Audio loading error:', e);
+              logger.error('Audio URL:', pepTalk.audio_url);
+              logger.error('Audio error code:', audioRef.current?.error?.code);
+              logger.error('Audio error message:', audioRef.current?.error?.message);
             }}
             onLoadedMetadata={() => {
-              console.log('Audio loaded successfully');
-              console.log('Duration:', audioRef.current?.duration);
+              logger.log('Audio loaded successfully');
+              logger.log('Duration:', audioRef.current?.duration);
             }}
           />
           

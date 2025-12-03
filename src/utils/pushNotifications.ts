@@ -9,17 +9,18 @@
 import { Capacitor } from '@capacitor/core';
 import { supabase } from "@/integrations/supabase/client";
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
+import { logger } from '@/utils/logger';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 // Warn if VAPID key is not configured for web
 if (!VAPID_PUBLIC_KEY && typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
-  console.warn('VITE_VAPID_PUBLIC_KEY not configured. Web push notifications will be disabled.');
+  logger.warn('VITE_VAPID_PUBLIC_KEY not configured. Web push notifications will be disabled.');
 }
 
 // Disable on native platforms
 if (Capacitor.isNativePlatform()) {
-  console.log('Web push disabled on native platform. Use nativePushNotifications.ts');
+  logger.log('Web push disabled on native platform. Use nativePushNotifications.ts');
 }
 
 // Track if native push listeners are already registered
@@ -60,7 +61,6 @@ export function isPushSupported(): boolean {
     return true;
   }
   // Web browsers need service worker and PushManager
-  return 'serviceWorker' in navigator && 'PushManager' in window;
   return !Capacitor.isNativePlatform() && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
@@ -107,7 +107,7 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription 
     // Web platform
     return await subscribeToWebPush(userId);
   } catch (error) {
-    console.error('Error subscribing to push:', error);
+    logger.error('Error subscribing to push:', error);
     throw error;
   }
 }
@@ -128,7 +128,7 @@ async function subscribeToNativePush(userId: string): Promise<void> {
     nativePushListenersRegistered = true;
   }
   
-  console.log('Native push notifications registered for user:', userId);
+  logger.log('Native push notifications registered for user:', userId);
 }
 
 /**
@@ -144,7 +144,7 @@ async function subscribeToWebPush(userId: string): Promise<PushSubscription | nu
   
   if (!subscription) {
     if (!VAPID_PUBLIC_KEY) {
-      console.warn('Cannot subscribe to push notifications: VAPID key not configured');
+      logger.warn('Cannot subscribe to push notifications: VAPID key not configured');
       return null;
     }
     
@@ -170,30 +170,30 @@ async function subscribeToWebPush(userId: string): Promise<PushSubscription | nu
 function setupNativePushListeners(): void {
   // Called when push registration succeeds
   PushNotifications.addListener('registration', async (token: Token) => {
-    console.log('Native push token received:', token.value);
+    logger.log('Native push token received:', token.value);
     
     // Use the current user ID (set during subscribeToPush call)
     if (currentNativePushUserId) {
       await saveNativePushToken(currentNativePushUserId, token.value);
     } else {
-      console.warn('No user ID available for saving native push token');
+      logger.warn('No user ID available for saving native push token');
     }
   });
 
   // Called when push registration fails
   PushNotifications.addListener('registrationError', (error: { error: string }) => {
-    console.error('Native push registration error:', error);
+    logger.error('Native push registration error:', error);
   });
 
   // Called when a push notification is received
   PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-    console.log('Push notification received:', notification);
+    logger.log('Push notification received:', notification);
     // Notification is automatically shown by the OS
   });
 
   // Called when a push notification is tapped
   PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-    console.log('Push notification action performed:', action);
+    logger.log('Push notification action performed:', action);
     // Handle notification tap (e.g., navigate to specific screen)
     const data = action.notification.data;
     if (data && data.url) {
@@ -215,7 +215,7 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
       if (currentNativePushUserId === userId) {
         currentNativePushUserId = null;
       }
-      console.log('Native push token removed from database');
+      logger.log('Native push token removed from database');
       return;
     }
 
@@ -229,7 +229,7 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('Error unsubscribing from push:', error);
+    logger.error('Error unsubscribing from push:', error);
     throw error;
   }
 }
@@ -254,7 +254,7 @@ async function savePushSubscription(userId: string, subscription: PushSubscripti
     });
 
   if (error) {
-    console.error('Error saving push subscription:', error);
+    logger.error('Error saving push subscription:', error);
     throw error;
   }
 }
@@ -279,7 +279,7 @@ async function saveNativePushToken(userId: string, token: string): Promise<void>
     });
 
   if (error) {
-    console.error('Error saving native push token:', error);
+    logger.error('Error saving native push token:', error);
     throw error;
   }
 }
@@ -297,7 +297,7 @@ async function deleteNativePushToken(userId: string): Promise<void> {
     .eq('platform', platform);
 
   if (result?.error) {
-    console.error('Error deleting native push token:', result.error);
+    logger.error('Error deleting native push token:', result.error);
     throw result.error;
   }
 }
@@ -313,7 +313,7 @@ async function deletePushSubscription(userId: string, endpoint: string): Promise
     .eq('endpoint', endpoint);
 
   if (error) {
-    console.error('Error deleting push subscription:', error);
+    logger.error('Error deleting push subscription:', error);
     throw error;
   }
 }
@@ -332,7 +332,7 @@ export async function hasActivePushSubscription(userId: string): Promise<boolean
     if (error) throw error;
     return (data?.length || 0) > 0;
   } catch (error) {
-    console.error('Error checking push subscription:', error);
+    logger.error('Error checking push subscription:', error);
     return false;
   }
 }

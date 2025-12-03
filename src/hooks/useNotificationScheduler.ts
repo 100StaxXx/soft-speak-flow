@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/utils/logger';
 
 /**
  * Hook to trigger notification generation based on user activity events.
@@ -22,7 +23,7 @@ export const useNotificationScheduler = () => {
         })
         .eq('user_id', user.id);
     } catch (error) {
-      console.error('Failed to track activity:', error);
+      logger.error('Failed to track activity:', error);
     }
   }, [user?.id]);
 
@@ -106,9 +107,9 @@ export const useNotificationScheduler = () => {
           },
         });
 
-      console.log(`Queued ${milestoneType} celebration notification`);
+      logger.log(`Queued ${milestoneType} celebration notification`);
     } catch (error) {
-      console.error('Failed to queue milestone notification:', error);
+      logger.error('Failed to queue milestone notification:', error);
     }
   }, [user?.id]);
 
@@ -146,9 +147,9 @@ export const useNotificationScheduler = () => {
           },
         });
 
-      console.log(`Scheduled mood follow-up for ${hoursLater.toFixed(1)} hours later`);
+      logger.log(`Scheduled mood follow-up for ${hoursLater.toFixed(1)} hours later`);
     } catch (error) {
-      console.error('Failed to schedule mood follow-up:', error);
+      logger.error('Failed to schedule mood follow-up:', error);
     }
   }, [user?.id]);
 
