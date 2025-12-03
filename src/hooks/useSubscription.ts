@@ -2,6 +2,7 @@ import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
+import { logger } from "@/utils/logger";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
@@ -59,10 +60,10 @@ export function useSubscription() {
 
     // Log warning if values were unexpected (for debugging)
     if (!isValidStatus(subscriptionData.status)) {
-      console.warn(`Unexpected subscription status: ${subscriptionData.status}`);
+      logger.warn(`Unexpected subscription status: ${subscriptionData.status}`);
     }
     if (subscriptionData.plan && !isValidPlan(subscriptionData.plan)) {
-      console.warn(`Unexpected subscription plan: ${subscriptionData.plan}`);
+      logger.warn(`Unexpected subscription plan: ${subscriptionData.plan}`);
     }
 
     return {
