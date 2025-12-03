@@ -29,8 +29,8 @@ export const StarfieldBackground = () => {
       y: Math.random() * 100,
       size: Math.random() * 2 + 1, // 1-3px
       opacity: Math.random() * 0.5 + 0.3, // 0.3-0.8
-      animationDelay: Math.random() * 3,
-      animationDuration: Math.random() * 2 + 2, // 2-4s
+      animationDelay: Math.random() * 10,
+      animationDuration: Math.random() * 6 + 8, // 8-14s (much slower twinkle)
     }));
 
     setStars(generatedStars);
@@ -47,15 +47,15 @@ export const StarfieldBackground = () => {
       <div className="absolute inset-0 opacity-30">
         <div 
           className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-[120px] bg-gradient-to-br from-[hsl(var(--nebula-pink))] to-transparent"
-          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 20s ease-in-out infinite' }}
+          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 60s ease-in-out infinite' }}
         />
         <div 
           className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full blur-[100px] bg-gradient-to-tr from-[hsl(var(--celestial-blue))] to-transparent"
-          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 25s ease-in-out infinite reverse' }}
+          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 75s ease-in-out infinite reverse' }}
         />
         <div 
           className="absolute top-1/2 left-1/2 w-[400px] h-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px] bg-gradient-to-br from-[hsl(var(--cosmiq-glow))] to-transparent"
-          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 30s ease-in-out infinite' }}
+          style={{ animation: prefersReducedMotion ? 'none' : 'nebula-shift 90s ease-in-out infinite' }}
         />
       </div>
 
@@ -83,7 +83,7 @@ export const StarfieldBackground = () => {
         <div
           className="absolute w-[2px] h-[2px] bg-white rounded-full"
           style={{
-            animation: 'shooting-star 3s ease-out 5s infinite',
+            animation: 'shooting-star 4s ease-out 20s infinite',
             boxShadow: '0 0 4px 2px rgba(255, 255, 255, 0.8)',
           }}
         />
