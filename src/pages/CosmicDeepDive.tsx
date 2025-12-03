@@ -54,6 +54,24 @@ const CosmiqDeepDive = () => {
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [isPersonalized, setIsPersonalized] = useState(false);
 
+  // Save quiz feedback to database
+  const handleQuizAnswer = async (resonates: boolean) => {
+    setQuizAnswer(resonates);
+    
+    if (user && placement && sign) {
+      try {
+        await supabase.from('cosmic_deep_dive_feedback').insert({
+          user_id: user.id,
+          placement: placement.toLowerCase(),
+          sign: sign.toLowerCase(),
+          resonates,
+        });
+      } catch (error) {
+        console.error('Failed to save feedback:', error);
+      }
+    }
+  };
+
   useEffect(() => {
     const fetchContent = async () => {
       if (!placement || !sign) return;
@@ -62,9 +80,11 @@ const CosmiqDeepDive = () => {
       try {
         // If user is logged in, try to get personalized content
         if (user) {
+          // Send timezone offset so backend uses correct local date
+          const timezoneOffset = new Date().getTimezoneOffset();
           const { data: personalizedData, error: personalizedError } = await supabase.functions.invoke(
             'generate-cosmic-deep-dive',
-            { body: { placement: placement.toLowerCase(), sign: sign.toLowerCase() } }
+            { body: { placement: placement.toLowerCase(), sign: sign.toLowerCase(), timezoneOffset } }
           );
 
           if (!personalizedError && personalizedData && !personalizedData.error) {
@@ -407,17 +427,19 @@ const CosmiqDeepDive = () => {
                   </p>
                   <div className="flex gap-3">
                     <Button
-                      onClick={() => setQuizAnswer(true)}
+                      onClick={() => handleQuizAnswer(true)}
                       variant={quizAnswer === true ? "default" : "outline"}
                       className={quizAnswer === true ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                      disabled={quizAnswer !== null}
                     >
                       <CheckCircle2 className="w-4 h-4 mr-2" />
                       Yes, that's me!
                     </Button>
                     <Button
-                      onClick={() => setQuizAnswer(false)}
+                      onClick={() => handleQuizAnswer(false)}
                       variant={quizAnswer === false ? "default" : "outline"}
                       className={quizAnswer === false ? "bg-rose-600 hover:bg-rose-700" : ""}
+                      disabled={quizAnswer !== null}
                     >
                       <XCircle className="w-4 h-4 mr-2" />
                       Not quite
