@@ -1698,6 +1698,42 @@ export type Database = {
           },
         ]
       }
+      guild_story_reads: {
+        Row: {
+          id: string
+          read_at: string
+          story_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          read_at?: string
+          story_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          read_at?: string
+          story_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_story_reads_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "guild_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_story_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       habit_completions: {
         Row: {
           completed_at: string | null
@@ -2109,6 +2145,52 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      muted_guild_users: {
+        Row: {
+          epic_id: string | null
+          id: string
+          muted_at: string
+          muted_user_id: string
+          user_id: string
+        }
+        Insert: {
+          epic_id?: string | null
+          id?: string
+          muted_at?: string
+          muted_user_id: string
+          user_id: string
+        }
+        Update: {
+          epic_id?: string | null
+          id?: string
+          muted_at?: string
+          muted_user_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "muted_guild_users_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "muted_guild_users_muted_user_id_fkey"
+            columns: ["muted_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "muted_guild_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_history: {
         Row: {
@@ -2883,6 +2965,52 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      shout_push_log: {
+        Row: {
+          epic_id: string
+          id: string
+          recipient_id: string
+          sender_id: string
+          sent_at: string
+        }
+        Insert: {
+          epic_id: string
+          id?: string
+          recipient_id: string
+          sender_id: string
+          sent_at?: string
+        }
+        Update: {
+          epic_id?: string
+          id?: string
+          recipient_id?: string
+          sender_id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shout_push_log_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shout_push_log_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shout_push_log_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {

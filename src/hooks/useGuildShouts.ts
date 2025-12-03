@@ -75,6 +75,24 @@ export const useGuildShouts = (epicId?: string) => {
         .single();
 
       if (error) throw error;
+
+      // Trigger push notification (fire and forget)
+      const message = getShoutByKey(messageKey);
+      const senderEmail = user.email || 'Someone';
+      const senderName = senderEmail.split('@')[0];
+      
+      supabase.functions.invoke('send-shout-notification', {
+        body: {
+          shoutId: data.id,
+          senderId: user.id,
+          recipientId,
+          epicId,
+          senderName,
+          shoutType,
+          messageText: message?.text || 'Someone sent you a shout!',
+        },
+      }).catch(err => console.error('Push notification failed:', err));
+
       return data;
     },
     onSuccess: (_, variables) => {

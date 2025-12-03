@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Award, TrendingUp, BookOpen, Sparkles, MapPin } from "lucide-react";
 import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -66,6 +67,7 @@ PostcardsTab.displayName = 'PostcardsTab';
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
+  const { data: unreadStoryCount = 0 } = useUnreadGuildStories();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -167,9 +169,14 @@ const Companion = () => {
                 <Award className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Badges</span>
               </TabsTrigger>
-              <TabsTrigger value="story" className="text-xs px-2">
+              <TabsTrigger value="story" className="text-xs px-2 relative">
                 <BookOpen className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Story</span>
+                {unreadStoryCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
+                    {unreadStoryCount > 9 ? '9+' : unreadStoryCount}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="cards" className="text-xs px-2">
                 <Sparkles className="h-4 w-4 sm:mr-1" />
