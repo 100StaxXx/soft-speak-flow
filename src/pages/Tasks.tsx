@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle, BookOpen } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
@@ -24,6 +24,12 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
@@ -35,7 +41,9 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
+import { EpicTemplatesBrowser } from "@/components/EpicTemplatesBrowser";
 import { useEpics } from "@/hooks/useEpics";
+import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { Sliders } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -158,6 +166,14 @@ export default function Tasks() {
   // Epics state
   const [createEpicDialogOpen, setCreateEpicDialogOpen] = useState(false);
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
+  const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
+  
+  const handleSelectTemplate = (template: EpicTemplate) => {
+    setSelectedTemplate(template);
+    setTemplatesDialogOpen(false);
+    setCreateEpicDialogOpen(true);
+  };
 
   // Fetch habits
   const { data: habits = [] } = useQuery({
@@ -1052,20 +1068,28 @@ export default function Tasks() {
           <TabsContent value="epics" className="space-y-4 mt-6">
             {/* Create Epic and Join Guild Buttons */}
             <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Button
                   onClick={() => setCreateEpicDialogOpen(true)}
-                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-base font-bold"
+                  className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
                 >
-                  <Castle className="h-5 w-5 mr-2" />
-                  Create Epic
+                  <Castle className="h-4 w-4 mr-1.5" />
+                  Create
+                </Button>
+                <Button
+                  onClick={() => setTemplatesDialogOpen(true)}
+                  variant="outline"
+                  className="flex-1 h-auto py-3 text-sm font-medium"
+                >
+                  <BookOpen className="h-4 w-4 mr-1.5" />
+                  Templates
                 </Button>
                 <Button
                   onClick={() => setJoinEpicDialogOpen(true)}
                   variant="outline"
                   className="h-auto py-3 px-4"
                 >
-                  <Users className="w-5 h-5" />
+                  <Users className="w-4 h-4" />
                 </Button>
               </div>
             </Card>
@@ -1128,13 +1152,31 @@ export default function Tasks() {
             {/* Create Epic Dialog */}
             <CreateEpicDialog
               open={createEpicDialogOpen}
-              onOpenChange={setCreateEpicDialogOpen}
+              onOpenChange={(open) => {
+                setCreateEpicDialogOpen(open);
+                if (!open) setSelectedTemplate(null);
+              }}
               onCreateEpic={(data) => {
                 createEpic(data);
                 setCreateEpicDialogOpen(false);
+                setSelectedTemplate(null);
               }}
               isCreating={isCreating}
+              template={selectedTemplate}
             />
+            
+            {/* Epic Templates Dialog */}
+            <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
+              <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-primary" />
+                    Epic Templates
+                  </DialogTitle>
+                </DialogHeader>
+                <EpicTemplatesBrowser onSelectTemplate={handleSelectTemplate} />
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </div>
