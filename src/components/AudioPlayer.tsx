@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
 import { safePlay, createIOSOptimizedAudio, isIOS, iosAudioManager } from "@/utils/iosAudio";
+import { setupMediaSession, updateMediaSession, clearMediaSession } from "@/utils/mediaSession";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -29,6 +30,26 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       iosAudioManager.registerAudio(audio);
     }
     
+    // Setup Media Session API for iOS lock screen controls
+    setupMediaSession({
+      title,
+      onPlay: () => {
+        if (audio && !globalAudio.getMuted()) {
+          safePlay(audio).then((success) => {
+            if (success) setIsPlaying(true);
+          });
+        }
+      },
+      onPause: () => {
+        if (audio) {
+          audio.pause();
+          setIsPlaying(false);
+        }
+      },
+      onSeekBackward: () => skipTime(-10),
+      onSeekForward: () => skipTime(10),
+    });
+    
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -37,8 +58,9 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
           iosAudioManager.unregisterAudio(audioRef.current);
         }
       }
+      clearMediaSession();
     };
-  }, [audioUrl]);
+  }, [audioUrl, title]);
 
   // Duck ambient music when playing
   useEffect(() => {
@@ -60,10 +82,12 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   useEffect(() => {
     const unsubscribe = globalAudio.subscribe((muted) => {
       setIsGloballyMuted(muted);
-      // Pause playback if globally muted
-      if (muted && isPlaying) {
-        const audio = audioRef.current;
-        if (audio) {
+      const audio = audioRef.current;
+      if (audio) {
+        // Use muted property for proper iOS support
+        audio.muted = muted;
+        // Pause playback if globally muted
+        if (muted && isPlaying) {
           audio.pause();
           setIsPlaying(false);
         }
@@ -81,9 +105,23 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       const time = audio.currentTime;
       setCurrentTime(time);
       onTimeUpdate?.(time);
+      // Update Media Session position state
+      updateMediaSession({
+        position: time,
+        duration: audio.duration,
+        playbackState: audio.paused ? 'paused' : 'playing',
+      });
     };
-    const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    const updateDuration = () => {
+      setDuration(audio.duration);
+      updateMediaSession({
+        duration: audio.duration,
+      });
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      updateMediaSession({ playbackState: 'none' });
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
@@ -103,16 +141,21 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
+      updateMediaSession({ playbackState: 'paused' });
     } else {
       // Don't play if globally muted
       if (globalAudio.getMuted()) {
         return;
       }
       
+      // Ensure audio is not muted before playing
+      audio.muted = false;
+      
       // Use iOS-safe play function
       const success = await safePlay(audio);
       if (success) {
         setIsPlaying(true);
+        updateMediaSession({ playbackState: 'playing' });
       }
     }
   };
