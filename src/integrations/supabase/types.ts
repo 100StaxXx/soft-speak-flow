@@ -3320,6 +3320,69 @@ export type Database = {
           },
         ]
       }
+      user_cosmic_deep_dives: {
+        Row: {
+          challenges: string[]
+          chart_synergy: string | null
+          compatible_signs: string[]
+          created_at: string
+          daily_practice: string
+          for_date: string
+          id: string
+          in_relationships: string
+          in_wellness: string
+          in_work: string
+          overview: string
+          placement: string
+          sign: string
+          strengths: string[]
+          tagline: string
+          title: string
+          todays_focus: string | null
+          user_id: string
+        }
+        Insert: {
+          challenges?: string[]
+          chart_synergy?: string | null
+          compatible_signs?: string[]
+          created_at?: string
+          daily_practice: string
+          for_date: string
+          id?: string
+          in_relationships: string
+          in_wellness: string
+          in_work: string
+          overview: string
+          placement: string
+          sign: string
+          strengths?: string[]
+          tagline: string
+          title: string
+          todays_focus?: string | null
+          user_id: string
+        }
+        Update: {
+          challenges?: string[]
+          chart_synergy?: string | null
+          compatible_signs?: string[]
+          created_at?: string
+          daily_practice?: string
+          for_date?: string
+          id?: string
+          in_relationships?: string
+          in_wellness?: string
+          in_work?: string
+          overview?: string
+          placement?: string
+          sign?: string
+          strengths?: string[]
+          tagline?: string
+          title?: string
+          todays_focus?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_daily_horoscopes: {
         Row: {
           cosmic_tip: string | null
