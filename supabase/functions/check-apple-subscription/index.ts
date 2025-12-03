@@ -1,14 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
 
   try {
@@ -42,13 +38,7 @@ serve(async (req) => {
     }
 
     if (!subscription) {
-      return new Response(
-        JSON.stringify({ subscribed: false }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
+      return jsonResponse(req, { subscribed: false });
     }
 
     const expiresAt = new Date(subscription.current_period_end);
@@ -56,18 +46,12 @@ serve(async (req) => {
     const isActive = expiresAt > new Date() && 
       (subscription.status === "active" || subscription.status === "trialing");
 
-    return new Response(
-      JSON.stringify({
-        subscribed: isActive,
-        status: subscription.status,
-        plan: subscription.plan,
-        subscription_end: subscription.current_period_end,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
+    return jsonResponse(req, {
+      subscribed: isActive,
+      status: subscription.status,
+      plan: subscription.plan,
+      subscription_end: subscription.current_period_end,
+    });
   } catch (error) {
     console.error("Error checking subscription:", error);
     
@@ -83,12 +67,6 @@ serve(async (req) => {
       statusCode = 400;
     }
     
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: statusCode,
-      }
-    );
+    return errorResponse(req, errorMessage, statusCode);
   }
 });
