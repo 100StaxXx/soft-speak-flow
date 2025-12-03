@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-
 const zodiacPrompts = [
   { sign: "aries", prompt: "A white ram with curved horns in a dynamic leaping pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
   { sign: "taurus", prompt: "A white bull in a strong walking pose with prominent horns, white line art illustration on dark purple starry background, simple elegant silhouette style" },
@@ -29,6 +27,11 @@ serve(async (req) => {
   }
 
   try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
+    }
+
     const { zodiacSign } = await req.json();
     
     const zodiacData = zodiacPrompts.find(z => z.sign === zodiacSign);
@@ -53,6 +56,20 @@ serve(async (req) => {
         modalities: ["image", "text"]
       })
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI generation failed:", response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+      if (response.status === 402) {
+        throw new Error("Insufficient AI credits.");
+      }
+      
+      throw new Error(`AI generation failed: ${response.status}`);
+    }
 
     const data = await response.json();
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;

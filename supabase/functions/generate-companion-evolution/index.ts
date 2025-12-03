@@ -276,7 +276,7 @@ serve(async (req) => {
       
       console.log(`Creating stage 0 champion destiny preview`);
       
-      userPrompt = `PHOTOREAL EPIC FANTASY - Stage 0 Divine Egg:
+      userPrompt = `STYLIZED FANTASY ART - Stage 0 Divine Egg:
 
 SUBJECT: A monumental crystalline egg suspended in cosmiq realm, containing the destiny of a legendary ${companion.spirit_animal} champion.
 
@@ -328,8 +328,8 @@ LIGHTING:
 - High contrast creating epic mood
 
 STYLE & QUALITY:
-- Hyper-realistic photoreal rendering (Unreal Engine 5 quality)
-- Cinematic blockbuster VFX
+- Stylized fantasy digital painting style (high-quality game art)
+- Cinematic composition and lighting
 - Awe-inspiring larger-than-life scale
 - Professional concept art mastery
 - 8K detail with perfect materials
@@ -345,7 +345,7 @@ MOOD: Legendary destiny sealed within, unstoppable divine potential, the champio
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
       const aquaticNote = isAquatic ? '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a baby aquatic creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Underwater environment with water physics and bubbles' : '';
       
-      userPrompt = `PHOTOREAL CREATURE BIRTH - Stage 1 Hatchling:
+      userPrompt = `STYLIZED FANTASY CREATURE - Stage 1 Hatchling:
 
 SUBJECT: A tiny newborn baby ${companion.spirit_animal} at the sacred moment of hatching.
 
@@ -407,11 +407,11 @@ COMPOSITION:
 - Environmental elements framing the subject
 
 STYLE & QUALITY:
-- Photoreal rendering with tender softness
-- Studio Ghibli emotional resonance meets fantasy realism
-- Natural history photography precision
+- Stylized fantasy art with tender softness
+- Studio Ghibli emotional resonance meets fantasy illustration
+- Charming yet detailed creature design
 - Cinematic newborn portrait quality
-- 8K detail showing every delicate feature
+- Rich detail with expressive features
 
 MOOD: Pure wonder, new beginning, innocent potential, sacred first breath, protective tenderness, hope incarnate`;
     } else {
@@ -580,7 +580,7 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
    - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
       }
       
-      userPrompt = `PHOTOREAL EVOLUTION CONTINUATION - Stage ${currentStage} to ${nextStage}:
+      userPrompt = `STYLIZED FANTASY EVOLUTION - Stage ${currentStage} to ${nextStage}:
 
 === PREVIOUS EVOLUTION ANALYSIS ===
 ${previousFeatures.vision_analysis || "No previous image available - using core identity as foundation"}
@@ -657,9 +657,9 @@ NOT: "This is a redesign" or "This is a different creature"
 The viewer should immediately recognize this as THE SAME companion from Stage ${currentStage}.
 
 === TECHNICAL RENDERING REQUIREMENTS ===
-- Photoreal quality (Unreal Engine 5 / Octane render)
+- Stylized fantasy art quality (high-quality game illustrations)
 - Anatomically accurate ${companion.spirit_animal} at Stage ${nextStage} maturity
-- Museum-specimen precision in biological details
+- Detailed but stylized biological rendering
 - Cinematic three-point lighting
 - Proper subsurface scattering and material response
 - Atmospheric volumetric effects
