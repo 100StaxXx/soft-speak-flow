@@ -9,26 +9,16 @@ export const useReferrals = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch user's referral code from referral_codes table
+  // Fetch user's referral code from profiles table (auto-generated on signup)
   const { data: referralStats, isLoading } = useQuery({
     queryKey: ["referral-stats", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
-      // Get user's referral code from referral_codes table
-      const { data: codeData, error: codeError } = await supabase
-        .from("referral_codes")
-        .select("code")
-        .eq("owner_user_id", user.id)
-        .eq("owner_type", "user")
-        .maybeSingle();
-
-      if (codeError) throw codeError;
-
-      // Get referral count from profiles
+      // Get referral code and count from profiles (code is auto-generated via trigger)
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("referral_count, referred_by_code")
+        .select("referral_code, referral_count, referred_by_code")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -36,7 +26,7 @@ export const useReferrals = () => {
       if (!profileData) return null;
 
       return {
-        referral_code: codeData?.code || null,
+        referral_code: profileData.referral_code || null,
         referral_count: profileData.referral_count || 0,
         referred_by: profileData.referred_by_code,
       };
