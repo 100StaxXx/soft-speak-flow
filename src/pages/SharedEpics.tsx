@@ -8,10 +8,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Share2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+
+const MAX_EPICS = 2;
 
 export default function SharedEpics() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: publicEpics, isLoading } = useQuery({
     queryKey: ['public-epics'],
@@ -21,7 +25,7 @@ export default function SharedEpics() {
         .select(`
           *,
           epic_habits(
-            habit:habits(*)
+            habit:habits(id, title, difficulty, frequency, custom_days)
           )
         `)
         .eq('is_public', true)
@@ -37,70 +41,106 @@ export default function SharedEpics() {
     mutationFn: async (epicId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data: originalEpic, error: fetchError } = await supabase
+      // Check epic limit (owned + joined)
+      const { data: ownedEpics } = await supabase
+        .from('epics')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      
+      const { data: joinedEpics } = await supabase
+        .from('epic_members')
+        .select('epic_id, epics!inner(user_id, status)')
+        .eq('user_id', user.id)
+        .neq('epics.user_id', user.id)
+        .eq('epics.status', 'active');
+
+      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
+      
+      if (totalActiveEpics >= MAX_EPICS) {
+        throw new Error(`You can only have ${MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.`);
+      }
+
+      // Fetch the epic with habits
+      const { data: epic, error: fetchError } = await supabase
         .from('epics')
         .select(`
           *,
           epic_habits(
-            habit:habits(*)
+            habit:habits(id, title, difficulty, frequency, custom_days)
           )
         `)
         .eq('id', epicId)
+        .eq('is_public', true)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
-      if (!originalEpic) throw new Error('Epic not found');
+      if (!epic) throw new Error('Epic not found');
 
-      // Create copy for user
-      const { data: newEpic, error: epicError } = await supabase
-        .from('epics')
-        .insert({
-          user_id: user.id,
-          title: originalEpic.title,
-          description: originalEpic.description,
-          target_days: originalEpic.target_days,
-          status: 'active',
-          is_public: false
-        })
-        .select()
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from('epic_members')
+        .select('id')
+        .eq('epic_id', epicId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (epicError) throw epicError;
-      if (!newEpic) throw new Error('Failed to create epic copy');
+      if (existingMember) {
+        throw new Error("You're already part of this guild!");
+      }
 
-      // Copy habits
-      if (originalEpic.epic_habits && originalEpic.epic_habits.length > 0) {
-        for (const epicHabit of originalEpic.epic_habits) {
-          const { data: newHabit } = await supabase
-            .from('habits')
-            .insert({
-              user_id: user.id,
-              title: epicHabit.habit.title,
-              frequency: epicHabit.habit.frequency,
-              difficulty: epicHabit.habit.difficulty,
-              custom_days: epicHabit.habit.custom_days
-            })
-            .select()
-            .maybeSingle();
+      // Join the epic as a member (not create a copy!)
+      const { error: memberError } = await supabase
+        .from('epic_members')
+        .insert({
+          epic_id: epicId,
+          user_id: user.id,
+        });
 
-          if (newHabit) {
-            await supabase
-              .from('epic_habits')
-              .insert({
-                epic_id: newEpic.id,
-                habit_id: newHabit.id
-              });
-          }
+      if (memberError) throw memberError;
+
+      // Copy habits to user's account and link to the ORIGINAL epic
+      if (epic.epic_habits && epic.epic_habits.length > 0) {
+        const habitsToCreate = epic.epic_habits.map((eh: { habit: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+          user_id: user.id,
+          title: eh.habit.title,
+          difficulty: eh.habit.difficulty,
+          frequency: eh.habit.frequency || 'daily',
+          custom_days: eh.habit.custom_days || null,
+        }));
+
+        const { data: newHabits, error: habitsError } = await supabase
+          .from('habits')
+          .insert(habitsToCreate)
+          .select();
+
+        if (habitsError) throw habitsError;
+
+        // Link new habits to the ORIGINAL epic (not a copy)
+        if (newHabits && newHabits.length > 0) {
+          const habitLinks = newHabits.map((habit: { id: string }) => ({
+            epic_id: epicId,
+            habit_id: habit.id,
+          }));
+
+          const { error: linkError } = await supabase
+            .from('epic_habits')
+            .insert(habitLinks);
+
+          if (linkError) throw linkError;
         }
       }
 
-      return newEpic;
+      return epic;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['epics'] });
-      toast.success('Epic joined!', {
-        description: 'This epic has been added to your journey'
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['public-epics'] });
+      toast.success('Guild joined! 🎯', {
+        description: "You're now part of this guild and can compete on the leaderboard!"
       });
+      navigate('/tasks');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -155,7 +195,7 @@ export default function SharedEpics() {
                         disabled={joinEpic.isPending}
                         size="sm"
                       >
-                        Join Epic
+                        {joinEpic.isPending ? 'Joining...' : 'Join Guild'}
                       </Button>
                     </div>
                   </CardContent>

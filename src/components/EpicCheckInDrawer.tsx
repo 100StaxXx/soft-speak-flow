@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,9 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const habitIds = habits.map(h => h.id);
+  
+  // Memoize habitIds to create a stable dependency for useCallback
+  const habitIdsKey = useMemo(() => habitIds.sort().join(','), [habitIds]);
 
   const fetchTodayCompletions = useCallback(async () => {
     if (!user?.id || habitIds.length === 0) return;
@@ -53,7 +56,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     } finally {
       setLoadingCompletions(false);
     }
-  }, [user?.id, habitIds.join(','), today]);
+  }, [user?.id, habitIdsKey, today, habitIds]);
 
   // Fetch today's completions when drawer opens
   useEffect(() => {
