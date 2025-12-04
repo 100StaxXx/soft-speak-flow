@@ -33,11 +33,11 @@ export const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
 
   return (
     <div className="min-h-screen bg-obsidian flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-2xl space-y-8 animate-velocity-fade-in">
-        <div className="space-y-2">
+      <div className="w-full max-w-2xl space-y-10 animate-velocity-fade-in">
+        <div className="space-y-3">
           <div className="flex justify-between text-sm text-steel">
-            <span>Question {currentQuestion + 1} of {ONBOARDING_QUESTIONS.length}</span>
-            <span>{Math.round(((currentQuestion + 1) / ONBOARDING_QUESTIONS.length) * 100)}%</span>
+            <span className="tracking-wide">Question {currentQuestion + 1} of {ONBOARDING_QUESTIONS.length}</span>
+            <span className="font-medium tabular-nums">{Math.round(((currentQuestion + 1) / ONBOARDING_QUESTIONS.length) * 100)}%</span>
           </div>
           <div className="h-2 bg-charcoal rounded-full overflow-hidden">
             <div className="h-full bg-royal-gold transition-all duration-300" style={{ width: `${((currentQuestion + 1) / ONBOARDING_QUESTIONS.length) * 100}%` }} />
@@ -45,12 +45,12 @@ export const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
         </div>
         <Card className="border-2 border-charcoal bg-midnight hover:border-royal-gold/50 transition-all">
           <CardHeader>
-            <CardTitle className="text-2xl text-pure-white">{question.question}</CardTitle>
+            <CardTitle className="text-2xl text-pure-white leading-snug">{question.question}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {question.answers.map((answer) => (
-              <Button key={answer.id} variant="outline" className="w-full justify-start text-left h-auto py-4 px-6 bg-charcoal/50 border-steel/30 text-pure-white hover:bg-royal-gold/20 hover:border-royal-gold transition-all" onClick={() => handleAnswer(answer.id, answer.mentorTags)}>
-                <span className="text-base">{answer.text}</span>
+              <Button key={answer.id} variant="outline" className="w-full justify-start text-left min-h-[56px] h-auto py-4 px-6 bg-charcoal/50 border-steel/30 text-pure-white hover:bg-royal-gold/20 hover:border-royal-gold transition-all" onClick={() => handleAnswer(answer.id, answer.mentorTags)}>
+                <span className="text-base leading-snug">{answer.text}</span>
               </Button>
             ))}
           </CardContent>
