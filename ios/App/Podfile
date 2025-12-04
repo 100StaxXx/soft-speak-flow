@@ -25,14 +25,51 @@ post_install do |installer|
 
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
-    original = 'public protocol DataDecoder: Sendable'
-    patched = '@preconcurrency public protocol DataDecoder: Sendable'
+    original_protocol = 'public protocol DataDecoder: Sendable'
+    patched_protocol = '@preconcurrency public protocol DataDecoder: Sendable'
+    json_sendable = 'extension JSONDecoder: @unchecked Sendable {}'
+    property_list_sendable = 'extension PropertyListDecoder: @unchecked Sendable {}'
 
     file_contents = File.read(alamofire_response_serialization)
-    unless file_contents.include?(patched)
+    updated_contents = file_contents.dup
+
+    if updated_contents.include?(original_protocol)
+      updated_contents = updated_contents.sub(original_protocol, patched_protocol)
+    end
+
+    unless updated_contents.include?(json_sendable)
+      updated_contents = updated_contents.sub(
+        'extension JSONDecoder: DataDecoder {}',
+        "#{json_sendable}\nextension JSONDecoder: DataDecoder {}"
+      )
+    end
+
+    unless updated_contents.include?(property_list_sendable)
+      updated_contents = updated_contents.sub(
+        'extension PropertyListDecoder: DataDecoder {}',
+        "#{property_list_sendable}\nextension PropertyListDecoder: DataDecoder {}"
+      )
+    end
+
+    if updated_contents != file_contents
+      File.write(alamofire_response_serialization, updated_contents)
+    end
+  end
+
+  gid_activity_indicator = File.join(
+    __dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources',
+    'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m'
+  )
+
+  if File.exist?(gid_activity_indicator)
+    deprecated_style = 'style = UIActivityIndicatorViewStyleGray;'
+    modern_style = 'style = UIActivityIndicatorViewStyleMedium;'
+
+    file_contents = File.read(gid_activity_indicator)
+    if file_contents.include?(deprecated_style) && !file_contents.include?(modern_style)
       File.write(
-        alamofire_response_serialization,
-        file_contents.sub(original, patched)
+        gid_activity_indicator,
+        file_contents.sub(deprecated_style, modern_style)
       )
     end
   end

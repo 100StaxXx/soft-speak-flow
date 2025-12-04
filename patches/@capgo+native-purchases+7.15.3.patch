@@ -11,3 +11,25 @@ index 7cb921e..05499c9 100644
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
+@@ -64,11 +64,13 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+                     // Notify JS listeners on main thread, after slight delay
+                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+                     await MainActor.run {
+-                        self?.notifyListeners("transactionUpdated", data: payload)
++                        guard let self else { return }
++                        self.notifyListeners("transactionUpdated", data: payload)
+                     }
+                 case .unverified(let transaction, let error):
+                     await MainActor.run {
+-                        self?.notifyListeners("transactionVerificationFailed", data: [
++                        guard let self else { return }
++                        self.notifyListeners("transactionVerificationFailed", data: [
+                             "transactionId": String(transaction.id),
+                             "error": error.localizedDescription
+                         ])
+@@ -360,3 +362,5 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     }
+ 
+ }
++
++extension NativePurchasesPlugin: @unchecked Sendable {}
