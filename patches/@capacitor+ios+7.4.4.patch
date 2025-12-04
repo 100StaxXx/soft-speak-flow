@@ -1,0 +1,35 @@
+diff --git a/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.h b/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.h
+index b156289..31ff25a 100644
+--- a/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.h
++++ b/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.h
+@@ -19,9 +19,12 @@
+ 
+ #import <WebKit/WebKit.h>
+ 
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+ @interface CDVWebViewProcessPoolFactory : NSObject
+ @property (nonatomic, retain) WKProcessPool* sharedPool;
+ 
+ +(instancetype) sharedFactory;
+ -(WKProcessPool*) sharedProcessPool;
+ @end
++#pragma clang diagnostic pop
+diff --git a/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.m b/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.m
+index 3781f48..d4e4f31 100644
+--- a/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.m
++++ b/node_modules/@capacitor/ios/CapacitorCordova/CapacitorCordova/Classes/Public/CDVWebViewProcessPoolFactory.m
+@@ -18,6 +18,8 @@
+  */
+ 
+ @import Foundation;
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+ @import WebKit;
+ #import <Cordova/CDVWebViewProcessPoolFactory.h>
+ 
+@@ -47,3 +49,4 @@ static CDVWebViewProcessPoolFactory *factory = nil;
+     return _sharedPool;
+ }
+ @end
++#pragma clang diagnostic pop

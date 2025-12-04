@@ -1,0 +1,39 @@
+diff --git a/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/GoogleProvider.swift b/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/GoogleProvider.swift
+index 6ce2426..63af6a6 100644
+--- a/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/GoogleProvider.swift
++++ b/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/GoogleProvider.swift
+@@ -70,7 +70,7 @@ class GoogleProvider {
+                             completion(.failure(NSError(domain: "GoogleProvider", code: 0, userInfo: [NSLocalizedDescriptionKey: "Cannot find serverAuthCode, make sure to set iOSServerClientId in the configuration"])))
+                             return
+                         }
+-                        completion(.success(self.createOfflineResponse(serverAuthCode: result.serverAuthCode ?? "")))
++                        completion(.success(self.createOfflineResponse(serverAuthCode: serverAuthCode)))
+                     } else {
+                         completion(.success(self.mode == .ONLINE ? self.createOnlineLoginResponse(user: result.user) : self.createOfflineResponse(serverAuthCode: result.serverAuthCode ?? "")))
+                     }
+@@ -79,7 +79,7 @@ class GoogleProvider {
+ 
+             if GIDSignIn.sharedInstance.hasPreviousSignIn() && !self.forceAuthCode && self.mode != .OFFLINE {
+                 GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
+-                    if let error = error {
++                    if error != nil {
+                         // completion(.failure(error))
+                         login()
+                         return
+diff --git a/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/SocialLoginPlugin.swift b/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/SocialLoginPlugin.swift
+index 287ce70..33f6e96 100644
+--- a/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/SocialLoginPlugin.swift
++++ b/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/SocialLoginPlugin.swift
+@@ -544,9 +544,9 @@ public class SocialLoginPlugin: CAPPlugin, CAPBridgedPlugin {
+             if let user = response as? SocialLoginUser {
+                 call.resolve([
+                     "accessToken": user.accessToken,
+-                    "idToken": user.idToken,
+-                    "refreshToken": user.refreshToken,
+-                    "expiresIn": user.expiresIn
++                    "idToken": user.idToken as Any,
++                    "refreshToken": user.refreshToken as Any,
++                    "expiresIn": user.expiresIn as Any
+                 ])
+             } else if let twitterResponse = response as? TwitterProfileResponse {
+                 call.resolve([
