@@ -1,13 +1,57 @@
 diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
-index 7cb921e..05499c9 100644
+index 7cb921e..108658a 100644
 --- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 +++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
-@@ -50,7 +50,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -2,6 +2,20 @@ import Foundation
+ import Capacitor
+ import StoreKit
+ 
++private final class NativePurchasesListenerNotifier: @unchecked Sendable {
++    private weak var plugin: NativePurchasesPlugin?
++
++    init(plugin: NativePurchasesPlugin) {
++        self.plugin = plugin
++    }
++
++    func notify(event: String, data: JSObject) async {
++        await MainActor.run {
++            self.plugin?.notifyListeners(event, data: data)
++        }
++    }
++}
++
+ /**
+  * Please read the Capacitor iOS Plugin Development Guide
+  * here: https://capacitorjs.com/docs/plugins/ios
+@@ -50,7 +64,8 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
 -        let task = Task.detached { [weak self] in
-+        let task = Task { @MainActor [weak self] in
++        let notifier = NativePurchasesListenerNotifier(plugin: self)
++        let task = Task { [notifier] in
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
+@@ -63,16 +78,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+ 
+                     // Notify JS listeners on main thread, after slight delay
+                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+-                    await MainActor.run {
+-                        self?.notifyListeners("transactionUpdated", data: payload)
+-                    }
++                    await notifier.notify(event: "transactionUpdated", data: payload)
+                 case .unverified(let transaction, let error):
+-                    await MainActor.run {
+-                        self?.notifyListeners("transactionVerificationFailed", data: [
+-                            "transactionId": String(transaction.id),
+-                            "error": error.localizedDescription
+-                        ])
+-                    }
++                    await notifier.notify(event: "transactionVerificationFailed", data: [
++                        "transactionId": String(transaction.id),
++                        "error": error.localizedDescription
++                    ])
+                 }
+             }
+         }

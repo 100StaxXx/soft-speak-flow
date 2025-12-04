@@ -1,4 +1,5 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+require 'set'
 
 platform :ios, '14.0'
 use_frameworks!
@@ -20,20 +21,113 @@ target 'App' do
   # Add your Pods here
 end
 
+SCRIPT_PHASES_TO_FORCE = ['[CP] Copy XCFrameworks', '[CP] Embed Pods Frameworks'].freeze
+
+def mark_script_phases_always_run(project, script_names)
+  return unless project
+
+  modified = false
+
+  project.targets.each do |target|
+    target.build_phases.each do |phase|
+      next unless phase.respond_to?(:name) && script_names.include?(phase.name)
+      next unless phase.respond_to?(:always_out_of_date=)
+      next if phase.always_out_of_date == '1'
+
+      phase.always_out_of_date = '1'
+      modified = true
+    end
+  end
+
+  project.save if modified && project.respond_to?(:save)
+end
+
+def force_run_script_phases(installer)
+  seen_projects = Set.new
+
+  installer.aggregate_targets.each do |aggregate|
+    project = aggregate.user_project
+    next unless project
+    next unless seen_projects.add?(project.path)
+
+    mark_script_phases_always_run(project, SCRIPT_PHASES_TO_FORCE)
+  end
+
+  mark_script_phases_always_run(installer.pods_project, SCRIPT_PHASES_TO_FORCE)
+end
+
+def patch_alamofire_response_serialization(base_dir)
+  path = File.join(base_dir, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
+  return unless File.exist?(path)
+
+  contents = File.read(path)
+  modified = false
+
+  original_protocol = 'public protocol DataDecoder: Sendable'
+  patched_protocol = '@preconcurrency public protocol DataDecoder: Sendable'
+
+  if contents.include?(original_protocol) && !contents.include?(patched_protocol)
+    contents = contents.sub(original_protocol, patched_protocol)
+    modified = true
+  end
+
+  sendable_marker = 'extension JSONDecoder: @unchecked Sendable {}'
+  if !contents.include?(sendable_marker)
+    injection = <<~'SWIFT'
+
+    extension JSONDecoder: @unchecked Sendable {}
+    extension PropertyListDecoder: @unchecked Sendable {}
+
+    SWIFT
+    target_line = 'extension PropertyListDecoder: DataDecoder {}'
+    if contents.include?(target_line)
+      contents = contents.sub(target_line, "#{target_line}\n#{injection}")
+      modified = true
+    end
+  end
+
+  File.write(path, contents) if modified
+end
+
+def patch_alamofire_event_monitor(base_dir)
+  path = File.join(base_dir, 'Pods', 'Alamofire', 'Source', 'Features', 'EventMonitor.swift')
+  return unless File.exist?(path)
+
+  contents = File.read(path)
+  marker = 'extension InputStream: @unchecked Sendable {}'
+  return if contents.include?(marker)
+
+  replacement = "import Foundation\n\n#{marker}\n"
+  if contents.include?('import Foundation')
+    File.write(path, contents.sub('import Foundation', replacement))
+  end
+end
+
+def patch_google_sign_in_indicator(base_dir)
+  path = File.join(base_dir, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  return unless File.exist?(path)
+
+  contents = File.read(path)
+  return if contents.include?('UIActivityIndicatorViewStyleMedium')
+
+  original = '    style = UIActivityIndicatorViewStyleGray;'
+  replacement = <<~'OBJC'.chomp
+    if (@available(iOS 13.0, *)) {
+      style = UIActivityIndicatorViewStyleMedium;
+    } else {
+      style = UIActivityIndicatorViewStyleGray;
+    }
+  OBJC
+
+  updated = contents.sub(original, "    #{replacement}")
+  File.write(path, updated) unless updated == contents
+end
+
 post_install do |installer|
   assertDeploymentTarget(installer)
 
-  alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
-  if File.exist?(alamofire_response_serialization)
-    original = 'public protocol DataDecoder: Sendable'
-    patched = '@preconcurrency public protocol DataDecoder: Sendable'
-
-    file_contents = File.read(alamofire_response_serialization)
-    unless file_contents.include?(patched)
-      File.write(
-        alamofire_response_serialization,
-        file_contents.sub(original, patched)
-      )
-    end
-  end
+  force_run_script_phases(installer)
+  patch_alamofire_response_serialization(__dir__)
+  patch_alamofire_event_monitor(__dir__)
+  patch_google_sign_in_indicator(__dir__)
 end
