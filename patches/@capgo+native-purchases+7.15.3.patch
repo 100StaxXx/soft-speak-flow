@@ -1,5 +1,5 @@
 diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
-index 7cb921e..71a2795 100644
+index 7cb921e..fbd2ce5 100644
 --- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 +++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 @@ -6,6 +6,7 @@ import StoreKit
@@ -10,22 +10,20 @@ index 7cb921e..71a2795 100644
  @objc(NativePurchasesPlugin)
  public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      public let identifier = "NativePurchasesPlugin"
-@@ -30,7 +31,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
-         ]
-     }
+@@ -23,7 +24,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     ]
  
+     private let pluginVersion: String = "7.15.3"
 -    private var transactionUpdatesTask: Task<Void, Never>?
 +    nonisolated(unsafe) private var transactionUpdatesTask: Task<Void, Never>?
  
      @objc func getPluginVersion(_ call: CAPPluginCall) {
          call.resolve(["version": self.pluginVersion])
-@@ -37,12 +38,14 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
-         }
+@@ -38,10 +39,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      }
  
--    deinit {
+     deinit {
 -        if #available(iOS 15.0, *) { cancelTransactionUpdatesListener() }
-+    deinit {
 +        if #available(iOS 15.0, *) {
 +            transactionUpdatesTask?.cancel()
 +        }
@@ -36,8 +34,7 @@ index 7cb921e..71a2795 100644
          self.transactionUpdatesTask?.cancel()
          self.transactionUpdatesTask = nil
      }
- 
-@@ -50,7 +51,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -50,7 +53,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
@@ -48,21 +45,20 @@ index 7cb921e..71a2795 100644
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
-@@ -63,16 +66,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -62,17 +67,19 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+                     await transaction.finish()
  
                      // Notify JS listeners on main thread, after slight delay
-+                    do {
-+                        try await Task.sleep(nanoseconds: 500_000_000)
-+                    } catch is CancellationError {
-+                        // Task was cancelled while sleeping — stop the listener
-+                        return
-+                    } catch {
-+                        // Unexpected error during sleep — stop the listener
-+                        return
-+                    }
+-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
 -                    await MainActor.run {
 -                        self?.notifyListeners("transactionUpdated", data: payload)
--                    }
++                    do {
++                        try await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
++                    } catch is CancellationError {
++                        return
++                    } catch {
++                        return
+                     }
 +                    self.notifyListeners("transactionUpdated", data: payload)
                  case .unverified(let transaction, let error):
 -                    await MainActor.run {
