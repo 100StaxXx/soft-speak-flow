@@ -10,7 +10,17 @@ index 239ebf381d0c4ae2ddbb0c27c836179736553d60..3de163736a4876a85f903b5a335be5df
  @objc(NativePurchasesPlugin)
  public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      public let identifier = "NativePurchasesPlugin"
-@@ -50,7 +51,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -35,7 +36,8 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     }
+ 
+     deinit {
+-        if #available(iOS 15.0, *) { cancelTransactionUpdatesListener() }
++        // Task cleanup handled automatically via [weak self] pattern
++        // Cannot call @MainActor methods from nonisolated deinit
+     }
+ 
+     private func cancelTransactionUpdatesListener() {
+@@ -50,7 +52,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
@@ -21,7 +31,7 @@ index 239ebf381d0c4ae2ddbb0c27c836179736553d60..3de163736a4876a85f903b5a335be5df
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
-@@ -63,16 +66,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -63,16 +67,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
  
                      // Notify JS listeners on main thread, after slight delay
                      try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
