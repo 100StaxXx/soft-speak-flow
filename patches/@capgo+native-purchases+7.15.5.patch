@@ -1,0 +1,43 @@
+diff --git a/node_modules/@capgo/native-purchases/android/src/main/java/ee/forgr/nativepurchases/NativePurchasesPlugin.java b/node_modules/@capgo/native-purchases/android/src/main/java/ee/forgr/nativepurchases/NativePurchasesPlugin.java
+index 9ad5638..e044ee4 100644
+--- a/node_modules/@capgo/native-purchases/android/src/main/java/ee/forgr/nativepurchases/NativePurchasesPlugin.java
++++ b/node_modules/@capgo/native-purchases/android/src/main/java/ee/forgr/nativepurchases/NativePurchasesPlugin.java
+@@ -39,7 +39,7 @@ import org.json.JSONArray;
+ @CapacitorPlugin(name = "NativePurchases")
+ public class NativePurchasesPlugin extends Plugin {
+ 
+-    private final String pluginVersion = "7.15.3";
++    private final String pluginVersion = "7.15.5";
+     public static final String TAG = "NativePurchases";
+     private static final Phaser semaphoreReady = new Phaser(1);
+     private BillingClient billingClient;
+diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
+index 7cb921e..f74a848 100644
+--- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
++++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
+@@ -6,6 +6,7 @@ import StoreKit
+  * Please read the Capacitor iOS Plugin Development Guide
+  * here: https://capacitorjs.com/docs/plugins/ios
+  */
++@MainActor
+ @objc(NativePurchasesPlugin)
+ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     public let identifier = "NativePurchasesPlugin"
+@@ -22,7 +23,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+         CAPPluginMethod(name: "acknowledgePurchase", returnType: CAPPluginReturnPromise)
+     ]
+ 
+-    private let pluginVersion: String = "7.15.3"
++    private let pluginVersion: String = "7.15.5"
+     private var transactionUpdatesTask: Task<Void, Never>?
+ 
+     @objc func getPluginVersion(_ call: CAPPluginCall) {
+@@ -50,7 +51,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     private func startTransactionUpdatesListener() {
+         // Ensure only one listener is running
+         cancelTransactionUpdatesListener()
+-        let task = Task.detached { [weak self] in
++        let task = Task { @MainActor [weak self] in
+             for await result in Transaction.updates {
+                 guard !Task.isCancelled else { break }
+                 switch result {
