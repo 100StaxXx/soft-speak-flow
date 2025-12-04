@@ -160,14 +160,14 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
               </motion.p>
             </div>
 
-            <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+            <div className="bg-card/60 backdrop-blur-md rounded-2xl p-6 border border-white/15">
               <div className="flex justify-center mb-4">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
                   disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                  className="rounded-lg border border-white/20 pointer-events-auto"
+                  className="rounded-lg pointer-events-auto"
                   captionLayout="dropdown-buttons"
                   fromYear={1930}
                   toYear={new Date().getFullYear()}
