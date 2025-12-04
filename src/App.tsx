@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, Suspense, lazy, memo, useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
@@ -121,6 +121,24 @@ const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
   const { session } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Ensure first app load starts on the Quests (Tasks) tab
+  useEffect(() => {
+    if (location.pathname !== "/") return;
+    if (typeof window === "undefined") return;
+    
+    try {
+      const hasRedirected = window.sessionStorage.getItem("initialRouteRedirected");
+      if (!hasRedirected) {
+        window.sessionStorage.setItem("initialRouteRedirected", "true");
+        navigate("/tasks", { replace: true });
+      }
+    } catch (error) {
+      logger.error("Failed to persist initial route redirect flag:", error);
+    }
+  }, [location.pathname, navigate]);
   
   // Initialize native push on login
   useEffect(() => {
