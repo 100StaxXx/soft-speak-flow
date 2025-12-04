@@ -1,18 +1,52 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Crown, Sparkles, Moon, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type PlanType = "monthly" | "yearly";
 
 export const TrialExpiredPaywall = () => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
-  const { handlePurchase, handleRestore, loading, isAvailable } = useAppleSubscription();
+  const { 
+    handlePurchase, 
+    handleRestore, 
+    loading, 
+    isAvailable,
+    products,
+    productsLoading,
+    productError,
+    reloadProducts,
+    hasLoadedProducts,
+  } = useAppleSubscription();
+  const { toast } = useToast();
+
+  const productMap = useMemo(() => {
+    return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
+      acc[product.productId] = product;
+      return acc;
+    }, {});
+  }, [products]);
+
+  const selectedProductId = selectedPlan === "yearly" 
+    ? IAP_PRODUCTS.YEARLY 
+    : IAP_PRODUCTS.MONTHLY;
+
+  const selectedProduct = productMap[selectedProductId];
 
   const handleSubscribe = async () => {
+    if (!selectedProduct) {
+      toast({
+        title: "Almost ready",
+        description: "We're still fetching Apple pricing details. Please try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const productId = selectedPlan === "yearly" 
       ? IAP_PRODUCTS.YEARLY 
       : IAP_PRODUCTS.MONTHLY;
@@ -21,12 +55,12 @@ export const TrialExpiredPaywall = () => {
 
   const plans = {
     monthly: {
-      price: "$9.99",
+      fallbackPrice: "$9.99",
       period: "/month",
       savings: null,
     },
     yearly: {
-      price: "$59.99",
+      fallbackPrice: "$59.99",
       period: "/year",
       savings: "Save 50%",
     },
@@ -71,7 +105,7 @@ export const TrialExpiredPaywall = () => {
                   {plan}
                 </p>
                 <p className="text-2xl font-bold text-foreground">
-                  {plans[plan].price}
+                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.price : productMap[IAP_PRODUCTS.MONTHLY]?.price) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {plans[plan].period}
@@ -106,10 +140,44 @@ export const TrialExpiredPaywall = () => {
           </div>
         )}
 
+        {productsLoading && (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-muted-foreground" />
+            Contacting the App Store...
+          </div>
+        )}
+
+        {productError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive flex flex-col gap-2">
+            <span>{productError}</span>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
+                Try Again
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => toast({
+                  title: "Need help?",
+                  description: "Please ensure you're signed in to the App Store and retry.",
+                })}
+              >
+                Contact support
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Subscribe Button */}
         <Button
           onClick={handleSubscribe}
-          disabled={loading || !isAvailable}
+          disabled={
+            loading || 
+            !isAvailable || 
+            productsLoading || 
+            !hasLoadedProducts ||
+            !selectedProduct
+          }
           className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
           size="lg"
         >

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,17 +8,51 @@ import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type PlanType = "monthly" | "yearly";
 
 export default function Premium() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { isActive } = useSubscription();
-  const { handlePurchase, handleRestore, loading, isAvailable } = useAppleSubscription();
+  const { 
+    handlePurchase, 
+    handleRestore, 
+    loading, 
+    isAvailable,
+    products,
+    productsLoading,
+    productError,
+    reloadProducts,
+    hasLoadedProducts,
+  } = useAppleSubscription();
   const { isInTrial, trialDaysRemaining } = useTrialStatus();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
 
+  const productMap = useMemo(() => {
+    return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
+      acc[product.productId] = product;
+      return acc;
+    }, {});
+  }, [products]);
+
+  const selectedProductId = selectedPlan === "yearly" 
+    ? IAP_PRODUCTS.YEARLY 
+    : IAP_PRODUCTS.MONTHLY;
+
+  const selectedProduct = productMap[selectedProductId];
+
   const handleSubscribe = async () => {
+    if (!selectedProduct) {
+      toast({
+        title: "Almost ready",
+        description: "We're still loading Apple pricing information. Please try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const productId = selectedPlan === "yearly" 
       ? IAP_PRODUCTS.YEARLY 
       : IAP_PRODUCTS.MONTHLY;
@@ -30,13 +64,13 @@ export default function Premium() {
 
   const plans = {
     monthly: {
-      price: "$9.99",
+      fallbackPrice: "$9.99",
       period: "/month",
       savings: null,
       description: "Billed monthly",
     },
     yearly: {
-      price: "$59.99",
+      fallbackPrice: "$59.99",
       period: "/year",
       savings: "Save 50%",
       description: "Just $4.99/month",
@@ -125,7 +159,7 @@ export default function Premium() {
                   {plan}
                 </p>
                 <p className="text-3xl font-bold text-foreground">
-                  {plans[plan].price}
+                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.price : productMap[IAP_PRODUCTS.MONTHLY]?.price) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {plans[plan].period}
@@ -206,10 +240,44 @@ export default function Premium() {
               </div>
             )}
 
+            {productsLoading && (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-muted-foreground" />
+                Contacting the App Store...
+              </div>
+            )}
+
+            {productError && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive flex flex-col gap-2">
+                <span>{productError}</span>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
+                    Try Again
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toast({
+                      title: "Need help?",
+                      description: "Please ensure you're signed in to the App Store and connected to the internet.",
+                    })}
+                  >
+                    Contact support
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* CTA Button */}
             <Button
               onClick={handleSubscribe}
-              disabled={loading || !isAvailable}
+              disabled={
+                loading || 
+                !isAvailable || 
+                productsLoading || 
+                !hasLoadedProducts ||
+                !selectedProduct
+              }
               className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
               size="lg"
             >
@@ -219,7 +287,7 @@ export default function Premium() {
                   Processing...
                 </>
               ) : (
-                `Subscribe ${selectedPlan === "yearly" ? "Yearly - $59.99" : "Monthly - $9.99"}`
+                `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"} - ${(selectedProduct?.price ?? plans[selectedPlan].fallbackPrice)}${selectedPlan === "yearly" ? " /year" : " /month"}`
               )}
             </Button>
 
