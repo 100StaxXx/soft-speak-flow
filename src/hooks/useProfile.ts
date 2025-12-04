@@ -38,6 +38,8 @@ interface Profile {
   mars_sign: string | null;
   venus_sign: string | null;
   cosmic_profile_generated_at: string | null;
+  // Faction
+  faction: string | null;
 }
 
 export const useProfile = () => {

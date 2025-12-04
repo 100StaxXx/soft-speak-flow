@@ -18,7 +18,7 @@ const narrativeLines = [
 ];
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
-  const [currentLine, setCurrentLine] = useState(0);
+  const [currentLine, setCurrentLine] = useState(1);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
 
@@ -71,8 +71,8 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
         {/* Narrative lines */}
         <div className="min-h-[220px] flex flex-col items-center justify-center space-y-6">
           <AnimatePresence mode="wait">
-            {narrativeLines.map((line, index) => (
-              index === currentLine - 1 && index < narrativeLines.length && (
+            {!showFinalMessage && narrativeLines.map((line, index) => (
+              index === currentLine - 1 && (
                 <motion.p
                   key={index}
                   initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}

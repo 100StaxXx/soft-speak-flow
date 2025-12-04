@@ -241,6 +241,15 @@ const Index = () => {
               <TodaysPepTalk />
             </ErrorBoundary>
 
+            {/* Ask Mentor Section */}
+            <CompanionErrorBoundary>
+              <ErrorBoundary>
+                <div className="cosmiq-glass rounded-2xl">
+                  <MentorQuickChat />
+                </div>
+              </ErrorBoundary>
+            </CompanionErrorBoundary>
+
             {/* Cosmiq Insight Section - Enhanced */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -325,14 +334,6 @@ const Index = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[slide-in-right_2s_ease-in-out_infinite]" />
               </div>
             </motion.div>
-            
-            <CompanionErrorBoundary>
-              <ErrorBoundary>
-                <div className="cosmiq-glass rounded-2xl">
-                  <MentorQuickChat />
-                </div>
-              </ErrorBoundary>
-            </CompanionErrorBoundary>
           </div>
         </div>
       </PageTransition>

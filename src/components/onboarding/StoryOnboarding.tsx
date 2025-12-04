@@ -98,9 +98,9 @@ export const StoryOnboarding = () => {
 
   // Faction-specific colors for theming
   const factionColors: Record<FactionType, { primary: string; gradient: string }> = {
-    starfall: { primary: "hsl(24, 100%, 50%)", gradient: "from-orange-500 to-red-600" },
-    void: { primary: "hsl(270, 70%, 50%)", gradient: "from-purple-600 to-indigo-700" },
-    stellar: { primary: "hsl(200, 90%, 60%)", gradient: "from-cyan-400 to-blue-600" },
+    starfall: { primary: "#FF6600", gradient: "from-orange-500 to-red-600" },
+    void: { primary: "#7F26D9", gradient: "from-purple-600 to-indigo-700" },
+    stellar: { primary: "#3DB8F5", gradient: "from-cyan-400 to-blue-600" },
   };
 
   const handlePrologueComplete = async (name: string) => {
@@ -283,13 +283,90 @@ export const StoryOnboarding = () => {
     if (!user || createCompanion.isPending) return;
 
     try {
-      await createCompanion.mutateAsync({
-        favoriteColor: preferences.favoriteColor,
-        spiritAnimal: preferences.spiritAnimal,
-        coreElement: preferences.coreElement,
-        storyTone: preferences.storyTone,
-      });
-
+      let companionId: string;
+      
+      // Check if companion already exists
+      const { data: existingCompanion } = await supabase
+        .from("user_companion")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (existingCompanion) {
+        console.log("Companion already exists, skipping creation");
+        companionId = existingCompanion.id;
+      } else {
+        // Create companion with full personalization
+        const { data: newCompanion, error } = await supabase
+          .from("user_companion")
+          .insert([{
+            user_id: user.id,
+            spirit_animal: preferences.spiritAnimal,
+            current_stage: 0,
+            current_xp: 0,
+            core_element: preferences.coreElement,
+            favorite_color: preferences.favoriteColor,
+            story_tone: preferences.storyTone,
+          }])
+          .select("id")
+          .single();
+        
+        if (error || !newCompanion) throw error || new Error("Failed to create companion");
+        companionId = newCompanion.id;
+        
+        // Create stage 0 evolution record and generate card in background
+        const generateStageZeroCard = async () => {
+          try {
+            // Check if stage 0 evolution already exists
+            const { data: existingEvolution } = await supabase
+              .from("companion_evolutions")
+              .select("id")
+              .eq("companion_id", companionId)
+              .eq("stage", 0)
+              .maybeSingle();
+            
+            let evolutionId = existingEvolution?.id;
+            
+            if (!evolutionId) {
+              // Create stage 0 evolution with placeholder image
+              const { data: evolution, error: evolutionError } = await supabase
+                .from("companion_evolutions")
+                .insert({
+                  companion_id: companionId,
+                  stage: 0,
+                  image_url: "/placeholder-egg.svg",
+                  xp_at_evolution: 0,
+                })
+                .select("id")
+                .single();
+              
+              if (evolutionError || !evolution) {
+                console.error("Failed to create stage 0 evolution:", evolutionError);
+                return;
+              }
+              evolutionId = evolution.id;
+            }
+            
+            // Generate stage 0 card
+            await supabase.functions.invoke("generate-evolution-card", {
+              body: {
+                companionId,
+                evolutionId,
+                stage: 0,
+                species: preferences.spiritAnimal,
+                element: preferences.coreElement,
+                color: preferences.favoriteColor,
+                userAttributes: { body: 50, mind: 50, soul: 50 },
+              },
+            });
+          } catch (cardError) {
+            console.error("Stage 0 card generation failed (non-critical):", cardError);
+          }
+        };
+        
+        generateStageZeroCard(); // Fire and forget - don't block onboarding
+      }
+      
       // Mark onboarding complete and save story tone
       const { data: profile } = await supabase
         .from("profiles")
