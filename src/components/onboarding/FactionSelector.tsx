@@ -109,7 +109,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
               onClick={handleClose}
-              className="absolute top-safe-top left-4 mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
+              className="absolute top-safe-top left-4 mt-6 flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
             >
               <ArrowLeft size={20} />
               <span className="text-sm font-medium">Back</span>
