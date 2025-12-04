@@ -20,10 +20,12 @@ serve(async (req) => {
 
     const {
       data: { user },
+      error: authError,
     } = await supabaseClient.auth.getUser();
 
-    if (!user) {
-      throw new Error("Unauthorized");
+    // Return not subscribed for unauthenticated requests instead of throwing
+    if (authError || !user) {
+      return jsonResponse(req, { subscribed: false });
     }
 
     // Get subscription from database
