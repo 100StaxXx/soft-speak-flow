@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanion } from "@/hooks/useCompanion";
 import { toast } from "sonner";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -49,6 +51,8 @@ interface Mentor {
 export const StoryOnboarding = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { createCompanion } = useCompanion();
   
   const [stage, setStage] = useState<OnboardingStage>("prologue");
   const [userName, setUserName] = useState("");
@@ -59,8 +63,8 @@ export const StoryOnboarding = () => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
-  const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [companionAnimal, setCompanionAnimal] = useState("");
+  const isCreatingCompanion = createCompanion.isPending;
 
   // Load mentors on mount
   useEffect(() => {
@@ -104,8 +108,19 @@ export const StoryOnboarding = () => {
     
     // Save name to profile
     if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .single();
+
+      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+
       await supabase.from("profiles").update({
-        onboarding_data: { userName: name },
+        onboarding_data: {
+          ...existingData,
+          userName: name,
+        },
       }).eq("id", user.id);
     }
     
@@ -199,12 +214,16 @@ export const StoryOnboarding = () => {
           }, { onConflict: "user_id,question_id" });
         }
       }
+      
+      setStage("mentor-result");
+      return;
     }
-    
-    setStage("mentor-result");
+
+    toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+    setStage("mentor-grid");
   };
 
-  const handleMentorConfirm = async (mentor: Mentor) => {
+  const handleMentorConfirm = async (mentor: Mentor, explanationOverride?: MentorExplanation | null) => {
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -213,6 +232,7 @@ export const StoryOnboarding = () => {
         .single();
       
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+      const explanationToSave = explanationOverride ?? mentorExplanation;
       
       await supabase.from("profiles").update({
         selected_mentor_id: mentor.id,
@@ -220,11 +240,11 @@ export const StoryOnboarding = () => {
           ...existingData,
           mentorId: mentor.id,
           mentorName: mentor.name,
-          explanation: mentorExplanation ? {
-            title: mentorExplanation.title,
-            subtitle: mentorExplanation.subtitle,
-            paragraph: mentorExplanation.paragraph,
-            bullets: mentorExplanation.bullets,
+          explanation: explanationToSave ? {
+            title: explanationToSave.title,
+            subtitle: explanationToSave.subtitle,
+            paragraph: explanationToSave.paragraph,
+            bullets: explanationToSave.bullets,
           } : null,
         },
       }).eq("id", user.id);
@@ -251,7 +271,7 @@ export const StoryOnboarding = () => {
     const explanation = generateMentorExplanation(selectedMentor, selectedAnswers);
     setMentorExplanation(explanation);
     
-    await handleMentorConfirm(selectedMentor);
+    await handleMentorConfirm(selectedMentor, explanation);
   };
 
   const handleCompanionComplete = async (preferences: {
@@ -260,10 +280,8 @@ export const StoryOnboarding = () => {
     coreElement: string;
     storyTone: string;
   }) => {
-    if (!user || isCreatingCompanion) return;
-    
-    setIsCreatingCompanion(true);
-    
+    if (!user || createCompanion.isPending) return;
+
     try {
       let companionId: string;
       
@@ -366,15 +384,15 @@ export const StoryOnboarding = () => {
           story_tone: preferences.storyTone,
         },
       }).eq("id", user.id);
-      
+
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+
       // Store companion animal and transition to journey begins
       setCompanionAnimal(preferences.spiritAnimal);
       setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
       toast.error("Something went wrong. Please try again.");
-    } finally {
-      setIsCreatingCompanion(false);
     }
   };
 
