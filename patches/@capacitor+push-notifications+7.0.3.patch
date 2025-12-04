@@ -1,0 +1,18 @@
+diff --git a/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift b/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift
+index f3972b6..8e077ff 100644
+--- a/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift
++++ b/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift
+@@ -35,7 +35,12 @@ public class PushNotificationsHandler: NSObject, NotificationHandlerProtocol {
+             optionsArray.forEach { option in
+                 switch option {
+                 case "alert":
+-                    presentationOptions.insert(.alert)
++                    if #available(iOS 14.0, *) {
++                        presentationOptions.insert(.banner)
++                        presentationOptions.insert(.list)
++                    } else {
++                        presentationOptions.insert(.alert)
++                    }
+                 case "badge":
+                     presentationOptions.insert(.badge)
+ 

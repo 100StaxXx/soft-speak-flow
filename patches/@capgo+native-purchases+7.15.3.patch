@@ -1,0 +1,13 @@
+diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
+index 7cb921e..05499c9 100644
+--- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
++++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
+@@ -50,7 +50,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     private func startTransactionUpdatesListener() {
+         // Ensure only one listener is running
+         cancelTransactionUpdatesListener()
+-        let task = Task.detached { [weak self] in
++        let task = Task { [weak self] in
+             for await result in Transaction.updates {
+                 guard !Task.isCancelled else { break }
+                 switch result {
