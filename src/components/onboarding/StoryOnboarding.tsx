@@ -504,7 +504,7 @@ export const StoryOnboarding = () => {
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
-      const companionDisplayName = await waitForCompanionDisplayName(companionId);
+      const companionDisplayName = await waitForCompanionDisplayName(companionData.id);
       if (!companionDisplayName) {
         console.warn("Companion name was not ready in time; falling back to spirit animal.");
       }
