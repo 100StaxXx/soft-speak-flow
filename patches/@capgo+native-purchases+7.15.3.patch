@@ -19,7 +19,7 @@ index 7cb921e..71a2795 100644
  
      @objc func getPluginVersion(_ call: CAPPluginCall) {
          call.resolve(["version": self.pluginVersion])
-@@ -37,10 +38,10 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -37,12 +38,14 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
          }
      }
  
