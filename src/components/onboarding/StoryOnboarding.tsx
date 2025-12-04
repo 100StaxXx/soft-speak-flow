@@ -11,7 +11,7 @@ import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
-import { QuickCompanionCreator } from "./QuickCompanionCreator";
+import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
@@ -251,7 +251,12 @@ export const StoryOnboarding = () => {
     await handleMentorConfirm(selectedMentor);
   };
 
-  const handleCompanionComplete = async (animal: string, element: string, name: string) => {
+  const handleCompanionComplete = async (preferences: {
+    favoriteColor: string;
+    spiritAnimal: string;
+    coreElement: string;
+    storyTone: string;
+  }) => {
     if (!user || isCreatingCompanion) return;
     
     setIsCreatingCompanion(true);
@@ -267,28 +272,21 @@ export const StoryOnboarding = () => {
       if (existingCompanion) {
         console.log("Companion already exists, skipping creation");
       } else {
-        // Create companion
-        const factionColorMap: Record<FactionType, string[]> = {
-          starfall: ["#FF6B35", "#FF8C42", "#FFD93D"],
-          void: ["#7B68EE", "#9370DB", "#4B0082"],
-          stellar: ["#4ECDC4", "#45B7D1", "#96CEB4"],
-        };
-        
-        const colors = faction ? factionColorMap[faction] : ["#7B68EE", "#9370DB", "#4B0082"];
-        
+        // Create companion with full personalization
         const { error } = await supabase.from("user_companion").insert([{
           user_id: user.id,
-          spirit_animal: animal,
+          spirit_animal: preferences.spiritAnimal,
           current_stage: 0,
           current_xp: 0,
-          core_element: element,
-          favorite_color: colors[0],
+          core_element: preferences.coreElement,
+          favorite_color: preferences.favoriteColor,
+          story_tone: preferences.storyTone,
         }]);
         
         if (error) throw error;
       }
       
-      // Mark onboarding complete
+      // Mark onboarding complete and save story tone
       const { data: profile } = await supabase
         .from("profiles")
         .select("onboarding_data")
@@ -302,6 +300,7 @@ export const StoryOnboarding = () => {
         onboarding_data: {
           ...existingData,
           walkthrough_completed: true,
+          story_tone: preferences.storyTone,
         },
       }).eq("id", user.id);
       
@@ -435,11 +434,11 @@ export const StoryOnboarding = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="relative z-10"
+            className="relative z-10 w-full"
           >
-            <QuickCompanionCreator
-              faction={faction}
+            <CompanionPersonalization
               onComplete={handleCompanionComplete}
+              isLoading={isCreatingCompanion}
             />
           </motion.div>
         )}
