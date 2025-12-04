@@ -104,7 +104,7 @@ export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionna
               <ChevronLeft className="h-4 w-4" />
               Back
             </button>
-            <span className="font-bold">
+            <span className="font-medium tabular-nums">
               Question {questionIndex + 1} of {QUESTIONNAIRE.length}
             </span>
           </div>
@@ -117,8 +117,8 @@ export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionna
         </div>
 
         {/* Question */}
-        <div className="space-y-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-pure-white text-center leading-tight">
+        <div className="space-y-10">
+          <h2 className="text-3xl md:text-4xl font-bold text-pure-white text-center leading-snug">
             {question.question}
           </h2>
 
@@ -129,15 +129,15 @@ export const EnhancedQuestionnaire = ({ onComplete, onBack }: EnhancedQuestionna
                 key={option.id}
                 onClick={() => handleAnswer(question.id, option.id)}
                 className={`
-                  p-6 cursor-pointer transition-all duration-300
-                  bg-midnight border-2
+                  min-h-[64px] p-5 cursor-pointer transition-all duration-300
+                  bg-midnight border-2 flex items-center
                   ${answers[question.id] === option.id
                     ? 'border-royal-purple bg-royal-purple/10 scale-[1.02]'
                     : 'border-charcoal hover:border-steel hover:bg-charcoal/50'
                   }
                 `}
               >
-                <p className="text-lg text-pure-white font-medium">
+                <p className="text-base text-pure-white font-medium leading-snug">
                   {option.label}
                 </p>
               </Card>

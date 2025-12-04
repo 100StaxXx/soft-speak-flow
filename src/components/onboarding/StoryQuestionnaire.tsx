@@ -173,11 +173,11 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="pt-safe-top mb-8 z-10"
+        className="pt-safe-top mb-10 z-10"
       >
-        <div className="flex items-center justify-between text-white/60 text-sm mb-2">
-          <span>Your Path Unfolds</span>
-          <span>{currentIndex + 1} of {questions.length}</span>
+        <div className="flex items-center justify-between text-white/60 text-sm mb-3">
+          <span className="tracking-wide">Your Path Unfolds</span>
+          <span className="font-medium tabular-nums">{currentIndex + 1} of {questions.length}</span>
         </div>
         <Progress value={progress} className="h-2" />
       </motion.div>
@@ -197,7 +197,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-white/60 text-sm italic mb-4 text-center"
+              className="text-white/60 text-sm italic mb-6 text-center leading-relaxed px-2"
             >
               {getFactionNarrative(faction, currentIndex)}
             </motion.p>
@@ -207,13 +207,13 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-2xl font-bold text-white text-center mb-8"
+              className="text-2xl font-bold text-white text-center mb-10 leading-snug"
             >
               {currentQuestion.question}
             </motion.h2>
 
             {/* Options */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {currentQuestion.options.map((option, index) => (
                 <motion.div
                   key={option.text}
@@ -224,18 +224,18 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
-                    className="w-full py-6 text-left justify-start text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
+                    className="w-full min-h-[64px] py-4 px-4 text-left justify-start text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,
                     }}
                   >
                     <span 
-                      className="w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm font-semibold"
+                      className="w-9 h-9 min-w-[36px] rounded-full flex items-center justify-center mr-4 text-sm font-bold shrink-0"
                       style={{ backgroundColor: `${factionColor}30`, color: factionColor }}
                     >
                       {String.fromCharCode(65 + index)}
                     </span>
-                    <span className="text-base">{option.text}</span>
+                    <span className="text-base leading-snug">{option.text}</span>
                   </Button>
                 </motion.div>
               ))}
