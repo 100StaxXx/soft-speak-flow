@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Cache Apple's JWKS. jose handles caching + kid selection internally.
+const appleJWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -20,48 +24,22 @@ serve(async (req) => {
       throw new Error('Identity token is required');
     }
 
-    // Decode the JWT token (Apple's identity token is a JWT)
-    // We'll decode it without verification first to get the payload
-    const tokenParts = identityToken.split('.');
-    if (tokenParts.length !== 3) {
-      throw new Error('Invalid token format');
-    }
-
-    const payload = JSON.parse(atob(tokenParts[1]));
-    console.log('Token payload:', { 
-      sub: payload.sub, 
-      email: payload.email,
-      aud: payload.aud,
-      iss: payload.iss 
-    });
-
-    // Validate token issuer
-    if (payload.iss !== 'https://appleid.apple.com') {
-      throw new Error('Invalid token issuer');
-    }
-
-    // Validate audience (should be either Service ID or Bundle ID)
     const appleServiceId = Deno.env.get('APPLE_SERVICE_ID');
     const iosBundleId = 'com.darrylgraham.revolution';
-    
-    if (payload.aud !== appleServiceId && payload.aud !== iosBundleId) {
-      console.error('Token audience mismatch:', {
-        received: payload.aud,
-        expectedServiceId: appleServiceId,
-        expectedBundleId: iosBundleId
-      });
-      throw new Error('Unacceptable audience in identity token');
+
+    if (!appleServiceId) {
+      throw new Error('Missing Apple Service ID configuration');
     }
 
-    console.log('Token validation passed');
+    // Fully verify the identity token signature/claims with Apple's JWKS
+    const { payload } = await jwtVerify(identityToken, appleJWKS, {
+      issuer: 'https://appleid.apple.com',
+      audience: [appleServiceId, iosBundleId],
+    });
 
-    // Verify token signature with Apple's public keys
-    const appleKeysResponse = await fetch('https://appleid.apple.com/auth/keys');
-    const appleKeys = await appleKeysResponse.json();
-    
-    // For production, implement full JWT signature verification
-    // For now, we trust the token after basic validation
-    console.log('Apple keys fetched successfully');
+    if (!payload.email) {
+      throw new Error('Apple token missing required email claim');
+    }
 
     const tokenInfo = {
       sub: payload.sub,
