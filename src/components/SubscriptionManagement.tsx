@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
@@ -9,6 +9,17 @@ import { Crown, Loader2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Capacitor } from '@capacitor/core';
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
+
+type PlanOption = {
+  id: 'monthly' | 'yearly';
+  label: string;
+  productId: string;
+  description: string;
+  hint: string;
+  fallbackPrice: string;
+  billingPeriodLabel: string;
+  badge?: string;
+};
 
 export function SubscriptionManagement() {
   const navigate = useNavigate();
@@ -26,6 +37,8 @@ export function SubscriptionManagement() {
     reloadProducts,
   } = useAppleSubscription();
 
+  const [selectedPlan, setSelectedPlan] = useState<PlanOption['id']>('yearly');
+
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
       acc[product.productId] = product;
@@ -33,21 +46,30 @@ export function SubscriptionManagement() {
     }, {});
   }, [products]);
 
-  const planOptions = [
+  const planOptions: PlanOption[] = [
     {
       id: 'monthly',
       label: 'Monthly',
       productId: IAP_PRODUCTS.MONTHLY,
-      description: 'Cancel anytime',
+      description: 'Full access billed every month',
+      hint: 'Cancel anytime',
+      fallbackPrice: "$9.99",
+      billingPeriodLabel: '/month',
     },
     {
       id: 'yearly',
       label: 'Yearly',
       productId: IAP_PRODUCTS.YEARLY,
-      description: 'Best value • 7-day trial eligible',
+      description: 'Best value with 7-day trial',
+      hint: 'Equivalent to $4.99/month',
+      fallbackPrice: "$59.99",
+      billingPeriodLabel: '/year',
       badge: 'Most popular',
     },
   ] as const;
+
+  const selectedPlanOption = planOptions.find((plan) => plan.id === selectedPlan);
+  const selectedProduct = selectedPlanOption ? productMap[selectedPlanOption.productId] : undefined;
 
   const getPriceForProduct = (productId: string) => {
     const product = productMap[productId];
@@ -62,10 +84,6 @@ export function SubscriptionManagement() {
     if (productError) return false;
     if (!hasLoadedProducts) return false;
     return Boolean(productMap[productId]);
-  };
-
-  const handlePlanSubscribe = async (productId: string) => {
-    await handlePurchase(productId);
   };
 
   const handleManageSubscription = async () => {
@@ -141,12 +159,16 @@ export function SubscriptionManagement() {
           <div className="grid gap-4 md:grid-cols-2">
             {planOptions.map((planOption) => {
               const price = getPriceForProduct(planOption.productId);
-              const disabled = !canPurchasePlan(planOption.productId);
+              const isSelected = selectedPlan === planOption.id;
 
               return (
                 <div
                   key={planOption.id}
-                  className="rounded-2xl border border-border/60 p-4 flex flex-col gap-3 bg-card/60 backdrop-blur"
+                  onClick={() => setSelectedPlan(planOption.id)}
+                  className={[
+                    "rounded-2xl border p-4 flex flex-col gap-3 bg-card/60 backdrop-blur cursor-pointer transition-colors",
+                    isSelected ? "border-primary shadow-glow" : "border-border/60 hover:border-primary/40"
+                  ].join(" ")}
                 >
                   <div>
                     <div className="flex items-center justify-between">
@@ -162,32 +184,38 @@ export function SubscriptionManagement() {
                     <p className="text-2xl font-semibold text-foreground mt-1">
                       {price}
                       <span className="text-sm font-normal text-muted-foreground">
-                        {planOption.id === 'yearly' ? "/year" : "/month"}
+                        {planOption.billingPeriodLabel}
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {planOption.description}
                     </p>
+                    <p className="text-xs text-muted-foreground">
+                      {planOption.hint}
+                    </p>
                   </div>
-
-                  <Button
-                    onClick={() => handlePlanSubscribe(planOption.productId)}
-                    disabled={disabled}
-                    className="w-full"
-                  >
-                    {purchasing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      `Subscribe ${planOption.label}`
-                    )}
-                  </Button>
                 </div>
               );
             })}
           </div>
+
+          <Button
+            onClick={() => selectedPlanOption && handlePurchase(selectedPlanOption.productId)}
+            disabled={
+              !selectedPlanOption ||
+              !canPurchasePlan(selectedPlanOption.productId)
+            }
+            className="w-full"
+          >
+            {purchasing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Subscribe ${selectedPlanOption?.label ?? ''} • ${selectedProduct?.price ?? selectedPlanOption?.fallbackPrice}${selectedPlanOption?.billingPeriodLabel}`
+            )}
+          </Button>
 
           <div className="space-y-2">
             {[
