@@ -18,6 +18,7 @@ import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
+import { useCompanion } from "@/hooks/useCompanion";
 
 type OnboardingStage = 
   | "prologue" 
@@ -52,6 +53,7 @@ export const StoryOnboarding = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { createCompanion } = useCompanion();
   
   const [stage, setStage] = useState<OnboardingStage>("prologue");
   const [userName, setUserName] = useState("");
@@ -408,120 +410,13 @@ export const StoryOnboarding = () => {
     setIsCreatingCompanion(true);
 
     try {
-      let companionId: string;
-      
-      // Check if companion already exists
-      const { data: existingCompanion } = await supabase
-        .from("user_companion")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (existingCompanion) {
-        console.log("Companion already exists, skipping creation");
-        companionId = existingCompanion.id;
-      } else {
-        // Create companion with full personalization
-        const { data: newCompanion, error } = await supabase
-          .from("user_companion")
-          .insert([{
-            user_id: user.id,
-            spirit_animal: preferences.spiritAnimal,
-            current_stage: 0,
-            current_xp: 0,
-            core_element: preferences.coreElement,
-            favorite_color: preferences.favoriteColor,
-            story_tone: preferences.storyTone,
-          }])
-          .select("id")
-          .single();
-        
-        if (error || !newCompanion) throw error || new Error("Failed to create companion");
-        companionId = newCompanion.id;
-        
-        // Create stage 0 evolution record, generate image and card in background
-        const generateStageZeroAssets = async () => {
-          try {
-            // Check if stage 0 evolution already exists
-            const { data: existingEvolution } = await supabase
-              .from("companion_evolutions")
-              .select("id, image_url")
-              .eq("companion_id", companionId)
-              .eq("stage", 0)
-              .maybeSingle();
-            
-            let evolutionId = existingEvolution?.id;
-            
-            if (!evolutionId) {
-              // Create stage 0 evolution with placeholder image initially
-              const { data: evolution, error: evolutionError } = await supabase
-                .from("companion_evolutions")
-                .insert({
-                  companion_id: companionId,
-                  stage: 0,
-                  image_url: "/placeholder-egg.svg",
-                  xp_at_evolution: 0,
-                })
-                .select("id")
-                .single();
-              
-              if (evolutionError || !evolution) {
-                console.error("Failed to create stage 0 evolution:", evolutionError);
-                return;
-              }
-              evolutionId = evolution.id;
-            }
-            
-            // Generate actual egg image if still placeholder
-            if (!existingEvolution?.image_url || existingEvolution.image_url === "/placeholder-egg.svg") {
-              try {
-                const { data: imageResult } = await supabase.functions.invoke("generate-companion-image", {
-                  body: {
-                    spiritAnimal: preferences.spiritAnimal,
-                    element: preferences.coreElement,
-                    stage: 0,
-                    favoriteColor: preferences.favoriteColor,
-                  },
-                });
-                
-                if (imageResult?.imageUrl) {
-                  // Update evolution record with actual image
-                  await supabase
-                    .from("companion_evolutions")
-                    .update({ image_url: imageResult.imageUrl })
-                    .eq("id", evolutionId);
-                  
-                  // Update companion's current image
-                  await supabase
-                    .from("user_companion")
-                    .update({ current_image_url: imageResult.imageUrl })
-                    .eq("id", companionId);
-                }
-              } catch (imageError) {
-                console.error("Stage 0 image generation failed (non-critical):", imageError);
-              }
-            }
-            
-            // Generate stage 0 card
-            await supabase.functions.invoke("generate-evolution-card", {
-              body: {
-                companionId,
-                evolutionId,
-                stage: 0,
-                species: preferences.spiritAnimal,
-                element: preferences.coreElement,
-                color: preferences.favoriteColor,
-                userAttributes: { body: 50, mind: 50, soul: 50 },
-              },
-            });
-          } catch (cardError) {
-            console.error("Stage 0 asset generation failed (non-critical):", cardError);
-          }
-        };
-        
-        generateStageZeroAssets(); // Fire and forget - don't block onboarding
-      }
-      
+      await createCompanion.mutateAsync({
+        favoriteColor: preferences.favoriteColor,
+        spiritAnimal: preferences.spiritAnimal,
+        coreElement: preferences.coreElement,
+        storyTone: preferences.storyTone,
+      });
+
       // Mark onboarding complete and save story tone
       const { data: profile } = await supabase
         .from("profiles")
@@ -542,15 +437,14 @@ export const StoryOnboarding = () => {
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      // Also refetch companion query to ensure it has the newly created companion
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
-      // Store companion animal and transition to journey begins
       setCompanionAnimal(preferences.spiritAnimal);
       setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
       toast.error("Something went wrong. Please try again.");
+    } finally {
       setIsCreatingCompanion(false);
     }
   };
