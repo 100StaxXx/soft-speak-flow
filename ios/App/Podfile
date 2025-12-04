@@ -23,17 +23,88 @@ end
 post_install do |installer|
   assertDeploymentTarget(installer)
 
+  installer.pods_project.targets.each do |target|
+    target.build_phases.each do |phase|
+      next unless phase.respond_to?(:name)
+      next unless phase.name&.start_with?('[CP]')
+
+      if phase.respond_to?(:alwaysOutOfDate=)
+        phase.alwaysOutOfDate = true
+      elsif phase.respond_to?(:always_out_of_date=)
+        phase.always_out_of_date = true
+      end
+    end
+  end
+
+  indicator_controller = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  if File.exist?(indicator_controller)
+    file_contents = File.read(indicator_controller)
+    deprecated_style = 'UIActivityIndicatorViewStyleGray'
+    replacement_style = 'UIActivityIndicatorViewStyleMedium'
+
+    if file_contents.include?(deprecated_style)
+      File.write(
+        indicator_controller,
+        file_contents.gsub(deprecated_style, replacement_style)
+      )
+    end
+  end
+
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
-    original = 'public protocol DataDecoder: Sendable'
-    patched = '@preconcurrency public protocol DataDecoder: Sendable'
+    replacements = {
+      'public protocol DataDecoder: Sendable' => '@preconcurrency public protocol DataDecoder: Sendable',
+      'extension JSONDecoder: DataDecoder {}' => '@preconcurrency extension JSONDecoder: DataDecoder {}',
+      'extension PropertyListDecoder: DataDecoder {}' => '@preconcurrency extension PropertyListDecoder: DataDecoder {}'
+    }
 
     file_contents = File.read(alamofire_response_serialization)
-    unless file_contents.include?(patched)
-      File.write(
-        alamofire_response_serialization,
-        file_contents.sub(original, patched)
-      )
+    updated_contents = file_contents.dup
+
+    replacements.each do |original, patched|
+      next if updated_contents.include?(patched)
+      updated_contents = updated_contents.sub(original, patched)
+    end
+
+    if updated_contents != file_contents
+      File.write(alamofire_response_serialization, updated_contents)
+    end
+  end
+
+  alamofire_event_monitor = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'EventMonitor.swift')
+  if File.exist?(alamofire_event_monitor)
+    file_contents = File.read(alamofire_event_monitor)
+    updated_contents = file_contents.dup
+
+    sendable_struct = <<~SWIFT
+      private struct SendableInputStream: @unchecked Sendable {
+          let stream: InputStream
+      }
+
+    SWIFT
+
+    foundation_import = "import Foundation\n\n"
+    unless updated_contents.include?('SendableInputStream: @unchecked Sendable')
+      if updated_contents.include?(foundation_import)
+        updated_contents = updated_contents.sub(foundation_import, foundation_import + sendable_struct)
+      end
+    end
+
+    closure_original = "        performEvent { $0.request(request, didProvideInputStream: stream) }\n"
+    unless updated_contents.include?('SendableInputStream(stream: stream)')
+      closure_replacement = <<~SWIFT
+        let sendableStream = SendableInputStream(stream: stream)
+        performEvent { monitor in
+            monitor.request(request, didProvideInputStream: sendableStream.stream)
+        }
+      SWIFT
+
+      indented_replacement = closure_replacement.each_line.map { |line| line == "\n" ? line : "        #{line}" }.join
+      updated_contents = updated_contents.sub(closure_original, indented_replacement)
+    end
+
+    if updated_contents != file_contents
+      File.write(alamofire_event_monitor, updated_contents)
     end
   end
 end

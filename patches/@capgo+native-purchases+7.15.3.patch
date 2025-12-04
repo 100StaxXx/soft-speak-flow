@@ -1,5 +1,5 @@
 diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
-index 7cb921e..05499c9 100644
+index 7cb921e..5e3fa69 100644
 --- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 +++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 @@ -50,7 +50,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -11,3 +11,22 @@ index 7cb921e..05499c9 100644
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
+@@ -63,12 +63,14 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+ 
+                     // Notify JS listeners on main thread, after slight delay
+                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
+-                    await MainActor.run {
+-                        self?.notifyListeners("transactionUpdated", data: payload)
++                    await MainActor.run { [weak self] in
++                        guard let self else { return }
++                        self.notifyListeners("transactionUpdated", data: payload)
+                     }
+                 case .unverified(let transaction, let error):
+-                    await MainActor.run {
+-                        self?.notifyListeners("transactionVerificationFailed", data: [
++                    await MainActor.run { [weak self] in
++                        guard let self else { return }
++                        self.notifyListeners("transactionVerificationFailed", data: [
+                             "transactionId": String(transaction.id),
+                             "error": error.localizedDescription
+                         ])
