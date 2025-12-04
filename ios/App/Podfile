@@ -20,6 +20,46 @@ def capacitor_pods
   pod 'CapgoCapacitorSocialLogin', :path => '../../node_modules/@capgo/capacitor-social-login'
 end
 
+def patch_google_sign_in_indicator!
+  file = File.join(__dir__, 'Pods/GoogleSignIn/GoogleSignIn/Sources/GIDAppCheck/UI/GIDActivityIndicatorViewController.m')
+  return unless File.exist?(file)
+
+  contents = File.read(file)
+  return if contents.include?('#pragma clang diagnostic push')
+
+  original = <<'ORIGINAL'
+  UIActivityIndicatorViewStyle style;
+  if (@available(iOS 13.0, *)) {
+    style = UIActivityIndicatorViewStyleLarge;
+  } else {
+    style = UIActivityIndicatorViewStyleGray;
+  }
+  _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:style];
+ORIGINAL
+
+  patched = <<'PATCHED'
+  UIActivityIndicatorViewStyle style;
+  if (@available(iOS 13.0, *)) {
+    style = UIActivityIndicatorViewStyleLarge;
+  } else {
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_13_0
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    style = UIActivityIndicatorViewStyleGray;
+#pragma clang diagnostic pop
+#endif
+  }
+  _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:style];
+PATCHED
+
+  if contents.include?(original)
+    File.write(file, contents.sub(original, patched))
+    puts 'Patched GoogleSignIn UIActivityIndicatorViewController to avoid deprecated styles.'
+  else
+    warn 'GoogleSignIn UIActivityIndicatorViewController snippet not found; update Podfile patch.'
+  end
+end
+
 target 'App' do
   capacitor_pods
   # Add your Pods here
@@ -27,4 +67,5 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  patch_google_sign_in_indicator!
 end
