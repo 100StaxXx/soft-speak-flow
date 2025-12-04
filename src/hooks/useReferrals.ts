@@ -115,7 +115,7 @@ export const useReferrals = () => {
         }
 
         const { data: applyResult, error: applyError } = await supabase
-          .rpc("apply_referral_code_atomic", {
+          .rpc("apply_referral_code_atomic" as any, {
             p_user_id: user.id,
             p_referrer_id: codeData.owner_user_id,
             p_referral_code: normalizedCode,
@@ -126,7 +126,7 @@ export const useReferrals = () => {
           throw new Error("Failed to apply referral code. Please try again.");
         }
 
-        const typedResult = applyResult as ApplyReferralCodeResult | null;
+        const typedResult = applyResult as unknown as ApplyReferralCodeResult | null;
         if (!typedResult?.success) {
           throw new Error(typedResult?.message ?? "Failed to apply referral code");
         }
