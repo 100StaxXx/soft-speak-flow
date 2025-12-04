@@ -19,44 +19,44 @@ export interface MentorExplanation {
 
 const MENTOR_BULLETS: Record<string, string[]> = {
   atlas: [
-    "Helps you think clearly when emotions are loud",
+    "Brings clarity when life gets noisy",
     "Keeps you grounded in principles, not impulses",
-    "Perfect when you feel overwhelmed or overthinking"
+    "Unlocks clear thinking even in emotional moments"
   ],
   darius: [
-    "Builds your self-respect and personal standards",
-    "Teaches you to lead yourself with discipline",
+    "Strengthens your self-respect and personal standards",
+    "Empowers you to lead yourself with discipline",
     "Helps you set boundaries and stand firm"
   ],
   kai: [
-    "Gives you the push you've been avoiding",
+    "Ignites the drive you've been looking for",
     "Holds you to a high standard, no excuses",
-    "Best when you're ready for serious change"
+    "Accelerates your growth when you're ready to level up"
   ],
   eli: [
-    "Reminds you of your strength when you forget",
-    "Helps you rebuild confidence after setbacks",
-    "Encourages steady progress, not perfection"
+    "Reminds you of the strength you already have",
+    "Celebrates your progress, not just perfection",
+    "Fuels your confidence with steady encouragement"
   ],
   nova: [
-    "Slows you down when your mind is racing",
-    "Creates space for clarity and calm",
-    "Perfect for managing anxiety and stress"
+    "Creates space for calm and clear thinking",
+    "Helps you find peace in the present moment",
+    "Unlocks mental clarity and inner stillness"
   ],
   sienna: [
-    "Validates your feelings while guiding you forward",
-    "Helps you heal without rushing the process",
-    "Creates emotional safety while building strength"
+    "Honors your journey while moving you forward",
+    "Creates emotional safety while building strength",
+    "Validates your feelings and guides you gently"
   ],
   lumi: [
-    "Brings clarity to confusing relationship patterns",
-    "Helps you understand attachment and boundaries",
-    "Guides you to healthier love without losing yourself"
+    "Illuminates patterns in how you connect",
+    "Strengthens your understanding of boundaries",
+    "Guides you toward deeper, healthier relationships"
   ],
   stryker: [
     "Maximizes your focus and execution",
     "Treats your goals like an athlete treats competition",
-    "Pushes you toward peak performance daily"
+    "Elevates you toward peak performance daily"
   ],
   solace: [
     "Reconnects you with your inner wisdom",
@@ -85,17 +85,17 @@ export function generateMentorExplanation(
 
   if (q1Label && q2Label) {
     const commStyle = formatCommunicationStyle(q1Label);
-    const struggle = formatStruggle(q2Label);
+    const focusArea = formatFocusArea(q2Label);
     
-    paragraph = `You said you prefer ${commStyle} and that you're ${struggle}. ${mentor.name} is ${toneDescription} `;
+    paragraph = `You said you prefer ${commStyle} and that you're ${focusArea}. ${mentor.name} is ${toneDescription} `;
     
     if (targetUser) {
-      paragraph += `and is best for ${targetUser} `;
+      paragraph += `and is ideal for ${targetUser} `;
     }
 
     if (mentor.themes && mentor.themes.length > 0) {
       const topThemes = mentor.themes.slice(0, 2).join(" and ");
-      paragraph += `They'll help you with ${topThemes} in a way that fits how you like to be guided.`;
+      paragraph += `They'll support your growth in ${topThemes} in a way that fits how you like to be guided.`;
     }
   } else {
     // Fallback if answers missing
@@ -125,9 +125,6 @@ function formatCommunicationStyle(q1Label: string): string {
   return q1Label.toLowerCase() + " guidance";
 }
 
-function formatStruggle(q2Label: string): string {
-  if (q2Label.includes("/")) {
-    return "struggling most with " + q2Label.toLowerCase();
-  }
-  return "struggling most with " + q2Label.toLowerCase();
+function formatFocusArea(q2Label: string): string {
+  return "focused on " + q2Label.toLowerCase();
 }

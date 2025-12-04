@@ -26,14 +26,14 @@ export const QUESTIONNAIRE: Question[] = [
   },
   {
     id: "q2",
-    question: "What are you struggling with the most right now?",
+    question: "What would you like to focus on growing?",
     options: [
-      { id: "q2_a", label: "Discipline / consistency" },
-      { id: "q2_b", label: "Anxiety / overthinking" },
-      { id: "q2_c", label: "Heartbreak or relationship issues" },
-      { id: "q2_d", label: "Confidence / self-worth" },
-      { id: "q2_e", label: "Focus / performance / goals" },
-      { id: "q2_f", label: "Emotional healing / forgiveness" }
+      { id: "q2_a", label: "Building stronger habits & discipline" },
+      { id: "q2_b", label: "Finding calm & mental clarity" },
+      { id: "q2_c", label: "Nurturing healthier connections" },
+      { id: "q2_d", label: "Stepping into my confidence" },
+      { id: "q2_e", label: "Leveling up my performance" },
+      { id: "q2_f", label: "Inner peace & letting go" }
     ]
   },
   {
@@ -58,14 +58,14 @@ export const QUESTIONNAIRE: Question[] = [
   },
   {
     id: "q5",
-    question: "What's your current season of life?",
+    question: "What chapter are you stepping into?",
     options: [
-      { id: "q5_a", label: "Building discipline and structure" },
-      { id: "q5_b", label: "Healing from emotional pain" },
-      { id: "q5_c", label: "Rebuilding confidence after setbacks" },
-      { id: "q5_d", label: "Searching for purpose and clarity" },
-      { id: "q5_e", label: "Improving relationships or breaking old patterns" },
-      { id: "q5_f", label: "Entering a new level of ambition and performance" }
+      { id: "q5_a", label: "Creating structure & momentum" },
+      { id: "q5_b", label: "Deepening my inner peace" },
+      { id: "q5_c", label: "Rising into my power" },
+      { id: "q5_d", label: "Discovering my direction" },
+      { id: "q5_e", label: "Evolving how I connect" },
+      { id: "q5_f", label: "Unlocking my next level" }
     ]
   },
   {
