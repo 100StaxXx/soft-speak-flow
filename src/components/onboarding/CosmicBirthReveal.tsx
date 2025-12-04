@@ -147,7 +147,7 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
                 transition={{ delay: 0.3 }}
               >
                 <span className="bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent">
-                  When Were You Born?
+                  When Did Your Story Begin?
                 </span>
               </motion.h1>
               <motion.p 
@@ -156,7 +156,7 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                Your birthday unlocks your cosmic identity
+                The stars remember the day you arrived
               </motion.p>
             </div>
 
