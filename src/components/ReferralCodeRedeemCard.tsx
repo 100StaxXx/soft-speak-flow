@@ -35,7 +35,7 @@ export const ReferralCodeRedeemCard = () => {
           <Gift className="h-5 w-5 text-primary" />
           <div>
             <CardTitle>Enter a Referral Code</CardTitle>
-            <CardDescription>Share the love and unlock rewards when you reach Stage 3.</CardDescription>
+            <CardDescription>Entering a friend's code simply lets them earn cosmetic skins when you reach Stage 3.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -46,7 +46,7 @@ export const ReferralCodeRedeemCard = () => {
             <div className="space-y-1">
               <p className="font-medium text-foreground">Referral code already applied</p>
               <p className="text-sm text-muted-foreground">
-                Thanks for supporting a friend! Keep progressing—rewards unlock once you hit Stage 3.
+                Your friend will get their cosmetic reward once you hit Stage 3; nothing changes on your account.
               </p>
             </div>
           </div>

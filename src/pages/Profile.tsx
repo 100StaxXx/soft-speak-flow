@@ -331,7 +331,9 @@ const Profile = () => {
                   <Gift className="h-6 w-6 text-primary" />
                   <div>
                     <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
-                    <p className="text-sm text-muted-foreground">Share Cosmiq and unlock exclusive companion skins</p>
+                    <p className="text-sm text-muted-foreground">
+                      Refer friends to unlock cosmetic companion skins for yourself. Applying a code just tags them so they earn a skin when you reach Stage 3—your access stays the same.
+                    </p>
                   </div>
                 </div>
                 
