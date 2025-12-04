@@ -140,12 +140,24 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
               >
                 <Sparkles size={40} style={{ color: factionColor }} />
               </motion.div>
-              <h1 className="text-3xl font-bold text-white mb-2">
-                When Were You Born?
-              </h1>
-              <p className="text-white/70">
+              <motion.h1 
+                className="text-3xl font-bold mb-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <span className="bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent">
+                  When Were You Born?
+                </span>
+              </motion.h1>
+              <motion.p 
+                className="text-white/70"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
                 Your birthday unlocks your cosmic identity
-              </p>
+              </motion.p>
             </div>
 
             <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
