@@ -58,7 +58,7 @@ private extension AppDelegate {
                 mode: .default,
                 options: [
                     .mixWithOthers,
-                    .allowBluetooth,
+                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .defaultToSpeaker
                 ]
