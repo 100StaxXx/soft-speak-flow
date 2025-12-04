@@ -56,6 +56,9 @@ index 7cb921e..71a2795 100644
 +                    } catch is CancellationError {
 +                        // Task was cancelled while sleeping — stop the listener
 +                        return
++                    } catch {
++                        // Unexpected error during sleep — stop the listener
++                        return
 +                    }
 -                    await MainActor.run {
 -                        self?.notifyListeners("transactionUpdated", data: payload)
