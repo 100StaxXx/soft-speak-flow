@@ -97,4 +97,37 @@ post_install do |installer|
       File.write(alamofire_event_monitor, file_contents)
     end
   end
+
+  gid_activity_indicator = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  if File.exist?(gid_activity_indicator)
+    original = <<~'ORIGINAL'
+      UIActivityIndicatorViewStyle style;
+      if (@available(iOS 13.0, *)) {
+        style = UIActivityIndicatorViewStyleLarge;
+      } else {
+        style = UIActivityIndicatorViewStyleGray;
+      }
+    ORIGINAL
+
+    patched = <<~'PATCHED'
+      #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        UIActivityIndicatorViewStyle style = UIActivityIndicatorViewStyleLarge;
+      #else
+        UIActivityIndicatorViewStyle style;
+        if (@available(iOS 13.0, *)) {
+          style = UIActivityIndicatorViewStyleLarge;
+        } else {
+          style = UIActivityIndicatorViewStyleGray;
+        }
+      #endif
+    PATCHED
+
+    file_contents = File.read(gid_activity_indicator)
+    unless file_contents.include?('#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000')
+      File.write(
+        gid_activity_indicator,
+        file_contents.sub(original, patched)
+      )
+    end
+  end
 end
