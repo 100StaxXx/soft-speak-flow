@@ -46,6 +46,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -278,6 +279,7 @@ const Auth = () => {
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+    setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
     
@@ -489,6 +491,8 @@ const Auth = () => {
         description: error.message || 'Failed to sign in. Please try again.',
         variant: "destructive",
       });
+    } finally {
+      setOauthLoading(null);
     }
   };
 
@@ -587,6 +591,50 @@ const Auth = () => {
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
                 </Button>
               </form>
+            )}
+
+            {!isForgotPassword && (
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.4em] text-steel">
+                  <span className="h-px flex-1 bg-obsidian/40" />
+                  <span>Or continue with</span>
+                  <span className="h-px flex-1 bg-obsidian/40" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="lg"
+                    className="w-full h-14 justify-start gap-3 normal-case tracking-normal bg-obsidian/60 hover:bg-obsidian"
+                    onClick={() => handleOAuthSignIn('apple')}
+                    disabled={loading || oauthLoading === 'apple'}
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian text-pure-white text-base font-semibold">
+                      A
+                    </span>
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="text-sm font-semibold text-pure-white">Continue with Apple</span>
+                      <span className="text-[11px] font-normal text-steel">Use your Apple ID</span>
+                    </span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="lg"
+                    className="w-full h-14 justify-start gap-3 normal-case tracking-normal bg-pure-white text-obsidian hover:bg-pure-white"
+                    onClick={() => handleOAuthSignIn('google')}
+                    disabled={loading || oauthLoading === 'google'}
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-pure-white text-obsidian text-base font-semibold border border-obsidian/20">
+                      G
+                    </span>
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="text-sm font-semibold">Continue with Google</span>
+                      <span className="text-[11px] font-normal text-steel">Use your Google Account</span>
+                    </span>
+                  </Button>
+                </div>
+              </div>
             )}
 
             <div className="text-center">
