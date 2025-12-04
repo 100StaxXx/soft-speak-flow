@@ -283,44 +283,6 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     </div>
                   </motion.div>
                   
-                  {/* Core Beliefs */}
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.35 }}
-                  >
-                    <h3 className="text-white/60 text-xs uppercase tracking-wider mb-3">Core Beliefs</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {expandedData.philosophy.map((point, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ x: -10, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.4 + i * 0.05 }}
-                          className="flex items-center gap-2"
-                        >
-                          <div 
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: expandedData.color }}
-                          />
-                          <span className="text-white/80 text-sm">{point}</span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-
-                  {/* Ideal For */}
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.45 }}
-                    className="bg-white/5 backdrop-blur-sm rounded-xl p-4"
-                  >
-                    <h3 className="text-white/60 text-xs uppercase tracking-wider mb-2">Perfect For</h3>
-                    <p className="text-white/85 text-sm leading-relaxed">
-                      {expandedData.idealFor}
-                    </p>
-                  </motion.div>
 
                   {/* Select Button */}
                   <motion.div
