@@ -195,7 +195,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                 alt={expandedData.name}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
             </motion.div>
 
             {/* Back Button */}
