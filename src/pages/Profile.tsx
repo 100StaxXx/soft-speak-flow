@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -23,6 +23,7 @@ import { FactionBadge } from "@/components/FactionBadge";
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
+import { DeleteAccountButton } from "@/components/DeleteAccountButton";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
@@ -339,6 +340,20 @@ const Profile = () => {
                 <ReferralDashboard />
                 <CompanionSkins />
               </div>
+
+              {/* Danger Zone - Account Deletion */}
+              <Card className="border-destructive/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    Danger Zone
+                  </CardTitle>
+                  <CardDescription>Permanently delete your account and all associated data</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DeleteAccountButton />
+                </CardContent>
+              </Card>
 
             </TabsContent>
 
