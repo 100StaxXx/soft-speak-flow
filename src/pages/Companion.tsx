@@ -9,10 +9,12 @@ import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
 import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
+import { FactionBadge } from "@/components/FactionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Award, TrendingUp, BookOpen, Sparkles, MapPin } from "lucide-react";
 import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useProfile } from "@/hooks/useProfile";
 import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -67,6 +69,7 @@ PostcardsTab.displayName = 'PostcardsTab';
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
+  const { profile } = useProfile();
   const { data: unreadStoryCount = 0 } = useUnreadGuildStories();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -147,6 +150,9 @@ const Companion = () => {
                 <h1 className="font-heading font-black text-xl">Companion</h1>
               </div>
               <div className="flex items-center gap-2">
+                {profile?.faction && (
+                  <FactionBadge faction={profile.faction} variant="icon-only" />
+                )}
                 <PageInfoButton onClick={() => setShowPageInfo(true)} />
                 <div data-tour="companion-tooltip-anchor">
                   <CompanionBadge 

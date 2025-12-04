@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SendShoutDrawer } from "./SendShoutDrawer";
 import { GuildMembersInfoTooltip } from "./GuildMembersInfoTooltip";
+import { FactionBadge } from "./FactionBadge";
 import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShoutType } from "@/data/shoutMessages";
@@ -22,6 +23,7 @@ interface LeaderboardMember {
   profile?: {
     email: string | null;
     onboarding_data?: unknown;
+    faction?: string | null;
   };
   companion?: {
     current_image_url: string | null;
@@ -63,13 +65,13 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
 
       // Batch fetch profiles and companions in parallel
       const [profilesRes, companionsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email, onboarding_data").in("id", userIds),
+        supabase.from("profiles").select("id, email, onboarding_data, faction").in("id", userIds),
         supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
       ]);
 
       // Create lookup maps for O(1) access
       const profilesMap = new Map(
-        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data }])
+        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
       );
       const companionsMap = new Map(
         (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
@@ -213,6 +215,9 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{displayName}</span>
+                    {member.profile?.faction && (
+                      <FactionBadge faction={member.profile.faction} variant="icon-only" className="h-6 w-6" />
+                    )}
                     {isCurrentUser && (
                       <Badge variant="secondary" className="text-xs">You</Badge>
                     )}
