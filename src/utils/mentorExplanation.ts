@@ -1,5 +1,3 @@
-import { QUESTIONNAIRE } from "@/config/questionnaire";
-
 interface Mentor {
   id: string;
   slug: string;
@@ -65,6 +63,35 @@ const MENTOR_BULLETS: Record<string, string[]> = {
   ]
 };
 
+// Map tags to readable text for explanation paragraph
+const TAG_TO_TEXT: Record<string, string> = {
+  // Growth focus tags
+  discipline: "building discipline",
+  performance: "peak performance",
+  calm: "finding calm",
+  mindfulness: "mental clarity",
+  healer: "emotional healing",
+  healing: "healing and recovery",
+  supportive: "supportive growth",
+  uplifting: "building confidence",
+  confidence: "confidence building",
+  momentum: "building momentum",
+  
+  // Guidance style tags
+  tough_love: "direct, no-nonsense guidance",
+  direct: "straightforward guidance",
+  warm: "gentle, nurturing guidance",
+  soft: "soft, compassionate guidance",
+  stoic: "calm, thoughtful wisdom",
+  high_energy: "high-energy motivation",
+  
+  // Energy tags
+  intense: "intense energy",
+  grounded: "grounded energy",
+  spiritual: "spiritual guidance",
+  intuition: "intuitive guidance",
+};
+
 export function generateMentorExplanation(
   mentor: Mentor,
   selectedAnswers: Record<string, string>
@@ -72,10 +99,10 @@ export function generateMentorExplanation(
   const title = `Your Mentor is: ${mentor.name}`;
   const subtitle = mentor.short_title;
 
-  // Get Q1, Q2, Q6 labels
-  const q1Label = getAnswerLabel("q1", selectedAnswers["q1"]);
-  const q2Label = getAnswerLabel("q2", selectedAnswers["q2"]);
-  const q6Label = getAnswerLabel("q6", selectedAnswers["q6"]);
+  // Get tags from the new StoryQuestionnaire format
+  const growthTag = selectedAnswers["growth_focus"] || "";
+  const guidanceTag = selectedAnswers["guidance_style"] || "";
+  const energyTag = selectedAnswers["energy_preference"] || "";
 
   // Build paragraph
   let paragraph = "";
@@ -83,23 +110,30 @@ export function generateMentorExplanation(
   const toneDescription = mentor.tone_description?.toLowerCase() ?? "supportive";
   const targetUser = mentor.target_user?.toLowerCase();
 
-  if (q1Label && q2Label) {
-    const commStyle = formatCommunicationStyle(q1Label);
-    const focusArea = formatFocusArea(q2Label);
-    
-    paragraph = `You said you prefer ${commStyle} and that you're ${focusArea}. ${mentor.name} is ${toneDescription} `;
+  const growthText = TAG_TO_TEXT[growthTag] || growthTag.replace(/_/g, " ");
+  const guidanceText = TAG_TO_TEXT[guidanceTag] || guidanceTag.replace(/_/g, " ");
+
+  if (growthTag && guidanceTag) {
+    paragraph = `You're focused on ${growthText} and prefer ${guidanceText}. ${mentor.name} is ${toneDescription}`;
     
     if (targetUser) {
-      paragraph += `and is ideal for ${targetUser} `;
+      paragraph += ` and is ideal for ${targetUser}.`;
+    } else {
+      paragraph += ".";
     }
 
     if (mentor.themes && mentor.themes.length > 0) {
       const topThemes = mentor.themes.slice(0, 2).join(" and ");
-      paragraph += `They'll support your growth in ${topThemes} in a way that fits how you like to be guided.`;
+      paragraph += ` They'll support your growth in ${topThemes} in a way that fits how you like to be guided.`;
     }
   } else {
     // Fallback if answers missing
-    paragraph = `${mentor.name} is ${toneDescription} ${targetUser ? `and is best for ${targetUser}` : ''}`;
+    paragraph = `${mentor.name} is ${toneDescription}${targetUser ? ` and is best for ${targetUser}` : ""}.`;
+    
+    if (mentor.themes && mentor.themes.length > 0) {
+      const topThemes = mentor.themes.slice(0, 2).join(" and ");
+      paragraph += ` They specialize in ${topThemes}.`;
+    }
   }
 
   // Get bullets
@@ -111,20 +145,4 @@ export function generateMentorExplanation(
   ];
 
   return { title, subtitle, paragraph, bullets };
-}
-
-function getAnswerLabel(questionId: string, optionId: string): string {
-  const question = QUESTIONNAIRE.find(q => q.id === questionId);
-  if (!question) return "";
-  
-  const option = question.options.find(o => o.id === optionId);
-  return option?.label || "";
-}
-
-function formatCommunicationStyle(q1Label: string): string {
-  return q1Label.toLowerCase() + " guidance";
-}
-
-function formatFocusArea(q2Label: string): string {
-  return "focused on " + q2Label.toLowerCase();
 }

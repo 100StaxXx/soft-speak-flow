@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCompanion } from "@/hooks/useCompanion";
 import { toast } from "sonner";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -52,7 +51,6 @@ export const StoryOnboarding = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { createCompanion } = useCompanion();
   
   const [stage, setStage] = useState<OnboardingStage>("prologue");
   const [userName, setUserName] = useState("");
@@ -64,7 +62,7 @@ export const StoryOnboarding = () => {
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
-  const isCreatingCompanion = createCompanion.isPending;
+  const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
 
   // Load mentors on mount
   useEffect(() => {
@@ -95,13 +93,6 @@ export const StoryOnboarding = () => {
     };
     loadMentors();
   }, []);
-
-  // Faction-specific colors for theming
-  const factionColors: Record<FactionType, { primary: string; gradient: string }> = {
-    starfall: { primary: "#FF6600", gradient: "from-orange-500 to-red-600" },
-    void: { primary: "#7F26D9", gradient: "from-purple-600 to-indigo-700" },
-    stellar: { primary: "#3DB8F5", gradient: "from-cyan-400 to-blue-600" },
-  };
 
   const handlePrologueComplete = async (name: string) => {
     setUserName(name);
@@ -283,7 +274,9 @@ export const StoryOnboarding = () => {
     coreElement: string;
     storyTone: string;
   }) => {
-    if (!user || createCompanion.isPending) return;
+    if (!user || isCreatingCompanion) return;
+
+    setIsCreatingCompanion(true);
 
     try {
       let companionId: string;
@@ -429,6 +422,7 @@ export const StoryOnboarding = () => {
     } catch (error) {
       console.error("Error creating companion:", error);
       toast.error("Something went wrong. Please try again.");
+      setIsCreatingCompanion(false);
     }
   };
 
