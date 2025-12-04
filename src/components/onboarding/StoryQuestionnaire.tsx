@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -117,6 +117,15 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
 
+  // Memoize star positions to prevent them from jumping on re-render
+  const starPositions = useMemo(() => 
+    [...Array(30)].map(() => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 2 + Math.random() * 2,
+      delay: Math.random() * 2,
+    })), []);
+
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
@@ -149,21 +158,21 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
     <div className="min-h-screen relative overflow-hidden flex flex-col p-6">
       {/* Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
-        {[...Array(30)].map((_, i) => (
+        {starPositions.map((star, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white rounded-full"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              left: star.left,
+              top: star.top,
             }}
             animate={{
               opacity: [0.2, 0.8, 0.2],
             }}
             transition={{
-              duration: 2 + Math.random() * 2,
+              duration: star.duration,
               repeat: Infinity,
-              delay: Math.random() * 2,
+              delay: star.delay,
             }}
           />
         ))}

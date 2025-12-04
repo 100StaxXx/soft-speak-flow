@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,16 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
   const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
+
+  // Memoize particle positions to prevent them from jumping on re-render
+  const particlePositions = useMemo(() => 
+    [...Array(6)].map(() => ({
+      x: Math.random() * 400 - 200,
+      y: Math.random() * 400 - 200,
+      left: `${20 + Math.random() * 60}%`,
+      top: `${30 + Math.random() * 40}%`,
+      duration: 4 + Math.random() * 2,
+    })), []);
 
   useEffect(() => {
     if (currentLine < narrativeLines.length) {
@@ -135,13 +145,13 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
       </div>
 
       {/* Floating particles */}
-      {[...Array(6)].map((_, i) => (
+      {particlePositions.map((particle, i) => (
         <motion.div
           key={i}
           className="absolute w-1 h-1 bg-primary/40 rounded-full"
           initial={{ 
-            x: Math.random() * 400 - 200, 
-            y: Math.random() * 400 - 200,
+            x: particle.x, 
+            y: particle.y,
             opacity: 0 
           }}
           animate={{ 
@@ -149,13 +159,13 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
             opacity: [0, 0.8, 0],
           }}
           transition={{
-            duration: 4 + Math.random() * 2,
+            duration: particle.duration,
             repeat: Infinity,
             delay: i * 0.8,
           }}
           style={{
-            left: `${20 + Math.random() * 60}%`,
-            top: `${30 + Math.random() * 40}%`,
+            left: particle.left,
+            top: particle.top,
           }}
         />
       ))}

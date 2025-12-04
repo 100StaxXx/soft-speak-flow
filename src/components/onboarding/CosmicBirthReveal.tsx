@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -67,6 +67,15 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
 
+  // Memoize star positions to prevent them from jumping on re-render
+  const starPositions = useMemo(() => 
+    [...Array(50)].map(() => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 2 + Math.random() * 3,
+      delay: Math.random() * 2,
+    })), []);
+
   const factionColor = factionColors[faction];
 
   const handleBirthdateSubmit = () => {
@@ -99,22 +108,22 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
     <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6">
       {/* Animated Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
-        {[...Array(50)].map((_, i) => (
+        {starPositions.map((star, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white rounded-full"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              left: star.left,
+              top: star.top,
             }}
             animate={{
               opacity: [0.2, 1, 0.2],
               scale: [0.5, 1, 0.5],
             }}
             transition={{
-              duration: 2 + Math.random() * 3,
+              duration: star.duration,
               repeat: Infinity,
-              delay: Math.random() * 2,
+              delay: star.delay,
             }}
           />
         ))}
