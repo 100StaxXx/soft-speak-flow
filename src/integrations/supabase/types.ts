@@ -2464,6 +2464,7 @@ export type Database = {
           daily_quote_push_time: string | null
           daily_quote_push_window: string | null
           email: string | null
+          faction: string | null
           id: string
           is_premium: boolean | null
           last_streak_freeze_used: string | null
@@ -2511,6 +2512,7 @@ export type Database = {
           daily_quote_push_time?: string | null
           daily_quote_push_window?: string | null
           email?: string | null
+          faction?: string | null
           id: string
           is_premium?: boolean | null
           last_streak_freeze_used?: string | null
@@ -2558,6 +2560,7 @@ export type Database = {
           daily_quote_push_time?: string | null
           daily_quote_push_window?: string | null
           email?: string | null
+          faction?: string | null
           id?: string
           is_premium?: boolean | null
           last_streak_freeze_used?: string | null
