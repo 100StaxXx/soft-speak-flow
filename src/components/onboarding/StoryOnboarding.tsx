@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { StoryPrologue } from "./StoryPrologue";
+import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
@@ -17,6 +18,7 @@ import { generateMentorExplanation, type MentorExplanation } from "@/utils/mento
 
 type OnboardingStage = 
   | "prologue" 
+  | "destiny"
   | "faction" 
   | "cosmic-birth" 
   | "questionnaire" 
@@ -102,6 +104,10 @@ export const StoryOnboarding = () => {
       }).eq("id", user.id);
     }
     
+    setStage("destiny");
+  };
+
+  const handleDestinyComplete = () => {
     setStage("faction");
   };
 
@@ -296,6 +302,18 @@ export const StoryOnboarding = () => {
             className="relative z-10"
           >
             <StoryPrologue onComplete={handlePrologueComplete} />
+          </motion.div>
+        )}
+
+        {stage === "destiny" && (
+          <motion.div
+            key="destiny"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10"
+          >
+            <DestinyReveal userName={userName} onComplete={handleDestinyComplete} />
           </motion.div>
         )}
 
