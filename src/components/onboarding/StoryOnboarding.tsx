@@ -248,6 +248,9 @@ export const StoryOnboarding = () => {
           } : null,
         },
       }).eq("id", user.id);
+      
+      // Force immediate refetch to ensure fresh data
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
     }
     
     setStage("companion");
@@ -385,7 +388,8 @@ export const StoryOnboarding = () => {
         },
       }).eq("id", user.id);
 
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
 
       // Store companion animal and transition to journey begins
       setCompanionAnimal(preferences.spiritAnimal);
