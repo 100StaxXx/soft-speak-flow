@@ -23,17 +23,96 @@ end
 post_install do |installer|
   assertDeploymentTarget(installer)
 
+  script_names = ['[CP] Copy XCFrameworks', '[CP] Embed Pods Frameworks']
+  ensure_script_outputs = lambda do |target|
+    next unless target.respond_to?(:build_phases)
+
+    target.build_phases.each do |phase|
+      next unless phase.respond_to?(:name) && script_names.include?(phase.name)
+
+      phase.output_paths ||= []
+      next unless phase.output_paths.empty?
+
+      target_slug = target.respond_to?(:name) && target.name ? target.name.gsub(/\W+/, '_') : 'target'
+      phase_slug = phase.name.gsub(/\W+/, '_')
+      phase.output_paths << "$(DERIVED_FILE_DIR)/#{target_slug}-#{phase_slug}"
+    end
+  end
+
+  installer.pods_project.targets.each do |target|
+    ensure_script_outputs.call(target)
+  end
+  installer.pods_project.save
+
+  installer.aggregate_targets
+           .map(&:user_project)
+           .uniq
+           .compact
+           .each do |project|
+             project.targets.each { |target| ensure_script_outputs.call(target) }
+             project.save
+           end
+
+  activity_indicator = File.join(
+    __dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources',
+    'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m'
+  )
+  if File.exist?(activity_indicator)
+    file_contents = File.read(activity_indicator)
+    deprecated_style = 'UIActivityIndicatorViewStyleGray'
+    replacement_style = 'UIActivityIndicatorViewStyleMedium'
+
+    if file_contents.include?(deprecated_style)
+      File.write(activity_indicator, file_contents.gsub(deprecated_style, replacement_style))
+    end
+  end
+
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
-    original = 'public protocol DataDecoder: Sendable'
-    patched = '@preconcurrency public protocol DataDecoder: Sendable'
-
     file_contents = File.read(alamofire_response_serialization)
-    unless file_contents.include?(patched)
-      File.write(
-        alamofire_response_serialization,
-        file_contents.sub(original, patched)
-      )
+    replacements_applied = false
+
+    protocol_original = 'public protocol DataDecoder: Sendable'
+    protocol_patched = '@preconcurrency public protocol DataDecoder: Sendable'
+    unless file_contents.include?(protocol_patched)
+      file_contents = file_contents.sub(protocol_original, protocol_patched)
+      replacements_applied = true
     end
+
+    decoder_extensions = [
+      'extension JSONDecoder: DataDecoder {}',
+      'extension PropertyListDecoder: DataDecoder {}'
+    ]
+    decoder_extensions.each do |line|
+      patched_line = "@preconcurrency #{line}"
+      next if file_contents.include?(patched_line)
+
+      file_contents = file_contents.sub(line, patched_line)
+      replacements_applied = true
+    end
+
+    File.write(alamofire_response_serialization, file_contents) if replacements_applied
+  end
+
+  event_monitor_path = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'EventMonitor.swift')
+  if File.exist?(event_monitor_path)
+    file_contents = File.read(event_monitor_path)
+    helper_declaration = "private struct AFSendableInputStream: @unchecked Sendable {\n    let base: InputStream\n}\n"
+
+    unless file_contents.include?('AFSendableInputStream')
+      file_contents = file_contents.sub("import Foundation\n", "import Foundation\n\n#{helper_declaration}\n")
+    end
+
+    needle = '        performEvent { $0.request(request, didProvideInputStream: stream) }'
+    replacement = <<~RUBY.chomp
+            let boxedStream = AFSendableInputStream(base: stream)
+            performEvent { $0.request(request, didProvideInputStream: boxedStream.base) }
+    RUBY
+
+    unless file_contents.include?('boxedStream')
+      file_contents = file_contents.sub(needle, replacement)
+    end
+
+    File.write(event_monitor_path, file_contents)
   end
 end

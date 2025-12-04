@@ -1,5 +1,5 @@
 diff --git a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
-index 7cb921e..05499c9 100644
+index 7cb921e..d9fc33d 100644
 --- a/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 +++ b/node_modules/@capgo/native-purchases/ios/Sources/NativePurchasesPlugin/NativePurchasesPlugin.swift
 @@ -50,7 +50,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -11,3 +11,9 @@ index 7cb921e..05499c9 100644
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
+@@ -360,3 +360,5 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     }
+ 
+ }
++
++extension NativePurchasesPlugin: @unchecked Sendable {}
