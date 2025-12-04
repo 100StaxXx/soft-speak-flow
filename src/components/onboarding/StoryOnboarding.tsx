@@ -317,13 +317,13 @@ export const StoryOnboarding = () => {
         if (error || !newCompanion) throw error || new Error("Failed to create companion");
         companionId = newCompanion.id;
         
-        // Create stage 0 evolution record and generate card in background
-        const generateStageZeroCard = async () => {
+        // Create stage 0 evolution record, generate image and card in background
+        const generateStageZeroAssets = async () => {
           try {
             // Check if stage 0 evolution already exists
             const { data: existingEvolution } = await supabase
               .from("companion_evolutions")
-              .select("id")
+              .select("id, image_url")
               .eq("companion_id", companionId)
               .eq("stage", 0)
               .maybeSingle();
@@ -331,7 +331,7 @@ export const StoryOnboarding = () => {
             let evolutionId = existingEvolution?.id;
             
             if (!evolutionId) {
-              // Create stage 0 evolution with placeholder image
+              // Create stage 0 evolution with placeholder image initially
               const { data: evolution, error: evolutionError } = await supabase
                 .from("companion_evolutions")
                 .insert({
@@ -350,6 +350,36 @@ export const StoryOnboarding = () => {
               evolutionId = evolution.id;
             }
             
+            // Generate actual egg image if still placeholder
+            if (!existingEvolution?.image_url || existingEvolution.image_url === "/placeholder-egg.svg") {
+              try {
+                const { data: imageResult } = await supabase.functions.invoke("generate-companion-image", {
+                  body: {
+                    spiritAnimal: preferences.spiritAnimal,
+                    element: preferences.coreElement,
+                    stage: 0,
+                    favoriteColor: preferences.favoriteColor,
+                  },
+                });
+                
+                if (imageResult?.imageUrl) {
+                  // Update evolution record with actual image
+                  await supabase
+                    .from("companion_evolutions")
+                    .update({ image_url: imageResult.imageUrl })
+                    .eq("id", evolutionId);
+                  
+                  // Update companion's current image
+                  await supabase
+                    .from("user_companion")
+                    .update({ current_image_url: imageResult.imageUrl })
+                    .eq("id", companionId);
+                }
+              } catch (imageError) {
+                console.error("Stage 0 image generation failed (non-critical):", imageError);
+              }
+            }
+            
             // Generate stage 0 card
             await supabase.functions.invoke("generate-evolution-card", {
               body: {
@@ -363,11 +393,11 @@ export const StoryOnboarding = () => {
               },
             });
           } catch (cardError) {
-            console.error("Stage 0 card generation failed (non-critical):", cardError);
+            console.error("Stage 0 asset generation failed (non-critical):", cardError);
           }
         };
         
-        generateStageZeroCard(); // Fire and forget - don't block onboarding
+        generateStageZeroAssets(); // Fire and forget - don't block onboarding
       }
       
       // Mark onboarding complete and save story tone
