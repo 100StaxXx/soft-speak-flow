@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { NativePurchases } from '@capgo/native-purchases';
 
 // Type definitions for IAP plugin responses
-interface IAPPurchase {
+export interface IAPPurchase {
   productId?: string;
   transactionId?: string;
   transactionDate?: number;
@@ -10,7 +10,7 @@ interface IAPPurchase {
   transactionReceipt?: string;
 }
 
-interface IAPProduct {
+export interface IAPProduct {
   productId: string;
   title: string;
   description: string;

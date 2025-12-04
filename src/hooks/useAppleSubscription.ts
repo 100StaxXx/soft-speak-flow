@@ -1,13 +1,63 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable } from '@/utils/appleIAP';
+import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
+
+const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
 
 export function useAppleSubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<IAPProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productError, setProductError] = useState<string | null>(null);
+  const [hasAttemptedProductFetch, setHasAttemptedProductFetch] = useState(false);
+
+  const fetchProducts = useCallback(async () => {
+    if (!isIAPAvailable()) {
+      setProducts([]);
+      setProductError("In-App Purchases are only available on iOS devices");
+      setHasAttemptedProductFetch(true);
+      return [];
+    }
+
+    setProductsLoading(true);
+    setProductError(null);
+
+    try {
+      const loadedProducts = await getProducts(Object.values(IAP_PRODUCTS));
+
+      if (!loadedProducts.length) {
+        throw new Error("No App Store products were returned");
+      }
+
+      setProducts(loadedProducts);
+      return loadedProducts;
+    } catch (error) {
+      console.error('Product load error:', error);
+      setProducts([]);
+      setProductError(PRODUCT_FETCH_ERROR_MESSAGE);
+      return [];
+    } finally {
+      setProductsLoading(false);
+      setHasAttemptedProductFetch(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const ensureProductsAvailable = useCallback(async () => {
+    if (!hasAttemptedProductFetch || products.length === 0) {
+      const loadedProducts = await fetchProducts();
+      return loadedProducts.length ? loadedProducts : null;
+    }
+
+    return products;
+  }, [fetchProducts, hasAttemptedProductFetch, products]);
 
   const handlePurchase = async (productId: string) => {
     if (!isIAPAvailable()) {
@@ -21,6 +71,26 @@ export function useAppleSubscription() {
 
     setLoading(true);
     try {
+      const availableProducts = await ensureProductsAvailable();
+      if (!availableProducts) {
+        toast({
+          title: "Unavailable",
+          description: PRODUCT_FETCH_ERROR_MESSAGE,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const productExists = availableProducts.some((product) => product.productId === productId);
+      if (!productExists) {
+        toast({
+          title: "Unavailable",
+          description: "Selected premium plan is not ready yet. Please try again in a moment.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
       const purchase = await purchaseProduct(productId);
       
       if (!purchase) {
@@ -28,7 +98,7 @@ export function useAppleSubscription() {
       }
       
       // Verify receipt with backend
-      const receipt = purchase.receipt;
+      const receipt = purchase.receipt ?? purchase.transactionReceipt;
       if (!receipt) {
         throw new Error("No receipt data available");
       }
@@ -155,7 +225,11 @@ export function useAppleSubscription() {
     handlePurchase,
     handleRestore,
     loading,
-    products: IAP_PRODUCTS,
+    products,
+    productsLoading,
+    productError,
+    hasLoadedProducts: hasAttemptedProductFetch,
+    reloadProducts: fetchProducts,
     isAvailable: isIAPAvailable(),
   };
 }
