@@ -71,6 +71,38 @@ export const StoryOnboarding = () => {
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
 
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const waitForCompanionDisplayName = async (companionId: string) => {
+    const maxAttempts = 30;
+    const delayMs = 1000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const { data, error } = await supabase
+        .from("companion_evolution_cards")
+        .select("creature_name")
+        .eq("companion_id", companionId)
+        .order("evolution_stage", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching companion name:", error);
+        return null;
+      }
+
+      if (data?.creature_name) {
+        return data.creature_name as string;
+      }
+
+      if (attempt < maxAttempts) {
+        await wait(delayMs);
+      }
+    }
+
+    return null;
+  };
+
   // Load mentors on mount
   useEffect(() => {
     const loadMentors = async () => {
@@ -545,12 +577,17 @@ export const StoryOnboarding = () => {
       // Also refetch companion query to ensure it has the newly created companion
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
-      // Store companion animal and transition to journey begins
-      setCompanionAnimal(preferences.spiritAnimal);
+      const companionDisplayName = await waitForCompanionDisplayName(companionId);
+      if (!companionDisplayName) {
+        console.warn("Companion name was not ready in time; falling back to spirit animal.");
+      }
+
+      setCompanionAnimal(companionDisplayName || preferences.spiritAnimal);
       setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
       toast.error("Something went wrong. Please try again.");
+    } finally {
       setIsCreatingCompanion(false);
     }
   };
