@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MissionErrorFallback } from "@/components/ErrorFallback";
 import { DailyMissionsInfoTooltip } from "@/components/DailyMissionsInfoTooltip";
+import { MissionCardSkeleton } from "@/components/SkeletonLoader";
 
 
 const DailyMissionsContent = () => {
   const { 
     missions, 
+    isLoading,
     completeMission, 
     isCompleting, 
     completedCount, 
@@ -28,6 +30,10 @@ const DailyMissionsContent = () => {
   
   // Enable auto-completion detection
   useMissionAutoComplete();
+
+  if (isLoading) {
+    return <MissionCardSkeleton />;
+  }
 
   if (missions.length === 0) {
     return (
