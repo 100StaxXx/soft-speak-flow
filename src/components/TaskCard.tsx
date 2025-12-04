@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowRight } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -152,14 +152,23 @@ export const TaskCard = ({
         <div className="relative overflow-visible">
           {/* Animated Arrow Indicator for Tutorial Quest */}
           {isTutorialQuest && !task.completed && (
-            <div 
-              className="absolute -left-6 top-1/2 -translate-y-1/2 pointer-events-none z-20"
+            <div
+              className="absolute left-1/2 -top-16 -translate-x-1/2 pointer-events-none z-20 flex flex-col items-center gap-1"
               style={{
-                animation: 'bounceRight 1s ease-in-out infinite, pulse 2s ease-in-out infinite',
+                animation: 'bounceDown 1.2s ease-in-out infinite',
               }}
             >
-              <ArrowRight 
-                className="h-6 w-6 text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]"
+              <div
+                className="text-xs font-bold text-primary bg-primary/20 px-3 py-1.5 rounded-full border-2 border-primary shadow-lg"
+                style={{
+                  animation: 'clickHerePulse 1.5s ease-in-out infinite',
+                }}
+              >
+                Click here!
+              </div>
+              <ArrowDown
+                className="h-8 w-8 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))] filter brightness-125"
+                strokeWidth={3}
               />
             </div>
           )}
@@ -177,7 +186,7 @@ export const TaskCard = ({
               <Circle className={cn(
                 "h-6 w-6 transition-all",
                 isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground",
-                isTutorialQuest && "text-primary"
+                isTutorialQuest && "text-primary ring-2 ring-primary ring-offset-2 ring-offset-background rounded-full"
               )} />
             )}
           </button>
