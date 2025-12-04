@@ -55,6 +55,12 @@ export const StoryOnboarding = () => {
   
   const [stage, setStage] = useState<OnboardingStage>("prologue");
   const [userName, setUserName] = useState("");
+
+  // Auto scroll to top when stage changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stage]);
+
   const [faction, setFaction] = useState<FactionType | null>(null);
   const [birthdate, setBirthdate] = useState("");
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);

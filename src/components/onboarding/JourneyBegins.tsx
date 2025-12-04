@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Star, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,14 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
   const [currentLine, setCurrentLine] = useState(1);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
+
+  // Memoize particle positions to prevent them from jumping on re-render
+  const particlePositions = useMemo(() => 
+    [...Array(12)].map(() => ({
+      left: `${10 + Math.random() * 80}%`,
+      top: `${50 + Math.random() * 40}%`,
+      duration: 5 + Math.random() * 3,
+    })), []);
 
   useEffect(() => {
     if (currentLine < narrativeLines.length) {
@@ -170,7 +178,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
       </div>
 
       {/* Floating star particles */}
-      {[...Array(12)].map((_, i) => (
+      {particlePositions.map((particle, i) => (
         <motion.div
           key={i}
           className="absolute w-1 h-1 bg-white/50 rounded-full"
@@ -183,14 +191,14 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
             scale: [0.5, 1, 0.5],
           }}
           transition={{
-            duration: 5 + Math.random() * 3,
+            duration: particle.duration,
             repeat: Infinity,
             delay: i * 0.6,
             ease: "easeOut",
           }}
           style={{
-            left: `${10 + Math.random() * 80}%`,
-            top: `${50 + Math.random() * 40}%`,
+            left: particle.left,
+            top: particle.top,
           }}
         />
       ))}
