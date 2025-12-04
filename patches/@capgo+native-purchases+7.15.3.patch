@@ -10,16 +10,30 @@ index 7cb921e..71a2795 100644
  @objc(NativePurchasesPlugin)
  public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      public let identifier = "NativePurchasesPlugin"
-@@ -37,7 +38,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -21,7 +22,7 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+     ]
+ 
+     private let pluginVersion: String = "7.15.3"
+-    private var transactionUpdatesTask: Task<Void, Never>?
++    nonisolated(unsafe) private var transactionUpdatesTask: Task<Void, Never>?
+ 
+     @objc func getPluginVersion(_ call: CAPPluginCall) {
+         call.resolve(["version": self.pluginVersion])
+@@ -37,11 +38,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
          }
      }
  
--    deinit {
-+    @MainActor deinit {
++    // deinit is nonisolated, so we need nonisolated access to cancel the task
+     deinit {
          if #available(iOS 15.0, *) { cancelTransactionUpdatesListener() }
      }
  
-@@ -50,7 +51,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+-    private func cancelTransactionUpdatesListener() {
++    nonisolated private func cancelTransactionUpdatesListener() {
+         self.transactionUpdatesTask?.cancel()
+         self.transactionUpdatesTask = nil
+     }
+@@ -50,7 +52,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
@@ -30,7 +44,7 @@ index 7cb921e..71a2795 100644
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
-@@ -63,16 +66,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -63,16 +67,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
  
                      // Notify JS listeners on main thread, after slight delay
                      try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
