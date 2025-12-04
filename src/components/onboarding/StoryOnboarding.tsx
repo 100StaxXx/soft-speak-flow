@@ -94,9 +94,9 @@ export const StoryOnboarding = () => {
 
   // Faction-specific colors for theming
   const factionColors: Record<FactionType, { primary: string; gradient: string }> = {
-    starfall: { primary: "hsl(24, 100%, 50%)", gradient: "from-orange-500 to-red-600" },
-    void: { primary: "hsl(270, 70%, 50%)", gradient: "from-purple-600 to-indigo-700" },
-    stellar: { primary: "hsl(200, 90%, 60%)", gradient: "from-cyan-400 to-blue-600" },
+    starfall: { primary: "#FF6600", gradient: "from-orange-500 to-red-600" },
+    void: { primary: "#7F26D9", gradient: "from-purple-600 to-indigo-700" },
+    stellar: { primary: "#3DB8F5", gradient: "from-cyan-400 to-blue-600" },
   };
 
   const handlePrologueComplete = async (name: string) => {

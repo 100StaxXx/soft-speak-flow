@@ -65,9 +65,9 @@ export const QuickCompanionCreator = ({ faction, onComplete }: QuickCompanionCre
   const suggestedElements = factionSuggestedElements[faction];
 
   const factionColors: Record<FactionType, string> = {
-    starfall: "hsl(24, 100%, 50%)",
-    void: "hsl(270, 70%, 50%)",
-    stellar: "hsl(200, 90%, 60%)",
+    starfall: "#FF6600",
+    void: "#7F26D9",
+    stellar: "#3DB8F5",
   };
   const factionColor = factionColors[faction];
 

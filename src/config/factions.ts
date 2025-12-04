@@ -37,7 +37,7 @@ export const factions: Faction[] = [
     traits: ["Courageous", "Driven", "Resilient", "Bold"],
     idealFor: "Those who thrive on challenge and want to build unstoppable momentum in their growth journey.",
     image: starfallImg,
-    color: "hsl(24, 100%, 50%)",
+    color: "#FF6600",
     fontClass: "font-bebas",
     nameStyle: {
       fontFamily: "'Bebas Neue', sans-serif",
@@ -61,7 +61,7 @@ export const factions: Faction[] = [
     traits: ["Introspective", "Wise", "Centered", "Mysterious"],
     idealFor: "Those who value mindfulness and want to cultivate inner wisdom alongside outer achievement.",
     image: voidImg,
-    color: "hsl(270, 70%, 50%)",
+    color: "#7F26D9",
     fontClass: "font-cinzel",
     nameStyle: {
       fontFamily: "'Cinzel', serif",
@@ -86,7 +86,7 @@ export const factions: Faction[] = [
     traits: ["Creative", "Optimistic", "Curious", "Inspiring"],
     idealFor: "Those who dream big and want to transform their aspirations into reality through wonder and creativity.",
     image: stellarImg,
-    color: "hsl(200, 90%, 60%)",
+    color: "#3DB8F5",
     fontClass: "font-quicksand",
     nameStyle: {
       fontFamily: "'Quicksand', sans-serif",
