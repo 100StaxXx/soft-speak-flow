@@ -13,7 +13,7 @@ import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire"
 import { QuickCompanionCreator } from "./QuickCompanionCreator";
 import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
-import { generateMentorExplanation } from "@/utils/mentorExplanation";
+import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 
 type OnboardingStage = 
   | "prologue" 
@@ -32,17 +32,13 @@ interface Mentor {
   tags: string[];
   mentor_type: string;
   target_user_type?: string;
-  slug?: string;
-  short_title?: string;
-  primary_color?: string;
+  slug: string;
+  short_title: string;
+  primary_color: string;
+  target_user: string;
+  themes?: string[];
 }
 
-interface MentorExplanation {
-  title: string;
-  subtitle: string;
-  paragraph: string;
-  bullets: string[];
-}
 
 export const StoryOnboarding = () => {
   const navigate = useNavigate();
@@ -67,7 +63,23 @@ export const StoryOnboarding = () => {
         .select("*")
         .eq("is_active", true);
       if (data) {
-        setMentors(data);
+        // Map to our Mentor interface with defaults for required fields
+        const mappedMentors: Mentor[] = data.map(m => ({
+          id: m.id,
+          name: m.name,
+          description: m.description,
+          tone_description: m.tone_description,
+          avatar_url: m.avatar_url ?? undefined,
+          tags: m.tags || [],
+          mentor_type: m.mentor_type,
+          target_user_type: m.target_user_type ?? undefined,
+          slug: m.slug || "",
+          short_title: m.short_title || "",
+          primary_color: m.primary_color || "#7B68EE",
+          target_user: m.target_user || "",
+          themes: m.themes ?? undefined,
+        }));
+        setMentors(mappedMentors);
       }
     };
     loadMentors();
@@ -152,8 +164,14 @@ export const StoryOnboarding = () => {
     if (bestMatch) {
       setRecommendedMentor(bestMatch);
       
+      // Convert answers to Record format for explanation generator
+      const selectedAnswers: Record<string, string> = {};
+      questionAnswers.forEach(answer => {
+        selectedAnswers[answer.questionId] = answer.tags[0] || "";
+      });
+      
       // Generate explanation
-      const explanation = generateMentorExplanation(bestMatch, allTags);
+      const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
       setMentorExplanation(explanation);
       
       // Save questionnaire responses
@@ -187,7 +205,12 @@ export const StoryOnboarding = () => {
           ...existingData,
           mentorId: mentor.id,
           mentorName: mentor.name,
-          explanation: mentorExplanation as unknown as Record<string, unknown>,
+          explanation: mentorExplanation ? {
+            title: mentorExplanation.title,
+            subtitle: mentorExplanation.subtitle,
+            paragraph: mentorExplanation.paragraph,
+            bullets: mentorExplanation.bullets,
+          } : null,
         },
       }).eq("id", user.id);
     }
@@ -222,11 +245,9 @@ export const StoryOnboarding = () => {
         
         const { error } = await supabase.from("user_companion").insert([{
           user_id: user.id,
-          species: animal,
-          name: name,
-          color_palette: colors,
+          spirit_animal: animal,
           current_stage: 0,
-          total_xp: 0,
+          current_xp: 0,
           core_element: element,
           favorite_color: colors[0],
         }]);
@@ -329,7 +350,7 @@ export const StoryOnboarding = () => {
             className="relative z-10"
           >
             <MentorResult
-              mentor={{ ...recommendedMentor, short_title: recommendedMentor.short_title || "", primary_color: recommendedMentor.primary_color || "#7B68EE" }}
+              mentor={recommendedMentor}
               explanation={mentorExplanation}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
               onSeeAll={() => {}}
