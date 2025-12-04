@@ -16,7 +16,6 @@ interface Faction {
   philosophy: string[];
   image: string;
   color: string;
-  gradient: string;
 }
 
 const factions: Faction[] = [
@@ -31,8 +30,7 @@ const factions: Faction[] = [
       "Fear is fuel for the fearless",
     ],
     image: starfallImg,
-    color: "hsl(24, 100%, 50%)", // Orange/fire
-    gradient: "from-orange-500/80 via-red-500/60 to-yellow-500/40",
+    color: "hsl(24, 100%, 50%)",
   },
   {
     id: "void",
@@ -45,8 +43,7 @@ const factions: Faction[] = [
       "The void holds all answers",
     ],
     image: voidImg,
-    color: "hsl(270, 70%, 50%)", // Purple/mystical
-    gradient: "from-purple-600/80 via-indigo-500/60 to-violet-400/40",
+    color: "hsl(270, 70%, 50%)",
   },
   {
     id: "stellar",
@@ -59,8 +56,7 @@ const factions: Faction[] = [
       "Dreams are destinations",
     ],
     image: stellarImg,
-    color: "hsl(200, 90%, 60%)", // Cyan/stellar
-    gradient: "from-cyan-400/80 via-blue-500/60 to-teal-400/40",
+    color: "hsl(200, 90%, 60%)",
   },
 ];
 
@@ -70,205 +66,172 @@ interface FactionSelectorProps {
 
 export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
   const [expandedFaction, setExpandedFaction] = useState<FactionType | null>(null);
-  const [selectedFaction, setSelectedFaction] = useState<FactionType | null>(null);
 
   const handleFactionTap = (factionId: FactionType) => {
-    if (expandedFaction === factionId) {
-      // Already expanded, select it
-      setSelectedFaction(factionId);
-    } else {
-      // Expand for preview
-      setExpandedFaction(factionId);
-    }
-  };
-
-  const handleConfirm = () => {
-    if (selectedFaction) {
-      onComplete(selectedFaction);
-    }
+    setExpandedFaction(factionId);
   };
 
   const handleClose = () => {
     setExpandedFaction(null);
-    setSelectedFaction(null);
   };
 
+  const handleSelect = (factionId: FactionType) => {
+    onComplete(factionId);
+  };
+
+  const expandedData = expandedFaction ? factions.find(f => f.id === expandedFaction) : null;
+
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col">
+    <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center pt-safe-top px-6 py-8 z-20"
+        className="text-center pt-safe-top px-6 py-6 z-20"
       >
-        <h1 className="text-3xl font-bold text-white mb-2">Choose Your Path</h1>
-        <p className="text-white/70 text-sm">
+        <h1 className="text-2xl font-bold text-foreground mb-1">Choose Your Path</h1>
+        <p className="text-muted-foreground text-sm">
           Your faction shapes your cosmic journey
         </p>
       </motion.div>
 
-      {/* Triangle Split View */}
-      <div className="flex-1 relative">
-        {factions.map((faction, index) => {
-          const isExpanded = expandedFaction === faction.id;
-          const isSelected = selectedFaction === faction.id;
-          const isOtherExpanded = expandedFaction && expandedFaction !== faction.id;
-
-          // Calculate clip paths for triangle sections
-          const getClipPath = () => {
-            if (isExpanded) return "polygon(0 0, 100% 0, 100% 100%, 0 100%)";
-            if (isOtherExpanded) return "polygon(0 0, 0 0, 0 0)";
+      {/* Faction Cards Grid */}
+      <div className="flex-1 px-4 pb-6 flex flex-col gap-3">
+        {factions.map((faction, index) => (
+          <motion.button
+            key={faction.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            onClick={() => handleFactionTap(faction.id)}
+            className="relative flex-1 min-h-[140px] rounded-2xl overflow-hidden group"
+          >
+            {/* Background Image */}
+            <img
+              src={faction.image}
+              alt={faction.name}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
             
-            // Default triangle splits
-            switch (index) {
-              case 0: // Top-left
-                return "polygon(0 0, 100% 0, 50% 100%, 0 100%)";
-              case 1: // Top-right  
-                return "polygon(50% 0, 100% 0, 100% 100%, 50% 100%)";
-              case 2: // Bottom center
-                return "polygon(25% 0, 75% 0, 100% 100%, 0 100%)";
-              default:
-                return "polygon(0 0, 100% 0, 100% 100%, 0 100%)";
-            }
-          };
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            
+            {/* Faction Name */}
+            <div className="absolute inset-0 flex items-end p-4">
+              <h2 className="text-xl font-bold text-white drop-shadow-lg">
+                {faction.name}
+              </h2>
+            </div>
 
-          return (
-            <motion.div
-              key={faction.id}
-              className="absolute inset-0 cursor-pointer overflow-hidden"
-              initial={false}
-              animate={{
-                clipPath: getClipPath(),
-                zIndex: isExpanded ? 30 : 10 - index,
-                opacity: isOtherExpanded ? 0 : 1,
-              }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              onClick={() => !isExpanded && handleFactionTap(faction.id)}
-            >
-              {/* Background Image */}
-              <div className="absolute inset-0">
-                <img
-                  src={faction.image}
-                  alt={faction.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className={`absolute inset-0 bg-gradient-to-t ${faction.gradient}`} />
-                <div className="absolute inset-0 bg-black/30" />
-              </div>
-
-              {/* Collapsed State - Just Name */}
-              <AnimatePresence>
-                {!isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    <div className="text-center">
-                      <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-                        {faction.name}
-                      </h2>
-                      <p className="text-white/80 text-xs mt-1">Tap to explore</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Expanded State - Full Details */}
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col justify-end p-6 pb-32"
-                  >
-                    {/* Close Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClose();
-                      }}
-                      className="absolute top-safe-top right-4 p-2 rounded-full bg-black/40 text-white"
-                    >
-                      <X size={24} />
-                    </button>
-
-                    {/* Faction Details */}
-                    <motion.div
-                      initial={{ y: 30, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      <h2 className="text-4xl font-bold text-white mb-1">
-                        {faction.name}
-                      </h2>
-                      <p className="text-white/80 text-lg mb-4">{faction.subtitle}</p>
-                      
-                      <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 mb-4">
-                        <p className="text-white italic text-lg mb-4">
-                          "{faction.motto}"
-                        </p>
-                        
-                        <div className="space-y-2">
-                          {faction.philosophy.map((point, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ x: -20, opacity: 0 }}
-                              animate={{ x: 0, opacity: 1 }}
-                              transition={{ delay: 0.3 + i * 0.1 }}
-                              className="flex items-center gap-2"
-                            >
-                              <div 
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: faction.color }}
-                              />
-                              <span className="text-white/90">{point}</span>
-                            </motion.div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Select Button */}
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFaction(faction.id);
-                        }}
-                        className="w-full py-6 text-lg font-semibold"
-                        style={{
-                          background: `linear-gradient(135deg, ${faction.color}, ${faction.color}80)`,
-                        }}
-                      >
-                        {isSelected ? "Selected!" : `Join ${faction.name}`}
-                        <ChevronRight className="ml-2" />
-                      </Button>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          );
-        })}
+            {/* Tap Indicator */}
+            <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+              <span className="text-white/90 text-xs font-medium">Tap to learn more</span>
+            </div>
+          </motion.button>
+        ))}
       </div>
 
-      {/* Confirm Button - Shows when faction selected */}
+      {/* Expanded Faction Modal */}
       <AnimatePresence>
-        {selectedFaction && (
+        {expandedData && (
           <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-0 left-0 right-0 p-6 pb-safe-bottom bg-gradient-to-t from-black to-transparent z-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50"
           >
-            <Button
-              onClick={handleConfirm}
-              className="w-full py-6 text-lg font-semibold bg-primary hover:bg-primary/90"
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={handleClose}
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="absolute inset-x-0 bottom-0 max-h-[85vh] rounded-t-3xl overflow-hidden"
             >
-              Begin Your Journey
-              <ChevronRight className="ml-2" />
-            </Button>
+              {/* Image Header */}
+              <div className="relative h-48">
+                <img
+                  src={expandedData.image}
+                  alt={expandedData.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+                
+                {/* Close Button */}
+                <button
+                  onClick={handleClose}
+                  className="absolute top-4 right-4 p-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="bg-background px-6 pb-safe-bottom">
+                <div className="-mt-8 relative">
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <h2 className="text-2xl font-bold text-foreground mb-1">
+                      {expandedData.name}
+                    </h2>
+                    <p className="text-muted-foreground mb-4">{expandedData.subtitle}</p>
+                    
+                    {/* Motto */}
+                    <div className="bg-muted/50 rounded-xl p-4 mb-4">
+                      <p className="text-foreground italic text-lg">
+                        "{expandedData.motto}"
+                      </p>
+                    </div>
+                    
+                    {/* Philosophy Points */}
+                    <div className="space-y-3 mb-6">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Core Beliefs
+                      </h3>
+                      {expandedData.philosophy.map((point, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ x: -10, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          transition={{ delay: 0.2 + i * 0.1 }}
+                          className="flex items-center gap-3"
+                        >
+                          <div 
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: expandedData.color }}
+                          />
+                          <span className="text-foreground">{point}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Select Button */}
+                    <Button
+                      onClick={() => handleSelect(expandedData.id)}
+                      className="w-full py-6 text-lg font-semibold mb-4"
+                      style={{
+                        background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
+                      }}
+                    >
+                      Join {expandedData.name}
+                      <ChevronRight className="ml-2" />
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
