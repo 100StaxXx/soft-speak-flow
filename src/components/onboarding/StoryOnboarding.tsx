@@ -12,6 +12,7 @@ import { FactionSelector, type FactionType } from "./FactionSelector";
 import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { QuickCompanionCreator } from "./QuickCompanionCreator";
+import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
@@ -23,6 +24,7 @@ type OnboardingStage =
   | "cosmic-birth" 
   | "questionnaire" 
   | "mentor-result" 
+  | "mentor-grid"
   | "companion";
 
 interface Mentor {
@@ -155,12 +157,16 @@ export const StoryOnboarding = () => {
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
     
-    // Calculate best mentor using tag matching
+    // Calculate best mentor using tag matching with themes included
     const allTags = questionAnswers.flatMap(a => a.tags);
     
     const mentorScores = mentors.map(mentor => {
-      const matchingTags = mentor.tags.filter(tag => 
-        allTags.some(userTag => tag.toLowerCase().includes(userTag.toLowerCase()) || userTag.toLowerCase().includes(tag.toLowerCase()))
+      const mentorAllTags = [...(mentor.tags || []), ...(mentor.themes || [])];
+      const matchingTags = mentorAllTags.filter(tag => 
+        allTags.some(userTag => 
+          tag.toLowerCase().includes(userTag.toLowerCase()) || 
+          userTag.toLowerCase().includes(tag.toLowerCase())
+        )
       );
       return { mentor, score: matchingTags.length };
     });
@@ -222,6 +228,27 @@ export const StoryOnboarding = () => {
     }
     
     setStage("companion");
+  };
+
+  const handleSeeAllMentors = () => {
+    setStage("mentor-grid");
+  };
+
+  const handleMentorSelectFromGrid = async (mentorId: string) => {
+    const selectedMentor = mentors.find(m => m.id === mentorId);
+    if (!selectedMentor) return;
+    
+    setRecommendedMentor(selectedMentor);
+    
+    // Generate explanation for the selected mentor
+    const selectedAnswers: Record<string, string> = {};
+    answers.forEach(answer => {
+      selectedAnswers[answer.questionId] = answer.tags[0] || "";
+    });
+    const explanation = generateMentorExplanation(selectedMentor, selectedAnswers);
+    setMentorExplanation(explanation);
+    
+    await handleMentorConfirm(selectedMentor);
   };
 
   const handleCompanionComplete = async (animal: string, element: string, name: string) => {
@@ -371,7 +398,33 @@ export const StoryOnboarding = () => {
               mentor={recommendedMentor}
               explanation={mentorExplanation}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
-              onSeeAll={() => {}}
+              onSeeAll={handleSeeAllMentors}
+            />
+          </motion.div>
+        )}
+
+        {stage === "mentor-grid" && (
+          <motion.div
+            key="mentor-grid"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 min-h-screen flex flex-col p-6 pt-safe-top"
+          >
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
+              <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
+            </div>
+            <MentorGrid
+              mentors={mentors.map(m => ({
+                ...m,
+                archetype: m.mentor_type,
+                style_description: m.tone_description,
+                signature_line: m.description,
+                themes: m.themes || [],
+              }))}
+              onSelectMentor={handleMentorSelectFromGrid}
+              recommendedMentorId={recommendedMentor?.id}
             />
           </motion.div>
         )}
