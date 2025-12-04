@@ -20,7 +20,9 @@ index 7cb921e..71a2795 100644
      }
  
 @@ -50,7 +51,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
-     private func startTransactionUpdatesListener() {
+     @available(iOS 15.0, *)
+-    private func startTransactionUpdatesListener() {
++    @MainActor private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
 -        let task = Task.detached { [weak self] in
