@@ -1,6 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+
+const defaultAppleBundleId = "com.darrylgraham.revolution";
+const appleWebhookAudiences = [
+  Deno.env.get("APPLE_WEBHOOK_AUDIENCE"),
+  Deno.env.get("APPLE_SERVICE_ID"),
+  Deno.env.get("APPLE_IOS_BUNDLE_ID"),
+].filter((value): value is string => Boolean(value));
+
+if (appleWebhookAudiences.length === 0) {
+  appleWebhookAudiences.push(defaultAppleBundleId);
+}
+
+const appleWebhookJWKS = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
 
 /**
  * Apple Server-to-Server Notification Webhook
@@ -18,7 +32,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
  * 3. Apple will send POST requests for subscription events
  * 
  * SECURITY NOTE: Apple webhooks don't send Origin headers, so CORS is permissive.
- * The security comes from the signed JWT payload (TODO: implement signature verification).
+ * The security comes from the signed JWT payload, which we now verify with Apple's JWKS.
  */
 
 // Notification types from Apple
@@ -51,13 +65,22 @@ serve(async (req) => {
     const payload = await req.json();
     
     console.log("Received Apple notification:", {
-      type: payload.notification_type,
+      type: payload.notification_type ?? payload?.notificationType,
       timestamp: new Date().toISOString(),
     });
 
-    // Extract notification data
-    const notificationType = payload.notification_type as NotificationType;
-    const latestReceiptInfo = payload.latest_receipt_info;
+    let notificationContext;
+    try {
+      notificationContext = await buildNotificationContext(payload);
+    } catch (verificationError) {
+      console.error("Apple webhook signature verification failed:", verificationError);
+      return new Response("Invalid signature", {
+        status: 401,
+        headers: getCorsHeaders(req),
+      });
+    }
+
+    const { notificationType, latestReceiptInfo, autoRenewStatus } = notificationContext;
     
     if (!latestReceiptInfo) {
       console.error("No receipt info in notification");
@@ -140,7 +163,7 @@ serve(async (req) => {
 
       case NotificationType.DID_CHANGE_RENEWAL_STATUS: {
         // User enabled/disabled auto-renewal
-        const willRenew = payload.auto_renew_status === "true";
+        const willRenew = normalizeAutoRenewStatus(autoRenewStatus);
         await handleRenewalStatusChange(
           supabaseClient,
           userId,
@@ -242,6 +265,95 @@ async function handleActivation(
   }).eq("id", userId);
 
   console.log(`Activated subscription for user ${userId}`);
+}
+
+type AppleJWSPayload = Record<string, unknown>;
+
+async function buildNotificationContext(body: any) {
+  let notificationType = body?.notification_type as NotificationType | undefined;
+  let latestReceiptInfo = body?.latest_receipt_info;
+  let autoRenewStatus = body?.auto_renew_status;
+
+  if (body?.signedPayload) {
+    const rootPayload = await verifyAppleNotification(body.signedPayload, appleWebhookAudiences);
+    notificationType = rootPayload.notificationType as NotificationType;
+
+    const data = (rootPayload.data ?? {}) as Record<string, unknown>;
+    const bundleAudience = typeof data.bundleId === "string" ? data.bundleId : appleWebhookAudiences;
+
+    let transactionInfo: AppleJWSPayload | null = null;
+    if (typeof data.signedTransactionInfo === "string") {
+      transactionInfo = await verifyAppleNotification(data.signedTransactionInfo, bundleAudience);
+    }
+
+    let renewalInfo: AppleJWSPayload | null = null;
+    if (typeof data.signedRenewalInfo === "string") {
+      renewalInfo = await verifyAppleNotification(data.signedRenewalInfo, bundleAudience);
+      if (renewalInfo?.autoRenewStatus !== undefined) {
+        autoRenewStatus = renewalInfo.autoRenewStatus;
+      }
+    }
+
+    if (!latestReceiptInfo && transactionInfo) {
+      latestReceiptInfo = convertTransactionToLegacyShape(transactionInfo);
+    }
+  }
+
+  if (!notificationType) {
+    throw new Error("Apple notification missing type");
+  }
+
+  return { notificationType, latestReceiptInfo, autoRenewStatus };
+}
+
+async function verifyAppleNotification(token: string, audience: string | string[]) {
+  const normalizedAudience = (Array.isArray(audience) ? audience : [audience]).filter(
+    (value): value is string => Boolean(value),
+  );
+
+  if (normalizedAudience.length === 0) {
+    throw new Error("Missing Apple webhook audience configuration");
+  }
+
+  const { payload } = await jwtVerify(token, appleWebhookJWKS, {
+    issuer: "appstoreconnect-v1",
+    audience: normalizedAudience,
+  });
+  return payload as AppleJWSPayload;
+}
+
+function convertTransactionToLegacyShape(transactionInfo: AppleJWSPayload) {
+  return {
+    original_transaction_id: transactionInfo.originalTransactionId ?? transactionInfo.transactionId,
+    product_id: transactionInfo.productId,
+    expires_date_ms: normalizeMillis(transactionInfo.expiresDate ?? transactionInfo.expiresDateMs),
+    purchase_date_ms: normalizeMillis(transactionInfo.purchaseDate ?? transactionInfo.purchaseDateMs),
+    cancellation_date_ms: normalizeMillis(transactionInfo.revocationDate ?? transactionInfo.revocationDateMs),
+  };
+}
+
+function normalizeMillis(value: unknown) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "number") {
+    return value.toString();
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeAutoRenewStatus(value: unknown) {
+  if (value === undefined || value === null) {
+    return false;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value).toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "on";
 }
 
 async function handleRenewalStatusChange(
