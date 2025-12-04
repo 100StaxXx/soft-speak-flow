@@ -51,7 +51,12 @@ index 7cb921e..71a2795 100644
 @@ -63,16 +66,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
  
                      // Notify JS listeners on main thread, after slight delay
-                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s delay
++                    do {
++                        try await Task.sleep(nanoseconds: 500_000_000)
++                    } catch is CancellationError {
++                        // Task was cancelled while sleeping — stop the listener
++                        return
++                    }
 -                    await MainActor.run {
 -                        self?.notifyListeners("transactionUpdated", data: payload)
 -                    }
