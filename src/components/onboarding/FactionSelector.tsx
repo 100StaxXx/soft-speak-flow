@@ -16,12 +16,14 @@ interface Faction {
   philosophy: string[];
   image: string;
   color: string;
+  fontClass: string;
+  nameStyle: React.CSSProperties;
 }
 
 const factions: Faction[] = [
   {
     id: "starfall",
-    name: "Starfall Fleet",
+    name: "STARFALL FLEET",
     subtitle: "Blazing Through the Unknown",
     motto: "We don't follow paths—we burn new ones.",
     philosophy: [
@@ -31,6 +33,12 @@ const factions: Faction[] = [
     ],
     image: starfallImg,
     color: "hsl(24, 100%, 50%)",
+    fontClass: "font-bebas",
+    nameStyle: {
+      fontFamily: "'Bebas Neue', sans-serif",
+      letterSpacing: "0.15em",
+      textShadow: "0 0 40px rgba(255, 150, 50, 0.8), 0 0 80px rgba(255, 100, 0, 0.4)",
+    },
   },
   {
     id: "void",
@@ -44,6 +52,13 @@ const factions: Faction[] = [
     ],
     image: voidImg,
     color: "hsl(270, 70%, 50%)",
+    fontClass: "font-cinzel",
+    nameStyle: {
+      fontFamily: "'Cinzel', serif",
+      letterSpacing: "0.2em",
+      fontWeight: 400,
+      textShadow: "0 0 30px rgba(180, 100, 255, 0.7), 0 0 60px rgba(130, 50, 200, 0.4)",
+    },
   },
   {
     id: "stellar",
@@ -57,6 +72,13 @@ const factions: Faction[] = [
     ],
     image: stellarImg,
     color: "hsl(200, 90%, 60%)",
+    fontClass: "font-quicksand",
+    nameStyle: {
+      fontFamily: "'Quicksand', sans-serif",
+      letterSpacing: "0.08em",
+      fontWeight: 600,
+      textShadow: "0 0 30px rgba(100, 200, 255, 0.7), 0 0 60px rgba(50, 150, 220, 0.4)",
+    },
   },
 ];
 
@@ -114,124 +136,124 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
             />
             
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             
             {/* Faction Name */}
-            <div className="absolute inset-0 flex items-end p-4">
-              <h2 className="text-xl font-bold text-white drop-shadow-lg">
+            <div className="absolute inset-0 flex items-end p-5">
+              <h2 
+                className="text-2xl text-white"
+                style={faction.nameStyle}
+              >
                 {faction.name}
               </h2>
-            </div>
-
-            {/* Tap Indicator */}
-            <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
-              <span className="text-white/90 text-xs font-medium">Tap to learn more</span>
             </div>
           </motion.button>
         ))}
       </div>
 
-      {/* Expanded Faction Modal */}
+      {/* Fullscreen Expanded View */}
       <AnimatePresence>
         {expandedData && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
             className="fixed inset-0 z-50"
           >
-            {/* Backdrop */}
+            {/* Fullscreen Background Image */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={handleClose}
-            />
-
-            {/* Modal Content */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="absolute inset-x-0 bottom-0 max-h-[85vh] rounded-t-3xl overflow-hidden"
+              initial={{ scale: 1.1 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 1.1, opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0"
             >
-              {/* Image Header */}
-              <div className="relative h-48">
-                <img
-                  src={expandedData.image}
-                  alt={expandedData.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-                
-                {/* Close Button */}
-                <button
-                  onClick={handleClose}
-                  className="absolute top-4 right-4 p-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="bg-background px-6 pb-safe-bottom">
-                <div className="-mt-8 relative">
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <h2 className="text-2xl font-bold text-foreground mb-1">
-                      {expandedData.name}
-                    </h2>
-                    <p className="text-muted-foreground mb-4">{expandedData.subtitle}</p>
-                    
-                    {/* Motto */}
-                    <div className="bg-muted/50 rounded-xl p-4 mb-4">
-                      <p className="text-foreground italic text-lg">
-                        "{expandedData.motto}"
-                      </p>
-                    </div>
-                    
-                    {/* Philosophy Points */}
-                    <div className="space-y-3 mb-6">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                        Core Beliefs
-                      </h3>
-                      {expandedData.philosophy.map((point, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ x: -10, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.2 + i * 0.1 }}
-                          className="flex items-center gap-3"
-                        >
-                          <div 
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: expandedData.color }}
-                          />
-                          <span className="text-foreground">{point}</span>
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Select Button */}
-                    <Button
-                      onClick={() => handleSelect(expandedData.id)}
-                      className="w-full py-6 text-lg font-semibold mb-4"
-                      style={{
-                        background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
-                      }}
-                    >
-                      Join {expandedData.name}
-                      <ChevronRight className="ml-2" />
-                    </Button>
-                  </motion.div>
-                </div>
-              </div>
+              <img
+                src={expandedData.image}
+                alt={expandedData.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
             </motion.div>
+
+            {/* Close Button */}
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              onClick={handleClose}
+              className="absolute top-safe-top right-4 mt-4 p-3 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
+            >
+              <X size={24} />
+            </motion.button>
+
+            {/* Content */}
+            <div className="absolute inset-x-0 bottom-0 p-6 pb-safe-bottom">
+              <motion.div
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.15, duration: 0.4 }}
+              >
+                {/* Faction Name */}
+                <h2 
+                  className="text-4xl text-white mb-2"
+                  style={expandedData.nameStyle}
+                >
+                  {expandedData.name}
+                </h2>
+                <p className="text-white/80 text-lg mb-5">{expandedData.subtitle}</p>
+                
+                {/* Motto */}
+                <motion.div 
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.25 }}
+                  className="bg-black/40 backdrop-blur-sm rounded-xl p-4 mb-5"
+                >
+                  <p className="text-white italic text-lg">
+                    "{expandedData.motto}"
+                  </p>
+                </motion.div>
+                
+                {/* Philosophy Points */}
+                <div className="space-y-2.5 mb-6">
+                  {expandedData.philosophy.map((point, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ x: -20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ delay: 0.35 + i * 0.08 }}
+                      className="flex items-center gap-3"
+                    >
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: expandedData.color }}
+                      />
+                      <span className="text-white/90">{point}</span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Select Button */}
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <Button
+                    onClick={() => handleSelect(expandedData.id)}
+                    className="w-full py-6 text-lg font-semibold"
+                    style={{
+                      background: `linear-gradient(135deg, ${expandedData.color}, ${expandedData.color}80)`,
+                    }}
+                  >
+                    Join {expandedData.name}
+                    <ChevronRight className="ml-2" />
+                  </Button>
+                </motion.div>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
