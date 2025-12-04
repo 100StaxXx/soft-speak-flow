@@ -20,6 +20,35 @@ import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
 
+const waitForCompanionDisplayName = async (companionId: string) => {
+  const MAX_ATTEMPTS = 10;
+  const DELAY_MS = 1500;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const { data, error } = await supabase
+      .from("companion_evolution_cards")
+      .select("creature_name")
+      .eq("companion_id", companionId)
+      .eq("evolution_stage", 0)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to fetch companion display name:", error);
+    }
+
+    const name = data?.creature_name?.trim();
+    if (name) {
+      return name;
+    }
+
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+    }
+  }
+
+  return null;
+};
+
 type OnboardingStage = 
   | "prologue" 
   | "destiny"
@@ -410,12 +439,16 @@ export const StoryOnboarding = () => {
     setIsCreatingCompanion(true);
 
     try {
-      await createCompanion.mutateAsync({
+      const companionData = await createCompanion.mutateAsync({
         favoriteColor: preferences.favoriteColor,
         spiritAnimal: preferences.spiritAnimal,
         coreElement: preferences.coreElement,
         storyTone: preferences.storyTone,
       });
+
+      if (!companionData?.id) {
+        throw new Error("Companion record missing ID after creation.");
+      }
 
       // Mark onboarding complete and save story tone
       const { data: profile } = await supabase
@@ -439,7 +472,12 @@ export const StoryOnboarding = () => {
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
-      setCompanionAnimal(preferences.spiritAnimal);
+      const companionDisplayName = await waitForCompanionDisplayName(companionData.id);
+      if (!companionDisplayName) {
+        console.warn("Companion name was not ready in time; falling back to spirit animal.");
+      }
+
+      setCompanionAnimal(companionDisplayName || preferences.spiritAnimal);
       setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
