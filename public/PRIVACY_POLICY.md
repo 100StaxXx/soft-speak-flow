@@ -220,10 +220,10 @@ You have the right to request deletion of your personal data and account. We pro
 **Option 1: In-App Account Deletion**
 1. Open the Cosmiq app
 2. Navigate to Profile → Account tab
-3. Scroll to the bottom of the page
-4. Tap "Delete Account" or contact support for assistance
-5. Confirm deletion when prompted
-6. Your account and associated data will be permanently deleted within 30 days
+3. Scroll to the Delete Account card
+4. Tap "Delete Account" to open the confirmation dialog
+5. Check the acknowledgement box and type **DELETE** to confirm
+6. Tap "Delete permanently" to finish—your access is revoked immediately and all personal data is removed within 30 days
 
 **Option 2: Email Request**
 1. Send an email to: alilrevolution@gmail.com

@@ -27,10 +27,10 @@ export function useAppleSubscription() {
         throw new Error("Purchase returned no data");
       }
       
-      // Verify receipt with backend
-      const receipt = purchase.receipt;
+      // Verify receipt with backend (support both receipt fields exposed by StoreKit)
+      const receipt = purchase.transactionReceipt ?? purchase.receipt;
       if (!receipt) {
-        throw new Error("No receipt data available");
+        throw new Error("Apple did not return a receipt. Please ensure you're signed into the App Store and try again.");
       }
       
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {

@@ -138,6 +138,9 @@ export default function TermsOfService() {
               <p className="text-muted-foreground leading-relaxed">
                 We reserve the right to terminate or suspend your account and access to the service at our sole discretion, without notice, for conduct that we believe violates these Terms of Service or is harmful to other users, us, or third parties.
               </p>
+              <p className="text-muted-foreground leading-relaxed">
+                You may also terminate your account at any time inside the app—open Profile → Account → <span className="font-semibold">Delete Account</span>, acknowledge the warning, type <span className="font-semibold">DELETE</span>, and submit the request to permanently erase your data without contacting support.
+              </p>
             </section>
 
             <section className="scroll-mt-20 space-y-3">

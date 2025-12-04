@@ -199,6 +199,24 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            <section className="scroll-mt-20 space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                <span className="text-lg">⚠️</span>
+                <span>How to delete your account in the app</span>
+              </div>
+              <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm leading-relaxed text-muted-foreground space-y-3">
+                <ol className="list-decimal space-y-2 pl-4 text-foreground">
+                  <li>Open Cosmiq and tap the Profile tab.</li>
+                  <li>Select the <span className="font-semibold">Account</span> tab and scroll to the new <span className="font-semibold">Delete Account</span> card.</li>
+                  <li>Tap <span className="font-semibold">Delete Account</span>, acknowledge the warning, and type <span className="font-semibold">DELETE</span> to confirm.</li>
+                  <li>Submit the request to immediately delete your account, companions, AI conversations, referral progress, and saved wellness data.</li>
+                </ol>
+                <p>
+                  Deletion takes effect instantly, though payment receipts and fraud-prevention records may be retained where required by law. Active App Store subscriptions must still be cancelled in Apple Settings.
+                </p>
+              </div>
+            </section>
+
             <section className="scroll-mt-20 space-y-3">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground leading-snug">
                 9. Children's Privacy

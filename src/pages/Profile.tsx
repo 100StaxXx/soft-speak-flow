@@ -29,6 +29,7 @@ import { AstrologySettings } from "@/components/AstrologySettings";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { AccountDeletionCard } from "@/components/AccountDeletionCard";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -324,6 +325,8 @@ const Profile = () => {
                   </Button>
                 </CardContent>
               </Card>
+
+              <AccountDeletionCard />
 
               {/* Referrals Section */}
               <div className="space-y-6">

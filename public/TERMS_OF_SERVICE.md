@@ -178,7 +178,7 @@ You agree to indemnify, defend, and hold harmless R-Evolution LLC, its officers,
 ## 13. Termination
 
 ### 13.1 By You
-You may terminate your account at any time by contacting us or using the account deletion feature in the App.
+You may terminate your account at any time by contacting us or by opening Profile → Account → **Delete Account** inside the app. The in-app flow walks you through acknowledging the data removal notice, typing **DELETE**, and submitting the request without needing to email support.
 
 ### 13.2 By Us
 We may suspend or terminate your account immediately, without prior notice or liability, for any reason, including:
