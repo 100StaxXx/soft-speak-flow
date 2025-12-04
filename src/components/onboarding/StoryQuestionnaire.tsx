@@ -233,7 +233,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
-                    className="w-full min-h-[60px] py-3.5 px-3.5 text-left justify-start text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
+                    className="w-full flex min-h-[60px] py-3.5 px-3.5 text-left justify-start items-start sm:items-center text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all whitespace-normal"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,
                     }}
@@ -244,7 +244,9 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                     >
                       {String.fromCharCode(65 + index)}
                     </span>
-                    <span className="text-[15px] sm:text-base leading-snug">{option.text}</span>
+                    <span className="flex-1 min-w-0 text-[15px] sm:text-base leading-snug whitespace-normal break-words">
+                      {option.text}
+                    </span>
                   </Button>
                 </motion.div>
               ))}
