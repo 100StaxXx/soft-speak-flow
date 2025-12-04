@@ -22,4 +22,18 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
+  if File.exist?(alamofire_response_serialization)
+    original = 'public protocol DataDecoder: Sendable'
+    patched = '@preconcurrency public protocol DataDecoder: Sendable'
+
+    file_contents = File.read(alamofire_response_serialization)
+    unless file_contents.include?(patched)
+      File.write(
+        alamofire_response_serialization,
+        file_contents.sub(original, patched)
+      )
+    end
+  end
 end
