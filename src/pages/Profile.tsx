@@ -18,6 +18,7 @@ import { DailyQuoteSettings } from "@/components/DailyQuoteSettings";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
+import { FactionBadge } from "@/components/FactionBadge";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -227,6 +228,16 @@ const Profile = () => {
             </TabsList>
 
             <TabsContent value="account" className="space-y-6">
+              {/* Faction Identity Card */}
+              {profile?.faction && (
+                <FactionBadge 
+                  faction={profile.faction} 
+                  variant="full"
+                  showMotto={true}
+                  showTraits={true}
+                />
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Account Information</CardTitle>
