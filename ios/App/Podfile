@@ -23,6 +23,32 @@ end
 post_install do |installer|
   assertDeploymentTarget(installer)
 
+  script_phase_names = [
+    '[CP] Copy XCFrameworks',
+    '[CP] Embed Pods Frameworks'
+  ].freeze
+
+  configure_script_phase = lambda do |phase|
+    next unless phase.respond_to?(:name) && script_phase_names.include?(phase.name)
+
+    phase.always_out_of_date = '1' if phase.respond_to?(:always_out_of_date=)
+    if phase.respond_to?(:based_on_dependency_analysis=)
+      phase.based_on_dependency_analysis = '0'
+    elsif phase.respond_to?(:basedOnDependencyAnalysis=)
+      phase.basedOnDependencyAnalysis = '0'
+    end
+  end
+
+  installer.pods_project.targets.each do |pods_target|
+    pods_target.shell_script_build_phases.each { |phase| configure_script_phase.call(phase) }
+  end
+
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_targets.each do |user_target|
+      user_target.shell_script_build_phases.each { |phase| configure_script_phase.call(phase) }
+    end
+  end
+
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
     original = 'public protocol DataDecoder: Sendable'
@@ -34,6 +60,41 @@ post_install do |installer|
         alamofire_response_serialization,
         file_contents.sub(original, patched)
       )
+    end
+
+    json_extension = 'extension JSONDecoder: DataDecoder {}'
+    json_replacement = "@available(iOS 16.0, *)\nextension JSONDecoder: DataDecoder {}"
+    plist_extension = 'extension PropertyListDecoder: DataDecoder {}'
+    plist_replacement = "@available(iOS 16.0, *)\nextension PropertyListDecoder: DataDecoder {}"
+
+    updated_contents = File.read(alamofire_response_serialization)
+    if updated_contents.include?(json_extension) && !updated_contents.include?(json_replacement)
+      updated_contents = updated_contents.sub(json_extension, json_replacement)
+    end
+    if updated_contents.include?(plist_extension) && !updated_contents.include?(plist_replacement)
+      updated_contents = updated_contents.sub(plist_extension, plist_replacement)
+    end
+    File.write(alamofire_response_serialization, updated_contents)
+  end
+
+  gid_activity_indicator = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  if File.exist?(gid_activity_indicator)
+    file_contents = File.read(gid_activity_indicator)
+    if file_contents.include?('UIActivityIndicatorViewStyleGray')
+      File.write(
+        gid_activity_indicator,
+        file_contents.gsub('UIActivityIndicatorViewStyleGray', 'UIActivityIndicatorViewStyleMedium')
+      )
+    end
+  end
+
+  alamofire_event_monitor = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'EventMonitor.swift')
+  if File.exist?(alamofire_event_monitor)
+    file_contents = File.read(alamofire_event_monitor)
+    shim = "extension InputStream: @unchecked Sendable {}"
+    unless file_contents.include?(shim)
+      file_contents = file_contents.sub('import Foundation', "import Foundation\n\n#{shim}")
+      File.write(alamofire_event_monitor, file_contents)
     end
   end
 end
