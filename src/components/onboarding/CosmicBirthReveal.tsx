@@ -141,10 +141,10 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
                 <Sparkles size={40} style={{ color: factionColor }} />
               </motion.div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                When Did Your Soul Enter This Universe?
+                When Were You Born?
               </h1>
               <p className="text-white/70">
-                Your cosmic birthday reveals your celestial identity
+                Your birthday unlocks your cosmic identity
               </p>
             </div>
 
@@ -155,7 +155,10 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
                   selected={selectedDate}
                   onSelect={setSelectedDate}
                   disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                  className="rounded-lg border border-white/20"
+                  className="rounded-lg border border-white/20 pointer-events-auto"
+                  captionLayout="dropdown-buttons"
+                  fromYear={1930}
+                  toYear={new Date().getFullYear()}
                 />
               </div>
 
