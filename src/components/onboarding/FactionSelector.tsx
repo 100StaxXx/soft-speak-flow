@@ -25,7 +25,7 @@ const factions: Faction[] = [
     id: "starfall",
     name: "STARFALL FLEET",
     subtitle: "Blazing Through the Unknown",
-    motto: "We don't follow paths—we burn new ones.",
+    motto: "We don't follow paths, we burn new ones.",
     philosophy: [
       "Action over hesitation",
       "Bold moves create breakthroughs",
@@ -43,7 +43,7 @@ const factions: Faction[] = [
   {
     id: "void",
     name: "Void Collective",
-    subtitle: "Masters of the In-Between",
+    subtitle: "Masters of the In Between",
     motto: "In stillness, we find infinite power.",
     philosophy: [
       "Depth over speed",
@@ -105,17 +105,19 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col bg-background">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center pt-safe-top px-6 py-6 z-20"
-      >
-        <h1 className="text-2xl font-bold text-foreground mb-1">Choose Your Path</h1>
-        <p className="text-muted-foreground text-sm">
-          Your faction shapes your cosmic journey
-        </p>
-      </motion.div>
+      {/* Header with iOS safe area */}
+      <header className="sticky top-0 z-20 bg-background pt-safe-top">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center px-6 py-6"
+        >
+          <h1 className="text-2xl font-bold text-foreground mb-1">Choose Your Path</h1>
+          <p className="text-muted-foreground text-sm">
+            Your faction shapes your cosmic journey
+          </p>
+        </motion.div>
+      </header>
 
       {/* Faction Cards Grid */}
       <div className="flex-1 px-4 pb-6 flex flex-col gap-3">
