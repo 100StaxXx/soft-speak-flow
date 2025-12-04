@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -29,6 +29,17 @@ import { AstrologySettings } from "@/components/AstrologySettings";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -41,6 +52,8 @@ const Profile = () => {
   const [isChangingMentor, setIsChangingMentor] = useState(false);
   const [viewingLegalDoc, setViewingLegalDoc] = useState<"terms" | "privacy" | null>(null);
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Check if we should open a specific tab from navigation state
   useEffect(() => {
@@ -153,6 +166,49 @@ const Profile = () => {
       const errorMessage = error instanceof Error ? error.message : "Failed to sign out";
       toast({ title: "Error signing out", description: errorMessage, variant: "destructive" });
       setIsSigningOut(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || isDeletingAccount) return;
+
+    setIsDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-user-account");
+      if (error) {
+        throw new Error(error.message || "Unable to delete account");
+      }
+
+      setShowDeleteDialog(false);
+      toast({
+        title: "Account deleted",
+        description: "Your account and saved progress have been permanently removed.",
+      });
+
+      await signOut();
+      navigate("/auth", {
+        replace: true,
+        state: { message: "Your account has been deleted." },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong deleting your account.";
+      if (errorMessage.toLowerCase().includes("jwt") || errorMessage.toLowerCase().includes("token")) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again to continue.",
+          variant: "destructive",
+        });
+        await signOut();
+        navigate("/auth", { replace: true });
+      } else {
+        toast({
+          title: "Account deletion failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -339,6 +395,59 @@ const Profile = () => {
                 <ReferralDashboard />
                 <CompanionSkins />
               </div>
+
+              {/* Danger Zone */}
+              <Card className="border-destructive/40">
+                <CardHeader>
+                  <CardTitle className="text-destructive">Delete Account</CardTitle>
+                  <CardDescription>
+                    Permanently remove your profile, mentor progress, and saved data from Cosmiq.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    This action cannot be undone. You will lose access to your companion, streaks, referrals, and any
+                    personalized content tied to this account.
+                  </p>
+                  <AlertDialog
+                    open={showDeleteDialog}
+                    onOpenChange={(open) => {
+                      if (isDeletingAccount) return;
+                      setShowDeleteDialog(open);
+                    }}
+                  >
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full border-destructive/60 text-destructive hover:bg-destructive/10"
+                        disabled={isDeletingAccount}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete your account, your companion progress, and your saved data. This
+                          action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={handleDeleteAccount}
+                          disabled={isDeletingAccount}
+                        >
+                          {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
 
             </TabsContent>
 
