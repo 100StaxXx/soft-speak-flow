@@ -6,3 +6,4 @@ export { FactionSelector, type FactionType } from "./FactionSelector";
 export { CosmicBirthReveal } from "./CosmicBirthReveal";
 export { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 export { QuickCompanionCreator } from "./QuickCompanionCreator";
+export { JourneyBegins } from "./JourneyBegins";

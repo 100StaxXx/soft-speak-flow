@@ -12,6 +12,7 @@ import { FactionSelector, type FactionType } from "./FactionSelector";
 import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
+import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
@@ -25,7 +26,8 @@ type OnboardingStage =
   | "questionnaire" 
   | "mentor-result" 
   | "mentor-grid"
-  | "companion";
+  | "companion"
+  | "journey-begins";
 
 interface Mentor {
   id: string;
@@ -58,6 +60,7 @@ export const StoryOnboarding = () => {
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
+  const [companionAnimal, setCompanionAnimal] = useState("");
 
   // Load mentors on mount
   useEffect(() => {
@@ -304,14 +307,20 @@ export const StoryOnboarding = () => {
         },
       }).eq("id", user.id);
       
-      toast.success("Welcome to Cosmiq! Your journey begins.");
-      navigate("/tasks");
+      // Store companion animal and transition to journey begins
+      setCompanionAnimal(preferences.spiritAnimal);
+      setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsCreatingCompanion(false);
     }
+  };
+
+  const handleJourneyComplete = () => {
+    toast.success("Welcome to Cosmiq! Your journey begins.");
+    navigate("/tasks");
   };
 
   return (
@@ -439,6 +448,22 @@ export const StoryOnboarding = () => {
             <CompanionPersonalization
               onComplete={handleCompanionComplete}
               isLoading={isCreatingCompanion}
+            />
+          </motion.div>
+        )}
+
+        {stage === "journey-begins" && (
+          <motion.div
+            key="journey-begins"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 w-full"
+          >
+            <JourneyBegins
+              userName={userName}
+              companionAnimal={companionAnimal}
+              onComplete={handleJourneyComplete}
             />
           </motion.div>
         )}
