@@ -420,6 +420,8 @@ export const StoryOnboarding = () => {
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      // Also refetch companion query to ensure it has the newly created companion
+      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
       // Store companion animal and transition to journey begins
       setCompanionAnimal(preferences.spiritAnimal);
