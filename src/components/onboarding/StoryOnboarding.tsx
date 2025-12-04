@@ -44,6 +44,7 @@ interface Mentor {
   primary_color: string;
   target_user: string;
   themes?: string[];
+  intensity_level?: string;
 }
 
 
@@ -87,6 +88,7 @@ export const StoryOnboarding = () => {
           primary_color: m.primary_color || "#7B68EE",
           target_user: m.target_user || "",
           themes: m.themes ?? undefined,
+          intensity_level: m.intensity_level ?? undefined,
         }));
         setMentors(mappedMentors);
       }
@@ -165,36 +167,156 @@ export const StoryOnboarding = () => {
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
-    
-    // Calculate best mentor using tag matching with themes included
-    const allTags = questionAnswers.flatMap(a => a.tags);
-    
-    const mentorScores = mentors.map(mentor => {
-      const mentorAllTags = [...(mentor.tags || []), ...(mentor.themes || [])];
-      const matchingTags = mentorAllTags.filter(tag => 
-        allTags.some(userTag => 
-          tag.toLowerCase().includes(userTag.toLowerCase()) || 
-          userTag.toLowerCase().includes(tag.toLowerCase())
-        )
-      );
-      return { mentor, score: matchingTags.length };
+
+    // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
+    const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
+
+    // Build weighted tags - duplicate tags based on question weight
+    const weightedUserTags: string[] = [];
+    questionAnswers.forEach((answer, index) => {
+      const weight = QUESTION_WEIGHTS[index] ?? 1.0;
+      const repeats = Math.round(weight * 10); // Multiply by 10 for finer granularity
+      for (let i = 0; i < repeats; i++) {
+        weightedUserTags.push(...answer.tags.map(t => t.toLowerCase()));
+      }
     });
-    
-    const bestMatch = mentorScores.sort((a, b) => b.score - a.score)[0]?.mentor;
-    
+
+    // Extract desired intensity from Q4 (energy_preference)
+    const energyAnswer = questionAnswers.find(a => a.questionId === "energy_preference");
+    let desiredIntensity = "medium"; // default
+    if (energyAnswer) {
+      const answerText = energyAnswer.answer;
+      if (answerText === "Focused, intense energy") {
+        desiredIntensity = "high";
+      } else if (answerText === "Calm, grounded presence") {
+        desiredIntensity = "medium";
+      } else if (answerText === "Warm, uplifting support") {
+        desiredIntensity = "medium";
+      } else if (answerText === "Spiritual and intuitive guidance") {
+        desiredIntensity = "medium";
+      }
+    }
+
+    // Calculate scores for each mentor
+    interface MentorScore {
+      mentor: Mentor;
+      score: number;
+      exactMatches: number;
+      partialMatches: number;
+      intensityMatch: boolean;
+    }
+
+    const mentorScores: MentorScore[] = mentors.map(mentor => {
+      const mentorAllTags = [...(mentor.tags || []), ...(mentor.themes || [])];
+      let score = 0;
+      let exactMatches = 0;
+      let partialMatches = 0;
+
+      // Count matches for each weighted user tag
+      weightedUserTags.forEach(userTag => {
+        mentorAllTags.forEach(mentorTag => {
+          const userTagLower = userTag.toLowerCase();
+          const mentorTagLower = mentorTag.toLowerCase();
+
+          if (userTagLower === mentorTagLower) {
+            // Exact match: +1.0
+            score += 1.0;
+            exactMatches += 1;
+          } else if (
+            userTagLower.includes(mentorTagLower) ||
+            mentorTagLower.includes(userTagLower)
+          ) {
+            // Partial match: +0.5
+            score += 0.5;
+            partialMatches += 1;
+          }
+        });
+      });
+
+      // Intensity alignment bonus
+      const intensityMatch = mentor.intensity_level?.toLowerCase() === desiredIntensity.toLowerCase();
+      if (intensityMatch) {
+        score += 1.0;
+      }
+
+      return {
+        mentor,
+        score,
+        exactMatches,
+        partialMatches,
+        intensityMatch,
+      };
+    });
+
+    // Sort by score descending
+    mentorScores.sort((a, b) => b.score - a.score);
+
+    // Get top score
+    const topScore = mentorScores[0]?.score ?? 0;
+
+    // Find all mentors tied at the top
+    const topMentors = mentorScores.filter(m => m.score === topScore);
+
+    // Tie-breaking logic
+    let bestMatch: Mentor | null = null;
+
+    if (topMentors.length === 1) {
+      bestMatch = topMentors[0].mentor;
+    } else if (topMentors.length > 1) {
+      // First tie-breaker: prefer intensity match
+      const intensityMatches = topMentors.filter(m => m.intensityMatch);
+      if (intensityMatches.length === 1) {
+        bestMatch = intensityMatches[0].mentor;
+      } else if (intensityMatches.length > 1) {
+        // Second tie-breaker: prefer more exact matches
+        intensityMatches.sort((a, b) => b.exactMatches - a.exactMatches);
+        const topExactMatches = intensityMatches[0].exactMatches;
+        const topExactMatchMentors = intensityMatches.filter(m => m.exactMatches === topExactMatches);
+
+        if (topExactMatchMentors.length === 1) {
+          bestMatch = topExactMatchMentors[0].mentor;
+        } else {
+          // Final tie-breaker: random selection
+          const randomIndex = Math.floor(Math.random() * topExactMatchMentors.length);
+          bestMatch = topExactMatchMentors[randomIndex].mentor;
+        }
+      } else {
+        // No intensity matches, use exact match count
+        topMentors.sort((a, b) => b.exactMatches - a.exactMatches);
+        const topExactMatches = topMentors[0].exactMatches;
+        const topExactMatchMentors = topMentors.filter(m => m.exactMatches === topExactMatches);
+
+        if (topExactMatchMentors.length === 1) {
+          bestMatch = topExactMatchMentors[0].mentor;
+        } else {
+          // Final tie-breaker: random selection
+          const randomIndex = Math.floor(Math.random() * topExactMatchMentors.length);
+          bestMatch = topExactMatchMentors[randomIndex].mentor;
+        }
+      }
+    }
+
+    // Fallback: if no match or score is 0, default to a reasonable mentor
+    if (!bestMatch || topScore === 0) {
+      // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
+      bestMatch = mentors.find(m => m.slug === "atlas")
+        || mentors.find(m => m.slug === "eli")
+        || mentors[0];
+    }
+
     if (bestMatch) {
       setRecommendedMentor(bestMatch);
-      
+
       // Convert answers to Record format for explanation generator
       const selectedAnswers: Record<string, string> = {};
       questionAnswers.forEach(answer => {
         selectedAnswers[answer.questionId] = answer.tags[0] || "";
       });
-      
+
       // Generate explanation
       const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
       setMentorExplanation(explanation);
-      
+
       // Save questionnaire responses
       if (user) {
         for (const answer of questionAnswers) {
@@ -205,11 +327,12 @@ export const StoryOnboarding = () => {
           }, { onConflict: "user_id,question_id" });
         }
       }
-      
+
       setStage("mentor-result");
       return;
     }
 
+    // Ultimate fallback if no mentors exist at all
     toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
     setStage("mentor-grid");
   };
