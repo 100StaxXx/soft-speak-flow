@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, ArrowLeft } from "lucide-react";
 import starfallImg from "@/assets/faction-starfall.png";
 import voidImg from "@/assets/faction-void.png";
 import stellarImg from "@/assets/faction-stellar.png";
@@ -177,15 +177,16 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
             </motion.div>
 
-            {/* Close Button */}
+            {/* Back Button */}
             <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
               onClick={handleClose}
-              className="absolute top-safe-top right-4 mt-4 p-3 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
+              className="absolute top-safe-top left-4 mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors z-10"
             >
-              <X size={24} />
+              <ArrowLeft size={20} />
+              <span className="text-sm font-medium">Back</span>
             </motion.button>
 
             {/* Content */}
