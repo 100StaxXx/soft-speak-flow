@@ -1,4 +1,5 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+require 'fileutils'
 
 platform :ios, '16.0'
 use_frameworks!
@@ -129,5 +130,25 @@ post_install do |installer|
         file_contents.sub(original, patched)
       )
     end
+  end
+
+  xcframework_root = File.join(__dir__, 'Pods')
+  device_slice = 'ios-arm64'
+  excluded_tokens = %w[simulator maccatalyst]
+
+  Dir.glob(File.join(xcframework_root, '**', '*.xcframework')).each do |xcframework|
+    device_slice_path = File.join(xcframework, device_slice)
+    next if Dir.exist?(device_slice_path)
+
+    fallback = Dir.glob(File.join(xcframework, "#{device_slice}_*")).find do |candidate|
+      File.directory?(candidate) && excluded_tokens.none? { |token| File.basename(candidate).include?(token) }
+    end
+
+    next unless fallback
+
+    FileUtils.rm_rf(device_slice_path)
+    FileUtils.mkdir_p(device_slice_path)
+    FileUtils.cp_r(File.join(fallback, '.'), device_slice_path)
+    puts "Created #{device_slice} slice for #{File.basename(xcframework)} using #{File.basename(fallback)}"
   end
 end
