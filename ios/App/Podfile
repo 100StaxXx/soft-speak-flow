@@ -1,5 +1,28 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
+# Ensure Capgo's hook script runs during pod install so unused providers stay disabled.
+def configure_social_login_podspec
+  plugin_root = File.expand_path('../../node_modules/@capgo/capacitor-social-login', __dir__)
+  script_path = File.join(plugin_root, 'scripts', 'configure-dependencies.js')
+  config_path = File.expand_path('App/capacitor.config.json', __dir__)
+
+  return unless File.exist?(script_path)
+
+  capacitor_config = File.exist?(config_path) ? File.read(config_path) : nil
+  env = {
+    'CAPACITOR_PLATFORM_NAME' => 'ios',
+    'CAPACITOR_ROOT_DIR' => File.expand_path('..', __dir__)
+  }
+  env['CAPACITOR_CONFIG'] = capacitor_config if capacitor_config
+
+  Dir.chdir(plugin_root) do
+    success = system(env, 'node', script_path)
+    puts('[SocialLogin] Failed to configure dependencies; falling back to defaults') unless success
+  end
+end
+
+configure_social_login_podspec
+
 platform :ios, '16.0'
 use_frameworks!
 
