@@ -57,6 +57,7 @@ const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 
 const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
+const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 
 
 // Create query client outside component for better performance and stability
@@ -203,6 +204,7 @@ const AppContent = memo(() => {
           <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
           <Route path="/partners" element={<Partners />} />
+          <Route path="/account-deletion" element={<AccountDeletionHelp />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<NotFound />} />
