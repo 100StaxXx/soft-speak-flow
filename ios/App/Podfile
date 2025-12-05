@@ -49,6 +49,77 @@ post_install do |installer|
     end
   end
 
+  # Fix XCFramework copy scripts to handle missing paths gracefully
+  # This addresses issues with IONFilesystemLib, FBSDKCoreKit_Basics, and other XCFramework pods
+  # where the architecture slice path may not match expected structure
+  installer.pods_project.targets.each do |target|
+    target.shell_script_build_phases.each do |phase|
+      next unless phase.name == '[CP] Copy XCFrameworks'
+      next if phase.shell_script.nil? || phase.shell_script.empty?
+      
+      # Skip if already patched
+      next if phase.shell_script.include?('# PATCHED: XCFramework copy with path validation')
+      
+      original_script = phase.shell_script
+      patched_script = original_script.dup
+      
+      # Modify rsync commands to check source paths before executing
+      patched_script = patched_script.gsub(
+        /^([ \t]*)(rsync\s+--delete\s+-av\s+[^\n]*?"([^"]+\.xcframework\/[^"]*)"[^\n]*?"([^"]+)")[ \t]*$/
+      ) do |match|
+        indent = $1 || ''
+        full_cmd = $2
+        source_pattern = $3
+        dest_path = $4
+        source_dir = source_pattern.sub(/\/?\*$/, '')
+        
+        # Generate a safer version that checks if source exists
+        <<~BASH.gsub(/^(?=\S)/, indent).rstrip
+# Check if XCFramework source path exists before rsync
+if [ -d "#{source_dir}" ] || [ -e "#{source_dir}" ]; then
+  #{full_cmd}
+else
+  echo "warning: Skipping copy for non-existent XCFramework path: #{source_dir}"
+  mkdir -p "#{dest_path}" 2>/dev/null || true
+fi
+        BASH
+      end
+      
+      # If regex didn't match (script unchanged), use fallback wrapper approach
+      if patched_script == original_script
+        phase.shell_script = <<~BASH
+#!/bin/bash
+# PATCHED: XCFramework copy with path validation (fallback wrapper)
+# Wrapping script to handle missing XCFramework paths gracefully
+
+# Create a wrapper function for rsync that checks source existence
+safe_rsync() {
+  local src_pattern="${@: -2:1}"
+  local src_dir="${src_pattern%/*}"
+  src_dir="${src_dir%\\*}"
+  
+  if [ -d "$src_dir" ] || [ -e "$src_dir" ]; then
+    rsync "$@"
+  else
+    echo "warning: Skipping rsync for non-existent path: $src_dir"
+    mkdir -p "${@: -1}" 2>/dev/null || true
+    return 0
+  fi
+}
+
+# Override rsync command for this script
+rsync() {
+  safe_rsync "$@"
+}
+
+#{original_script}
+        BASH
+      else
+        phase.shell_script = "#!/bin/bash\n# PATCHED: XCFramework copy with path validation\n\n" + patched_script
+      end
+    end
+  end
+
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
     original = 'public protocol DataDecoder: Sendable'
