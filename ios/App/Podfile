@@ -49,6 +49,68 @@ post_install do |installer|
     end
   end
 
+  # Fix XCFramework copy scripts to handle missing slices gracefully
+  # This patches the generated shell scripts to check if source exists before rsync
+  pods_dir = File.join(__dir__, 'Pods')
+  target_support_files = File.join(pods_dir, 'Target Support Files')
+  
+  # Helper function to patch xcframework copy scripts for resilience
+  patch_xcframework_script = lambda do |script_content|
+    return script_content if script_content.include?('# PATCHED: xcframework copy resilience')
+    
+    patched = script_content
+    
+    # Replace rsync --delete -av commands with a guarded version
+    # Pattern matches: rsync --delete -av [any options] "source/*" "dest"
+    # We extract the source base path and wrap in a conditional
+    patched = patched.gsub(/(rsync\s+--delete\s+-av\s+(?:[^"]*\s+)*"([^"]+)\/\*"\s+"[^"]+")/) do |match|
+      full_cmd = $1
+      source_base = $2
+      
+      # Create an inline conditional that checks if source exists before running rsync
+      # Use double brackets for bash compatibility and proper quoting
+      <<~GUARDED.chomp
+# PATCHED: xcframework copy resilience - check source exists
+if [[ -d "#{source_base}" ]] && [[ -n "$(ls -A "#{source_base}" 2>/dev/null)" ]]; then
+  #{full_cmd}
+else
+  echo "warning: Skipping xcframework copy - source does not exist or is empty: #{source_base}"
+fi
+      GUARDED
+    end
+    
+    patched
+  end
+  
+  if Dir.exist?(target_support_files)
+    Dir.glob(File.join(target_support_files, '**', '*-xcframeworks.sh')).each do |script_path|
+      next unless File.exist?(script_path)
+      
+      script_content = File.read(script_path)
+      patched_content = patch_xcframework_script.call(script_content)
+      
+      if patched_content != script_content
+        File.write(script_path, patched_content)
+        puts "Patched XCFramework copy script: #{script_path}"
+      end
+    end
+  end
+  
+  # Also patch individual target scripts that might have xcframework copy commands
+  installer.pods_project.targets.each do |target|
+    target.shell_script_build_phases.each do |phase|
+      next unless phase.name == '[CP] Copy XCFrameworks'
+      next if phase.shell_script.nil? || phase.shell_script.empty?
+      
+      patched_script = patch_xcframework_script.call(phase.shell_script)
+      
+      if patched_script != phase.shell_script
+        phase.shell_script = patched_script
+        puts "Patched inline XCFramework copy script for target: #{target.name}"
+      end
+    end
+  end
+
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
   if File.exist?(alamofire_response_serialization)
     original = 'public protocol DataDecoder: Sendable'
