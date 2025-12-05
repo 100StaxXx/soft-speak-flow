@@ -30,6 +30,8 @@ PODS:
     - Alamofire (~> 5.10.2)
     - Capacitor
     - GoogleSignIn (~> 9.0.0)
+  - CapgoNativePurchases (7.15.3):
+    - Capacitor
   - GoogleSignIn (9.0.0):
     - AppAuth (~> 2.0)
     - AppCheckCore (~> 11.0)
@@ -61,6 +63,8 @@ DEPENDENCIES:
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/@capgo/capacitor-social-login`)"
+  - "CapgoNativePurchases (from `../../node_modules/@capgo/native-purchases`)"
+  - IONFilesystemLib (from `../IONFilesystemLib`)
 
 SPEC REPOS:
   trunk:
@@ -71,7 +75,6 @@ SPEC REPOS:
     - GoogleUtilities
     - GTMAppAuth
     - GTMSessionFetcher
-    - IONFilesystemLib
     - PromisesObjC
 
 EXTERNAL SOURCES:
@@ -93,27 +96,32 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapgoCapacitorSocialLogin:
     :path: "../../node_modules/@capgo/capacitor-social-login"
+  CapgoNativePurchases:
+    :path: "../../node_modules/@capgo/native-purchases"
+  IONFilesystemLib:
+    :path: "../IONFilesystemLib"
 
 SPEC CHECKSUMS:
   Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
-  Capacitor: 358dd1c3fdd71d969547b17e159fd8a7736cb45f
-  CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
+  Capacitor: 09d9ff8e9618e8c4b3cab2bbee34a17215dd2fef
+  CapacitorCommunityAppleSignIn: 59bc8ade5677e6ea60a14bdca8d3f4bdc91069e2
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
-  CapacitorFilesystem: 609d5cceca1ed93d7f25839dbfdfd224bfe78209
-  CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
-  CapacitorScreenOrientation: e0d5b9ef293b269b8f93373355d5b276f50fabea
-  CapacitorShare: be166411fa995ead2d39b104aa0aae56d8615c66
-  CapacitorSplashScreen: e388b8e0ed0e982a9d3a40417f478e7a018a8763
-  CapgoCapacitorSocialLogin: 27bccb5e6c6f8aaa54af8189dcc9d9fb56073c29
+  CapacitorFilesystem: 2caf7ad6e26d68defef0631b0f09adb09a353f27
+  CapacitorPushNotifications: 729ade0d2791ec1969feaf931a15e28d929a6d70
+  CapacitorScreenOrientation: f698d08d01a06dfe0b21392f6c6ba522b9f61773
+  CapacitorShare: 051c3ceee0ddf3bb54574851a622bbb317eed5bd
+  CapacitorSplashScreen: d06ae8804808e9f649a08e7bb7f283c77b688084
+  CapgoCapacitorSocialLogin: d26a492b3a58d98df33445d7e4ecc5eb419b8fbc
+  CapgoNativePurchases: a78a01337be7209a8f261cf50f43c387d6146f2a
   GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
-  IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
+  IONFilesystemLib: e53d0bd6dd0048c17f966bde2be02f017ee0d10c
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
 
-PODFILE CHECKSUM: 65da915c7020d938e438e9d348a593ffe0cd70d4
+PODFILE CHECKSUM: e3af680e877d5c4efb5ba2b379aed469aa11b42e
 
 COCOAPODS: 1.16.2
