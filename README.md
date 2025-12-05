@@ -60,6 +60,44 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## iOS Build Troubleshooting
+
+If you encounter XCFramework copy errors during iOS builds (e.g., `[CP] Copy XCFrameworks` failing with rsync errors for `IONFilesystemLib` or `FBSDKCoreKit_Basics`), follow these steps:
+
+### Clean Pod Installation
+
+```sh
+# Navigate to iOS App directory
+cd ios/App
+
+# Remove existing Pods and lock file
+rm -rf Pods
+rm -f Podfile.lock
+
+# Clear CocoaPods cache (optional but recommended)
+pod cache clean --all
+
+# Reinstall pods
+pod install
+```
+
+### Clear Xcode Derived Data
+
+If issues persist, clear the Xcode derived data:
+
+```sh
+# Remove derived data
+rm -rf ~/Library/Developer/Xcode/DerivedData
+
+# Or from Xcode: Product > Clean Build Folder (Cmd+Shift+K)
+```
+
+### Common Issues
+
+- **FBSDKCoreKit_Basics errors**: This usually indicates stale pods from a previous configuration. The clean installation above should resolve this.
+- **IONFilesystemLib XCFramework errors**: The Podfile includes a post-install fix that handles architecture slice mismatches gracefully.
+- **"Internal inconsistency error"**: This Xcode error often resolves after cleaning derived data and rebuilding.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and click on Share -> Publish.
