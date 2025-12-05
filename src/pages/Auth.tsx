@@ -656,6 +656,17 @@ const Auth = () => {
                   : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
             </div>
+            <div className="text-center text-[11px] text-steel">
+              Need to delete your account?
+              <Button
+                type="button"
+                variant="link"
+                className="px-1 text-royal-purple hover:text-accent-purple"
+                onClick={() => navigate("/account-deletion")}
+              >
+                View instructions
+              </Button>
+            </div>
           </div>
         </div>
       </section>

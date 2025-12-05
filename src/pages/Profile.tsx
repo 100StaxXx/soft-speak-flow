@@ -5,7 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2 } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -61,6 +61,15 @@ const Profile = () => {
       setActiveTab(location.state.openTab);
     }
   }, [location.state]);
+
+  // Automatically open the delete dialog when deep-linked from the help page
+  useEffect(() => {
+    if (location.state?.showDeleteDialog) {
+      setActiveTab("account");
+      setShowDeleteDialog(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.showDeleteDialog, location.pathname, navigate]);
 
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
     queryKey: ["adaptive-push-settings", user?.id],
@@ -311,6 +320,41 @@ const Profile = () => {
 
               <SubscriptionManagement />
 
+              <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/5 border-primary/20 shadow-inner">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Why Cosmiq is different
+                  </CardTitle>
+                  <CardDescription>
+                    App Review feedback called out saturated horoscope apps—here&apos;s what makes Cosmiq unique.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-muted-foreground">
+                  <div className="flex gap-3">
+                    <MessageCircle className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Adaptive mentor chat + nudges</p>
+                      <p>Choose an AI mentor, fire off one-tap prompts from Quick Chat, and receive mentor-authored nudges stored per user in Supabase.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Evolving companion game loop</p>
+                      <p>Story-driven onboarding assigns a faction, zodiac profile, and living companion that unlocks 21 visual evolutions and quests.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Shield className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Referral cosmetics, not fortune spam</p>
+                      <p>Referral rewards only unlock limited companion skins—no recycled horoscope feeds or paywalled readings.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Your Mentor</CardTitle>
@@ -395,6 +439,28 @@ const Profile = () => {
                 
                 <ReferralCodeRedeemCard />
                 <ReferralDashboard />
+                <Card className="border-dashed border-primary/40 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5 text-primary" />
+                      Referral FAQ
+                    </CardTitle>
+                    <CardDescription>Answers to App Review&apos;s questions about codes vs. rewards.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li>
+                        <span className="font-semibold text-foreground">Referral code:</span> a unique tag minted on signup so friends can credit you. Entering a code never unlocks extra content for the new user—it just ties their profile to the referrer for rewards tracking.
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Referral rewards:</span> purely cosmetic companion skins automatically delivered to the referrer once a tagged friend reaches Stage 3. No paywalled horoscopes, chats, or quests unlock.
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Digital content unlocked:</span> limited-run skin variants listed below in Companion Skins. They only change appearance for the referrer and never impact the recipient&apos;s access tier.
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
                 <CompanionSkins />
               </div>
 
@@ -411,6 +477,13 @@ const Profile = () => {
                     This action cannot be undone. You will lose access to your companion, streaks, referrals, and any
                     personalized content tied to this account.
                   </p>
+                <Button
+                  variant="link"
+                  className="px-0 text-sm text-primary"
+                  onClick={() => navigate("/account-deletion")}
+                >
+                  How account deletion works
+                </Button>
                   <AlertDialog
                     open={showDeleteDialog}
                     onOpenChange={(open) => {
