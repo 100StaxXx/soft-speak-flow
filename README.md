@@ -71,3 +71,20 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## iOS build troubleshooting
+
+The Capacitor iOS project includes a custom CocoaPods `post_install` hook (see `ios/App/Podfile`) that scans every downloaded `.xcframework`. If a framework ships without the plain `ios-arm64` slice that the `[CP] Copy XCFrameworks` script expects, the hook clones the closest non-simulator `ios-arm64_*` variant into place. This prevents `rsync` errors like the ones seen for `IONFilesystemLib` or `FBSDKCoreKit_Basics`.
+
+If you still hit `[CP] Copy XCFrameworks` failures:
+
+1. Ensure JavaScript deps are installed: `npm install`
+2. On macOS, clean and reinstall Pods:
+   ```sh
+   cd ios/App
+   rm -rf Pods Podfile.lock
+   pod install
+   ```
+3. In Xcode, delete Derived Data for the app target, then rebuild.
+
+After a fresh `pod install`, the hook will repopulate missing `ios-arm64` slices automatically, so the build completes even when upstream vendors omit that directory.
