@@ -171,6 +171,13 @@ export const useDailyMissions = () => {
       toast({ title: "Mission Complete!", description: "XP awarded!" });
       playMissionComplete();
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Mission not completed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const completedCount = missions?.filter(m => m.completed).length || 0;
