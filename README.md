@@ -74,6 +74,16 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/c
 
 ## iOS build troubleshooting
 
+### Add the iOS platform
+
+If `npx cap sync ios` reports that the iOS platform has not been added, add it once with:
+
+```sh
+npx cap add ios
+```
+
+After the platform is created, you can rerun `npx cap sync ios` to copy the latest web assets and update native dependencies.
+
 The Capacitor iOS project includes a custom CocoaPods `post_install` hook (see `ios/App/Podfile`) that scans every downloaded `.xcframework`. If a framework ships without the plain `ios-arm64` slice that the `[CP] Copy XCFrameworks` script expects, the hook clones the closest non-simulator `ios-arm64_*` variant into place. This prevents `rsync` errors like the ones seen for `IONFilesystemLib` or `FBSDKCoreKit_Basics`.
 
 If you still hit `[CP] Copy XCFrameworks` failures:
