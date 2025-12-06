@@ -11,6 +11,7 @@ const NATIVE_REDIRECT_BASE = import.meta.env.VITE_NATIVE_REDIRECT_BASE;
 export const getRedirectUrl = (): string => {
   // For native iOS/Android, use the production domain
   if (Capacitor.isNativePlatform()) {
+    return 'https://app.cosmiq.quest';
     if (!NATIVE_REDIRECT_BASE) {
       throw new Error('Missing VITE_NATIVE_REDIRECT_BASE for native auth redirects');
     }
