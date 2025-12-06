@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "patch-package",
-    "cards:snapshot": "tsx scripts/cardSnapshot.ts"
+    "cards:snapshot": "tsx scripts/cardSnapshot.ts",
+    "ios:sync": "cd ios/App && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
