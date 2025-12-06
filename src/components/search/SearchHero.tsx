@@ -1,19 +1,14 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
-import { Search, Sparkles } from "lucide-react";
+import { Search } from "lucide-react";
 
 interface SearchHeroProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  stats: {
-    quotes: number;
-    pepTalks: number;
-    challenges: number;
-  };
 }
 
-export const SearchHero = ({ searchQuery, onSearchChange, stats }: SearchHeroProps) => {
+export const SearchHero = ({ searchQuery, onSearchChange }: SearchHeroProps) => {
   const floatingOrbs = useMemo(
     () =>
       Array.from({ length: 7 }, (_, index) => ({
@@ -26,12 +21,6 @@ export const SearchHero = ({ searchQuery, onSearchChange, stats }: SearchHeroPro
       })),
     []
   );
-
-  const statBlocks = [
-    { label: "Quotes", value: stats.quotes },
-    { label: "Pep Talks", value: stats.pepTalks },
-    { label: "Challenges", value: stats.challenges },
-  ];
 
   return (
     <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-[hsl(var(--deep-space))] via-[hsl(var(--royal-purple)/0.6)] to-[hsl(var(--nebula-pink)/0.6)] px-6 py-12 md:px-10 md:py-16 shadow-[0_25px_120px_rgba(88,63,172,0.3)]">
@@ -73,15 +62,6 @@ export const SearchHero = ({ searchQuery, onSearchChange, stats }: SearchHeroPro
           transition={{ duration: 0.6 }}
           className="space-y-3"
         >
-          <motion.div
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-1 text-xs uppercase tracking-[0.3em] text-stardust-gold"
-            animate={{ opacity: [0.8, 1, 0.8] }}
-            transition={{ repeat: Infinity, duration: 4 }}
-          >
-            <Sparkles className="h-4 w-4" />
-            Signal Search
-            <Sparkles className="h-4 w-4" />
-          </motion.div>
           <h1 className="text-3xl md:text-5xl font-bold text-pure-white leading-tight bg-gradient-to-r from-pure-white via-[hsl(var(--celestial-blue))] to-[hsl(var(--nebula-pink))] bg-clip-text text-transparent">
             Find the words that shift your universe
           </h1>
@@ -111,26 +91,6 @@ export const SearchHero = ({ searchQuery, onSearchChange, stats }: SearchHeroPro
             />
             <div className="absolute inset-px rounded-[1.05rem] border border-white/5 pointer-events-none" />
           </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 gap-3 sm:grid-cols-3 max-w-3xl mx-auto"
-        >
-          {statBlocks.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + index * 0.1 }}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white/80"
-            >
-              <p className="text-xs uppercase tracking-widest text-white/60">{stat.label}</p>
-              <p className="text-2xl font-bold text-pure-white">{stat.value.toLocaleString()}</p>
-            </motion.div>
-          ))}
         </motion.div>
       </div>
     </div>

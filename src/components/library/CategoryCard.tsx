@@ -5,7 +5,6 @@ interface CategoryCardProps {
   icon: LucideIcon;
   title: string;
   description: string;
-  count: number;
   gradient: string;
   glowColor: string;
   onClick: () => void;
@@ -16,7 +15,6 @@ export const CategoryCard = ({
   icon: Icon,
   title,
   description,
-  count,
   gradient,
   glowColor,
   onClick,
@@ -63,10 +61,6 @@ export const CategoryCard = ({
         <div>
           <h3 className="text-lg font-bold text-pure-white mb-1">{title}</h3>
           <p className="text-sm text-white/60 mb-3">{description}</p>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-pure-white">{count.toLocaleString()}</span>
-            <span className="text-xs text-white/40 uppercase tracking-wider">available</span>
-          </div>
         </div>
 
         <motion.div
