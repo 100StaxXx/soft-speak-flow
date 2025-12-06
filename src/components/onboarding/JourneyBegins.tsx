@@ -34,12 +34,12 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     if (currentLine < narrativeLines.length) {
       const timer = setTimeout(() => {
         setCurrentLine(prev => prev + 1);
-      }, 2800);
+      }, 3400);
       return () => clearTimeout(timer);
     } else {
       const finalTimer = setTimeout(() => {
         setShowFinalMessage(true);
-      }, 600);
+      }, 1200);
       return () => clearTimeout(finalTimer);
     }
   }, [currentLine]);
@@ -48,7 +48,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     if (showFinalMessage) {
       const buttonTimer = setTimeout(() => {
         setShowButton(true);
-      }, 2500);
+      }, 3200);
       return () => clearTimeout(buttonTimer);
     }
   }, [showFinalMessage]);
