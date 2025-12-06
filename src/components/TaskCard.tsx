@@ -112,7 +112,8 @@ export const TaskCard = ({
       
       <Card
         className={cn(
-          "relative overflow-hidden transition-all duration-300 cursor-pointer group",
+          "relative transition-all duration-300 cursor-pointer group",
+          isTutorialQuest && !task.completed ? "overflow-visible" : "overflow-hidden",
           // Main Quest Styling - Gold cosmiq glow
           isMainQuest && [
             "border-2 border-stardust-gold",
