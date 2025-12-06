@@ -620,7 +620,7 @@ const Auth = () => {
                     type="button"
                     variant="secondary"
                     size="lg"
-                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-pure-white text-obsidian hover:bg-pure-white/90 transition-all"
+                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-obsidian to-black text-pure-white border border-white/10 shadow-lg shadow-royal-purple/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('apple')}
                     disabled={loading || oauthLoading !== null}
                   >
@@ -635,13 +635,13 @@ const Auth = () => {
                       {oauthLoading === 'apple' ? 'Signing in...' : 'Continue with Apple'}
                     </span>
                   </Button>
-                  
+
                   {/* Google Sign In - Full width */}
                   <Button
                     type="button"
                     variant="secondary"
                     size="lg"
-                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-obsidian/60 hover:bg-obsidian/80 border border-steel/20 transition-all"
+                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-pure-white to-slate-100 text-obsidian border border-steel/30 shadow-md shadow-obsidian/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('google')}
                     disabled={loading || oauthLoading !== null}
                   >
@@ -655,7 +655,7 @@ const Auth = () => {
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                       </svg>
                     )}
-                    <span className="text-base font-semibold text-pure-white">
+                    <span className="text-base font-semibold">
                       {oauthLoading === 'google' ? 'Signing in...' : 'Continue with Google'}
                     </span>
                   </Button>
@@ -680,17 +680,6 @@ const Auth = () => {
                 {isForgotPassword 
                   ? "Back to Sign In" 
                   : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
-              </Button>
-            </div>
-            <div className="text-center text-[11px] text-steel">
-              Need to delete your account?
-              <Button
-                type="button"
-                variant="link"
-                className="px-1 text-royal-purple hover:text-accent-purple"
-                onClick={() => navigate("/account-deletion")}
-              >
-                View instructions
               </Button>
             </div>
           </div>
