@@ -136,17 +136,18 @@ const Index = () => {
     }
   }, [user, profileLoading, companionLoading]);
 
-  // Check for incomplete onboarding and redirect (only after data is ready)
+  // Check for incomplete onboarding pieces and redirect (only after data is ready)
   useEffect(() => {
-    if (!user || !isReady) return;
-    
-    if (profile) {
-      // If onboarding is not complete or user has no mentor, redirect to onboarding
-      if (!profile.onboarding_completed || !profile.selected_mentor_id) {
-        navigate("/onboarding");
-      }
+    if (!user || !isReady || !profile) return;
+
+    const missingMentor = !profile.selected_mentor_id;
+    const explicitlyIncomplete = profile.onboarding_completed === false;
+    const missingCompanion = !companion && !companionLoading;
+
+    if (missingMentor || explicitlyIncomplete || missingCompanion) {
+      navigate("/onboarding");
     }
-  }, [user, isReady, profile, navigate]);
+  }, [user, isReady, profile, companion, companionLoading, navigate]);
 
   // Show loading state while critical data loads
   if (isTransitioning || !isReady) {
