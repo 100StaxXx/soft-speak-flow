@@ -1,6 +1,11 @@
 /**
  * Comprehensive Mission Templates System
  * Supports auto-detection, difficulty scaling, chains, and personalization
+ * 
+ * Mission Philosophy:
+ * - Connection = Small & instantly doable (5-10 XP, easy)
+ * - Quick Win = 1-5 minutes (5-10 XP, easy/medium)
+ * - Identity = Can be bigger or full-day missions (10-15 XP, medium/hard)
  */
 
 export interface MissionTemplate {
@@ -8,109 +13,137 @@ export interface MissionTemplate {
   text: string;
   xp: number;
   difficulty: 'easy' | 'medium' | 'hard';
-  category: 'habits' | 'wellness' | 'learning' | 'social' | 'growth';
+  category: 'connection' | 'quick_win' | 'identity';
   autoComplete: boolean;
   progressTarget?: number;
   chainMissions?: string[]; // Mission types that unlock as bonuses
 }
 
 export const MISSION_TEMPLATES: MissionTemplate[] = [
-  // === HABITS CATEGORY ===
+  // === CONNECTION CATEGORY (5-10 XP, easy) ===
   { 
-    type: "habit_complete_1", 
-    text: "Complete 1 habit today", 
-    xp: 5, 
+    type: "connection_text_friend", 
+    text: "Text someone you appreciate and let them know why", 
+    xp: 8, 
     difficulty: 'easy', 
-    category: 'habits',
-    autoComplete: true,
-    progressTarget: 1
+    category: 'connection',
+    autoComplete: false
   },
   { 
-    type: "all_habits", 
-    text: "Complete all your habits today", 
-    xp: 10, 
-    difficulty: 'medium', 
-    category: 'habits',
-    autoComplete: true
+    type: "connection_check_in", 
+    text: "Send a simple check-in message to a friend or family member", 
+    xp: 7, 
+    difficulty: 'easy', 
+    category: 'connection',
+    autoComplete: false
+  },
+  { 
+    type: "connection_compliment", 
+    text: "Give someone a small compliment today", 
+    xp: 5, 
+    difficulty: 'easy', 
+    category: 'connection',
+    autoComplete: false
+  },
+  { 
+    type: "connection_gratitude", 
+    text: "Express gratitude to someone who helped you recently", 
+    xp: 8, 
+    difficulty: 'easy', 
+    category: 'connection',
+    autoComplete: false
   },
 
-  // === WELLNESS CATEGORY ===
+  // === QUICK WIN CATEGORY (5-10 XP, easy/medium) ===
   { 
-    type: "check_in_morning", 
-    text: "Complete your morning check-in", 
-    xp: 5, 
+    type: "quick_win_avoided_task", 
+    text: "Do one tiny task you've been avoiding", 
+    xp: 8, 
     difficulty: 'easy', 
-    category: 'wellness',
-    autoComplete: true
+    category: 'quick_win',
+    autoComplete: false
   },
   { 
-    type: "mood_log", 
-    text: "Log your mood 3 times today", 
+    type: "quick_win_organize", 
+    text: "Organize one small area for two minutes", 
+    xp: 6, 
+    difficulty: 'easy', 
+    category: 'quick_win',
+    autoComplete: false
+  },
+  { 
+    type: "quick_win_make_bed", 
+    text: "Make your bed to start the day with a win", 
+    xp: 5, 
+    difficulty: 'easy', 
+    category: 'quick_win',
+    autoComplete: false
+  },
+  { 
+    type: "quick_win_declutter", 
+    text: "Throw away or delete one thing you no longer need", 
+    xp: 7, 
+    difficulty: 'easy', 
+    category: 'quick_win',
+    autoComplete: false
+  },
+  { 
+    type: "quick_win_five_minutes", 
+    text: "Take care of something that will take less than five minutes", 
+    xp: 8, 
+    difficulty: 'medium', 
+    category: 'quick_win',
+    autoComplete: false
+  },
+
+  // === IDENTITY CATEGORY (10-15 XP, medium/hard) ===
+  { 
+    type: "identity_complete_all_quests", 
+    text: "Complete all your quests today", 
+    xp: 15, 
+    difficulty: 'hard', 
+    category: 'identity',
+    autoComplete: true // Auto-completes when all quests done
+  },
+  { 
+    type: "identity_complete_all_habits", 
+    text: "Complete all your habits today", 
     xp: 12, 
     difficulty: 'medium', 
-    category: 'wellness',
-    autoComplete: true,
-    progressTarget: 3
+    category: 'identity',
+    autoComplete: true // Auto-completes when all habits done
   },
   { 
-    type: "reflection_write", 
-    text: "Write a reflection note", 
-    xp: 10, 
-    difficulty: 'easy', 
-    category: 'wellness',
-    autoComplete: true
-  },
-
-  // === LEARNING CATEGORY ===
-  { 
-    type: "pep_talk_listen", 
-    text: "Listen to today's pep talk", 
-    xp: 3, 
-    difficulty: 'easy', 
-    category: 'learning',
-    autoComplete: true
-  },
-  { 
-    type: "mentor_chat_start", 
-    text: "Chat with your mentor", 
-    xp: 10, 
-    difficulty: 'easy', 
-    category: 'learning',
-    autoComplete: true
-  },
-  { 
-    type: "quote_read", 
-    text: "Read today's quote", 
-    xp: 3, 
-    difficulty: 'easy', 
-    category: 'learning',
-    autoComplete: true
-  },
-
-  // === GROWTH CATEGORY ===
-  { 
-    type: "companion_visit", 
-    text: "Visit your companion", 
-    xp: 5, 
-    difficulty: 'easy', 
-    category: 'growth',
-    autoComplete: true
-  },
-  { 
-    type: "profile_update", 
-    text: "Update your profile", 
-    xp: 5, 
-    difficulty: 'easy', 
-    category: 'growth',
-    autoComplete: false // Manual
-  },
-  { 
-    type: "streak_maintain", 
-    text: "Maintain your daily streak", 
+    type: "identity_plan_tomorrow", 
+    text: "Plan tomorrow before you go to bed", 
     xp: 10, 
     difficulty: 'medium', 
-    category: 'growth',
-    autoComplete: true
+    category: 'identity',
+    autoComplete: false
+  },
+  { 
+    type: "identity_schedule", 
+    text: "Schedule something you've been putting off", 
+    xp: 12, 
+    difficulty: 'medium', 
+    category: 'identity',
+    autoComplete: false
+  },
+  { 
+    type: "identity_future_self", 
+    text: "Take one action your future self would thank you for", 
+    xp: 12, 
+    difficulty: 'medium', 
+    category: 'identity',
+    autoComplete: false
+  },
+  { 
+    type: "identity_discipline_burst", 
+    text: "Act for two minutes as the most disciplined version of yourself", 
+    xp: 10, 
+    difficulty: 'medium', 
+    category: 'identity',
+    autoComplete: false
   },
 ];
 
@@ -119,6 +152,15 @@ export const MISSION_ACTIVITY_MAP: Record<string, {
   activityType: string | string[];
   validator?: (activityData: any, progressCurrent: number, progressTarget: number) => boolean;
 }> = {
+  // Identity missions that auto-complete
+  identity_complete_all_quests: {
+    activityType: 'all_quests_completed'
+  },
+  identity_complete_all_habits: {
+    activityType: 'all_habits_completed'
+  },
+  
+  // Legacy mappings for backward compatibility
   habit_complete_1: {
     activityType: 'habit_completed',
     validator: (_, current, target) => current >= target
@@ -222,4 +264,11 @@ export const MISSION_ACTIVITY_MAP: Record<string, {
       return categories.size >= 3;
     }
   }
+};
+
+// Category-specific XP ranges for validation
+export const CATEGORY_XP_RANGES: Record<string, { min: number; max: number; difficulties: ('easy' | 'medium' | 'hard')[] }> = {
+  connection: { min: 5, max: 10, difficulties: ['easy'] },
+  quick_win: { min: 5, max: 10, difficulties: ['easy', 'medium'] },
+  identity: { min: 10, max: 15, difficulties: ['medium', 'hard'] },
 };

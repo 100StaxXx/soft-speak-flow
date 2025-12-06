@@ -1,7 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getCorsHeaders } from "./cors.ts";
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// Use any for flexible client type compatibility across different Supabase client instances
+type SupabaseClient = any;
 
 type AppleReceiptInfo = {
   product_id?: string;
