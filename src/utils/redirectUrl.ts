@@ -6,12 +6,15 @@ import { Capacitor } from '@capacitor/core';
  * 
  * @returns The production domain for native platforms, current origin for web
  */
+const NATIVE_REDIRECT_BASE = import.meta.env.VITE_NATIVE_REDIRECT_BASE;
+
 export const getRedirectUrl = (): string => {
   // For native iOS/Android, use the production domain
   if (Capacitor.isNativePlatform()) {
-    // TODO: Replace with your actual production domain when deployed
-    // For now, using the Lovable preview domain
-    return 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com';
+    if (!NATIVE_REDIRECT_BASE) {
+      throw new Error('Missing VITE_NATIVE_REDIRECT_BASE for native auth redirects');
+    }
+    return NATIVE_REDIRECT_BASE;
   }
   
   // For web, use current origin

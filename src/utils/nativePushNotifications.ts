@@ -66,7 +66,7 @@ export async function initializeNativePush(userId: string): Promise<void> {
       // Handle notification tap - navigate to appropriate screen
       const data = notification.notification.data;
       if (data?.url) {
-        window.location.href = data.url;
+        window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: data.url }));
       }
     });
 
