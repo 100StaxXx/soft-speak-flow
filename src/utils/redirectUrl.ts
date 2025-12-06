@@ -9,9 +9,7 @@ import { Capacitor } from '@capacitor/core';
 export const getRedirectUrl = (): string => {
   // For native iOS/Android, use the production domain
   if (Capacitor.isNativePlatform()) {
-    // TODO: Replace with your actual production domain when deployed
-    // For now, using the Lovable preview domain
-    return 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com';
+    return 'https://app.cosmiq.quest';
   }
   
   // For web, use current origin
