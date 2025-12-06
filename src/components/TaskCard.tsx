@@ -153,7 +153,7 @@ export const TaskCard = ({
           {/* Animated Arrow Indicator for Tutorial Quest */}
           {isTutorialQuest && !task.completed && (
             <div
-              className="absolute left-1/2 -top-16 -translate-x-1/2 pointer-events-none z-20 flex flex-col items-center gap-1"
+              className="absolute left-1/2 -top-20 -translate-x-1/2 pointer-events-none z-[60] flex flex-col items-center gap-2"
               style={{
                 animation: 'bounceDown 1.2s ease-in-out infinite',
               }}
@@ -167,7 +167,7 @@ export const TaskCard = ({
                 Click here!
               </div>
               <ArrowDown
-                className="h-8 w-8 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))] filter brightness-125"
+                className="h-8 w-8 -translate-y-1 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))] filter brightness-125"
                 strokeWidth={3}
               />
             </div>
