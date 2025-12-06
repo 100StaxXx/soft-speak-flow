@@ -535,16 +535,25 @@ const Auth = () => {
         provider,
         options: {
           redirectTo: getRedirectUrlWithPath('/'),
+          skipBrowserRedirect: true, // We'll handle the redirect ourselves for better control on iOS
         },
       });
 
-      console.log(`[${provider} OAuth] OAuth response:`, { 
-        hasUrl: !!oauthData?.url, 
+      console.log(`[${provider} OAuth] OAuth response:`, {
+        hasUrl: !!oauthData?.url,
         provider: oauthData?.provider,
-        error: error?.message 
+        error: error?.message
       });
 
       if (error) throw error;
+
+      if (oauthData?.url) {
+        console.log(`[${provider} OAuth] Manually redirecting to provider URL to avoid stuck state`);
+        window.location.href = oauthData.url;
+        return;
+      }
+
+      throw new Error('No redirect URL received from OAuth provider');
     } catch (error) {
       console.error(`[${provider} OAuth] Error caught:`, {
         message: error.message,
