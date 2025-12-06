@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
+      includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
       manifest: {
         name: 'Cosmiq - Your Personal AI Mentor',
         short_name: 'Cosmiq',
@@ -28,15 +28,15 @@ export default defineConfig(({ mode }) => ({
         start_url: '/',
         icons: [
           {
-            src: '/icon-192.png',
+            src: '/icon-192.svg',
             sizes: '192x192',
-            type: 'image/png',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon-512.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           }
         ]
@@ -61,14 +61,9 @@ export default defineConfig(({ mode }) => ({
           },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5 // 5 minutes
-              }
-            }
+            // Do not cache authenticated API responses to avoid persisting
+            // user data offline. Always fetch fresh content instead.
+            handler: 'NetworkOnly',
           }
         ]
       }

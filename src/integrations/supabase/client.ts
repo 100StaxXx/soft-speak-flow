@@ -10,7 +10,7 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error(
     'Missing required environment variables: VITE_SUPABASE_URL and/or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
-    'Please check your .env file and ensure these variables are set.'
+    'Copy .env.example to .env and populate the Supabase values before starting the app.'
   );
 }
 
