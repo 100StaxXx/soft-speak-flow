@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,19 +12,46 @@ import { BookOpen, MessageSquare, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 
-export const GlobalSearch = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+interface GlobalSearchProps {
+  initialQuery?: string;
+  searchQuery?: string;
+  hideSearchBar?: boolean;
+  onSearchChange?: (query: string) => void;
+}
+
+export const GlobalSearch = ({
+  initialQuery = "",
+  searchQuery,
+  hideSearchBar = false,
+  onSearchChange,
+}: GlobalSearchProps) => {
+  const [internalQuery, setInternalQuery] = useState(initialQuery);
+  const isControlled = typeof searchQuery === "string";
+  const currentQuery = isControlled ? searchQuery : internalQuery;
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (!isControlled) {
+      setInternalQuery(initialQuery);
+    }
+  }, [initialQuery, isControlled]);
+
+  const handleQueryChange = (value: string) => {
+    if (!isControlled) {
+      setInternalQuery(value);
+    }
+    onSearchChange?.(value);
+  };
+
   const { data: quotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["search-quotes", searchQuery],
-    enabled: searchQuery.length >= 2,
+    queryKey: ["search-quotes", currentQuery],
+    enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
-        .or(`text.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%`)
+        .or(`text.ilike.%${currentQuery}%,author.ilike.%${currentQuery}%`)
         .limit(10);
 
       if (error) throw error;
@@ -33,13 +60,13 @@ export const GlobalSearch = () => {
   });
 
   const { data: pepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["search-pep-talks", searchQuery],
-    enabled: searchQuery.length >= 2,
+    queryKey: ["search-pep-talks", currentQuery],
+    enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
-        .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,quote.ilike.%${searchQuery}%`)
+        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%,quote.ilike.%${currentQuery}%`)
         .limit(10);
 
       if (error) throw error;
@@ -48,13 +75,13 @@ export const GlobalSearch = () => {
   });
 
   const { data: challenges, isLoading: challengesLoading } = useQuery({
-    queryKey: ["search-challenges", searchQuery],
-    enabled: searchQuery.length >= 2,
+    queryKey: ["search-challenges", currentQuery],
+    enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("challenges")
         .select("*")
-        .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
         .limit(10);
 
       if (error) throw error;
@@ -63,7 +90,7 @@ export const GlobalSearch = () => {
   });
 
   const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['search-tasks', searchQuery, user?.id],
+    queryKey: ['search-tasks', currentQuery, user?.id],
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -73,14 +100,14 @@ export const GlobalSearch = () => {
         .from('daily_tasks')
         .select('*')
         .eq('user_id', user.id)
-        .ilike('task_text', `%${searchQuery}%`)
+        .ilike('task_text', `%${currentQuery}%`)
         .order('task_date', { ascending: false })
         .limit(10);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: searchQuery.length >= 2 && !!user,
+    enabled: currentQuery.length >= 2 && !!user,
   });
 
   const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading;
@@ -88,12 +115,15 @@ export const GlobalSearch = () => {
 
   return (
     <div className="space-y-4">
-      <SearchBar
-        onSearch={setSearchQuery}
-        placeholder="Search quotes, pep talks, challenges, quests..."
-      />
+      {!hideSearchBar && (
+        <SearchBar
+          onSearch={handleQueryChange}
+          placeholder="Search quotes, pep talks, challenges, quests..."
+          value={currentQuery}
+        />
+      )}
 
-      {searchQuery.length >= 2 && (
+      {currentQuery.length >= 2 && (
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="all">All</TabsTrigger>
@@ -111,7 +141,7 @@ export const GlobalSearch = () => {
               </div>
             ) : !hasResults ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
+                <p className="text-muted-foreground">No results found for "{currentQuery}"</p>
               </Card>
             ) : (
               <div className="space-y-6">
@@ -324,7 +354,7 @@ export const GlobalSearch = () => {
         </Tabs>
       )}
 
-      {searchQuery.length > 0 && searchQuery.length < 2 && (
+      {currentQuery.length > 0 && currentQuery.length < 2 && (
         <Card className="p-4 text-center">
           <p className="text-sm text-muted-foreground">Type at least 2 characters to search</p>
         </Card>

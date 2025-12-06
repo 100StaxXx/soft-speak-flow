@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
 };
 
 interface PushError {
@@ -23,11 +23,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+    if (!internalSecret) {
+      throw new Error('INTERNAL_FUNCTION_SECRET is not configured');
+    }
+
     console.log("Starting daily quote push dispatch (iOS native)...");
 
     const now = new Date().toISOString();
 
-    // Get all pending quote pushes that are due
     const { data: pendingPushes, error: fetchError } = await supabase
       .from('user_daily_quote_pushes')
       .select(`
@@ -57,7 +61,6 @@ serve(async (req) => {
       try {
         console.log(`Dispatching quote push ${push.id} to user ${push.user_id}`);
         
-        // Fetch the actual quote using the quote_id from daily_quotes
         const { data: quote, error: quoteError } = await supabase
           .from('quotes')
           .select('*')
@@ -69,7 +72,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Get user's iOS device tokens
         const { data: deviceTokens, error: tokenError } = await supabase
           .from('push_device_tokens')
           .select('device_token')
@@ -84,7 +86,6 @@ serve(async (req) => {
 
         if (!deviceTokens || deviceTokens.length === 0) {
           console.log(`No iOS devices for user ${push.user_id}`);
-          // Still mark as delivered even if no devices
           await supabase
             .from('user_daily_quote_pushes')
             .update({ delivered_at: new Date().toISOString() })
@@ -93,7 +94,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Send to all user's iOS devices
         for (const token of deviceTokens) {
           try {
             const { error: sendError } = await supabase.functions.invoke('send-apns-notification', {
@@ -106,6 +106,9 @@ serve(async (req) => {
                   quote_id: quote.id,
                   url: '/inspire?tab=quotes'
                 }
+              },
+              headers: {
+                'x-internal-key': internalSecret,
               }
             });
 
@@ -119,7 +122,6 @@ serve(async (req) => {
           }
         }
 
-        // Mark as delivered
         const { error: updateError } = await supabase
           .from('user_daily_quote_pushes')
           .update({ delivered_at: new Date().toISOString() })

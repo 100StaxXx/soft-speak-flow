@@ -3,8 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
 };
+
+const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+if (!internalSecret) {
+  throw new Error('INTERNAL_FUNCTION_SECRET is not configured');
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,7 +24,6 @@ serve(async (req) => {
 
     console.log('Fetching pending native push notifications...');
 
-    // Get pending pushes for native devices
     const now = new Date().toISOString();
     const { data: pendingPushes, error: fetchError } = await supabaseClient
       .from('user_daily_pushes')
@@ -39,7 +43,6 @@ serve(async (req) => {
 
     for (const push of pendingPushes || []) {
       try {
-        // Get device tokens for this user
         const { data: deviceTokens, error: tokenError } = await supabaseClient
           .from('push_device_tokens')
           .select('device_token')
@@ -51,10 +54,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Send to each device
         for (const { device_token } of deviceTokens) {
           try {
-            // Call send-apns-notification function
             const { error: sendError } = await supabaseClient.functions.invoke(
               'send-apns-notification',
               {
@@ -66,6 +67,9 @@ serve(async (req) => {
                     url: '/pep-talks',
                     pepTalkId: push.pep_talk_id
                   }
+                },
+                headers: {
+                  'x-internal-key': internalSecret,
                 }
               }
             );
@@ -82,7 +86,6 @@ serve(async (req) => {
           }
         }
 
-        // Mark push as delivered
         const { error: updateError } = await supabaseClient
           .from('user_daily_pushes')
           .update({ delivered: true, delivered_at: new Date().toISOString() })

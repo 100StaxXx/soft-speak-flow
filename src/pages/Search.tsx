@@ -1,29 +1,228 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { BookOpen, MessageSquare, Target, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
-import { GlobalSearch } from "@/components/GlobalSearch";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import { SearchHero } from "@/components/search/SearchHero";
+import { SuggestedSearches } from "@/components/library/SuggestedSearches";
+import { CategoryCard } from "@/components/library/CategoryCard";
+import { FeaturedQuoteCard } from "@/components/library/FeaturedQuoteCard";
+import { FeaturedPepTalkCard } from "@/components/library/FeaturedPepTalkCard";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Search = () => {
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const trimmedQuery = searchQuery.trim();
+  const isSearchActive = trimmedQuery.length >= 2;
+
+  const { data: quotesCount = 0 } = useQuery({
+    queryKey: ["quotes-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("quotes").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const { data: pepTalksCount = 0 } = useQuery({
+    queryKey: ["pep-talks-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("pep_talks").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const { data: challengesCount = 0 } = useQuery({
+    queryKey: ["challenges-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("challenges").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
+    queryKey: ["featured-quotes"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("quotes")
+        .select("id, text, author")
+        .order("created_at", { ascending: false })
+        .limit(4);
+      return data || [];
+    },
+  });
+
+  const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
+    queryKey: ["featured-pep-talks"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("pep_talks")
+        .select("id, title, category, description")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      return data || [];
+    },
+  });
+
   return (
     <PageTransition>
-      {/* Cosmiq Starfield Background */}
       <StarfieldBackground />
-      
-      <div className="min-h-screen pb-24 relative">
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6 safe-area-top">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Search
-            </h1>
-            <p className="text-sm text-muted-foreground">Find quotes, pep talks, and challenges</p>
-          </div>
-        </div>
 
-        <div className="max-w-4xl mx-auto px-4 relative z-10">
-          <GlobalSearch />
+      <div className="relative min-h-screen pb-24">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 py-10 space-y-12">
+          <SearchHero
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            stats={{
+              quotes: quotesCount,
+              pepTalks: pepTalksCount,
+              challenges: challengesCount,
+            }}
+          />
+
+          <AnimatePresence mode="wait">
+            {isSearchActive ? (
+              <motion.div
+                key="search-results"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+              >
+                <GlobalSearch searchQuery={trimmedQuery} hideSearchBar />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="search-discover"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.4 }}
+                className="space-y-12"
+              >
+                <SuggestedSearches onSearch={setSearchQuery} />
+
+                <section>
+                  <motion.h2
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-xl font-semibold mb-4 flex items-center gap-2"
+                  >
+                    <Sparkles className="h-5 w-5 text-stardust-gold" />
+                    Browse categories
+                  </motion.h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <CategoryCard
+                      icon={BookOpen}
+                      title="Quotes"
+                      description="Daily sparks of wisdom"
+                      count={quotesCount}
+                      gradient="bg-gradient-to-br from-[hsl(var(--royal-purple)/0.35)] to-[hsl(var(--deep-purple)/0.2)]"
+                      glowColor="bg-royal-purple"
+                      onClick={() => navigate("/library")}
+                      delay={0.1}
+                    />
+                    <CategoryCard
+                      icon={MessageSquare}
+                      title="Pep Talks"
+                      description="Immersive encouragement hits"
+                      count={pepTalksCount}
+                      gradient="bg-gradient-to-br from-[hsl(var(--nebula-pink)/0.3)] to-[hsl(var(--nebula-pink)/0.1)]"
+                      glowColor="bg-nebula-pink"
+                      onClick={() => navigate("/pep-talks")}
+                      delay={0.2}
+                    />
+                    <CategoryCard
+                      icon={Target}
+                      title="Challenges"
+                      description="Guided quests for growth"
+                      count={challengesCount}
+                      gradient="bg-gradient-to-br from-[hsl(var(--celestial-blue)/0.35)] to-[hsl(var(--celestial-blue)/0.1)]"
+                      glowColor="bg-celestial-blue"
+                      onClick={() => navigate("/challenges")}
+                      delay={0.3}
+                    />
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <motion.h2
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xl font-semibold flex items-center gap-2"
+                    >
+                      <BookOpen className="h-5 w-5 text-royal-purple" />
+                      Featured Quotes
+                    </motion.h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate("/library")}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      View all
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {quotesLoading ? (
+                      <>
+                        <Skeleton className="h-32 rounded-2xl" />
+                        <Skeleton className="h-32 rounded-2xl" />
+                      </>
+                    ) : (
+                      featuredQuotes?.map((quote, index) => (
+                        <FeaturedQuoteCard key={quote.id} quote={quote} index={index} />
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <motion.h2
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xl font-semibold flex items-center gap-2"
+                    >
+                      <MessageSquare className="h-5 w-5 text-nebula-pink" />
+                      Featured Pep Talks
+                    </motion.h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate("/pep-talks")}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      View all
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {pepTalksLoading ? (
+                      <>
+                        <Skeleton className="h-40 rounded-2xl" />
+                        <Skeleton className="h-40 rounded-2xl" />
+                        <Skeleton className="h-40 rounded-2xl" />
+                      </>
+                    ) : (
+                      featuredPepTalks?.map((pepTalk, index) => (
+                        <FeaturedPepTalkCard key={pepTalk.id} pepTalk={pepTalk} index={index} />
+                      ))
+                    )}
+                  </div>
+                </section>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+        <BottomNav />
       </div>
-      <BottomNav />
     </PageTransition>
   );
 };

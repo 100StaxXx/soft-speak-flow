@@ -7,18 +7,30 @@ interface SearchBarProps {
   onSearch: (query: string) => void;
   placeholder?: string;
   className?: string;
+  value?: string;
 }
 
-export const SearchBar = ({ onSearch, placeholder = "Search...", className = "" }: SearchBarProps) => {
-  const [query, setQuery] = useState("");
+export const SearchBar = ({
+  onSearch,
+  placeholder = "Search...",
+  className = "",
+  value,
+}: SearchBarProps) => {
+  const isControlled = value !== undefined;
+  const [internalQuery, setInternalQuery] = useState("");
+  const query = isControlled ? value : internalQuery;
 
   const handleChange = (value: string) => {
-    setQuery(value);
+    if (!isControlled) {
+      setInternalQuery(value);
+    }
     onSearch(value);
   };
 
   const handleClear = () => {
-    setQuery("");
+    if (!isControlled) {
+      setInternalQuery("");
+    }
     onSearch("");
   };
 
