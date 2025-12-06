@@ -2,14 +2,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
 };
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+
+if (!internalSecret) {
+  throw new Error('INTERNAL_FUNCTION_SECRET is not configured');
+}
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -19,11 +23,9 @@ Deno.serve(async (req) => {
     
     console.log('Checking for tasks needing reminders...');
     
-    // Get current date and time for comparison
     const now = new Date();
     const today = now.toLocaleDateString('en-CA');
     
-    // Find tasks that need reminders sent
     const { data: tasks, error } = await supabase
       .from('daily_tasks')
       .select('*')
@@ -43,21 +45,17 @@ Deno.serve(async (req) => {
     const tasksToRemind = tasks?.filter(task => {
       if (!task.scheduled_time || !task.reminder_minutes_before) return false;
       
-      // Combine task_date and scheduled_time to get full datetime
       const scheduledDateTime = new Date(`${task.task_date}T${task.scheduled_time}`);
       const reminderTime = new Date(scheduledDateTime.getTime() - task.reminder_minutes_before * 60 * 1000);
       
-      // Check if it's time to send reminder (within 1 minute window)
       const timeDiff = reminderTime.getTime() - now.getTime();
-      return timeDiff >= -30000 && timeDiff <= 30000; // 30 second window on either side
+      return timeDiff >= -30000 && timeDiff <= 30000;
     }) || [];
     
     console.log(`Sending reminders for ${tasksToRemind.length} tasks`);
     
-    // Send reminders for each task
     for (const task of tasksToRemind) {
       try {
-        // Get iOS push device tokens for this user
         const { data: deviceTokens } = await supabase
           .from('push_device_tokens')
           .select('device_token')
@@ -69,7 +67,6 @@ Deno.serve(async (req) => {
           continue;
         }
         
-        // Get companion for emoji
         const { data: companion } = await supabase
           .from('user_companion')
           .select('spirit_animal')
@@ -85,7 +82,6 @@ Deno.serve(async (req) => {
                               companion?.spirit_animal === 'Lion' ? '🦁' :
                               companion?.spirit_animal === 'Fox' ? '🦊' : '⚔️';
         
-        // Send to all user's iOS devices via APNs
         for (const token of deviceTokens) {
           try {
             const { error: sendError } = await supabase.functions.invoke('send-apns-notification', {
@@ -98,6 +94,9 @@ Deno.serve(async (req) => {
                   type: 'task_reminder',
                   url: '/tasks'
                 }
+              },
+              headers: {
+                'x-internal-key': internalSecret,
               }
             });
 
@@ -111,7 +110,6 @@ Deno.serve(async (req) => {
           }
         }
         
-        // Mark reminder as sent
         await supabase
           .from('daily_tasks')
           .update({ reminder_sent: true })
