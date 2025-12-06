@@ -83,6 +83,7 @@ type PendingTaskData = {
   recurrenceDays: number[];
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  moreInformation: string | null;
 };
 
 export default function Tasks() {
@@ -145,6 +146,7 @@ export default function Tasks() {
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
+  const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<PendingTaskData | null>(null);
   const drawerActionHandledRef = useRef(false);
@@ -364,6 +366,7 @@ export default function Tasks() {
       recurrenceDays,
       reminderEnabled,
       reminderMinutesBefore,
+      moreInformation,
     };
     
     // If no main quest exists, ask user BEFORE creating the task
@@ -392,8 +395,9 @@ export default function Tasks() {
         recurrenceDays: dataToAdd.recurrenceDays,
         reminderEnabled: dataToAdd.reminderEnabled,
         reminderMinutesBefore: dataToAdd.reminderMinutesBefore,
+        notes: dataToAdd.moreInformation,
       });
-      
+
       // Clear form
       setNewTaskText("");
       setTaskDifficulty("medium");
@@ -403,6 +407,7 @@ export default function Tasks() {
       setRecurrenceDays([]);
       setReminderEnabled(false);
       setReminderMinutesBefore(15);
+      setMoreInformation(null);
       setShowAdvanced(false);
     } catch (error) {
       console.error('Failed to add task:', error);
@@ -1117,6 +1122,8 @@ export default function Tasks() {
                         onRecurrenceDaysChange={setRecurrenceDays}
                         onReminderEnabledChange={setReminderEnabled}
                         onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                        moreInformation={moreInformation}
+                        onMoreInformationChange={setMoreInformation}
                       />
                     )}
 

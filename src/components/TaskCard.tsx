@@ -15,6 +15,7 @@ interface TaskCardProps {
     scheduled_time?: string | null;
     estimated_duration?: number | null;
     recurrence_pattern?: string | null;
+    notes?: string | null;
   };
   onToggle: () => void;
   onDelete: () => void;
@@ -207,7 +208,13 @@ export const TaskCard = ({
                 {task.task_text}
               </p>
             </div>
-          
+
+            {task.notes && (
+              <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">
+                {task.notes}
+              </p>
+            )}
+
             <div className="flex items-center gap-3 mt-1 flex-wrap">
               {task.difficulty && (
                 <span className={cn("text-xs", difficultyColors[task.difficulty as keyof typeof difficultyColors])}>

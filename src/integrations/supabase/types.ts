@@ -1137,6 +1137,7 @@ export type Database = {
           is_bonus: boolean | null
           is_main_quest: boolean | null
           is_recurring: boolean | null
+          notes: string | null
           parent_template_id: string | null
           recurrence_days: number[] | null
           recurrence_pattern: string | null
@@ -1160,6 +1161,7 @@ export type Database = {
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
+          notes?: string | null
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
@@ -1183,6 +1185,7 @@ export type Database = {
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
+          notes?: string | null
           parent_template_id?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null

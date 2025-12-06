@@ -45,6 +45,7 @@ export interface AddTaskParams {
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
   category?: string;
+  notes?: string | null;
 }
 
 export const useTaskMutations = (taskDate: string) => {
@@ -95,6 +96,7 @@ export const useTaskMutations = (taskDate: string) => {
             is_recurring: !!params.recurrencePattern,
             reminder_enabled: params.reminderEnabled ?? false,
             reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+            notes: params.notes || null,
             category: detectedCategory,
             is_bonus: false
           });
