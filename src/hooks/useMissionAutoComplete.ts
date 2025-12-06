@@ -88,11 +88,15 @@ export const useMissionAutoComplete = () => {
 
           // Update progress
           if (newProgress !== mission.progress_current && mounted) {
-            await supabase
+            const { error: progressError } = await supabase
               .from('daily_missions')
               .update({ progress_current: newProgress })
               .eq('id', mission.id)
               .eq('user_id', user.id);
+
+            if (!progressError) {
+              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+            }
           }
 
           // Complete mission if criteria met
