@@ -1,6 +1,6 @@
 type MentorAwareProfile = {
   selected_mentor_id?: string | null;
-  onboarding_data?: Record<string, unknown> | null;
+  onboarding_data?: unknown;
 } | null;
 
 export const getResolvedMentorId = (profile: MentorAwareProfile): string | null => {
