@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import { SocialLogin } from '@capgo/capacitor-social-login';
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,21 @@ const Auth = () => {
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
+    if (!session) return;
+
+    try {
+      hasRedirected.current = true;
+      await ensureProfile(session.user.id, session.user.email);
+      const path = await getAuthRedirectPath(session.user.id);
+      console.log(`[Auth ${source}] Navigating to ${path}`);
+      navigate(path);
+    } catch (error) {
+      console.error(`[Auth ${source}] Navigation error:`, error);
+      navigate('/onboarding');
+    }
+  }, [navigate]);
   
   // Refs to track OAuth fallback timeouts (for cleanup)
   const googleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -105,10 +121,7 @@ const Auth = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        hasRedirected.current = true; // Mark that we're handling initial redirect
-        await ensureProfile(session.user.id, session.user.email);
-        const path = await getAuthRedirectPath(session.user.id);
-        navigate(path);
+        await handlePostAuthNavigation(session, 'checkSession');
       }
     };
 
@@ -125,16 +138,8 @@ const Auth = () => {
         
         const timestamp = Date.now();
         console.log(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        try {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          await ensureProfile(session.user.id, session.user.email);
-          const path = await getAuthRedirectPath(session.user.id);
-          console.log(`[Auth onAuthStateChange] Navigating to ${path} at ${Date.now()} (${Date.now() - timestamp}ms elapsed)`);
-          navigate(path);
-        } catch (error) {
-          console.error('Error in auth state change:', error);
-          navigate('/onboarding');
-        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
       }
     });
 
@@ -148,7 +153,7 @@ const Auth = () => {
         clearTimeout(appleFallbackTimeout.current);
       }
     };
-  }, [navigate]);
+  }, [handlePostAuthNavigation]);
 
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
@@ -182,6 +187,9 @@ const Auth = () => {
         });
 
         if (error) throw error;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        await handlePostAuthNavigation(session, 'passwordSignIn');
       } else {
         const { error } = await supabase.auth.signUp({
           email: sanitizedEmail,
@@ -330,11 +338,11 @@ const Auth = () => {
           });
 
           if (sessionError) throw sessionError;
-          
+
           const sessionSetTime = Date.now();
-          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
-          // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
-          
+          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
+          await handlePostAuthNavigation(newSession, 'googleNative');
+
           // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
           if (newSession?.user) {
             googleFallbackTimeout.current = setTimeout(async () => {
@@ -345,9 +353,7 @@ const Auth = () => {
                   return;
                 }
                 console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-                await ensureProfile(newSession.user.id, newSession.user.email);
-                const path = await getAuthRedirectPath(newSession.user.id);
-                navigate(path);
+                await handlePostAuthNavigation(newSession, 'googleNativeFallback');
               } catch (error) {
                 console.error('[Google OAuth Fallback] Error during redirect:', error);
                 // Fallback to onboarding if something goes wrong
@@ -440,11 +446,11 @@ const Auth = () => {
         });
 
         if (sessionError) throw sessionError;
-        
+
         const sessionSetTime = Date.now();
-        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
-        // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
-        
+        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
+        await handlePostAuthNavigation(newSession, 'appleNative');
+
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
         if (newSession?.user) {
           appleFallbackTimeout.current = setTimeout(async () => {
@@ -455,9 +461,7 @@ const Auth = () => {
                 return;
               }
               console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-              await ensureProfile(newSession.user.id, newSession.user.email);
-              const path = await getAuthRedirectPath(newSession.user.id);
-              navigate(path);
+              await handlePostAuthNavigation(newSession, 'appleNativeFallback');
             } catch (error) {
               console.error('[Apple OAuth Fallback] Error during redirect:', error);
               // Fallback to onboarding if something goes wrong
