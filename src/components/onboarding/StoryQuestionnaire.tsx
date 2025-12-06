@@ -192,7 +192,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
       </motion.div>
 
       {/* Question Content */}
-      <div className="flex-1 flex flex-col justify-center z-10">
+      <div className="flex-1 flex flex-col justify-center items-center z-10">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -200,6 +200,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.3 }}
+            className="w-full max-w-2xl"
           >
             {/* Narrative Text */}
             <motion.p
@@ -222,7 +223,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             </motion.h2>
 
             {/* Options */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3 sm:space-y-4 w-full max-w-xl mx-auto">
               {currentQuestion.options.map((option, index) => (
                 <motion.div
                   key={option.text}
