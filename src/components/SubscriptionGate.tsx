@@ -18,11 +18,12 @@ export const SubscriptionGate = () => {
   const { hasAccess, isInTrial, trialDaysRemaining } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
-  const [hasShownPaywall, setHasShownPaywall] = useState(() => {
-    const lastShown = safeLocalStorage.getItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY);
-    return lastShown === getTodayDateString();
-  });
+  const todayString = getTodayDateString();
+  const [lastShownDate, setLastShownDate] = useState<string | null>(() =>
+    safeLocalStorage.getItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY)
+  );
   const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
+  const hasShownToday = lastShownDate === todayString;
 
   useEffect(() => {
     // Don't show if already subscribed (not just in trial)
@@ -35,19 +36,19 @@ export const SubscriptionGate = () => {
     // Don't trigger while evolution is in progress - wait for it to complete
     if (isEvolvingLoading) {
       // Queue paywall to show after evolution completes if companion is at stage 1+
-      if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
+      if (companion && companion.current_stage >= 1 && !hasShownToday) {
         setShouldShowAfterEvolution(true);
       }
       return;
     }
 
     // Show modal if companion is at stage 1+ and we haven't shown it yet
-    if (companion && companion.current_stage >= 1 && !hasShownPaywall) {
+    if (companion && companion.current_stage >= 1 && !hasShownToday) {
       setShowPaywall(true);
-      setHasShownPaywall(true);
-      safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, getTodayDateString());
+      setLastShownDate(todayString);
+      safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, todayString);
     }
-  }, [companion, hasAccess, isInTrial, hasShownPaywall, isEvolvingLoading]);
+  }, [companion, hasAccess, isInTrial, hasShownToday, isEvolvingLoading, todayString]);
 
   // Listen for evolution completion
   useEffect(() => {
@@ -55,14 +56,14 @@ export const SubscriptionGate = () => {
       // Small delay to let evolution modal fully dismiss
       const timer = setTimeout(() => {
         setShowPaywall(true);
-        setHasShownPaywall(true);
-        safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, getTodayDateString());
+        setLastShownDate(todayString);
+        safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, todayString);
         setShouldShowAfterEvolution(false);
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
-  }, [shouldShowAfterEvolution, isEvolvingLoading]);
+  }, [shouldShowAfterEvolution, isEvolvingLoading, todayString]);
 
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
