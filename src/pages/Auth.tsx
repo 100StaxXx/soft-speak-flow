@@ -14,6 +14,7 @@ import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
+import { useAuth } from "@/hooks/useAuth";
 
 const authSchema = z.object({
   email: z.string()
@@ -50,6 +51,7 @@ const Auth = () => {
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { session: authSession } = useAuth();
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
     if (!session) return;
@@ -116,6 +118,53 @@ const Auth = () => {
     initializeAuth();
   }, []); // No dependencies - run only once
 
+  // Handle OAuth callback parameters that return the user to /auth with a valid code/token
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      if (typeof window === "undefined" || hasRedirected.current) return;
+
+      const url = new URL(window.location.href);
+      const hasAccessToken = url.hash.includes("access_token");
+      const code = url.searchParams.get("code");
+
+      // Only run when coming back from an OAuth provider
+      if (!code && !hasAccessToken) return;
+
+      try {
+        // If Supabase didn't automatically exchange the code, do it manually
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          await handlePostAuthNavigation(data.session, "oauthCodeExchange");
+        } else {
+          // Hash-based tokens (implicit flow)
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await handlePostAuthNavigation(session, "oauthHashSession");
+          }
+        }
+      } catch (error) {
+        console.error("[OAuth Callback] Failed to complete OAuth login:", error);
+        toast({
+          title: "Error",
+          description: "Something went wrong signing you in. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        // Clean up URL parameters to avoid re-processing on re-render
+        if (code) {
+          url.searchParams.delete("code");
+          const cleanedUrl = `${url.pathname}${url.search}${url.hash}`;
+          window.history.replaceState(window.history.state, "", cleanedUrl);
+        } else if (hasAccessToken) {
+          window.location.hash = "";
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [handlePostAuthNavigation, toast]);
+
   // Separate effect for session check and auth state listener
   useEffect(() => {
     const checkSession = async () => {
@@ -154,6 +203,12 @@ const Auth = () => {
       }
     };
   }, [handlePostAuthNavigation]);
+
+  // Extra safety net: if the auth context already has a session, redirect immediately
+  useEffect(() => {
+    if (!authSession || hasRedirected.current) return;
+    handlePostAuthNavigation(authSession, 'authContext');
+  }, [authSession, handlePostAuthNavigation]);
 
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
