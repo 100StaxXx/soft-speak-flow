@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { useProfile } from "@/hooks/useProfile";
+import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -180,8 +181,10 @@ const AppContent = memo(() => {
     }
   }, [profileLoading, splashHidden]);
   
+  const resolvedMentorId = getResolvedMentorId(profile);
+
   return (
-    <ThemeProvider mentorId={profile?.selected_mentor_id}>
+    <ThemeProvider mentorId={resolvedMentorId}>
       <XPProvider>
         <Suspense fallback={<LoadingFallback />}>
           <EvolutionAwareContent />

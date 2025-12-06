@@ -7,24 +7,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
 
+  const resolvedMentorId = getResolvedMentorId(profile);
+
   const { data: selectedMentor } = useQuery({
-    queryKey: ["selected-mentor", profile?.selected_mentor_id],
-    enabled: !!profile?.selected_mentor_id,
+    queryKey: ["selected-mentor", resolvedMentorId],
+    enabled: !!resolvedMentorId,
     staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
     queryFn: async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         throw new Error('No mentor selected');
       }
-      
+
       const { data, error } = await supabase
         .from("mentors")
         .select("slug, name, primary_color") // Select only needed fields
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
       if (error) throw error;
       return data;

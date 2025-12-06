@@ -14,10 +14,12 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
+import { getResolvedMentorId } from "@/utils/mentor";
 import { Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Index = () => {
   const { user } = useAuth();
@@ -25,6 +27,7 @@ const Index = () => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [mentorImage, setMentorImage] = useState<string>("");
@@ -34,6 +37,34 @@ const Index = () => {
   } | null>(null);
 
   // Combined initialization effect for better performance
+  const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
+
+  // Backfill mentor selection for users who completed onboarding but never persisted the mentor ID
+  useEffect(() => {
+    const syncMentorSelection = async () => {
+      if (!user || !profile) return;
+
+      const onboardingMentorId = (profile.onboarding_data as { mentorId?: string | null } | null)?.mentorId;
+      const needsBackfill = profile.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId;
+
+      if (!needsBackfill) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ selected_mentor_id: onboardingMentorId })
+        .eq("id", user.id);
+
+      if (error) {
+        console.error("Failed to backfill mentor selection:", error);
+        return;
+      }
+
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+    };
+
+    void syncMentorSelection();
+  }, [profile, queryClient, user]);
+
   useEffect(() => {
     // Scroll to top on mount
     window.scrollTo(0, 0);
@@ -41,13 +72,13 @@ const Index = () => {
     let isMounted = true;
 
     const fetchMentorData = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!resolvedMentorId) return;
 
       try {
         const { data: mentorData } = await supabase
           .from("mentors")
           .select("avatar_url, slug")
-          .eq("id", profile.selected_mentor_id)
+          .eq("id", resolvedMentorId)
           .maybeSingle();
 
         if (!isMounted || !mentorData) return;
@@ -124,7 +155,7 @@ const Index = () => {
     return () => {
       isMounted = false;
     };
-  }, [profile?.selected_mentor_id, user]);
+  }, [resolvedMentorId, user]);
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {
@@ -140,14 +171,17 @@ const Index = () => {
   useEffect(() => {
     if (!user || !isReady || !profile) return;
 
-    const missingMentor = !profile.selected_mentor_id;
+    // If onboarding is explicitly completed, don't force users back into the flow
+    if (profile.onboarding_completed === true) return;
+
+    const missingMentor = !resolvedMentorId;
     const explicitlyIncomplete = profile.onboarding_completed === false;
     const missingCompanion = !companion && !companionLoading;
 
     if (missingMentor || explicitlyIncomplete || missingCompanion) {
       navigate("/onboarding");
     }
-  }, [user, isReady, profile, companion, companionLoading, navigate]);
+  }, [user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
 
   // Show loading state while critical data loads
   if (isTransitioning || !isReady) {
