@@ -141,6 +141,18 @@ const AppContent = memo(() => {
     }
   }, [location.pathname, navigate]);
   
+  // Respond to native push navigation events
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const url = (event as CustomEvent<string>).detail;
+      if (typeof url === 'string') {
+        navigate(url);
+      }
+    };
+    window.addEventListener('native-push-navigation', handler as EventListener);
+    return () => window.removeEventListener('native-push-navigation', handler as EventListener);
+  }, [navigate]);
+  
   // Initialize native push on login
   useEffect(() => {
     if (session?.user) {

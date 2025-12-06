@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
 };
 
 interface APNsPayload {
@@ -19,10 +18,15 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+    if (!internalSecret) {
+      throw new Error('INTERNAL_FUNCTION_SECRET is not configured');
+    }
+
+    const providedSecret = req.headers.get('x-internal-key');
+    if (providedSecret !== internalSecret) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
 
     const { deviceToken, title, body, data } = await req.json() as APNsPayload;
 
@@ -30,19 +34,17 @@ serve(async (req) => {
       throw new Error('Missing required fields: deviceToken, title, body');
     }
 
-    // APNs configuration
     const apnsKeyId = Deno.env.get('APNS_KEY_ID');
     const apnsTeamId = Deno.env.get('APNS_TEAM_ID');
     const apnsBundleId = Deno.env.get('APNS_BUNDLE_ID');
     const apnsKey = Deno.env.get('APNS_AUTH_KEY');
-    const apnsEnvironment = Deno.env.get('APNS_ENVIRONMENT') || 'sandbox'; // 'sandbox' for TestFlight, 'production' for App Store
+    const apnsEnvironment = Deno.env.get('APNS_ENVIRONMENT') || 'sandbox';
 
     if (!apnsKeyId || !apnsTeamId || !apnsBundleId || !apnsKey) {
       console.error('Missing APNs configuration');
       throw new Error('APNs not configured. Please add APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, and APNS_AUTH_KEY secrets.');
     }
 
-    // Construct APNs payload
     const payload = {
       aps: {
         alert: {
@@ -55,10 +57,8 @@ serve(async (req) => {
       ...data
     };
 
-    // Generate JWT for APNs authentication
     const jwt = await generateAPNsJWT(apnsKeyId, apnsTeamId, apnsKey);
 
-    // Send to APNs (sandbox for TestFlight, production for App Store)
     const apnsHost = apnsEnvironment === 'production' 
       ? 'api.push.apple.com' 
       : 'api.sandbox.push.apple.com';
@@ -106,10 +106,8 @@ serve(async (req) => {
 });
 
 async function generateAPNsJWT(keyId: string, teamId: string, privateKey: string): Promise<string> {
-  // Import jose for JWT generation
   const { SignJWT } = await import('https://deno.land/x/jose@v5.2.0/index.ts');
 
-  // Parse the private key (P8 format)
   const key = await crypto.subtle.importKey(
     'pkcs8',
     Uint8Array.from(atob(privateKey), c => c.charCodeAt(0)),
@@ -118,7 +116,6 @@ async function generateAPNsJWT(keyId: string, teamId: string, privateKey: string
     ['sign']
   );
 
-  // Create JWT
   const jwt = await new SignJWT({})
     .setProtectedHeader({ alg: 'ES256', kid: keyId })
     .setIssuer(teamId)
