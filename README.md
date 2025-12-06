@@ -85,6 +85,10 @@ If you still hit `[CP] Copy XCFrameworks` failures:
    rm -rf Pods Podfile.lock
    pod install
    ```
+   If CocoaPods reports that the sandbox is out of sync with `Podfile.lock`, run the root-level helper to regenerate the iOS pods:
+   ```sh
+   npm run ios:sync
+   ```
 3. In Xcode, delete Derived Data for the app target, then rebuild.
 
 After a fresh `pod install`, the hook will repopulate missing `ios-arm64` slices automatically, so the build completes even when upstream vendors omit that directory.
