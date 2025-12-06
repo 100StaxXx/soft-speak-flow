@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getResolvedMentorId } from "./mentor";
 
 /**
  * Centralized auth redirect logic
@@ -8,9 +9,18 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("selected_mentor_id, onboarding_completed")
+      .select("selected_mentor_id, onboarding_completed, onboarding_data")
       .eq("id", userId)
       .maybeSingle();
+
+    const resolvedMentorId = getResolvedMentorId(profile);
+
+    if (profile?.onboarding_completed && !profile.selected_mentor_id && resolvedMentorId) {
+      await supabase
+        .from("profiles")
+        .update({ selected_mentor_id: resolvedMentorId })
+        .eq("id", userId);
+    }
 
     // If onboarding is completed, always go to tasks
     if (profile?.onboarding_completed) {
@@ -18,7 +28,7 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
     }
 
     // No profile or no mentor selected -> onboarding
-    if (!profile || !profile.selected_mentor_id) {
+    if (!profile || !resolvedMentorId) {
       return "/onboarding";
     }
 
