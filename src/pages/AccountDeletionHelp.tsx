@@ -142,7 +142,7 @@ export default function AccountDeletionHelp() {
           </CardContent>
         </Card>
 
-        <Alert variant="secondary">
+        <Alert variant="default">
           <Info className="h-4 w-4" />
           <AlertTitle>Need more details?</AlertTitle>
           <AlertDescription>
