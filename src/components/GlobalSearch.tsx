@@ -5,10 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { SearchBar } from "./SearchBar";
 import { Card } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Badge } from "./ui/badge";
 import { QuoteCard } from "./QuoteCard";
 import { PepTalkCard } from "./PepTalkCard";
-import { BookOpen, MessageSquare, Trophy, Target } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { BookOpen, MessageSquare, Sparkles, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 
@@ -110,27 +110,54 @@ export const GlobalSearch = ({
     enabled: currentQuery.length >= 2 && !!user,
   });
 
-  const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading;
-  const hasResults = (quotes && quotes.length > 0) || (pepTalks && pepTalks.length > 0) || (challenges && challenges.length > 0) || (tasks && tasks.length > 0);
+  const { data: epics, isLoading: epicsLoading } = useQuery({
+    queryKey: ['search-epics', currentQuery, user?.id],
+    queryFn: async () => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('epics')
+        .select('id, title, description, target_days, status, epic_members(user_id)')
+        .or(`user_id.eq.${user.id},epic_members.user_id.eq.${user.id}`)
+        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: currentQuery.length >= 2 && !!user,
+  });
+
+  const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading || epicsLoading;
+  const hasResults =
+    (quotes && quotes.length > 0) ||
+    (pepTalks && pepTalks.length > 0) ||
+    (challenges && challenges.length > 0) ||
+    (tasks && tasks.length > 0) ||
+    (epics && epics.length > 0);
 
   return (
     <div className="space-y-4">
       {!hideSearchBar && (
         <SearchBar
           onSearch={handleQueryChange}
-          placeholder="Search quotes, pep talks, challenges, quests..."
+          placeholder="Search quotes, pep talks, challenges, quests, and epics..."
           value={currentQuery}
         />
       )}
 
       {currentQuery.length >= 2 && (
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="pep-talks">Pep Talks</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
             <TabsTrigger value="quests">Quests</TabsTrigger>
+            <TabsTrigger value="epics">Epics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4 mt-4">
@@ -150,7 +177,6 @@ export const GlobalSearch = ({
                     <div className="flex items-center gap-2 mb-3">
                       <MessageSquare className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Pep Talks</h3>
-                      <Badge variant="secondary">{pepTalks.length}</Badge>
                     </div>
                     <div className="space-y-3">
                       {pepTalks.map((talk) => (
@@ -165,7 +191,6 @@ export const GlobalSearch = ({
                     <div className="flex items-center gap-2 mb-3">
                       <BookOpen className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Quotes</h3>
-                      <Badge variant="secondary">{quotes.length}</Badge>
                     </div>
                     <div className="grid gap-3">
                       {quotes.map((quote) => (
@@ -180,7 +205,6 @@ export const GlobalSearch = ({
                     <div className="flex items-center gap-2 mb-3">
                       <Target className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Challenges</h3>
-                      <Badge variant="secondary">{challenges.length}</Badge>
                     </div>
                     <div className="space-y-3">
                       {challenges.map((challenge) => (
@@ -195,6 +219,35 @@ export const GlobalSearch = ({
                             <Badge variant="outline">{challenge.duration_days} days</Badge>
                             {challenge.category && (
                               <Badge variant="secondary">{challenge.category}</Badge>
+                            )}
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {epics && epics.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold">Epics</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {epics.map((epic) => (
+                        <Card
+                          key={epic.id}
+                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          onClick={() => navigate("/epics")}
+                        >
+                          <h4 className="font-semibold mb-1">{epic.title}</h4>
+                          {epic.description && (
+                            <p className="text-sm text-muted-foreground">{epic.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <Badge variant="outline">{epic.target_days} days</Badge>
+                            {epic.status && (
+                              <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
                             )}
                           </div>
                         </Card>
@@ -301,6 +354,35 @@ export const GlobalSearch = ({
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No challenges found</p>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="epics" className="space-y-3 mt-4">
+            {epicsLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : epics && epics.length > 0 ? (
+              epics.map((epic) => (
+                <Card
+                  key={epic.id}
+                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate("/epics")}
+                >
+                  <h4 className="font-semibold mb-1">{epic.title}</h4>
+                  {epic.description && (
+                    <p className="text-sm text-muted-foreground">{epic.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{epic.target_days} days</Badge>
+                    {epic.status && (
+                      <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
+                    )}
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No epics found</p>
               </Card>
             )}
           </TabsContent>

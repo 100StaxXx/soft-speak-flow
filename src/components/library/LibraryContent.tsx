@@ -112,7 +112,6 @@ export const LibraryContent = () => {
                   icon={BookOpen}
                   title="Quotes"
                   description="Wisdom from great minds"
-                  count={quotesCount}
                   gradient="bg-gradient-to-br from-[hsl(var(--royal-purple)/0.4)] to-[hsl(var(--deep-purple)/0.2)]"
                   glowColor="bg-royal-purple"
                   onClick={() => navigate("/library")}
@@ -122,7 +121,6 @@ export const LibraryContent = () => {
                   icon={MessageSquare}
                   title="Pep Talks"
                   description="Motivational audio sessions"
-                  count={pepTalksCount}
                   gradient="bg-gradient-to-br from-[hsl(var(--nebula-pink)/0.4)] to-[hsl(var(--nebula-pink)/0.1)]"
                   glowColor="bg-nebula-pink"
                   onClick={() => navigate("/pep-talks")}
@@ -132,7 +130,6 @@ export const LibraryContent = () => {
                   icon={Target}
                   title="Challenges"
                   description="Multi-day growth journeys"
-                  count={challengesCount}
                   gradient="bg-gradient-to-br from-[hsl(var(--celestial-blue)/0.4)] to-[hsl(var(--celestial-blue)/0.1)]"
                   glowColor="bg-celestial-blue"
                   onClick={() => navigate("/challenges")}

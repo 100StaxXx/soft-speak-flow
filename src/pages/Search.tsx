@@ -22,30 +22,6 @@ const Search = () => {
   const trimmedQuery = searchQuery.trim();
   const isSearchActive = trimmedQuery.length >= 2;
 
-  const { data: quotesCount = 0 } = useQuery({
-    queryKey: ["quotes-count"],
-    queryFn: async () => {
-      const { count } = await supabase.from("quotes").select("*", { count: "exact", head: true });
-      return count || 0;
-    },
-  });
-
-  const { data: pepTalksCount = 0 } = useQuery({
-    queryKey: ["pep-talks-count"],
-    queryFn: async () => {
-      const { count } = await supabase.from("pep_talks").select("*", { count: "exact", head: true });
-      return count || 0;
-    },
-  });
-
-  const { data: challengesCount = 0 } = useQuery({
-    queryKey: ["challenges-count"],
-    queryFn: async () => {
-      const { count } = await supabase.from("challenges").select("*", { count: "exact", head: true });
-      return count || 0;
-    },
-  });
-
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["featured-quotes"],
     queryFn: async () => {
@@ -79,11 +55,6 @@ const Search = () => {
           <SearchHero
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            stats={{
-              quotes: quotesCount,
-              pepTalks: pepTalksCount,
-              challenges: challengesCount,
-            }}
           />
 
           <AnimatePresence mode="wait">
@@ -122,7 +93,6 @@ const Search = () => {
                       icon={BookOpen}
                       title="Quotes"
                       description="Daily sparks of wisdom"
-                      count={quotesCount}
                       gradient="bg-gradient-to-br from-[hsl(var(--royal-purple)/0.35)] to-[hsl(var(--deep-purple)/0.2)]"
                       glowColor="bg-royal-purple"
                       onClick={() => navigate("/library")}
@@ -132,7 +102,6 @@ const Search = () => {
                       icon={MessageSquare}
                       title="Pep Talks"
                       description="Immersive encouragement hits"
-                      count={pepTalksCount}
                       gradient="bg-gradient-to-br from-[hsl(var(--nebula-pink)/0.3)] to-[hsl(var(--nebula-pink)/0.1)]"
                       glowColor="bg-nebula-pink"
                       onClick={() => navigate("/pep-talks")}
@@ -142,7 +111,6 @@ const Search = () => {
                       icon={Target}
                       title="Challenges"
                       description="Guided quests for growth"
-                      count={challengesCount}
                       gradient="bg-gradient-to-br from-[hsl(var(--celestial-blue)/0.35)] to-[hsl(var(--celestial-blue)/0.1)]"
                       glowColor="bg-celestial-blue"
                       onClick={() => navigate("/challenges")}
