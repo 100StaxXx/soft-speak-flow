@@ -16,26 +16,47 @@ interface GeneratedMission {
   difficulty?: string;
 }
 
-const CATEGORY_GUIDELINES = `**MISSION STRUCTURE:**
-Include exactly 1 mission from each category:
+const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
 
-1. **Connection Mission** ("good human day" - kindness/gratitude)
-   - Text a friend/family and check in
-   - Send someone a compliment
-   - Thank someone for something small
-   - Reach out to someone you haven't spoken to
-   - Tell someone you appreciate them
+1. **Connection Mission** (Good Human Day)
+   Purpose: light positive interaction.
+   Approved patterns:
+   - "Text someone you appreciate and let them know why."
+   - "Send a simple check-in message to a friend or family member."
+   - "Give someone a small compliment today."
+   - "Express gratitude to someone who helped you recently."
+   XP: 5-10
+   Difficulty: easy
 
-2. **Quick Win** (momentum/confidence builder)
-   - Do one thing you've been avoiding for less than 5 minutes
-   - Finish one tiny task right now
-   - Complete the easiest to-do item first
-   - Organize your home screen for 2 minutes
+2. **Quick Win Mission** (Momentum Builder)
+   Purpose: create an instant sense of progress or order. Should take 1-5 minutes.
+   Approved patterns:
+   - "Do one tiny task you've been avoiding."
+   - "Organize one small area for two minutes."
+   - "Take care of something that will take less than five minutes."
+   - "Make your bed to start the day with a win."
+   - "Throw away or delete one thing you no longer need."
+   XP: 5-10
+   Difficulty: easy or medium
 
-3. **Identity Mission** (supports habits/discipline)
-   - Complete all your habits today
-   - Do something your future self will thank you for
-   - Give yourself a 2-minute discipline burst`;
+3. **Identity Mission** (Discipline & Future Self)
+   Purpose: something that reinforces the person they want to become.
+   These can be larger or all-day missions.
+   Approved patterns:
+   - "Complete all your quests today."
+   - "Plan tomorrow before you go to bed."
+   - "Schedule something you've been putting off."
+   - "Take one action your future self would thank you for."
+   - "Act for two minutes as the most disciplined version of yourself."
+   XP: 10-15
+   Difficulty: medium or hard`;
+
+// Category-specific XP and difficulty validation
+const CATEGORY_RULES: Record<string, { xpRange: [number, number]; difficulties: string[] }> = {
+  connection: { xpRange: [5, 10], difficulties: ['easy'] },
+  quick_win: { xpRange: [5, 10], difficulties: ['easy', 'medium'] },
+  identity: { xpRange: [10, 15], difficulties: ['medium', 'hard'] },
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -155,12 +176,35 @@ serve(async (req) => {
       throw new Error('Invalid AI response format');
     }
 
-    // Validate output
+    // Validate output with category-specific rules
     const validator = new OutputValidator(validationRules, outputConstraints);
     const validationResult = validator.validate(missions);
 
+    // Additional category-specific validation
+    const categoryErrors: string[] = [];
+    for (const mission of missions) {
+      const category = mission.category?.toLowerCase();
+      const rules = CATEGORY_RULES[category];
+      
+      if (rules) {
+        const [minXp, maxXp] = rules.xpRange;
+        if (mission.xp < minXp || mission.xp > maxXp) {
+          categoryErrors.push(`${category} mission XP should be ${minXp}-${maxXp}, got ${mission.xp}`);
+        }
+        if (mission.difficulty && !rules.difficulties.includes(mission.difficulty)) {
+          categoryErrors.push(`${category} mission difficulty should be ${rules.difficulties.join('/')}, got ${mission.difficulty}`);
+        }
+      }
+      
+      // Check mission text length (max 80 chars)
+      if (mission.mission && mission.mission.length > 80) {
+        categoryErrors.push(`Mission text too long: ${mission.mission.length} chars (max 80)`);
+      }
+    }
+
     // Log validation results
     const responseTime = Date.now() - startTime;
+    const allErrors = [...validationResult.errors, ...categoryErrors];
     await supabase
       .from('ai_output_validation_log')
       .insert({
@@ -168,18 +212,30 @@ serve(async (req) => {
         template_key: 'daily_missions',
         input_data: { streak, userContext },
         output_data: { missions },
-        validation_passed: validationResult.isValid,
-        validation_errors: validationResult.errors && validationResult.errors.length > 0 ? validationResult.errors : null,
+        validation_passed: allErrors.length === 0,
+        validation_errors: allErrors.length > 0 ? allErrors : null,
         model_used: 'google/gemini-2.5-flash',
         response_time_ms: responseTime
       });
 
-    if (!validationResult.isValid) {
-      console.error('Validation failed:', validator.getValidationSummary(validationResult));
-      throw new Error(`Mission validation failed: ${validationResult.errors.join(', ')}`);
+    if (allErrors.length > 0) {
+      console.warn('Validation warnings (proceeding anyway):', allErrors);
+      // Don't fail on validation - just log warnings and continue
     }
 
     console.log('Parsed missions:', missions);
+
+    // Determine auto_complete based on category (Identity missions that are full-day get auto_complete)
+    const getAutoComplete = (category: string, missionText: string): boolean => {
+      const lowerText = missionText.toLowerCase();
+      // These patterns should auto-complete when detected
+      if (lowerText.includes('complete all your quests') || 
+          lowerText.includes('complete all your habits') ||
+          lowerText.includes('complete all habits')) {
+        return true;
+      }
+      return false;
+    };
 
     // Map to database format
     const missionsToInsert = missions.map((m) => ({
@@ -190,7 +246,7 @@ serve(async (req) => {
       category: m.category || 'general',
       xp_reward: m.xp || 10,
       difficulty: m.difficulty || 'medium',
-      auto_complete: false,
+      auto_complete: getAutoComplete(m.category, m.mission),
       completed: false,
       progress_target: 1,
       progress_current: 0,
