@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { resolvePlanFromProduct, upsertSubscription } from "../_shared/appleSubscriptions.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const appleWebhookAudiences = [
@@ -122,10 +123,7 @@ serve(async (req) => {
     const userId = subscription.user_id;
 
     // Determine plan from product ID
-    let plan = "monthly";
-    if (productId.includes("yearly") || productId.includes("annual")) {
-      plan = "yearly";
-    }
+    const plan = resolvePlanFromProduct(productId);
 
     // Process notification based on type
     switch (notificationType) {
@@ -243,26 +241,19 @@ async function handleActivation(
 ) {
   const expiresDate = new Date(parseInt(expiresDateMs));
   const purchaseDate = new Date(parseInt(purchaseDateMs));
+  const normalizedPlan = resolvePlanFromProduct(plan);
 
-  await supabase.from("subscriptions").upsert({
-    user_id: userId,
-    stripe_subscription_id: transactionId,
-    stripe_customer_id: transactionId,
-    plan,
-    status: "active",
-    current_period_start: purchaseDate.toISOString(),
-    current_period_end: expiresDate.toISOString(),
-    updated_at: new Date().toISOString(),
-  }, {
-    onConflict: "user_id"
+  await upsertSubscription(supabase, {
+    userId,
+    transactionId,
+    productId: plan,
+    plan: normalizedPlan,
+    expiresAt: expiresDate,
+    purchaseDate,
+    cancellationDate: null,
+    environment: undefined,
+    source: "webhook",
   });
-
-  await supabase.from("profiles").update({
-    is_premium: true,
-    subscription_status: "active",
-    subscription_expires_at: expiresDate.toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq("id", userId);
 
   console.log(`Activated subscription for user ${userId}`);
 }
