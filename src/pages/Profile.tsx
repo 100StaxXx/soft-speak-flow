@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,6 +55,8 @@ const Profile = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const isDeleteConfirmationValid = deleteConfirmationText.trim().toLowerCase() === "delete";
 
   // Check if we should open a specific tab from navigation state
   useEffect(() => {
@@ -179,7 +182,7 @@ const Profile = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (!user || isDeletingAccount) return;
+    if (!user || isDeletingAccount || !isDeleteConfirmationValid) return;
 
     setIsDeletingAccount(true);
     try {
@@ -189,6 +192,7 @@ const Profile = () => {
       }
 
       setShowDeleteDialog(false);
+      setDeleteConfirmationText("");
       toast({
         title: "Account deleted",
         description: "Your account and saved progress have been permanently removed.",
@@ -489,6 +493,9 @@ const Profile = () => {
                     onOpenChange={(open) => {
                       if (isDeletingAccount) return;
                       setShowDeleteDialog(open);
+                      if (!open) {
+                        setDeleteConfirmationText("");
+                      }
                     }}
                   >
                     <AlertDialogTrigger asChild>
@@ -509,12 +516,29 @@ const Profile = () => {
                           action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+                      <div className="space-y-2">
+                        <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
+                        <Input
+                          id="delete-confirmation-input"
+                          value={deleteConfirmationText}
+                          onChange={(event) => setDeleteConfirmationText(event.target.value)}
+                          placeholder='Type "delete"'
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          disabled={isDeletingAccount}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          This extra step prevents accidental deletions.
+                        </p>
+                      </div>
                       <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           onClick={handleDeleteAccount}
-                          disabled={isDeletingAccount}
+                          disabled={isDeletingAccount || !isDeleteConfirmationValid}
                         >
                           {isDeletingAccount ? "Deleting..." : "Delete Account"}
                         </AlertDialogAction>
