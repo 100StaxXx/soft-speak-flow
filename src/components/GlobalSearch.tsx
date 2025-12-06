@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,10 +12,20 @@ import { BookOpen, MessageSquare, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 
-export const GlobalSearch = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+interface GlobalSearchProps {
+  initialQuery?: string;
+}
+
+export const GlobalSearch = ({ initialQuery = "" }: GlobalSearchProps) => {
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (initialQuery) {
+      setSearchQuery(initialQuery);
+    }
+  }, [initialQuery]);
 
   const { data: quotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["search-quotes", searchQuery],
