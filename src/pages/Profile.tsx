@@ -186,7 +186,20 @@ const Profile = () => {
 
     setIsDeletingAccount(true);
     try {
-      const { error } = await supabase.functions.invoke("delete-user-account");
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        throw new Error("Session expired. Please sign in again.");
+      }
+
+      const { error } = await supabase.functions.invoke("delete-user-account", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
       if (error) {
         throw new Error(error.message || "Unable to delete account");
       }
