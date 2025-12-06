@@ -7,6 +7,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type AppleUserMetadata = {
+  apple_user_id?: string;
+  [key: string]: unknown;
+};
+
+type SupabaseAuthUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: AppleUserMetadata | null;
+};
+
+class AppleAuthError extends Error {
+  code: string;
+  
+  constructor(message: string, code = 'APPLE_NATIVE_AUTH_ERROR') {
+    super(message);
+    this.code = code;
+  }
+}
+
 // Cache Apple's JWKS. jose handles caching + kid selection internally.
 const appleJWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
@@ -38,12 +58,12 @@ serve(async (req) => {
     });
 
     if (!payload.email) {
-      throw new Error('Apple token missing required email claim');
+      console.warn('Apple token missing email claim; falling back to Apple ID lookup');
     }
 
     const tokenInfo = {
-      sub: payload.sub,
-      email: payload.email,
+      sub: payload.sub as string,
+      email: payload.email as string | undefined,
       email_verified: payload.email_verified === 'true' || payload.email_verified === true,
     };
 
@@ -52,70 +72,101 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Look up user by email with pagination
-    console.log('Looking up user by email:', tokenInfo.email);
-    let existingUser = null;
-    let page = 1;
-    const perPage = 1000;
+    const fetchUser = async (matchFn: (user: SupabaseAuthUser) => boolean) => {
+      let page = 1;
+      const perPage = 1000;
 
-    // Paginate through users to find by email
-    while (!existingUser) {
-      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-      
-      if (listError) {
-        console.error('Failed to list users:', listError);
-        throw new Error('Failed to look up user');
+      while (true) {
+        const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+
+        if (listError) {
+          console.error('Failed to list users:', listError);
+          throw new AppleAuthError('Failed to look up user', 'APPLE_USER_LOOKUP_FAILED');
+        }
+
+        const users = data?.users ?? [];
+
+        if (!users.length) {
+          break;
+        }
+
+        const match = users.find(matchFn);
+        if (match) {
+          return match as SupabaseAuthUser;
+        }
+
+        if (users.length < perPage) {
+          break;
+        }
+
+        page++;
       }
 
-      if (!users || users.length === 0) {
-        break; // No more users to check
-      }
+      return null;
+    };
 
-      existingUser = users.find(u => u.email?.toLowerCase() === tokenInfo.email?.toLowerCase());
-      
-      if (users.length < perPage) {
-        break; // Last page
-      }
-      page++;
+    let existingUser: SupabaseAuthUser | null = null;
+
+    if (tokenInfo.email) {
+      console.log('Looking up user by email:', tokenInfo.email);
+      existingUser = await fetchUser(u => u.email?.toLowerCase() === tokenInfo.email?.toLowerCase());
     }
-    let userId: string;
 
     if (!existingUser) {
-      console.log('Creating new user...');
+      console.log('Looking up user by Apple ID sub:', tokenInfo.sub);
+      existingUser = await fetchUser(u => u.user_metadata?.apple_user_id === tokenInfo.sub);
+    }
+
+    let userId: string;
+    let userEmail: string | null = null;
+
+    if (!existingUser) {
+      console.log('No existing user found');
+      
+      if (!tokenInfo.email) {
+        throw new AppleAuthError(
+          'Apple did not share an email address for this account. Remove Revolution from Settings → Apple ID → Password & Security → Sign in with Apple, then try again.',
+          'APPLE_EMAIL_MISSING'
+        );
+      }
+
+      const normalizedEmail = tokenInfo.email.toLowerCase();
+      console.log('Creating new user with email:', normalizedEmail);
       
       try {
-        // Create new user
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email: tokenInfo.email,
+          email: normalizedEmail,
           email_confirm: true,
           user_metadata: {
             provider: 'apple',
+            apple_user_id: tokenInfo.sub,
           }
         });
 
         if (createError) {
-          // Handle race condition - user may have been created by concurrent request
           if (createError.message?.includes('already registered') || createError.message?.includes('already exists')) {
             console.log('User was created by concurrent request, retrying lookup...');
-            const { data: { users: retryUsers } } = await supabaseAdmin.auth.admin.listUsers();
-            existingUser = retryUsers?.find(u => u.email === tokenInfo.email);
+            const retryUser = await fetchUser(u => u.email?.toLowerCase() === normalizedEmail);
             
-            if (!existingUser) {
+            if (!retryUser) {
               console.error('Failed to find user after race condition');
-              throw new Error('Failed to create or find user');
+              throw new AppleAuthError('Failed to create or find user', 'APPLE_USER_CREATE_FAILED');
             }
-            userId = existingUser.id;
+            userId = retryUser.id;
+            userEmail = retryUser.email?.toLowerCase() ?? null;
+            existingUser = retryUser;
           } else {
             console.error('Failed to create user:', createError);
-            throw new Error('Failed to create user');
+            throw new AppleAuthError('Failed to create user', 'APPLE_USER_CREATE_FAILED');
           }
-        } else if (!newUser.user) {
-          throw new Error('Failed to create user - no user returned');
+        } else if (!newUser?.user) {
+          throw new AppleAuthError('Failed to create user - no user returned', 'APPLE_USER_CREATE_FAILED');
         } else {
           userId = newUser.user.id;
+          userEmail = normalizedEmail;
           console.log('New user created:', userId);
         }
       } catch (e) {
@@ -124,14 +175,37 @@ serve(async (req) => {
       }
     } else {
       userId = existingUser.id;
+      userEmail = existingUser.email?.toLowerCase() ?? null;
       console.log('Existing user found:', userId);
+
+      if (existingUser.user_metadata?.apple_user_id !== tokenInfo.sub) {
+        console.log('Linking Apple ID to existing user metadata');
+        const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            ...(existingUser.user_metadata || {}),
+            apple_user_id: tokenInfo.sub,
+          }
+        });
+
+        if (metadataError) {
+          console.error('Failed to update user metadata:', metadataError);
+          throw new AppleAuthError('Failed to link Apple ID to user account', 'APPLE_METADATA_UPDATE_FAILED');
+        }
+      }
+    }
+
+    if (!userEmail) {
+      throw new AppleAuthError(
+        'Unable to determine the email associated with this Apple ID. Please contact support.',
+        'APPLE_ACCOUNT_EMAIL_MISSING'
+      );
     }
 
     // Generate a magic link to get the verification token
     console.log('Generating session for user:', userId);
     const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: tokenInfo.email,
+      email: userEmail,
     });
 
     if (magicLinkError || !magicLinkData) {
@@ -177,8 +251,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in apple-native-auth:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorCode = error instanceof AppleAuthError ? error.code : 'APPLE_NATIVE_AUTH_ERROR';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: errorMessage, code: errorCode }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

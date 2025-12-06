@@ -411,10 +411,24 @@ const Auth = () => {
         console.log('[Apple OAuth] Edge function response:', { 
           hasAccessToken: !!sessionData?.access_token,
           hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionError?.message 
+          error: functionError?.message,
+          errorCode: sessionData?.code
         });
 
-        if (functionError) throw functionError;
+        if (functionError) {
+          if (sessionData?.code === 'APPLE_EMAIL_MISSING') {
+            console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
+            toast({
+              title: "Finish setting up Apple Sign-In",
+              description: "We couldn’t create an account with your Apple ID. Open Settings → Apple ID → Password & Security → Sign in with Apple, remove Revolution, then try again to share your email.",
+            });
+            setIsLogin(true);
+            setIsForgotPassword(false);
+            return;
+          }
+
+          throw new Error(sessionData?.error || functionError.message || 'Apple Sign-In failed');
+        }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
           throw new Error('Failed to get session tokens from edge function');
         }
