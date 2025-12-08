@@ -1,5 +1,8 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.delete-user-account]
+verify_jwt = true
+
 [functions.generate-cosmic-postcard]
 verify_jwt = true
 
