@@ -83,7 +83,25 @@ serve(async (req) => {
     console.error("delete-user-account edge function error", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
-    return new Response(JSON.stringify({ success: false, error: message }), {
+
+    const errorPayload: Record<string, unknown> = {
+      success: false,
+      error: message,
+    };
+
+    if (typeof error === "object" && error !== null) {
+      const maybeCode = (error as { code?: unknown }).code;
+      if (typeof maybeCode === "string" && maybeCode.length > 0) {
+        errorPayload.code = maybeCode;
+      }
+
+      const maybeDetails = (error as { details?: unknown }).details;
+      if (typeof maybeDetails === "string" && maybeDetails.length > 0) {
+        errorPayload.details = maybeDetails;
+      }
+    }
+
+    return new Response(JSON.stringify(errorPayload), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
