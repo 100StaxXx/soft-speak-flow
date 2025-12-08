@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ChevronLeft } from "lucide-react";
 import { type FactionType } from "./FactionSelector";
 
 interface QuestionOption {
@@ -137,6 +138,8 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   };
   const factionColor = factionColors[faction];
 
+  const canGoBack = currentIndex > 0;
+
   const handleAnswer = (option: QuestionOption) => {
     const newAnswer: OnboardingAnswer = {
       questionId: currentQuestion.id,
@@ -154,8 +157,14 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
     }
   };
 
+  const handleBack = () => {
+    if (!canGoBack) return;
+    setAnswers((prev) => prev.slice(0, -1));
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
+
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col p-6">
+    <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-6 pt-safe-top safe-area-bottom">
       {/* Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
         {starPositions.map((star, i) => (
@@ -182,11 +191,24 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="pt-safe-top mb-10 z-10"
+        className="mb-8 z-10"
       >
-        <div className="flex items-center justify-between text-white/60 text-sm mb-3">
-          <span className="tracking-wide">Your Path Unfolds</span>
-          <span className="font-medium tabular-nums">{currentIndex + 1} of {questions.length}</span>
+        <div className="flex items-center justify-between text-white/70 text-xs uppercase tracking-wide mb-4 gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            disabled={!canGoBack}
+            className="gap-2 text-white/80 hover:text-white disabled:opacity-40 disabled:hover:text-white/70 border border-white/10 rounded-full px-3 py-1 bg-black/30 backdrop-blur-sm"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <span className="flex-1 text-center text-sm font-semibold">Your Path Unfolds</span>
+          <span className="text-sm font-medium tabular-nums min-w-[72px] text-right">
+            {currentIndex + 1} of {questions.length}
+          </span>
         </div>
         <Progress value={progress} className="h-2" />
       </motion.div>
@@ -223,7 +245,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             </motion.h2>
 
             {/* Options */}
-              <div className="space-y-3 sm:space-y-4 w-full max-w-xl mx-auto">
+            <div className="space-y-4 w-full max-w-xl mx-auto">
               {currentQuestion.options.map((option, index) => (
                 <motion.div
                   key={option.text}
@@ -234,18 +256,18 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
-                    className="w-full flex items-start text-left gap-4 min-h-[80px] py-4 px-4 text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
+                    className="w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white border border-white/15 rounded-2xl hover:border-white/40 bg-black/30 backdrop-blur-xl hover:bg-black/40 transition-all shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,
                     }}
                   >
                     <span
-                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold mt-0.5"
-                      style={{ backgroundColor: `${factionColor}30`, color: factionColor }}
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold border border-white/20 bg-white/5 text-white tracking-wide"
+                      style={{ boxShadow: `0 0 15px ${factionColor}33`, color: factionColor }}
                     >
                       {String.fromCharCode(65 + index)}
                     </span>
-                    <span className="text-[15px] sm:text-base leading-snug whitespace-normal break-words">
+                    <span className="text-sm sm:text-base leading-relaxed whitespace-normal break-words flex-1">
                       {option.text}
                     </span>
                   </Button>
