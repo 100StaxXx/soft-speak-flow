@@ -366,15 +366,22 @@ const Auth = () => {
 
         console.log('[Google OAuth] SocialLogin result:', JSON.stringify(result, null, 2));
 
+        // The plugin sometimes returns the payload under `result`, sometimes directly at the root
+        const nativeResponse = (result as { result?: Record<string, unknown> })?.result ?? result;
+
+        // Prefer explicit responseType when available but don't block when it's missing
+        const responseType = (nativeResponse as { responseType?: string })?.responseType;
+        const idToken = (nativeResponse as { idToken?: string })?.idToken;
+
         // Check if we got a valid response
-        if (result.provider === 'google' && result.result.responseType === 'online') {
-          const { idToken } = result.result;
-          
-          console.log('[Google OAuth] ID token received:', idToken ? `${idToken.substring(0, 20)}...` : 'MISSING');
-          
-          if (!idToken) {
-            throw new Error('No ID token received from Google sign-in');
+        if (idToken) {
+          console.log('[Google OAuth] ID token received:', `${idToken.substring(0, 20)}...`);
+
+          if (responseType && responseType !== 'online') {
+            console.warn(`[Google OAuth] Unexpected responseType (${responseType}), continuing with idToken flow`);
           }
+
+          // Continue using the idToken even if the provider/responseType metadata is missing
 
           console.log('[Google OAuth] Calling google-native-auth edge function');
           
@@ -426,8 +433,8 @@ const Auth = () => {
           }
           return;
         } else {
-          console.error('[Google OAuth] Unexpected response type:', result);
-          throw new Error('Unexpected Google sign-in response');
+          console.error('[Google OAuth] Missing idToken in native response:', result);
+          throw new Error('Google sign-in did not return an ID token');
         }
       }
 
