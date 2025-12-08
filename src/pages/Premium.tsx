@@ -44,11 +44,22 @@ export default function Premium() {
 
   const selectedProduct = productMap[selectedProductId];
 
+  const diagnosticsSummary = useMemo(() => {
+    return [
+      `available=${isAvailable}`,
+      `productsLoading=${productsLoading}`,
+      `fetchAttempted=${hasLoadedProducts}`,
+      `productCount=${products.length}`,
+      `selectedPlan=${selectedPlan}`,
+      `selectedProductReady=${Boolean(selectedProduct)}`,
+    ].join(" • ");
+  }, [hasLoadedProducts, isAvailable, products, productsLoading, selectedPlan, selectedProduct]);
+
   const handleSubscribe = async () => {
     if (!selectedProduct) {
       toast({
         title: "Almost ready",
-        description: "We're still loading Apple pricing information. Please try again in a moment.",
+        description: `We're still loading Apple pricing information. Diagnostics: ${diagnosticsSummary}`,
         variant: "destructive",
       });
       return;
@@ -277,16 +288,25 @@ export default function Premium() {
               </div>
             )}
 
+            {(!selectedProduct || productError || !hasLoadedProducts) && (
+              <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 p-3 text-xs text-muted-foreground space-y-2">
+                <p className="text-sm font-semibold text-foreground">Subscription diagnostics</p>
+                <div className="space-y-1 font-mono text-[11px]">
+                  <p>IAP available: {isAvailable ? "yes" : "no"}</p>
+                  <p>Products loading: {productsLoading ? "yes" : "no"}</p>
+                  <p>Fetch attempted: {hasLoadedProducts ? "yes" : "no"}</p>
+                  <p>Products returned: {products.length}</p>
+                  <p>Selected plan: {selectedPlan}</p>
+                  <p>Selected product ready: {selectedProduct ? "yes" : "no"}</p>
+                  <p>Product IDs: {products.map((product) => product.productId).join(", ") || "none"}</p>
+                </div>
+              </div>
+            )}
+
             {/* CTA Button */}
             <Button
               onClick={handleSubscribe}
-              disabled={
-                loading || 
-                !isAvailable || 
-                productsLoading || 
-                !hasLoadedProducts ||
-                !selectedProduct
-              }
+              disabled={loading}
               className="w-full py-7 text-lg font-black uppercase tracking-wider bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-glow"
               size="lg"
             >

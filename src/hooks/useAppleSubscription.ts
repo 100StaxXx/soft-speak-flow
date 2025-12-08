@@ -2,9 +2,27 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct } from '@/utils/appleIAP';
+import { logger } from '@/utils/logger';
 import { useToast } from './use-toast';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
+const log = logger.scope('useAppleSubscription');
+
+const describeError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
 
 export function useAppleSubscription() {
   const queryClient = useQueryClient();
@@ -16,10 +34,14 @@ export function useAppleSubscription() {
   const [hasAttemptedProductFetch, setHasAttemptedProductFetch] = useState(false);
 
   const fetchProducts = useCallback(async () => {
-    if (!isIAPAvailable()) {
+    const iapAvailable = isIAPAvailable();
+    log.info('Fetching Apple IAP products', { iapAvailable });
+
+    if (!iapAvailable) {
       setProducts([]);
       setProductError("In-App Purchases are only available on iOS devices");
       setHasAttemptedProductFetch(true);
+      log.warn('Skipped product fetch because IAP is unavailable');
       return [];
     }
 
@@ -27,18 +49,24 @@ export function useAppleSubscription() {
     setProductError(null);
 
     try {
-      const loadedProducts = await getProducts(Object.values(IAP_PRODUCTS));
+      const productIds = Object.values(IAP_PRODUCTS);
+      const loadedProducts = await getProducts(productIds);
 
       if (!loadedProducts.length) {
         throw new Error("No App Store products were returned");
       }
 
       setProducts(loadedProducts);
+      log.info('Loaded Apple IAP products', {
+        count: loadedProducts.length,
+        productIds: loadedProducts.map((product) => product.productId),
+      });
       return loadedProducts;
     } catch (error) {
-      console.error('Product load error:', error);
+      const details = describeError(error);
+      log.error('Product load error', { details });
       setProducts([]);
-      setProductError(PRODUCT_FETCH_ERROR_MESSAGE);
+      setProductError(`${PRODUCT_FETCH_ERROR_MESSAGE} (Details: ${details})`);
       return [];
     } finally {
       setProductsLoading(false);
@@ -60,7 +88,10 @@ export function useAppleSubscription() {
   }, [fetchProducts, hasAttemptedProductFetch, products]);
 
   const handlePurchase = async (productId: string) => {
+    log.info('Starting purchase flow', { productId });
+
     if (!isIAPAvailable()) {
+      log.warn('handlePurchase called while IAP unavailable', { productId });
       toast({
         title: "Not Available",
         description: "In-App Purchases are only available on iOS devices",
@@ -73,6 +104,7 @@ export function useAppleSubscription() {
     try {
       const availableProducts = await ensureProductsAvailable();
       if (!availableProducts) {
+        log.warn('No products available during purchase attempt', { productId });
         toast({
           title: "Unavailable",
           description: PRODUCT_FETCH_ERROR_MESSAGE,
@@ -83,6 +115,10 @@ export function useAppleSubscription() {
 
       const productExists = availableProducts.some((product) => product.productId === productId);
       if (!productExists) {
+        log.warn('Selected product missing from loaded products', {
+          productId,
+          availableProducts: availableProducts.map((product) => product.productId),
+        });
         toast({
           title: "Unavailable",
           description: "Selected premium plan is not ready yet. Please try again in a moment.",
@@ -117,13 +153,15 @@ export function useAppleSubscription() {
         description: "Your subscription is now active",
       });
 
+      log.info('Purchase verified successfully', { productId });
       return true;
     } catch (error) {
-      console.error('Purchase error:', error);
+      const details = describeError(error);
+      log.error('Purchase error', { productId, details });
       const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Purchase Failed",
-        description: errorMessage,
+        description: `${errorMessage}`,
         variant: "destructive",
       });
       return false;
@@ -133,7 +171,10 @@ export function useAppleSubscription() {
   };
 
   const handleRestore = async () => {
+    log.info('Starting restore flow');
+
     if (!isIAPAvailable()) {
+      log.warn('handleRestore called while IAP unavailable');
       toast({
         title: "Not Available",
         description: "In-App Purchases are only available on iOS devices",
@@ -208,12 +249,16 @@ export function useAppleSubscription() {
         title: "Restored!",
         description: "Your subscription has been restored",
       });
+      log.info('Subscription restored successfully', {
+        productId: subscriptionPurchase.productId,
+      });
     } catch (error) {
-      console.error('Restore error:', error);
+      const details = describeError(error);
+      log.error('Restore error', { details });
       const errorMessage = error instanceof Error ? error.message : "Please try again";
       toast({
         title: "Restore Failed",
-        description: errorMessage,
+        description: `${errorMessage}`,
         variant: "destructive",
       });
     } finally {
