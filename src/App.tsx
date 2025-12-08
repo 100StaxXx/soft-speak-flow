@@ -36,6 +36,7 @@ const Premium = lazy(() => import("./pages/Premium"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const Mentor = lazy(() => import("./pages/Mentor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Reflection = lazy(() => import("./pages/Reflection"));
@@ -195,6 +196,7 @@ const AppContent = memo(() => {
           <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
           <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
           
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
