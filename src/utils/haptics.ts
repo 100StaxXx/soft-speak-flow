@@ -3,49 +3,55 @@
  * Provides tactile feedback for user interactions
  */
 
+const hasNavigator = typeof navigator !== 'undefined';
+const supportsVibrate = hasNavigator && 'vibrate' in navigator && typeof navigator.vibrate === 'function';
+
+let hasVibrationError = false;
+
+const safeVibrate = (pattern: number | number[]) => {
+  if (!supportsVibrate || hasVibrationError) return;
+
+  try {
+    navigator.vibrate(pattern);
+  } catch (error) {
+    console.warn('Haptics unavailable, disabling vibration', error);
+    hasVibrationError = true; // Avoid repeated attempts on unsupported environments
+  }
+};
+
 export const haptics = {
   /**
    * Light impact - for subtle interactions like hover states
    */
   light: () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(10);
-    }
+    safeVibrate(10);
   },
 
   /**
    * Medium impact - for button presses and selections
    */
   medium: () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(20);
-    }
+    safeVibrate(20);
   },
 
   /**
    * Heavy impact - for important actions like completions
    */
   heavy: () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(30);
-    }
+    safeVibrate(30);
   },
 
   /**
    * Success pattern - celebratory feedback
    */
   success: () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate([10, 50, 10]);
-    }
+    safeVibrate([10, 50, 10]);
   },
 
   /**
    * Error pattern - warning feedback
    */
   error: () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate([50, 100, 50]);
-    }
+    safeVibrate([50, 100, 50]);
   }
 };
