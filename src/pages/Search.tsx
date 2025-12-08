@@ -2,14 +2,13 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, MessageSquare, Target, Sparkles } from "lucide-react";
+import { BookOpen, MessageSquare } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { SearchHero } from "@/components/search/SearchHero";
 import { SuggestedSearches } from "@/components/library/SuggestedSearches";
-import { CategoryCard } from "@/components/library/CategoryCard";
 import { FeaturedQuoteCard } from "@/components/library/FeaturedQuoteCard";
 import { FeaturedPepTalkCard } from "@/components/library/FeaturedPepTalkCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,46 +77,6 @@ const Search = () => {
                 className="space-y-12"
               >
                 <SuggestedSearches onSearch={setSearchQuery} />
-
-                <section>
-                  <motion.h2
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="text-xl font-semibold mb-4 flex items-center gap-2"
-                  >
-                    <Sparkles className="h-5 w-5 text-stardust-gold" />
-                    Browse categories
-                  </motion.h2>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <CategoryCard
-                      icon={BookOpen}
-                      title="Quotes"
-                      description="Daily sparks of wisdom"
-                      gradient="bg-gradient-to-br from-[hsl(var(--royal-purple)/0.35)] to-[hsl(var(--deep-purple)/0.2)]"
-                      glowColor="bg-royal-purple"
-                      onClick={() => navigate("/library")}
-                      delay={0.1}
-                    />
-                    <CategoryCard
-                      icon={MessageSquare}
-                      title="Pep Talks"
-                      description="Immersive encouragement hits"
-                      gradient="bg-gradient-to-br from-[hsl(var(--nebula-pink)/0.3)] to-[hsl(var(--nebula-pink)/0.1)]"
-                      glowColor="bg-nebula-pink"
-                      onClick={() => navigate("/pep-talks")}
-                      delay={0.2}
-                    />
-                    <CategoryCard
-                      icon={Target}
-                      title="Challenges"
-                      description="Guided quests for growth"
-                      gradient="bg-gradient-to-br from-[hsl(var(--celestial-blue)/0.35)] to-[hsl(var(--celestial-blue)/0.1)]"
-                      glowColor="bg-celestial-blue"
-                      onClick={() => navigate("/challenges")}
-                      delay={0.3}
-                    />
-                  </div>
-                </section>
 
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">

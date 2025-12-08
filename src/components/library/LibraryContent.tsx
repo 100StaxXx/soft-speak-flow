@@ -3,9 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, MessageSquare, Target, Sparkles, ArrowRight } from "lucide-react";
+import { BookOpen, MessageSquare, ArrowRight } from "lucide-react";
 import { LibraryHero } from "./LibraryHero";
-import { CategoryCard } from "./CategoryCard";
 import { FeaturedQuoteCard } from "./FeaturedQuoteCard";
 import { FeaturedPepTalkCard } from "./FeaturedPepTalkCard";
 import { SuggestedSearches } from "./SuggestedSearches";
@@ -97,46 +96,6 @@ export const LibraryContent = () => {
             transition={{ duration: 0.3 }}
           >
             <SuggestedSearches onSearch={setSearchQuery} />
-
-            <div className="mb-10">
-              <motion.h2
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-xl font-bold mb-4 flex items-center gap-2"
-              >
-                <Sparkles className="h-5 w-5 text-stardust-gold" />
-                Browse by Category
-              </motion.h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <CategoryCard
-                  icon={BookOpen}
-                  title="Quotes"
-                  description="Wisdom from great minds"
-                  gradient="bg-gradient-to-br from-[hsl(var(--royal-purple)/0.4)] to-[hsl(var(--deep-purple)/0.2)]"
-                  glowColor="bg-royal-purple"
-                  onClick={() => navigate("/library")}
-                  delay={0.1}
-                />
-                <CategoryCard
-                  icon={MessageSquare}
-                  title="Pep Talks"
-                  description="Motivational audio sessions"
-                  gradient="bg-gradient-to-br from-[hsl(var(--nebula-pink)/0.4)] to-[hsl(var(--nebula-pink)/0.1)]"
-                  glowColor="bg-nebula-pink"
-                  onClick={() => navigate("/pep-talks")}
-                  delay={0.2}
-                />
-                <CategoryCard
-                  icon={Target}
-                  title="Challenges"
-                  description="Multi-day growth journeys"
-                  gradient="bg-gradient-to-br from-[hsl(var(--celestial-blue)/0.4)] to-[hsl(var(--celestial-blue)/0.1)]"
-                  glowColor="bg-celestial-blue"
-                  onClick={() => navigate("/challenges")}
-                  delay={0.3}
-                />
-              </div>
-            </div>
 
             <div className="mb-10">
               <div className="flex items-center justify-between mb-4">

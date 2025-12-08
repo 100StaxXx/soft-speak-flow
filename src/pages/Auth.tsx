@@ -367,7 +367,7 @@ const Auth = () => {
         console.log('[Google OAuth] SocialLogin result:', JSON.stringify(result, null, 2));
 
         // The plugin sometimes returns the payload under `result`, sometimes directly at the root
-        const nativeResponse = (result as { result?: Record<string, unknown> })?.result ?? result;
+        const nativeResponse = (result as unknown as { result?: Record<string, unknown> })?.result ?? result;
 
         // Prefer explicit responseType when available but don't block when it's missing
         const responseType = (nativeResponse as { responseType?: string })?.responseType;
