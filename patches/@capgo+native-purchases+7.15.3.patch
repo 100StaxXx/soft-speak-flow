@@ -21,20 +21,20 @@ index 7cb921e..fbd2ce5 100644
          call.resolve(["version": self.pluginVersion])
 @@ -38,10 +39,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      }
- 
+
      deinit {
 -        if #available(iOS 15.0, *) { cancelTransactionUpdatesListener() }
 +        if #available(iOS 15.0, *) {
-+            transactionUpdatesTask?.cancel()
++            cancelTransactionUpdatesListener()
 +        }
      }
- 
+
 -    private func cancelTransactionUpdatesListener() {
 +    nonisolated private func cancelTransactionUpdatesListener() {
          self.transactionUpdatesTask?.cancel()
          self.transactionUpdatesTask = nil
      }
-@@ -50,7 +53,9 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -50,7 +53,10 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
@@ -42,6 +42,8 @@ index 7cb921e..fbd2ce5 100644
 +        let task = Task { @MainActor [weak self] in
 +            guard let self else { return }
 +
++            defer { self.transactionUpdatesTask = nil }
+
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
                  switch result {
