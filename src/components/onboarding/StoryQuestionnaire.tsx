@@ -223,7 +223,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             </motion.h2>
 
             {/* Options */}
-            <div className="space-y-3 sm:space-y-4 w-full max-w-xl mx-auto">
+              <div className="space-y-3 sm:space-y-4 w-full max-w-xl mx-auto">
               {currentQuestion.options.map((option, index) => (
                 <motion.div
                   key={option.text}
@@ -234,13 +234,13 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
-                    className="w-full flex flex-col items-center justify-center text-center gap-3 min-h-[80px] py-4 px-4 text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
+                    className="w-full flex items-start text-left gap-4 min-h-[80px] py-4 px-4 text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,
                     }}
                   >
                     <span
-                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold"
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold mt-0.5"
                       style={{ backgroundColor: `${factionColor}30`, color: factionColor }}
                     >
                       {String.fromCharCode(65 + index)}
