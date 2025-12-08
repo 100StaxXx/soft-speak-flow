@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import { SocialLogin } from '@capgo/capacitor-social-login';
@@ -50,6 +50,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { session: authSession } = useAuth();
 
@@ -80,6 +81,13 @@ const Auth = () => {
 
   // Track whether the native SocialLogin plugin is ready for use
   const [nativeOAuthReady, setNativeOAuthReady] = useState(false);
+
+  // If we ever land back on /auth, allow redirects to run again
+  useEffect(() => {
+    if (location.pathname === '/auth' && hasRedirected.current) {
+      hasRedirected.current = false;
+    }
+  }, [location.pathname]);
 
   // Separate effect for OAuth initialization to prevent re-renders
   useEffect(() => {
@@ -409,12 +417,20 @@ const Auth = () => {
 
           if (sessionError) throw sessionError;
 
+          // Ensure Supabase client state has the session before navigating
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          const sessionToUse = newSession ?? currentSession;
+
+          if (!sessionToUse) {
+            throw new Error('Failed to establish Supabase session after Google sign-in');
+          }
+
           const sessionSetTime = Date.now();
           console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-          await handlePostAuthNavigation(newSession, 'googleNative');
+          await handlePostAuthNavigation(sessionToUse, 'googleNative');
 
           // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-          if (newSession?.user) {
+          if (sessionToUse.user) {
             googleFallbackTimeout.current = setTimeout(async () => {
               try {
                 // Check if already redirected by onAuthStateChange
@@ -423,7 +439,7 @@ const Auth = () => {
                   return;
                 }
                 console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-                await handlePostAuthNavigation(newSession, 'googleNativeFallback');
+                await handlePostAuthNavigation(sessionToUse, 'googleNativeFallback');
               } catch (error) {
                 console.error('[Google OAuth Fallback] Error during redirect:', error);
                 // Fallback to onboarding if something goes wrong
@@ -517,12 +533,20 @@ const Auth = () => {
 
         if (sessionError) throw sessionError;
 
+        // Ensure Supabase client state reflects the session before navigating
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const sessionToUse = newSession ?? currentSession;
+
+        if (!sessionToUse) {
+          throw new Error('Failed to establish Supabase session after Apple sign-in');
+        }
+
         const sessionSetTime = Date.now();
         console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        await handlePostAuthNavigation(newSession, 'appleNative');
+        await handlePostAuthNavigation(sessionToUse, 'appleNative');
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-        if (newSession?.user) {
+        if (sessionToUse.user) {
           appleFallbackTimeout.current = setTimeout(async () => {
             try {
               // Check if already redirected by onAuthStateChange
@@ -531,7 +555,7 @@ const Auth = () => {
                 return;
               }
               console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-              await handlePostAuthNavigation(newSession, 'appleNativeFallback');
+              await handlePostAuthNavigation(sessionToUse, 'appleNativeFallback');
             } catch (error) {
               console.error('[Apple OAuth Fallback] Error during redirect:', error);
               // Fallback to onboarding if something goes wrong
