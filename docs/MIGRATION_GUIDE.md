@@ -1,178 +1,181 @@
-# Supabase Migration Guide: Lovable Cloud → Self-Managed
+# Supabase Migration Guide: Fresh Start on New Project
 
 ## Overview
-This guide covers migrating from Lovable Cloud (project: `tffrgsaawvletgiztfry`) to a self-managed Supabase project.
+This guide covers setting up the fresh Supabase project: `opbfpbbqvuksuuvmtmssd`
+
+**Project URL**: `https://opbfpbbqvuksuuvmtmssd.supabase.co`
 
 ---
 
-## Phase 1: Pre-Migration (Current Project)
+## Phase 1: Local Setup
 
-### 1.1 Export Data
+### 1.1 Clone and Install
 ```bash
-# Export schema
-supabase db dump -f supabase/export/schema.sql --project-ref tffrgsaawvletgiztfry
+# Clone your repo from GitHub
+git clone <your-repo-url>
+cd <project-folder>
+npm install
 
-# Export data (excludes schema)
-supabase db dump -f supabase/export/data.sql --data-only --project-ref tffrgsaawvletgiztfry
-
-# Export auth users (if supported by your CLI version)
-supabase auth export --project-ref tffrgsaawvletgiztfry > supabase/export/auth.json
+# Install Supabase CLI
+npm install -g supabase
 ```
 
-### 1.2 Backup Storage
+### 1.2 Link to Project
 ```bash
-# Set your service role key
-export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
-export SUPABASE_URL="https://tffrgsaawvletgiztfry.supabase.co"
-
-# Run backup script
-npx ts-node scripts/backup-storage.ts
+supabase link --project-ref opbfpbbqvuksuuvmtmssd
 ```
-
-### 1.3 Document Current Secrets
-Export all secret values before migration (store securely):
-
-| Secret Name | Description |
-|-------------|-------------|
-| SUPABASE_URL | https://tffrgsaawvletgiztfry.supabase.co |
-| SUPABASE_ANON_KEY | Current anon key |
-| SUPABASE_SERVICE_ROLE_KEY | Current service role key |
-| SUPABASE_DB_URL | Database connection string |
-| OPENAI_API_KEY | OpenAI API key |
-| ELEVENLABS_API_KEY | ElevenLabs TTS key |
-| APPLE_TEAM_ID | Apple Developer Team ID |
-| APPLE_KEY_ID | Apple Auth Key ID |
-| APPLE_PRIVATE_KEY | Apple Auth Private Key (PEM) |
-| APPLE_SERVICE_ID | com.darrylgraham.revolution.web |
-| APPLE_SHARED_SECRET | App Store shared secret |
-| APPLE_IOS_BUNDLE_ID | com.darrylgraham.revolution |
-| APNS_KEY_ID | APNs Key ID |
-| APNS_TEAM_ID | APNs Team ID |
-| APNS_AUTH_KEY | APNs Auth Key (P8) |
-| APNS_BUNDLE_ID | APNs Bundle ID |
-| GOOGLE_CLIENT_ID | Google OAuth Client ID |
-| VITE_GOOGLE_WEB_CLIENT_ID | Google Web Client ID |
-| VITE_GOOGLE_IOS_CLIENT_ID | Google iOS Client ID |
-| DISCORD_BOT_TOKEN | Discord bot token |
-| DISCORD_WEBHOOK_URL | Discord webhook URL |
-| DISCORD_GUILD_ID | Discord Guild ID |
-| PAYPAL_CLIENT_ID | PayPal Client ID |
-| PAYPAL_SECRET | PayPal Secret |
-| STRIPE_SECRET_KEY | Stripe Secret Key |
-| LOVABLE_API_KEY | Lovable API Key |
-| VITE_NATIVE_REDIRECT_BASE | https://app.cosmiq.quest |
 
 ---
 
-## Phase 2: New Project Setup
+## Phase 2: Database Setup
 
-### 2.1 Create New Supabase Project
-1. Go to https://supabase.com/dashboard
-2. Create new project in your organization
-3. Note these values:
-   - **Project Ref**: `<NEW_PROJECT_REF>`
-   - **API URL**: `https://<NEW_PROJECT_REF>.supabase.co`
-   - **Anon Key**: `<NEW_ANON_KEY>`
-   - **Service Role Key**: `<NEW_SERVICE_ROLE_KEY>`
-   - **DB Password**: `<NEW_DB_PASSWORD>`
-
-### 2.2 Enable Required Extensions
-In SQL Editor, run:
+### 2.1 Enable Required Extensions
+In Supabase Dashboard → SQL Editor, run:
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 ```
 
----
-
-## Phase 3: Apply Migration
-
-### 3.1 Update Config Files
-
-**supabase/config.toml** - Update first line:
-```toml
-project_id = "<NEW_PROJECT_REF>"
-```
-
-**.env** - Update:
-```env
-VITE_SUPABASE_URL=https://<NEW_PROJECT_REF>.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=<NEW_ANON_KEY>
-VITE_SUPABASE_PROJECT_ID=<NEW_PROJECT_REF>
-```
-
-**.env.example** - Update with same placeholders
-
-**REGENERATE_TYPES.sh** - Update PROJECT_ID:
+### 2.2 Push All Migrations
 ```bash
-PROJECT_ID="<NEW_PROJECT_REF>"
-```
-
-### 3.2 Link and Push Schema
-```bash
-# Link to new project
-supabase link --project-ref <NEW_PROJECT_REF>
-
-# Push all migrations
 supabase db push
 ```
 
-### 3.3 Load Data
+This creates all tables, functions, triggers, and RLS policies from scratch.
+
+---
+
+## Phase 3: Set Secrets
+
+### 3.1 Required Secrets (27 total)
+Set all secrets via CLI:
 ```bash
-# Connect and load data
-psql "postgres://postgres.<NEW_PROJECT_REF>:<NEW_DB_PASSWORD>@aws-0-us-east-1.pooler.supabase.com:6543/postgres" < supabase/export/data.sql
+supabase secrets set --project-ref opbfpbbqvuksuuvmtmssd \
+  SUPABASE_URL="https://opbfpbbqvuksuuvmtmssd.supabase.co" \
+  SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw" \
+  SUPABASE_SERVICE_ROLE_KEY="<YOUR_SERVICE_ROLE_KEY>" \
+  SUPABASE_DB_URL="<YOUR_DB_URL>" \
+  SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw" \
+  OPENAI_API_KEY="<YOUR_OPENAI_KEY>" \
+  ELEVENLABS_API_KEY="<YOUR_ELEVENLABS_KEY>" \
+  LOVABLE_API_KEY="<YOUR_LOVABLE_KEY>" \
+  APPLE_TEAM_ID="B6VW78ABTR" \
+  APPLE_KEY_ID="FPGVLVRK63" \
+  APPLE_PRIVATE_KEY="<YOUR_APPLE_PRIVATE_KEY>" \
+  APPLE_SERVICE_ID="com.darrylgraham.revolution.web" \
+  APPLE_SHARED_SECRET="<YOUR_APPLE_SHARED_SECRET>" \
+  APPLE_IOS_BUNDLE_ID="com.darrylgraham.revolution" \
+  APNS_KEY_ID="<YOUR_APNS_KEY_ID>" \
+  APNS_TEAM_ID="<YOUR_APNS_TEAM_ID>" \
+  APNS_AUTH_KEY="<YOUR_APNS_AUTH_KEY>" \
+  APNS_BUNDLE_ID="com.darrylgraham.revolution" \
+  GOOGLE_CLIENT_ID="<YOUR_GOOGLE_CLIENT_ID>" \
+  VITE_GOOGLE_WEB_CLIENT_ID="371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com" \
+  VITE_GOOGLE_IOS_CLIENT_ID="371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com" \
+  DISCORD_BOT_TOKEN="<YOUR_DISCORD_BOT_TOKEN>" \
+  DISCORD_WEBHOOK_URL="<YOUR_DISCORD_WEBHOOK>" \
+  DISCORD_GUILD_ID="<YOUR_DISCORD_GUILD_ID>" \
+  PAYPAL_CLIENT_ID="<YOUR_PAYPAL_CLIENT_ID>" \
+  PAYPAL_SECRET="<YOUR_PAYPAL_SECRET>" \
+  STRIPE_SECRET_KEY="<YOUR_STRIPE_SECRET>" \
+  VITE_NATIVE_REDIRECT_BASE="https://app.cosmiq.quest"
 ```
 
-### 3.4 Update Cron Jobs
-The cron jobs reference hardcoded URLs. Run this SQL with new values:
+### 3.2 Secrets Reference Table
 
+| Secret Name | Description | Required |
+|-------------|-------------|----------|
+| SUPABASE_URL | Project URL | ✅ |
+| SUPABASE_ANON_KEY | Anon/public key | ✅ |
+| SUPABASE_SERVICE_ROLE_KEY | Service role key | ✅ |
+| SUPABASE_DB_URL | Database connection string | ✅ |
+| SUPABASE_PUBLISHABLE_KEY | Same as anon key | ✅ |
+| OPENAI_API_KEY | OpenAI API key | ✅ |
+| ELEVENLABS_API_KEY | ElevenLabs TTS | ✅ |
+| LOVABLE_API_KEY | Lovable AI | ✅ |
+| APPLE_TEAM_ID | Apple Developer Team ID | ✅ |
+| APPLE_KEY_ID | Apple Auth Key ID | ✅ |
+| APPLE_PRIVATE_KEY | Apple Auth Private Key | ✅ |
+| APPLE_SERVICE_ID | com.darrylgraham.revolution.web | ✅ |
+| APPLE_SHARED_SECRET | App Store shared secret | ✅ |
+| APPLE_IOS_BUNDLE_ID | com.darrylgraham.revolution | ✅ |
+| APNS_KEY_ID | APNs Key ID | ✅ |
+| APNS_TEAM_ID | APNs Team ID | ✅ |
+| APNS_AUTH_KEY | APNs Auth Key (P8) | ✅ |
+| APNS_BUNDLE_ID | APNs Bundle ID | ✅ |
+| GOOGLE_CLIENT_ID | Google OAuth Client ID | Optional |
+| VITE_GOOGLE_WEB_CLIENT_ID | Google Web Client ID | Optional |
+| VITE_GOOGLE_IOS_CLIENT_ID | Google iOS Client ID | Optional |
+| DISCORD_BOT_TOKEN | Discord bot token | Optional |
+| DISCORD_WEBHOOK_URL | Discord webhook URL | Optional |
+| DISCORD_GUILD_ID | Discord Guild ID | Optional |
+| PAYPAL_CLIENT_ID | PayPal Client ID | Optional |
+| PAYPAL_SECRET | PayPal Secret | Optional |
+| STRIPE_SECRET_KEY | Stripe Secret Key | Optional |
+| VITE_NATIVE_REDIRECT_BASE | https://app.cosmiq.quest | ✅ |
+
+---
+
+## Phase 4: Deploy Edge Functions
+
+### 4.1 Deploy All Functions
+```bash
+# Deploy all edge functions (70+)
+for fn in $(ls supabase/functions | grep -v '^_'); do
+  echo "Deploying $fn..."
+  supabase functions deploy "$fn" --project-ref opbfpbbqvuksuuvmtmssd
+done
+```
+
+---
+
+## Phase 5: Configure Cron Jobs
+
+Run in Supabase SQL Editor:
 ```sql
--- Remove old jobs
-SELECT cron.unschedule('dispatch-daily-pushes-native');
-SELECT cron.unschedule('dispatch-daily-quote-pushes');
-SELECT cron.unschedule('process-daily-decay');
-
--- Recreate with new URLs
+-- Daily pushes (1 PM UTC)
 SELECT cron.schedule(
   'dispatch-daily-pushes-native',
   '0 13 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://<NEW_PROJECT_REF>.supabase.co/functions/v1/dispatch-daily-pushes-native',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes-native',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer <NEW_ANON_KEY>'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   ) AS request_id
   $$
 );
 
+-- Daily quote pushes (2:30 PM UTC)
 SELECT cron.schedule(
   'dispatch-daily-quote-pushes',
   '30 14 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://<NEW_PROJECT_REF>.supabase.co/functions/v1/dispatch-daily-quote-pushes',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-quote-pushes',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer <NEW_ANON_KEY>'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   ) AS request_id
   $$
 );
 
+-- Daily decay (5 AM UTC)
 SELECT cron.schedule(
   'process-daily-decay',
   '0 5 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://<NEW_PROJECT_REF>.supabase.co/functions/v1/process-daily-decay',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/process-daily-decay',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer <NEW_ANON_KEY>'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   ) AS request_id
@@ -182,141 +185,91 @@ SELECT cron.schedule(
 
 ---
 
-## Phase 4: Configure Services
+## Phase 6: Configure OAuth Providers
 
-### 4.1 Set All Secrets
-```bash
-supabase secrets set --project-ref <NEW_PROJECT_REF> \
-  SUPABASE_URL="https://<NEW_PROJECT_REF>.supabase.co" \
-  SUPABASE_ANON_KEY="<NEW_ANON_KEY>" \
-  SUPABASE_SERVICE_ROLE_KEY="<NEW_SERVICE_ROLE_KEY>" \
-  SUPABASE_DB_URL="postgres://postgres.<NEW_PROJECT_REF>:<DB_PASSWORD>@..." \
-  OPENAI_API_KEY="sk-..." \
-  ELEVENLABS_API_KEY="..." \
-  APPLE_TEAM_ID="..." \
-  APPLE_KEY_ID="..." \
-  APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..." \
-  APPLE_SERVICE_ID="com.darrylgraham.revolution.web" \
-  APPLE_SHARED_SECRET="..." \
-  APPLE_IOS_BUNDLE_ID="com.darrylgraham.revolution" \
-  APNS_KEY_ID="..." \
-  APNS_TEAM_ID="..." \
-  APNS_AUTH_KEY="-----BEGIN PRIVATE KEY-----..." \
-  APNS_BUNDLE_ID="com.darrylgraham.revolution" \
-  GOOGLE_CLIENT_ID="...apps.googleusercontent.com" \
-  VITE_GOOGLE_WEB_CLIENT_ID="...apps.googleusercontent.com" \
-  VITE_GOOGLE_IOS_CLIENT_ID="...apps.googleusercontent.com" \
-  DISCORD_BOT_TOKEN="..." \
-  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..." \
-  DISCORD_GUILD_ID="..." \
-  PAYPAL_CLIENT_ID="..." \
-  PAYPAL_SECRET="..." \
-  STRIPE_SECRET_KEY="sk_live_..." \
-  VITE_NATIVE_REDIRECT_BASE="https://app.cosmiq.quest"
-```
-
-### 4.2 Deploy Edge Functions
-```bash
-# Deploy all functions
-for fn in $(ls supabase/functions | grep -v '^_'); do
-  echo "Deploying $fn..."
-  supabase functions deploy "$fn" --project-ref <NEW_PROJECT_REF>
-done
-```
-
-### 4.3 Upload Storage Files
-```bash
-# For each bucket, upload backed-up files
-# Example using supabase-js or CLI:
-for bucket in pep-talk-audio audio-pep-talks video-pep-talks quotes-json mentors-avatars voice-samples playlists-assets hero-media mentor-audio evolution-cards; do
-  echo "Uploading to $bucket..."
-  # Use supabase storage upload or a custom script
-done
-```
-
-### 4.4 Configure OAuth Providers
-In Supabase Dashboard → Authentication → Providers:
-
-**Google:**
-- Client ID: Your Google Web Client ID
+### 6.1 Google OAuth
+In Supabase Dashboard → Authentication → Providers → Google:
+- Client ID: `371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com`
 - Client Secret: Your Google Client Secret
 
-**Apple:**
-- Service ID: com.darrylgraham.revolution.web
-- Team ID: Your Apple Team ID
-- Key ID: Your Apple Key ID
-- Private Key: Your Apple Private Key (PEM)
+In Google Cloud Console, add redirect URL:
+- `https://opbfpbbqvuksuuvmtmssd.supabase.co/auth/v1/callback`
 
-### 4.5 Update Apple Webhook
+### 6.2 Apple Sign In
+In Supabase Dashboard → Authentication → Providers → Apple:
+- Service ID: `com.darrylgraham.revolution.web`
+- Team ID: `B6VW78ABTR`
+- Key ID: `FPGVLVRK63`
+- Private Key: Your Apple Private Key
+
+---
+
+## Phase 7: Create Storage Buckets
+
+In Supabase Dashboard → Storage, create these public buckets:
+- `pep-talk-audio`
+- `audio-pep-talks`
+- `video-pep-talks`
+- `quotes-json`
+- `mentors-avatars`
+- `voice-samples`
+- `playlists-assets`
+- `hero-media`
+- `mentor-audio`
+- `evolution-cards`
+
+---
+
+## Phase 8: Update Apple Webhook
+
 In App Store Connect → App Information:
-- Production Server URL: `https://<NEW_PROJECT_REF>.supabase.co/functions/v1/apple-webhook`
+- Production Server URL: `https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/apple-webhook`
 - Version: Version 2
 
 ---
 
-## Phase 5: Client Updates
+## Phase 9: Regenerate Types & Rebuild
 
-### 5.1 Regenerate Types
 ```bash
+# Regenerate TypeScript types
 ./REGENERATE_TYPES.sh
-```
 
-### 5.2 Update Capacitor Config
-In `capacitor.config.ts`, update if any URLs are hardcoded.
-
-### 5.3 Rebuild iOS App
-```bash
+# Build app
 npm run build
+
+# Sync iOS
 npx cap sync ios
-# Open Xcode and rebuild
 ```
 
 ---
 
-## Phase 6: Validation
+## Phase 10: Validation Checklist
 
-### 6.1 Verify Cron Jobs
-```sql
-SELECT * FROM cron.job;
--- Check last run status
-SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
-```
-
-### 6.2 Test Critical Flows
-- [ ] User signup/login
-- [ ] Companion evolution
-- [ ] Quest completion + XP
-- [ ] Subscription purchase
-- [ ] Push notifications
-- [ ] Mentor chat
-- [ ] Daily missions generation
-- [ ] Storage file access
-
-### 6.3 Revoke Old Credentials
-After validation, rotate/revoke old Lovable Cloud credentials to ensure no traffic hits old project.
+- [ ] User signup/login works
+- [ ] Companion creation succeeds
+- [ ] Quest completion awards XP
+- [ ] Subscription purchase works
+- [ ] Push notifications fire
+- [ ] Mentor chat responds
+- [ ] Daily missions generate
+- [ ] Storage files upload/download
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+### Edge functions 500 errors
+```bash
+supabase functions logs <function-name> --project-ref opbfpbbqvuksuuvmtmssd
+```
 
-**Cron jobs not firing:**
-- Check pg_cron extension is enabled
-- Verify URLs and anon key in cron job definitions
-- Check `cron.job_run_details` for errors
+### Missing secrets
+```bash
+supabase secrets list --project-ref opbfpbbqvuksuuvmtmssd
+```
 
-**Edge functions 500 errors:**
-- Check function logs: `supabase functions logs <function-name>`
-- Verify all secrets are set correctly
-- Check CORS configuration in `_shared/cors.ts`
-
-**Storage access denied:**
-- Verify bucket policies are applied
-- Check RLS policies on `storage.objects`
-- Ensure buckets are marked public if needed
-
-**Apple webhook failures:**
-- Verify webhook URL is correct in App Store Connect
-- Check edge function logs for errors
-- Verify APPLE_SHARED_SECRET is correct
+### Cron jobs not firing
+```sql
+SELECT * FROM cron.job;
+SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
+```
