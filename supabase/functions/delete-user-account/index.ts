@@ -7,6 +7,30 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+async function cleanupReferralArtifacts(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+) {
+  // Remove any referral payouts tied to this user either as referrer or recipient
+  const { error: referralPayoutsError } = await supabase
+    .from("referral_payouts")
+    .delete()
+    .or(`referrer_id.eq.${userId},recipient_user_id.eq.${userId}`);
+  if (referralPayoutsError) {
+    throw referralPayoutsError;
+  }
+
+  // Remove any referral codes owned by this user (prevents FK violations on auth.users)
+  const { error: referralCodesError } = await supabase
+    .from("referral_codes")
+    .delete()
+    .eq("owner_type", "user")
+    .eq("owner_user_id", userId);
+  if (referralCodesError) {
+    throw referralCodesError;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -69,6 +93,9 @@ serve(async (req) => {
     if (deleteDataError) {
       throw deleteDataError;
     }
+
+    // Ensure referral artifacts are removed even if the RPC function is stale
+    await cleanupReferralArtifacts(supabase, userId);
 
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
     if (authDeleteError) {
