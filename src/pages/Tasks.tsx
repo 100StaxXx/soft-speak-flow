@@ -160,6 +160,20 @@ export default function Tasks() {
     }, 0);
   }, [tasks]);
 
+  const tutorialQuestId = useMemo(() => {
+    const normalizedTutorial = tasks.find((task) =>
+      task.task_text?.trim().toLowerCase() === 'join cosmiq'
+    );
+
+    if (normalizedTutorial) return normalizedTutorial.id;
+
+    if (showTutorial) {
+      return tasks.find((task) => !task.completed)?.id;
+    }
+
+    return undefined;
+  }, [tasks, showTutorial]);
+
   // Habits state
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -984,7 +998,7 @@ export default function Tasks() {
                             onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
                             onDelete={() => deleteTask(mainQuest.id)}
                             isMainQuest={true}
-                            isTutorialQuest={mainQuest.task_text === 'Join Cosmiq'}
+                            isTutorialQuest={mainQuest.id === tutorialQuestId}
                           />
                         </div>
                       )}
@@ -1005,7 +1019,7 @@ export default function Tasks() {
                                 onDelete={() => deleteTask(task.id)}
                                 onSetMainQuest={() => setMainQuest(task.id)}
                                 showPromoteButton={!mainQuest}
-                                isTutorialQuest={task.task_text === 'Join Cosmiq'}
+                                isTutorialQuest={task.id === tutorialQuestId}
                               />
                             ))}
                           </div>
