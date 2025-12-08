@@ -202,20 +202,28 @@ export function SubscriptionManagement() {
           <Button
             onClick={() => selectedPlanOption && handlePurchase(selectedPlanOption.productId)}
             disabled={
+              !isAvailable ||
               !selectedPlanOption ||
               !canPurchasePlan(selectedPlanOption.productId)
             }
             className="w-full"
           >
-            {purchasing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Subscribe ${selectedPlanOption?.label ?? ''} • ${selectedProduct?.price ?? selectedPlanOption?.fallbackPrice}${selectedPlanOption?.billingPeriodLabel}`
-            )}
+            {(!isAvailable && "Available on iOS only") ||
+              (purchasing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Subscribe ${selectedPlanOption?.label ?? ''} • ${selectedProduct?.price ?? selectedPlanOption?.fallbackPrice}${selectedPlanOption?.billingPeriodLabel}`
+              ))}
           </Button>
+          
+          {!isAvailable && (
+            <p className="text-xs text-muted-foreground text-center">
+              Purchases must be completed inside the Cosmiq iOS app. Open the iOS app to subscribe.
+            </p>
+          )}
 
           <div className="space-y-2">
             {[
