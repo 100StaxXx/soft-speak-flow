@@ -374,7 +374,46 @@ const Horoscope = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
       </div>
 
-      <div className="relative max-w-2xl mx-auto p-6 space-y-6 safe-area-top">
+      <header className="sticky top-0 z-40 w-full border-b border-purple-500/30 bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-gray-950/60 safe-area-top">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <motion.div
+            className="flex-1 text-center"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
+              <motion.div
+                animate={{
+                  rotate: [0, 360],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Moon className="w-8 h-8 text-purple-400" />
+              </motion.div>
+              Cosmiq Insight
+              <HoroscopeInfoTooltip />
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">
+              {date ? formatDate(date) : 'Loading...'}
+            </p>
+          </motion.div>
+        </div>
+      </header>
+
+      <div className="relative max-w-2xl mx-auto px-6 pt-6 pb-6 space-y-6">
         {/* Welcome Tooltip for first-time visitors */}
         {showWelcomeTooltip && (
           <motion.div
@@ -402,44 +441,6 @@ const Horoscope = () => {
             </div>
           </motion.div>
         )}
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/')}
-            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <motion.div
-            className="flex-1 text-center"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
-              <motion.div
-                animate={{
-                  rotate: [0, 360],
-                  scale: [1, 1.2, 1],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-              <Moon className="w-8 h-8 text-purple-400" />
-              </motion.div>
-              Cosmiq Insight
-              <HoroscopeInfoTooltip />
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              {date ? formatDate(date) : 'Loading...'}
-            </p>
-          </motion.div>
-        </div>
 
         {/* Constellation Zodiac Display */}
         <motion.div
