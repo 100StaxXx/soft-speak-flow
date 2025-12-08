@@ -21,14 +21,14 @@ index 7cb921e..fbd2ce5 100644
          call.resolve(["version": self.pluginVersion])
 @@ -38,10 +39,12 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      }
-
+ 
      deinit {
 -        if #available(iOS 15.0, *) { cancelTransactionUpdatesListener() }
 +        if #available(iOS 15.0, *) {
 +            cancelTransactionUpdatesListener()
 +        }
      }
-
+ 
 -    private func cancelTransactionUpdatesListener() {
 +    nonisolated private func cancelTransactionUpdatesListener() {
          self.transactionUpdatesTask?.cancel()
@@ -43,11 +43,10 @@ index 7cb921e..fbd2ce5 100644
 +            guard let self else { return }
 +
 +            defer { self.transactionUpdatesTask = nil }
-
+ 
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
-                 switch result {
-@@ -62,17 +67,19 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -63,17 +69,19 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
                      await transaction.finish()
  
                      // Notify JS listeners on main thread, after slight delay
