@@ -3,7 +3,6 @@ import { Quote, Heart } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ShareButton } from "@/components/ShareButton";
 
 interface FeaturedQuoteCardProps {
   quote: {
@@ -95,10 +94,6 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
                 className={`h-4 w-4 ${isFavorited ? 'fill-nebula-pink text-nebula-pink' : 'text-muted-foreground'}`}
               />
             </motion.button>
-            <ShareButton
-              title="Inspiring Quote"
-              text={`"${quote.text}"${quote.author ? ` - ${quote.author}` : ''}`}
-            />
           </div>
         </div>
       </div>
