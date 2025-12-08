@@ -1,4 +1,4 @@
-project_id = "tffrgsaawvletgiztfry"
+project_id = "your-project-ref"
 
 [functions.delete-user-account]
 verify_jwt = true
