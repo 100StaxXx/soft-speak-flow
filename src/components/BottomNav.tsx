@@ -44,8 +44,7 @@ export const BottomNav = memo(() => {
       >
         <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
         <NavLink
-          to="/"
-          end
+          to="/mentor"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >

@@ -86,7 +86,7 @@ const MentorSelection = () => {
       });
       
       // Navigate without full reload
-      navigate("/", { replace: true });
+      navigate("/mentor", { replace: true });
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
