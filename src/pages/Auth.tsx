@@ -78,20 +78,23 @@ const Auth = () => {
   // Ref to prevent re-renders during initialization
   const initializationComplete = useRef(false);
 
+  // Track whether the native SocialLogin plugin is ready for use
+  const [nativeOAuthReady, setNativeOAuthReady] = useState(false);
+
   // Separate effect for OAuth initialization to prevent re-renders
   useEffect(() => {
     if (initializationComplete.current) return;
-    
+
     const initializeAuth = async () => {
       // Initialize SocialLogin plugin for native platforms
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('SocialLogin')) {
         try {
           const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
           const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
-          
-          console.log('[OAuth Init] Initializing with:', { 
-            hasWebClientId: !!webClientId, 
-            hasIOSClientId: !!iOSClientId 
+
+          console.log('[OAuth Init] Initializing with:', {
+            hasWebClientId: !!webClientId,
+            hasIOSClientId: !!iOSClientId
           });
 
           if (!webClientId || !iOSClientId) {
@@ -106,11 +109,16 @@ const Auth = () => {
               mode: 'online'
             }
           });
-          
+
           console.log('[OAuth Init] SocialLogin initialized successfully');
+          setNativeOAuthReady(true);
         } catch (error) {
           console.error('[OAuth Init] Failed to initialize SocialLogin:', error);
+          setNativeOAuthReady(false);
         }
+      } else {
+        console.warn('[OAuth Init] SocialLogin plugin unavailable - using web OAuth fallback');
+        setNativeOAuthReady(false);
       }
       initializationComplete.current = true;
     };
@@ -348,7 +356,7 @@ const Auth = () => {
     
     try {
       // Native Google Sign-In for iOS/Android
-      if (provider === 'google' && Capacitor.isNativePlatform()) {
+      if (provider === 'google' && Capacitor.isNativePlatform() && nativeOAuthReady) {
         console.log('[Google OAuth] Initiating native Google sign-in');
         
         const result = await SocialLogin.login({
@@ -424,7 +432,7 @@ const Auth = () => {
       }
 
       // Native Apple Sign-In for iOS
-      if (provider === 'apple' && Capacitor.isNativePlatform()) {
+      if (provider === 'apple' && Capacitor.isNativePlatform() && nativeOAuthReady) {
         console.log('[Apple OAuth] Initiating native Apple sign-in');
         
         // Generate secure random nonce (Supabase provides this method)
@@ -528,6 +536,10 @@ const Auth = () => {
       }
 
       // Web OAuth flow for Google and web Apple Sign-In
+      if (Capacitor.isNativePlatform() && !nativeOAuthReady) {
+        console.warn(`[${provider} OAuth] Native plugin unavailable - falling back to web flow`);
+      }
+
       console.log(`[${provider} OAuth] Using web OAuth flow`);
       console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
       
