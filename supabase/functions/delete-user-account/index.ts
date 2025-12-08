@@ -7,8 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function cleanupReferralArtifacts(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   userId: string,
 ) {
   // Remove any referral payouts tied to this user either as referrer or recipient

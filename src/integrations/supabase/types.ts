@@ -3235,6 +3235,7 @@ export type Database = {
           favorite_color: string
           fur_color: string | null
           id: string
+          image_regenerations_used: number
           inactive_days: number | null
           initial_image_url: string | null
           last_activity_date: string | null
@@ -3260,6 +3261,7 @@ export type Database = {
           favorite_color: string
           fur_color?: string | null
           id?: string
+          image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_url?: string | null
           last_activity_date?: string | null
@@ -3285,6 +3287,7 @@ export type Database = {
           favorite_color?: string
           fur_color?: string | null
           id?: string
+          image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_url?: string | null
           last_activity_date?: string | null

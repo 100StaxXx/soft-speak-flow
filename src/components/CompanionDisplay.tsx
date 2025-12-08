@@ -6,13 +6,15 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
-import { useState, useEffect, useMemo, memo } from "react";
+import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
+import { useState, useEffect, useMemo, memo, useRef, useCallback } from "react";
 import { getStageName } from "@/config/companionStages";
 
 // Convert hex color to color name (moved outside component for performance)
@@ -71,6 +73,7 @@ export const CompanionDisplay = memo(() => {
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
+  const { regenerate, isRegenerating, maxRegenerations } = useCompanionRegenerate();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -79,6 +82,47 @@ export const CompanionDisplay = memo(() => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  
+  // Long press detection refs
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressing = useRef(false);
+  
+  // Long press handlers for hidden regenerate feature
+  const handlePressStart = useCallback(() => {
+    if (!companion || isRegenerating) return;
+    
+    const regenerationsUsed = (companion as any).image_regenerations_used ?? 0;
+    if (regenerationsUsed >= maxRegenerations) return;
+    
+    isLongPressing.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPressing.current = true;
+      setShowRegenerateDialog(true);
+    }, 800); // 800ms long press
+  }, [companion, isRegenerating, maxRegenerations]);
+  
+  const handlePressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+  
+  const handleRegenerateConfirm = useCallback(() => {
+    if (!companion) return;
+    regenerate({
+      id: companion.id,
+      spirit_animal: companion.spirit_animal,
+      core_element: companion.core_element,
+      favorite_color: companion.favorite_color,
+      current_stage: companion.current_stage,
+      eye_color: companion.eye_color,
+      fur_color: companion.fur_color,
+      image_regenerations_used: (companion as any).image_regenerations_used ?? 0,
+    });
+    setShowRegenerateDialog(false);
+  }, [companion, regenerate]);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -234,7 +278,15 @@ export const CompanionDisplay = memo(() => {
               aria-hidden="true" 
             />
             <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
-            <div className="relative">
+            <div 
+              className="relative select-none"
+              onMouseDown={handlePressStart}
+              onMouseUp={handlePressEnd}
+              onMouseLeave={handlePressEnd}
+              onTouchStart={handlePressStart}
+              onTouchEnd={handlePressEnd}
+              onTouchCancel={handlePressEnd}
+            >
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
@@ -267,7 +319,7 @@ export const CompanionDisplay = memo(() => {
                 key={imageKey}
                 src={displayImageUrl || ""}
                 alt={`${stageName} companion at stage ${companion.current_stage}${health.moodState !== 'happy' ? ` (${health.moodState})` : ''}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'}`}
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''}`}
                 style={{ ...skinStyles, ...moodStyles }}
                 onLoad={() => {
                   setImageLoaded(true);
@@ -279,6 +331,7 @@ export const CompanionDisplay = memo(() => {
                 }}
                 loading="lazy"
                 decoding="async"
+                draggable={false}
               />
               {/* Mood badge overlay */}
               {moodBadge && (
@@ -344,6 +397,15 @@ export const CompanionDisplay = memo(() => {
           setShowWelcomeBack(false);
           setWelcomeBackDismissed(true);
         }} 
+      />
+
+      {/* Hidden Regenerate Dialog */}
+      <CompanionRegenerateDialog
+        isOpen={showRegenerateDialog}
+        onClose={() => setShowRegenerateDialog(false)}
+        onConfirm={handleRegenerateConfirm}
+        isRegenerating={isRegenerating}
+        regenerationsRemaining={maxRegenerations - ((companion as any)?.image_regenerations_used ?? 0)}
       />
     </>
   );
