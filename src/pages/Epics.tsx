@@ -162,28 +162,20 @@ const Epics = () => {
                 animate={{ opacity: 1 }}
                 className="text-center py-12 bg-secondary/20 rounded-lg border-2 border-dashed border-primary/20"
               >
-                <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <Sparkles className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
                 <h3 className="text-lg font-semibold mb-2">No Active Epics</h3>
-                <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
-                  Begin your first legendary quest! Browse star paths or create your own epic.
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  Begin your first legendary quest! Discover guided paths designed to help you build powerful habits and achieve your goals.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <Button
-                    onClick={() => setTemplatesDialogOpen(true)}
-                    variant="outline"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Star Paths
-                  </Button>
-                  {!hasReachedLimit && (
-                    <Button
-                      onClick={() => setCreateDialogOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Custom
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  onClick={() => setTemplatesDialogOpen(true)}
+                  className="bg-gradient-to-r from-amber-500 via-purple-500 to-pink-500 hover:from-amber-600 hover:via-purple-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-12 px-8 text-base font-semibold"
+                  size="lg"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Explore Star Paths
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </Button>
               </motion.div>
             ) : (
               activeEpics.map((epic) => (
