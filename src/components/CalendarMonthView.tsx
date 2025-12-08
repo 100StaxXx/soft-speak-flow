@@ -27,7 +27,7 @@ interface CalendarMonthViewProps {
 export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick }: CalendarMonthViewProps) => {
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfMonth(monthEnd);
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
@@ -89,7 +89,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
           <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
             {day}
           </div>

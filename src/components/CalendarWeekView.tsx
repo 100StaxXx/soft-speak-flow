@@ -31,7 +31,7 @@ interface CalendarWeekViewProps {
 
 export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop }: CalendarWeekViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
-  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
 

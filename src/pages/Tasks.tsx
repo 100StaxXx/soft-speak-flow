@@ -111,7 +111,7 @@ export default function Tasks() {
   // Calendar state for quest scheduling
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarView, setCalendarView] = useState<"list" | "month" | "week">("list");
-  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday start
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   
   // Tasks state - use regular hook for list view single-day tasks
