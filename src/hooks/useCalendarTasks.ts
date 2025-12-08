@@ -10,16 +10,16 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
     if (view === "month") {
       const monthStart = startOfMonth(selectedDate);
       const monthEnd = endOfMonth(selectedDate);
-      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
       return { start: calendarStart, end: calendarEnd };
     } else if (view === "week") {
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
       const weekEnd = addDays(weekStart, 6);
       return { start: weekStart, end: weekEnd };
     } else {
       // For list view, just get the week
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
       const weekEnd = addDays(weekStart, 6);
       return { start: weekStart, end: weekEnd };
     }
