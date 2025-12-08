@@ -5,8 +5,41 @@
 # ============================================
 # Run this after applying migrations to update types
 
-PROJECT_ID="tffrgsaawvletgiztfry"
 OUTPUT_FILE="src/integrations/supabase/types.ts"
+
+# Allow overriding through env vars to avoid hard-coded project IDs.
+# Priority:
+#   1. SUPABASE_PROJECT_ID (explicit override)
+#   2. VITE_SUPABASE_PROJECT_ID (from .env usage)
+#   3. First matching value inside .env or .env.local
+PROJECT_ID="${SUPABASE_PROJECT_ID:-${VITE_SUPABASE_PROJECT_ID:-}}"
+
+extract_project_id () {
+  local file="$1"
+  if [ -f "$file" ]; then
+    local value
+    value=$(grep -m1 '^VITE_SUPABASE_PROJECT_ID=' "$file" | cut -d= -f2- | tr -d '\"' | tr -d "'")
+    if [ -n "$value" ]; then
+      echo "$value"
+    fi
+  fi
+}
+
+if [ -z "$PROJECT_ID" ]; then
+  PROJECT_ID="$(extract_project_id .env)"
+fi
+
+if [ -z "$PROJECT_ID" ]; then
+  PROJECT_ID="$(extract_project_id .env.local)"
+fi
+
+if [ -z "$PROJECT_ID" ]; then
+  echo "❌ ERROR: Could not determine Supabase project ID."
+  echo ""
+  echo "Set SUPABASE_PROJECT_ID or VITE_SUPABASE_PROJECT_ID, or add VITE_SUPABASE_PROJECT_ID"
+  echo "to your .env/.env.local before running this script."
+  exit 1
+fi
 
 echo "================================================"
 echo "Regenerating TypeScript types from Supabase..."
