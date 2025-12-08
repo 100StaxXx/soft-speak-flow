@@ -3957,6 +3957,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      delete_user_account: { Args: { p_user_id: string }; Returns: undefined }
       generate_referral_code: { Args: never; Returns: string }
       get_next_evolution_threshold: {
         Args: { current_stage: number }
