@@ -97,7 +97,10 @@ export const TaskCard = ({
   }, [task.completed, justCompleted]);
 
   return (
-    <div className="relative">
+    <div 
+      className="relative"
+      data-tutorial-quest={isTutorialQuest ? "true" : undefined}
+    >
       {/* Floating XP Animation */}
       {showXP && (
         <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar as CalendarIcon, Target, Zap, Flame, Mountain, Swords, LayoutGrid, CalendarDays, Trophy, Star, Sliders } from "lucide-react";
+import { Calendar as CalendarIcon, Target, Zap, Flame, Mountain, Swords, LayoutGrid, CalendarDays, Trophy, Star, Sliders, ArrowDown } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { CalendarDayView } from "@/components/CalendarDayView";
@@ -75,6 +75,7 @@ export default function Tasks() {
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
   const tutorialCheckRef = useRef(false);
+  const tutorialScrollHandledRef = useRef(false);
   
   // Page info state
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -143,6 +144,33 @@ export default function Tasks() {
     return undefined;
   }, [tasks, showTutorial]);
 
+  const tutorialQuestPending = useMemo(() => {
+    if (!tutorialQuestId) return false;
+    const quest = tasks.find((task) => task.id === tutorialQuestId);
+    return !!quest && !quest.completed;
+  }, [tasks, tutorialQuestId]);
+
+  const scrollToTutorialQuest = useCallback(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const tutorialCard = document.querySelector('[data-tutorial-quest="true"]') as HTMLElement | null;
+    if (!tutorialCard) return;
+
+    tutorialCard.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    if (typeof tutorialCard.animate === "function") {
+      tutorialCard.animate(
+        [
+          { boxShadow: "0 0 0 0 rgba(129, 140, 248, 0.45)" },
+          { boxShadow: "0 0 0 24px rgba(129, 140, 248, 0)" },
+        ],
+        {
+          duration: 1200,
+          easing: "ease-out",
+        }
+      );
+    }
+  }, []);
+
   // Tutorial auto-generation
   useEffect(() => {
     if (!user?.id || !profile) return;
@@ -207,6 +235,22 @@ export default function Tasks() {
       checkAndCreateQuest();
     }
   }, [user?.id, profile, showTutorial, queryClient]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!tutorialQuestPending) {
+      tutorialScrollHandledRef.current = false;
+      return;
+    }
+
+    if (tutorialScrollHandledRef.current) return;
+
+    tutorialScrollHandledRef.current = true;
+    const timeoutId = window.setTimeout(() => scrollToTutorialQuest(), 450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [tutorialQuestPending, scrollToTutorialQuest]);
 
   const handleTutorialClose = async () => {
     if (!user?.id) return;
@@ -463,6 +507,24 @@ export default function Tasks() {
           </TabsList>
 
           <TabsContent value="quests" className="space-y-4 mt-4">
+            {tutorialQuestPending && (
+              <Card className="p-4 border-primary/40 bg-primary/5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+                <div>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">Starter quest ready</p>
+                  <p className="text-sm text-muted-foreground">
+                    Tap the glowing checkbox below to complete your first quest.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={scrollToTutorialQuest}
+                  className="w-full sm:w-auto gap-2"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                  Jump to quest
+                </Button>
+              </Card>
+            )}
             {/* Calendar Card */}
             <Card data-tour="week-calendar" className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 space-y-4">
               <div className="flex items-center justify-between mb-3">
