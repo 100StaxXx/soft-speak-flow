@@ -3,22 +3,20 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EnergyBeamGame } from './EnergyBeamGame';
 import { TapSequenceGame } from './TapSequenceGame';
-import { BreathSyncGame } from './BreathSyncGame';
-import { QuickSwipeGame } from './QuickSwipeGame';
-import { ConstellationTraceGame } from './ConstellationTraceGame';
-import { ShieldBarrierGame } from './ShieldBarrierGame';
-import { GravityBalanceGame } from './GravityBalanceGame';
+import { AstralFrequencyGame } from './AstralFrequencyGame';
+import { EclipseTimingGame } from './EclipseTimingGame';
+import { StarfallDodgeGame } from './StarfallDodgeGame';
+import { RuneResonanceGame } from './RuneResonanceGame';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { Zap, Target, Wind, ArrowUpDown, X, Sparkles, Shield, Scale } from 'lucide-react';
+import { Zap, Target, Radio, Moon, Sparkles, Music, X } from 'lucide-react';
 
 const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode }[] = [
   { type: 'energy_beam', label: 'Energy Beam', icon: <Zap className="w-4 h-4" /> },
   { type: 'tap_sequence', label: 'Tap Sequence', icon: <Target className="w-4 h-4" /> },
-  { type: 'breath_sync', label: 'Breath Sync', icon: <Wind className="w-4 h-4" /> },
-  { type: 'quick_swipe', label: 'Quick Swipe', icon: <ArrowUpDown className="w-4 h-4" /> },
-  { type: 'constellation_trace', label: 'Constellation', icon: <Sparkles className="w-4 h-4" /> },
-  { type: 'shield_barrier', label: 'Shield Barrier', icon: <Shield className="w-4 h-4" /> },
-  { type: 'gravity_balance', label: 'Gravity Balance', icon: <Scale className="w-4 h-4" /> },
+  { type: 'astral_frequency', label: 'Astral Frequency', icon: <Radio className="w-4 h-4" /> },
+  { type: 'eclipse_timing', label: 'Eclipse Timing', icon: <Moon className="w-4 h-4" /> },
+  { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" /> },
+  { type: 'rune_resonance', label: 'Rune Resonance', icon: <Music className="w-4 h-4" /> },
 ];
 
 interface MiniGameTesterProps {
@@ -35,7 +33,6 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
     setTimeout(() => setActiveGame(null), 2000);
   };
 
-  // Convert quest interval to scale: 2 = -0.15, 3 = 0, 4 = +0.15
   const questIntervalScale = (questInterval - 3) * 0.15;
 
   const renderGame = () => {
@@ -51,16 +48,14 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
         return <EnergyBeamGame {...props} />;
       case 'tap_sequence':
         return <TapSequenceGame {...props} />;
-      case 'breath_sync':
-        return <BreathSyncGame {...props} />;
-      case 'quick_swipe':
-        return <QuickSwipeGame {...props} />;
-      case 'constellation_trace':
-        return <ConstellationTraceGame {...props} />;
-      case 'shield_barrier':
-        return <ShieldBarrierGame {...props} />;
-      case 'gravity_balance':
-        return <GravityBalanceGame {...props} />;
+      case 'astral_frequency':
+        return <AstralFrequencyGame {...props} />;
+      case 'eclipse_timing':
+        return <EclipseTimingGame {...props} />;
+      case 'starfall_dodge':
+        return <StarfallDodgeGame {...props} />;
+      case 'rune_resonance':
+        return <RuneResonanceGame {...props} />;
       default:
         return null;
     }
@@ -95,7 +90,6 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
         </div>
       )}
 
-      {/* Quest Interval Selector */}
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">Quest Interval (2=easier, 4=harder)</p>
         <div className="flex gap-2">

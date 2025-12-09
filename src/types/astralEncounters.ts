@@ -18,11 +18,10 @@ export type AdversaryTier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary
 export type MiniGameType = 
   | 'energy_beam' 
   | 'tap_sequence' 
-  | 'breath_sync' 
-  | 'quick_swipe'
-  | 'constellation_trace'
-  | 'shield_barrier'
-  | 'gravity_balance';
+  | 'astral_frequency'
+  | 'eclipse_timing'
+  | 'starfall_dodge'
+  | 'rune_resonance';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -112,13 +111,13 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   chaos: 'tap_sequence',
   stagnation: 'energy_beam',
   laziness: 'energy_beam',
-  anxiety: 'breath_sync',
-  overthinking: 'breath_sync',
-  doubt: 'quick_swipe',
-  fear: 'quick_swipe',
-  confusion: 'constellation_trace',
-  vulnerability: 'shield_barrier',
-  imbalance: 'gravity_balance',
+  anxiety: 'astral_frequency',
+  overthinking: 'astral_frequency',
+  doubt: 'starfall_dodge',
+  fear: 'starfall_dodge',
+  confusion: 'rune_resonance',
+  vulnerability: 'eclipse_timing',
+  imbalance: 'rune_resonance',
 };
 
 // Theme to stat mapping
