@@ -11,6 +11,8 @@ import { ConstellationTraceGame } from './ConstellationTraceGame';
 import { ShieldBarrierGame } from './ShieldBarrierGame';
 import { GravityBalanceGame } from './GravityBalanceGame';
 import { EncounterResultScreen } from './EncounterResult';
+import { GameInstructionsOverlay } from './GameInstructionsOverlay';
+import { BattleSceneHeader } from './BattleSceneHeader';
 import { useCompanion } from '@/hooks/useCompanion';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
@@ -20,11 +22,11 @@ interface AstralEncounterModalProps {
   onOpenChange: (open: boolean) => void;
   encounter: AstralEncounter | null;
   adversary: Adversary | null;
-  questInterval?: number; // 2-4, higher = harder
+  questInterval?: number;
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
 }
 
-type Phase = 'reveal' | 'battle' | 'result';
+type Phase = 'reveal' | 'instructions' | 'battle' | 'result';
 
 export const AstralEncounterModal = ({
   open,
@@ -51,10 +53,30 @@ export const AstralEncounterModal = ({
     soul: companion?.soul || 50,
   };
 
+  // Get current mini-game type for instructions
+  const getCurrentGameType = useCallback((): MiniGameType => {
+    if (!adversary) return 'energy_beam';
+    
+    const themeGameMap: Record<string, MiniGameType[]> = {
+      mind: ['tap_sequence', 'gravity_balance'],
+      body: ['energy_beam', 'shield_barrier', 'quick_swipe'],
+      soul: ['breath_sync', 'constellation_trace'],
+    };
+    
+    const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
+    return adversary.phases === 1 
+      ? adversary.miniGameType 
+      : themeGames[currentPhaseIndex % themeGames.length];
+  }, [adversary, currentPhaseIndex]);
+
   const handleBeginBattle = useCallback(() => {
-    setPhase('battle');
+    setPhase('instructions');
     setCurrentPhaseIndex(0);
     setPhaseResults([]);
+  }, []);
+
+  const handleInstructionsReady = useCallback(() => {
+    setPhase('battle');
   }, []);
 
   const handleMiniGameComplete = useCallback((result: MiniGameResult) => {
@@ -63,12 +85,11 @@ export const AstralEncounterModal = ({
     const newResults = [...phaseResults, result];
     setPhaseResults(newResults);
 
-    // Check if more phases remain
     if (currentPhaseIndex < adversary.phases - 1) {
-      // Move to next phase
       setCurrentPhaseIndex(prev => prev + 1);
+      // Show instructions for next phase
+      setPhase('instructions');
     } else {
-      // Calculate final result
       const totalAccuracy = Math.round(
         newResults.reduce((sum, r) => sum + r.accuracy, 0) / newResults.length
       );
@@ -81,7 +102,6 @@ export const AstralEncounterModal = ({
         xpEarned,
       });
 
-      // Complete the encounter
       onComplete({
         encounterId: encounter.id,
         accuracy: totalAccuracy,
@@ -94,7 +114,6 @@ export const AstralEncounterModal = ({
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
-    // Reset state after close
     setTimeout(() => {
       setPhase('reveal');
       setCurrentPhaseIndex(0);
@@ -106,18 +125,7 @@ export const AstralEncounterModal = ({
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
 
-    // For multi-phase battles, use theme-based mini-game rotation
-    // Match mini-game to adversary stat type for thematic cohesion
-    const themeGameMap: Record<string, MiniGameType[]> = {
-      mind: ['tap_sequence', 'gravity_balance'],
-      body: ['energy_beam', 'shield_barrier', 'quick_swipe'],
-      soul: ['breath_sync', 'constellation_trace'],
-    };
-    
-    const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
-    const gameType = adversary.phases === 1 
-      ? adversary.miniGameType 
-      : themeGames[currentPhaseIndex % themeGames.length];
+    const gameType = getCurrentGameType();
 
     const difficulty = adversary.tier === 'legendary' || adversary.tier === 'epic' 
       ? 'hard' 
@@ -125,8 +133,7 @@ export const AstralEncounterModal = ({
         ? 'medium' 
         : 'easy';
 
-    // Quest interval scaling: 2 = -15% difficulty, 3 = baseline, 4 = +15% difficulty
-    const intervalScale = (questInterval - 3) * 0.15; // -0.15 to +0.15
+    const intervalScale = (questInterval - 3) * 0.15;
 
     const props = {
       companionStats,
@@ -153,7 +160,7 @@ export const AstralEncounterModal = ({
       default:
         return <EnergyBeamGame {...props} />;
     }
-  }, [adversary, currentPhaseIndex, companionStats, handleMiniGameComplete, questInterval]);
+  }, [adversary, getCurrentGameType, companionStats, handleMiniGameComplete, questInterval]);
 
   if (!encounter || !adversary) return null;
 
@@ -181,6 +188,20 @@ export const AstralEncounterModal = ({
                 </motion.div>
               )}
 
+              {phase === 'instructions' && (
+                <motion.div
+                  key={`instructions-${currentPhaseIndex}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
+                  <GameInstructionsOverlay 
+                    gameType={getCurrentGameType()}
+                    onReady={handleInstructionsReady}
+                  />
+                </motion.div>
+              )}
+
               {phase === 'battle' && (
                 <motion.div
                   key={`battle-${currentPhaseIndex}`}
@@ -188,9 +209,16 @@ export const AstralEncounterModal = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
+                  {/* Battle scene header */}
+                  <BattleSceneHeader
+                    companionImageUrl={companion?.current_image_url || undefined}
+                    companionName={companion?.spirit_animal || "Companion"}
+                    adversary={adversary}
+                  />
+
                   {/* Phase indicator for multi-phase */}
                   {adversary.phases > 1 && (
-                    <div className="flex justify-center gap-2 pt-4">
+                    <div className="flex justify-center gap-2 py-2">
                       {Array.from({ length: adversary.phases }).map((_, i) => (
                         <div
                           key={i}
