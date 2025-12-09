@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Progress } from "./ui/progress";
 import { Card } from "./ui/card";

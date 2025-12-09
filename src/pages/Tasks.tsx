@@ -847,12 +847,14 @@ export default function Tasks() {
                       return aDiff - bDiff;
                     });
 
-                    let currentTime = 8; // Start at 8am
+                    let currentTimeMinutes = 8 * 60; // Start at 8am (in minutes)
                     const updates = [];
 
                     for (const task of sortedTasks) {
                       const duration = task.estimated_duration || 30;
-                      const timeStr = `${currentTime.toString().padStart(2, '0')}:00`;
+                      const hours = Math.floor(currentTimeMinutes / 60);
+                      const minutes = currentTimeMinutes % 60;
+                      const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
                       updates.push(
                         supabase
@@ -865,8 +867,8 @@ export default function Tasks() {
                       );
 
                       // Move to next slot (add duration + 15min buffer)
-                      currentTime += Math.ceil((duration + 15) / 60);
-                      if (currentTime > 20) currentTime = 20; // Cap at 8pm
+                      currentTimeMinutes += duration + 15;
+                      if (currentTimeMinutes > 20 * 60) currentTimeMinutes = 20 * 60; // Cap at 8pm
                     }
 
                     await Promise.all(updates);
