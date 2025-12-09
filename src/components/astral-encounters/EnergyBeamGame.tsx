@@ -27,8 +27,8 @@ export const EnergyBeamGame = ({
 
   // Sweet spot calculation based on body stat
   const bodyBonus = Math.min(companionStats.body / 100, 1);
-  const sweetSpotSize = difficulty === 'easy' ? 25 : difficulty === 'medium' ? 20 : 15;
-  const adjustedSweetSpotSize = sweetSpotSize + (bodyBonus * 10); // Body stat widens sweet spot
+  const sweetSpotSize = difficulty === 'easy' ? 18 : difficulty === 'medium' ? 14 : 10;
+  const adjustedSweetSpotSize = sweetSpotSize + (bodyBonus * 6); // Body stat widens sweet spot
   
   // Sweet spot position (randomized each attempt)
   const [sweetSpotStart, setSweetSpotStart] = useState(40);
@@ -52,9 +52,9 @@ export const EnergyBeamGame = ({
           // Auto-release if maxed out
           return 100;
         }
-        return prev + 2;
+        return prev + 2.5; // Faster charge speed
       });
-    }, 30);
+    }, 25); // Faster interval
   }, [gameComplete, released]);
 
   const releaseBeam = useCallback(() => {

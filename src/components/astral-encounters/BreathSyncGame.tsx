@@ -31,8 +31,8 @@ export const BreathSyncGame = ({
   
   // Soul stat affects sync window (more forgiving timing)
   const soulBonus = Math.min(companionStats.soul / 100, 1);
-  const syncWindow = difficulty === 'easy' ? 0.3 : difficulty === 'medium' ? 0.2 : 0.15;
-  const adjustedSyncWindow = syncWindow + (soulBonus * 0.1);
+  const syncWindow = difficulty === 'easy' ? 0.22 : difficulty === 'medium' ? 0.15 : 0.10;
+  const adjustedSyncWindow = syncWindow + (soulBonus * 0.06);
   
   // Cycle timing
   const cycleDuration = 6000; // 6 seconds per full cycle
