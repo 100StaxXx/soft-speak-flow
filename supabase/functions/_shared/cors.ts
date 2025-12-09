@@ -37,10 +37,13 @@ const getAllowedOrigins = (): string[] => {
     // Lovable preview URLs
     "https://lovable.dev",
     "https://lovableproject.com",
-    // Production domains (update these with your actual domains)
+    // Production domains
     "https://cosmiq.app",
     "https://www.cosmiq.app",
     "https://app.cosmiq.app",
+    "https://cosmiq.quest",
+    "https://www.cosmiq.quest",
+    "https://app.cosmiq.quest", // Native app redirect base
     // Capacitor apps (iOS/Android)
     "capacitor://localhost",
     "http://localhost",

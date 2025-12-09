@@ -40,15 +40,22 @@ serve(async (req) => {
     });
 
     // Verify audience is either Web or iOS Client ID
-    const webClientId = Deno.env.get('VITE_GOOGLE_WEB_CLIENT_ID');
-    const iosClientId = Deno.env.get('VITE_GOOGLE_IOS_CLIENT_ID');
+    // Note: These must be set as Supabase secrets via `supabase secrets set`
+    const webClientId = Deno.env.get('GOOGLE_WEB_CLIENT_ID');
+    const iosClientId = Deno.env.get('GOOGLE_IOS_CLIENT_ID');
+
+    // Validate client IDs are configured
+    if (!webClientId && !iosClientId) {
+      console.error('Missing Google Client ID secrets. Set GOOGLE_WEB_CLIENT_ID and GOOGLE_IOS_CLIENT_ID via `supabase secrets set`');
+      throw new Error('Google OAuth not configured - missing client IDs');
+    }
 
     const validAudience = 
       tokenInfo.aud === webClientId || 
       tokenInfo.aud === iosClientId;
 
     if (!validAudience) {
-      console.error('Invalid audience:', tokenInfo.aud);
+      console.error('Invalid audience:', tokenInfo.aud, 'Expected:', { webClientId: webClientId?.substring(0, 20), iosClientId: iosClientId?.substring(0, 20) });
       throw new Error('Token audience does not match expected client IDs');
     }
 

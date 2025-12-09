@@ -48,7 +48,8 @@ serve(async (req) => {
     const iosBundleId = 'com.darrylgraham.revolution';
 
     if (!appleServiceId) {
-      throw new Error('Missing Apple Service ID configuration');
+      console.error('Missing APPLE_SERVICE_ID secret. Set it via `supabase secrets set APPLE_SERVICE_ID="com.darrylgraham.revolution.web"`');
+      throw new Error('Apple OAuth not configured - missing APPLE_SERVICE_ID secret');
     }
 
     // Fully verify the identity token signature/claims with Apple's JWKS
