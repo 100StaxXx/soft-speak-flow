@@ -19,16 +19,9 @@ function getNativeRedirectBase(): string {
  *
  * @returns The production domain for native platforms, current origin for web.
  */
-const NATIVE_REDIRECT_BASE = import.meta.env.VITE_NATIVE_REDIRECT_BASE;
-
 export const getRedirectUrl = (): string => {
   if (Capacitor.isNativePlatform()) {
     return getNativeRedirectBase();
-    return 'https://app.cosmiq.quest';
-    if (!NATIVE_REDIRECT_BASE) {
-      throw new Error('Missing VITE_NATIVE_REDIRECT_BASE for native auth redirects');
-    }
-    return NATIVE_REDIRECT_BASE;
   }
 
   return window.location.origin;
