@@ -12,7 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tffrgsaawvletgiztfry.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://opbfpbbqvuksuvmtmssd.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 if (!SERVICE_ROLE_KEY) {
