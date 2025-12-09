@@ -32,12 +32,23 @@ export const useEncounterTrigger = () => {
     if (questCountRef.current === null || nextEncounterRef.current === null) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('total_quests_completed, next_encounter_quest_count')
+        .select('total_quests_completed, next_encounter_quest_count, astral_encounters_enabled')
         .eq('id', user.id)
         .single();
 
       if (error || !profile) {
         console.error('Failed to fetch quest count', error);
+        return { shouldTrigger: false };
+      }
+
+      // Check if encounters are disabled
+      if (profile.astral_encounters_enabled === false) {
+        // Still update quest count but don't trigger encounters
+        questCountRef.current = (profile.total_quests_completed || 0) + 1;
+        await supabase
+          .from('profiles')
+          .update({ total_quests_completed: questCountRef.current })
+          .eq('id', user.id);
         return { shouldTrigger: false };
       }
 
