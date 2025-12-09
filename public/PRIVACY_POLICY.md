@@ -226,7 +226,7 @@ You have the right to request deletion of your personal data and account. We pro
 6. Your account and associated data will be permanently deleted within 30 days
 
 **Option 2: Email Request**
-1. Send an email to: alilrevolution@gmail.com
+1. Send an email to: admin@cosmiq.quest
 2. Use subject line: "Data Deletion Request"
 3. Include in your email:
    - Your full name
@@ -237,7 +237,7 @@ You have the right to request deletion of your personal data and account. We pro
 5. We may request identity verification to protect your privacy
 
 **Option 3: Support Contact**
-1. Contact us via email at alilrevolution@gmail.com
+1. Contact us via email at admin@cosmiq.quest
 2. Our support team will guide you through the deletion process
 3. We will confirm receipt of your request within 3 business days
 4. Deletion will be completed within 30 days
@@ -281,7 +281,7 @@ You have the right to request deletion of your personal data and account. We pro
 - Request restriction of processing under certain circumstances
 - Limit how we use your data while maintaining your account
 
-**To exercise these rights, contact us at:** alilrevolution@gmail.com
+**To exercise these rights, contact us at:** admin@cosmiq.quest
 
 ## 8. Children's Privacy
 
@@ -319,11 +319,11 @@ We process your personal data based on:
 - Right not to be subject to automated decision-making
 
 ### 10.3 Data Protection Officer
-For GDPR-related inquiries, contact: alilrevolution@gmail.com
+For GDPR-related inquiries, contact: admin@cosmiq.quest
 
 **Company Information:**
 R-Evolution LLC
-Email: alilrevolution@gmail.com
+Email: admin@cosmiq.quest
 Jurisdiction: New Mexico, USA
 
 ## 11. California Privacy Rights (CCPA)
@@ -345,7 +345,7 @@ We do not sell personal information. If this changes, we will provide an opt-out
 ### 11.4 Right to Non-Discrimination
 We will not discriminate against you for exercising your CCPA rights.
 
-**To exercise your CCPA rights, contact us at:** alilrevolution@gmail.com
+**To exercise your CCPA rights, contact us at:** admin@cosmiq.quest
 
 ## 12. Cookies and Tracking Technologies
 
@@ -402,7 +402,7 @@ In the unlikely event of a data breach that affects your personal information:
 If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices:
 
 **Company:** R-Evolution LLC
-**Email:** alilrevolution@gmail.com
+**Email:** admin@cosmiq.quest
 **Location:** New Mexico, USA
 
 **Subject Line:** Please include "Privacy Request" in your subject line

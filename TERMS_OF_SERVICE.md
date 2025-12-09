@@ -69,7 +69,7 @@ Parents and legal guardians:
 ### 4.4 Age Verification
 - We may request proof of age at any time
 - Falsifying your age is a violation of these Terms and grounds for immediate termination
-- If you are a parent and believe your child under 13 is using the App, contact us immediately at alilrevolution@gmail.com
+- If you are a parent and believe your child under 13 is using the App, contact us immediately at admin@cosmiq.quest
 
 ## 5. User Accounts
 
@@ -245,7 +245,7 @@ No waiver of any term of these Terms shall be deemed a further or continuing wai
 
 If you have any questions about these Terms, please contact us:
 
-**Email:** alilrevolution@gmail.com
+**Email:** admin@cosmiq.quest
 
 ---
 

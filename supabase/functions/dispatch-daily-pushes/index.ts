@@ -22,7 +22,7 @@ serve(async (req) => {
     // Load VAPID keys for Web Push (optional, only for web browsers)
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@revolution.app';
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@cosmiq.quest';
 
     console.log('Note: This function is for web push only. Native iOS uses dispatch-daily-pushes-native.');
 

@@ -64,7 +64,7 @@ supabase secrets set --project-ref opbfpbbqvuksuuvmtmssd \
   INTERNAL_FUNCTION_SECRET="<GENERATE_A_STRONG_SECRET>" \
   VAPID_PUBLIC_KEY="<YOUR_VAPID_PUBLIC_KEY>" \
   VAPID_PRIVATE_KEY="<YOUR_VAPID_PRIVATE_KEY>" \
-  VAPID_SUBJECT="mailto:support@cosmiq.quest" \
+  VAPID_SUBJECT="mailto:admin@cosmiq.quest" \
   APPLE_SERVICE_ID="com.darrylgraham.revolution.web" \
   APPLE_IOS_BUNDLE_ID="com.darrylgraham.revolution" \
   APPLE_SHARED_SECRET="<YOUR_APPLE_SHARED_SECRET>" \

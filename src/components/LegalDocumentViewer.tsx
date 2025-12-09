@@ -120,8 +120,8 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
         <div className="px-6 py-4 border-t bg-muted/50">
           <p className="text-xs text-muted-foreground text-center">
             For questions or concerns, contact us at{" "}
-            <a href="mailto:alilrevolution@gmail.com" className="text-primary underline">
-              alilrevolution@gmail.com
+            <a href="mailto:admin@cosmiq.quest" className="text-primary underline">
+              admin@cosmiq.quest
             </a>
           </p>
         </div>

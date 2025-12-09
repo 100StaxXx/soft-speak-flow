@@ -134,9 +134,9 @@ export default function AccountDeletionHelp() {
               Email our team from the address tied to your account and include "Cosmiq account deletion" in the subject. We will verify ownership and run the same deletion routine on your behalf.
             </p>
             <Button asChild variant="outline">
-              <a href="mailto:support@cosmiq.app">
+              <a href="mailto:admin@cosmiq.quest">
                 <Mail className="h-4 w-4 mr-2" />
-                support@cosmiq.app
+                admin@cosmiq.quest
               </a>
             </Button>
           </CardContent>
