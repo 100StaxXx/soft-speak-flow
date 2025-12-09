@@ -3,7 +3,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
 
-interface Task {
+interface ConflictTask {
   id: string;
   task_text: string;
   scheduled_time: string | null;
@@ -11,13 +11,13 @@ interface Task {
 }
 
 interface TimeConflictDetectorProps {
-  tasks: Task[];
+  tasks: ConflictTask[];
   className?: string;
 }
 
 interface Conflict {
-  task1: Task;
-  task2: Task;
+  task1: ConflictTask;
+  task2: ConflictTask;
   overlapMinutes: number;
 }
 

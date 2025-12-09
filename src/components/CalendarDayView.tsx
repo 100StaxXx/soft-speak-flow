@@ -9,27 +9,15 @@ import { playSound } from "@/utils/soundEffects";
 import { Progress } from "./ui/progress";
 import { Card } from "./ui/card";
 import { toast } from "sonner";
-
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  completed: boolean;
-  is_main_quest: boolean;
-  difficulty: string | null;
-  xp_reward: number;
-  category?: string | null;
-}
+import { CalendarTask } from "@/types/quest";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: Task[];
+  tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
-  onAutoSchedule?: (tasks: Task[]) => void;
+  onAutoSchedule?: (tasks: CalendarTask[]) => void;
 }
 
 export const CalendarDayView = ({

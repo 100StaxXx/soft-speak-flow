@@ -2,17 +2,10 @@ import { Zap, Target, Trophy, Star, Crown, Sparkles } from "lucide-react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
-
-interface Task {
-  id: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  is_main_quest: boolean;
-  xp_reward: number;
-}
+import { ScheduleTask } from "@/types/quest";
 
 interface SchedulePowerUpsProps {
-  tasks: Task[];
+  tasks: ScheduleTask[];
   className?: string;
 }
 
@@ -50,9 +43,9 @@ export const SchedulePowerUps = ({ tasks, className }: SchedulePowerUpsProps) =>
     };
   };
 
-  const findPowerHours = (tasks: Task[]) => {
+  const findPowerHours = (tasks: ScheduleTask[]) => {
     // Group tasks by hour and find consecutive blocks of 3+
-    const hourlyTasks = new Map<number, Task[]>();
+    const hourlyTasks = new Map<number, ScheduleTask[]>();
     tasks.forEach(task => {
       const hour = parseInt(task.scheduled_time!.split(':')[0]);
       if (!hourlyTasks.has(hour)) hourlyTasks.set(hour, []);
@@ -71,7 +64,7 @@ export const SchedulePowerUps = ({ tasks, className }: SchedulePowerUpsProps) =>
     return powerHours;
   };
 
-  const checkConflicts = (tasks: Task[]) => {
+  const checkConflicts = (tasks: ScheduleTask[]) => {
     for (let i = 0; i < tasks.length; i++) {
       for (let j = i + 1; j < tasks.length; j++) {
         const t1Start = new Date(`2000-01-01T${tasks[i].scheduled_time}:00`);

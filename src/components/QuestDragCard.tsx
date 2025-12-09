@@ -2,19 +2,10 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Clock, Zap, Flame, Mountain, Star, Sparkles, Brain, Dumbbell, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DragTask, isValidCategory } from "@/types/quest";
 
 interface QuestDragCardProps {
-  task: {
-    id: string;
-    task_text: string;
-    scheduled_time?: string | null;
-    estimated_duration?: number | null;
-    is_main_quest?: boolean | null;
-    difficulty?: string | null;
-    category?: 'mind' | 'body' | 'soul' | null;
-    xp_reward?: number;
-    completed?: boolean | null;
-  };
+  task: DragTask;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   compact?: boolean;
@@ -73,7 +64,7 @@ export const QuestDragCard = ({ task, isDragging, onDragStart, compact = false, 
 
   const difficulty = task.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
   const config = difficulty ? difficultyConfig[difficulty] : null;
-  const category = task.category as 'mind' | 'body' | 'soul' | undefined;
+  const category = isValidCategory(task.category) ? task.category : undefined;
   const categoryInfo = category ? categoryConfig[category] : null;
 
   const formatTime = (time: string) => {
