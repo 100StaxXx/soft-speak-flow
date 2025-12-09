@@ -175,6 +175,76 @@ export type Database = {
           },
         ]
       }
+      adversary_essences: {
+        Row: {
+          absorbed_at: string
+          adversary_name: string
+          adversary_theme: string
+          companion_id: string
+          created_at: string
+          encounter_id: string
+          essence_description: string | null
+          essence_name: string
+          id: string
+          rarity: string
+          stat_boost: number
+          stat_type: string
+          user_id: string
+        }
+        Insert: {
+          absorbed_at?: string
+          adversary_name: string
+          adversary_theme: string
+          companion_id: string
+          created_at?: string
+          encounter_id: string
+          essence_description?: string | null
+          essence_name: string
+          id?: string
+          rarity?: string
+          stat_boost?: number
+          stat_type: string
+          user_id: string
+        }
+        Update: {
+          absorbed_at?: string
+          adversary_name?: string
+          adversary_theme?: string
+          companion_id?: string
+          created_at?: string
+          encounter_id?: string
+          essence_description?: string | null
+          essence_name?: string
+          id?: string
+          rarity?: string
+          stat_boost?: number
+          stat_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adversary_essences_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "adversary_essences_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "astral_encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "adversary_essences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_output_validation_log: {
         Row: {
           created_at: string | null
@@ -218,6 +288,96 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ai_output_validation_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      astral_encounters: {
+        Row: {
+          accuracy_score: number | null
+          adversary_lore: string | null
+          adversary_name: string
+          adversary_theme: string
+          adversary_tier: string
+          companion_id: string
+          completed_at: string | null
+          created_at: string
+          essence_earned: string | null
+          id: string
+          mini_game_type: string
+          phases_completed: number | null
+          result: string | null
+          retry_available_at: string | null
+          started_at: string
+          stat_boost_amount: number | null
+          stat_boost_type: string | null
+          total_phases: number | null
+          trigger_source_id: string | null
+          trigger_type: string
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          accuracy_score?: number | null
+          adversary_lore?: string | null
+          adversary_name: string
+          adversary_theme: string
+          adversary_tier?: string
+          companion_id: string
+          completed_at?: string | null
+          created_at?: string
+          essence_earned?: string | null
+          id?: string
+          mini_game_type: string
+          phases_completed?: number | null
+          result?: string | null
+          retry_available_at?: string | null
+          started_at?: string
+          stat_boost_amount?: number | null
+          stat_boost_type?: string | null
+          total_phases?: number | null
+          trigger_source_id?: string | null
+          trigger_type: string
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          accuracy_score?: number | null
+          adversary_lore?: string | null
+          adversary_name?: string
+          adversary_theme?: string
+          adversary_tier?: string
+          companion_id?: string
+          completed_at?: string | null
+          created_at?: string
+          essence_earned?: string | null
+          id?: string
+          mini_game_type?: string
+          phases_completed?: number | null
+          result?: string | null
+          retry_available_at?: string | null
+          started_at?: string
+          stat_boost_amount?: number | null
+          stat_boost_type?: string | null
+          total_phases?: number | null
+          trigger_source_id?: string | null
+          trigger_type?: string
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "astral_encounters_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "astral_encounters_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -886,6 +1046,50 @@ export type Database = {
           voice_style?: string
         }
         Relationships: []
+      }
+      cosmic_codex_entries: {
+        Row: {
+          adversary_lore: string | null
+          adversary_name: string
+          adversary_theme: string
+          created_at: string
+          first_defeated_at: string
+          id: string
+          last_defeated_at: string
+          times_defeated: number
+          user_id: string
+        }
+        Insert: {
+          adversary_lore?: string | null
+          adversary_name: string
+          adversary_theme: string
+          created_at?: string
+          first_defeated_at?: string
+          id?: string
+          last_defeated_at?: string
+          times_defeated?: number
+          user_id: string
+        }
+        Update: {
+          adversary_lore?: string | null
+          adversary_name?: string
+          adversary_theme?: string
+          created_at?: string
+          first_defeated_at?: string
+          id?: string
+          last_defeated_at?: string
+          times_defeated?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cosmic_codex_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cosmic_deep_dive_feedback: {
         Row: {
@@ -2467,7 +2671,9 @@ export type Database = {
           faction: string | null
           id: string
           is_premium: boolean | null
+          last_encounter_quest_count: number | null
           last_streak_freeze_used: string | null
+          last_weekly_encounter: string | null
           longest_habit_streak: number | null
           mars_sign: string | null
           mercury_sign: string | null
@@ -2492,6 +2698,7 @@ export type Database = {
           subscription_started_at: string | null
           subscription_status: string | null
           timezone: string | null
+          total_quests_completed: number | null
           trial_ends_at: string | null
           trial_started_at: string | null
           updated_at: string | null
@@ -2515,7 +2722,9 @@ export type Database = {
           faction?: string | null
           id: string
           is_premium?: boolean | null
+          last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
+          last_weekly_encounter?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -2540,6 +2749,7 @@ export type Database = {
           subscription_started_at?: string | null
           subscription_status?: string | null
           timezone?: string | null
+          total_quests_completed?: number | null
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string | null
@@ -2563,7 +2773,9 @@ export type Database = {
           faction?: string | null
           id?: string
           is_premium?: boolean | null
+          last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
+          last_weekly_encounter?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -2588,6 +2800,7 @@ export type Database = {
           subscription_started_at?: string | null
           subscription_status?: string | null
           timezone?: string | null
+          total_quests_completed?: number | null
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string | null
