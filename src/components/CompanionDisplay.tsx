@@ -243,6 +243,20 @@ export const CompanionDisplay = memo(() => {
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
+  // Calculate effective image URL (must be before the useEffect that depends on it)
+  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
+    ? health.neglectedImageUrl 
+    : companion?.current_image_url;
+  const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
+
+  // Track image URL changes to reset loading state
+  useEffect(() => {
+    if (previousImageUrl.current === effectiveImageUrl) return;
+    previousImageUrl.current = effectiveImageUrl;
+    setImageLoaded(false);
+    setImageError(false);
+  }, [effectiveImageUrl]);
+
   useEffect(() => {
     return () => {
       if (longPressTimer.current) {
@@ -254,21 +268,8 @@ export const CompanionDisplay = memo(() => {
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
-  // Determine which image to show based on mood state
-  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
-    ? health.neglectedImageUrl 
-    : companion.current_image_url;
-  
   // Get mood-based filter styles
   const moodStyles = getMoodFilterStyles(health.moodState);
-  const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
-
-  useEffect(() => {
-    if (previousImageUrl.current === effectiveImageUrl) return;
-    previousImageUrl.current = effectiveImageUrl;
-    setImageLoaded(false);
-    setImageError(false);
-  }, [effectiveImageUrl]);
 
   // Get mood badge info
   const getMoodBadge = () => {
