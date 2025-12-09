@@ -1,4 +1,4 @@
-project_id = "opbfpbbqvuksuvmtmssd"
+project_id = "opbfpbbqvuksuuvmtmssd"
 
 [functions.delete-user-account]
 verify_jwt = true
@@ -77,7 +77,6 @@ verify_jwt = false
 
 [functions.check-task-reminders]
 verify_jwt = false
-
 
 [functions.verify-apple-receipt]
 verify_jwt = true
