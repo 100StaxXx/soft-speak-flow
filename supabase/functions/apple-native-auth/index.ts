@@ -214,10 +214,12 @@ serve(async (req) => {
     }
 
     // Extract the verification token from the magic link
-    const verificationToken = new URL(magicLinkData.properties.action_link).searchParams.get('token');
+    const actionLink = new URL(magicLinkData.properties.action_link);
+    const verificationToken = actionLink.searchParams.get('token_hash') ?? actionLink.searchParams.get('token');
+    const verificationType = actionLink.searchParams.get('type') || 'magiclink';
     
     if (!verificationToken) {
-      throw new Error('Failed to extract verification token');
+      throw new Error('Failed to extract verification token hash');
     }
 
     // Create a regular Supabase client and verify the token to get the session
@@ -226,7 +228,7 @@ serve(async (req) => {
     
     const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
       token_hash: verificationToken,
-      type: 'magiclink',
+      type: verificationType as any,
     });
 
     if (sessionError || !sessionData.session) {
