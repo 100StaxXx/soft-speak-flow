@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
@@ -11,6 +11,127 @@ interface EnergyBeamGameProps {
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
 }
+
+// Memoized attempt indicator dots
+const AttemptDots = memo(({ 
+  maxAttempts, 
+  attempts, 
+  hits 
+}: { 
+  maxAttempts: number; 
+  attempts: number; 
+  hits: number;
+}) => (
+  <div className="flex gap-3 mb-4">
+    {Array.from({ length: maxAttempts }).map((_, i) => (
+      <div
+        key={i}
+        className={`w-4 h-4 rounded-full border-2 transition-all ${
+          i < attempts 
+            ? i < hits 
+              ? 'bg-green-500 border-green-400' 
+              : 'bg-red-500 border-red-400'
+            : i === attempts
+              ? 'border-primary bg-primary/20 scale-pulse'
+              : 'border-muted bg-muted/20'
+        }`}
+      />
+    ))}
+  </div>
+));
+AttemptDots.displayName = 'AttemptDots';
+
+// Memoized charge bar component
+const ChargeBar = memo(({ 
+  chargeLevel, 
+  sweetSpotStart, 
+  adjustedSweetSpotSize, 
+  isInSweetSpot, 
+  isPerfectZone,
+  isCharging,
+  pulseRing,
+}: { 
+  chargeLevel: number;
+  sweetSpotStart: number;
+  adjustedSweetSpotSize: number;
+  isInSweetSpot: boolean;
+  isPerfectZone: boolean;
+  isCharging: boolean;
+  pulseRing: boolean;
+}) => (
+  <div className="relative w-full max-w-xs h-20 mb-6">
+    {/* Background track */}
+    <div className="absolute inset-0 bg-muted/30 rounded-2xl overflow-hidden border border-border/50 backdrop-blur-sm">
+      {/* Sweet spot indicator with gradient */}
+      <div 
+        className="absolute top-0 bottom-0 overflow-hidden"
+        style={{ 
+          left: `${sweetSpotStart}%`, 
+          width: `${adjustedSweetSpotSize}%` 
+        }}
+      >
+        {/* Outer zone */}
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30" />
+        
+        {/* Perfect zone (inner) */}
+        <div 
+          className="absolute top-0 bottom-0 bg-gradient-to-r from-yellow-400/40 via-yellow-400/60 to-yellow-400/40 perfect-zone-pulse"
+          style={{
+            left: '30%',
+            width: '40%',
+          }}
+        />
+        
+        {/* Edge borders */}
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
+        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-primary" />
+      </div>
+      
+      {/* Charge level fill */}
+      <div 
+        className={`absolute top-0 bottom-0 left-0 transition-all duration-75 ${
+          isPerfectZone ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+          isInSweetSpot ? 'bg-gradient-to-r from-primary to-primary/80' : 
+          'bg-gradient-to-r from-accent to-accent/80'
+        }`}
+        style={{ 
+          width: `${chargeLevel}%`,
+          boxShadow: isInSweetSpot ? '0 0 30px hsl(var(--primary))' : 'none',
+        }}
+      />
+
+      {/* Charge indicator line */}
+      <div
+        className={`absolute top-2 bottom-2 w-1 bg-white rounded-full shadow-lg gpu-accelerated ${isCharging ? 'charge-pulse' : ''}`}
+        style={{ 
+          left: `${chargeLevel}%`,
+          boxShadow: '0 0 10px white, 0 0 20px white',
+        }}
+      />
+
+      {/* Pulse ring on hit */}
+      <AnimatePresence>
+        {pulseRing && (
+          <motion.div
+            className="absolute inset-0 border-4 border-yellow-400 rounded-2xl"
+            initial={{ opacity: 1, scale: 1 }}
+            animate={{ opacity: 0, scale: 1.2 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+
+    {/* Zone labels */}
+    <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-xs text-muted-foreground px-1">
+      <span>0%</span>
+      <span className="text-primary font-medium">Sweet Spot</span>
+      <span>100%</span>
+    </div>
+  </div>
+));
+ChargeBar.displayName = 'ChargeBar';
 
 export const EnergyBeamGame = ({ 
   companionStats, 
@@ -50,6 +171,9 @@ export const EnergyBeamGame = ({
 
   const sweetSpotEnd = sweetSpotStart + adjustedSweetSpotSize;
 
+  // Memoized charge speed
+  const chargeSpeed = useMemo(() => 2.5 * (1 + questIntervalScale), [questIntervalScale]);
+
   const startCharging = useCallback(() => {
     if (gameState !== 'playing' || released) return;
     setIsCharging(true);
@@ -60,13 +184,13 @@ export const EnergyBeamGame = ({
       setChargeLevel(prev => {
         if (prev >= 100) return 100;
         // Subtle haptic feedback while charging
-        if (Math.floor(prev / 20) < Math.floor((prev + 2.5) / 20)) {
+        if (Math.floor(prev / 20) < Math.floor((prev + chargeSpeed) / 20)) {
           triggerHaptic('light');
         }
-        return prev + 2.5 * (1 + questIntervalScale);
+        return prev + chargeSpeed;
       });
     }, 25);
-  }, [gameState, released, questIntervalScale]);
+  }, [gameState, released, chargeSpeed]);
 
   const releaseBeam = useCallback(() => {
     if (!isCharging || gameState !== 'playing') return;
@@ -84,8 +208,11 @@ export const EnergyBeamGame = ({
     
     if (isInSweetSpot) {
       setHits(prev => prev + 1);
-      setCombo(c => c + 1);
-      setMaxCombo(m => Math.max(m, combo + 1));
+      setCombo(c => {
+        const newCombo = c + 1;
+        setMaxCombo(m => Math.max(m, newCombo));
+        return newCombo;
+      });
       setLastHitType(isPerfect ? 'perfect' : 'good');
       setPulseRing(true);
       triggerHaptic(isPerfect ? 'success' : 'medium');
@@ -123,7 +250,7 @@ export const EnergyBeamGame = ({
         });
       }
     }, 800);
-  }, [isCharging, chargeLevel, sweetSpotStart, sweetSpotEnd, adjustedSweetSpotSize, attempts, hits, combo, maxCombo, gameState, onComplete]);
+  }, [isCharging, chargeLevel, sweetSpotStart, sweetSpotEnd, adjustedSweetSpotSize, attempts, hits, maxCombo, gameState, onComplete]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -169,107 +296,19 @@ export const EnergyBeamGame = ({
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
 
-      {/* Attempts indicator */}
-      <div className="flex gap-3 mb-4">
-        {Array.from({ length: maxAttempts }).map((_, i) => (
-          <motion.div
-            key={i}
-            className={`w-4 h-4 rounded-full border-2 ${
-              i < attempts 
-                ? i < hits 
-                  ? 'bg-green-500 border-green-400' 
-                  : 'bg-red-500 border-red-400'
-                : i === attempts
-                  ? 'border-primary bg-primary/20'
-                  : 'border-muted bg-muted/20'
-            }`}
-            animate={i === attempts ? { scale: [1, 1.2, 1] } : {}}
-            transition={{ duration: 0.5, repeat: Infinity }}
-          />
-        ))}
-      </div>
+      {/* Attempts indicator - memoized */}
+      <AttemptDots maxAttempts={maxAttempts} attempts={attempts} hits={hits} />
 
-      {/* Charge bar container */}
-      <div className="relative w-full max-w-xs h-20 mb-6">
-        {/* Background track */}
-        <div className="absolute inset-0 bg-muted/30 rounded-2xl overflow-hidden border border-border/50 backdrop-blur-sm">
-          {/* Sweet spot indicator with gradient */}
-          <div 
-            className="absolute top-0 bottom-0 overflow-hidden"
-            style={{ 
-              left: `${sweetSpotStart}%`, 
-              width: `${adjustedSweetSpotSize}%` 
-            }}
-          >
-            {/* Outer zone */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30" />
-            
-            {/* Perfect zone (inner) */}
-            <motion.div 
-              className="absolute top-0 bottom-0 bg-gradient-to-r from-yellow-400/40 via-yellow-400/60 to-yellow-400/40"
-              style={{
-                left: '30%',
-                width: '40%',
-              }}
-              animate={{ opacity: [0.6, 1, 0.6] }}
-              transition={{ duration: 0.8, repeat: Infinity }}
-            />
-            
-            {/* Edge borders */}
-            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-            <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-primary" />
-          </div>
-          
-          {/* Charge level fill */}
-          <motion.div 
-            className={`absolute top-0 bottom-0 left-0 ${
-              isPerfectZone ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-              isInSweetSpot ? 'bg-gradient-to-r from-primary to-primary/80' : 
-              'bg-gradient-to-r from-accent to-accent/80'
-            }`}
-            style={{ width: `${chargeLevel}%` }}
-            animate={{ 
-              boxShadow: isInSweetSpot 
-                ? ['0 0 20px hsl(var(--primary))', '0 0 40px hsl(var(--primary))', '0 0 20px hsl(var(--primary))']
-                : 'none'
-            }}
-            transition={{ duration: 0.3, repeat: isInSweetSpot ? Infinity : 0 }}
-          />
-
-          {/* Charge indicator line */}
-          <motion.div
-            className="absolute top-2 bottom-2 w-1 bg-white rounded-full shadow-lg"
-            style={{ 
-              left: `${chargeLevel}%`,
-              boxShadow: '0 0 10px white, 0 0 20px white',
-            }}
-            animate={{ 
-              scaleY: isCharging ? [1, 1.1, 1] : 1,
-            }}
-            transition={{ repeat: Infinity, duration: 0.2 }}
-          />
-
-          {/* Pulse ring on hit */}
-          <AnimatePresence>
-            {pulseRing && (
-              <motion.div
-                className="absolute inset-0 border-4 border-yellow-400 rounded-2xl"
-                initial={{ opacity: 1, scale: 1 }}
-                animate={{ opacity: 0, scale: 1.2 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Zone labels */}
-        <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-xs text-muted-foreground px-1">
-          <span>0%</span>
-          <span className="text-primary font-medium">Sweet Spot</span>
-          <span>100%</span>
-        </div>
-      </div>
+      {/* Charge bar - memoized */}
+      <ChargeBar
+        chargeLevel={chargeLevel}
+        sweetSpotStart={sweetSpotStart}
+        adjustedSweetSpotSize={adjustedSweetSpotSize}
+        isInSweetSpot={isInSweetSpot}
+        isPerfectZone={isPerfectZone}
+        isCharging={isCharging}
+        pulseRing={pulseRing}
+      />
 
       {/* Result feedback */}
       <AnimatePresence>
@@ -293,7 +332,7 @@ export const EnergyBeamGame = ({
       {/* Charge button */}
       {gameState === 'playing' && !showResult && (
         <motion.button
-          className="relative w-36 h-36 rounded-full flex items-center justify-center border-4 border-primary/50 overflow-hidden mt-4"
+          className={`relative w-36 h-36 rounded-full flex items-center justify-center border-4 border-primary/50 overflow-hidden mt-4 gpu-accelerated ${isCharging ? 'charging-glow' : 'idle-glow'}`}
           style={{
             background: isCharging 
               ? 'radial-gradient(circle, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)'
@@ -306,28 +345,10 @@ export const EnergyBeamGame = ({
           onTouchEnd={releaseBeam}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          animate={{
-            boxShadow: isCharging
-              ? [
-                  '0 0 30px hsl(var(--primary))',
-                  '0 0 60px hsl(var(--primary))',
-                  '0 0 30px hsl(var(--primary))',
-                ]
-              : '0 0 15px hsl(var(--primary) / 0.5)',
-          }}
-          transition={{ repeat: isCharging ? Infinity : 0, duration: 0.3 }}
         >
-          {/* Inner rings animation */}
-          <motion.div
-            className="absolute inset-4 rounded-full border-2 border-white/30"
-            animate={isCharging ? { scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] } : {}}
-            transition={{ duration: 0.5, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute inset-8 rounded-full border-2 border-white/20"
-            animate={isCharging ? { scale: [1.3, 1, 1.3], opacity: [0.2, 0.5, 0.2] } : {}}
-            transition={{ duration: 0.5, repeat: Infinity, delay: 0.25 }}
-          />
+          {/* Inner rings animation - CSS only */}
+          <div className={`absolute inset-4 rounded-full border-2 border-white/30 ${isCharging ? 'ring-pulse-1' : ''}`} />
+          <div className={`absolute inset-8 rounded-full border-2 border-white/20 ${isCharging ? 'ring-pulse-2' : ''}`} />
           
           {/* Center icon */}
           <Zap 
@@ -362,7 +383,7 @@ export const EnergyBeamGame = ({
         Body stat bonus: +{Math.round(bodyBonus * 10)}% sweet spot size
       </p>
 
-      {/* Shake animation keyframes */}
+      {/* CSS animations */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -371,6 +392,52 @@ export const EnergyBeamGame = ({
         }
         .animate-shake {
           animation: shake 0.3s ease-in-out;
+        }
+        .gpu-accelerated {
+          transform: translateZ(0);
+          backface-visibility: hidden;
+        }
+        .scale-pulse {
+          animation: scale-pulse 0.5s ease-in-out infinite;
+        }
+        @keyframes scale-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.2); }
+        }
+        .perfect-zone-pulse {
+          animation: opacity-pulse 0.8s ease-in-out infinite;
+        }
+        @keyframes opacity-pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        .charge-pulse {
+          animation: charge-scale 0.2s ease-in-out infinite;
+        }
+        @keyframes charge-scale {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(1.1); }
+        }
+        .charging-glow {
+          box-shadow: 0 0 30px hsl(var(--primary)), 0 0 60px hsl(var(--primary));
+          animation: glow-pulse 0.3s ease-in-out infinite;
+        }
+        .idle-glow {
+          box-shadow: 0 0 15px hsl(var(--primary) / 0.5);
+        }
+        @keyframes glow-pulse {
+          0%, 100% { box-shadow: 0 0 30px hsl(var(--primary)); }
+          50% { box-shadow: 0 0 60px hsl(var(--primary)); }
+        }
+        .ring-pulse-1 {
+          animation: ring-pulse 0.5s ease-in-out infinite;
+        }
+        .ring-pulse-2 {
+          animation: ring-pulse 0.5s ease-in-out infinite 0.25s;
+        }
+        @keyframes ring-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.3; }
+          50% { transform: scale(1.3); opacity: 0.6; }
         }
       `}</style>
     </div>

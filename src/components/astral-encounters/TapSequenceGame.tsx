@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
-import { triggerHaptic } from './gameUtils';
+import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
 
 interface TapSequenceGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -18,6 +18,157 @@ interface Orb {
   order: number;
   tapped: boolean;
 }
+
+// Memoized star background component using CSS animations
+const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    {stars.map(star => (
+      <div
+        key={star.id}
+        className="absolute w-1 h-1 bg-white/40 rounded-full gpu-accelerated"
+        style={{
+          left: `${star.x}%`,
+          top: `${star.y}%`,
+          animation: `twinkle ${star.animationDuration}s ease-in-out infinite`,
+          animationDelay: `${star.animationDelay}s`,
+        }}
+      />
+    ))}
+  </div>
+));
+StarBackground.displayName = 'StarBackground';
+
+// Memoized Orb component for better performance
+interface OrbComponentProps {
+  orb: Orb;
+  isHighlighted: boolean;
+  isPast: boolean;
+  isNext: boolean;
+  showNumber: boolean;
+  tapResult: { id: number; success: boolean } | null;
+  onClick: () => void;
+  disabled: boolean;
+}
+
+const OrbComponent = memo(({ 
+  orb, 
+  isHighlighted, 
+  isPast, 
+  isNext, 
+  showNumber,
+  tapResult, 
+  onClick, 
+  disabled 
+}: OrbComponentProps) => {
+  const buttonClasses = useMemo(() => {
+    if (orb.tapped) return 'bg-gradient-to-br from-green-500 to-green-600 border-green-400 text-white';
+    if (isHighlighted) return 'bg-gradient-to-br from-primary to-accent border-primary text-primary-foreground scale-125 z-20';
+    if (isPast) return 'bg-primary/40 border-primary/50 text-primary-foreground';
+    if (isNext) return 'bg-primary/30 border-primary/80 text-primary-foreground';
+    return 'bg-muted/40 border-border text-muted-foreground hover:bg-muted/60 hover:border-primary/50';
+  }, [orb.tapped, isHighlighted, isPast, isNext]);
+
+  const boxShadow = useMemo(() => {
+    if (isHighlighted) return '0 0 30px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.5)';
+    if (orb.tapped) return '0 0 20px hsl(142, 76%, 46%)';
+    if (isNext) return '0 0 15px hsl(var(--primary)/0.5)';
+    return 'none';
+  }, [isHighlighted, orb.tapped, isNext]);
+
+  return (
+    <motion.button
+      className={`absolute w-14 h-14 rounded-full border-2 flex items-center justify-center font-bold transition-colors will-animate gpu-accelerated ${buttonClasses}`}
+      style={{
+        left: `${orb.x}%`,
+        top: `${orb.y}%`,
+        transform: 'translate(-50%, -50%)',
+        boxShadow,
+      }}
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ 
+        scale: isHighlighted ? 1.25 : 1, 
+        opacity: 1,
+      }}
+      exit={{ scale: 0, opacity: 0 }}
+      onClick={onClick}
+      disabled={disabled}
+      whileTap={{ scale: 0.9 }}
+    >
+      {/* Number display */}
+      <span className={`text-lg ${isHighlighted ? 'font-black' : ''}`}>
+        {showNumber ? orb.order : '?'}
+      </span>
+
+      {/* Pulse ring for current orb - CSS only */}
+      {isNext && (
+        <div className="absolute inset-0 rounded-full border-2 border-primary pulse-ring" />
+      )}
+
+      {/* Highlight ring animation */}
+      {isHighlighted && (
+        <>
+          <motion.div
+            className="absolute inset-0 rounded-full border-4 border-white"
+            initial={{ scale: 1, opacity: 1 }}
+            animate={{ scale: 1.8, opacity: 0 }}
+            transition={{ duration: 0.6, repeat: Infinity }}
+          />
+          <motion.div
+            className="absolute inset-0 rounded-full bg-white/20"
+            animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
+            transition={{ duration: 0.6 }}
+          />
+        </>
+      )}
+
+      {/* Tap result feedback */}
+      {tapResult && (
+        <motion.div
+          className="absolute inset-0 rounded-full flex items-center justify-center"
+          initial={{ scale: 0.5, opacity: 1 }}
+          animate={{ scale: 2, opacity: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <span className="text-2xl">
+            {tapResult.success ? '✨' : '❌'}
+          </span>
+        </motion.div>
+      )}
+    </motion.button>
+  );
+});
+OrbComponent.displayName = 'OrbComponent';
+
+// Memoized connection lines - only renders when sequence is being shown
+const ConnectionLines = memo(({ orbs, highlightIndex }: { orbs: Orb[]; highlightIndex: number }) => {
+  if (highlightIndex <= 0) return null;
+  
+  return (
+    <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
+      {orbs.slice(0, highlightIndex).map((orb, i) => {
+        if (i === 0) return null;
+        const prevOrb = orbs[i - 1];
+        return (
+          <motion.line
+            key={`line-${i}`}
+            x1={`${prevOrb.x}%`}
+            y1={`${prevOrb.y}%`}
+            x2={`${orb.x}%`}
+            y2={`${orb.y}%`}
+            stroke="hsl(var(--primary))"
+            strokeWidth="2"
+            strokeOpacity="0.4"
+            strokeDasharray="5,5"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.3 }}
+          />
+        );
+      })}
+    </svg>
+  );
+});
+ConnectionLines.displayName = 'ConnectionLines';
 
 export const TapSequenceGame = ({ 
   companionStats, 
@@ -47,34 +198,19 @@ export const TapSequenceGame = ({
   const baseDisplayTime = 600 + (mindBonus * 300);
   const displayTime = baseDisplayTime * (1 - questIntervalScale * 0.3);
 
-  // Generate orbs with better distribution
+  // Static stars - memoized
+  const stars = useStaticStars(10);
+
+  // Generate orbs with better distribution using utility function
   const generateOrbs = useCallback(() => {
-    const newOrbs: Orb[] = [];
-    const gridSize = Math.ceil(Math.sqrt(orbsPerRound));
-    const usedPositions: Set<string> = new Set();
-    
-    for (let i = 0; i < orbsPerRound; i++) {
-      let x, y;
-      let attempts = 0;
-      do {
-        x = 15 + Math.random() * 70;
-        y = 15 + Math.random() * 55;
-        const key = `${Math.floor(x / 15)}-${Math.floor(y / 15)}`;
-        if (!usedPositions.has(key) || attempts > 20) {
-          usedPositions.add(key);
-          break;
-        }
-        attempts++;
-      } while (attempts < 30);
-      
-      newOrbs.push({
-        id: i,
-        x,
-        y,
-        order: i + 1,
-        tapped: false,
-      });
-    }
+    const positions = getGridPositions(orbsPerRound, 15, 70);
+    const newOrbs: Orb[] = positions.map((pos, i) => ({
+      id: i,
+      x: pos.x,
+      y: pos.y,
+      order: i + 1,
+      tapped: false,
+    }));
     setOrbs(newOrbs);
   }, [orbsPerRound]);
 
@@ -117,8 +253,11 @@ export const TapSequenceGame = ({
       ));
       setCurrentOrder(prev => prev + 1);
       setScore(prev => prev + 1);
-      setCombo(c => c + 1);
-      setMaxCombo(m => Math.max(m, combo + 1));
+      setCombo(c => {
+        const newCombo = c + 1;
+        setMaxCombo(m => Math.max(m, newCombo));
+        return newCombo;
+      });
       setPerfectStreak(s => s + 1);
       setLastTapResult({ id: orb.id, success: true });
 
@@ -168,11 +307,11 @@ export const TapSequenceGame = ({
     }
   }, [gameState, currentOrder, orbsPerRound, round, score, combo, maxCombo, generateOrbs, onComplete]);
 
-  const getRoundProgressText = () => {
+  const getRoundProgressText = useCallback(() => {
     if (gameState === 'showing') return `Watch the sequence...`;
     if (gameState === 'playing') return `Tap orb ${currentOrder} of ${orbsPerRound}`;
     return '';
-  };
+  }, [gameState, currentOrder, orbsPerRound]);
 
   return (
     <div className={`flex flex-col items-center relative ${shake ? 'animate-shake' : ''}`}>
@@ -222,56 +361,13 @@ export const TapSequenceGame = ({
         {/* Cosmic background effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
         
-        {/* Animated star particles */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(15)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-white/40 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                opacity: [0.2, 0.8, 0.2],
-                scale: [0.5, 1, 0.5],
-              }}
-              transition={{
-                duration: 1.5 + Math.random() * 2,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
+        {/* Animated star particles - memoized with CSS */}
+        <StarBackground stars={stars} />
 
         {/* Connection lines between orbs during sequence show */}
-        {gameState === 'showing' && highlightIndex > 0 && (
-          <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
-            {orbs.slice(0, highlightIndex).map((orb, i) => {
-              if (i === 0) return null;
-              const prevOrb = orbs[i - 1];
-              return (
-                <motion.line
-                  key={`line-${i}`}
-                  x1={`${prevOrb.x}%`}
-                  y1={`${prevOrb.y}%`}
-                  x2={`${orb.x}%`}
-                  y2={`${orb.y}%`}
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="2"
-                  strokeOpacity="0.4"
-                  strokeDasharray="5,5"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              );
-            })}
-          </svg>
-        )}
+        {gameState === 'showing' && <ConnectionLines orbs={orbs} highlightIndex={highlightIndex} />}
         
-        {/* Orbs */}
+        {/* Orbs - using memoized component */}
         <AnimatePresence>
           {orbs.map((orb) => {
             const isHighlighted = gameState === 'showing' && highlightIndex === orb.order;
@@ -280,87 +376,17 @@ export const TapSequenceGame = ({
             const tapResult = lastTapResult?.id === orb.id ? lastTapResult : null;
             
             return (
-              <motion.button
+              <OrbComponent
                 key={orb.id}
-                className={`absolute w-14 h-14 rounded-full border-2 flex items-center justify-center font-bold transition-all ${
-                  orb.tapped 
-                    ? 'bg-gradient-to-br from-green-500 to-green-600 border-green-400 text-white' 
-                    : isHighlighted
-                      ? 'bg-gradient-to-br from-primary to-accent border-primary text-primary-foreground scale-125 z-20'
-                      : isPast
-                        ? 'bg-primary/40 border-primary/50 text-primary-foreground'
-                        : isNext
-                          ? 'bg-primary/30 border-primary/80 text-primary-foreground animate-pulse'
-                          : 'bg-muted/40 border-border text-muted-foreground hover:bg-muted/60 hover:border-primary/50'
-                }`}
-                style={{
-                  left: `${orb.x}%`,
-                  top: `${orb.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  boxShadow: isHighlighted 
-                    ? '0 0 30px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.5)' 
-                    : orb.tapped 
-                      ? '0 0 20px hsl(142, 76%, 46%)'
-                      : isNext 
-                        ? '0 0 15px hsl(var(--primary)/0.5)'
-                        : 'none',
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                  scale: isHighlighted ? 1.25 : 1, 
-                  opacity: 1,
-                }}
-                exit={{ scale: 0, opacity: 0 }}
+                orb={orb}
+                isHighlighted={isHighlighted}
+                isPast={isPast}
+                isNext={isNext}
+                showNumber={gameState === 'showing' || orb.tapped}
+                tapResult={tapResult}
                 onClick={() => handleOrbTap(orb)}
                 disabled={gameState === 'showing' || orb.tapped}
-                whileTap={{ scale: 0.9 }}
-              >
-                {/* Number display */}
-                <span className={`text-lg ${isHighlighted ? 'font-black' : ''}`}>
-                  {(gameState === 'showing' || orb.tapped) ? orb.order : '?'}
-                </span>
-
-                {/* Pulse ring for current orb */}
-                {isNext && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full border-2 border-primary"
-                    initial={{ scale: 1, opacity: 0.5 }}
-                    animate={{ scale: 1.5, opacity: 0 }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
-                )}
-
-                {/* Highlight ring animation */}
-                {isHighlighted && (
-                  <>
-                    <motion.div
-                      className="absolute inset-0 rounded-full border-4 border-white"
-                      initial={{ scale: 1, opacity: 1 }}
-                      animate={{ scale: 1.8, opacity: 0 }}
-                      transition={{ duration: 0.6, repeat: Infinity }}
-                    />
-                    <motion.div
-                      className="absolute inset-0 rounded-full bg-white/20"
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
-                      transition={{ duration: 0.6 }}
-                    />
-                  </>
-                )}
-
-                {/* Tap result feedback */}
-                {tapResult && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full flex items-center justify-center"
-                    initial={{ scale: 0.5, opacity: 1 }}
-                    animate={{ scale: 2, opacity: 0 }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    <span className="text-2xl">
-                      {tapResult.success ? '✨' : '❌'}
-                    </span>
-                  </motion.div>
-                )}
-              </motion.button>
+              />
             );
           })}
         </AnimatePresence>
@@ -405,7 +431,7 @@ export const TapSequenceGame = ({
         Mind stat bonus: +{Math.round(mindBonus * 400)}ms display time
       </p>
 
-      {/* Shake animation */}
+      {/* CSS animations */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -414,6 +440,24 @@ export const TapSequenceGame = ({
         }
         .animate-shake {
           animation: shake 0.3s ease-in-out;
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.2; transform: scale(0.5); }
+          50% { opacity: 0.8; transform: scale(1); }
+        }
+        .pulse-ring {
+          animation: pulse-expand 1s ease-out infinite;
+        }
+        @keyframes pulse-expand {
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+        .will-animate {
+          will-change: transform, opacity;
+        }
+        .gpu-accelerated {
+          transform: translateZ(0);
+          backface-visibility: hidden;
         }
       `}</style>
     </div>

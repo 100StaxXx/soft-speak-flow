@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
-import { triggerHaptic } from './gameUtils';
+import { triggerHaptic, useGameLoop, useStaticStars, useParticleSystem } from './gameUtils';
 
 interface StarfallDodgeGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -20,13 +20,90 @@ interface FallingObject {
   size: number;
 }
 
-interface Particle {
-  id: number;
-  x: number;
-  y: number;
-  color: string;
-  velocity: { x: number; y: number };
-}
+// Memoized static star background
+const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    {stars.map(star => (
+      <div
+        key={star.id}
+        className="absolute rounded-full bg-white gpu-accelerated"
+        style={{
+          width: star.size,
+          height: star.size,
+          left: `${star.x}%`,
+          top: `${star.y}%`,
+          opacity: star.opacity,
+          animation: `twinkle ${star.animationDuration}s ease-in-out infinite`,
+          animationDelay: `${star.animationDelay}s`,
+        }}
+      />
+    ))}
+  </div>
+));
+StarBackground.displayName = 'StarBackground';
+
+// Memoized falling object component
+const FallingObjectComponent = memo(({ obj }: { obj: FallingObject }) => {
+  if (obj.type === 'crystal') {
+    return (
+      <div 
+        className="w-7 h-7 flex items-center justify-center will-animate gpu-accelerated"
+        style={{ 
+          filter: 'drop-shadow(0 0 8px #22d3ee)',
+          animation: 'spin 3s linear infinite',
+        }}
+      >
+        <span className="text-2xl">💎</span>
+      </div>
+    );
+  } else if (obj.type === 'powerup') {
+    return (
+      <div 
+        className="w-8 h-8 flex items-center justify-center will-animate gpu-accelerated"
+        style={{ 
+          filter: 'drop-shadow(0 0 12px #fbbf24)',
+          animation: 'pulse-spin 1.5s ease-in-out infinite',
+        }}
+      >
+        <span className="text-2xl">⭐</span>
+      </div>
+    );
+  } else {
+    return (
+      <div
+        className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 via-orange-500 to-red-600 will-animate gpu-accelerated"
+        style={{ 
+          boxShadow: '0 0 12px rgba(239, 68, 68, 0.6), inset 0 0 8px rgba(255,255,255,0.3)',
+          animation: 'spin 0.8s linear infinite',
+        }}
+      >
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-4 bg-gradient-to-t from-orange-500/80 to-transparent rounded-full blur-sm" />
+      </div>
+    );
+  }
+});
+FallingObjectComponent.displayName = 'FallingObjectComponent';
+
+// Memoized particle component
+const ParticleRenderer = memo(({ particles }: { particles: { id: number; x: number; y: number; color: string; life: number; maxLife: number }[] }) => (
+  <>
+    {particles.map(particle => (
+      <div
+        key={particle.id}
+        className="absolute w-2 h-2 rounded-full pointer-events-none gpu-accelerated"
+        style={{
+          left: `${particle.x}%`,
+          top: `${particle.y}%`,
+          backgroundColor: particle.color,
+          boxShadow: `0 0 6px ${particle.color}`,
+          opacity: particle.life / particle.maxLife,
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
+    ))}
+  </>
+));
+ParticleRenderer.displayName = 'ParticleRenderer';
 
 export const StarfallDodgeGame = ({
   companionStats,
@@ -36,8 +113,6 @@ export const StarfallDodgeGame = ({
 }: StarfallDodgeGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [playerX, setPlayerX] = useState(50);
-  const [objects, setObjects] = useState<FallingObject[]>([]);
-  const [particles, setParticles] = useState<Particle[]>([]);
   const [crystalsCollected, setCrystalsCollected] = useState(0);
   const [hits, setHits] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -48,161 +123,154 @@ export const StarfallDodgeGame = ({
   const [playerGlow, setPlayerGlow] = useState(false);
   const [showCollectFeedback, setShowCollectFeedback] = useState<{ x: number; type: 'crystal' | 'hit' } | null>(null);
   
+  // Refs for mutable state to avoid re-renders in game loop
   const gameAreaRef = useRef<HTMLDivElement>(null);
+  const objectsRef = useRef<FallingObject[]>([]);
+  const [objects, setObjects] = useState<FallingObject[]>([]);
   const objectIdRef = useRef(0);
-  const particleIdRef = useRef(0);
-  const animationRef = useRef<number>();
   const lastSpawnRef = useRef(0);
+  const playerXRef = useRef(playerX);
+  const gameStateRef = useRef(gameState);
+  const statsRef = useRef({ crystalsCollected, hits, combo, maxCombo, totalCrystals });
+
+  // Keep refs in sync
+  useEffect(() => { playerXRef.current = playerX; }, [playerX]);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => {
+    statsRef.current = { crystalsCollected, hits, combo, maxCombo, totalCrystals };
+  }, [crystalsCollected, hits, combo, maxCombo, totalCrystals]);
+
+  // Use particle system from shared utilities
+  const { particles, emit: emitParticles } = useParticleSystem(30);
+
+  // Static stars - only calculated once
+  const stars = useStaticStars(20);
 
   // Mind + Body hybrid bonus
   const statBonus = Math.round((companionStats.mind + companionStats.body) / 2);
   const playerSize = 32 + Math.floor(statBonus / 35);
 
-  // Difficulty settings
-  const settings = {
-    easy: { spawnRate: 550, debrisRatio: 0.45, baseSpeed: 2, time: 12 },
-    medium: { spawnRate: 400, debrisRatio: 0.55, baseSpeed: 3, time: 12 },
-    hard: { spawnRate: 280, debrisRatio: 0.65, baseSpeed: 4, time: 12 },
-  };
-  const config = settings[difficulty];
-  const spawnRate = config.spawnRate - questIntervalScale * 40;
-  const baseSpeed = config.baseSpeed + questIntervalScale * 0.4;
-
-  // Spawn particles effect
-  const spawnParticles = useCallback((x: number, y: number, color: string, count: number = 5) => {
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < count; i++) {
-      newParticles.push({
-        id: particleIdRef.current++,
-        x,
-        y,
-        color,
-        velocity: {
-          x: (Math.random() - 0.5) * 8,
-          y: (Math.random() - 0.5) * 8 - 2,
-        },
-      });
-    }
-    setParticles(prev => [...prev, ...newParticles]);
-    setTimeout(() => {
-      setParticles(prev => prev.filter(p => !newParticles.some(np => np.id === p.id)));
-    }, 600);
-  }, []);
+  // Memoized difficulty settings
+  const config = useMemo(() => {
+    const settings = {
+      easy: { spawnRate: 550, debrisRatio: 0.45, baseSpeed: 2, time: 12 },
+      medium: { spawnRate: 400, debrisRatio: 0.55, baseSpeed: 3, time: 12 },
+      hard: { spawnRate: 280, debrisRatio: 0.65, baseSpeed: 4, time: 12 },
+    };
+    const s = settings[difficulty];
+    return {
+      ...s,
+      spawnRate: s.spawnRate - questIntervalScale * 40,
+      baseSpeed: s.baseSpeed + questIntervalScale * 0.4,
+    };
+  }, [difficulty, questIntervalScale]);
 
   // Handle player movement
   const handleMove = useCallback((clientX: number) => {
-    if (!gameAreaRef.current || gameState !== 'playing') return;
+    if (!gameAreaRef.current || gameStateRef.current !== 'playing') return;
     const rect = gameAreaRef.current.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 100;
     setPlayerX(Math.max(8, Math.min(92, x)));
-  }, [gameState]);
+  }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => handleMove(e.clientX);
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => handleMove(e.clientX), [handleMove]);
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     handleMove(e.touches[0].clientX);
-  };
+  }, [handleMove]);
 
   // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
   }, []);
 
-  // Game loop
-  useEffect(() => {
-    if (gameState !== 'playing') return;
+  // Optimized game loop using shared hook
+  useGameLoop((deltaTime, time) => {
+    if (gameStateRef.current !== 'playing') return;
 
-    let lastTime = 0;
-    
-    const gameLoop = (time: number) => {
-      if (!lastTime) lastTime = time;
-      const delta = time - lastTime;
-      lastTime = time;
+    const currentPlayerX = playerXRef.current;
+    const currentPlayerSize = playerSize;
 
-      // Spawn objects
-      if (time - lastSpawnRef.current > spawnRate) {
-        lastSpawnRef.current = time;
-        const rand = Math.random();
-        const isPowerup = rand > 0.95;
-        const isCrystal = !isPowerup && rand > config.debrisRatio;
-        
-        if (isCrystal || isPowerup) setTotalCrystals(t => t + 1);
-        
-        setObjects(prev => [...prev, {
-          id: objectIdRef.current++,
-          x: 8 + Math.random() * 84,
-          y: -5,
-          type: isPowerup ? 'powerup' : isCrystal ? 'crystal' : 'debris',
-          speed: baseSpeed + Math.random() * 1.2,
-          size: isPowerup ? 32 : isCrystal ? 28 : 24,
-        }]);
+    // Spawn objects with rate limiting
+    if (time - lastSpawnRef.current > config.spawnRate) {
+      lastSpawnRef.current = time;
+      const rand = Math.random();
+      const isPowerup = rand > 0.95;
+      const isCrystal = !isPowerup && rand > config.debrisRatio;
+      
+      if (isCrystal || isPowerup) {
+        setTotalCrystals(t => t + 1);
       }
+      
+      const newObj: FallingObject = {
+        id: objectIdRef.current++,
+        x: 8 + Math.random() * 84,
+        y: -5,
+        type: isPowerup ? 'powerup' : isCrystal ? 'crystal' : 'debris',
+        speed: config.baseSpeed + Math.random() * 1.2,
+        size: isPowerup ? 32 : isCrystal ? 28 : 24,
+      };
+      
+      objectsRef.current = [...objectsRef.current, newObj];
+    }
 
-      // Update objects
-      setObjects(prev => {
-        const updated: FallingObject[] = [];
-        
-        prev.forEach(obj => {
-          const newY = obj.y + obj.speed * (delta / 16);
-          
-          // Check collision with player
-          const playerLeft = playerX - playerSize / 2;
-          const playerRight = playerX + playerSize / 2;
-          const objInRange = obj.x > playerLeft - 2 && obj.x < playerRight + 2;
-          const atPlayerHeight = newY > 78 && newY < 95;
-          
-          if (objInRange && atPlayerHeight) {
-            if (obj.type === 'crystal' || obj.type === 'powerup') {
-              setCrystalsCollected(c => c + (obj.type === 'powerup' ? 2 : 1));
-              setCombo(c => c + 1);
-              setMaxCombo(m => Math.max(m, combo + 1));
-              setPlayerGlow(true);
-              spawnParticles(obj.x, 85, obj.type === 'powerup' ? '#fbbf24' : '#22d3ee', 8);
-              triggerHaptic('success');
-              setShowCollectFeedback({ x: obj.x, type: 'crystal' });
-              setTimeout(() => {
-                setPlayerGlow(false);
-                setShowCollectFeedback(null);
-              }, 300);
-            } else {
-              setHits(h => h + 1);
-              setCombo(0);
-              setShake(true);
-              spawnParticles(obj.x, 85, '#ef4444', 6);
-              triggerHaptic('error');
-              setShowCollectFeedback({ x: obj.x, type: 'hit' });
-              setTimeout(() => {
-                setShake(false);
-                setShowCollectFeedback(null);
-              }, 300);
-            }
-            return;
-          }
-          
-          if (newY < 110) {
-            updated.push({ ...obj, y: newY });
-          }
-        });
-        
-        return updated;
-      });
+    // Update and filter objects - batch processing
+    const collisions: { type: 'crystal' | 'powerup' | 'debris'; x: number }[] = [];
+    const updated: FallingObject[] = [];
+    
+    const playerLeft = currentPlayerX - currentPlayerSize / 2;
+    const playerRight = currentPlayerX + currentPlayerSize / 2;
 
-      // Update particles
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: p.x + p.velocity.x,
-        y: p.y + p.velocity.y,
-        velocity: { ...p.velocity, y: p.velocity.y + 0.3 },
-      })));
+    for (const obj of objectsRef.current) {
+      const newY = obj.y + obj.speed * deltaTime * 60;
+      
+      // Check collision with player
+      const objInRange = obj.x > playerLeft - 2 && obj.x < playerRight + 2;
+      const atPlayerHeight = newY > 78 && newY < 95;
+      
+      if (objInRange && atPlayerHeight) {
+        collisions.push({ type: obj.type, x: obj.x });
+      } else if (newY < 110) {
+        updated.push({ ...obj, y: newY });
+      }
+    }
 
-      animationRef.current = requestAnimationFrame(gameLoop);
-    };
+    // Process collisions outside the loop
+    if (collisions.length > 0) {
+      for (const collision of collisions) {
+        if (collision.type === 'crystal' || collision.type === 'powerup') {
+          setCrystalsCollected(c => c + (collision.type === 'powerup' ? 2 : 1));
+          setCombo(c => {
+            const newCombo = c + 1;
+            setMaxCombo(m => Math.max(m, newCombo));
+            return newCombo;
+          });
+          setPlayerGlow(true);
+          emitParticles(collision.x, 85, collision.type === 'powerup' ? '#fbbf24' : '#22d3ee', 6);
+          triggerHaptic('success');
+          setShowCollectFeedback({ x: collision.x, type: 'crystal' });
+          setTimeout(() => {
+            setPlayerGlow(false);
+            setShowCollectFeedback(null);
+          }, 300);
+        } else {
+          setHits(h => h + 1);
+          setCombo(0);
+          setShake(true);
+          emitParticles(collision.x, 85, '#ef4444', 4);
+          triggerHaptic('error');
+          setShowCollectFeedback({ x: collision.x, type: 'hit' });
+          setTimeout(() => {
+            setShake(false);
+            setShowCollectFeedback(null);
+          }, 300);
+        }
+      }
+    }
 
-    animationRef.current = requestAnimationFrame(gameLoop);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [gameState, playerX, playerSize, spawnRate, baseSpeed, config.debrisRatio, combo, spawnParticles]);
+    objectsRef.current = updated;
+    setObjects(updated);
+  }, gameState === 'playing');
 
   // Timer
   useEffect(() => {
@@ -275,110 +343,32 @@ export const StarfallDodgeGame = ({
         onMouseMove={handleMouseMove}
         onTouchMove={handleTouchMove}
       >
-        {/* Starfield background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(30)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full bg-white"
-              style={{
-                width: Math.random() * 2 + 1,
-                height: Math.random() * 2 + 1,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                opacity: [0.2, 0.8, 0.2],
-              }}
-              transition={{
-                duration: 1 + Math.random() * 2,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
+        {/* Starfield background - memoized */}
+        <StarBackground stars={stars} />
 
-        {/* Nebula effect */}
+        {/* Nebula effect - static CSS */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-0 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl" />
         </div>
 
-        {/* Falling objects */}
-        <AnimatePresence>
-          {objects.map(obj => (
-            <motion.div
-              key={obj.id}
-              className="absolute pointer-events-none"
-              style={{
-                left: `${obj.x}%`,
-                top: `${obj.y}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-            >
-              {obj.type === 'crystal' ? (
-                <motion.div
-                  className="relative flex items-center justify-center"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                >
-                  <div 
-                    className="w-7 h-7 flex items-center justify-center"
-                    style={{ filter: 'drop-shadow(0 0 8px #22d3ee)' }}
-                  >
-                    <span className="text-2xl">💎</span>
-                  </div>
-                </motion.div>
-              ) : obj.type === 'powerup' ? (
-                <motion.div
-                  className="relative flex items-center justify-center"
-                  animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <div 
-                    className="w-8 h-8 flex items-center justify-center"
-                    style={{ filter: 'drop-shadow(0 0 12px #fbbf24)' }}
-                  >
-                    <span className="text-2xl">⭐</span>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 via-orange-500 to-red-600"
-                  style={{ boxShadow: '0 0 12px rgba(239, 68, 68, 0.6), inset 0 0 8px rgba(255,255,255,0.3)' }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                >
-                  {/* Meteor tail */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-4 bg-gradient-to-t from-orange-500/80 to-transparent rounded-full blur-sm" />
-                </motion.div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {/* Falling objects - optimized rendering */}
+        {objects.map(obj => (
+          <div
+            key={obj.id}
+            className="absolute pointer-events-none will-animate"
+            style={{
+              left: `${obj.x}%`,
+              top: `${obj.y}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <FallingObjectComponent obj={obj} />
+          </div>
+        ))}
 
-        {/* Particles */}
-        <AnimatePresence>
-          {particles.map(particle => (
-            <motion.div
-              key={particle.id}
-              className="absolute w-2 h-2 rounded-full pointer-events-none"
-              style={{
-                left: `${particle.x}%`,
-                top: `${particle.y}%`,
-                backgroundColor: particle.color,
-                boxShadow: `0 0 6px ${particle.color}`,
-              }}
-              initial={{ opacity: 1, scale: 1 }}
-              animate={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.5 }}
-            />
-          ))}
-        </AnimatePresence>
+        {/* Particles - memoized */}
+        <ParticleRenderer particles={particles} />
 
         {/* Collection feedback */}
         <AnimatePresence>
@@ -399,22 +389,17 @@ export const StarfallDodgeGame = ({
         </AnimatePresence>
 
         {/* Player avatar */}
-        <motion.div
-          className="absolute bottom-6 z-20"
+        <div
+          className="absolute bottom-6 z-20 will-animate gpu-accelerated"
           style={{
             left: `${playerX}%`,
             transform: 'translateX(-50%)',
+            transition: 'left 0.05s ease-out',
           }}
-          animate={{ x: 0 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
-          <motion.div
-            className="relative"
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-          >
+          <div className="relative" style={{ animation: 'float 0.8s ease-in-out infinite' }}>
             {/* Shield glow */}
-            <motion.div 
+            <div 
               className={`absolute inset-0 rounded-full blur-lg transition-all duration-200 ${
                 playerGlow ? 'bg-cyan-400/60 scale-150' : 'bg-primary/30'
               }`}
@@ -448,18 +433,13 @@ export const StarfallDodgeGame = ({
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* Touch/move hint */}
-        <motion.div 
-          className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs text-white/40"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs text-white/40">
           ← Move to dodge & collect →
-        </motion.div>
+        </div>
       </div>
 
       {/* Legend */}
@@ -478,7 +458,7 @@ export const StarfallDodgeGame = ({
         </div>
       </div>
 
-      {/* Shake animation */}
+      {/* Optimized CSS animations */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -487,6 +467,29 @@ export const StarfallDodgeGame = ({
         }
         .animate-shake {
           animation: shake 0.3s ease-in-out;
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.8; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-spin {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          50% { transform: scale(1.2) rotate(180deg); }
+        }
+        .will-animate {
+          will-change: transform, opacity;
+        }
+        .gpu-accelerated {
+          transform: translateZ(0);
+          backface-visibility: hidden;
         }
       `}</style>
     </div>
