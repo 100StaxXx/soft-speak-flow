@@ -282,7 +282,7 @@ const Auth = () => {
         const { data: { session } } = await supabase.auth.getSession();
         await handlePostAuthNavigation(session, 'passwordSignIn');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email: sanitizedEmail,
           password,
           options: {
@@ -301,8 +301,12 @@ const Auth = () => {
           throw error;
         }
         
-        // For sign-up, show success message
-        if (!isLogin) {
+        // Check if we have a session (email confirmation disabled in Supabase)
+        // If session exists, user is immediately logged in - navigate them
+        if (signUpData?.session) {
+          await handlePostAuthNavigation(signUpData.session, 'signUpImmediate');
+        } else {
+          // Email confirmation required - show message
           toast({
             title: "Check your email",
             description: "We've sent you a confirmation link to complete your registration.",
