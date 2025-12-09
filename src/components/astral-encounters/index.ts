@@ -5,6 +5,7 @@ export { EnergyBeamGame } from './EnergyBeamGame';
 export { TapSequenceGame } from './TapSequenceGame';
 export { BreathSyncGame } from './BreathSyncGame';
 export { QuickSwipeGame } from './QuickSwipeGame';
+export { MiniGameTester } from './MiniGameTester';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';
