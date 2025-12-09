@@ -262,13 +262,52 @@ export const useTaskMutations = (taskDate: string) => {
     },
   });
 
+  const updateTask = useMutation({
+    mutationFn: async ({ taskId, updates }: { 
+      taskId: string; 
+      updates: {
+        task_text: string;
+        difficulty: string;
+        scheduled_time: string | null;
+        estimated_duration: number | null;
+        notes: string | null;
+      }
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({
+          task_text: updates.task_text,
+          difficulty: updates.difficulty,
+          scheduled_time: updates.scheduled_time,
+          estimated_duration: updates.estimated_duration,
+          notes: updates.notes,
+        })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      toast({ title: "Quest updated!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update quest", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
     deleteTask: deleteTask.mutate,
     setMainQuest: setMainQuest.mutate,
+    updateTask: updateTask.mutateAsync,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,
+    isUpdating: updateTask.isPending,
   };
 };
