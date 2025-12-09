@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,6 +49,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
@@ -594,11 +596,35 @@ const Profile = () => {
               
               <Card>
                 <CardHeader>
-                  <CardTitle>App Preferences</CardTitle>
-                  <CardDescription>Customize your experience</CardDescription>
+                  <CardTitle>Gameplay</CardTitle>
+                  <CardDescription>Customize your game experience</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">More preferences coming soon...</p>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="astral-encounters">Astral Encounters</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable mini-game boss battles that appear as you complete quests
+                      </p>
+                    </div>
+                    <Switch
+                      id="astral-encounters"
+                      checked={profile?.astral_encounters_enabled !== false}
+                      onCheckedChange={async (checked) => {
+                        if (!user?.id) return;
+                        const { error } = await supabase
+                          .from('profiles')
+                          .update({ astral_encounters_enabled: checked })
+                          .eq('id', user.id);
+                        if (error) {
+                          sonnerToast.error('Failed to update setting');
+                        } else {
+                          queryClient.invalidateQueries({ queryKey: ['profile'] });
+                          sonnerToast.success(checked ? 'Astral Encounters enabled' : 'Astral Encounters disabled');
+                        }
+                      }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

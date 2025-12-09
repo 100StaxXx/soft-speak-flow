@@ -2655,6 +2655,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          astral_encounters_enabled: boolean | null
           birth_location: string | null
           birth_time: string | null
           birthdate: string | null
@@ -2707,6 +2708,7 @@ export type Database = {
           zodiac_sign: string | null
         }
         Insert: {
+          astral_encounters_enabled?: boolean | null
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
@@ -2759,6 +2761,7 @@ export type Database = {
           zodiac_sign?: string | null
         }
         Update: {
+          astral_encounters_enabled?: boolean | null
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
