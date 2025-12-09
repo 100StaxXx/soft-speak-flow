@@ -30,7 +30,7 @@ export default function TermsOfService() {
                 Last Updated: November 21, 2025
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Cosmiq LLC • alilrevolution@gmail.com
+                Cosmiq LLC • admin@cosmiq.quest
               </p>
             </div>
           </CardHeader>
@@ -171,11 +171,11 @@ export default function TermsOfService() {
                   <p className="text-sm text-muted-foreground">
                     Email:{" "}
                     <a
-                      href="mailto:alilrevolution@gmail.com"
+                      href="mailto:admin@cosmiq.quest"
                       className="text-primary hover:underline"
                       aria-label="Email Cosmiq LLC support"
                     >
-                      alilrevolution@gmail.com
+                      admin@cosmiq.quest
                     </a>
                   </p>
                   <p className="text-sm text-muted-foreground">Location: New Mexico, USA</p>
