@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useXPRewards } from '@/hooks/useXPRewards';
 import { 
@@ -18,17 +19,10 @@ import {
 import { toast } from 'sonner';
 
 export const useAstralEncounters = () => {
+  const { user } = useAuth();
   const { companion } = useCompanion();
   const { awardCustomXP } = useXPRewards();
   const queryClient = useQueryClient();
-  const [userId, setUserId] = useState<string | null>(null);
-  
-  // Get user on mount
-  useState(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id || null);
-    });
-  });
   
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
@@ -247,7 +241,7 @@ export const useAstralEncounters = () => {
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
       queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
       queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
-      refetchCompanion();
+      queryClient.invalidateQueries({ queryKey: ['companion'] });
 
       if (result !== 'fail') {
         toast.success(`Victory! +${xpEarned} XP`);
