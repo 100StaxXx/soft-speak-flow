@@ -128,7 +128,7 @@ export const ShieldBarrierGame = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [currentAttackIndex, attacks, approachTime, gameComplete]);
+  }, [currentAttackIndex, attacks, approachTime, gameComplete, handleAttackResult]);
 
   const handleAttackResult = useCallback((blocked: boolean) => {
     if (completedRef.current) return;

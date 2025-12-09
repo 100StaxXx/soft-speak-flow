@@ -112,7 +112,7 @@ export const ConstellationTraceGame = ({
         clearTimeout(fadeTimerRef.current);
       }
     };
-  }, [stars.length, round, fadeTime, gameComplete]);
+  }, [stars.length, round, fadeTime, gameComplete, handleRoundEnd]);
 
   useEffect(() => {
     if (stars.length === 0 || gameComplete) return;
