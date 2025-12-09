@@ -2678,6 +2678,7 @@ export type Database = {
           mars_sign: string | null
           mercury_sign: string | null
           moon_sign: string | null
+          next_encounter_quest_count: number | null
           onboarding_completed: boolean | null
           onboarding_data: Json | null
           onboarding_step: string | null
@@ -2729,6 +2730,7 @@ export type Database = {
           mars_sign?: string | null
           mercury_sign?: string | null
           moon_sign?: string | null
+          next_encounter_quest_count?: number | null
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
@@ -2780,6 +2782,7 @@ export type Database = {
           mars_sign?: string | null
           mercury_sign?: string | null
           moon_sign?: string | null
+          next_encounter_quest_count?: number | null
           onboarding_completed?: boolean | null
           onboarding_data?: Json | null
           onboarding_step?: string | null
