@@ -25,6 +25,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     setShowEncounterModal,
     checkEncounterTrigger,
     completeEncounter,
+    closeEncounter,
   } = useAstralEncounters();
 
   const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
@@ -56,6 +57,15 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     // Now show the actual encounter modal
     setShowEncounterModal(true);
   }, [setShowEncounterModal]);
+
+  const handleModalOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      closeEncounter();
+      return;
+    }
+
+    setShowEncounterModal(true);
+  }, [closeEncounter, setShowEncounterModal]);
 
   // Listen for quest completion events
   const handleQuestCompleted = useCallback(async () => {
@@ -137,7 +147,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
       {/* Main encounter modal */}
       <AstralEncounterModal
         open={showEncounterModal}
-        onOpenChange={setShowEncounterModal}
+        onOpenChange={handleModalOpenChange}
         encounter={activeEncounter?.encounter || null}
         adversary={activeEncounter?.adversary || null}
         questInterval={activeEncounter?.questInterval}
