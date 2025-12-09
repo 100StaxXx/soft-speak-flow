@@ -9,15 +9,25 @@ interface QuestDropZoneProps {
   onDrop: (e: React.DragEvent) => void;
   children?: React.ReactNode;
   time?: string;
+  onTouchStart?: () => void;
+  onTouchEnd?: () => void;
+  onMouseDown?: () => void;
+  onMouseUp?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export const QuestDropZone = ({ 
-  isOver, 
-  canDrop, 
-  hasConflict, 
-  onDrop, 
+export const QuestDropZone = ({
+  isOver,
+  canDrop,
+  hasConflict,
+  onDrop,
   children,
-  time 
+  time,
+  onTouchStart,
+  onTouchEnd,
+  onMouseDown,
+  onMouseUp,
+  onMouseLeave: onMouseLeaveHandler
 }: QuestDropZoneProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -32,6 +42,14 @@ export const QuestDropZone = ({
         e.preventDefault();
         setIsDragOver(false);
         onDrop(e);
+      }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
+      onMouseLeave={() => {
+        setIsDragOver(false);
+        onMouseLeaveHandler?.();
       }}
       className={cn(
         "min-h-[80px] border rounded-lg p-2 transition-all duration-300 relative overflow-hidden",

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle, BookOpen } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
+import { CalendarDayView } from "@/components/CalendarDayView";
 import { TimeConflictDetector } from "@/components/TimeConflictDetector";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { SchedulePowerUps } from "@/components/SchedulePowerUps";
@@ -795,77 +796,43 @@ export default function Tasks() {
               </div>
 
               {calendarView === "list" && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedDate(addDays(selectedDate, -7))}
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="font-semibold text-sm hover:bg-accent/50 h-8 gap-2"
-                        >
-                          <CalendarIcon className="h-4 w-4" />
-                          {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d, yyyy')}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="center">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedDate(addDays(selectedDate, 7))}
-                      className="h-8 w-8 p-0"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {weekDays.map((day) => {
-                      const isSelected = isSameDay(day, selectedDate);
-                      const isToday = isSameDay(day, new Date());
-                      return (
-                        <button
-                          key={day.toISOString()}
-                          onClick={() => setSelectedDate(day)}
-                          className={cn(
-                            "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
-                            isSelected 
-                              ? "bg-primary text-primary-foreground shadow-glow" 
-                              : "hover:bg-accent",
-                            isToday && !isSelected && "ring-2 ring-primary/30"
-                          )}
-                        >
-                          <span className="text-xs font-medium mb-1">
-                            {format(day, 'EEE')}
-                          </span>
-                          <span className={cn(
-                            "text-lg font-bold",
-                            isSelected && "text-primary-foreground"
-                          )}>
-                            {format(day, 'd')}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
+                <CalendarDayView
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  tasks={allCalendarTasks}
+                  onTaskDrop={async (taskId, newDate, newTime) => {
+                    const { error } = await supabase
+                      .from('daily_tasks')
+                      .update({
+                        task_date: format(newDate, 'yyyy-MM-dd'),
+                        scheduled_time: newTime,
+                        reminder_sent: false
+                      })
+                      .eq('id', taskId);
+
+                    if (!error) {
+                      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+                      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+                      toast({
+                        title: "Quest scheduled",
+                        description: newTime
+                          ? `Scheduled for ${format(newDate, 'MMM d')} at ${newTime}`
+                          : `Moved to ${format(newDate, 'MMM d')}`
+                      });
+                    }
+                  }}
+                  onTimeSlotLongPress={(date, time) => {
+                    setScheduledTime(time);
+                    setSelectedDate(date);
+                    // Focus on the add quest input
+                    setTimeout(() => {
+                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
+                      input?.focus();
+                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }}
+                />
               )}
 
               {calendarView === "month" && (
@@ -875,6 +842,16 @@ export default function Tasks() {
                   tasks={allCalendarTasks}
                   onTaskClick={(task) => {
                     setCalendarView("list");
+                  }}
+                  onDateLongPress={(date) => {
+                    setSelectedDate(date);
+                    setCalendarView("list");
+                    // Focus on the add quest input after a brief delay
+                    setTimeout(() => {
+                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
+                      input?.focus();
+                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
                   }}
                 />
               )}
@@ -897,25 +874,35 @@ export default function Tasks() {
                     if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
                       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-                      
+
                       toast({
                         title: "Quest rescheduled",
-                        description: newTime 
+                        description: newTime
                           ? `Moved to ${format(newDate, 'MMM d')} at ${newTime}`
                           : `Moved to ${format(newDate, 'MMM d')}`
                       });
-                      
+
                       // Check for celebration triggers
                       setTimeout(() => {
                         const allTasks = allCalendarTasks;
                         const scheduledTasks = allTasks.filter((t: any) => t.scheduled_time && t.estimated_duration);
-                        
+
                         // Check for perfect week
                         if (scheduledTasks.length >= 5 && scheduledTasks.every((t: any) => !checkTaskConflicts(t, scheduledTasks))) {
                           setShowCelebration({ show: true, type: "perfect_week" });
                         }
                       }, 500);
                     }
+                  }}
+                  onTimeSlotLongPress={(date, time) => {
+                    setScheduledTime(time);
+                    setSelectedDate(date);
+                    // Focus on the add quest input
+                    setTimeout(() => {
+                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
+                      input?.focus();
+                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
                   }}
                 />
               )}
