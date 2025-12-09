@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface BreathSyncGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -37,6 +38,28 @@ export const BreathSyncGame = ({
   // Quest interval scaling: more quests waited = tighter sync window
   const syncWindow = baseSyncWindow * (1 - questIntervalScale * 0.5);
   const adjustedSyncWindow = syncWindow + (soulBonus * 0.06);
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Balanced rhythm'
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% tempo`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const soulBonusPercent = Math.round(soulBonus * 10);
+  const infoChips = [
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { 
+      label: 'Quest drift', 
+      value: questDriftLabel, 
+      tone: questDriftTone,
+      helperText: questDriftPercent === 0 ? 'Standard cadence' : questDriftPercent > 0 ? 'Faster breath cycles' : 'Slower breath cycles',
+    },
+    { 
+      label: 'Soul focus', 
+      value: `+${soulBonusPercent}% window`, 
+      tone: 'positive' as const,
+      helperText: 'Sync tolerance',
+    },
+  ];
   
   // Cycle timing
   const cycleDuration = 6000; // 6 seconds per full cycle
@@ -134,22 +157,25 @@ export const BreathSyncGame = ({
     setTimeout(() => setShowFeedback(null), 300);
   }, [gameComplete, ringScale, adjustedSyncWindow]);
 
-  return (
-    <div className="flex flex-col items-center gap-6 p-6">
-      {/* Title */}
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Breath Sync Battle</h3>
-        <p className="text-sm text-muted-foreground">
-          Tap when the ring reaches its peak or valley
-        </p>
+  const statusBarContent = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Cycle</p>
+          <p className="font-semibold">{currentCycle}/{totalCycles}</p>
+        </div>
+        <div className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary capitalize">
+          {phase}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Sync {Math.round(syncScore)}/{totalCycles * tapsPerCycle}
+        </div>
       </div>
-
-      {/* Cycle counter */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 justify-center">
         {Array.from({ length: totalCycles }).map((_, i) => (
           <div
             key={i}
-            className={`w-3 h-3 rounded-full ${
+            className={`h-2 w-10 rounded-full ${
               i < currentCycle - 1 
                 ? 'bg-primary' 
                 : i === currentCycle - 1
@@ -159,10 +185,19 @@ export const BreathSyncGame = ({
           />
         ))}
       </div>
+    </div>
+  );
 
-      {/* Breathing ring */}
+  return (
+    <MiniGameHud
+      title="Breath Sync Battle"
+      subtitle="Tap when the ring hits the peak (inhale/hold) or valley (exhale)."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Soul stat bonus: +${soulBonusPercent}% sync window`}
+    >
       <div 
-        className="relative w-64 h-64 flex items-center justify-center cursor-pointer"
+        className="relative w-64 h-64 flex items-center justify-center cursor-pointer mx-auto"
         onClick={handleTap}
       >
         {/* Outer guide ring */}
@@ -215,17 +250,6 @@ export const BreathSyncGame = ({
           </motion.div>
         )}
       </div>
-
-      {/* Score */}
-      <div className="text-center">
-        <p className="text-lg font-bold text-primary">
-          Sync: {Math.round(syncScore)}/{totalCycles * tapsPerCycle}
-        </p>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Soul stat bonus: +{Math.round(soulBonus * 10)}% sync window
-      </p>
-    </div>
+    </MiniGameHud>
   );
 };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface ConstellationTraceGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -33,16 +34,6 @@ export const ConstellationTraceGame = ({
   difficulty = 'medium',
   questIntervalScale = 0,
 }: ConstellationTraceGameProps) => {
-  const [stars, setStars] = useState<Star[]>([]);
-  const [currentOrder, setCurrentOrder] = useState(1);
-  const [round, setRound] = useState(1);
-  const [score, setScore] = useState(0);
-  const [totalStars, setTotalStars] = useState(0);
-  const [gameComplete, setGameComplete] = useState(false);
-  const [connections, setConnections] = useState<number[][]>([]);
-  const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const fadeTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   const maxRounds = 3;
   const baseStarCount = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
   const starCount = Math.round(baseStarCount * (1 + questIntervalScale * 0.3));
@@ -51,6 +42,19 @@ export const ConstellationTraceGame = ({
   const soulBonus = Math.min(companionStats.soul / 100, 1);
   const baseFadeTime = difficulty === 'easy' ? 4000 : difficulty === 'medium' ? 3000 : 2500;
   const fadeTime = baseFadeTime * (1 - questIntervalScale * 0.2) + soulBonus * 1000;
+
+  const [stars, setStars] = useState<Star[]>([]);
+  const [currentOrder, setCurrentOrder] = useState(1);
+  const [round, setRound] = useState(1);
+  const [score, setScore] = useState(0);
+  const [totalStars, setTotalStars] = useState(0);
+  const [gameComplete, setGameComplete] = useState(false);
+  const [connections, setConnections] = useState<number[][]>([]);
+  const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [constellationName, setConstellationName] = useState<string>('Constellation');
+  const [fadeRemaining, setFadeRemaining] = useState(fadeTime);
+  const fadeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeProgressRef = useRef<number | null>(null);
 
   // Generate stars for current round
   const generateStars = useCallback(() => {
@@ -78,7 +82,9 @@ export const ConstellationTraceGame = ({
     setTotalStars(prev => prev + numStars);
     setConnections([]);
     setCurrentOrder(1);
-  }, [starCount]);
+    setConstellationName(constellation.name);
+    setFadeRemaining(fadeTime);
+  }, [starCount, fadeTime]);
 
   // Initialize game
   useEffect(() => {
@@ -106,6 +112,29 @@ export const ConstellationTraceGame = ({
       }
     };
   }, [stars.length, round, fadeTime, gameComplete]);
+
+  useEffect(() => {
+    if (stars.length === 0 || gameComplete) return;
+    
+    const start = performance.now();
+    setFadeRemaining(fadeTime);
+
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      setFadeRemaining(Math.max(fadeTime - elapsed, 0));
+      if (elapsed < fadeTime && !gameComplete) {
+        fadeProgressRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    fadeProgressRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (fadeProgressRef.current) {
+        cancelAnimationFrame(fadeProgressRef.current);
+      }
+    };
+  }, [stars, fadeTime, gameComplete]);
 
   const handleRoundEnd = useCallback(() => {
     const connectedCount = stars.filter(s => s.connected).length;
@@ -176,22 +205,65 @@ export const ConstellationTraceGame = ({
     setTimeout(() => setShowFeedback(null), 300);
   }, [gameComplete, currentOrder, stars, round, score, totalStars, generateStars, onComplete]);
 
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Balanced map'
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% stars`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const soulBonusMs = Math.round(soulBonus * 1000);
+  const infoChips = [
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Constellation', value: constellationName, helperText: 'Pattern' },
+    { 
+      label: 'Quest drift', 
+      value: questDriftLabel, 
+      tone: questDriftTone,
+      helperText: questDriftPercent === 0 ? 'Standard nodes' : questDriftPercent > 0 ? 'More stars' : 'Fewer stars',
+    },
+    { 
+      label: 'Soul focus', 
+      value: `+${soulBonusMs}ms`, 
+      tone: 'positive' as const,
+      helperText: 'Fade buffer',
+    },
+  ];
+  const fadePercent = Math.max(0, Math.round((fadeRemaining / fadeTime) * 100));
+  const statusBarContent = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Round</p>
+          <p className="font-semibold">{round}/{maxRounds}</p>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Score {score}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span>Star visibility</span>
+          <span>{Math.ceil(fadeRemaining / 1000)}s</span>
+        </div>
+        <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+          <motion.div
+            className="h-full bg-primary"
+            style={{ width: `${100 - fadePercent}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Constellation Trace</h3>
-        <p className="text-sm text-muted-foreground">
-          Connect the stars in order before they fade!
-        </p>
-      </div>
-
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">Round {round}/{maxRounds}</span>
-        <span className="text-primary">Score: {score}</span>
-      </div>
-
-      {/* Game area */}
-      <div className="relative w-full aspect-square max-w-xs bg-muted/20 rounded-2xl border border-border/50 overflow-hidden">
+    <MiniGameHud
+      title="Constellation Trace"
+      subtitle="Connect the stars in order before their light fades."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Soul stat bonus: +${soulBonusMs}ms fade time`}
+    >
+      <div className="relative w-full aspect-square max-w-xs bg-muted/20 rounded-2xl border border-border/50 overflow-hidden mx-auto">
         {/* Starfield background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10">
           {Array.from({ length: 20 }).map((_, i) => (
@@ -285,10 +357,6 @@ export const ConstellationTraceGame = ({
           )}
         </AnimatePresence>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        Soul stat bonus: +{Math.round(soulBonus * 1000)}ms fade time
-      </p>
-    </div>
+    </MiniGameHud>
   );
 };

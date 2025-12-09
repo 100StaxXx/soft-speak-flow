@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface QuickSwipeGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -52,6 +53,28 @@ export const QuickSwipeGame = ({
   // Combined stat bonus affects reaction time window
   const statBonus = Math.min((companionStats.body + companionStats.mind) / 200, 1);
   const timeWindow = attackSpeed + (statBonus * 350);
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Standard volley'
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% attacks`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const reactionBonus = Math.round(statBonus * 500);
+  const infoChips = [
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { 
+      label: 'Quest drift', 
+      value: questDriftLabel, 
+      tone: questDriftTone,
+      helperText: questDriftPercent === 0 ? 'Baseline tempo' : questDriftPercent > 0 ? 'More, faster swipes' : 'Fewer, slower swipes',
+    },
+    { 
+      label: 'Mind + Body', 
+      value: `+${reactionBonus}ms`, 
+      tone: 'positive' as const,
+      helperText: 'Reaction window',
+    },
+  ];
 
   // Generate attacks
   useEffect(() => {
@@ -161,23 +184,24 @@ export const QuickSwipeGame = ({
   const currentAttack = attacks[currentIndex];
   const Icon = currentAttack ? DIRECTION_ICONS[currentAttack.direction] : null;
 
-  return (
-    <div className="flex flex-col items-center gap-6 p-6">
-      {/* Title */}
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Quick Swipe Reactions</h3>
-        <p className="text-sm text-muted-foreground">
-          Swipe in the direction shown!
-        </p>
+  const upcomingAttacks = attacks.slice(currentIndex + 1, currentIndex + 3);
+  const statusBarContent = (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Deflections</p>
+          <p className="font-semibold">{score}/{totalAttacks}</p>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {gameComplete ? 'Wave complete' : `Swipe ${currentIndex + 1} of ${totalAttacks}`}
+        </div>
       </div>
-
-      {/* Progress */}
-      <div className="flex items-center gap-4">
-        <div className="flex gap-1">
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1 flex-wrap">
           {attacks.map((attack, i) => (
             <div
               key={attack.id}
-              className={`w-2 h-2 rounded-full ${
+              className={`h-2 w-6 rounded-full ${
                 attack.result === 'success' 
                   ? 'bg-green-500' 
                   : attack.result === 'fail'
@@ -189,86 +213,109 @@ export const QuickSwipeGame = ({
             />
           ))}
         </div>
-        <span className="text-sm text-muted-foreground">{score}/{totalAttacks}</span>
-      </div>
-
-      {/* Swipe area */}
-      <motion.div
-        className={`relative w-48 h-48 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing ${
-          showResult === 'success' 
-            ? 'bg-green-500/20 border-green-500' 
-            : showResult === 'fail'
-              ? 'bg-red-500/20 border-red-500'
-              : 'bg-muted/30 border-border'
-        } border-4`}
-        drag
-        dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
-        dragElastic={0.5}
-        onDragEnd={handleDragEnd}
-        whileDrag={{ scale: 1.05 }}
-      >
-        <AnimatePresence mode="wait">
-          {Icon && !gameComplete && (
-            <motion.div
-              key={currentIndex}
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              exit={{ scale: 0, rotate: 180 }}
-              className="text-primary"
-            >
-              <Icon className="w-20 h-20" strokeWidth={3} />
-            </motion.div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wider">Up next</span>
+          {upcomingAttacks.length === 0 ? (
+            <span className="text-muted-foreground/60">—</span>
+          ) : (
+            upcomingAttacks.map((attack) => {
+              const PreviewIcon = DIRECTION_ICONS[attack.direction];
+              return (
+                <span
+                  key={attack.id}
+                  className="inline-flex items-center justify-center rounded-full border border-border/60 bg-muted/30 p-1"
+                >
+                  <PreviewIcon className="w-4 h-4 text-muted-foreground" />
+                </span>
+              );
+            })
           )}
-        </AnimatePresence>
-
-        {/* Direction hints */}
-        <div className="absolute -top-8 text-muted-foreground">
-          <ArrowUp className="w-6 h-6" />
         </div>
-        <div className="absolute -bottom-8 text-muted-foreground">
-          <ArrowDown className="w-6 h-6" />
-        </div>
-        <div className="absolute -left-8 text-muted-foreground">
-          <ArrowLeft className="w-6 h-6" />
-        </div>
-        <div className="absolute -right-8 text-muted-foreground">
-          <ArrowRight className="w-6 h-6" />
-        </div>
-      </motion.div>
-
-      {/* Keyboard/button controls */}
-      <div className="grid grid-cols-3 gap-2 mt-2">
-        <div />
-        <button 
-          onClick={() => handleSwipe('up')}
-          className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
-        >
-          <ArrowUp className="w-6 h-6 mx-auto" />
-        </button>
-        <div />
-        <button 
-          onClick={() => handleSwipe('left')}
-          className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
-        >
-          <ArrowLeft className="w-6 h-6 mx-auto" />
-        </button>
-        <button 
-          onClick={() => handleSwipe('down')}
-          className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
-        >
-          <ArrowDown className="w-6 h-6 mx-auto" />
-        </button>
-        <button 
-          onClick={() => handleSwipe('right')}
-          className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
-        >
-          <ArrowRight className="w-6 h-6 mx-auto" />
-        </button>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        Body+Mind bonus: +{Math.round(statBonus * 500)}ms reaction time
-      </p>
     </div>
+  );
+
+  return (
+    <MiniGameHud
+      title="Quick Swipe Reactions"
+      subtitle="Drag in the highlighted direction before the impact circle reaches you."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Mind + Body bonus: +${reactionBonus}ms reaction window`}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <motion.div
+          className={`relative w-48 h-48 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing ${
+            showResult === 'success' 
+              ? 'bg-green-500/20 border-green-500' 
+              : showResult === 'fail'
+                ? 'bg-red-500/20 border-red-500'
+                : 'bg-muted/30 border-border'
+          } border-4`}
+          drag
+          dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+          dragElastic={0.5}
+          onDragEnd={handleDragEnd}
+          whileDrag={{ scale: 1.05 }}
+        >
+          <AnimatePresence mode="wait">
+            {Icon && !gameComplete && (
+              <motion.div
+                key={currentIndex}
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                exit={{ scale: 0, rotate: 180 }}
+                className="text-primary"
+              >
+                <Icon className="w-20 h-20" strokeWidth={3} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Direction hints */}
+          <div className="absolute -top-8 text-muted-foreground">
+            <ArrowUp className="w-6 h-6" />
+          </div>
+          <div className="absolute -bottom-8 text-muted-foreground">
+            <ArrowDown className="w-6 h-6" />
+          </div>
+          <div className="absolute -left-8 text-muted-foreground">
+            <ArrowLeft className="w-6 h-6" />
+          </div>
+          <div className="absolute -right-8 text-muted-foreground">
+            <ArrowRight className="w-6 h-6" />
+          </div>
+        </motion.div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div />
+          <button 
+            onClick={() => handleSwipe('up')}
+            className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
+          >
+            <ArrowUp className="w-6 h-6 mx-auto" />
+          </button>
+          <div />
+          <button 
+            onClick={() => handleSwipe('left')}
+            className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
+          >
+            <ArrowLeft className="w-6 h-6 mx-auto" />
+          </button>
+          <button 
+            onClick={() => handleSwipe('down')}
+            className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
+          >
+            <ArrowDown className="w-6 h-6 mx-auto" />
+          </button>
+          <button 
+            onClick={() => handleSwipe('right')}
+            className="p-3 rounded-lg bg-muted hover:bg-muted/80 active:bg-primary/20"
+          >
+            <ArrowRight className="w-6 h-6 mx-auto" />
+          </button>
+        </div>
+      </div>
+    </MiniGameHud>
   );
 };

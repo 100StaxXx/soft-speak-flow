@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface ShieldBarrierGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -55,6 +56,28 @@ export const ShieldBarrierGame = ({
   // Body stat affects timing window
   const bodyBonus = Math.min(companionStats.body / 100, 1);
   const blockWindow = 0.3 + bodyBonus * 0.15; // 30-45% of attack progress
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Balanced assault'
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% volleys`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const bodyBonusPercent = Math.round(bodyBonus * 15);
+  const infoChips = [
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { 
+      label: 'Quest drift', 
+      value: questDriftLabel, 
+      tone: questDriftTone,
+      helperText: questDriftPercent === 0 ? 'Baseline speed' : questDriftPercent > 0 ? 'More frequent' : 'Sparser attacks',
+    },
+    { 
+      label: 'Body focus', 
+      value: `+${bodyBonusPercent}% window`, 
+      tone: 'positive' as const,
+      helperText: 'Block timing',
+    },
+  ];
 
   // Generate attacks
   useEffect(() => {
@@ -161,39 +184,58 @@ export const ShieldBarrierGame = ({
   }, [gameComplete, attacks, currentAttackIndex, blockWindow, handleAttackResult]);
 
   const currentAttack = attacks[currentAttackIndex];
+  const impactPercent = currentAttack ? Math.min(currentAttack.progress, 1) * 100 : 0;
+  const statusBarContent = (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Blocks</p>
+          <p className="font-semibold">{score}/{totalAttacks}</p>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {gameComplete ? 'Assault repelled' : `Impact in ${Math.max(0, 100 - Math.round(impactPercent))}%`}
+        </div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        {attacks.map((attack) => (
+          <div
+            key={attack.id}
+            className={`h-2 w-6 rounded-full ${
+              attack.blocked === true
+                ? 'bg-green-500'
+                : attack.blocked === false
+                  ? 'bg-red-500'
+                  : attack.id === currentAttackIndex
+                    ? 'bg-primary animate-pulse'
+                    : 'bg-muted'
+            }`}
+          />
+        ))}
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span>Projectile distance</span>
+          <span>{Math.round(impactPercent)}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+          <motion.div
+            className="h-full bg-red-500"
+            style={{ width: `${impactPercent}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Shield Barrier</h3>
-        <p className="text-sm text-muted-foreground">
-          Tap the shield to block attacks from that direction!
-        </p>
-      </div>
-
-      {/* Progress */}
-      <div className="flex items-center gap-4">
-        <div className="flex gap-1 flex-wrap max-w-[200px] justify-center">
-          {attacks.map((attack) => (
-            <div
-              key={attack.id}
-              className={`w-2 h-2 rounded-full ${
-                attack.blocked === true
-                  ? 'bg-green-500'
-                  : attack.blocked === false
-                    ? 'bg-red-500'
-                    : attack.id === currentAttackIndex
-                      ? 'bg-primary animate-pulse'
-                      : 'bg-muted'
-              }`}
-            />
-          ))}
-        </div>
-        <span className="text-sm text-muted-foreground">{score}/{totalAttacks}</span>
-      </div>
-
-      {/* Game area */}
-      <div className="relative w-64 h-64">
+    <MiniGameHud
+      title="Shield Barrier"
+      subtitle="Tap the directional shields right before the projectile lands."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Body stat bonus: +${bodyBonusPercent}% block window`}
+    >
+      <div className="relative w-64 h-64 mx-auto">
         {/* Center core */}
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border-2 border-primary/50 flex items-center justify-center ${
           showResult === 'hit' ? 'animate-shake bg-red-500/30 border-red-500' : ''
@@ -271,10 +313,6 @@ export const ShieldBarrierGame = ({
         </AnimatePresence>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Body stat bonus: +{Math.round(bodyBonus * 15)}% block window
-      </p>
-
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translate(-50%, -50%); }
@@ -285,6 +323,6 @@ export const ShieldBarrierGame = ({
           animation: shake 0.3s ease-in-out;
         }
       `}</style>
-    </div>
+    </MiniGameHud>
   );
 };

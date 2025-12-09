@@ -9,6 +9,7 @@ export { ConstellationTraceGame } from './ConstellationTraceGame';
 export { ShieldBarrierGame } from './ShieldBarrierGame';
 export { GravityBalanceGame } from './GravityBalanceGame';
 export { MiniGameTester } from './MiniGameTester';
+export { MiniGameHud } from './MiniGameHud';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';

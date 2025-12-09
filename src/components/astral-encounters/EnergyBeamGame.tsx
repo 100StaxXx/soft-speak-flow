@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface EnergyBeamGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -44,6 +45,38 @@ export const EnergyBeamGame = ({
   }, [attempts]);
 
   const sweetSpotEnd = sweetSpotStart + adjustedSweetSpotSize;
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Balanced pace' 
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% tempo`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const bodyBonusPercent = Math.round(bodyBonus * 10);
+
+  const infoChips = [
+    {
+      label: 'Difficulty',
+      value: difficultyLabel,
+      tone: 'accent' as const,
+    },
+    {
+      label: 'Quest drift',
+      value: questDriftLabel,
+      tone: questDriftTone,
+      helperText:
+        questDriftPercent === 0
+          ? 'Standard timing'
+          : questDriftPercent > 0
+            ? 'Faster charge, tighter window'
+            : 'Slower charge, wider window',
+    },
+    {
+      label: 'Body boost',
+      value: `+${bodyBonusPercent}% window`,
+      tone: 'positive' as const,
+      helperText: 'Sweet spot width',
+    },
+  ];
 
   const startCharging = useCallback(() => {
     if (gameComplete || released) return;
@@ -59,7 +92,7 @@ export const EnergyBeamGame = ({
         return prev + 2.5 * (1 + questIntervalScale);
       });
     }, 25);
-  }, [gameComplete, released]);
+  }, [gameComplete, released, questIntervalScale]);
 
   const releaseBeam = useCallback(() => {
     if (!isCharging || gameComplete) return;
@@ -113,119 +146,155 @@ export const EnergyBeamGame = ({
   }, []);
 
   const isInSweetSpot = chargeLevel >= sweetSpotStart && chargeLevel <= sweetSpotEnd;
+  const sweetSpotRangeLabel = `${Math.round(sweetSpotStart)}% - ${Math.round(sweetSpotEnd)}%`;
+  const precisionStatus = isInSweetSpot
+    ? 'Aligned'
+    : chargeLevel === 0
+      ? 'Waiting'
+      : chargeLevel < sweetSpotStart
+        ? 'Too early'
+        : 'Overcharged';
+  const statusBarContent = (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span>Attempts</span>
+          <span>{Math.min(attempts + (released ? 1 : 0), maxAttempts)}/{maxAttempts}</span>
+        </div>
+        <div className="flex gap-2 justify-center">
+          {Array.from({ length: maxAttempts }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2.5 w-8 rounded-full ${
+                i < attempts 
+                  ? i < hits 
+                    ? 'bg-green-500'
+                    : 'bg-red-500/80'
+                  : 'bg-muted'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span>Precision window</span>
+          <span className={`font-semibold text-xs ${isInSweetSpot ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {precisionStatus}
+          </span>
+        </div>
+        <div className="relative h-2 rounded-full bg-muted/40 overflow-hidden">
+          <div 
+            className="absolute inset-y-0 bg-primary/20"
+            style={{ left: `${sweetSpotStart}%`, width: `${adjustedSweetSpotSize}%` }}
+          />
+          <motion.div 
+            className="absolute inset-y-0 bg-foreground/70"
+            style={{ width: `${chargeLevel}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+          <span>0%</span>
+          <span>{sweetSpotRangeLabel}</span>
+          <span>100%</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col items-center gap-6 p-6">
-      {/* Title */}
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Energy Beam Harmonization</h3>
-        <p className="text-sm text-muted-foreground">
-          Hold to charge, release in the glowing zone!
-        </p>
-      </div>
-
-      {/* Attempts counter */}
-      <div className="flex gap-2">
-        {Array.from({ length: maxAttempts }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-3 h-3 rounded-full ${
-              i < attempts 
-                ? i < hits 
-                  ? 'bg-green-500' 
-                  : 'bg-red-500'
-                : 'bg-muted'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Charge bar */}
-      <div className="relative w-full max-w-xs h-16 bg-muted/30 rounded-xl overflow-hidden border border-border/50">
-        {/* Sweet spot indicator */}
-        <div 
-          className="absolute top-0 bottom-0 bg-primary/30 border-x-2 border-primary"
-          style={{ 
-            left: `${sweetSpotStart}%`, 
-            width: `${adjustedSweetSpotSize}%` 
-          }}
-        >
-          <div className="absolute inset-0 animate-pulse bg-primary/20" />
-        </div>
-        
-        {/* Charge level */}
-        <motion.div 
-          className={`absolute top-0 bottom-0 left-0 ${
-            isInSweetSpot ? 'bg-primary' : 'bg-accent'
-          }`}
-          style={{ width: `${chargeLevel}%` }}
-          animate={{ 
-            boxShadow: isInSweetSpot 
-              ? '0 0 20px hsl(var(--primary))' 
-              : 'none'
-          }}
-        />
-
-        {/* Charge indicator */}
-        <motion.div
-          className="absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-foreground rounded-full"
-          style={{ left: `${chargeLevel}%` }}
-          animate={{ 
-            scale: isCharging ? [1, 1.2, 1] : 1,
-          }}
-          transition={{ repeat: Infinity, duration: 0.3 }}
-        />
-      </div>
-
-      {/* Result feedback */}
-      <AnimatePresence>
-        {showResult && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className={`text-2xl font-bold ${
-              chargeLevel >= sweetSpotStart && chargeLevel <= sweetSpotEnd
-                ? 'text-green-500'
-                : 'text-red-500'
-            }`}
+    <MiniGameHud
+      title="Energy Beam Harmonization"
+      subtitle="Hold to charge and release power inside the shimmering window."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Body stat bonus: +${bodyBonusPercent}% sweet spot size`}
+    >
+      <div className="flex flex-col items-center gap-6">
+        {/* Charge bar */}
+        <div className="relative w-full max-w-xs h-16 bg-muted/30 rounded-xl overflow-hidden border border-border/50">
+          {/* Sweet spot indicator */}
+          <div 
+            className="absolute top-0 bottom-0 bg-primary/30 border-x-2 border-primary"
+            style={{ 
+              left: `${sweetSpotStart}%`, 
+              width: `${adjustedSweetSpotSize}%` 
+            }}
           >
-            {chargeLevel >= sweetSpotStart && chargeLevel <= sweetSpotEnd
-              ? '✨ Perfect Hit!'
-              : '💨 Missed!'}
-          </motion.div>
+            <div className="absolute inset-0 animate-pulse bg-primary/20" />
+          </div>
+          
+          {/* Charge level */}
+          <motion.div 
+            className={`absolute top-0 bottom-0 left-0 ${
+              isInSweetSpot ? 'bg-primary' : 'bg-accent'
+            }`}
+            style={{ width: `${chargeLevel}%` }}
+            animate={{ 
+              boxShadow: isInSweetSpot 
+                ? '0 0 20px hsl(var(--primary))' 
+                : 'none'
+            }}
+          />
+
+          {/* Charge indicator */}
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-foreground rounded-full"
+            style={{ left: `${chargeLevel}%` }}
+            animate={{ 
+              scale: isCharging ? [1, 1.2, 1] : 1,
+            }}
+            transition={{ repeat: Infinity, duration: 0.3 }}
+          />
+        </div>
+
+        {/* Result feedback */}
+        <AnimatePresence>
+          {showResult && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className={`text-2xl font-bold ${
+                chargeLevel >= sweetSpotStart && chargeLevel <= sweetSpotEnd
+                  ? 'text-green-500'
+                  : 'text-red-500'
+              }`}
+            >
+              {chargeLevel >= sweetSpotStart && chargeLevel <= sweetSpotEnd
+                ? '✨ Perfect Hit!'
+                : '💨 Missed!'}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Charge button */}
+        {!gameComplete && (
+          <motion.button
+            className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-primary/50"
+            onMouseDown={startCharging}
+            onMouseUp={releaseBeam}
+            onMouseLeave={releaseBeam}
+            onTouchStart={startCharging}
+            onTouchEnd={releaseBeam}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            animate={{
+              boxShadow: isCharging
+                ? [
+                    '0 0 20px hsl(var(--primary))',
+                    '0 0 40px hsl(var(--primary))',
+                    '0 0 20px hsl(var(--primary))',
+                  ]
+                : '0 0 10px hsl(var(--primary) / 0.5)',
+            }}
+            transition={{ repeat: isCharging ? Infinity : 0, duration: 0.5 }}
+          >
+            <Zap className={`w-12 h-12 text-primary-foreground ${isCharging ? 'animate-pulse' : ''}`} />
+          </motion.button>
         )}
-      </AnimatePresence>
-
-      {/* Charge button */}
-      {!gameComplete && (
-        <motion.button
-          className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-primary/50"
-          onMouseDown={startCharging}
-          onMouseUp={releaseBeam}
-          onMouseLeave={releaseBeam}
-          onTouchStart={startCharging}
-          onTouchEnd={releaseBeam}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          animate={{
-            boxShadow: isCharging
-              ? [
-                  '0 0 20px hsl(var(--primary))',
-                  '0 0 40px hsl(var(--primary))',
-                  '0 0 20px hsl(var(--primary))',
-                ]
-              : '0 0 10px hsl(var(--primary) / 0.5)',
-          }}
-          transition={{ repeat: isCharging ? Infinity : 0, duration: 0.5 }}
-        >
-          <Zap className={`w-12 h-12 text-primary-foreground ${isCharging ? 'animate-pulse' : ''}`} />
-        </motion.button>
-      )}
-
-      <p className="text-xs text-muted-foreground">
-        Body stat bonus: +{Math.round(bodyBonus * 10)}% sweet spot
-      </p>
-    </div>
+      </div>
+  </MiniGameHud>
   );
 };

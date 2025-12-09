@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
+import { MiniGameHud } from './MiniGameHud';
 
 interface GravityBalanceGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -43,6 +44,28 @@ export const GravityBalanceGame = ({
   // Mind stat affects gravity response (slower drift)
   const mindBonus = Math.min(companionStats.mind / 100, 1);
   const adjustedGravityStrength = gravityStrength * (1 - mindBonus * 0.3);
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const questDriftPercent = Math.round(questIntervalScale * 100);
+  const questDriftLabel = questDriftPercent === 0 
+    ? 'Stable orbit'
+    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% pull`;
+  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+  const mindBonusPercent = Math.round(mindBonus * 30);
+  const infoChips = [
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { 
+      label: 'Quest drift', 
+      value: questDriftLabel, 
+      tone: questDriftTone,
+      helperText: questDriftPercent === 0 ? 'Neutral gravity' : questDriftPercent > 0 ? 'Heavier pull' : 'Gentler pull',
+    },
+    { 
+      label: 'Mind focus', 
+      value: `-${mindBonusPercent}% gravity`, 
+      tone: 'positive' as const,
+      helperText: 'Gravity strength',
+    },
+  ];
 
   const isInSafeZone = useCallback(() => {
     const dx = orbPosition.x - 50;
@@ -165,135 +188,134 @@ export const GravityBalanceGame = ({
     right: '→',
   };
 
-  return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-foreground mb-2">Gravity Balance</h3>
-        <p className="text-sm text-muted-foreground">
-          Keep the orb in the center! Tap to counter gravity.
-        </p>
+  const statusBarContent = (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Time</p>
+          <p className="font-semibold">
+            {Math.round(totalTime / 1000)}s / {gameDuration / 1000}s
+          </p>
+        </div>
+        <div className={`text-sm font-semibold ${inZone ? 'text-green-500' : 'text-amber-400'}`}>
+          Balance {accuracyPercent}%
+        </div>
       </div>
-
-      {/* Stats */}
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">
-          Time: {Math.round(totalTime / 1000)}s / {gameDuration / 1000}s
-        </span>
-        <span className={inZone ? 'text-green-500' : 'text-red-500'}>
-          Balance: {accuracyPercent}%
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full max-w-xs h-2 bg-muted rounded-full overflow-hidden">
+      <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
         <motion.div
           className="h-full bg-primary"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
+    </div>
+  );
 
-      {/* Game area */}
-      <div className="relative w-64 h-64 bg-muted/20 rounded-2xl border border-border/50 overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+  return (
+    <MiniGameHud
+      title="Gravity Balance"
+      subtitle="Keep the orb hovering inside the safe zone by tapping against gravity."
+      chips={infoChips}
+      statusBar={statusBarContent}
+      footerNote={`Mind stat bonus: -${mindBonusPercent}% gravity strength`}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative w-64 h-64 bg-muted/20 rounded-2xl border border-border/50 overflow-hidden">
+          {/* Background gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
 
-        {/* Gravity direction indicator */}
-        <motion.div
-          className={`absolute top-2 right-2 text-2xl ${showGravityChange ? 'text-primary' : 'text-muted-foreground'}`}
-          animate={{ scale: showGravityChange ? [1, 1.5, 1] : 1 }}
-        >
-          {gravityArrow[gravityDirection]}
-        </motion.div>
+          {/* Gravity direction indicator */}
+          <motion.div
+            className={`absolute top-2 right-2 text-2xl ${showGravityChange ? 'text-primary' : 'text-muted-foreground'}`}
+            animate={{ scale: showGravityChange ? [1, 1.5, 1] : 1 }}
+          >
+            {gravityArrow[gravityDirection]}
+          </motion.div>
 
-        {/* Safe zone */}
-        <div
-          className={`absolute rounded-full border-2 transition-colors ${
-            inZone ? 'border-green-500 bg-green-500/10' : 'border-primary/50 bg-primary/5'
-          }`}
-          style={{
-            width: `${safeZoneSize}%`,
-            height: `${safeZoneSize}%`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          {inZone && (
-            <div className="absolute inset-0 rounded-full bg-green-500/20 animate-pulse" />
-          )}
+          {/* Safe zone */}
+          <div
+            className={`absolute rounded-full border-2 transition-colors ${
+              inZone ? 'border-green-500 bg-green-500/10' : 'border-primary/50 bg-primary/5'
+            }`}
+            style={{
+              width: `${safeZoneSize}%`,
+              height: `${safeZoneSize}%`,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            {inZone && (
+              <div className="absolute inset-0 rounded-full bg-green-500/20 animate-pulse" />
+            )}
+          </div>
+
+          {/* Orb */}
+          <motion.div
+            className="absolute w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent border-2 border-primary-foreground/30"
+            style={{
+              left: `${orbPosition.x}%`,
+              top: `${orbPosition.y}%`,
+              transform: 'translate(-50%, -50%)',
+              boxShadow: inZone
+                ? '0 0 20px hsl(var(--primary)), inset 0 0 10px rgba(255,255,255,0.3)'
+                : '0 0 10px hsl(var(--accent))',
+            }}
+            animate={{
+              scale: inZone ? [1, 1.05, 1] : 1,
+            }}
+            transition={{ repeat: Infinity, duration: 1 }}
+          >
+            <div className="absolute inset-2 rounded-full bg-white/30" />
+          </motion.div>
+
+          {/* Touch controls - invisible tap zones */}
+          <button
+            className="absolute top-0 left-0 right-0 h-1/3 opacity-0"
+            onClick={() => handleCounterGravity('up')}
+          />
+          <button
+            className="absolute bottom-0 left-0 right-0 h-1/3 opacity-0"
+            onClick={() => handleCounterGravity('down')}
+          />
+          <button
+            className="absolute left-0 top-1/3 bottom-1/3 w-1/3 opacity-0"
+            onClick={() => handleCounterGravity('left')}
+          />
+          <button
+            className="absolute right-0 top-1/3 bottom-1/3 w-1/3 opacity-0"
+            onClick={() => handleCounterGravity('right')}
+          />
         </div>
 
-        {/* Orb */}
-        <motion.div
-          className="absolute w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent border-2 border-primary-foreground/30"
-          style={{
-            left: `${orbPosition.x}%`,
-            top: `${orbPosition.y}%`,
-            transform: 'translate(-50%, -50%)',
-            boxShadow: inZone
-              ? '0 0 20px hsl(var(--primary)), inset 0 0 10px rgba(255,255,255,0.3)'
-              : '0 0 10px hsl(var(--accent))',
-          }}
-          animate={{
-            scale: inZone ? [1, 1.05, 1] : 1,
-          }}
-          transition={{ repeat: Infinity, duration: 1 }}
-        >
-          <div className="absolute inset-2 rounded-full bg-white/30" />
-        </motion.div>
-
-        {/* Touch controls - invisible tap zones */}
-        <button
-          className="absolute top-0 left-0 right-0 h-1/3 opacity-0"
-          onClick={() => handleCounterGravity('up')}
-        />
-        <button
-          className="absolute bottom-0 left-0 right-0 h-1/3 opacity-0"
-          onClick={() => handleCounterGravity('down')}
-        />
-        <button
-          className="absolute left-0 top-1/3 bottom-1/3 w-1/3 opacity-0"
-          onClick={() => handleCounterGravity('left')}
-        />
-        <button
-          className="absolute right-0 top-1/3 bottom-1/3 w-1/3 opacity-0"
-          onClick={() => handleCounterGravity('right')}
-        />
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div />
+          <button
+            className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
+            onClick={() => handleCounterGravity('up')}
+          >
+            ↑
+          </button>
+          <div />
+          <button
+            className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
+            onClick={() => handleCounterGravity('left')}
+          >
+            ←
+          </button>
+          <button
+            className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
+            onClick={() => handleCounterGravity('down')}
+          >
+            ↓
+          </button>
+          <button
+            className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
+            onClick={() => handleCounterGravity('right')}
+          >
+            →
+          </button>
+        </div>
       </div>
-
-      {/* Control hints */}
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div />
-        <button
-          className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
-          onClick={() => handleCounterGravity('up')}
-        >
-          ↑
-        </button>
-        <div />
-        <button
-          className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
-          onClick={() => handleCounterGravity('left')}
-        >
-          ←
-        </button>
-        <button
-          className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
-          onClick={() => handleCounterGravity('down')}
-        >
-          ↓
-        </button>
-        <button
-          className="p-2 rounded bg-muted hover:bg-muted/80 active:bg-primary/20 text-sm"
-          onClick={() => handleCounterGravity('right')}
-        >
-          →
-        </button>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Mind stat bonus: -{Math.round(mindBonus * 30)}% gravity strength
-      </p>
-    </div>
+    </MiniGameHud>
   );
 };
