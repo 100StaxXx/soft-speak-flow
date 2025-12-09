@@ -6,24 +6,13 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
-
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  completed: boolean;
-  is_main_quest: boolean;
-  difficulty: string | null;
-  xp_reward: number;
-}
+import { CalendarTask } from "@/types/quest";
 
 interface CalendarMonthViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: Task[];
-  onTaskClick: (task: Task) => void;
+  tasks: CalendarTask[];
+  onTaskClick: (task: CalendarTask) => void;
   onDateLongPress?: (date: Date) => void;
 }
 

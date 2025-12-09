@@ -9,23 +9,12 @@ import { QuestDropZone } from "./QuestDropZone";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { toast } from "sonner";
-
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  completed: boolean;
-  is_main_quest: boolean;
-  difficulty: string | null;
-  xp_reward: number;
-}
+import { CalendarTask } from "@/types/quest";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: Task[];
+  tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
 }
