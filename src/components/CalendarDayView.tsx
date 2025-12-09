@@ -4,9 +4,8 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
-import { Progress } from "./ui/progress";
 import { Card } from "./ui/card";
 import { toast } from "sonner";
 import { CalendarTask } from "@/types/quest";
@@ -31,7 +30,8 @@ export const CalendarDayView = ({
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [longPressSlot, setLongPressSlot] = useState<{ hour: number; minute: number } | null>(null);
-  const [showStats, setShowStats] = useState(true);
+  const [showStats, setShowStats] = useState(false);
+  const [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
 
   // Calculate date string and day tasks first
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -121,6 +121,13 @@ export const CalendarDayView = ({
   };
 
   const unscheduledTasks = getUnscheduledTasks();
+  const scheduledTasksCount = dayTasks.length - unscheduledTasks.length;
+  const MAX_UNSCHEDULED_PREVIEW = 3;
+  const visibleUnscheduledTasks = showAllUnscheduled
+    ? unscheduledTasks
+    : unscheduledTasks.slice(0, MAX_UNSCHEDULED_PREVIEW);
+  const hiddenUnscheduledCount = Math.max(unscheduledTasks.length - visibleUnscheduledTasks.length, 0);
+  const shouldShowPreviewToggle = unscheduledTasks.length > MAX_UNSCHEDULED_PREVIEW;
   const isToday = isSameDay(selectedDate, new Date());
 
   // Calculate stats
@@ -171,10 +178,22 @@ export const CalendarDayView = ({
   const conflicts = checkConflicts();
   const powerUpXP = checkPowerUps();
 
+  useEffect(() => {
+    if ((conflicts > 0 || powerUpXP > 0) && !showStats) {
+      setShowStats(true);
+    }
+  }, [conflicts, powerUpXP, showStats]);
+
+  useEffect(() => {
+    if (!shouldShowPreviewToggle && showAllUnscheduled) {
+      setShowAllUnscheduled(false);
+    }
+  }, [shouldShowPreviewToggle, showAllUnscheduled]);
+
   return (
     <div className="space-y-3">
       {/* Compact Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -186,14 +205,16 @@ export const CalendarDayView = ({
           </Button>
 
           <div className="text-center">
-            <h2 className={cn(
-              "text-lg font-bold",
-              isToday && "text-primary"
-            )}>
-              {isToday ? "Today" : format(selectedDate, 'EEEE')}
+            <h2
+              className={cn(
+                "text-lg font-bold",
+                isToday && "text-primary"
+              )}
+            >
+              {isToday ? "Today" : format(selectedDate, "EEEE")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {format(selectedDate, 'MMMM d, yyyy')}
+              {format(selectedDate, "MMMM d, yyyy")}
             </p>
           </div>
 
@@ -207,73 +228,65 @@ export const CalendarDayView = ({
           </Button>
         </div>
 
-        {/* Quick Stats */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowStats(!showStats)}
-          className="flex items-center gap-2 h-auto py-1"
-        >
-          <div className="text-right">
-            <div className="text-sm font-semibold text-foreground">
-              {completedCount}/{totalCount}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {totalXP} XP
-            </div>
-          </div>
-          {showStats ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        </Button>
+        {/* Insights */}
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+          <span className="rounded-full bg-muted px-3 py-1 font-medium text-foreground">
+            {completedCount}/{totalCount || 0} done
+          </span>
+          <span className="rounded-full bg-primary/10 px-3 py-1 font-medium text-primary">
+            +{totalXP} XP
+          </span>
+          {powerUpXP > 0 && (
+            <span className="rounded-full bg-amber-500/10 px-3 py-1 font-semibold text-amber-600">
+              +{powerUpXP} bonus XP
+            </span>
+          )}
+          {conflicts > 0 && (
+            <span className="rounded-full bg-destructive/10 px-3 py-1 font-semibold text-destructive">
+              Resolve {conflicts} conflict{conflicts > 1 ? "s" : ""}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowStats(!showStats)}
+            className="h-7 gap-1 px-2 text-xs"
+          >
+            {showStats ? "Hide details" : "Day details"}
+            {showStats ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </Button>
+        </div>
       </div>
 
       {/* Collapsible Stats Panel */}
       {showStats && (totalCount > 0 || conflicts > 0 || powerUpXP > 0) && (
-        <Card className="p-3 space-y-3 bg-muted/30">
-          {/* Progress Bar */}
+        <Card className="space-y-3 border-dashed border-border/60 bg-background/80 p-3">
           {totalCount > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Progress: {completedCount}/{totalCount}
-                </span>
-                <span className="text-primary font-semibold">
-                  +{totalXP} XP
-                </span>
-              </div>
-              <Progress
-                value={(completedCount / totalCount) * 100}
-                className="h-2"
-              />
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{scheduledTasksCount}</span> of{" "}
+              <span className="font-medium text-foreground">{totalCount}</span> quests scheduled •{" "}
+              <span className="font-medium text-foreground">{unscheduledTasks.length}</span> waiting to place
             </div>
           )}
 
-          {/* Conflicts Warning */}
           {conflicts > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
-              <div className="text-sm">
-                <span className="font-semibold text-destructive">{conflicts} time conflict{conflicts > 1 ? 's' : ''}</span>
-                <span className="text-muted-foreground"> - Resolve for +10 XP each</span>
-              </div>
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              Clear {conflicts} overlapping quest{conflicts > 1 ? "s" : ""} to unlock bonus XP.
             </div>
           )}
 
-          {/* Power-Ups */}
           {powerUpXP > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-primary/10 border border-primary/20 rounded-lg">
-              <Zap className="h-4 w-4 text-primary flex-shrink-0" />
-              <div className="text-sm">
-                <span className="font-semibold text-primary">+{powerUpXP} Bonus XP</span>
-                <span className="text-muted-foreground"> available from power-ups</span>
-              </div>
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2 text-sm text-primary">
+              <Zap className="h-4 w-4 flex-shrink-0" />
+              {powerUpXP} bonus XP available from power hours, mornings, or deep work.
             </div>
           )}
 
-          {/* Potential Total */}
-          {(totalCount > 0 || powerUpXP > 0) && (
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-sm text-muted-foreground">Potential Total</span>
-              <span className="text-sm font-bold text-primary flex items-center gap-1">
+          {(totalXP > 0 || powerUpXP > 0) && (
+            <div className="flex items-center justify-between border-t border-dashed border-border pt-2 text-sm">
+              <span className="text-muted-foreground">Potential total today</span>
+              <span className="flex items-center gap-1 font-semibold text-primary">
                 <TrendingUp className="h-3 w-3" />
                 {totalXP + powerUpXP} XP
               </span>
@@ -284,91 +297,88 @@ export const CalendarDayView = ({
 
       {/* Unscheduled Tasks */}
       {unscheduledTasks.length > 0 && (
-        <div className="bg-muted/30 rounded-lg p-3 border border-border">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
+        <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Unscheduled ({unscheduledTasks.length})
-              </span>
+              Unscheduled ({unscheduledTasks.length})
             </div>
-            {onAutoSchedule && unscheduledTasks.length > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  playSound('pop');
-                  onAutoSchedule(unscheduledTasks);
-                  toast.success("Auto-scheduling quests...", {
-                    description: "Finding optimal time slots for your quests"
-                  });
-                }}
-                className="h-7 gap-1 text-xs bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30 hover:from-primary/20 hover:to-purple-500/20"
-              >
-                <Sparkles className="h-3 w-3" />
-                Auto-Schedule
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {onAutoSchedule && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    playSound("pop");
+                    onAutoSchedule(unscheduledTasks);
+                    toast.success("Auto-scheduling quests...", {
+                      description: "Finding optimal time slots for your quests",
+                    });
+                  }}
+                  className="h-7 gap-1 text-xs border-primary/30 bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Auto-Schedule
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {unscheduledTasks.map(task => (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {visibleUnscheduledTasks.map((task) => (
               <div
                 key={task.id}
                 draggable
                 onDragStart={(e) => {
-                  e.dataTransfer.setData('taskId', task.id);
+                  e.dataTransfer.setData("taskId", task.id);
                   setDraggedTask(task.id);
-                  playSound('pop');
+                  playSound("pop");
                 }}
                 className="cursor-move"
               >
-                <QuestDragCard
-                  task={task}
-                  isDragging={draggedTask === task.id}
-                  compact
-                />
+                <QuestDragCard task={task} isDragging={draggedTask === task.id} compact />
               </div>
             ))}
+            {!showAllUnscheduled && hiddenUnscheduledCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 border-dashed text-xs"
+                onClick={() => setShowAllUnscheduled(true)}
+              >
+                +{hiddenUnscheduledCount} more
+              </Button>
+            )}
           </div>
+          {showAllUnscheduled && shouldShowPreviewToggle && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 text-xs"
+              onClick={() => setShowAllUnscheduled(false)}
+            >
+              Show less
+            </Button>
+          )}
         </div>
       )}
 
       {/* Empty State Prompt */}
       {dayTasks.filter(t => t.scheduled_time).length === 0 && unscheduledTasks.length > 0 && (
-        <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
-          <div className="text-center space-y-2">
-            <div className="text-2xl">📅</div>
-            <h3 className="font-semibold text-foreground">Schedule Your Day</h3>
-            <p className="text-sm text-muted-foreground">
-              You have {unscheduledTasks.length} unscheduled quest{unscheduledTasks.length > 1 ? 's' : ''}.
-              <br />
-              Drag them to the timeline or long press a time slot to add more.
-            </p>
-          </div>
-        </Card>
+        <div className="rounded-lg border border-dashed border-border/60 bg-background/70 p-3 text-center text-sm text-muted-foreground">
+          You have {unscheduledTasks.length} unscheduled quest{unscheduledTasks.length > 1 ? "s" : ""}. Drag a chip into
+          the timeline or long press any slot to place it.
+        </div>
       )}
 
       {/* Completely Empty State */}
       {totalCount === 0 && (
-        <Card className="p-6 bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
-          <div className="text-center space-y-3">
-            <div className="text-4xl">✨</div>
-            <h3 className="text-lg font-bold text-foreground">Ready to Start Your Quest?</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Long press any time slot on the timeline below to quickly add a quest, or scroll down to create your first quest.
-            </p>
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
-              <div className="flex items-center gap-1">
-                <Plus className="h-3 w-3" />
-                <span>Long press = Quick add</span>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <div className="rounded-lg border border-dashed border-border/60 bg-background/70 p-4 text-center text-sm text-muted-foreground">
+          Long press any time slot below or use the form to add your first quest.
+        </div>
       )}
 
       {/* Timeline */}
-      <ScrollArea className="h-[calc(100vh-280px)] rounded-lg border border-border">
+      <ScrollArea className="max-h-[520px] min-h-[320px] rounded-lg border border-border">
         <div className="relative">
           {timeSlots.map(({ hour, minute }, index) => {
             const slotTasks = getTasksForTimeSlot(hour, minute);
