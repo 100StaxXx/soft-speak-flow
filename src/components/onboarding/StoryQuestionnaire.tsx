@@ -51,10 +51,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What area of growth calls to you most right now?",
     options: [
-      { text: "Strengthening my discipline and performance", tags: ["discipline", "tough_love", "performance", "elite"] },
-      { text: "Cultivating inner peace and clarity", tags: ["calm", "mindfulness", "clarity", "presence"] },
-      { text: "Deepening healing and emotional resilience", tags: ["healing", "supportive", "soft", "recovery"] },
-      { text: "Building confidence and forward momentum", tags: ["confidence", "self_belief", "momentum", "uplifting"] },
+      { text: "Strengthening my discipline and performance", tags: ["discipline", "momentum"] },
+      { text: "Cultivating inner peace and clarity", tags: ["calm", "spiritual"] },
+      { text: "Deepening healing and emotional resilience", tags: ["healing", "supportive"] },
+      { text: "Building confidence and forward momentum", tags: ["confidence", "momentum"] },
     ],
   },
   {
@@ -62,10 +62,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What kind of guidance resonates with you most?",
     options: [
-      { text: "Direct and honest guidance", tags: ["tough_love", "direct", "intense"] },
-      { text: "Gentle and supportive encouragement", tags: ["warm", "soft", "supportive", "feminine"] },
-      { text: "Calm and thoughtful wisdom", tags: ["stoic", "deep", "grounded", "calm"] },
-      { text: "High-energy motivation", tags: ["high_energy", "energetic", "elite", "uplifting"] },
+      { text: "Direct and honest guidance", tags: ["discipline", "confidence"] },
+      { text: "Gentle and supportive encouragement", tags: ["supportive", "healing"] },
+      { text: "Calm and thoughtful wisdom", tags: ["calm", "spiritual"] },
+      { text: "High-energy motivation", tags: ["momentum", "confidence"] },
     ],
   },
   {
@@ -73,10 +73,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Where could you use a little extra support or strength right now?",
     options: [
-      { text: "Staying consistent on my path", tags: ["discipline", "habits", "execution", "grind"] },
-      { text: "Feeling mentally scattered or tense", tags: ["mindfulness", "calm", "presence", "anxiety_relief"] },
-      { text: "Moving forward from emotional heaviness", tags: ["healing", "relationships", "heartbreak", "self_worth"] },
-      { text: "Believing in myself more deeply", tags: ["confidence", "self_belief", "supportive", "momentum"] },
+      { text: "Staying consistent on my path", tags: ["discipline", "momentum"] },
+      { text: "Feeling mentally scattered or tense", tags: ["calm", "supportive"] },
+      { text: "Moving forward from emotional heaviness", tags: ["healing", "supportive"] },
+      { text: "Believing in myself more deeply", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -84,10 +84,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What kind of energy do you want from your mentor?",
     options: [
-      { text: "Focused, intense energy", tags: ["intense", "elite", "high_energy"] },
-      { text: "Calm, grounded presence", tags: ["calm", "grounded", "neutral"] },
-      { text: "Warm, uplifting support", tags: ["warm", "encouraging", "accessible", "uplifting"] },
-      { text: "Spiritual and intuitive guidance", tags: ["spiritual", "intuition", "higher_self"] },
+      { text: "Focused, intense energy", tags: ["discipline", "momentum"] },
+      { text: "Calm, grounded presence", tags: ["calm", "supportive"] },
+      { text: "Warm, uplifting support", tags: ["supportive", "confidence"] },
+      { text: "Spiritual and intuitive guidance", tags: ["spiritual", "calm"] },
     ],
   },
   {
@@ -95,10 +95,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Who are you becoming?",
     options: [
-      { text: "Mentally strong and unshakeable", tags: ["stoic", "discipline", "clarity", "strong"] },
-      { text: "Peaceful and centered", tags: ["inner_peace", "calm", "mindfulness", "presence"] },
-      { text: "Confident and self-assured", tags: ["confidence", "self_belief", "momentum", "performance"] },
-      { text: "Emotionally whole and grounded", tags: ["healing", "self_compassion", "soft", "recovery"] },
+      { text: "Mentally strong and unshakeable", tags: ["discipline", "calm"] },
+      { text: "Peaceful and centered", tags: ["calm", "spiritual"] },
+      { text: "Confident and self-assured", tags: ["confidence", "momentum"] },
+      { text: "Emotionally whole and grounded", tags: ["healing", "supportive"] },
     ],
   },
 ];
