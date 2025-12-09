@@ -7,6 +7,7 @@ interface QuickSwipeGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
+  questIntervalScale?: number; // -0.15 to +0.15
 }
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -30,7 +31,8 @@ const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
 export const QuickSwipeGame = ({ 
   companionStats, 
   onComplete,
-  difficulty = 'medium' 
+  difficulty = 'medium',
+  questIntervalScale = 0
 }: QuickSwipeGameProps) => {
   const [attacks, setAttacks] = useState<Attack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -40,8 +42,12 @@ export const QuickSwipeGame = ({
   const completedRef = useRef(false); // Guard against double completion
   const processingRef = useRef(false); // Guard against concurrent swipes
   
-  const totalAttacks = difficulty === 'easy' ? 8 : difficulty === 'medium' ? 10 : 12;
-  const attackSpeed = difficulty === 'easy' ? 2000 : difficulty === 'medium' ? 1600 : 1200;
+  const baseTotalAttacks = difficulty === 'easy' ? 8 : difficulty === 'medium' ? 10 : 12;
+  // Quest interval scaling: more quests waited = more attacks
+  const totalAttacks = Math.round(baseTotalAttacks * (1 + questIntervalScale));
+  const baseAttackSpeed = difficulty === 'easy' ? 2000 : difficulty === 'medium' ? 1600 : 1200;
+  // Quest interval scaling: more quests waited = faster attacks
+  const attackSpeed = baseAttackSpeed * (1 - questIntervalScale * 0.3);
   
   // Combined stat bonus affects reaction time window
   const statBonus = Math.min((companionStats.body + companionStats.mind) / 200, 1);

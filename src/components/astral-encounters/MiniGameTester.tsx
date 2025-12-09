@@ -19,14 +19,23 @@ interface MiniGameTesterProps {
 export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10 } }: MiniGameTesterProps) => {
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
   const [lastResult, setLastResult] = useState<MiniGameResult | null>(null);
+  const [questInterval, setQuestInterval] = useState<2 | 3 | 4>(3);
 
   const handleComplete = (result: MiniGameResult) => {
     setLastResult(result);
     setTimeout(() => setActiveGame(null), 2000);
   };
 
+  // Convert quest interval to scale: 2 = -0.15, 3 = 0, 4 = +0.15
+  const questIntervalScale = (questInterval - 3) * 0.15;
+
   const renderGame = () => {
-    const props = { companionStats, onComplete: handleComplete, difficulty: 'medium' as const };
+    const props = { 
+      companionStats, 
+      onComplete: handleComplete, 
+      difficulty: 'medium' as const,
+      questIntervalScale 
+    };
     
     switch (activeGame) {
       case 'energy_beam':
@@ -53,6 +62,9 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
         >
           <X className="w-4 h-4" />
         </Button>
+        <div className="absolute top-2 left-2 text-xs text-muted-foreground">
+          Quest Interval: {questInterval} ({questIntervalScale > 0 ? '+' : ''}{(questIntervalScale * 100).toFixed(0)}%)
+        </div>
         {renderGame()}
       </Card>
     );
@@ -67,6 +79,23 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
           Last result: {lastResult.result} ({lastResult.accuracy}% accuracy)
         </div>
       )}
+
+      {/* Quest Interval Selector */}
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">Quest Interval (2=easier, 4=harder)</p>
+        <div className="flex gap-2">
+          {([2, 3, 4] as const).map((interval) => (
+            <Button
+              key={interval}
+              variant={questInterval === interval ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setQuestInterval(interval)}
+            >
+              {interval} quests
+            </Button>
+          ))}
+        </div>
+      </div>
       
       <div className="grid grid-cols-2 gap-3">
         {GAMES.map((game) => (
