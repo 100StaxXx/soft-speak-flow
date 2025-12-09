@@ -40,12 +40,12 @@ export const QuickSwipeGame = ({
   const completedRef = useRef(false); // Guard against double completion
   const processingRef = useRef(false); // Guard against concurrent swipes
   
-  const totalAttacks = difficulty === 'easy' ? 6 : difficulty === 'medium' ? 8 : 10;
-  const attackSpeed = difficulty === 'easy' ? 2500 : difficulty === 'medium' ? 2000 : 1500;
+  const totalAttacks = difficulty === 'easy' ? 8 : difficulty === 'medium' ? 10 : 12;
+  const attackSpeed = difficulty === 'easy' ? 2000 : difficulty === 'medium' ? 1600 : 1200;
   
   // Combined stat bonus affects reaction time window
   const statBonus = Math.min((companionStats.body + companionStats.mind) / 200, 1);
-  const timeWindow = attackSpeed + (statBonus * 500);
+  const timeWindow = attackSpeed + (statBonus * 350);
 
   // Generate attacks
   useEffect(() => {

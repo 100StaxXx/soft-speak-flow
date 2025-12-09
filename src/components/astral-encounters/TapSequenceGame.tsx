@@ -31,11 +31,11 @@ export const TapSequenceGame = ({
   const [gameComplete, setGameComplete] = useState(false);
 
   const maxRounds = 3;
-  const orbsPerRound = difficulty === 'easy' ? 3 : difficulty === 'medium' ? 4 : 5;
+  const orbsPerRound = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
   
   // Mind stat affects timing forgiveness (longer display time)
   const mindBonus = Math.min(companionStats.mind / 100, 1);
-  const displayTime = 600 + (mindBonus * 400); // 600-1000ms per orb
+  const displayTime = 500 + (mindBonus * 300); // 500-800ms per orb (faster)
 
   // Generate orbs for current round
   const generateOrbs = useCallback(() => {
