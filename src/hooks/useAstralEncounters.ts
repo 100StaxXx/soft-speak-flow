@@ -1,0 +1,328 @@
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useCompanion } from '@/hooks/useCompanion';
+import { useXPRewards } from '@/hooks/useXPRewards';
+import { 
+  Adversary, 
+  AstralEncounter, 
+  AdversaryEssence, 
+  CosmicCodexEntry,
+  TriggerType 
+} from '@/types/astralEncounters';
+import { 
+  generateAdversary, 
+  calculateXPReward, 
+  getResultFromAccuracy 
+} from '@/utils/adversaryGenerator';
+import { toast } from 'sonner';
+
+export const useAstralEncounters = () => {
+  const { companion } = useCompanion();
+  const { awardCustomXP } = useXPRewards();
+  const queryClient = useQueryClient();
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Get user on mount
+  useState(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id || null);
+    });
+  });
+  
+  const [activeEncounter, setActiveEncounter] = useState<{
+    encounter: AstralEncounter;
+    adversary: Adversary;
+  } | null>(null);
+  const [showEncounterModal, setShowEncounterModal] = useState(false);
+
+  // Fetch user's encounter history
+  const { data: encounters, isLoading: encountersLoading } = useQuery({
+    queryKey: ['astral-encounters', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('astral_encounters')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data as AstralEncounter[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch collected essences
+  const { data: essences, isLoading: essencesLoading } = useQuery({
+    queryKey: ['adversary-essences', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('adversary_essences')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('absorbed_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as AdversaryEssence[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch cosmic codex entries
+  const { data: codexEntries, isLoading: codexLoading } = useQuery({
+    queryKey: ['cosmic-codex', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('cosmic_codex_entries')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('times_defeated', { ascending: false });
+      
+      if (error) throw error;
+      return data as CosmicCodexEntry[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Calculate total stat boosts from essences
+  const totalStatBoosts = essences?.reduce(
+    (acc, essence) => {
+      const statType = essence.stat_type as 'mind' | 'body' | 'soul';
+      acc[statType] = (acc[statType] || 0) + essence.stat_boost;
+      return acc;
+    },
+    { mind: 0, body: 0, soul: 0 }
+  ) || { mind: 0, body: 0, soul: 0 };
+
+  // Start a new encounter
+  const startEncounter = useMutation({
+    mutationFn: async (params: {
+      triggerType: TriggerType;
+      triggerSourceId?: string;
+      epicProgress?: number;
+      epicCategory?: string;
+    }) => {
+      if (!user?.id || !companion?.id) {
+        throw new Error('User or companion not found');
+      }
+
+      const adversary = generateAdversary(
+        params.triggerType,
+        params.epicProgress,
+        params.epicCategory
+      );
+
+      const { data, error } = await supabase
+        .from('astral_encounters')
+        .insert({
+          user_id: user.id,
+          companion_id: companion.id,
+          adversary_name: adversary.name,
+          adversary_theme: adversary.theme,
+          adversary_tier: adversary.tier,
+          adversary_lore: adversary.lore,
+          mini_game_type: adversary.miniGameType,
+          trigger_type: params.triggerType,
+          trigger_source_id: params.triggerSourceId || null,
+          total_phases: adversary.phases,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { encounter: data as AstralEncounter, adversary };
+    },
+    onSuccess: ({ encounter, adversary }) => {
+      setActiveEncounter({ encounter, adversary });
+      setShowEncounterModal(true);
+      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+    },
+    onError: (error) => {
+      console.error('Failed to start encounter:', error);
+      toast.error('Failed to start encounter');
+    },
+  });
+
+  // Complete an encounter
+  const completeEncounter = useMutation({
+    mutationFn: async (params: {
+      encounterId: string;
+      accuracy: number;
+      phasesCompleted: number;
+    }) => {
+      if (!user?.id || !companion?.id || !activeEncounter) {
+        throw new Error('Missing required data');
+      }
+
+      const result = getResultFromAccuracy(params.accuracy);
+      const xpEarned = calculateXPReward(
+        activeEncounter.adversary.tier,
+        params.accuracy
+      );
+
+      // Update encounter
+      const { error: updateError } = await supabase
+        .from('astral_encounters')
+        .update({
+          result,
+          accuracy_score: params.accuracy,
+          xp_earned: xpEarned,
+          essence_earned: result !== 'fail' ? activeEncounter.adversary.essenceName : null,
+          stat_boost_type: result !== 'fail' ? activeEncounter.adversary.statType : null,
+          stat_boost_amount: result !== 'fail' ? activeEncounter.adversary.statBoost : 0,
+          phases_completed: params.phasesCompleted,
+          completed_at: new Date().toISOString(),
+          retry_available_at: result === 'fail' 
+            ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() 
+            : null,
+        })
+        .eq('id', params.encounterId);
+
+      if (updateError) throw updateError;
+
+      // If successful, create essence and update codex
+      if (result !== 'fail') {
+        // Create essence
+        await supabase.from('adversary_essences').insert({
+          user_id: user.id,
+          companion_id: companion.id,
+          encounter_id: params.encounterId,
+          essence_name: activeEncounter.adversary.essenceName,
+          essence_description: activeEncounter.adversary.essenceDescription,
+          stat_type: activeEncounter.adversary.statType,
+          stat_boost: activeEncounter.adversary.statBoost,
+          adversary_name: activeEncounter.adversary.name,
+          adversary_theme: activeEncounter.adversary.theme,
+          rarity: activeEncounter.adversary.tier,
+        });
+
+        // Update or insert codex entry
+        const { data: existingEntry } = await supabase
+          .from('cosmic_codex_entries')
+          .select('id, times_defeated')
+          .eq('user_id', user.id)
+          .eq('adversary_theme', activeEncounter.adversary.theme)
+          .single();
+
+        if (existingEntry) {
+          await supabase
+            .from('cosmic_codex_entries')
+            .update({
+              times_defeated: existingEntry.times_defeated + 1,
+              last_defeated_at: new Date().toISOString(),
+            })
+            .eq('id', existingEntry.id);
+        } else {
+          await supabase.from('cosmic_codex_entries').insert({
+            user_id: user.id,
+            adversary_theme: activeEncounter.adversary.theme,
+            adversary_name: activeEncounter.adversary.name,
+            adversary_lore: activeEncounter.adversary.lore,
+          });
+        }
+
+        // Update companion stats
+        const statField = activeEncounter.adversary.statType;
+        const currentStat = companion[statField] || 0;
+        const newStat = Math.min(100, currentStat + activeEncounter.adversary.statBoost);
+
+        await supabase
+          .from('user_companion')
+          .update({ [statField]: newStat })
+          .eq('id', companion.id);
+
+        // Award XP
+        if (xpEarned > 0) {
+          await awardCustomXP(xpEarned, 'astral_encounter', `Defeated ${activeEncounter.adversary.name}`);
+        }
+      }
+
+      return { result, xpEarned };
+    },
+    onSuccess: ({ result, xpEarned }) => {
+      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+      queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
+      queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
+      refetchCompanion();
+
+      if (result !== 'fail') {
+        toast.success(`Victory! +${xpEarned} XP`);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to complete encounter:', error);
+      toast.error('Failed to complete encounter');
+    },
+  });
+
+  // Check if encounter should trigger
+  const checkEncounterTrigger = useCallback(async (
+    triggerType: TriggerType,
+    triggerSourceId?: string,
+    epicProgress?: number,
+    epicCategory?: string
+  ) => {
+    if (!user?.id) return false;
+
+    // Check for recent incomplete encounter
+    const { data: pendingEncounter } = await supabase
+      .from('astral_encounters')
+      .select('*')
+      .eq('user_id', user.id)
+      .is('completed_at', null)
+      .single();
+
+    if (pendingEncounter) {
+      // Resume pending encounter
+      const adversary = generateAdversary(triggerType, epicProgress, epicCategory);
+      setActiveEncounter({ 
+        encounter: pendingEncounter as AstralEncounter, 
+        adversary 
+      });
+      setShowEncounterModal(true);
+      return true;
+    }
+
+    // Start new encounter
+    startEncounter.mutate({ 
+      triggerType, 
+      triggerSourceId, 
+      epicProgress, 
+      epicCategory 
+    });
+    return true;
+  }, [user?.id, startEncounter]);
+
+  const closeEncounter = useCallback(() => {
+    setShowEncounterModal(false);
+    setActiveEncounter(null);
+  }, []);
+
+  return {
+    // State
+    activeEncounter,
+    showEncounterModal,
+    
+    // Data
+    encounters,
+    essences,
+    codexEntries,
+    totalStatBoosts,
+    
+    // Loading states
+    isLoading: encountersLoading || essencesLoading || codexLoading,
+    isStarting: startEncounter.isPending,
+    isCompleting: completeEncounter.isPending,
+    
+    // Actions
+    startEncounter: startEncounter.mutate,
+    completeEncounter: completeEncounter.mutate,
+    checkEncounterTrigger,
+    closeEncounter,
+    setShowEncounterModal,
+  };
+};
