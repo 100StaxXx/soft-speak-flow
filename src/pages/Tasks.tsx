@@ -4,9 +4,7 @@ import { Calendar as CalendarIcon, Target, Zap, Flame, Mountain, Swords, LayoutG
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { CalendarDayView } from "@/components/CalendarDayView";
-import { TimeConflictDetector } from "@/components/TimeConflictDetector";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
-import { SchedulePowerUps } from "@/components/SchedulePowerUps";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
@@ -636,14 +634,6 @@ export default function Tasks() {
                 />
               )}
             </Card>
-
-            {/* Schedule Power-Ups & Conflict Detector */}
-            {calendarView === "list" && (
-              <>
-                <SchedulePowerUps tasks={tasks} />
-                <TimeConflictDetector tasks={tasks} />
-              </>
-            )}
 
             {/* Quest List */}
             <Card className="p-4 space-y-4">
