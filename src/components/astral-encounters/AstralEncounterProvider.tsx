@@ -20,7 +20,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     setShowEncounterModal,
     checkEncounterTrigger,
     completeEncounter,
-  } = useAstralEncounters();
+  } = useAstralEncounters({ loadCollections: false });
 
   const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
 

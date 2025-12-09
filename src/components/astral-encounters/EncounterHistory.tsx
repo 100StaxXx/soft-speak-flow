@@ -30,7 +30,9 @@ export const EncounterHistory = ({ encounters }: EncounterHistoryProps) => {
         <Card className="p-6 text-center text-muted-foreground">
           <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
           <p>No encounters yet</p>
-          <p className="text-sm mt-1">Complete 20 quests to trigger your first encounter</p>
+          <p className="text-sm mt-1">
+            Finish a few quests (usually every 2-4) to trigger your first encounter
+          </p>
         </Card>
       ) : (
         <ScrollArea className="h-80">

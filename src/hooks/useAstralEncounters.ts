@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,11 +23,16 @@ import {
 } from '@/utils/adversaryGenerator';
 import { toast } from 'sonner';
 
-export const useAstralEncounters = () => {
+interface AstralEncounterOptions {
+  loadCollections?: boolean;
+}
+
+export const useAstralEncounters = ({ loadCollections = true }: AstralEncounterOptions = {}) => {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { awardCustomXP } = useXPRewards();
   const queryClient = useQueryClient();
+  const shouldLoadCollections = loadCollections && !!user?.id;
   
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
@@ -35,8 +40,51 @@ export const useAstralEncounters = () => {
   } | null>(null);
   const [showEncounterModal, setShowEncounterModal] = useState(false);
 
+  const buildAdversaryFromStoredEncounter = useCallback((storedEncounter: AstralEncounter): Adversary => {
+    const theme = storedEncounter.adversary_theme as AdversaryTheme;
+    const tier = storedEncounter.adversary_tier as AdversaryTier;
+
+    return {
+      name: storedEncounter.adversary_name,
+      theme,
+      tier,
+      lore: storedEncounter.adversary_lore || '',
+      miniGameType: storedEncounter.mini_game_type as MiniGameType,
+      phases: storedEncounter.total_phases || 1,
+      essenceName: `Essence of ${storedEncounter.adversary_name}`,
+      essenceDescription: `Power absorbed from defeating ${storedEncounter.adversary_name}`,
+      statType: THEME_STAT_MAP[theme] || 'mind',
+      statBoost: TIER_CONFIG[tier]?.statBoost || 1,
+    };
+  }, []);
+
+  const resumePendingEncounter = useCallback(async () => {
+    if (!user?.id || activeEncounter) return false;
+
+    const { data: pendingEncounter } = await supabase
+      .from('astral_encounters')
+      .select('*')
+      .eq('user_id', user.id)
+      .is('completed_at', null)
+      .maybeSingle();
+
+    if (!pendingEncounter) {
+      return false;
+    }
+
+    const storedEncounter = pendingEncounter as AstralEncounter;
+    const adversary = buildAdversaryFromStoredEncounter(storedEncounter);
+    setActiveEncounter({ encounter: storedEncounter, adversary });
+    setShowEncounterModal(true);
+    return true;
+  }, [activeEncounter, buildAdversaryFromStoredEncounter, user?.id]);
+
+  useEffect(() => {
+    resumePendingEncounter();
+  }, [resumePendingEncounter]);
+
   // Fetch user's encounter history
-  const { data: encounters, isLoading: encountersLoading } = useQuery({
+  const { data: encountersData, isLoading: encountersLoading } = useQuery({
     queryKey: ['astral-encounters', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -50,11 +98,11 @@ export const useAstralEncounters = () => {
       if (error) throw error;
       return data as AstralEncounter[];
     },
-    enabled: !!user?.id,
+    enabled: shouldLoadCollections,
   });
 
   // Fetch collected essences
-  const { data: essences, isLoading: essencesLoading } = useQuery({
+  const { data: essencesData, isLoading: essencesLoading } = useQuery({
     queryKey: ['adversary-essences', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -67,11 +115,11 @@ export const useAstralEncounters = () => {
       if (error) throw error;
       return data as AdversaryEssence[];
     },
-    enabled: !!user?.id,
+    enabled: shouldLoadCollections,
   });
 
   // Fetch cosmic codex entries
-  const { data: codexEntries, isLoading: codexLoading } = useQuery({
+  const { data: codexEntriesData, isLoading: codexLoading } = useQuery({
     queryKey: ['cosmic-codex', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -84,18 +132,22 @@ export const useAstralEncounters = () => {
       if (error) throw error;
       return data as CosmicCodexEntry[];
     },
-    enabled: !!user?.id,
+    enabled: shouldLoadCollections,
   });
 
+  const encounters = (encountersData ?? []) as AstralEncounter[];
+  const essences = (essencesData ?? []) as AdversaryEssence[];
+  const codexEntries = (codexEntriesData ?? []) as CosmicCodexEntry[];
+
   // Calculate total stat boosts from essences
-  const totalStatBoosts = essences?.reduce(
+  const totalStatBoosts = (essences ?? []).reduce(
     (acc, essence) => {
       const statType = essence.stat_type as 'mind' | 'body' | 'soul';
       acc[statType] = (acc[statType] || 0) + essence.stat_boost;
       return acc;
     },
     { mind: 0, body: 0, soul: 0 }
-  ) || { mind: 0, body: 0, soul: 0 };
+  );
 
   // Start a new encounter
   const startEncounter = useMutation({
@@ -271,34 +323,8 @@ export const useAstralEncounters = () => {
   ) => {
     if (!user?.id) return false;
 
-    // Check for recent incomplete encounter
-    const { data: pendingEncounter } = await supabase
-      .from('astral_encounters')
-      .select('*')
-      .eq('user_id', user.id)
-      .is('completed_at', null)
-      .single();
-
-    if (pendingEncounter) {
-      // Resume pending encounter - reconstruct adversary from stored data
-      const storedEncounter = pendingEncounter as AstralEncounter;
-      const theme = storedEncounter.adversary_theme as AdversaryTheme;
-      const tier = storedEncounter.adversary_tier as AdversaryTier;
-      const adversary: Adversary = {
-        name: storedEncounter.adversary_name,
-        theme,
-        tier,
-        lore: storedEncounter.adversary_lore || '',
-        miniGameType: storedEncounter.mini_game_type as MiniGameType,
-        phases: storedEncounter.total_phases || 1,
-        // Use theme-stat mapping for essence details
-        essenceName: `Essence of ${storedEncounter.adversary_name}`,
-        essenceDescription: `Power absorbed from defeating ${storedEncounter.adversary_name}`,
-        statType: THEME_STAT_MAP[theme] || 'mind',
-        statBoost: TIER_CONFIG[tier]?.statBoost || 1,
-      };
-      setActiveEncounter({ encounter: storedEncounter, adversary });
-      setShowEncounterModal(true);
+    const hasPending = await resumePendingEncounter();
+    if (hasPending) {
       return true;
     }
 
@@ -310,7 +336,7 @@ export const useAstralEncounters = () => {
       epicCategory 
     });
     return true;
-  }, [user?.id, startEncounter]);
+  }, [resumePendingEncounter, startEncounter, user?.id]);
 
   const closeEncounter = useCallback(() => {
     setShowEncounterModal(false);
@@ -329,7 +355,7 @@ export const useAstralEncounters = () => {
     totalStatBoosts,
     
     // Loading states
-    isLoading: encountersLoading || essencesLoading || codexLoading,
+    isLoading: loadCollections ? (encountersLoading || essencesLoading || codexLoading) : false,
     isStarting: startEncounter.isPending,
     isCompleting: completeEncounter.isPending,
     

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 import { TriggerType } from '@/types/astralEncounters';
 
 interface TriggerResult {
@@ -16,13 +17,54 @@ const getRandomInterval = () => Math.floor(Math.random() * 3) + 2;
 
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const questCountRef = useRef<number | null>(null);
   const nextEncounterRef = useRef<number | null>(null);
+  const encountersEnabledRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     questCountRef.current = null;
     nextEncounterRef.current = null;
+    encountersEnabledRef.current = null;
   }, [user?.id]);
+
+  useEffect(() => {
+    questCountRef.current = null;
+    nextEncounterRef.current = null;
+    if (profile?.astral_encounters_enabled !== undefined && profile?.astral_encounters_enabled !== null) {
+      encountersEnabledRef.current = profile.astral_encounters_enabled !== false;
+    }
+  }, [profile?.astral_encounters_enabled]);
+
+  const ensureEncountersEnabled = useCallback(async (): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    if (profile?.astral_encounters_enabled !== undefined && profile?.astral_encounters_enabled !== null) {
+      const isEnabled = profile.astral_encounters_enabled !== false;
+      encountersEnabledRef.current = isEnabled;
+      return isEnabled;
+    }
+
+    if (encountersEnabledRef.current !== null) {
+      return encountersEnabledRef.current;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('astral_encounters_enabled')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Failed to verify astral encounters setting', error);
+      encountersEnabledRef.current = true;
+      return true;
+    }
+
+    const isEnabled = data?.astral_encounters_enabled !== false;
+    encountersEnabledRef.current = isEnabled;
+    return isEnabled;
+  }, [profile?.astral_encounters_enabled, user?.id]);
 
   // Check for quest milestone trigger (random 2-4 quests)
   const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
@@ -40,6 +82,8 @@ export const useEncounterTrigger = () => {
         console.error('Failed to fetch quest count', error);
         return { shouldTrigger: false };
       }
+
+      encountersEnabledRef.current = profile.astral_encounters_enabled !== false;
 
       // Check if encounters are disabled
       if (profile.astral_encounters_enabled === false) {
@@ -88,6 +132,10 @@ export const useEncounterTrigger = () => {
       nextEncounterRef.current = nextEncounterValue;
     }
 
+    if (!encountersEnabledRef.current) {
+      return { shouldTrigger: false };
+    }
+
     if (shouldTrigger) {
       return { 
         shouldTrigger: true, 
@@ -105,6 +153,10 @@ export const useEncounterTrigger = () => {
     currentProgress: number
   ): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
+
+    if (!(await ensureEncountersEnabled())) {
+      return { shouldTrigger: false };
+    }
 
     const milestones = [25, 50, 75, 100];
     
@@ -142,11 +194,15 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id]);
+  }, [ensureEncountersEnabled, user?.id]);
 
   // Check for weekly trigger (once per 7 days)
   const checkWeeklyTrigger = useCallback(async (): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
+
+    if (!(await ensureEncountersEnabled())) {
+      return { shouldTrigger: false };
+    }
 
     // Check last weekly encounter
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -167,7 +223,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id]);
+  }, [ensureEncountersEnabled, user?.id]);
 
   return {
     checkQuestMilestone,
