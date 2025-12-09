@@ -11,22 +11,28 @@ interface TriggerResult {
   epicCategory?: string;
 }
 
+// Generate random interval between 2-4
+const getRandomInterval = () => Math.floor(Math.random() * 3) + 2;
+
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
   const questCountRef = useRef<number | null>(null);
+  const nextEncounterRef = useRef<number | null>(null);
 
   useEffect(() => {
     questCountRef.current = null;
+    nextEncounterRef.current = null;
   }, [user?.id]);
 
-  // Check for quest milestone trigger (every 20 quests)
+  // Check for quest milestone trigger (random 2-4 quests)
   const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
 
-    if (questCountRef.current === null) {
+    // Fetch current counts if not cached
+    if (questCountRef.current === null || nextEncounterRef.current === null) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('total_quests_completed')
+        .select('total_quests_completed, next_encounter_quest_count')
         .eq('id', user.id)
         .single();
 
@@ -36,14 +42,28 @@ export const useEncounterTrigger = () => {
       }
 
       questCountRef.current = profile.total_quests_completed || 0;
+      // If no next encounter set, initialize with random 2-4
+      nextEncounterRef.current = profile.next_encounter_quest_count ?? getRandomInterval();
     }
 
     questCountRef.current += 1;
     const newTotal = questCountRef.current;
 
+    // Check if we've reached the encounter threshold
+    const shouldTrigger = newTotal >= (nextEncounterRef.current ?? 0);
+
+    // Calculate next encounter threshold if triggering
+    const nextEncounterValue = shouldTrigger 
+      ? newTotal + getRandomInterval() 
+      : nextEncounterRef.current;
+
+    // Update database with new quest count and potentially new encounter threshold
     const { error: updateError } = await supabase
       .from('profiles')
-      .update({ total_quests_completed: newTotal })
+      .update({ 
+        total_quests_completed: newTotal,
+        next_encounter_quest_count: nextEncounterValue
+      })
       .eq('id', user.id);
 
     if (updateError) {
@@ -52,7 +72,12 @@ export const useEncounterTrigger = () => {
       return { shouldTrigger: false };
     }
 
-    if (newTotal > 0 && newTotal % 20 === 0) {
+    // Update local ref if triggering
+    if (shouldTrigger) {
+      nextEncounterRef.current = nextEncounterValue;
+    }
+
+    if (shouldTrigger) {
       return { 
         shouldTrigger: true, 
         triggerType: 'quest_milestone',
