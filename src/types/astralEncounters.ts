@@ -21,7 +21,12 @@ export type MiniGameType =
   | 'astral_frequency'
   | 'eclipse_timing'
   | 'starfall_dodge'
-  | 'rune_resonance';
+  | 'rune_resonance'
+  | 'breath_sync'
+  | 'quick_swipe'
+  | 'constellation_trace'
+  | 'shield_barrier'
+  | 'gravity_balance';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 

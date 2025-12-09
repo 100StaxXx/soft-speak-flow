@@ -81,6 +81,41 @@ export const ShieldBarrierGame = ({
     },
   ];
 
+  const handleAttackResult = useCallback((blocked: boolean) => {
+    if (completedRef.current) return;
+
+    setAttacks(prev => prev.map((a, i) =>
+      i === currentAttackIndex ? { ...a, blocked } : a
+    ));
+
+    if (blocked) {
+      setScore(prev => prev + 1);
+      setShowResult('blocked');
+    } else {
+      setShowResult('hit');
+    }
+
+    setTimeout(() => {
+      setShowResult(null);
+      setActiveShield(null);
+
+      const nextIndex = currentAttackIndex + 1;
+      if (nextIndex >= totalAttacks && !completedRef.current) {
+        completedRef.current = true;
+        setGameComplete(true);
+        const finalScore = blocked ? score + 1 : score;
+        const accuracy = Math.round(finalScore / totalAttacks * 100);
+        onComplete({
+          success: accuracy >= 50,
+          accuracy,
+          result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail',
+        });
+      } else {
+        setCurrentAttackIndex(nextIndex);
+      }
+    }, 400);
+  }, [currentAttackIndex, totalAttacks, score, onComplete]);
+
   // Generate attacks
   useEffect(() => {
     const newAttacks: Attack[] = [];
@@ -129,41 +164,6 @@ export const ShieldBarrierGame = ({
       }
     };
   }, [currentAttackIndex, attacks, approachTime, gameComplete, handleAttackResult]);
-
-  const handleAttackResult = useCallback((blocked: boolean) => {
-    if (completedRef.current) return;
-
-    setAttacks(prev => prev.map((a, i) =>
-      i === currentAttackIndex ? { ...a, blocked } : a
-    ));
-
-    if (blocked) {
-      setScore(prev => prev + 1);
-      setShowResult('blocked');
-    } else {
-      setShowResult('hit');
-    }
-
-    setTimeout(() => {
-      setShowResult(null);
-      setActiveShield(null);
-
-      const nextIndex = currentAttackIndex + 1;
-      if (nextIndex >= totalAttacks && !completedRef.current) {
-        completedRef.current = true;
-        setGameComplete(true);
-        const finalScore = blocked ? score + 1 : score;
-        const accuracy = Math.round(finalScore / totalAttacks * 100);
-        onComplete({
-          success: accuracy >= 50,
-          accuracy,
-          result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail',
-        });
-      } else {
-        setCurrentAttackIndex(nextIndex);
-      }
-    }, 400);
-  }, [currentAttackIndex, totalAttacks, score, onComplete]);
 
   const handleShieldActivate = useCallback((direction: Direction) => {
     if (gameComplete || completedRef.current) return;

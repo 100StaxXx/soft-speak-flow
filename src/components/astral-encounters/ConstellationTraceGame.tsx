@@ -87,6 +87,25 @@ export const ConstellationTraceGame = ({
     setFadeRemaining(fadeTime);
   }, [starCount, fadeTime]);
 
+  const handleRoundEnd = useCallback(() => {
+    const connectedCount = stars.filter(s => s.connected).length;
+    
+    if (round < maxRounds) {
+      setTimeout(() => {
+        setRound(prev => prev + 1);
+        generateStars();
+      }, 500);
+    } else {
+      setGameComplete(true);
+      const accuracy = Math.round((score + connectedCount) / totalStars * 100);
+      onComplete({
+        success: accuracy >= 50,
+        accuracy,
+        result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail',
+      });
+    }
+  }, [round, stars, score, totalStars, generateStars, onComplete]);
+
   // Initialize game
   useEffect(() => {
     generateStars();
@@ -136,25 +155,6 @@ export const ConstellationTraceGame = ({
       }
     };
   }, [stars, fadeTime, gameComplete]);
-
-  const handleRoundEnd = useCallback(() => {
-    const connectedCount = stars.filter(s => s.connected).length;
-    
-    if (round < maxRounds) {
-      setTimeout(() => {
-        setRound(prev => prev + 1);
-        generateStars();
-      }, 500);
-    } else {
-      setGameComplete(true);
-      const accuracy = Math.round((score + connectedCount) / totalStars * 100);
-      onComplete({
-        success: accuracy >= 50,
-        accuracy,
-        result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail',
-      });
-    }
-  }, [round, stars, score, totalStars, generateStars, onComplete]);
 
   const handleStarTap = useCallback((star: Star) => {
     if (gameComplete || star.connected || star.fading) return;
