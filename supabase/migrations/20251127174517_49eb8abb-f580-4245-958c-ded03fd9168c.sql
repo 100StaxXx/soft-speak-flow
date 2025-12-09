@@ -21,10 +21,10 @@ SELECT cron.schedule(
   '1 0 * * *',  -- Every day at 00:01 UTC
   $$
   SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/generate-daily-mentor-pep-talks',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/generate-daily-mentor-pep-talks',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZnJnc2Fhd3ZsZXRnaXp0ZnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwOTkwNzgsImV4cCI6MjA3ODY3NTA3OH0.Rfrr2KRuqbiqVhWv8gEXNDb0RrnqX_7Nbo9frcwaPyw'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   );
@@ -37,10 +37,10 @@ SELECT cron.schedule(
   '5 0 * * *',  -- Every day at 00:05 UTC
   $$
   SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/schedule-daily-mentor-pushes',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/schedule-daily-mentor-pushes',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZnJnc2Fhd3ZsZXRnaXp0ZnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwOTkwNzgsImV4cCI6MjA3ODY3NTA3OH0.Rfrr2KRuqbiqVhWv8gEXNDb0RrnqX_7Nbo9frcwaPyw'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   );
@@ -53,10 +53,10 @@ SELECT cron.schedule(
   '*/5 * * * *',  -- Every 5 minutes
   $$
   SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/dispatch-daily-pushes',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZnJnc2Fhd3ZsZXRnaXp0ZnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwOTkwNzgsImV4cCI6MjA3ODY3NTA3OH0.Rfrr2KRuqbiqVhWv8gEXNDb0RrnqX_7Nbo9frcwaPyw'
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
     ),
     body := '{}'::jsonb
   );

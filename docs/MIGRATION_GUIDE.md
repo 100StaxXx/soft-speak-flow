@@ -1,9 +1,9 @@
 # Supabase Migration Guide: Fresh Start on New Project
 
 ## Overview
-This guide covers setting up the fresh Supabase project: `opbfpbbqvuksuuvmtmssd`
+This guide covers setting up the fresh Supabase project: `opbfpbbqvuksuvmtmssd`
 
-**Project URL**: `https://opbfpbbqvuksuuvmtmssd.supabase.co`
+**Project URL**: `https://opbfpbbqvuksuvmtmssd.supabase.co`
 
 ---
 
@@ -22,7 +22,7 @@ npm install -g supabase
 
 ### 1.2 Link to Project
 ```bash
-supabase link --project-ref opbfpbbqvuksuuvmtmssd
+supabase link --project-ref opbfpbbqvuksuvmtmssd
 ```
 
 ---
@@ -51,36 +51,35 @@ This creates all tables, functions, triggers, and RLS policies from scratch.
 ### 3.1 Required Secrets (27 total)
 Set all secrets via CLI:
 ```bash
-supabase secrets set --project-ref opbfpbbqvuksuuvmtmssd \
-  SUPABASE_URL="https://opbfpbbqvuksuuvmtmssd.supabase.co" \
-  SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw" \
+supabase secrets set --project-ref opbfpbbqvuksuvmtmssd \
+  SUPABASE_URL="https://opbfpbbqvuksuvmtmssd.supabase.co" \
+  SUPABASE_ANON_KEY="<YOUR_ANON_KEY>" \
   SUPABASE_SERVICE_ROLE_KEY="<YOUR_SERVICE_ROLE_KEY>" \
-  SUPABASE_DB_URL="<YOUR_DB_URL>" \
-  SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw" \
   OPENAI_API_KEY="<YOUR_OPENAI_KEY>" \
   ELEVENLABS_API_KEY="<YOUR_ELEVENLABS_KEY>" \
   LOVABLE_API_KEY="<YOUR_LOVABLE_KEY>" \
-  APPLE_TEAM_ID="B6VW78ABTR" \
-  APPLE_KEY_ID="FPGVLVRK63" \
-  APPLE_PRIVATE_KEY="<YOUR_APPLE_PRIVATE_KEY>" \
+  ALLOWED_ORIGINS="https://app.cosmiq.quest" \
+  ENVIRONMENT="production" \
+  APP_URL="https://app.cosmiq.quest" \
+  INTERNAL_FUNCTION_SECRET="<GENERATE_A_STRONG_SECRET>" \
+  VAPID_PUBLIC_KEY="<YOUR_VAPID_PUBLIC_KEY>" \
+  VAPID_PRIVATE_KEY="<YOUR_VAPID_PRIVATE_KEY>" \
+  VAPID_SUBJECT="mailto:support@cosmiq.quest" \
   APPLE_SERVICE_ID="com.darrylgraham.revolution.web" \
-  APPLE_SHARED_SECRET="<YOUR_APPLE_SHARED_SECRET>" \
   APPLE_IOS_BUNDLE_ID="com.darrylgraham.revolution" \
+  APPLE_SHARED_SECRET="<YOUR_APPLE_SHARED_SECRET>" \
+  APPLE_WEBHOOK_AUDIENCE="appstoreconnect-v1" \
   APNS_KEY_ID="<YOUR_APNS_KEY_ID>" \
   APNS_TEAM_ID="<YOUR_APNS_TEAM_ID>" \
-  APNS_AUTH_KEY="<YOUR_APNS_AUTH_KEY>" \
+  APNS_AUTH_KEY="<APNS_P8_CONTENTS>" \
   APNS_BUNDLE_ID="com.darrylgraham.revolution" \
-  GOOGLE_CLIENT_ID="<YOUR_GOOGLE_CLIENT_ID>" \
+  APNS_ENVIRONMENT="production" \
   VITE_GOOGLE_WEB_CLIENT_ID="371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com" \
   VITE_GOOGLE_IOS_CLIENT_ID="371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com" \
-  DISCORD_BOT_TOKEN="<YOUR_DISCORD_BOT_TOKEN>" \
-  DISCORD_WEBHOOK_URL="<YOUR_DISCORD_WEBHOOK>" \
-  DISCORD_GUILD_ID="<YOUR_DISCORD_GUILD_ID>" \
   PAYPAL_CLIENT_ID="<YOUR_PAYPAL_CLIENT_ID>" \
-  PAYPAL_SECRET="<YOUR_PAYPAL_SECRET>" \
-  STRIPE_SECRET_KEY="<YOUR_STRIPE_SECRET>" \
-  VITE_NATIVE_REDIRECT_BASE="https://app.cosmiq.quest"
+  PAYPAL_SECRET="<YOUR_PAYPAL_SECRET>"
 ```
+
 
 ### 3.2 Secrets Reference Table
 
@@ -124,7 +123,7 @@ supabase secrets set --project-ref opbfpbbqvuksuuvmtmssd \
 # Deploy all edge functions (70+)
 for fn in $(ls supabase/functions | grep -v '^_'); do
   echo "Deploying $fn..."
-  supabase functions deploy "$fn" --project-ref opbfpbbqvuksuuvmtmssd
+  supabase functions deploy "$fn" --project-ref opbfpbbqvuksuvmtmssd
 done
 ```
 
@@ -140,7 +139,7 @@ SELECT cron.schedule(
   '0 13 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes-native',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes-native',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -156,7 +155,7 @@ SELECT cron.schedule(
   '30 14 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-quote-pushes',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/dispatch-daily-quote-pushes',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -172,7 +171,7 @@ SELECT cron.schedule(
   '0 5 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/process-daily-decay',
+    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/process-daily-decay',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -193,7 +192,7 @@ In Supabase Dashboard → Authentication → Providers → Google:
 - Client Secret: Your Google Client Secret
 
 In Google Cloud Console, add redirect URL:
-- `https://opbfpbbqvuksuuvmtmssd.supabase.co/auth/v1/callback`
+- `https://opbfpbbqvuksuvmtmssd.supabase.co/auth/v1/callback`
 
 ### 6.2 Apple Sign In
 In Supabase Dashboard → Authentication → Providers → Apple:
@@ -223,7 +222,7 @@ In Supabase Dashboard → Storage, create these public buckets:
 ## Phase 8: Update Apple Webhook
 
 In App Store Connect → App Information:
-- Production Server URL: `https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/apple-webhook`
+- Production Server URL: `https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/apple-webhook`
 - Version: Version 2
 
 ---
@@ -260,12 +259,12 @@ npx cap sync ios
 
 ### Edge functions 500 errors
 ```bash
-supabase functions logs <function-name> --project-ref opbfpbbqvuksuuvmtmssd
+supabase functions logs <function-name> --project-ref opbfpbbqvuksuvmtmssd
 ```
 
 ### Missing secrets
 ```bash
-supabase secrets list --project-ref opbfpbbqvuksuuvmtmssd
+supabase secrets list --project-ref opbfpbbqvuksuvmtmssd
 ```
 
 ### Cron jobs not firing
