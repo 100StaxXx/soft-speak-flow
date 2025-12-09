@@ -32,7 +32,8 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         result.triggerType,
         result.sourceId,
         result.epicProgress,
-        result.epicCategory
+        result.epicCategory,
+        result.questInterval
       );
     }
   }, [checkQuestMilestone, checkEncounterTrigger]);
@@ -97,6 +98,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         onOpenChange={setShowEncounterModal}
         encounter={activeEncounter?.encounter || null}
         adversary={activeEncounter?.adversary || null}
+        questInterval={activeEncounter?.questInterval}
         onComplete={handleComplete}
       />
     </>

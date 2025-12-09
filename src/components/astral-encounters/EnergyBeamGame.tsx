@@ -7,12 +7,14 @@ interface EnergyBeamGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
+  questIntervalScale?: number; // -0.15 to +0.15
 }
 
 export const EnergyBeamGame = ({ 
   companionStats, 
   onComplete,
-  difficulty = 'medium' 
+  difficulty = 'medium',
+  questIntervalScale = 0
 }: EnergyBeamGameProps) => {
   const [isCharging, setIsCharging] = useState(false);
   const [chargeLevel, setChargeLevel] = useState(0);
@@ -27,7 +29,9 @@ export const EnergyBeamGame = ({
 
   // Sweet spot calculation based on body stat
   const bodyBonus = Math.min(companionStats.body / 100, 1);
-  const sweetSpotSize = difficulty === 'easy' ? 18 : difficulty === 'medium' ? 14 : 10;
+  const baseSweetSpotSize = difficulty === 'easy' ? 18 : difficulty === 'medium' ? 14 : 10;
+  // Quest interval scaling: more quests waited = smaller sweet spot
+  const sweetSpotSize = baseSweetSpotSize * (1 - questIntervalScale * 0.5);
   const adjustedSweetSpotSize = sweetSpotSize + (bodyBonus * 6); // Body stat widens sweet spot
   
   // Sweet spot position (randomized each attempt)
@@ -49,12 +53,12 @@ export const EnergyBeamGame = ({
     chargeRef.current = setInterval(() => {
       setChargeLevel(prev => {
         if (prev >= 100) {
-          // Auto-release if maxed out
           return 100;
         }
-        return prev + 2.5; // Faster charge speed
+        // Quest interval scaling: more quests waited = faster charge
+        return prev + 2.5 * (1 + questIntervalScale);
       });
-    }, 25); // Faster interval
+    }, 25);
   }, [gameComplete, released]);
 
   const releaseBeam = useCallback(() => {

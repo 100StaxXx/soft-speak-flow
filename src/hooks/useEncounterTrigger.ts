@@ -9,6 +9,7 @@ interface TriggerResult {
   sourceId?: string;
   epicProgress?: number;
   epicCategory?: string;
+  questInterval?: number; // Number of quests since last encounter (2-4)
 }
 
 // Generate random interval between 2-4
@@ -89,9 +90,12 @@ export const useEncounterTrigger = () => {
     }
 
     if (shouldTrigger) {
+      // Calculate how many quests since last encounter
+      const questInterval = newTotal - ((nextEncounterRef.current ?? newTotal) - getRandomInterval());
       return { 
         shouldTrigger: true, 
         triggerType: 'quest_milestone',
+        questInterval: Math.min(Math.max(questInterval, 2), 4), // Clamp to 2-4
       };
     }
 

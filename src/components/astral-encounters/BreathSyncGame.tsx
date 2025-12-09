@@ -6,12 +6,14 @@ interface BreathSyncGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
+  questIntervalScale?: number; // -0.15 to +0.15
 }
 
 export const BreathSyncGame = ({ 
   companionStats, 
   onComplete,
-  difficulty = 'medium' 
+  difficulty = 'medium',
+  questIntervalScale = 0
 }: BreathSyncGameProps) => {
   const [phase, setPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
   const [ringScale, setRingScale] = useState(1);
@@ -31,7 +33,9 @@ export const BreathSyncGame = ({
   
   // Soul stat affects sync window (more forgiving timing)
   const soulBonus = Math.min(companionStats.soul / 100, 1);
-  const syncWindow = difficulty === 'easy' ? 0.22 : difficulty === 'medium' ? 0.15 : 0.10;
+  const baseSyncWindow = difficulty === 'easy' ? 0.22 : difficulty === 'medium' ? 0.15 : 0.10;
+  // Quest interval scaling: more quests waited = tighter sync window
+  const syncWindow = baseSyncWindow * (1 - questIntervalScale * 0.5);
   const adjustedSyncWindow = syncWindow + (soulBonus * 0.06);
   
   // Cycle timing

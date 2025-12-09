@@ -32,6 +32,7 @@ export const useAstralEncounters = () => {
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
     adversary: Adversary;
+    questInterval?: number;
   } | null>(null);
   const [showEncounterModal, setShowEncounterModal] = useState(false);
 
@@ -104,6 +105,7 @@ export const useAstralEncounters = () => {
       triggerSourceId?: string;
       epicProgress?: number;
       epicCategory?: string;
+      questInterval?: number;
     }) => {
       if (!user?.id || !companion?.id) {
         throw new Error('User or companion not found');
@@ -133,10 +135,10 @@ export const useAstralEncounters = () => {
         .single();
 
       if (error) throw error;
-      return { encounter: data as AstralEncounter, adversary };
+      return { encounter: data as AstralEncounter, adversary, questInterval: params.questInterval };
     },
-    onSuccess: ({ encounter, adversary }) => {
-      setActiveEncounter({ encounter, adversary });
+    onSuccess: ({ encounter, adversary, questInterval }) => {
+      setActiveEncounter({ encounter, adversary, questInterval });
       setShowEncounterModal(true);
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
     },
@@ -267,7 +269,8 @@ export const useAstralEncounters = () => {
     triggerType: TriggerType,
     triggerSourceId?: string,
     epicProgress?: number,
-    epicCategory?: string
+    epicCategory?: string,
+    questInterval?: number
   ) => {
     if (!user?.id) return false;
 
@@ -297,7 +300,7 @@ export const useAstralEncounters = () => {
         statType: THEME_STAT_MAP[theme] || 'mind',
         statBoost: TIER_CONFIG[tier]?.statBoost || 1,
       };
-      setActiveEncounter({ encounter: storedEncounter, adversary });
+      setActiveEncounter({ encounter: storedEncounter, adversary, questInterval: 3 }); // Default for resumed
       setShowEncounterModal(true);
       return true;
     }
@@ -307,7 +310,8 @@ export const useAstralEncounters = () => {
       triggerType, 
       triggerSourceId, 
       epicProgress, 
-      epicCategory 
+      epicCategory,
+      questInterval
     });
     return true;
   }, [user?.id, startEncounter]);

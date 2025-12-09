@@ -6,6 +6,7 @@ interface TapSequenceGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
+  questIntervalScale?: number; // -0.15 to +0.15 (2 quests = easier, 4 = harder)
 }
 
 interface Orb {
@@ -19,7 +20,8 @@ interface Orb {
 export const TapSequenceGame = ({ 
   companionStats, 
   onComplete,
-  difficulty = 'medium' 
+  difficulty = 'medium',
+  questIntervalScale = 0
 }: TapSequenceGameProps) => {
   const [orbs, setOrbs] = useState<Orb[]>([]);
   const [currentOrder, setCurrentOrder] = useState(1);
@@ -31,11 +33,15 @@ export const TapSequenceGame = ({
   const [gameComplete, setGameComplete] = useState(false);
 
   const maxRounds = 3;
-  const orbsPerRound = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
+  const baseOrbsPerRound = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 5 : 6;
+  // Quest interval scaling: more quests waited = more orbs
+  const orbsPerRound = Math.round(baseOrbsPerRound * (1 + questIntervalScale));
   
   // Mind stat affects timing forgiveness (longer display time)
   const mindBonus = Math.min(companionStats.mind / 100, 1);
-  const displayTime = 500 + (mindBonus * 300); // 500-800ms per orb (faster)
+  const baseDisplayTime = 500 + (mindBonus * 300); // 500-800ms per orb
+  // Quest interval scaling: more quests waited = less display time
+  const displayTime = baseDisplayTime * (1 - questIntervalScale * 0.5);
 
   // Generate orbs for current round
   const generateOrbs = useCallback(() => {

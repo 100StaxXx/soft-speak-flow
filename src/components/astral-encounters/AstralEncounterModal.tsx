@@ -17,6 +17,7 @@ interface AstralEncounterModalProps {
   onOpenChange: (open: boolean) => void;
   encounter: AstralEncounter | null;
   adversary: Adversary | null;
+  questInterval?: number; // 2-4, higher = harder
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
 }
 
@@ -27,6 +28,7 @@ export const AstralEncounterModal = ({
   onOpenChange,
   encounter,
   adversary,
+  questInterval = 3,
   onComplete,
 }: AstralEncounterModalProps) => {
   const [phase, setPhase] = useState<Phase>('reveal');
@@ -120,10 +122,14 @@ export const AstralEncounterModal = ({
         ? 'medium' 
         : 'easy';
 
+    // Quest interval scaling: 2 = -15% difficulty, 3 = baseline, 4 = +15% difficulty
+    const intervalScale = (questInterval - 3) * 0.15; // -0.15 to +0.15
+
     const props = {
       companionStats,
       onComplete: handleMiniGameComplete,
       difficulty: difficulty as 'easy' | 'medium' | 'hard',
+      questIntervalScale: intervalScale,
     };
 
     switch (gameType) {
@@ -138,7 +144,7 @@ export const AstralEncounterModal = ({
       default:
         return <EnergyBeamGame {...props} />;
     }
-  }, [adversary, currentPhaseIndex, companionStats, handleMiniGameComplete]);
+  }, [adversary, currentPhaseIndex, companionStats, handleMiniGameComplete, questInterval]);
 
   if (!encounter || !adversary) return null;
 
