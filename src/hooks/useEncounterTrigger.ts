@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TriggerType } from '@/types/astralEncounters';
@@ -13,43 +13,49 @@ interface TriggerResult {
 
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
-  const lastTriggerRef = useRef<number>(0);
-  const COOLDOWN_MS = 60000; // 1 minute cooldown between triggers
+  const questCountRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    questCountRef.current = null;
+  }, [user?.id]);
 
   // Check for quest milestone trigger (every 20 quests)
   const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
-    
-    // Cooldown check
-    const now = Date.now();
-    if (now - lastTriggerRef.current < COOLDOWN_MS) {
-      return { shouldTrigger: false };
+
+    if (questCountRef.current === null) {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('total_quests_completed')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile) {
+        console.error('Failed to fetch quest count', error);
+        return { shouldTrigger: false };
+      }
+
+      questCountRef.current = profile.total_quests_completed || 0;
     }
 
-    // Get and increment total quests completed
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('total_quests_completed')
-      .eq('id', user.id)
-      .single();
+    questCountRef.current += 1;
+    const newTotal = questCountRef.current;
 
-    if (error || !profile) return { shouldTrigger: false };
-
-    const newTotal = (profile.total_quests_completed || 0) + 1;
-
-    // Update the counter
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ total_quests_completed: newTotal })
       .eq('id', user.id);
 
-    // Check if this is a milestone (every 20 quests)
+    if (updateError) {
+      console.error('Failed to update quest count', updateError);
+      questCountRef.current -= 1;
+      return { shouldTrigger: false };
+    }
+
     if (newTotal > 0 && newTotal % 20 === 0) {
-      lastTriggerRef.current = now;
       return { 
         shouldTrigger: true, 
         triggerType: 'quest_milestone',
-        sourceId: `quest-${newTotal}`
       };
     }
 
@@ -90,7 +96,6 @@ export const useEncounterTrigger = () => {
         category = 'learning';
       }
 
-      lastTriggerRef.current = Date.now();
       return {
         shouldTrigger: true,
         triggerType: 'epic_checkpoint',
@@ -119,7 +124,6 @@ export const useEncounterTrigger = () => {
       .limit(1);
 
     if (!recentWeekly || recentWeekly.length === 0) {
-      lastTriggerRef.current = Date.now();
       return {
         shouldTrigger: true,
         triggerType: 'weekly'

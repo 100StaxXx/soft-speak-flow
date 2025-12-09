@@ -15,16 +15,16 @@ export const BreathSyncGame = ({
 }: BreathSyncGameProps) => {
   const [phase, setPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
   const [ringScale, setRingScale] = useState(1);
-  const [isExpanding, setIsExpanding] = useState(true);
   const [syncScore, setSyncScore] = useState(0);
-  const [totalTaps, setTotalTaps] = useState(0);
   const [currentCycle, setCurrentCycle] = useState(1);
   const [gameComplete, setGameComplete] = useState(false);
   const [showFeedback, setShowFeedback] = useState<'perfect' | 'good' | 'miss' | null>(null);
   
   const animationRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
   const completedRef = useRef(false); // Guard against double completion
+  const syncScoreRef = useRef(0);
+  const currentCycleRef = useRef(1);
+  const gameCompleteRef = useRef(false);
   
   const totalCycles = 3;
   const tapsPerCycle = 3; // One tap per phase transition
@@ -44,11 +44,12 @@ export const BreathSyncGame = ({
   useEffect(() => {
     if (gameComplete) return;
 
-    const startTime = Date.now();
-    lastTimeRef.current = startTime;
+    const startTime = performance.now();
 
     const animate = () => {
-      const elapsed = Date.now() - startTime;
+      if (completedRef.current || gameCompleteRef.current) return;
+
+      const elapsed = performance.now() - startTime;
       const cycleTime = elapsed % cycleDuration;
       
       let newPhase: 'inhale' | 'hold' | 'exhale';
@@ -58,32 +59,29 @@ export const BreathSyncGame = ({
         newPhase = 'inhale';
         const progress = cycleTime / inhaleTime;
         newScale = 1 + (progress * 0.5); // 1 to 1.5
-        setIsExpanding(true);
       } else if (cycleTime < inhaleTime + holdTime) {
         newPhase = 'hold';
         newScale = 1.5;
-        setIsExpanding(false);
       } else {
         newPhase = 'exhale';
         const progress = (cycleTime - inhaleTime - holdTime) / exhaleTime;
         newScale = 1.5 - (progress * 0.5); // 1.5 to 1
-        setIsExpanding(false);
       }
       
       setPhase(newPhase);
       setRingScale(newScale);
       
       // Check for cycle completion
-      const currentCycleNumber = Math.floor(elapsed / cycleDuration) + 1;
-      if (currentCycleNumber > currentCycle && currentCycleNumber <= totalCycles) {
-        setCurrentCycle(currentCycleNumber);
-      } else if (currentCycleNumber > totalCycles && !gameComplete && !completedRef.current) {
+      const cycleNumber = Math.floor(elapsed / cycleDuration) + 1;
+      if (cycleNumber > currentCycleRef.current && cycleNumber <= totalCycles) {
+        currentCycleRef.current = cycleNumber;
+        setCurrentCycle(cycleNumber);
+      } else if (cycleNumber > totalCycles && !completedRef.current) {
         completedRef.current = true;
+        gameCompleteRef.current = true;
         setGameComplete(true);
-        // Round syncScore to handle decimal values (0.7 for 'good' hits)
-        const roundedScore = Math.round(syncScore);
         const maxScore = totalCycles * tapsPerCycle;
-        const accuracy = maxScore > 0 ? Math.min(100, Math.round((roundedScore / maxScore) * 100)) : 0;
+        const accuracy = maxScore > 0 ? Math.min(100, Math.round((syncScoreRef.current / maxScore) * 100)) : 0;
         onComplete({
           success: accuracy >= 50,
           accuracy,
@@ -102,12 +100,10 @@ export const BreathSyncGame = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [cycleDuration, inhaleTime, holdTime, exhaleTime, currentCycle, gameComplete, syncScore, totalTaps, onComplete]);
+  }, [cycleDuration, inhaleTime, holdTime, exhaleTime, gameComplete, onComplete, totalCycles, tapsPerCycle]);
 
   const handleTap = useCallback(() => {
-    if (gameComplete) return;
-    
-    setTotalTaps(prev => prev + 1);
+    if (gameComplete || completedRef.current) return;
     
     // Check if tap is at transition point (scale near 1.0 or 1.5)
     const nearInhaleStart = Math.abs(ringScale - 1) < adjustedSyncWindow;
@@ -119,9 +115,11 @@ export const BreathSyncGame = ({
       const perfectThreshold = adjustedSyncWindow * 0.5;
       
       if (distance < perfectThreshold) {
+        syncScoreRef.current += 1;
         setSyncScore(prev => prev + 1);
         setShowFeedback('perfect');
       } else {
+        syncScoreRef.current += 0.7;
         setSyncScore(prev => prev + 0.7);
         setShowFeedback('good');
       }

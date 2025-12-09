@@ -24,6 +24,7 @@ import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
+import { AstralEncounterProvider } from "@/components/astral-encounters";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -249,10 +250,12 @@ const App = () => {
             <Sonner />
             <InstallPWA />
             <AmbientMusicPlayer />
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <ScrollToTop />
-              <AppContent />
-            </BrowserRouter>
+            <AstralEncounterProvider>
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                <ScrollToTop />
+                <AppContent />
+              </BrowserRouter>
+            </AstralEncounterProvider>
           </TooltipProvider>
         </EvolutionProvider>
       </QueryClientProvider>
