@@ -19,6 +19,7 @@ import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
+import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
 
 const waitForCompanionDisplayName = async (companionId: string) => {
   const MAX_ATTEMPTS = 10;
@@ -76,6 +77,21 @@ interface Mentor {
   themes?: string[];
   intensity_level?: string;
 }
+
+const ENERGY_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
+  "Focused, intense energy": "high",
+  "Calm, grounded presence": "gentle",
+  "Warm, uplifting support": "medium",
+  "Spiritual and intuitive guidance": "gentle",
+};
+
+const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
+  const normalized = value?.toLowerCase();
+  if (!normalized) return "medium";
+  if (["gentle", "soft", "low"].includes(normalized)) return "gentle";
+  if (["high", "strong", "intense"].includes(normalized)) return "high";
+  return "medium";
+};
 
 
 export const StoryOnboarding = () => {
@@ -240,79 +256,60 @@ export const StoryOnboarding = () => {
     // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
     const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
 
-    // Build weighted tags - duplicate tags based on question weight
-    const weightedUserTags: string[] = [];
+    // Build canonical tag weight map instead of duplicating strings
+    const canonicalTagWeights: Record<string, number> = {};
     questionAnswers.forEach((answer, index) => {
       const weight = QUESTION_WEIGHTS[index] ?? 1.0;
-      const repeats = Math.round(weight * 10); // Multiply by 10 for finer granularity
-      for (let i = 0; i < repeats; i++) {
-        weightedUserTags.push(...answer.tags.map(t => t.toLowerCase()));
-      }
+      answer.tags.forEach(tag => {
+        const canonical = getCanonicalTag(tag);
+        if (!canonical) return;
+        canonicalTagWeights[canonical] = (canonicalTagWeights[canonical] ?? 0) + weight;
+      });
     });
 
     // Extract desired intensity from Q4 (energy_preference)
     const energyAnswer = questionAnswers.find(a => a.questionId === "energy_preference");
-    let desiredIntensity = "medium"; // default
-    if (energyAnswer) {
-      const answerText = energyAnswer.answer;
-      if (answerText === "Focused, intense energy") {
-        desiredIntensity = "high";
-      } else if (answerText === "Calm, grounded presence") {
-        desiredIntensity = "medium";
-      } else if (answerText === "Warm, uplifting support") {
-        desiredIntensity = "medium";
-      } else if (answerText === "Spiritual and intuitive guidance") {
-        desiredIntensity = "medium";
-      }
-    }
+    const desiredIntensity: "high" | "medium" | "gentle" = energyAnswer
+      ? ENERGY_TO_INTENSITY[energyAnswer.answer] ?? "medium"
+      : "medium";
 
     // Calculate scores for each mentor
     interface MentorScore {
       mentor: Mentor;
       score: number;
       exactMatches: number;
-      partialMatches: number;
       intensityMatch: boolean;
     }
-
     const mentorScores: MentorScore[] = mentors.map(mentor => {
-      const mentorAllTags = [...(mentor.tags || []), ...(mentor.themes || [])];
+      const mentorCanonicalTags = (() => {
+        const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
+        if (normalized.length > 0) {
+          return normalized;
+        }
+        return MENTOR_FALLBACK_TAGS[mentor.slug] ?? [];
+      })();
+
       let score = 0;
       let exactMatches = 0;
-      let partialMatches = 0;
 
-      // Count matches for each weighted user tag
-      weightedUserTags.forEach(userTag => {
-        mentorAllTags.forEach(mentorTag => {
-          const userTagLower = userTag.toLowerCase();
-          const mentorTagLower = mentorTag.toLowerCase();
-
-          if (userTagLower === mentorTagLower) {
-            // Exact match: +1.0
-            score += 1.0;
-            exactMatches += 1;
-          } else if (
-            userTagLower.includes(mentorTagLower) ||
-            mentorTagLower.includes(userTagLower)
-          ) {
-            // Partial match: +0.5
-            score += 0.5;
-            partialMatches += 1;
-          }
-        });
+      mentorCanonicalTags.forEach(tag => {
+        const tagWeight = canonicalTagWeights[tag];
+        if (tagWeight) {
+          score += tagWeight;
+          exactMatches += 1;
+        }
       });
 
-      // Intensity alignment bonus
-      const intensityMatch = mentor.intensity_level?.toLowerCase() === desiredIntensity.toLowerCase();
+      const mentorIntensity = normalizeIntensityLevel(mentor.intensity_level);
+      const intensityMatch = mentorIntensity === desiredIntensity;
       if (intensityMatch) {
-        score += 1.0;
+        score += 0.8;
       }
 
       return {
         mentor,
         score,
         exactMatches,
-        partialMatches,
         intensityMatch,
       };
     });
