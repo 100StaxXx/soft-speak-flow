@@ -99,7 +99,7 @@ export const useAstralEncounters = () => {
   ) || { mind: 0, body: 0, soul: 0 };
 
   // Start a new encounter
-  const startEncounter = useMutation({
+  const startEncounterMutation = useMutation({
     mutationFn: async (params: {
       triggerType: TriggerType;
       triggerSourceId?: string;
@@ -147,6 +147,8 @@ export const useAstralEncounters = () => {
       toast.error('Failed to start encounter');
     },
   });
+
+  const startEncounterMutate = startEncounterMutation.mutate;
 
   // Complete an encounter
   const completeEncounter = useMutation({
@@ -273,6 +275,10 @@ export const useAstralEncounters = () => {
     questInterval?: number
   ) => {
     if (!user?.id) return false;
+    if (!companion?.id) {
+      console.warn('Encounter trigger skipped: companion not ready');
+      return false;
+    }
 
     // Check for recent incomplete encounter
     const { data: pendingEncounter } = await supabase
@@ -306,7 +312,7 @@ export const useAstralEncounters = () => {
     }
 
     // Start new encounter
-    startEncounter.mutate({ 
+    startEncounterMutate({ 
       triggerType, 
       triggerSourceId, 
       epicProgress, 
@@ -314,7 +320,7 @@ export const useAstralEncounters = () => {
       questInterval
     });
     return true;
-  }, [user?.id, startEncounter]);
+  }, [user?.id, companion?.id, startEncounterMutate]);
 
   const closeEncounter = useCallback(() => {
     setShowEncounterModal(false);
@@ -334,11 +340,11 @@ export const useAstralEncounters = () => {
     
     // Loading states
     isLoading: encountersLoading || essencesLoading || codexLoading,
-    isStarting: startEncounter.isPending,
+    isStarting: startEncounterMutation.isPending,
     isCompleting: completeEncounter.isPending,
     
     // Actions
-    startEncounter: startEncounter.mutate,
+    startEncounter: startEncounterMutate,
     completeEncounter: completeEncounter.mutate,
     checkEncounterTrigger,
     closeEncounter,
