@@ -1,9 +1,9 @@
 # Supabase Migration Guide: Fresh Start on New Project
 
 ## Overview
-This guide covers setting up the fresh Supabase project: `opbfpbbqvuksuvmtmssd`
+This guide covers setting up the fresh Supabase project: `opbfpbbqvuksuuvmtmssd`
 
-**Project URL**: `https://opbfpbbqvuksuvmtmssd.supabase.co`
+**Project URL**: `https://opbfpbbqvuksuuvmtmssd.supabase.co`
 
 ---
 
@@ -22,7 +22,7 @@ npm install -g supabase
 
 ### 1.2 Link to Project
 ```bash
-supabase link --project-ref opbfpbbqvuksuvmtmssd
+supabase link --project-ref opbfpbbqvuksuuvmtmssd
 ```
 
 ---
@@ -51,8 +51,8 @@ This creates all tables, functions, triggers, and RLS policies from scratch.
 ### 3.1 Required Secrets (27 total)
 Set all secrets via CLI:
 ```bash
-supabase secrets set --project-ref opbfpbbqvuksuvmtmssd \
-  SUPABASE_URL="https://opbfpbbqvuksuvmtmssd.supabase.co" \
+supabase secrets set --project-ref opbfpbbqvuksuuvmtmssd \
+  SUPABASE_URL="https://opbfpbbqvuksuuvmtmssd.supabase.co" \
   SUPABASE_ANON_KEY="<YOUR_ANON_KEY>" \
   SUPABASE_SERVICE_ROLE_KEY="<YOUR_SERVICE_ROLE_KEY>" \
   OPENAI_API_KEY="<YOUR_OPENAI_KEY>" \
@@ -123,7 +123,7 @@ supabase secrets set --project-ref opbfpbbqvuksuvmtmssd \
 # Deploy all edge functions (70+)
 for fn in $(ls supabase/functions | grep -v '^_'); do
   echo "Deploying $fn..."
-  supabase functions deploy "$fn" --project-ref opbfpbbqvuksuvmtmssd
+  supabase functions deploy "$fn" --project-ref opbfpbbqvuksuuvmtmssd
 done
 ```
 
@@ -139,7 +139,7 @@ SELECT cron.schedule(
   '0 13 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes-native',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-pushes-native',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -155,7 +155,7 @@ SELECT cron.schedule(
   '30 14 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/dispatch-daily-quote-pushes',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/dispatch-daily-quote-pushes',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -171,7 +171,7 @@ SELECT cron.schedule(
   '0 5 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/process-daily-decay',
+    url := 'https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/process-daily-decay',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wYmZwYmJxdnVrc3V2bXRtc3NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMjA4MTgsImV4cCI6MjA4MDc5NjgxOH0.0IpdmZyokW17gckZrRytKXAVJx4Vi5sq1QfJ283vKsw'
@@ -192,7 +192,7 @@ In Supabase Dashboard → Authentication → Providers → Google:
 - Client Secret: Your Google Client Secret
 
 In Google Cloud Console, add redirect URL:
-- `https://opbfpbbqvuksuvmtmssd.supabase.co/auth/v1/callback`
+- `https://opbfpbbqvuksuuvmtmssd.supabase.co/auth/v1/callback`
 
 ### 6.2 Apple Sign In
 In Supabase Dashboard → Authentication → Providers → Apple:
@@ -222,7 +222,7 @@ In Supabase Dashboard → Storage, create these public buckets:
 ## Phase 8: Update Apple Webhook
 
 In App Store Connect → App Information:
-- Production Server URL: `https://opbfpbbqvuksuvmtmssd.supabase.co/functions/v1/apple-webhook`
+- Production Server URL: `https://opbfpbbqvuksuuvmtmssd.supabase.co/functions/v1/apple-webhook`
 - Version: Version 2
 
 ---
@@ -259,12 +259,12 @@ npx cap sync ios
 
 ### Edge functions 500 errors
 ```bash
-supabase functions logs <function-name> --project-ref opbfpbbqvuksuvmtmssd
+supabase functions logs <function-name> --project-ref opbfpbbqvuksuuvmtmssd
 ```
 
 ### Missing secrets
 ```bash
-supabase secrets list --project-ref opbfpbbqvuksuvmtmssd
+supabase secrets list --project-ref opbfpbbqvuksuuvmtmssd
 ```
 
 ### Cron jobs not firing
