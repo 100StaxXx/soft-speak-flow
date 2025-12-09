@@ -8,6 +8,7 @@ interface CosmicCodexProps {
   codexEntries: CosmicCodexEntry[];
   essences: AdversaryEssence[];
   totalStatBoosts: { mind: number; body: number; soul: number };
+  isLoading?: boolean;
 }
 
 const THEME_ICONS: Record<string, string> = {
@@ -21,7 +22,23 @@ const THEME_ICONS: Record<string, string> = {
   fear: '👁️',
 };
 
-export const CosmicCodex = ({ codexEntries, essences, totalStatBoosts }: CosmicCodexProps) => {
+export const CosmicCodex = ({ codexEntries, essences, totalStatBoosts, isLoading }: CosmicCodexProps) => {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-4 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30 animate-pulse">
+          <div className="h-6 w-32 bg-muted rounded mb-4" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-16 bg-muted rounded-lg" />
+            ))}
+          </div>
+        </Card>
+        <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with stats */}

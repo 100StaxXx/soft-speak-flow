@@ -7,3 +7,4 @@ export { BreathSyncGame } from './BreathSyncGame';
 export { QuickSwipeGame } from './QuickSwipeGame';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
+export { AstralEncounterProvider } from './AstralEncounterProvider';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
@@ -37,6 +37,8 @@ export const QuickSwipeGame = ({
   const [score, setScore] = useState(0);
   const [gameComplete, setGameComplete] = useState(false);
   const [showResult, setShowResult] = useState<'success' | 'fail' | null>(null);
+  const completedRef = useRef(false); // Guard against double completion
+  const processingRef = useRef(false); // Guard against concurrent swipes
   
   const totalAttacks = difficulty === 'easy' ? 6 : difficulty === 'medium' ? 8 : 10;
   const attackSpeed = difficulty === 'easy' ? 2500 : difficulty === 'medium' ? 2000 : 1500;
@@ -60,17 +62,18 @@ export const QuickSwipeGame = ({
 
   // Attack timer
   useEffect(() => {
-    if (gameComplete || attacks.length === 0) return;
+    if (gameComplete || attacks.length === 0 || completedRef.current) return;
 
     const timer = setTimeout(() => {
-      if (currentIndex < totalAttacks) {
+      if (currentIndex < totalAttacks && !completedRef.current) {
         // Mark current attack as failed if not swiped
         setAttacks(prev => prev.map((a, i) => 
           i === currentIndex && !a.result ? { ...a, result: 'fail' } : a
         ));
         
         const nextIndex = currentIndex + 1;
-        if (nextIndex >= totalAttacks) {
+        if (nextIndex >= totalAttacks && !completedRef.current) {
+          completedRef.current = true;
           setGameComplete(true);
           const accuracy = Math.round((score / totalAttacks) * 100);
           onComplete({
@@ -88,11 +91,14 @@ export const QuickSwipeGame = ({
   }, [currentIndex, attacks, totalAttacks, timeWindow, gameComplete, score, onComplete]);
 
   const handleSwipe = useCallback((direction: Direction) => {
-    if (gameComplete || currentIndex >= attacks.length) return;
+    // Guards against double completion and concurrent processing
+    if (gameComplete || completedRef.current || processingRef.current) return;
+    if (currentIndex >= attacks.length) return;
     
     const currentAttack = attacks[currentIndex];
     if (!currentAttack || currentAttack.result) return;
     
+    processingRef.current = true;
     const isCorrect = currentAttack.direction === direction;
     
     setAttacks(prev => prev.map((a, i) => 
@@ -108,9 +114,11 @@ export const QuickSwipeGame = ({
     
     setTimeout(() => {
       setShowResult(null);
+      processingRef.current = false;
       const nextIndex = currentIndex + 1;
       
-      if (nextIndex >= totalAttacks) {
+      if (nextIndex >= totalAttacks && !completedRef.current) {
+        completedRef.current = true;
         setGameComplete(true);
         const finalScore = isCorrect ? score + 1 : score;
         const accuracy = Math.round((finalScore / totalAttacks) * 100);

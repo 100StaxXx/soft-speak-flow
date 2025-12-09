@@ -101,11 +101,18 @@ export const AstralEncounterModal = ({
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
 
-    // For multi-phase battles, cycle through different mini-games
-    const miniGameTypes: MiniGameType[] = ['energy_beam', 'tap_sequence', 'breath_sync', 'quick_swipe'];
+    // For multi-phase battles, use theme-based mini-game rotation
+    // Match mini-game to adversary stat type for thematic cohesion
+    const themeGameMap: Record<string, MiniGameType[]> = {
+      mind: ['tap_sequence', 'breath_sync'],
+      body: ['energy_beam', 'quick_swipe'],
+      soul: ['breath_sync', 'tap_sequence'],
+    };
+    
+    const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
     const gameType = adversary.phases === 1 
       ? adversary.miniGameType 
-      : miniGameTypes[currentPhaseIndex % miniGameTypes.length];
+      : themeGames[currentPhaseIndex % themeGames.length];
 
     const difficulty = adversary.tier === 'legendary' || adversary.tier === 'epic' 
       ? 'hard' 

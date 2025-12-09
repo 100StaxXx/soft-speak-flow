@@ -187,6 +187,9 @@ export const useTaskMutations = (taskDate: string) => {
           updateBodyFromActivity(companion.id).catch(console.error);
         }
         window.dispatchEvent(new CustomEvent('mission-completed'));
+        
+        // Dispatch event for Astral Encounter trigger check
+        window.dispatchEvent(new CustomEvent('quest-completed'));
       }
     },
     onError: (error: Error) => {
