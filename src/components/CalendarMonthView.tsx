@@ -4,6 +4,8 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { useState } from "react";
+import { playSound } from "@/utils/soundEffects";
 
 interface Task {
   id: string;
@@ -22,14 +24,32 @@ interface CalendarMonthViewProps {
   onDateSelect: (date: Date) => void;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick }: CalendarMonthViewProps) => {
+export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick, onDateLongPress }: CalendarMonthViewProps) => {
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfMonth(monthEnd);
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  const handleLongPressStart = (date: Date) => {
+    const timer = setTimeout(() => {
+      playSound('pop');
+      onDateLongPress?.(date);
+    }, 500);
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
   
   const getTasksForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -111,6 +131,11 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
                 !isSameMonth(day, selectedDate) && "opacity-50"
               )}
               onClick={() => onDateSelect(day)}
+              onTouchStart={() => handleLongPressStart(day)}
+              onTouchEnd={handleLongPressEnd}
+              onMouseDown={() => handleLongPressStart(day)}
+              onMouseUp={handleLongPressEnd}
+              onMouseLeave={handleLongPressEnd}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className={cn(
