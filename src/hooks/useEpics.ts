@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
-import { useXPToast } from "@/contexts/XPContext";
+import { useXPRewards } from "@/hooks/useXPRewards";
 
 // Type for habits created during epic creation
 interface CreatedHabit {
@@ -29,7 +29,7 @@ interface CreatedEpic {
 export const useEpics = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { showXPToast } = useXPToast();
+  const { awardCustomXP } = useXPRewards();
 
   // Fetch all epics for the user
   const { data: epics, isLoading, error: epicsError } = useQuery({
@@ -254,12 +254,21 @@ export const useEpics = () => {
 
       return { epic, status, wasAlreadyCompleted: epic.status === "completed" };
     },
-    onSuccess: ({ epic, status, wasAlreadyCompleted }) => {
+    onSuccess: async ({ epic, status, wasAlreadyCompleted }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       
       if (status === "completed" && !wasAlreadyCompleted) {
         // Only award XP if this is the FIRST time completing
-        showXPToast(epic.xp_reward, `Epic "${epic.title}" Completed!`);
+        try {
+          await awardCustomXP(
+            epic.xp_reward,
+            "epic_complete",
+            `Epic "${epic.title}" Completed!`,
+            { epic_id: variables?.epicId }
+          );
+        } catch (error) {
+          console.error("Failed to award epic completion XP:", error);
+        }
         toast.success("Epic Completed! 🏆", {
           description: `You've conquered the ${epic.title} epic! Your companion grows stronger!`,
         });

@@ -20,7 +20,7 @@ export function useHabits() {
   const { profile } = useProfile();
   const { companion } = useCompanion();
   const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
-  const { awardCustomXP } = useXPRewards();
+  const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
   const { checkStreakAchievements } = useAchievements();
 
   // Fetch habits
@@ -55,6 +55,42 @@ export function useHabits() {
     },
     enabled: !!user,
   });
+
+  const maybeAwardAllHabitsComplete = async () => {
+    if (!user?.id || habits.length === 0) return;
+
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { count } = await supabase
+        .from('habit_completions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('date', today);
+
+      if ((count ?? 0) < habits.length) {
+        return;
+      }
+
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const { data: existingBonus } = await supabase
+        .from('xp_events')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('event_type', 'all_habits_complete')
+        .gte('created_at', startOfDay.toISOString())
+        .maybeSingle();
+
+      if (existingBonus) {
+        return;
+      }
+
+      awardAllHabitsComplete();
+    } catch (error) {
+      console.error('Failed to award all habits complete bonus:', error);
+    }
+  };
 
   // Add habit mutation
   const addHabitMutation = useMutation({
@@ -141,6 +177,7 @@ export function useHabits() {
           
           const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+          await maybeAwardAllHabitsComplete();
           
           // Update companion attributes in background
           if (companion?.id) {

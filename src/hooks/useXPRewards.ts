@@ -251,11 +251,16 @@ export const useXPRewards = () => {
     if (displayReason) {
       showXPToast(xpAmount, displayReason);
     }
-    awardXP.mutate({
-      eventType,
-      xpAmount,
-      metadata,
-    });
+
+    try {
+      await awardXP.mutateAsync({
+        eventType,
+        xpAmount,
+        metadata,
+      });
+    } catch (error) {
+      logger.error('Error awarding custom XP:', error);
+    }
   };
 
   return {

@@ -24,6 +24,7 @@
  * - Challenge Day Complete: 25 XP
  * - Weekly Challenge Complete: 60 XP
  * - Streak Milestone: 15 XP
+ * - Welcome Back Bonus: 25 XP
  *
  * STREAK MULTIPLIER:
  * - 0-6 day streak: 1.0x XP

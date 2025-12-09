@@ -49,6 +49,8 @@ export const SYSTEM_XP_REWARDS = {
   CHECK_IN: 3,
   /** Reaching a streak milestone */
   STREAK_MILESTONE: 15,
+  /** Returning after inactivity to re-engage with the companion */
+  WELCOME_BACK_BONUS: 25,
 } as const;
 
 /**

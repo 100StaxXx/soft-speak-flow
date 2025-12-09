@@ -15,7 +15,7 @@ interface WelcomeBackModalProps {
 export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => {
   const { health, markUserActive } = useCompanionHealth();
   const { companion } = useCompanion();
-  const { awardCustomXP } = useXPRewards();
+  const { awardCustomXP, XP_REWARDS } = useXPRewards();
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
 
@@ -43,7 +43,12 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
     
     // Award welcome back XP bonus (only once)
     if (!hasAwarded) {
-      await awardCustomXP(25, "Welcome back bonus! 🎉");
+      await awardCustomXP(
+        XP_REWARDS.WELCOME_BACK_BONUS,
+        "welcome_back_bonus",
+        "Welcome Back Bonus! 🎉",
+        { days_inactive: health.daysInactive }
+      );
       setHasAwarded(true);
     }
     
