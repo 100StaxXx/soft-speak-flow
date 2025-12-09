@@ -18,15 +18,37 @@ export const useEncounterTrigger = () => {
   const { user } = useAuth();
   const questCountRef = useRef<number | null>(null);
   const nextEncounterRef = useRef<number | null>(null);
+  const encountersEnabledRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     questCountRef.current = null;
     nextEncounterRef.current = null;
+    encountersEnabledRef.current = null;
+  }, [user?.id]);
+
+  const ensureEncountersEnabled = useCallback(async () => {
+    if (!user?.id) return false;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('astral_encounters_enabled')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Failed to fetch astral encounter setting', error);
+      return false;
+    }
+
+    encountersEnabledRef.current = profile?.astral_encounters_enabled !== false;
+    return encountersEnabledRef.current;
   }, [user?.id]);
 
   // Check for quest milestone trigger (random 2-4 quests)
   const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
+
+    const encountersEnabled = await ensureEncountersEnabled();
 
     // Fetch current counts if not cached
     if (questCountRef.current === null || nextEncounterRef.current === null) {
@@ -42,6 +64,8 @@ export const useEncounterTrigger = () => {
       }
 
       // Check if encounters are disabled
+      encountersEnabledRef.current = profile.astral_encounters_enabled !== false;
+
       if (profile.astral_encounters_enabled === false) {
         // Still update quest count but don't trigger encounters
         questCountRef.current = (profile.total_quests_completed || 0) + 1;
@@ -55,6 +79,15 @@ export const useEncounterTrigger = () => {
       questCountRef.current = profile.total_quests_completed || 0;
       // If no next encounter set, initialize with random 2-4
       nextEncounterRef.current = profile.next_encounter_quest_count ?? getRandomInterval();
+    }
+
+    if (!encountersEnabled) {
+      questCountRef.current += 1;
+      await supabase
+        .from('profiles')
+        .update({ total_quests_completed: questCountRef.current })
+        .eq('id', user.id);
+      return { shouldTrigger: false };
     }
 
     questCountRef.current += 1;
@@ -96,7 +129,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id]);
+  }, [user?.id, ensureEncountersEnabled]);
 
   // Check for epic checkpoint trigger (25%, 50%, 75%, 100%)
   const checkEpicCheckpoint = useCallback(async (
@@ -105,6 +138,9 @@ export const useEncounterTrigger = () => {
     currentProgress: number
   ): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
+
+    const encountersEnabled = await ensureEncountersEnabled();
+    if (!encountersEnabled) return { shouldTrigger: false };
 
     const milestones = [25, 50, 75, 100];
     
@@ -142,11 +178,14 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id]);
+  }, [user?.id, ensureEncountersEnabled]);
 
   // Check for weekly trigger (once per 7 days)
   const checkWeeklyTrigger = useCallback(async (): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
+
+    const encountersEnabled = await ensureEncountersEnabled();
+    if (!encountersEnabled) return { shouldTrigger: false };
 
     // Check last weekly encounter
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -167,7 +206,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id]);
+  }, [user?.id, ensureEncountersEnabled]);
 
   return {
     checkQuestMilestone,
