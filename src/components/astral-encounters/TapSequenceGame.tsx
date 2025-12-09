@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Target, Eye, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -51,18 +52,20 @@ export const TapSequenceGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const mindBonusMs = Math.round(mindBonus * 400);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Target className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
-      helperText: questDriftPercent === 0 ? 'Baseline memory' : questDriftPercent > 0 ? 'More nodes visible' : 'Fewer nodes' 
+      helperText: questDriftPercent === 0 ? 'Baseline memory' : questDriftPercent > 0 ? 'More nodes visible' : 'Fewer nodes',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Mind focus', 
       value: `+${mindBonusMs}ms`, 
       tone: 'positive' as const,
-      helperText: 'Reveal duration' 
+      helperText: 'Reveal duration',
+      icon: <Eye className="w-3.5 h-3.5" />,
     },
   ];
 
@@ -192,11 +195,31 @@ export const TapSequenceGame = ({
       </div>
     </div>
   );
+  const tracedLines = orbs.reduce<
+    { id: string; x1: number; y1: number; x2: number; y2: number; intensity: number }[]
+  >((acc, orb) => {
+    const next = orbs.find((o) => o.order === orb.order + 1);
+    if (!next) return acc;
+    const revealThreshold = showSequence ? highlightIndex : currentOrder;
+    const shouldReveal = revealThreshold > orb.order;
+    const lockedIn = orb.tapped && next.tapped;
+    if (!shouldReveal && !lockedIn) return acc;
+    acc.push({
+      id: `${orb.id}-${next.id}`,
+      x1: orb.x,
+      y1: orb.y,
+      x2: next.x,
+      y2: next.y,
+      intensity: lockedIn ? 1 : 0.35,
+    });
+    return acc;
+  }, []);
 
   return (
     <MiniGameHud
       title="Cosmic Tap Sequence"
       subtitle={showSequence ? 'Watch the orbiting lights.' : 'Recreate the cosmic path.'}
+      eyebrow="Memory Trial"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Mind stat bonus: +${mindBonusMs}ms display time`}
@@ -205,6 +228,24 @@ export const TapSequenceGame = ({
         <div className="relative w-full aspect-square max-w-xs bg-muted/20 rounded-2xl border border-border/50 overflow-hidden">
           {/* Cosmic background effect */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            {tracedLines.map((line) => (
+              <motion.line
+                key={line.id}
+                x1={`${line.x1}%`}
+                y1={`${line.y1}%`}
+                x2={`${line.x2}%`}
+                y2={`${line.y2}%`}
+                stroke="hsl(var(--primary))"
+                strokeWidth={line.intensity > 0.5 ? 4 : 2}
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: line.intensity }}
+                transition={{ duration: 0.35 }}
+                style={{ filter: 'drop-shadow(0 0 6px hsl(var(--primary)))' }}
+              />
+            ))}
+          </svg>
           
           <AnimatePresence>
             {orbs.map((orb) => {
@@ -243,6 +284,19 @@ export const TapSequenceGame = ({
                 </motion.button>
               );
             })}
+          </AnimatePresence>
+          <AnimatePresence>
+            {showSequence && (
+              <motion.div
+                key="sequenceOverlay"
+                className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-black/35 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-white/80 backdrop-blur"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+              >
+                Memorize the arc
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 

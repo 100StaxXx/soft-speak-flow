@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield } from 'lucide-react';
+import { Shield, Activity, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -64,18 +64,20 @@ export const ShieldBarrierGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const bodyBonusPercent = Math.round(bodyBonus * 15);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Shield className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
       helperText: questDriftPercent === 0 ? 'Baseline speed' : questDriftPercent > 0 ? 'More frequent' : 'Sparser attacks',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Body focus', 
       value: `+${bodyBonusPercent}% window`, 
       tone: 'positive' as const,
       helperText: 'Block timing',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
   ];
 
@@ -184,7 +186,11 @@ export const ShieldBarrierGame = ({
   }, [gameComplete, attacks, currentAttackIndex, blockWindow, handleAttackResult]);
 
   const currentAttack = attacks[currentAttackIndex];
-  const impactPercent = currentAttack ? Math.min(currentAttack.progress, 1) * 100 : 0;
+  const attackProgress = currentAttack ? Math.min(currentAttack.progress, 1) : 0;
+  const impactPercent = attackProgress * 100;
+  const attackRingRadius = 105;
+  const attackCircumference = 2 * Math.PI * attackRingRadius;
+  const attackOffset = attackCircumference - attackProgress * attackCircumference;
   const statusBarContent = (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -196,7 +202,7 @@ export const ShieldBarrierGame = ({
           {gameComplete ? 'Assault repelled' : `Impact in ${Math.max(0, 100 - Math.round(impactPercent))}%`}
         </div>
       </div>
-      <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 flex-wrap">
         {attacks.map((attack) => (
           <div
             key={attack.id}
@@ -231,16 +237,46 @@ export const ShieldBarrierGame = ({
     <MiniGameHud
       title="Shield Barrier"
       subtitle="Tap the directional shields right before the projectile lands."
+      eyebrow="Barrier Drill"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Body stat bonus: +${bodyBonusPercent}% block window`}
     >
       <div className="relative w-64 h-64 mx-auto">
+        {currentAttack && (
+          <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 260 260">
+            <circle
+              cx="130"
+              cy="130"
+              r={attackRingRadius}
+              stroke="hsl(var(--border))"
+              strokeWidth="6"
+              fill="transparent"
+            />
+            <motion.circle
+              cx="130"
+              cy="130"
+              r={attackRingRadius}
+              stroke="hsl(var(--primary))"
+              strokeWidth="6"
+              strokeDasharray={attackCircumference}
+              strokeDashoffset={attackOffset}
+              strokeLinecap="round"
+              fill="transparent"
+              animate={{ strokeDashoffset: attackOffset }}
+              transition={{ duration: 0.2, ease: 'linear' }}
+            />
+          </svg>
+        )}
+
         {/* Center core */}
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border-2 border-primary/50 flex items-center justify-center ${
           showResult === 'hit' ? 'animate-shake bg-red-500/30 border-red-500' : ''
         }`}>
           <div className="w-8 h-8 rounded-full bg-primary/50 animate-pulse" />
+        </div>
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-white/80 backdrop-blur">
+          {currentAttack ? currentAttack.direction : 'Ready'}
         </div>
 
         {/* Shield buttons */}

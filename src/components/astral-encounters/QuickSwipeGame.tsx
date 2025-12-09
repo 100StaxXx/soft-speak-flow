@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ArrowUpDown as ArrowUpDownIcon, Activity, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -40,6 +40,7 @@ export const QuickSwipeGame = ({
   const [score, setScore] = useState(0);
   const [gameComplete, setGameComplete] = useState(false);
   const [showResult, setShowResult] = useState<'success' | 'fail' | null>(null);
+  const [countdown, setCountdown] = useState(0);
   const completedRef = useRef(false); // Guard against double completion
   const processingRef = useRef(false); // Guard against concurrent swipes
   
@@ -61,18 +62,20 @@ export const QuickSwipeGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const reactionBonus = Math.round(statBonus * 500);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <ArrowUpDownIcon className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
       helperText: questDriftPercent === 0 ? 'Baseline tempo' : questDriftPercent > 0 ? 'More, faster swipes' : 'Fewer, slower swipes',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Mind + Body', 
       value: `+${reactionBonus}ms`, 
       tone: 'positive' as const,
       helperText: 'Reaction window',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
   ];
 
@@ -118,6 +121,24 @@ export const QuickSwipeGame = ({
 
     return () => clearTimeout(timer);
   }, [currentIndex, attacks, totalAttacks, timeWindow, gameComplete, score, onComplete]);
+
+  useEffect(() => {
+    if (gameComplete || completedRef.current) return;
+    let frame: number;
+    const start = performance.now();
+    const animateCountdown = () => {
+      const elapsed = performance.now() - start;
+      const progress = Math.min(elapsed / timeWindow, 1);
+      setCountdown(progress);
+      if (progress < 1) {
+        frame = requestAnimationFrame(animateCountdown);
+      }
+    };
+    animateCountdown();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [currentIndex, timeWindow, gameComplete]);
 
   const handleSwipe = useCallback((direction: Direction) => {
     // Guards against double completion and concurrent processing
@@ -235,57 +256,104 @@ export const QuickSwipeGame = ({
     </div>
   );
 
+  const ringRadius = 70;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const countdownOffset = ringCircumference - countdown * ringCircumference;
+
   return (
     <MiniGameHud
       title="Quick Swipe Reactions"
       subtitle="Drag in the highlighted direction before the impact circle reaches you."
+      eyebrow="Reflex Check"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Mind + Body bonus: +${reactionBonus}ms reaction window`}
     >
       <div className="flex flex-col items-center gap-4">
-        <motion.div
-          className={`relative w-48 h-48 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing ${
-            showResult === 'success' 
-              ? 'bg-green-500/20 border-green-500' 
-              : showResult === 'fail'
-                ? 'bg-red-500/20 border-red-500'
-                : 'bg-muted/30 border-border'
-          } border-4`}
-          drag
-          dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
-          dragElastic={0.5}
-          onDragEnd={handleDragEnd}
-          whileDrag={{ scale: 1.05 }}
-        >
-          <AnimatePresence mode="wait">
-            {Icon && !gameComplete && (
-              <motion.div
-                key={currentIndex}
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                exit={{ scale: 0, rotate: 180 }}
-                className="text-primary"
-              >
-                <Icon className="w-20 h-20" strokeWidth={3} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="relative flex items-center justify-center">
+          <svg className="absolute inset-0 w-60 h-60 -rotate-90" viewBox="0 0 180 180">
+            <circle
+              cx="90"
+              cy="90"
+              r={ringRadius}
+              stroke="hsl(var(--border))"
+              strokeWidth="6"
+              fill="transparent"
+            />
+            <motion.circle
+              cx="90"
+              cy="90"
+              r={ringRadius}
+              stroke="hsl(var(--primary))"
+              strokeWidth="6"
+              strokeDasharray={ringCircumference}
+              strokeDashoffset={countdownOffset}
+              strokeLinecap="round"
+              fill="transparent"
+              animate={{ strokeDashoffset: countdownOffset }}
+              transition={{ duration: 0.2, ease: 'linear' }}
+            />
+          </svg>
+          <motion.div
+            className={`relative w-48 h-48 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing ${
+              showResult === 'success' 
+                ? 'bg-green-500/20 border-green-500' 
+                : showResult === 'fail'
+                  ? 'bg-red-500/20 border-red-500'
+                  : 'bg-muted/30 border-border'
+            } border-4`}
+            drag
+            dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+            dragElastic={0.5}
+            onDragEnd={handleDragEnd}
+            whileDrag={{ scale: 1.05 }}
+          >
+            <AnimatePresence>
+              {showResult && (
+                <motion.span
+                  key={showResult}
+                  className={`absolute inset-0 rounded-full border-4 ${
+                    showResult === 'success' ? 'border-green-400/60' : 'border-red-400/60'
+                  }`}
+                  initial={{ opacity: 0.6, scale: 0.8 }}
+                  animate={{ opacity: 0, scale: 1.4 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence mode="wait">
+              {Icon && !gameComplete && (
+                <motion.div
+                  key={currentIndex}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  exit={{ scale: 0, rotate: 180 }}
+                  className="text-primary"
+                >
+                  <Icon className="w-20 h-20" strokeWidth={3} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div className="absolute bottom-3 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              {currentAttack ? currentAttack.direction : 'Ready'}
+            </div>
 
-          {/* Direction hints */}
-          <div className="absolute -top-8 text-muted-foreground">
-            <ArrowUp className="w-6 h-6" />
-          </div>
-          <div className="absolute -bottom-8 text-muted-foreground">
-            <ArrowDown className="w-6 h-6" />
-          </div>
-          <div className="absolute -left-8 text-muted-foreground">
-            <ArrowLeft className="w-6 h-6" />
-          </div>
-          <div className="absolute -right-8 text-muted-foreground">
-            <ArrowRight className="w-6 h-6" />
-          </div>
-        </motion.div>
+            {/* Direction hints */}
+            <div className="absolute -top-8 text-muted-foreground">
+              <ArrowUp className="w-6 h-6" />
+            </div>
+            <div className="absolute -bottom-8 text-muted-foreground">
+              <ArrowDown className="w-6 h-6" />
+            </div>
+            <div className="absolute -left-8 text-muted-foreground">
+              <ArrowLeft className="w-6 h-6" />
+            </div>
+            <div className="absolute -right-8 text-muted-foreground">
+              <ArrowRight className="w-6 h-6" />
+            </div>
+          </motion.div>
+        </div>
 
         <div className="grid grid-cols-3 gap-2">
           <div />

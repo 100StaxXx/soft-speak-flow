@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap } from 'lucide-react';
+import { Zap, Gauge, Activity, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -58,6 +58,7 @@ export const EnergyBeamGame = ({
       label: 'Difficulty',
       value: difficultyLabel,
       tone: 'accent' as const,
+      icon: <Gauge className="w-3.5 h-3.5" />,
     },
     {
       label: 'Quest drift',
@@ -69,12 +70,14 @@ export const EnergyBeamGame = ({
           : questDriftPercent > 0
             ? 'Faster charge, tighter window'
             : 'Slower charge, wider window',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     {
       label: 'Body boost',
       value: `+${bodyBonusPercent}% window`,
       tone: 'positive' as const,
       helperText: 'Sweet spot width',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
   ];
 
@@ -202,11 +205,17 @@ export const EnergyBeamGame = ({
       </div>
     </div>
   );
+  const gradientId = useId();
+  const ringRadius = 58;
+  const circumference = 2 * Math.PI * ringRadius;
+  const chargeProgress = chargeLevel / 100;
+  const dashOffset = circumference - chargeProgress * circumference;
 
   return (
     <MiniGameHud
       title="Energy Beam Harmonization"
       subtitle="Hold to charge and release power inside the shimmering window."
+      eyebrow="Beam Resonance"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Body stat bonus: +${bodyBonusPercent}% sweet spot size`}
@@ -271,28 +280,65 @@ export const EnergyBeamGame = ({
 
         {/* Charge button */}
         {!gameComplete && (
-          <motion.button
-            className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-primary/50"
-            onMouseDown={startCharging}
-            onMouseUp={releaseBeam}
-            onMouseLeave={releaseBeam}
-            onTouchStart={startCharging}
-            onTouchEnd={releaseBeam}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            animate={{
-              boxShadow: isCharging
-                ? [
-                    '0 0 20px hsl(var(--primary))',
-                    '0 0 40px hsl(var(--primary))',
-                    '0 0 20px hsl(var(--primary))',
-                  ]
-                : '0 0 10px hsl(var(--primary) / 0.5)',
-            }}
-            transition={{ repeat: isCharging ? Infinity : 0, duration: 0.5 }}
-          >
-            <Zap className={`w-12 h-12 text-primary-foreground ${isCharging ? 'animate-pulse' : ''}`} />
-          </motion.button>
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative flex items-center justify-center">
+              <svg className="absolute inset-0 h-32 w-32 -rotate-90" viewBox="0 0 140 140">
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={ringRadius}
+                  className="text-border/40"
+                  strokeWidth="6"
+                  stroke="currentColor"
+                  fill="transparent"
+                />
+                <motion.circle
+                  cx="70"
+                  cy="70"
+                  r={ringRadius}
+                  strokeWidth="6"
+                  stroke={`url(#${gradientId})`}
+                  fill="transparent"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                  strokeLinecap="round"
+                  animate={{ strokeDashoffset: dashOffset }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                />
+                <defs>
+                  <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" />
+                    <stop offset="100%" stopColor="hsl(var(--accent))" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <motion.button
+                className="relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center border-4 border-white/20 shadow-[0_0_35px_rgba(255,255,255,0.25)]"
+                onMouseDown={startCharging}
+                onMouseUp={releaseBeam}
+                onMouseLeave={releaseBeam}
+                onTouchStart={startCharging}
+                onTouchEnd={releaseBeam}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                animate={{
+                  boxShadow: isCharging
+                    ? [
+                        '0 0 20px hsl(var(--primary))',
+                        '0 0 35px hsl(var(--primary))',
+                        '0 0 20px hsl(var(--primary))',
+                      ]
+                    : '0 0 15px hsl(var(--primary) / 0.4)',
+                }}
+                transition={{ repeat: isCharging ? Infinity : 0, duration: 0.6 }}
+              >
+                <Zap className={`w-12 h-12 text-primary-foreground ${isCharging ? 'animate-pulse' : ''}`} />
+              </motion.button>
+            </div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+              {isCharging ? 'Release in the glow' : 'Hold to charge'}
+            </p>
+          </div>
         )}
       </div>
   </MiniGameHud>

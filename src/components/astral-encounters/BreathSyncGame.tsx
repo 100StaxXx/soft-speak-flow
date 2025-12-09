@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Wind, Activity, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -22,6 +23,8 @@ export const BreathSyncGame = ({
   const [currentCycle, setCurrentCycle] = useState(1);
   const [gameComplete, setGameComplete] = useState(false);
   const [showFeedback, setShowFeedback] = useState<'perfect' | 'good' | 'miss' | null>(null);
+  const [phaseProgress, setPhaseProgress] = useState(0);
+  const [tapPulseKey, setTapPulseKey] = useState(0);
   
   const animationRef = useRef<number | null>(null);
   const completedRef = useRef(false); // Guard against double completion
@@ -46,18 +49,20 @@ export const BreathSyncGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const soulBonusPercent = Math.round(soulBonus * 10);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Wind className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
       helperText: questDriftPercent === 0 ? 'Standard cadence' : questDriftPercent > 0 ? 'Faster breath cycles' : 'Slower breath cycles',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Soul focus', 
       value: `+${soulBonusPercent}% window`, 
       tone: 'positive' as const,
       helperText: 'Sync tolerance',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
   ];
   
@@ -82,21 +87,24 @@ export const BreathSyncGame = ({
       let newPhase: 'inhale' | 'hold' | 'exhale';
       let newScale: number;
       
+      let phaseProgressValue = 0;
       if (cycleTime < inhaleTime) {
         newPhase = 'inhale';
-        const progress = cycleTime / inhaleTime;
-        newScale = 1 + (progress * 0.5); // 1 to 1.5
+        phaseProgressValue = cycleTime / inhaleTime;
+        newScale = 1 + (phaseProgressValue * 0.5); // 1 to 1.5
       } else if (cycleTime < inhaleTime + holdTime) {
         newPhase = 'hold';
+        phaseProgressValue = (cycleTime - inhaleTime) / holdTime;
         newScale = 1.5;
       } else {
         newPhase = 'exhale';
-        const progress = (cycleTime - inhaleTime - holdTime) / exhaleTime;
-        newScale = 1.5 - (progress * 0.5); // 1.5 to 1
+        phaseProgressValue = (cycleTime - inhaleTime - holdTime) / exhaleTime;
+        newScale = 1.5 - (phaseProgressValue * 0.5); // 1.5 to 1
       }
       
       setPhase(newPhase);
       setRingScale(newScale);
+      setPhaseProgress(phaseProgressValue);
       
       // Check for cycle completion
       const cycleNumber = Math.floor(elapsed / cycleDuration) + 1;
@@ -154,11 +162,14 @@ export const BreathSyncGame = ({
       setShowFeedback('miss');
     }
     
+    setTapPulseKey((key) => key + 1);
     setTimeout(() => setShowFeedback(null), 300);
   }, [gameComplete, ringScale, adjustedSyncWindow]);
 
+  const phaseOrder: Array<'inhale' | 'hold' | 'exhale'> = ['inhale', 'hold', 'exhale'];
+  const phaseIndex = phaseOrder.indexOf(phase);
   const statusBarContent = (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Cycle</p>
@@ -170,6 +181,26 @@ export const BreathSyncGame = ({
         <div className="text-xs text-muted-foreground">
           Sync {Math.round(syncScore)}/{totalCycles * tapsPerCycle}
         </div>
+      </div>
+      <div className="flex gap-1 text-[10px] uppercase tracking-widest text-muted-foreground/80">
+        {phaseOrder.map((entry, idx) => {
+          const isActive = phaseIndex === idx;
+          const isComplete = phaseIndex > idx;
+          const fillPercent = isComplete ? 100 : isActive ? Math.min(phaseProgress * 100, 100) : 0;
+          return (
+            <div key={entry} className="flex-1">
+              <div className="mb-1 text-center">{entry.slice(0, 3)}</div>
+              <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
+                <motion.div
+                  className={`h-full ${isComplete ? 'bg-primary' : 'bg-primary/70'}`}
+                  style={{ width: `${fillPercent}%` }}
+                  animate={{ width: `${fillPercent}%` }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
       <div className="flex gap-2 justify-center">
         {Array.from({ length: totalCycles }).map((_, i) => (
@@ -192,6 +223,7 @@ export const BreathSyncGame = ({
     <MiniGameHud
       title="Breath Sync Battle"
       subtitle="Tap when the ring hits the peak (inhale/hold) or valley (exhale)."
+      eyebrow="Breath Alignment"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Soul stat bonus: +${soulBonusPercent}% sync window`}
@@ -226,6 +258,16 @@ export const BreathSyncGame = ({
         
         {/* Center indicator */}
         <div className="absolute w-4 h-4 rounded-full bg-foreground/80" />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tapPulseKey}
+            className="absolute rounded-full border-2 border-primary/30"
+            initial={{ width: 60, height: 60, opacity: 0.5 }}
+            animate={{ width: 180, height: 180, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </AnimatePresence>
         
         {/* Phase text */}
         <div className="absolute -bottom-2 text-sm font-medium text-muted-foreground capitalize">

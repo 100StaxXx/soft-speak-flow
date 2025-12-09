@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { Activity, Brain, Sparkles } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -26,10 +27,12 @@ export const GravityBalanceGame = ({
   const [totalTime, setTotalTime] = useState(0);
   const [gameComplete, setGameComplete] = useState(false);
   const [showGravityChange, setShowGravityChange] = useState(false);
+  const [trail, setTrail] = useState<Array<{ x: number; y: number; id: number }>>([]);
   
   const animationRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const completedRef = useRef(false);
+  const trailIdRef = useRef(0);
 
   const gameDuration = 20000; // 20 seconds
   const baseSafeZoneSize = difficulty === 'easy' ? 35 : difficulty === 'medium' ? 28 : 22;
@@ -52,20 +55,27 @@ export const GravityBalanceGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const mindBonusPercent = Math.round(mindBonus * 30);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Sparkles className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
       helperText: questDriftPercent === 0 ? 'Neutral gravity' : questDriftPercent > 0 ? 'Heavier pull' : 'Gentler pull',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Mind focus', 
       value: `-${mindBonusPercent}% gravity`, 
       tone: 'positive' as const,
       helperText: 'Gravity strength',
+      icon: <Brain className="w-3.5 h-3.5" />,
     },
   ];
+
+  const pushTrail = useCallback((point: { x: number; y: number }) => {
+    const id = trailIdRef.current++;
+    setTrail((prev) => [...prev, { ...point, id }].slice(-12));
+  }, []);
 
   const isInSafeZone = useCallback(() => {
     const dx = orbPosition.x - 50;
@@ -117,7 +127,9 @@ export const GravityBalanceGame = ({
         newX = Math.max(10, Math.min(90, newX));
         newY = Math.max(10, Math.min(90, newY));
 
-        return { x: newX, y: newY };
+        const nextPosition = { x: newX, y: newY };
+        pushTrail(nextPosition);
+        return nextPosition;
       });
 
       setTotalTime(elapsed);
@@ -153,7 +165,7 @@ export const GravityBalanceGame = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [gameComplete, gravityDirection, adjustedGravityStrength, gravityChangeInterval, safeZoneSize, orbPosition, timeInZone, onComplete]);
+  }, [gameComplete, gravityDirection, adjustedGravityStrength, gravityChangeInterval, safeZoneSize, orbPosition, timeInZone, onComplete, pushTrail]);
 
   const handleCounterGravity = useCallback((direction: Direction) => {
     if (gameComplete) return;
@@ -173,13 +185,17 @@ export const GravityBalanceGame = ({
       newX = Math.max(10, Math.min(90, newX));
       newY = Math.max(10, Math.min(90, newY));
 
-      return { x: newX, y: newY };
+      const nextPosition = { x: newX, y: newY };
+      pushTrail(nextPosition);
+      return nextPosition;
     });
-  }, [gameComplete]);
+  }, [gameComplete, pushTrail]);
 
   const inZone = isInSafeZone();
   const progressPercent = Math.min((totalTime / gameDuration) * 100, 100);
   const accuracyPercent = totalTime > 0 ? Math.round((timeInZone / totalTime) * 100) : 100;
+  const tiltX = (orbPosition.y - 50) / 8;
+  const tiltY = (orbPosition.x - 50) / -8;
 
   const gravityArrow: Record<Direction, string> = {
     up: '↑',
@@ -201,6 +217,9 @@ export const GravityBalanceGame = ({
           Balance {accuracyPercent}%
         </div>
       </div>
+      <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+        Gravity {gravityArrow[gravityDirection]}
+      </div>
       <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
         <motion.div
           className="h-full bg-primary"
@@ -214,12 +233,19 @@ export const GravityBalanceGame = ({
     <MiniGameHud
       title="Gravity Balance"
       subtitle="Keep the orb hovering inside the safe zone by tapping against gravity."
+      eyebrow="Orb Stabilization"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Mind stat bonus: -${mindBonusPercent}% gravity strength`}
     >
       <div className="flex flex-col items-center gap-4">
-        <div className="relative w-64 h-64 bg-muted/20 rounded-2xl border border-border/50 overflow-hidden">
+        <div
+          className="relative w-64 h-64 bg-muted/20 rounded-2xl border border-border/50 overflow-hidden"
+          style={{
+            transform: `perspective(900px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`,
+            transition: 'transform 0.25s ease-out',
+          }}
+        >
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
 
@@ -248,6 +274,22 @@ export const GravityBalanceGame = ({
               <div className="absolute inset-0 rounded-full bg-green-500/20 animate-pulse" />
             )}
           </div>
+
+          {/* Orb trail */}
+          {trail.map((point) => (
+            <motion.div
+              key={point.id}
+              className="absolute w-3 h-3 rounded-full bg-primary/30"
+              style={{
+                left: `${point.x}%`,
+                top: `${point.y}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              initial={{ opacity: 0.5, scale: 0.6 }}
+              animate={{ opacity: 0, scale: 1.4 }}
+              transition={{ duration: 0.8 }}
+            />
+          ))}
 
           {/* Orb */}
           <motion.div

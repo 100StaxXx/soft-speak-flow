@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Sparkles, Star } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { MiniGameHud } from './MiniGameHud';
 
@@ -213,19 +214,21 @@ export const ConstellationTraceGame = ({
   const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
   const soulBonusMs = Math.round(soulBonus * 1000);
   const infoChips = [
-    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const },
-    { label: 'Constellation', value: constellationName, helperText: 'Pattern' },
+    { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Star className="w-3.5 h-3.5" /> },
+    { label: 'Constellation', value: constellationName, helperText: 'Pattern', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { 
       label: 'Quest drift', 
       value: questDriftLabel, 
       tone: questDriftTone,
       helperText: questDriftPercent === 0 ? 'Standard nodes' : questDriftPercent > 0 ? 'More stars' : 'Fewer stars',
+      icon: <Activity className="w-3.5 h-3.5" />,
     },
     { 
       label: 'Soul focus', 
       value: `+${soulBonusMs}ms`, 
       tone: 'positive' as const,
       helperText: 'Fade buffer',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
     },
   ];
   const fadePercent = Math.max(0, Math.round((fadeRemaining / fadeTime) * 100));
@@ -259,6 +262,7 @@ export const ConstellationTraceGame = ({
     <MiniGameHud
       title="Constellation Trace"
       subtitle="Connect the stars in order before their light fades."
+      eyebrow="Stellar Cartography"
       chips={infoChips}
       statusBar={statusBarContent}
       footerNote={`Soul stat bonus: +${soulBonusMs}ms fade time`}
@@ -298,6 +302,14 @@ export const ConstellationTraceGame = ({
             />
           ))}
         </svg>
+
+        <div className="absolute top-3 left-3 rounded-full bg-black/35 px-3 py-1 text-xs text-white/80 backdrop-blur capitalize">
+          {constellationName}
+        </div>
+        <div className="absolute top-3 right-3 text-right text-xs text-white/70">
+          <p className="uppercase tracking-[0.3em] text-[9px]">Fade</p>
+          <p className="font-semibold text-sm">{Math.ceil(fadeRemaining / 1000)}s</p>
+        </div>
 
         {/* Stars */}
         <AnimatePresence>
