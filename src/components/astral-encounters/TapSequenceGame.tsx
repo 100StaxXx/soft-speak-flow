@@ -45,11 +45,17 @@ export const TapSequenceGame = ({
   // Quest interval scaling: more quests waited = less display time
   const displayTime = baseDisplayTime * (1 - questIntervalScale * 0.5);
   const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-  const questDriftPercent = Math.round(questIntervalScale * 100);
-  const questDriftLabel = questDriftPercent === 0 
-    ? 'Standard cadence'
-    : `${questDriftPercent > 0 ? '+' : ''}${questDriftPercent}% orbit count`;
-  const questDriftTone = questDriftPercent > 0 ? 'warning' : questDriftPercent < 0 ? 'positive' : 'default';
+
+  function getQuestDriftChipData(questIntervalScale: number, context: string) {
+    const percent = Math.round(questIntervalScale * 100);
+    const label = percent === 0
+      ? 'Standard cadence'
+      : `${percent > 0 ? '+' : ''}${percent}% ${context}`;
+    const tone = percent > 0 ? 'warning' : percent < 0 ? 'positive' : 'default';
+    return { percent, label, tone };
+  }
+
+  const { percent: questDriftPercent, label: questDriftLabel, tone: questDriftTone } = getQuestDriftChipData(questIntervalScale, 'orbit count');
   const mindBonusMs = Math.round(mindBonus * 400);
   const infoChips = [
     { label: 'Difficulty', value: difficultyLabel, tone: 'accent' as const, icon: <Target className="w-3.5 h-3.5" /> },
