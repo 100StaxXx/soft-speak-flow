@@ -12,8 +12,9 @@ interface TriggerResult {
   questInterval?: number; // Number of quests since last encounter (2-4)
 }
 
-// Generate random interval between 2-4
+// Generate random interval between 2-4 quests
 const getRandomInterval = () => Math.floor(Math.random() * 3) + 2;
+const MIN_QUESTS_BEFORE_ENCOUNTERS = 2;
 
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
@@ -32,7 +33,7 @@ export const useEncounterTrigger = () => {
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('astral_encounters_enabled')
+      .select('astral_encounters_enabled,onboarding_completed,total_quests_completed')
       .eq('id', user.id)
       .single();
 
@@ -41,7 +42,26 @@ export const useEncounterTrigger = () => {
       return false;
     }
 
-    encountersEnabledRef.current = profile?.astral_encounters_enabled !== false;
+    // Astral encounters can be manually disabled from profile settings
+    if (profile?.astral_encounters_enabled === false) {
+      encountersEnabledRef.current = false;
+      return false;
+    }
+
+    // Require onboarding to be complete before any encounters unlock
+    if (!profile?.onboarding_completed) {
+      encountersEnabledRef.current = false;
+      return false;
+    }
+
+    // Require at least a couple of quest completions before unlocking encounters
+    const totalQuestsCompleted = profile?.total_quests_completed ?? 0;
+    if (totalQuestsCompleted < MIN_QUESTS_BEFORE_ENCOUNTERS) {
+      encountersEnabledRef.current = false;
+      return false;
+    }
+
+    encountersEnabledRef.current = true;
     return encountersEnabledRef.current;
   }, [user?.id]);
 
