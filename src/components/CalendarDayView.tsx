@@ -370,13 +370,6 @@ export const CalendarDayView = ({
         </div>
       )}
 
-      {/* Completely Empty State */}
-      {totalCount === 0 && (
-        <div className="rounded-lg border border-dashed border-border/60 bg-background/70 p-4 text-center text-sm text-muted-foreground">
-          Long press any time slot below or use the form to add your first quest.
-        </div>
-      )}
-
       {/* Timeline */}
       <ScrollArea className="max-h-[520px] min-h-[320px] rounded-lg border border-border">
         <div className="relative">
