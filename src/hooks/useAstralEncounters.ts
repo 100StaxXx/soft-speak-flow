@@ -9,7 +9,12 @@ import {
   AstralEncounter, 
   AdversaryEssence, 
   CosmicCodexEntry,
-  TriggerType 
+  TriggerType,
+  AdversaryTheme,
+  AdversaryTier,
+  MiniGameType,
+  THEME_STAT_MAP,
+  TIER_CONFIG
 } from '@/types/astralEncounters';
 import { 
   generateAdversary, 
@@ -219,9 +224,13 @@ export const useAstralEncounters = () => {
           });
         }
 
-        // Update companion stats
-        const statField = activeEncounter.adversary.statType;
-        const currentStat = companion[statField] || 0;
+        // Update companion stats - validate statType is a valid field
+        const statField = activeEncounter.adversary.statType as 'mind' | 'body' | 'soul';
+        if (!['mind', 'body', 'soul'].includes(statField)) {
+          console.error('Invalid stat type:', statField);
+          return { result, xpEarned };
+        }
+        const currentStat = (companion as any)[statField] || 0;
         const newStat = Math.min(100, currentStat + activeEncounter.adversary.statBoost);
 
         await supabase
@@ -271,12 +280,24 @@ export const useAstralEncounters = () => {
       .single();
 
     if (pendingEncounter) {
-      // Resume pending encounter
-      const adversary = generateAdversary(triggerType, epicProgress, epicCategory);
-      setActiveEncounter({ 
-        encounter: pendingEncounter as AstralEncounter, 
-        adversary 
-      });
+      // Resume pending encounter - reconstruct adversary from stored data
+      const storedEncounter = pendingEncounter as AstralEncounter;
+      const theme = storedEncounter.adversary_theme as AdversaryTheme;
+      const tier = storedEncounter.adversary_tier as AdversaryTier;
+      const adversary: Adversary = {
+        name: storedEncounter.adversary_name,
+        theme,
+        tier,
+        lore: storedEncounter.adversary_lore || '',
+        miniGameType: storedEncounter.mini_game_type as MiniGameType,
+        phases: storedEncounter.total_phases || 1,
+        // Use theme-stat mapping for essence details
+        essenceName: `Essence of ${storedEncounter.adversary_name}`,
+        essenceDescription: `Power absorbed from defeating ${storedEncounter.adversary_name}`,
+        statType: THEME_STAT_MAP[theme] || 'mind',
+        statBoost: TIER_CONFIG[tier]?.statBoost || 1,
+      };
+      setActiveEncounter({ encounter: storedEncounter, adversary });
       setShowEncounterModal(true);
       return true;
     }

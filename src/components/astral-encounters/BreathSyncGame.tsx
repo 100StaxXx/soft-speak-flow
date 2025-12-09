@@ -24,6 +24,7 @@ export const BreathSyncGame = ({
   
   const animationRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const completedRef = useRef(false); // Guard against double completion
   
   const totalCycles = 3;
   const tapsPerCycle = 3; // One tap per phase transition
@@ -76,9 +77,13 @@ export const BreathSyncGame = ({
       const currentCycleNumber = Math.floor(elapsed / cycleDuration) + 1;
       if (currentCycleNumber > currentCycle && currentCycleNumber <= totalCycles) {
         setCurrentCycle(currentCycleNumber);
-      } else if (currentCycleNumber > totalCycles && !gameComplete) {
+      } else if (currentCycleNumber > totalCycles && !gameComplete && !completedRef.current) {
+        completedRef.current = true;
         setGameComplete(true);
-        const accuracy = totalTaps > 0 ? Math.round((syncScore / (totalCycles * tapsPerCycle)) * 100) : 0;
+        // Round syncScore to handle decimal values (0.7 for 'good' hits)
+        const roundedScore = Math.round(syncScore);
+        const maxScore = totalCycles * tapsPerCycle;
+        const accuracy = maxScore > 0 ? Math.min(100, Math.round((roundedScore / maxScore) * 100)) : 0;
         onComplete({
           success: accuracy >= 50,
           accuracy,

@@ -14,7 +14,7 @@ import {
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { GuildActivityFeed } from "./GuildActivityFeed";
@@ -25,6 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
+import { useAstralEncounters } from "@/hooks/useAstralEncounters";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -80,10 +82,14 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
+  const { checkEpicCheckpoint } = useEncounterTrigger();
+  const { checkEncounterTrigger } = useAstralEncounters();
+  
   // Initialize to -1 on first render to catch any milestones that may have been
   // crossed before this component mounted. Server handles duplicate prevention.
   const previousProgressRef = useRef<number>(-1);
   const hasInitializedRef = useRef<boolean>(false);
+  const encounterCheckRef = useRef<number>(-1);
   
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -145,7 +151,18 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     
     // Update ref for next comparison
     previousProgressRef.current = currentProgress;
-  }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
+    
+    // Check for Astral Encounter trigger on epic milestone crossings
+    if (encounterCheckRef.current !== currentProgress && currentProgress > 0) {
+      const prevCheck = encounterCheckRef.current;
+      encounterCheckRef.current = currentProgress;
+      checkEpicCheckpoint(epic.id, prevCheck < 0 ? 0 : prevCheck, currentProgress).then(result => {
+        if (result.shouldTrigger && result.triggerType) {
+          checkEncounterTrigger(result.triggerType, result.sourceId, result.epicProgress, result.epicCategory);
+        }
+      });
+    }
+  }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard, checkEpicCheckpoint, checkEncounterTrigger]);
 
   const handleShareEpic = async () => {
     if (!epic.invite_code) return;
