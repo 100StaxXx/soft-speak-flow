@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,9 +9,9 @@ interface TaskCardProps {
     id: string;
     task_text: string;
     completed: boolean;
-    difficulty?: string;
+    difficulty?: string | null;
     xp_reward: number;
-    is_main_quest?: boolean;
+    is_main_quest?: boolean | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
     recurrence_pattern?: string | null;
@@ -19,6 +19,7 @@ interface TaskCardProps {
   };
   onToggle: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
   onSetMainQuest?: () => void;
   showPromoteButton?: boolean;
   isMainQuest?: boolean;
@@ -29,6 +30,7 @@ export const TaskCard = ({
   task,
   onToggle,
   onDelete,
+  onEdit,
   onSetMainQuest,
   showPromoteButton,
   isMainQuest,
@@ -253,6 +255,22 @@ export const TaskCard = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Edit Button */}
+            {onEdit && !task.completed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Edit task"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            
             {/* Promote to Main Quest Button */}
             {showPromoteButton && onSetMainQuest && !task.completed && (
               <Button

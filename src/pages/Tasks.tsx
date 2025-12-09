@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar as CalendarIcon, Plus, CheckCircle2, Circle, Trash2, Target, Zap, Flame, Mountain, Swords, ChevronLeft, ChevronRight, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle, BookOpen } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Trash2, Target, Zap, Flame, Mountain, Swords, Star, LayoutGrid, CalendarDays, Trophy, Users, Castle, BookOpen } from "lucide-react";
 import { CalendarMonthView } from "@/components/CalendarMonthView";
 import { CalendarWeekView } from "@/components/CalendarWeekView";
 import { CalendarDayView } from "@/components/CalendarDayView";
@@ -36,7 +36,6 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
-import { HabitCard } from "@/components/HabitCard";
 import { HabitTemplates } from "@/components/HabitTemplates";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
@@ -47,7 +46,7 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { useEpics } from "@/hooks/useEpics";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
-import { Sliders } from "lucide-react";
+import { Sliders, Scroll } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,13 +62,12 @@ import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
+import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -151,6 +149,10 @@ export default function Tasks() {
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<PendingTaskData | null>(null);
   const drawerActionHandledRef = useRef(false);
+  
+  // Edit quest state
+  const [editingTask, setEditingTask] = useState<typeof tasks[0] | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   // Calculate total XP for the day (memoized to prevent unnecessary recalculations)
   const totalXP = useMemo(() => {
@@ -473,55 +475,24 @@ export default function Tasks() {
 
   // Check if tutorial should be shown and auto-generate "Join Cosmiq" quest
   useEffect(() => {
-    // Debug logging for tutorial visibility
-    console.log('[Tutorial Debug] Effect triggered', {
-      userId: user?.id,
-      hasProfile: !!profile,
-      profileLoading: !profile && !!user?.id,
-      showTutorial,
-      tutorialCheckRef: tutorialCheckRef.current
-    });
-    
-    if (!user?.id) {
-      console.log('[Tutorial Debug] No user ID, skipping');
-      return;
-    }
-    
-    if (!profile) {
-      console.log('[Tutorial Debug] Profile not loaded yet, waiting...');
-      return;
-    }
+    if (!user?.id || !profile) return;
     
     // Prevent multiple simultaneous checks
-    if (tutorialCheckRef.current) {
-      console.log('[Tutorial Debug] Already processing tutorial check, skipping');
-      return;
-    }
+    if (tutorialCheckRef.current) return;
     
     // Check localStorage first for immediate feedback
     const tutorialDismissed = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`);
-    console.log('[Tutorial Debug] localStorage check', { tutorialDismissed });
     
     if (tutorialDismissed === 'true') {
-      if (showTutorial) {
-        console.log('[Tutorial Debug] Closing tutorial - localStorage says dismissed');
-        setShowTutorial(false);
-      }
+      if (showTutorial) setShowTutorial(false);
       return;
     }
     
     const onboardingData = profile.onboarding_data as { quests_tutorial_seen?: boolean } | null;
     const tutorialSeen = onboardingData?.quests_tutorial_seen;
     
-    console.log('[Tutorial Debug] Profile onboarding_data check', {
-      onboardingData,
-      tutorialSeen,
-      profileCreatedAt: profile.created_at
-    });
-    
     // If database says tutorial was seen, mark localStorage and close
     if (tutorialSeen) {
-      console.log('[Tutorial Debug] Tutorial already seen in database, syncing to localStorage');
       safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
       if (showTutorial) setShowTutorial(false);
       return;
@@ -529,7 +500,6 @@ export default function Tasks() {
     
     // Only show tutorial once when not seen
     if (!tutorialSeen && !showTutorial) {
-      console.log('[Tutorial Debug] ✅ SHOWING TUTORIAL for new user');
       tutorialCheckRef.current = true;
       setShowTutorial(true);
       
@@ -537,19 +507,15 @@ export default function Tasks() {
       const today = format(new Date(), 'yyyy-MM-dd');
       const questCreationKey = `tutorial_quest_created_${user.id}`;
       
-      // Check if we've already attempted to create this quest in this session
       const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
-      console.log('[Tutorial Debug] Quest creation check', { questCreationKey, questAlreadyCreated });
       
       if (questAlreadyCreated) {
         tutorialCheckRef.current = false;
         return;
       }
       
-      // Mark as attempted to prevent duplicate creation
       safeLocalStorage.setItem(questCreationKey, 'true');
       
-      // Check if this quest already exists
       const checkAndCreateQuest = async () => {
         try {
           const { data: existingQuest, error: checkError } = await supabase
@@ -560,15 +526,11 @@ export default function Tasks() {
             .maybeSingle();
           
           if (checkError) {
-            console.error('[Tutorial Debug] Failed to check for tutorial quest:', checkError);
             tutorialCheckRef.current = false;
             return;
           }
           
-          console.log('[Tutorial Debug] Existing quest check', { existingQuest });
-          
           if (!existingQuest) {
-            // Create the welcome quest
             const { error: insertError } = await supabase
               .from('daily_tasks')
               .insert({
@@ -581,17 +543,12 @@ export default function Tasks() {
               });
             
             if (insertError) {
-              console.error('[Tutorial Debug] Failed to create tutorial quest:', insertError);
-              // Remove the flag so it can be retried
               safeLocalStorage.removeItem(questCreationKey);
             } else {
-              console.log('[Tutorial Debug] ✅ Tutorial quest created successfully');
               queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
             }
           }
-        } catch (error) {
-          console.error('[Tutorial Debug] Unexpected error creating tutorial quest:', error);
-          // Remove the flag so it can be retried
+        } catch {
           safeLocalStorage.removeItem(questCreationKey);
         } finally {
           tutorialCheckRef.current = false;
@@ -599,41 +556,54 @@ export default function Tasks() {
       };
       
       checkAndCreateQuest();
-    } else {
-      console.log('[Tutorial Debug] Not showing tutorial', { tutorialSeen, showTutorial });
     }
   }, [user?.id, profile, showTutorial, queryClient]);
 
   const handleTutorialClose = async () => {
     if (!user?.id) return;
     
-    // Immediately mark as dismissed in localStorage to prevent re-showing
     safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
     setShowTutorial(false);
     
-    // Then update database in background
     if (profile) {
-      try {
-        const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
-        const updatedData = {
-          ...onboardingData,
-          quests_tutorial_seen: true,
-        };
-        
-        const { error } = await supabase
-          .from('profiles')
-          .update({ onboarding_data: updatedData })
-          .eq('id', user.id);
-        
-        if (error) {
-          console.error('Failed to update tutorial status:', error);
-        } else {
-          // Invalidate profile cache
-          queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-        }
-      } catch (error) {
-        console.error('Unexpected error updating tutorial status:', error);
-      }
+      const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
+      const updatedData = { ...onboardingData, quests_tutorial_seen: true };
+      
+      await supabase
+        .from('profiles')
+        .update({ onboarding_data: updatedData })
+        .eq('id', user.id);
+      
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, updates: {
+    task_text: string;
+    difficulty: string;
+    scheduled_time: string | null;
+    estimated_duration: number | null;
+    notes: string | null;
+  }) => {
+    if (!user?.id) return;
+    setIsUpdating(true);
+    
+    try {
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update(updates)
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      toast({ title: "Quest updated!" });
+    } catch {
+      toast({ title: "Failed to update quest", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -1371,6 +1341,15 @@ export default function Tasks() {
         onUseFreeze={useFreeze}
         onResetStreak={resetStreak}
         isResolving={isResolving}
+      />
+
+      {/* Edit Quest Dialog */}
+      <EditQuestDialog
+        task={editingTask}
+        open={!!editingTask}
+        onOpenChange={(open) => !open && setEditingTask(null)}
+        onSave={handleUpdateTask}
+        isSaving={isUpdating}
       />
 
       <BottomNav />
