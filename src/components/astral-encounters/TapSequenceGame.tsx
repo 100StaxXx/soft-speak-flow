@@ -51,7 +51,7 @@ export const TapSequenceGame = ({
     const label = percent === 0
       ? 'Standard cadence'
       : `${percent > 0 ? '+' : ''}${percent}% ${context}`;
-    const tone = percent > 0 ? 'warning' : percent < 0 ? 'positive' : 'default';
+    const tone = percent > 0 ? 'warning' : percent < 0 ? 'positive' : 'default' as const;
     return { percent, label, tone };
   }
 
