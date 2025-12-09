@@ -2,9 +2,9 @@ import { PageTransition } from "@/components/PageTransition";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Trophy, Shield, Swords } from "lucide-react";
-import { CosmicCodex, EncounterHistory } from "@/components/astral-encounters";
+import { CosmicCodex, EncounterHistory, MiniGameTester } from "@/components/astral-encounters";
 import { useAstralEncounters } from "@/hooks/useAstralEncounters";
-
+import { useCompanion } from "@/hooks/useCompanion";
 export default function BattleArena() {
   const {
     encounters = [],
@@ -13,7 +13,13 @@ export default function BattleArena() {
     totalStatBoosts,
     isLoading,
   } = useAstralEncounters();
-
+  const { companion } = useCompanion();
+  
+  const companionStats = companion ? {
+    mind: companion.mind ?? 10,
+    body: companion.body ?? 10,
+    soul: companion.soul ?? 10,
+  } : undefined;
   const completedEncounters = encounters.filter(encounter => encounter.completed_at);
   const victories = completedEncounters.filter(encounter => encounter.result !== "fail").length;
   const recentEncounter = completedEncounters[0];
@@ -72,6 +78,8 @@ export default function BattleArena() {
               )}
             </Card>
           </div>
+
+          <MiniGameTester companionStats={companionStats} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <CosmicCodex
