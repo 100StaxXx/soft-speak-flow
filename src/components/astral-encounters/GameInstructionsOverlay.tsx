@@ -3,14 +3,12 @@ import { Button } from "@/components/ui/button";
 import { 
   Zap, 
   Circle, 
-  Wind, 
-  ArrowRight, 
-  Star, 
-  Shield, 
-  Scale,
+  Radio,
+  Moon,
+  Sparkles,
+  Music,
   Brain,
-  Heart,
-  Sparkles
+  Heart
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -53,65 +51,53 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statBonus: 'mind',
     statIcon: Brain,
   },
-  breath_sync: {
-    icon: Wind,
-    title: "Breath Sync",
-    goal: "Match your breathing to the cosmic rhythm!",
+  astral_frequency: {
+    icon: Radio,
+    title: "Astral Frequency Align",
+    goal: "Match your frequency with the cosmic wave!",
     howToPlay: [
-      "Watch the breathing circle expand and contract",
-      "Hold when the circle expands (inhale)",
-      "Release when it shrinks (exhale)"
+      "Drag the slider to adjust your frequency",
+      "Align with the target wavelength",
+      "Hold alignment for the required time"
     ],
     statBonus: 'soul',
     statIcon: Sparkles,
   },
-  quick_swipe: {
-    icon: ArrowRight,
-    title: "Quick Swipe",
-    goal: "Block incoming attacks with quick reflexes!",
+  eclipse_timing: {
+    icon: Moon,
+    title: "Eclipse Timing Duel",
+    goal: "Tap when sun and moon align!",
     howToPlay: [
-      "Watch for incoming attack indicators",
-      "Swipe in the matching direction quickly",
-      "Chain successful blocks for bonus points"
+      "Watch the sun and moon orbit",
+      "Tap exactly when they overlap (eclipse)",
+      "Windows get tighter each cycle"
     ],
     statBonus: 'body',
     statIcon: Heart,
   },
-  constellation_trace: {
-    icon: Star,
-    title: "Constellation Trace",
-    goal: "Connect the stars before they fade!",
+  starfall_dodge: {
+    icon: Sparkles,
+    title: "Starfall Dodge",
+    goal: "Dodge debris and collect crystals!",
     howToPlay: [
-      "Stars appear with numbers showing order",
-      "Tap each star in the correct sequence",
-      "Complete the constellation before time runs out"
-    ],
-    statBonus: 'soul',
-    statIcon: Sparkles,
-  },
-  shield_barrier: {
-    icon: Shield,
-    title: "Shield Barrier",
-    goal: "Protect your core from all directions!",
-    howToPlay: [
-      "Attacks come from four directions",
-      "Tap the shield quadrant matching the attack",
-      "React quickly to block each strike"
-    ],
-    statBonus: 'body',
-    statIcon: Heart,
-  },
-  gravity_balance: {
-    icon: Scale,
-    title: "Gravity Balance",
-    goal: "Keep the cosmic orb centered!",
-    howToPlay: [
-      "Gravity shifts pull the orb around",
-      "Tap opposite to the pull direction",
-      "Keep the orb in the safe zone"
+      "Move left and right to dodge falling debris",
+      "Collect glowing crystals for points",
+      "Survive the 10-second starfall"
     ],
     statBonus: 'mind',
     statIcon: Brain,
+  },
+  rune_resonance: {
+    icon: Music,
+    title: "Rune Resonance",
+    goal: "Tap runes at their peak brightness!",
+    howToPlay: [
+      "Each rune pulses at its own rhythm",
+      "Tap when a rune glows brightest",
+      "Activate all runes to complete"
+    ],
+    statBonus: 'soul',
+    statIcon: Sparkles,
   },
 };
 

@@ -5,11 +5,10 @@ import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/type
 import { AdversaryReveal } from './AdversaryReveal';
 import { EnergyBeamGame } from './EnergyBeamGame';
 import { TapSequenceGame } from './TapSequenceGame';
-import { BreathSyncGame } from './BreathSyncGame';
-import { QuickSwipeGame } from './QuickSwipeGame';
-import { ConstellationTraceGame } from './ConstellationTraceGame';
-import { ShieldBarrierGame } from './ShieldBarrierGame';
-import { GravityBalanceGame } from './GravityBalanceGame';
+import { AstralFrequencyGame } from './AstralFrequencyGame';
+import { EclipseTimingGame } from './EclipseTimingGame';
+import { StarfallDodgeGame } from './StarfallDodgeGame';
+import { RuneResonanceGame } from './RuneResonanceGame';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { BattleSceneHeader } from './BattleSceneHeader';
@@ -58,9 +57,9 @@ export const AstralEncounterModal = ({
     if (!adversary) return 'energy_beam';
     
     const themeGameMap: Record<string, MiniGameType[]> = {
-      mind: ['tap_sequence', 'gravity_balance'],
-      body: ['energy_beam', 'shield_barrier', 'quick_swipe'],
-      soul: ['breath_sync', 'constellation_trace'],
+      mind: ['tap_sequence', 'starfall_dodge'],
+      body: ['energy_beam', 'eclipse_timing'],
+      soul: ['astral_frequency', 'rune_resonance'],
     };
     
     const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
@@ -87,7 +86,6 @@ export const AstralEncounterModal = ({
 
     if (currentPhaseIndex < adversary.phases - 1) {
       setCurrentPhaseIndex(prev => prev + 1);
-      // Show instructions for next phase
       setPhase('instructions');
     } else {
       const totalAccuracy = Math.round(
@@ -147,16 +145,14 @@ export const AstralEncounterModal = ({
         return <EnergyBeamGame {...props} />;
       case 'tap_sequence':
         return <TapSequenceGame {...props} />;
-      case 'breath_sync':
-        return <BreathSyncGame {...props} />;
-      case 'quick_swipe':
-        return <QuickSwipeGame {...props} />;
-      case 'constellation_trace':
-        return <ConstellationTraceGame {...props} />;
-      case 'shield_barrier':
-        return <ShieldBarrierGame {...props} />;
-      case 'gravity_balance':
-        return <GravityBalanceGame {...props} />;
+      case 'astral_frequency':
+        return <AstralFrequencyGame {...props} />;
+      case 'eclipse_timing':
+        return <EclipseTimingGame {...props} />;
+      case 'starfall_dodge':
+        return <StarfallDodgeGame {...props} />;
+      case 'rune_resonance':
+        return <RuneResonanceGame {...props} />;
       default:
         return <EnergyBeamGame {...props} />;
     }
@@ -168,10 +164,8 @@ export const AstralEncounterModal = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-background border-border">
         <div className="relative min-h-[500px]">
-          {/* Cosmic background */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
           
-          {/* Content */}
           <div className="relative z-10">
             <AnimatePresence mode="wait">
               {phase === 'reveal' && (
@@ -209,14 +203,12 @@ export const AstralEncounterModal = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  {/* Battle scene header */}
                   <BattleSceneHeader
                     companionImageUrl={companion?.current_image_url || undefined}
                     companionName={companion?.spirit_animal || "Companion"}
                     adversary={adversary}
                   />
 
-                  {/* Phase indicator for multi-phase */}
                   {adversary.phases > 1 && (
                     <div className="flex justify-center gap-2 py-2">
                       {Array.from({ length: adversary.phases }).map((_, i) => (
