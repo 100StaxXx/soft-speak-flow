@@ -10,34 +10,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
-import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { useAuth } from "@/hooks/useAuth";
 
-const authSchema = z.object({
-  email: z.string()
-    .trim()
-    .toLowerCase()
-    .email("Invalid email address")
-    .min(3, "Email too short")
-    .max(255, "Email too long")
-    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
+// Email validation schema (shared between login and signup)
+const emailSchema = z.string()
+  .trim()
+  .toLowerCase()
+  .email("Invalid email address")
+  .min(3, "Email too short")
+  .max(255, "Email too long");
+
+// Login schema - minimal validation, let Supabase verify credentials
+const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, "Password is required"),
+});
+
+// Signup schema - enforce password complexity for new accounts
+const signupSchema = z.object({
+  email: emailSchema,
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .max(100, "Password too long")
     .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character"),
-  confirmPassword: z.string().optional()
-}).refine((data) => {
-  // Only validate password match during signup (when confirmPassword is provided)
-  if (data.confirmPassword !== undefined) {
-    return data.password === data.confirmPassword;
-  }
-  return true;
-}, {
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
-  path: ["confirmPassword"]
+  path: ["confirmPassword"],
 });
 
 
@@ -254,11 +255,16 @@ const Auth = () => {
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
-    const result = authSchema.safeParse({ 
-      email: sanitizedEmail, 
-      password,
-      confirmPassword: isLogin ? undefined : confirmPassword 
-    });
+    
+    // Use different schemas for login vs signup
+    // Login: minimal validation - let Supabase verify credentials
+    // Signup: enforce password complexity for new accounts
+    const schema = isLogin ? loginSchema : signupSchema;
+    const dataToValidate = isLogin 
+      ? { email: sanitizedEmail, password }
+      : { email: sanitizedEmail, password, confirmPassword };
+    
+    const result = schema.safeParse(dataToValidate);
     if (!result.success) {
       toast({
         title: "Validation Error",
@@ -310,9 +316,10 @@ const Auth = () => {
         }
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -367,10 +374,11 @@ const Auth = () => {
         setEmail("");
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -616,22 +624,26 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorCode = (error as { code?: string })?.code;
+      const errorStatus = (error as { status?: number })?.status;
+      
       console.error(`[${provider} OAuth] Error caught:`, {
-        message: error.message,
-        code: error.code,
-        status: error.status,
+        message: errorMessage,
+        code: errorCode,
+        status: errorStatus,
         fullError: error
       });
       
       // Handle user cancellation gracefully (don't show error toast)
-      if (error.message?.includes('1001') || error.message?.includes('cancel')) {
+      if (errorMessage?.includes('1001') || errorMessage?.includes('cancel')) {
         console.log(`[${provider} OAuth] User cancelled sign-in`);
         return; // User cancelled, just return silently
       }
       
       toast({
         title: "Error",
-        description: error.message || 'Failed to sign in. Please try again.',
+        description: errorMessage || 'Failed to sign in. Please try again.',
         variant: "destructive",
       });
     } finally {
