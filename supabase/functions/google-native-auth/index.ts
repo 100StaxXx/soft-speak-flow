@@ -151,11 +151,11 @@ serve(async (req) => {
 
     // Extract token from the magic link URL
     const url = new URL(linkData.properties.action_link);
-    const token = url.searchParams.get('token');
+    const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
     const type = url.searchParams.get('type') || 'magiclink';
 
-    if (!token) {
-      throw new Error('Failed to extract token from magic link');
+    if (!tokenHash) {
+      throw new Error('Failed to extract token hash from magic link');
     }
 
     console.log('Token extracted, verifying OTP...');
@@ -164,7 +164,7 @@ serve(async (req) => {
     const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
     
     const { data: verifyData, error: verifyError } = await supabaseClient.auth.verifyOtp({
-      token_hash: token,
+      token_hash: tokenHash,
       type: type as any,
     });
 
