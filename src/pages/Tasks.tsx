@@ -832,6 +832,49 @@ export default function Tasks() {
                       input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 100);
                   }}
+                  onAutoSchedule={async (unscheduledTasks) => {
+                    // Auto-schedule algorithm
+                    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                    const dayTasks = allCalendarTasks.filter(t => t.task_date === dateStr);
+
+                    // Sort: main quest first, then by difficulty (hard → easy)
+                    const sortedTasks = [...unscheduledTasks].sort((a, b) => {
+                      if (a.is_main_quest) return -1;
+                      if (b.is_main_quest) return 1;
+                      const difficultyOrder = { hard: 0, medium: 1, easy: 2 };
+                      const aDiff = difficultyOrder[a.difficulty as keyof typeof difficultyOrder] ?? 1;
+                      const bDiff = difficultyOrder[b.difficulty as keyof typeof difficultyOrder] ?? 1;
+                      return aDiff - bDiff;
+                    });
+
+                    let currentTimeMinutes = 8 * 60; // Start at 8am (in minutes)
+                    const updates = [];
+
+                    for (const task of sortedTasks) {
+                      const duration = task.estimated_duration || 30;
+                      const hours = Math.floor(currentTimeMinutes / 60);
+                      const minutes = currentTimeMinutes % 60;
+                      const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+                      updates.push(
+                        supabase
+                          .from('daily_tasks')
+                          .update({
+                            scheduled_time: timeStr,
+                            estimated_duration: duration
+                          })
+                          .eq('id', task.id)
+                      );
+
+                      // Move to next slot (add duration + 15min buffer)
+                      currentTimeMinutes += duration + 15;
+                      if (currentTimeMinutes > 20 * 60) currentTimeMinutes = 20 * 60; // Cap at 8pm
+                    }
+
+                    await Promise.all(updates);
+                    queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+                    queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+                  }}
                 />
               )}
 
