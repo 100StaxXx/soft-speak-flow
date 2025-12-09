@@ -14,3 +14,5 @@ export { MiniGameTester } from './MiniGameTester';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';
+export { GameHUD, CountdownOverlay, ScorePopup, PauseOverlay } from './GameHUD';
+export { useScreenShake, triggerHaptic } from './gameUtils';
