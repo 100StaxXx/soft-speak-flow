@@ -7,6 +7,9 @@ import { EnergyBeamGame } from './EnergyBeamGame';
 import { TapSequenceGame } from './TapSequenceGame';
 import { BreathSyncGame } from './BreathSyncGame';
 import { QuickSwipeGame } from './QuickSwipeGame';
+import { ConstellationTraceGame } from './ConstellationTraceGame';
+import { ShieldBarrierGame } from './ShieldBarrierGame';
+import { GravityBalanceGame } from './GravityBalanceGame';
 import { EncounterResultScreen } from './EncounterResult';
 import { useCompanion } from '@/hooks/useCompanion';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
@@ -106,9 +109,9 @@ export const AstralEncounterModal = ({
     // For multi-phase battles, use theme-based mini-game rotation
     // Match mini-game to adversary stat type for thematic cohesion
     const themeGameMap: Record<string, MiniGameType[]> = {
-      mind: ['tap_sequence', 'breath_sync'],
-      body: ['energy_beam', 'quick_swipe'],
-      soul: ['breath_sync', 'tap_sequence'],
+      mind: ['tap_sequence', 'gravity_balance'],
+      body: ['energy_beam', 'shield_barrier', 'quick_swipe'],
+      soul: ['breath_sync', 'constellation_trace'],
     };
     
     const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
@@ -141,6 +144,12 @@ export const AstralEncounterModal = ({
         return <BreathSyncGame {...props} />;
       case 'quick_swipe':
         return <QuickSwipeGame {...props} />;
+      case 'constellation_trace':
+        return <ConstellationTraceGame {...props} />;
+      case 'shield_barrier':
+        return <ShieldBarrierGame {...props} />;
+      case 'gravity_balance':
+        return <GravityBalanceGame {...props} />;
       default:
         return <EnergyBeamGame {...props} />;
     }

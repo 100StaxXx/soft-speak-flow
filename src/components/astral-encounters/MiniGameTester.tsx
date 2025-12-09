@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { EnergyBeamGame, TapSequenceGame, BreathSyncGame, QuickSwipeGame } from './index';
+import { EnergyBeamGame } from './EnergyBeamGame';
+import { TapSequenceGame } from './TapSequenceGame';
+import { BreathSyncGame } from './BreathSyncGame';
+import { QuickSwipeGame } from './QuickSwipeGame';
+import { ConstellationTraceGame } from './ConstellationTraceGame';
+import { ShieldBarrierGame } from './ShieldBarrierGame';
+import { GravityBalanceGame } from './GravityBalanceGame';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { Zap, Target, Wind, ArrowUpDown, X } from 'lucide-react';
+import { Zap, Target, Wind, ArrowUpDown, X, Sparkles, Shield, Scale } from 'lucide-react';
 
 const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode }[] = [
   { type: 'energy_beam', label: 'Energy Beam', icon: <Zap className="w-4 h-4" /> },
   { type: 'tap_sequence', label: 'Tap Sequence', icon: <Target className="w-4 h-4" /> },
   { type: 'breath_sync', label: 'Breath Sync', icon: <Wind className="w-4 h-4" /> },
   { type: 'quick_swipe', label: 'Quick Swipe', icon: <ArrowUpDown className="w-4 h-4" /> },
+  { type: 'constellation_trace', label: 'Constellation', icon: <Sparkles className="w-4 h-4" /> },
+  { type: 'shield_barrier', label: 'Shield Barrier', icon: <Shield className="w-4 h-4" /> },
+  { type: 'gravity_balance', label: 'Gravity Balance', icon: <Scale className="w-4 h-4" /> },
 ];
 
 interface MiniGameTesterProps {
@@ -46,6 +55,12 @@ export const MiniGameTester = ({ companionStats = { mind: 10, body: 10, soul: 10
         return <BreathSyncGame {...props} />;
       case 'quick_swipe':
         return <QuickSwipeGame {...props} />;
+      case 'constellation_trace':
+        return <ConstellationTraceGame {...props} />;
+      case 'shield_barrier':
+        return <ShieldBarrierGame {...props} />;
+      case 'gravity_balance':
+        return <GravityBalanceGame {...props} />;
       default:
         return null;
     }

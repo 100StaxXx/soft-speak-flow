@@ -20,6 +20,9 @@ const NAME_PREFIXES: Record<AdversaryTheme, string[]> = {
   overthinking: ['Echo', 'Loop', 'Recursive', 'Tangled'],
   doubt: ['Shadow', 'Whisper', 'Fading', 'Hollow'],
   fear: ['Dread', 'Creeping', 'Lurking', 'Umbral'],
+  confusion: ['Maze', 'Veiled', 'Obscured', 'Fogbound'],
+  vulnerability: ['Exposed', 'Piercing', 'Breaching', 'Unshielded'],
+  imbalance: ['Tilting', 'Wavering', 'Unstable', 'Teetering'],
 };
 
 // Adversary name suffixes by tier
@@ -65,6 +68,18 @@ const LORE_TEMPLATES: Record<AdversaryTheme, string[]> = {
     'Materialized from primal terrors and modern anxieties, it paralyzes the brave.',
     'This ancient adversary has hunted dreamers since the first star was wished upon.',
   ],
+  confusion: [
+    'A living labyrinth, this entity thrives when paths blur and direction fades.',
+    'Born from lost purpose and wandering souls, it delights in disorientation.',
+  ],
+  vulnerability: [
+    'Forged from moments of exposure and defenselessness, it strikes at unguarded hearts.',
+    'This predator hunts those who lower their shields, feeding on raw weakness.',
+  ],
+  imbalance: [
+    'Spawned from tilted scales and unstable foundations, it topples the centered.',
+    'Where equilibrium falters and harmony breaks, this adversary finds its strength.',
+  ],
 };
 
 // Essence names by theme
@@ -77,6 +92,9 @@ const ESSENCE_NAMES: Record<AdversaryTheme, string[]> = {
   overthinking: ['Stillness Essence', 'Simplicity Shard', 'Clarity Core'],
   doubt: ['Confidence Essence', 'Belief Crystal', 'Courage Core'],
   fear: ['Bravery Essence', 'Valor Shard', 'Fearless Core'],
+  confusion: ['Direction Essence', 'Pathfinder Shard', 'Clarity Star'],
+  vulnerability: ['Shield Essence', 'Guardian Core', 'Protection Crystal'],
+  imbalance: ['Equilibrium Essence', 'Stability Shard', 'Center Core'],
 };
 
 // Essence descriptions by theme
@@ -89,6 +107,9 @@ const ESSENCE_DESCRIPTIONS: Record<AdversaryTheme, string> = {
   overthinking: 'Quiets the endless mental chatter.',
   doubt: 'Reinforces self-belief and inner strength.',
   fear: 'Transforms terror into courageous resolve.',
+  confusion: 'Illuminates the path forward with clarity.',
+  vulnerability: 'Fortifies inner defenses and builds resilience.',
+  imbalance: 'Restores harmony and centers the spirit.',
 };
 
 // Get random item from array
@@ -149,7 +170,8 @@ export const getThemeForTrigger = (
   // Random theme for other triggers
   const allThemes: AdversaryTheme[] = [
     'distraction', 'chaos', 'stagnation', 'laziness',
-    'anxiety', 'overthinking', 'doubt', 'fear'
+    'anxiety', 'overthinking', 'doubt', 'fear',
+    'confusion', 'vulnerability', 'imbalance'
   ];
   return randomFrom(allThemes);
 };
