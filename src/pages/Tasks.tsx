@@ -997,6 +997,7 @@ export default function Tasks() {
                             task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER }}
                             onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
                             onDelete={() => deleteTask(mainQuest.id)}
+                            onEdit={() => setEditingTask(mainQuest)}
                             isMainQuest={true}
                             isTutorialQuest={mainQuest.id === tutorialQuestId}
                           />
@@ -1017,6 +1018,7 @@ export default function Tasks() {
                                 task={task}
                                 onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
                                 onDelete={() => deleteTask(task.id)}
+                                onEdit={() => setEditingTask(task)}
                                 onSetMainQuest={() => setMainQuest(task.id)}
                                 showPromoteButton={!mainQuest}
                                 isTutorialQuest={task.id === tutorialQuestId}
