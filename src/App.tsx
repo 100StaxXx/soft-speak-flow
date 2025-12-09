@@ -188,46 +188,48 @@ const AppContent = memo(() => {
   return (
     <ThemeProvider mentorId={resolvedMentorId}>
       <XPProvider>
-        <Suspense fallback={<LoadingFallback />}>
-          <EvolutionAwareContent />
-          <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/auth/reset-password" element={<ResetPassword />} />
-          <Route path="/creator" element={<Creator />} />
-          <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
-          <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
-          
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-          <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
-          <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
-          <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
-          <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
-          <Route path="/join/:code" element={<JoinEpic />} />
-          <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-          <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
-          <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-          <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
-          
-          <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
-          <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-          <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
-          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
-          <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
-          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-          <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
-          <Route path="/partners" element={<Partners />} />
-          <Route path="/account-deletion" element={<AccountDeletionHelp />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        <AstralEncounterProvider>
+          <Suspense fallback={<LoadingFallback />}>
+            <EvolutionAwareContent />
+            <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/creator" element={<Creator />} />
+            <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
+            <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
+            
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+            <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
+            <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+            <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
+            <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+            <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+            <Route path="/join/:code" element={<JoinEpic />} />
+            <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
+            <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
+            <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+            <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
+            
+            <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
+            <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+            <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+            <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
+            <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
+            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
+            <Route path="/partners" element={<Partners />} />
+            <Route path="/account-deletion" element={<AccountDeletionHelp />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AstralEncounterProvider>
       </XPProvider>
     </ThemeProvider>
   );
@@ -250,12 +252,10 @@ const App = () => {
             <Sonner />
             <InstallPWA />
             <AmbientMusicPlayer />
-            <AstralEncounterProvider>
-              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                <ScrollToTop />
-                <AppContent />
-              </BrowserRouter>
-            </AstralEncounterProvider>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <ScrollToTop />
+              <AppContent />
+            </BrowserRouter>
           </TooltipProvider>
         </EvolutionProvider>
       </QueryClientProvider>
