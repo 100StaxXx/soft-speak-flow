@@ -8,11 +8,21 @@ export type AdversaryTheme =
   | 'chaos'
   | 'laziness'
   | 'overthinking'
-  | 'fear';
+  | 'fear'
+  | 'confusion'
+  | 'vulnerability'
+  | 'imbalance';
 
 export type AdversaryTier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
-export type MiniGameType = 'energy_beam' | 'tap_sequence' | 'breath_sync' | 'quick_swipe';
+export type MiniGameType = 
+  | 'energy_beam' 
+  | 'tap_sequence' 
+  | 'breath_sync' 
+  | 'quick_swipe'
+  | 'constellation_trace'
+  | 'shield_barrier'
+  | 'gravity_balance';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -106,6 +116,9 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   overthinking: 'breath_sync',
   doubt: 'quick_swipe',
   fear: 'quick_swipe',
+  confusion: 'constellation_trace',
+  vulnerability: 'shield_barrier',
+  imbalance: 'gravity_balance',
 };
 
 // Theme to stat mapping
@@ -118,6 +131,9 @@ export const THEME_STAT_MAP: Record<AdversaryTheme, 'mind' | 'body' | 'soul'> = 
   overthinking: 'soul',
   doubt: 'mind',
   fear: 'body',
+  confusion: 'soul',
+  vulnerability: 'body',
+  imbalance: 'mind',
 };
 
 // Tier configurations
