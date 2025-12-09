@@ -15,4 +15,14 @@ export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';
 export { GameHUD, CountdownOverlay, ScorePopup, PauseOverlay } from './GameHUD';
-export { useScreenShake, triggerHaptic } from './gameUtils';
+export { 
+  useScreenShake, 
+  triggerHaptic, 
+  useGameLoop, 
+  useGameTimer, 
+  useParticleSystem, 
+  useStaticStars,
+  useDebouncedCallback,
+  getGridPositions,
+  shakeKeyframes 
+} from './gameUtils';
