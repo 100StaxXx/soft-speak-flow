@@ -7,6 +7,12 @@ interface AstralEncounterProviderProps {
   children: React.ReactNode;
 }
 
+interface EpicCheckpointEventDetail {
+  epicId: string;
+  previousProgress: number;
+  currentProgress: number;
+}
+
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
   const {
     activeEncounter,
@@ -16,7 +22,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     completeEncounter,
   } = useAstralEncounters();
 
-  const { checkQuestMilestone, checkWeeklyTrigger } = useEncounterTrigger();
+  const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
 
   // Listen for quest completion events
   const handleQuestCompleted = useCallback(async () => {
@@ -50,6 +56,30 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     window.addEventListener('quest-completed', handleQuestCompleted);
     return () => window.removeEventListener('quest-completed', handleQuestCompleted);
   }, [handleQuestCompleted]);
+
+  const handleEpicCheckpointEvent = useCallback(
+    async (event: CustomEvent<EpicCheckpointEventDetail>) => {
+      if (!event.detail) return;
+      const { epicId, previousProgress, currentProgress } = event.detail;
+      const result = await checkEpicCheckpoint(epicId, previousProgress, currentProgress);
+      if (result.shouldTrigger && result.triggerType) {
+        checkEncounterTrigger(
+          result.triggerType,
+          result.sourceId,
+          result.epicProgress,
+          result.epicCategory
+        );
+      }
+    },
+    [checkEpicCheckpoint, checkEncounterTrigger]
+  );
+
+  useEffect(() => {
+    const listener = (event: Event) =>
+      handleEpicCheckpointEvent(event as CustomEvent<EpicCheckpointEventDetail>);
+    window.addEventListener('epic-progress-checkpoint', listener as EventListener);
+    return () => window.removeEventListener('epic-progress-checkpoint', listener as EventListener);
+  }, [handleEpicCheckpointEvent]);
 
   const handleComplete = useCallback((params: {
     encounterId: string;

@@ -25,8 +25,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
-import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
-import { useAstralEncounters } from "@/hooks/useAstralEncounters";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -83,7 +81,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
   const { checkEpicCheckpoint } = useEncounterTrigger();
-  const { checkEncounterTrigger } = useAstralEncounters();
   
   // Initialize to -1 on first render to catch any milestones that may have been
   // crossed before this component mounted. Server handles duplicate prevention.
@@ -152,17 +149,21 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     // Update ref for next comparison
     previousProgressRef.current = currentProgress;
     
-    // Check for Astral Encounter trigger on epic milestone crossings
+    // Dispatch event for Astral Encounter trigger on epic milestone crossings
     if (encounterCheckRef.current !== currentProgress && currentProgress > 0) {
-      const prevCheck = encounterCheckRef.current;
+      const prevCheck = encounterCheckRef.current < 0 ? 0 : encounterCheckRef.current;
       encounterCheckRef.current = currentProgress;
-      checkEpicCheckpoint(epic.id, prevCheck < 0 ? 0 : prevCheck, currentProgress).then(result => {
-        if (result.shouldTrigger && result.triggerType) {
-          checkEncounterTrigger(result.triggerType, result.sourceId, result.epicProgress, result.epicCategory);
-        }
-      });
+      window.dispatchEvent(
+        new CustomEvent('epic-progress-checkpoint', {
+          detail: {
+            epicId: epic.id,
+            previousProgress: prevCheck,
+            currentProgress,
+          },
+        })
+      );
     }
-  }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard, checkEpicCheckpoint, checkEncounterTrigger]);
+  }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 
   const handleShareEpic = async () => {
     if (!epic.invite_code) return;
