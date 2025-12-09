@@ -1,7 +1,9 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useAstralEncounters } from '@/hooks/useAstralEncounters';
 import { useEncounterTrigger } from '@/hooks/useEncounterTrigger';
 import { AstralEncounterModal } from './AstralEncounterModal';
+import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
+import { AdversaryTier, TriggerType } from '@/types/astralEncounters';
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;
@@ -14,6 +16,9 @@ interface EpicCheckpointEventDetail {
 }
 
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
+  const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
+  const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
+
   const {
     activeEncounter,
     showEncounterModal,
@@ -24,11 +29,39 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
   const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
 
+  // Wrap checkEncounterTrigger to show overlay first
+  const triggerEncounterWithOverlay = useCallback(async (
+    triggerType: TriggerType,
+    sourceId?: string,
+    epicProgress?: number,
+    epicCategory?: string,
+    questInterval?: number
+  ) => {
+    // Start by triggering the encounter logic (which generates the adversary)
+    await checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
+  }, [checkEncounterTrigger]);
+
+  // Watch for activeEncounter changes to show overlay
+  useEffect(() => {
+    if (activeEncounter?.adversary && !showEncounterModal) {
+      // Set the tier for the overlay
+      setPendingTier(activeEncounter.adversary.tier as AdversaryTier);
+      // Show the trigger overlay
+      setShowTriggerOverlay(true);
+    }
+  }, [activeEncounter, showEncounterModal]);
+
+  const handleTriggerOverlayComplete = useCallback(() => {
+    setShowTriggerOverlay(false);
+    // Now show the actual encounter modal
+    setShowEncounterModal(true);
+  }, [setShowEncounterModal]);
+
   // Listen for quest completion events
   const handleQuestCompleted = useCallback(async () => {
     const result = await checkQuestMilestone();
     if (result.shouldTrigger && result.triggerType) {
-      checkEncounterTrigger(
+      triggerEncounterWithOverlay(
         result.triggerType,
         result.sourceId,
         result.epicProgress,
@@ -36,7 +69,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         result.questInterval
       );
     }
-  }, [checkQuestMilestone, checkEncounterTrigger]);
+  }, [checkQuestMilestone, triggerEncounterWithOverlay]);
 
   // Check for weekly trigger on mount
   useEffect(() => {
@@ -45,12 +78,12 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
       if (result.shouldTrigger && result.triggerType) {
         // Delay slightly to avoid immediate popup on app load
         setTimeout(() => {
-          checkEncounterTrigger(result.triggerType!);
+          triggerEncounterWithOverlay(result.triggerType!);
         }, 3000);
       }
     };
     checkWeekly();
-  }, [checkWeeklyTrigger, checkEncounterTrigger]);
+  }, [checkWeeklyTrigger, triggerEncounterWithOverlay]);
 
   // Listen for quest-completed events
   useEffect(() => {
@@ -64,7 +97,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
       const { epicId, previousProgress, currentProgress } = event.detail;
       const result = await checkEpicCheckpoint(epicId, previousProgress, currentProgress);
       if (result.shouldTrigger && result.triggerType) {
-        checkEncounterTrigger(
+        triggerEncounterWithOverlay(
           result.triggerType,
           result.sourceId,
           result.epicProgress,
@@ -72,7 +105,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         );
       }
     },
-    [checkEpicCheckpoint, checkEncounterTrigger]
+    [checkEpicCheckpoint, triggerEncounterWithOverlay]
   );
 
   useEffect(() => {
@@ -93,6 +126,15 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
   return (
     <>
       {children}
+      
+      {/* Epic trigger animation overlay */}
+      <AstralEncounterTriggerOverlay
+        isVisible={showTriggerOverlay}
+        tier={pendingTier}
+        onComplete={handleTriggerOverlayComplete}
+      />
+
+      {/* Main encounter modal */}
       <AstralEncounterModal
         open={showEncounterModal}
         onOpenChange={setShowEncounterModal}
