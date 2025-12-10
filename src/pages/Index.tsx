@@ -25,7 +25,7 @@ type IndexProps = {
   enableOnboardingGuard?: boolean;
 };
 
-const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
+const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
