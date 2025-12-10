@@ -5,7 +5,7 @@
 # ============================================
 # Run this after applying migrations to update types
 
-PROJECT_ID="opbfpbbqvuksuuvmtmssd"
+PROJECT_ID="opbfpbbqvuksuvmtmssd"
 OUTPUT_FILE="src/integrations/supabase/types.ts"
 
 echo "================================================"
