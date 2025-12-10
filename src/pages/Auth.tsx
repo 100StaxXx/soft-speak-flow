@@ -215,9 +215,9 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
-        // Skip INITIAL_SESSION if checkSession already handled the redirect
-        if (event === 'INITIAL_SESSION' && hasRedirected.current) {
-          console.log('[Auth onAuthStateChange] Skipping INITIAL_SESSION - already redirected by checkSession');
+        // Skip if already redirected by direct OAuth call, checkSession, or previous event
+        if (hasRedirected.current) {
+          console.log(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
           return;
         }
         
