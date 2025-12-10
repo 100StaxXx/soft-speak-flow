@@ -27,7 +27,7 @@ import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 
 // Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
+const Home = lazy(() => import("./pages/Home"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -197,7 +197,7 @@ const AppContent = memo(() => {
             <Route path="/creator" element={<Creator />} />
             <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
             <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
             
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

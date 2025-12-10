@@ -15,7 +15,7 @@ export const BottomNav = memo(() => {
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
-  const { data: selectedMentor } = useQuery({
+  const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
     enabled: !!resolvedMentorId,
     staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
@@ -50,7 +50,9 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              {selectedMentor ? (
+              {mentorLoading ? (
+                <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
+              ) : selectedMentor ? (
                 <MentorAvatar
                   mentorSlug={selectedMentor.slug || ''}
                   mentorName={selectedMentor.name}
