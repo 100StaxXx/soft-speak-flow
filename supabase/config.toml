@@ -3,6 +3,9 @@ project_id = "opbfpbbqvuksuvmtmssd"
 [functions.delete-user-account]
 verify_jwt = true
 
+[functions.delete-user]
+verify_jwt = true
+
 [functions.generate-cosmic-postcard]
 verify_jwt = true
 
