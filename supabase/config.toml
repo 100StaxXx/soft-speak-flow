@@ -1,5 +1,14 @@
 project_id = "opbfpbbqvuksuvmtmssd"
 
+[auth]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = false
+max_frequency = "1s"
+
 [functions.delete-user-account]
 verify_jwt = true
 
