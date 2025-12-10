@@ -23,7 +23,7 @@ const authSchema = z.object({
     .email("Invalid email address")
     .min(3, "Email too short")
     .max(255, "Email too long")
-    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
+    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .max(100, "Password too long")
