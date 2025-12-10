@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { NativePurchases } from '@capgo/native-purchases';
 
 // Type definitions for IAP plugin responses
@@ -79,4 +80,13 @@ export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> =
     console.error('Get products failed:', error);
     return [];
   }
+};
+
+export const openManageSubscriptions = async (): Promise<void> => {
+  if (isIAPAvailable()) {
+    await NativePurchases.manageSubscriptions();
+    return;
+  }
+
+  await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' });
 };
