@@ -104,7 +104,14 @@ export const GlobalEvolutionListener = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          // Successfully subscribed to realtime updates
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Log but don't crash - realtime is a nice-to-have for evolution animation
+          console.warn('Evolution listener subscription error:', status, err?.message);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

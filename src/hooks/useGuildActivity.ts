@@ -53,7 +53,11 @@ export const useGuildActivity = (epicId?: string) => {
           queryClient.invalidateQueries({ queryKey: ["guild-activity", epicId] });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Guild activity subscription error:', status, err?.message);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

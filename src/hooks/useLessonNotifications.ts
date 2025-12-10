@@ -38,7 +38,11 @@ export function useLessonNotifications() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Lesson notifications subscription error:', status, err?.message);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
