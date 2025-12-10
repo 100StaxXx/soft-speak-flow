@@ -98,7 +98,11 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
         { event: '*', schema: 'public', table: 'epic_members', filter: `epic_id=eq.${epicId}` },
         () => fetchMembers()
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Guild members subscription error:', status, err?.message);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

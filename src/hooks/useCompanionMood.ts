@@ -67,7 +67,7 @@ export const useCompanionMood = () => {
           .eq('user_id', user.id);
 
         queryClient.invalidateQueries({ queryKey: ['companion-mood'] });
-        queryClient.invalidateQueries({ queryKey: ['user-companion'] });
+        queryClient.invalidateQueries({ queryKey: ['companion'] });
       }
     };
 
@@ -86,7 +86,11 @@ export const useCompanionMood = () => {
           updateCompanionMood();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Companion mood subscription error:', status, err?.message);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
