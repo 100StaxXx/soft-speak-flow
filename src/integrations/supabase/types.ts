@@ -4182,6 +4182,7 @@ export type Database = {
         Args: { current_stage: number }
         Returns: number
       }
+      get_user_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
