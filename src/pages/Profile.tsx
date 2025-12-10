@@ -197,7 +197,7 @@ const Profile = () => {
         throw new Error("Session expired. Please sign in again.");
       }
 
-      const { error } = await supabase.functions.invoke("delete-user-account", {
+      const { error } = await supabase.functions.invoke("delete-user", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -206,6 +206,7 @@ const Profile = () => {
         throw new Error(error.message || "Unable to delete account");
       }
 
+      queryClient.clear();
       setShowDeleteDialog(false);
       setDeleteConfirmationText("");
       toast({
@@ -496,13 +497,16 @@ const Profile = () => {
                     This action cannot be undone. You will lose access to your companion, streaks, referrals, and any
                     personalized content tied to this account.
                   </p>
-                <Button
-                  variant="link"
-                  className="px-0 text-sm text-primary"
-                  onClick={() => navigate("/account-deletion")}
-                >
-                  How account deletion works
-                </Button>
+                  <p className="text-sm text-muted-foreground">
+                    You can delete your account at any time. This will permanently remove your data from our servers.
+                  </p>
+                  <Button
+                    variant="link"
+                    className="px-0 text-sm text-primary"
+                    onClick={() => navigate("/account-deletion")}
+                  >
+                    How account deletion works
+                  </Button>
                   <AlertDialog
                     open={showDeleteDialog}
                     onOpenChange={(open) => {
@@ -520,15 +524,15 @@ const Profile = () => {
                         disabled={isDeletingAccount}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
-                        {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                        {isDeletingAccount ? "Deleting..." : "Delete account"}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete your account, your companion progress, and your saved data. This
-                          action cannot be undone.
+                          This will permanently delete your account, your companion, and your progress. This can&apos;t be
+                          undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <div className="space-y-2">
@@ -555,7 +559,7 @@ const Profile = () => {
                           onClick={handleDeleteAccount}
                           disabled={isDeletingAccount || !isDeleteConfirmationValid}
                         >
-                          {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                          {isDeletingAccount ? "Deleting..." : "Delete account"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
