@@ -385,11 +385,23 @@ const Auth = () => {
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
-    
+
     try {
       const isNative = Capacitor.isNativePlatform();
       const platform = Capacitor.getPlatform?.() ?? 'web';
       const providerSupportsNative = provider === 'google' ? isNative : (isNative && platform === 'ios');
+
+      // Validate Apple sign-in is only attempted on iOS with native plugin
+      if (provider === 'apple' && (!isNative || platform !== 'ios' || !appleNativeReady)) {
+        console.error('[Apple OAuth] Apple sign-in is only supported on iOS devices');
+        toast({
+          title: "Apple Sign-In Not Available",
+          description: "Apple sign-in is only available on iOS devices. Please use Google sign-in or email/password.",
+          variant: "destructive",
+        });
+        setOauthLoading(null);
+        return;
+      }
 
       // Native Google Sign-In for iOS/Android
       if (provider === 'google' && providerSupportsNative && googleNativeReady) {
@@ -748,8 +760,9 @@ const Auth = () => {
                   <span className="h-px flex-1 bg-obsidian/40" />
                 </div>
                 <div className="grid gap-3">
-                  {/* Apple Sign In - Full width, prominent */}
-                  <Button
+                  {/* Apple Sign In - Only show on iOS with native support */}
+                  {appleNativeReady && (
+                    <Button
                     type="button"
                     variant="secondary"
                     size="lg"
@@ -768,6 +781,7 @@ const Auth = () => {
                       {oauthLoading === 'apple' ? 'Signing in...' : 'Continue with Apple'}
                     </span>
                   </Button>
+                  )}
 
                   {/* Google Sign In - Full width */}
                   <Button
