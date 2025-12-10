@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
 import { NativePurchases } from '@capgo/native-purchases';
 
 // Type definitions for IAP plugin responses
@@ -88,5 +87,5 @@ export const openManageSubscriptions = async (): Promise<void> => {
     return;
   }
 
-  await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' });
+  window.open('https://apps.apple.com/account/subscriptions', '_blank');
 };
