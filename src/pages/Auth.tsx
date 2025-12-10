@@ -49,6 +49,12 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  // Detect OAuth callback on mount to show loading state immediately
+  const [isProcessingCallback, setIsProcessingCallback] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const url = new URL(window.location.href);
+    return url.searchParams.has("code") || url.hash.includes("access_token");
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -156,6 +162,8 @@ const Auth = () => {
 
   // Handle OAuth callback parameters that return the user to /auth with a valid code/token
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+
     const handleOAuthCallback = async () => {
       if (typeof window === "undefined" || hasRedirected.current) return;
 
@@ -166,12 +174,43 @@ const Auth = () => {
       // Only run when coming back from an OAuth provider
       if (!code && !hasAccessToken) return;
 
+      // Show loading state during callback processing
+      setIsProcessingCallback(true);
+      console.log("[OAuth Callback] Processing callback, code:", !!code, "hasAccessToken:", hasAccessToken);
+
+      // Safety timeout: if callback takes more than 15 seconds, show error and reset
+      timeoutId = setTimeout(() => {
+        if (!hasRedirected.current) {
+          console.error("[OAuth Callback] Timeout - callback took too long");
+          setIsProcessingCallback(false);
+          toast({
+            title: "Sign in taking too long",
+            description: "Please try again. If the problem persists, check your internet connection.",
+            variant: "destructive",
+          });
+          // Clean up URL parameters
+          url.searchParams.delete("code");
+          window.location.hash = "";
+          window.history.replaceState(window.history.state, "", url.pathname);
+        }
+      }, 15000);
+
       try {
-        // If Supabase didn't automatically exchange the code, do it manually
         if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-          await handlePostAuthNavigation(data.session, "oauthCodeExchange");
+          // First check if Supabase has already auto-exchanged the code
+          // (detectSessionInUrl: true is the default behavior)
+          const { data: { session: existingSession } } = await supabase.auth.getSession();
+
+          if (existingSession) {
+            console.log("[OAuth Callback] Session already exists from auto-exchange");
+            await handlePostAuthNavigation(existingSession, "oauthAutoExchange");
+          } else {
+            // Supabase didn't auto-exchange, do it manually
+            console.log("[OAuth Callback] Manually exchanging code for session");
+            const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) throw error;
+            await handlePostAuthNavigation(data.session, "oauthCodeExchange");
+          }
         } else {
           // Hash-based tokens (implicit flow)
           const { data: { session } } = await supabase.auth.getSession();
@@ -181,12 +220,17 @@ const Auth = () => {
         }
       } catch (error) {
         console.error("[OAuth Callback] Failed to complete OAuth login:", error);
-        toast({
-          title: "Error",
-          description: "Something went wrong signing you in. Please try again.",
-          variant: "destructive",
-        });
+        // Only show error if we haven't already redirected (prevents flash of error on success)
+        if (!hasRedirected.current) {
+          toast({
+            title: "Error",
+            description: "Something went wrong signing you in. Please try again.",
+            variant: "destructive",
+          });
+        }
       } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+        setIsProcessingCallback(false);
         // Clean up URL parameters to avoid re-processing on re-render
         if (code) {
           url.searchParams.delete("code");
@@ -199,11 +243,24 @@ const Auth = () => {
     };
 
     handleOAuthCallback();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [handlePostAuthNavigation, toast]);
 
   // Separate effect for session check and auth state listener
   useEffect(() => {
     const checkSession = async () => {
+      // Skip session check if we're processing an OAuth callback
+      // The callback handler will manage navigation
+      const url = new URL(window.location.href);
+      const hasOAuthParams = url.searchParams.has("code") || url.hash.includes("access_token");
+      if (hasOAuthParams) {
+        console.log("[Auth checkSession] Skipping - OAuth callback will handle session");
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await handlePostAuthNavigation(session, 'checkSession');
@@ -676,9 +733,9 @@ const Auth = () => {
                 <Button
                   type="submit"
                   className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
-                  disabled={loading}
+                  disabled={loading || isProcessingCallback}
                 >
-                  {loading ? "Sending..." : "Send Reset Link"}
+                  {loading || isProcessingCallback ? "Sending..." : "Send Reset Link"}
                 </Button>
               </form>
             ) : (
@@ -733,9 +790,9 @@ const Auth = () => {
                 <Button
                   type="submit"
                   className="w-full bg-royal-purple hover:bg-accent-purple text-pure-white font-bold h-12 text-lg"
-                  disabled={loading}
+                  disabled={loading || isProcessingCallback}
                 >
-                  {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
+                  {loading || isProcessingCallback ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
                 </Button>
               </form>
             )}
@@ -755,9 +812,9 @@ const Auth = () => {
                     size="lg"
                     className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-obsidian to-black text-pure-white border border-white/10 shadow-lg shadow-royal-purple/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('apple')}
-                    disabled={loading || oauthLoading !== null}
+                    disabled={loading || oauthLoading !== null || isProcessingCallback}
                   >
-                    {oauthLoading === 'apple' ? (
+                    {oauthLoading === 'apple' || isProcessingCallback ? (
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-obsidian border-t-transparent" />
                     ) : (
                       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -765,7 +822,7 @@ const Auth = () => {
                       </svg>
                     )}
                     <span className="text-base font-semibold">
-                      {oauthLoading === 'apple' ? 'Signing in...' : 'Continue with Apple'}
+                      {oauthLoading === 'apple' || isProcessingCallback ? 'Signing in...' : 'Continue with Apple'}
                     </span>
                   </Button>
 
@@ -776,9 +833,9 @@ const Auth = () => {
                     size="lg"
                     className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-pure-white to-slate-100 text-obsidian border border-steel/30 shadow-md shadow-obsidian/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading !== null}
+                    disabled={loading || oauthLoading !== null || isProcessingCallback}
                   >
-                    {oauthLoading === 'google' ? (
+                    {oauthLoading === 'google' || isProcessingCallback ? (
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-pure-white border-t-transparent" />
                     ) : (
                       <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -789,7 +846,7 @@ const Auth = () => {
                       </svg>
                     )}
                     <span className="text-base font-semibold">
-                      {oauthLoading === 'google' ? 'Signing in...' : 'Continue with Google'}
+                      {oauthLoading === 'google' || isProcessingCallback ? 'Signing in...' : 'Continue with Google'}
                     </span>
                   </Button>
                 </div>
