@@ -632,6 +632,36 @@ const Auth = () => {
         console.log(`[${provider} OAuth] User cancelled sign-in`);
         return; // User cancelled, just return silently
       }
+
+      // Handle Apple Sign-In error code 1000 (unknown/configuration error)
+      if (error.message?.includes('1000') || error.message?.includes('AuthorizationError')) {
+        console.log(`[${provider} OAuth] Apple authorization error - likely configuration issue`);
+        toast({
+          title: "Sign-In Unavailable",
+          description: "Apple Sign-In is temporarily unavailable. Please try again or use email sign-in.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Handle network/server connection errors
+      const isNetworkError = 
+        error.message?.includes('hostname could not be found') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('NetworkError') ||
+        error.message?.includes('network request failed') ||
+        error.message?.includes('access control checks') ||
+        error.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.log(`[${provider} OAuth] Network error detected`);
+        toast({
+          title: "Connection Error",
+          description: "Unable to connect to the server. Please check your internet connection and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       toast({
         title: "Error",
