@@ -1,13 +1,31 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
-import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
-import { SocialLogin } from '@capgo/capacitor-social-login';
 import type { Session } from "@/hooks/useAuth";
 import { signUp, signIn, resetPassword, signInWithGoogle, signInWithGoogleCredential, signInWithAppleCredential } from "@/lib/firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
 import { convertFirebaseUser } from "@/lib/firebase/auth";
 import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
+
+// Dynamic imports for Capacitor plugins to improve initial load time
+let SignInWithApple: typeof import('@capacitor-community/apple-sign-in').SignInWithApple;
+let SocialLogin: typeof import('@capgo/capacitor-social-login').SocialLogin;
+type SignInWithAppleResponse = import('@capacitor-community/apple-sign-in').SignInWithAppleResponse;
+
+const loadCapacitorPlugins = async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const [applePlugin, socialPlugin] = await Promise.all([
+        import('@capacitor-community/apple-sign-in'),
+        import('@capgo/capacitor-social-login')
+      ]);
+      SignInWithApple = applePlugin.SignInWithApple;
+      SocialLogin = socialPlugin.SocialLogin;
+    } catch (error) {
+      console.warn('[Auth] Failed to load Capacitor plugins:', error);
+    }
+  }
+};
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -190,12 +208,18 @@ const Auth = () => {
   }, [location.pathname]);
 
   // Separate effect for OAuth initialization to prevent re-renders
+  // Load plugins dynamically to improve initial page load
   useEffect(() => {
     if (initializationComplete.current) return;
 
     const initializeAuth = async () => {
+      // Load Capacitor plugins only if on native platform
+      if (Capacitor.isNativePlatform()) {
+        await loadCapacitorPlugins();
+      }
+
       // Initialize SocialLogin plugin for native platforms
-      if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('SocialLogin')) {
+      if (Capacitor.isNativePlatform() && SocialLogin && Capacitor.isPluginAvailable('SocialLogin')) {
         try {
           const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
           const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
@@ -231,7 +255,10 @@ const Auth = () => {
       initializationComplete.current = true;
     };
 
-    initializeAuth();
+    // Defer initialization slightly to allow page to render first
+    setTimeout(() => {
+      initializeAuth();
+    }, 0);
   }, []); // No dependencies - run only once
 
   useEffect(() => {
@@ -427,7 +454,7 @@ const Auth = () => {
       const providerSupportsNative = provider === 'google' ? isNative : (isNative && platform === 'ios');
 
       // Native Google Sign-In for iOS/Android
-      if (provider === 'google' && providerSupportsNative && googleNativeReady) {
+      if (provider === 'google' && providerSupportsNative && googleNativeReady && SocialLogin) {
         console.log('[Google OAuth] Initiating native Google sign-in with Firebase');
         
         const result = await SocialLogin.login({
@@ -474,7 +501,7 @@ const Auth = () => {
       }
 
       // Native Apple Sign-In for iOS
-      if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
+      if (provider === 'apple' && providerSupportsNative && appleNativeReady && SignInWithApple) {
         console.log('[Apple OAuth] Initiating native Apple sign-in with Firebase');
         
         // Generate secure random nonce for Firebase
