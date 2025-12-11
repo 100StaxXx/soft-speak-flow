@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, Suspense, lazy, memo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
@@ -241,6 +243,22 @@ const App = () => {
   useEffect(() => {
     // Lock orientation to portrait on native apps
     lockToPortrait();
+  }, []);
+
+  // Firebase auth state listener
+  useEffect(() => {
+    try {
+      if (!firebaseAuth) {
+        console.error('Firebase auth not initialized - check your .env file');
+        return;
+      }
+      const unsub = onAuthStateChanged(firebaseAuth, (user) => {
+        console.log("🔥 Firebase auth state:", user ? user.email : "logged out");
+      });
+      return () => unsub();
+    } catch (error) {
+      console.error("Firebase auth listener error:", error);
+    }
   }, []);
 
   return (

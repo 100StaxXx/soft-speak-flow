@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { 
+  generateMentorAudio, 
+  generateCompanionImage, 
+  generateSampleCard, 
+  generateCosmicPostcard,
+  generateCompletePepTalk
+} from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,13 +131,13 @@ const Admin = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc("has_role", {
-        _user_id: user.id,
-        _role: "admin",
-      });
-
-      if (error || !data) {
-        console.debug('Admin check failed', { error, data, userId: user.id });
+      // TODO: Migrate admin role check to Firestore custom claims or a user_roles collection
+      // For now, check if user has admin role in profile or custom claims
+      const profile = await getDocument("profiles", user.uid);
+      const isAdminUser = profile?.role === "admin" || profile?.is_admin === true;
+      
+      if (!isAdminUser) {
+        console.debug('Admin check failed', { userId: user.uid });
         toast.error("Access Denied: You don't have permission to access this page.");
         setIsAdmin(false);
         setAuthLoading(false);
@@ -152,29 +159,27 @@ const Admin = () => {
   }, [isAdmin]);
 
   const fetchMentors = async () => {
-    const { data, error } = await supabase
-      .from("mentors")
-      .select("*")
-      .order("name");
-
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from("mentors")
+        .select("*")
+        .order("name", { ascending: true });
+      
+      if (error) throw error;
+      setMentors(data || []);
+    } catch (error) {
+      console.error("Error fetching mentors:", error);
       toast.error("Failed to load mentors");
-      return;
     }
-    setMentors(data || []);
   };
 
   const fetchPepTalks = async () => {
-    const { data, error } = await supabase
-      .from("pep_talks")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
+    try {
+      const data = await getDocuments("pep_talks", undefined, "created_at", "desc");
+      setPepTalks(data || []);
+    } catch (error) {
       toast.error("Failed to load pep talks");
-      return;
     }
-    setPepTalks(data || []);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,17 +200,13 @@ const Admin = () => {
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError, data } = await supabase.storage
-        .from("pep-talk-audio")
-        .upload(filePath, audioFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("pep-talk-audio")
-        .getPublicUrl(filePath);
-
-      return publicUrl;
+      // TODO: Migrate to Firebase Storage
+      // const storageRef = ref(storage, `pep-talk-audio/${filePath}`);
+      // await uploadBytes(storageRef, audioFile);
+      // const publicUrl = await getDownloadURL(storageRef);
+      // return publicUrl;
+      
+      throw new Error("Audio upload needs Firebase Storage migration");
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload audio file");
@@ -242,27 +243,22 @@ const Admin = () => {
       audio_url: audioUrl || formData.audio_url,
     };
 
-    if (editingId) {
-      const { error } = await supabase
-        .from("pep_talks")
-        .update(pepTalkData)
-        .eq("id", editingId);
-
-      if (error) {
-        toast.error("Failed to update pep talk");
-        setUploading(false);
-        return;
+    try {
+      if (editingId) {
+        await updateDocument("pep_talks", editingId, pepTalkData);
+        toast.success("Pep talk updated successfully");
+      } else {
+        const pepTalkId = `pep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await setDocument("pep_talks", pepTalkId, {
+          id: pepTalkId,
+          ...pepTalkData,
+        }, false);
+        toast.success("Pep talk created successfully");
       }
-      toast.success("Pep talk updated successfully");
-    } else {
-      const { error } = await supabase.from("pep_talks").insert([pepTalkData]);
-
-      if (error) {
-        toast.error("Failed to create pep talk");
-        setUploading(false);
-        return;
-      }
-      toast.success("Pep talk created successfully");
+    } catch (error) {
+      toast.error(editingId ? "Failed to update pep talk" : "Failed to create pep talk");
+      setUploading(false);
+      return;
     }
 
     setIsPreview(false);
@@ -299,15 +295,13 @@ const Admin = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this pep talk?")) return;
 
-    const { error } = await supabase.from("pep_talks").delete().eq("id", id);
-
-    if (error) {
+    try {
+      await deleteDocument("pep_talks", id);
+      toast.success("Pep talk deleted successfully");
+      fetchPepTalks();
+    } catch (error) {
       toast.error("Failed to delete pep talk");
-      return;
     }
-
-    toast.success("Pep talk deleted successfully");
-    fetchPepTalks();
   };
 
   const resetForm = () => {
@@ -352,14 +346,10 @@ const Admin = () => {
 
     setPreviewingVoice(mentorSlug);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-mentor-audio", {
-        body: {
-          mentorSlug,
-          script: previewText,
-        },
+      const data = await generateMentorAudio({
+        mentorSlug,
+        script: previewText,
       });
-
-      if (error) throw error;
 
       // Play the audio (unless globally muted)
       if (!globalAudio.getMuted()) {
@@ -395,20 +385,16 @@ const Admin = () => {
     setGeneratedPrompt(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-companion-image", {
-        body: {
-          spiritAnimal: companionTestData.spiritAnimal,
-          element: companionTestData.element,
-          stage: companionTestData.stage,
-          favoriteColor: companionTestData.favoriteColor,
-          eyeColor: companionTestData.eyeColor || undefined,
-          furColor: companionTestData.furColor || undefined,
-        },
+      const data = await generateCompanionImage({
+        companionId: "test",
+        stage: companionTestData.stage || 0,
+        species: companionTestData.spiritAnimal,
+        element: companionTestData.element,
+        color: companionTestData.favoriteColor,
       });
 
-      if (error) throw error;
-
-      setGeneratedCompanionImage(data.imageUrl);
+      const imageUrl = data?.imageData?.imageUrl || data?.imageUrl;
+      setGeneratedCompanionImage(imageUrl);
       setGeneratedPrompt(data.prompt || "Prompt not returned");
       toast.success("Companion image generated successfully!");
     } catch (error) {
@@ -424,22 +410,11 @@ const Admin = () => {
     setGeneratedSampleCard(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-sample-card", {
-        body: {
-          spiritAnimal: sampleCardData.spiritAnimal,
-          element: sampleCardData.element,
-          stage: sampleCardData.stage,
-          favoriteColor: sampleCardData.favoriteColor,
-          eyeColor: sampleCardData.eyeColor || undefined,
-          furColor: sampleCardData.furColor || undefined,
-          mind: sampleCardData.mind,
-          body: sampleCardData.body,
-          soul: sampleCardData.soul,
-          customName: sampleCardData.customName || undefined,
-        },
+      const data = await generateSampleCard({
+        species: sampleCardData.spiritAnimal,
+        element: sampleCardData.element,
+        stage: sampleCardData.stage,
       });
-
-      if (error) throw error;
 
       setGeneratedSampleCard(data.card);
       toast.success("Sample card generated!");
@@ -461,45 +436,30 @@ const Admin = () => {
       // If no source image provided, generate a companion image first
       if (!sourceImageUrl) {
         toast.info("Generating companion image first...");
-        const { data: companionData, error: companionError } = await supabase.functions.invoke("generate-companion-image", {
-          body: {
-            spiritAnimal: postcardTestData.spiritAnimal,
-            element: postcardTestData.element,
-            stage: 5,
-            favoriteColor: postcardTestData.favoriteColor,
-            eyeColor: postcardTestData.eyeColor,
-            furColor: postcardTestData.furColor,
-          },
+        const companionData = await generateCompanionImage({
+          companionId: "test",
+          stage: 5,
+          species: postcardTestData.spiritAnimal,
+          element: postcardTestData.element,
+          color: postcardTestData.favoriteColor,
         });
-
-        if (companionError) throw companionError;
-        sourceImageUrl = companionData.imageUrl;
+        sourceImageUrl = companionData?.imageData?.imageUrl || companionData?.imageUrl;
         toast.success("Companion image generated!");
       }
 
       toast.info("Generating cosmic postcard...");
       
-      const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard-test", {
-        body: {
-          milestonePercent: postcardTestData.milestonePercent,
-          sourceImageUrl,
-          companionData: {
-            spirit_animal: postcardTestData.spiritAnimal,
-            core_element: postcardTestData.element,
-            favorite_color: postcardTestData.favoriteColor,
-            eye_color: postcardTestData.eyeColor,
-            fur_color: postcardTestData.furColor,
-          },
-        },
+      const data = await generateCosmicPostcard({
+        companionId: "test",
+        occasion: `Milestone: ${postcardTestData.milestonePercent}%`,
       });
 
-      if (error) throw error;
-
+      const postcard = data?.postcard || data;
       setGeneratedPostcard({
-        imageUrl: data.imageUrl,
-        locationName: data.locationName,
-        locationDescription: data.locationDescription,
-        caption: data.caption,
+        imageUrl: postcard.imageUrl || postcard.imageData?.imageUrl,
+        locationName: postcard.locationName,
+        locationDescription: postcard.locationDescription,
+        caption: postcard.caption,
       });
       toast.success(`Postcard generated at ${data.locationName}!`);
     } catch (error: any) {
@@ -526,39 +486,27 @@ const Admin = () => {
     try {
       // Step 1: Generate complete pep talk content
       toast.info("Generating pep talk content...");
-      const { data: contentData, error: contentError } = await supabase.functions.invoke(
-        "generate-complete-pep-talk",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            category: formData.category || "motivation",
-          },
-        }
-      );
-
-      if (contentError) throw contentError;
+      const contentData = await generateCompletePepTalk({
+        mentorSlug: mentor.slug,
+        topicCategory: formData.category || "motivation",
+      });
 
       // Step 2: Generate audio from the script
       toast.info("Generating audio...");
-      const { data: audioData, error: audioError } = await supabase.functions.invoke(
-        "generate-mentor-audio",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            script: contentData.script,
-          },
-        }
-      );
+      const audioData = await generateMentorAudio({
+        mentorSlug: mentor.slug,
+        script: contentData.pepTalk?.script || contentData.script,
+      });
 
-      if (audioError) throw audioError;
 
       // Update form with all generated data
+      const pepTalk = contentData.pepTalk || contentData;
       setFormData(prev => ({
         ...prev,
-        title: contentData.title,
-        quote: contentData.quote,
-        description: contentData.description,
-        category: contentData.category,
+        title: pepTalk.title || contentData.title,
+        quote: pepTalk.quote || contentData.quote,
+        description: pepTalk.description || contentData.description,
+        category: pepTalk.category || contentData.category || formData.category,
         audio_url: audioData.audioUrl,
       }));
 

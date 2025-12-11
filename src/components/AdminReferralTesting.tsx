@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createInfluencerCode, processPaypalPayout } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,17 +39,12 @@ export const AdminReferralTesting = () => {
       
       addResult("Creating influencer code", 'success', `Attempting to create code for: ${influencerName}`);
       
-      const { data, error } = await supabase.functions.invoke('create-influencer-code', {
-        body: { 
-          name: influencerName,
-          email: testEmail,
-          handle: testHandle,
-          paypal_email: testEmail
-        }
+      const data = await createInfluencerCode({
+        name: influencerName,
+        email: testEmail,
+        handle: testHandle,
+        paypalEmail: testEmail,
       });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
 
       addResult("Influencer code created", 'success', `Code: ${data.code}, Link: ${data.link}`);
       setTestCode(data.code);
@@ -279,13 +275,11 @@ export const AdminReferralTesting = () => {
       addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}${codeData ? `, Code: ${codeData.code}` : ''}`);
 
       // Call the PayPal payout function
-      const { data, error } = await supabase.functions.invoke('process-paypal-payout', {
-        body: { payout_id: payout.id }
+      const data = await processPaypalPayout({
+        payoutId: payout.id,
       });
 
-      if (error) throw error;
-
-      addResult("PayPal payout initiated", 'success', `Transaction ID: ${data.payoutBatchId || 'N/A'}`);
+      addResult("PayPal payout initiated", 'success', `Transaction ID: ${data.payout_batch_id || 'N/A'}`);
       toast.success("PayPal payout test completed!");
     } catch (error: any) {
       addResult("PayPal test failed", 'error', error.message);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { processPaypalPayout } from "@/lib/firebase/functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -210,15 +211,9 @@ export const AdminPayouts = () => {
   const processPayoutMutation = useMutation({
     mutationFn: async (payoutId: string) => {
       setProcessingId(payoutId);
-      const { data, error } = await supabase.functions.invoke(
-        "process-paypal-payout",
-        {
-          body: { payout_id: payoutId },
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      const data = await processPaypalPayout({
+        payoutId,
+      });
       return data;
     },
     onSuccess: (data) => {

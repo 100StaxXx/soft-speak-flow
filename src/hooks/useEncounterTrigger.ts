@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { getDocument, getDocuments, updateDocument, timestampToISO } from '@/lib/firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { TriggerType } from '@/types/astralEncounters';
 
@@ -26,19 +26,19 @@ export const useEncounterTrigger = () => {
     questCountRef.current = null;
     nextEncounterRef.current = null;
     encountersEnabledRef.current = null;
-  }, [user?.id]);
+  }, [user?.uid]);
 
   const ensureEncountersEnabled = useCallback(async () => {
-    if (!user?.id) return false;
+    if (!user?.uid) return false;
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('astral_encounters_enabled,onboarding_completed,total_quests_completed')
-      .eq('id', user.id)
-      .single();
+    const profile = await getDocument<{
+      astral_encounters_enabled: boolean | null;
+      onboarding_completed: boolean | null;
+      total_quests_completed: number;
+    }>('profiles', user.uid);
 
-    if (error) {
-      console.error('Failed to fetch astral encounter setting', error);
+    if (!profile) {
+      console.error('Failed to fetch astral encounter setting');
       return false;
     }
 
@@ -63,24 +63,24 @@ export const useEncounterTrigger = () => {
 
     encountersEnabledRef.current = true;
     return encountersEnabledRef.current;
-  }, [user?.id]);
+  }, [user?.uid]);
 
   // Check for quest milestone trigger (random 2-4 quests)
   const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
-    if (!user?.id) return { shouldTrigger: false };
+    if (!user?.uid) return { shouldTrigger: false };
 
     const encountersEnabled = await ensureEncountersEnabled();
 
     // Fetch current counts if not cached
     if (questCountRef.current === null || nextEncounterRef.current === null) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('total_quests_completed, next_encounter_quest_count, astral_encounters_enabled')
-        .eq('id', user.id)
-        .single();
+      const profile = await getDocument<{
+        total_quests_completed: number;
+        next_encounter_quest_count: number | null;
+        astral_encounters_enabled: boolean | null;
+      }>('profiles', user.uid);
 
-      if (error || !profile) {
-        console.error('Failed to fetch quest count', error);
+      if (!profile) {
+        console.error('Failed to fetch quest count');
         return { shouldTrigger: false };
       }
 
@@ -90,10 +90,9 @@ export const useEncounterTrigger = () => {
       if (profile.astral_encounters_enabled === false) {
         // Still update quest count but don't trigger encounters
         questCountRef.current = (profile.total_quests_completed || 0) + 1;
-        await supabase
-          .from('profiles')
-          .update({ total_quests_completed: questCountRef.current })
-          .eq('id', user.id);
+        await updateDocument('profiles', user.uid, {
+          total_quests_completed: questCountRef.current,
+        });
         return { shouldTrigger: false };
       }
 
@@ -104,10 +103,9 @@ export const useEncounterTrigger = () => {
 
     if (!encountersEnabled) {
       questCountRef.current += 1;
-      await supabase
-        .from('profiles')
-        .update({ total_quests_completed: questCountRef.current })
-        .eq('id', user.id);
+      await updateDocument('profiles', user.uid, {
+        total_quests_completed: questCountRef.current,
+      });
       return { shouldTrigger: false };
     }
 
@@ -123,15 +121,12 @@ export const useEncounterTrigger = () => {
       : nextEncounterRef.current;
 
     // Update database with new quest count and potentially new encounter threshold
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ 
+    try {
+      await updateDocument('profiles', user.uid, {
         total_quests_completed: newTotal,
-        next_encounter_quest_count: nextEncounterValue
-      })
-      .eq('id', user.id);
-
-    if (updateError) {
+        next_encounter_quest_count: nextEncounterValue,
+      });
+    } catch (updateError) {
       console.error('Failed to update quest count', updateError);
       questCountRef.current -= 1;
       return { shouldTrigger: false };
@@ -161,7 +156,7 @@ export const useEncounterTrigger = () => {
     previousProgress: number,
     currentProgress: number
   ): Promise<TriggerResult> => {
-    if (!user?.id) return { shouldTrigger: false };
+    if (!user?.uid) return { shouldTrigger: false };
 
     const encountersEnabled = await ensureEncountersEnabled();
     if (!encountersEnabled) return { shouldTrigger: false };
@@ -175,11 +170,7 @@ export const useEncounterTrigger = () => {
 
     if (crossedMilestone) {
       // Get epic category for themed adversary
-      const { data: epic } = await supabase
-        .from('epics')
-        .select('title, description')
-        .eq('id', epicId)
-        .single();
+      const epic = await getDocument<{ title: string; description: string }>('epics', epicId);
 
       // Infer category from title/description
       const text = `${epic?.title || ''} ${epic?.description || ''}`.toLowerCase();
@@ -206,23 +197,32 @@ export const useEncounterTrigger = () => {
 
   // Check for weekly trigger (once per 7 days)
   const checkWeeklyTrigger = useCallback(async (): Promise<TriggerResult> => {
-    if (!user?.id) return { shouldTrigger: false };
+    if (!user?.uid) return { shouldTrigger: false };
 
     const encountersEnabled = await ensureEncountersEnabled();
     if (!encountersEnabled) return { shouldTrigger: false };
 
     // Check last weekly encounter
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     
-    const { data: recentWeekly } = await supabase
-      .from('astral_encounters')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('trigger_type', 'weekly')
-      .gte('created_at', oneWeekAgo)
-      .limit(1);
+    const recentWeekly = await getDocuments(
+      'astral_encounters',
+      [
+        ['user_id', '==', user.uid],
+        ['trigger_type', '==', 'weekly'],
+      ],
+      'created_at',
+      'desc',
+      1
+    );
 
-    if (!recentWeekly || recentWeekly.length === 0) {
+    // Check if any encounter was created within the last week
+    const hasRecentWeekly = recentWeekly.some(encounter => {
+      const createdAt = timestampToISO(encounter.created_at as any) || encounter.created_at;
+      return createdAt && new Date(createdAt) >= oneWeekAgo;
+    });
+
+    if (!hasRecentWeekly) {
       return {
         shouldTrigger: true,
         triggerType: 'weekly'
@@ -230,7 +230,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id, ensureEncountersEnabled]);
+  }, [user?.uid, ensureEncountersEnabled]);
 
   return {
     checkQuestMilestone,

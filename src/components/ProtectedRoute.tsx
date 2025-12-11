@@ -27,7 +27,8 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (authLoading || accessLoading) {
+    // Only block on auth loading, not profile/access loading
+    if (authLoading) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -43,10 +44,11 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
         clearInterval(timer);
       }
     };
-  }, [authLoading, accessLoading]);
+  }, [authLoading]);
 
-  // Show loading while checking auth
-  if (authLoading || accessLoading) {
+  // Show loading ONLY while checking auth (not profile/access)
+  // Profile can load in the background - don't block navigation
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -63,10 +65,12 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   // Don't render children until auth is confirmed
   if (!user) return null;
 
-  // Show hard paywall if no access (trial expired and not subscribed)
-  if (!hasAccess) {
+  // Only check access if it's loaded - don't block if still loading
+  // Profile/access can load in background, pages will handle their own loading states
+  if (!accessLoading && !hasAccess) {
     return <TrialExpiredPaywall />;
   }
 
+  // Render children - profile/access will load in background
   return <>{children}</>;
 };

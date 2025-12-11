@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, setDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { playAchievementUnlock } from "@/utils/soundEffects";
@@ -26,33 +26,33 @@ export const useAchievements = () => {
 
     try {
       // Check if already earned
-      const { data: existing } = await supabase
-        .from("achievements")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("achievement_type", achievement.type)
-        .maybeSingle();
+      const existing = await getDocuments(
+        "achievements",
+        [
+          ["user_id", "==", user.uid],
+          ["achievement_type", "==", achievement.type],
+        ]
+      );
 
-      if (existing) return; // Already earned
+      if (existing.length > 0) return; // Already earned
 
-      const { error } = await supabase
-        .from("achievements")
-        .insert({
-          user_id: user.id,
-          achievement_type: achievement.type,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          tier: achievement.tier,
-          metadata: achievement.metadata || {},
-        });
+      const achievementId = `${user.uid}_${achievement.type}`;
+      await setDocument("achievements", achievementId, {
+        id: achievementId,
+        user_id: user.uid,
+        achievement_type: achievement.type,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon,
+        tier: achievement.tier,
+        metadata: achievement.metadata || {},
+        earned_at: new Date().toISOString(),
+      }, false);
 
-      if (!error) {
-        toast.success("🏆 Achievement Unlocked!", {
-          description: achievement.title,
-        });
-        playAchievementUnlock();
-      }
+      toast.success("🏆 Achievement Unlocked!", {
+        description: achievement.title,
+      });
+      playAchievementUnlock();
     } catch (error) {
       console.error("Error awarding achievement:", error);
     }

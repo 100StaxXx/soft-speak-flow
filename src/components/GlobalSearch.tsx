@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { SearchBar } from "./SearchBar";
 import { Card } from "./ui/card";
@@ -44,18 +44,20 @@ export const GlobalSearch = ({
     onSearchChange?.(value);
   };
 
+  // Firestore doesn't have native text search, so we fetch and filter client-side
+  // TODO: Consider implementing Algolia or similar for better search performance
   const { data: quotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["search-quotes", currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*")
-        .or(`text.ilike.%${currentQuery}%,author.ilike.%${currentQuery}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const allQuotes = await getDocuments("quotes", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allQuotes
+        .filter(q => 
+          (q.text?.toLowerCase().includes(queryLower)) ||
+          (q.author?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
@@ -63,14 +65,15 @@ export const GlobalSearch = ({
     queryKey: ["search-pep-talks", currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%,quote.ilike.%${currentQuery}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const allPepTalks = await getDocuments("pep_talks", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allPepTalks
+        .filter(p => 
+          (p.title?.toLowerCase().includes(queryLower)) ||
+          (p.description?.toLowerCase().includes(queryLower)) ||
+          (p.quote?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
@@ -78,55 +81,62 @@ export const GlobalSearch = ({
     queryKey: ["search-challenges", currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("challenges")
-        .select("*")
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const allChallenges = await getDocuments("challenges", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allChallenges
+        .filter(c => 
+          (c.title?.toLowerCase().includes(queryLower)) ||
+          (c.description?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
   const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['search-tasks', currentQuery, user?.id],
+    queryKey: ['search-tasks', currentQuery, user?.uid],
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .ilike('task_text', `%${currentQuery}%`)
-        .order('task_date', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
+      const userTasks = await getDocuments(
+        'daily_tasks',
+        [['user_id', '==', user.uid]],
+        'task_date',
+        'desc',
+        100
+      );
+      const queryLower = currentQuery.toLowerCase();
+      return userTasks
+        .filter(t => t.task_text?.toLowerCase().includes(queryLower))
+        .slice(0, 10);
     },
     enabled: currentQuery.length >= 2 && !!user,
   });
 
   const { data: epics, isLoading: epicsLoading } = useQuery({
-    queryKey: ['search-epics', currentQuery, user?.id],
+    queryKey: ['search-epics', currentQuery, user?.uid],
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await supabase
-        .from('epics')
-        .select('id, title, description, target_days, status, epic_members(user_id)')
-        .or(`user_id.eq.${user.id},epic_members.user_id.eq.${user.id}`)
-        .or(`title.ilike.%${currentQuery}%,description.ilike.%${currentQuery}%`)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
+      // Fetch user's epics (owned and joined)
+      const ownedEpics = await getDocuments('epics', [['user_id', '==', user.uid]], 'created_at', 'desc', 50);
+      const memberships = await getDocuments('epic_members', [['user_id', '==', user.uid]]);
+      const joinedEpicIds = memberships.map(m => m.epic_id);
+      const joinedEpics = joinedEpicIds.length > 0 
+        ? await Promise.all(joinedEpicIds.map(id => getDocuments('epics', [['id', '==', id]])))
+        : [];
+      const allUserEpics = [...ownedEpics, ...joinedEpics.flat()];
+      
+      const queryLower = currentQuery.toLowerCase();
+      return allUserEpics
+        .filter(e => 
+          (e.title?.toLowerCase().includes(queryLower)) ||
+          (e.description?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
     enabled: currentQuery.length >= 2 && !!user,
   });

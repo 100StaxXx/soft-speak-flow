@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { generateQuoteImage } from "@/lib/firebase/functions";
 import { toast } from "sonner";
 import { Loader2, Sparkles, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -28,20 +28,14 @@ export const QuoteImageGenerator = ({
   const generateImage = async () => {
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-quote-image", {
-        body: {
-          quoteText,
-          author: author || "Unknown",
-          category,
-          intensity,
-          emotionalTrigger,
-        },
+      const data = await generateQuoteImage({
+        quoteText,
+        style: `${category || ""} ${intensity || ""} ${emotionalTrigger || ""}`.trim() || undefined,
       });
 
-      if (error) throw error;
-
-      if (data?.imageUrl) {
-        setGeneratedImage(data.imageUrl);
+      const imageUrl = data?.imageData?.imageUrl || data?.imageUrl;
+      if (imageUrl) {
+        setGeneratedImage(imageUrl);
         toast.success("Quote image generated!");
       } else {
         throw new Error("No image URL returned");

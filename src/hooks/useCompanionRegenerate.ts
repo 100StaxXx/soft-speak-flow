@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
@@ -23,77 +23,63 @@ export const useCompanionRegenerate = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
-      const { data: latestCompanion, error: latestCompanionError } = await supabase
-        .from("user_companion")
-        .select("image_regenerations_used")
-        .eq("id", companion.id)
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const latestCompanion = await getDocument<{ image_regenerations_used: number; user_id: string }>(
+        "user_companion",
+        companion.id
+      );
 
-      if (latestCompanionError) {
-        console.error("Failed to verify regeneration count:", latestCompanionError);
-        throw new Error("Unable to verify regeneration status. Please try again.");
+      if (!latestCompanion) {
+        throw new Error("Companion not found");
       }
 
-      const regenerationsUsed = latestCompanion?.image_regenerations_used ?? 0;
+      if (latestCompanion.user_id !== user.uid) {
+        throw new Error("Unauthorized");
+      }
+
+      const regenerationsUsed = latestCompanion.image_regenerations_used ?? 0;
       if (regenerationsUsed >= MAX_REGENERATIONS) {
         throw new Error("You've used all your regenerations");
       }
 
+      // TODO: Migrate to Firebase Cloud Function
       // Call the image generation function
-      const { data: imageResult, error: imageError } = await supabase.functions.invoke(
-        "generate-companion-image",
-        {
-          body: {
-            favoriteColor: companion.favorite_color,
-            spiritAnimal: companion.spirit_animal,
-            element: companion.core_element,
-            stage: companion.current_stage,
-            eyeColor: companion.eye_color,
-            furColor: companion.fur_color,
-          },
-        }
-      );
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-image', {
+      //   method: 'POST',
+      //   body: JSON.stringify({
+      //     favoriteColor: companion.favorite_color,
+      //     spiritAnimal: companion.spirit_animal,
+      //     element: companion.core_element,
+      //     stage: companion.current_stage,
+      //     eyeColor: companion.eye_color,
+      //     furColor: companion.fur_color,
+      //   }),
+      // });
+      // const imageResult = await response.json();
+      
+      throw new Error("Companion regeneration needs Firebase Cloud Function migration");
 
-      if (imageError) {
-        const errorMsg = imageError.message || String(imageError);
-        if (errorMsg.includes("RATE_LIMITED") || errorMsg.includes("busy")) {
-          throw new Error("Service is busy. Please try again in a moment.");
-        }
-        throw new Error("Failed to regenerate image. Please try again.");
-      }
+      // if (!imageResult?.imageUrl) {
+      //   throw new Error("Failed to generate new image");
+      // }
 
-      if (!imageResult?.imageUrl) {
-        throw new Error("Failed to generate new image");
-      }
+      // // Update companion with new image and increment regeneration count
+      // // Note: Firestore doesn't support conditional updates like Supabase, so we check again
+      // const currentCompanion = await getDocument("user_companion", companion.id);
+      // if (currentCompanion.image_regenerations_used !== regenerationsUsed) {
+      //   throw new Error("Regeneration already consumed. Please refresh to continue.");
+      // }
 
-      // Update companion with new image and increment regeneration count atomically
-      const { data: updatedRow, error: updateError } = await supabase
-        .from("user_companion")
-        .update({
-          current_image_url: imageResult.imageUrl,
-          image_regenerations_used: regenerationsUsed + 1,
-        })
-        .eq("id", companion.id)
-        .eq("user_id", user.id)
-        .eq("image_regenerations_used", regenerationsUsed)
-        .select("image_regenerations_used")
-        .single();
+      // await updateDocument("user_companion", companion.id, {
+      //   current_image_url: imageResult.imageUrl,
+      //   image_regenerations_used: regenerationsUsed + 1,
+      // });
 
-      if (updateError) {
-        const errorCode = (updateError as { code?: string })?.code;
-        if (errorCode === "PGRST116") {
-          throw new Error("Regeneration already consumed. Please refresh to continue.");
-        }
-        throw updateError;
-      }
+      // const totalUsed = regenerationsUsed + 1;
 
-      const totalUsed = updatedRow?.image_regenerations_used ?? regenerationsUsed + 1;
-
-      return { 
-        imageUrl: imageResult.imageUrl, 
-        regenerationsRemaining: Math.max(0, MAX_REGENERATIONS - totalUsed) 
-      };
+      // return { 
+      //   imageUrl: imageResult.imageUrl, 
+      //   regenerationsRemaining: Math.max(0, MAX_REGENERATIONS - totalUsed) 
+      // };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });

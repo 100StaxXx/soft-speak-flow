@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo } from "react";
@@ -36,47 +36,47 @@ export const useCompanionHealth = () => {
 
   // Fetch extended companion data with neglect fields
   const { data: companionHealthData, isLoading: isHealthLoading } = useQuery({
-    queryKey: ['companion-health', user?.id],
+    queryKey: ['companion-health', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.uid) return null;
       
-      const { data, error } = await supabase
-        .from('user_companion')
-        .select('inactive_days, last_activity_date, neglected_image_url, current_mood, body, mind, soul, current_image_url')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Failed to fetch companion health:', error);
-        throw error;
-      }
+      const data = await getDocument<{
+        inactive_days: number;
+        last_activity_date: string | null;
+        neglected_image_url: string | null;
+        current_mood: string;
+        body: number;
+        mind: number;
+        soul: number;
+        current_image_url: string | null;
+      }>('user_companion', user.uid);
       
-      return data;
+      if (!data) return null;
+      
+      return {
+        ...data,
+        last_activity_date: timestampToISO(data.last_activity_date as any) || data.last_activity_date,
+      };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
     staleTime: 60000, // 1 minute
   });
 
   // Fetch streak freeze data from profile
   const { data: streakFreezeData, isLoading: isFreezeLoading } = useQuery({
-    queryKey: ['streak-freezes', user?.id],
+    queryKey: ['streak-freezes', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.uid) return null;
       
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('streak_freezes_available, last_streak_freeze_used, streak_freezes_reset_at')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Failed to fetch streak freeze data:', error);
-        throw error;
-      }
+      const data = await getDocument<{
+        streak_freezes_available: number;
+        last_streak_freeze_used: string | null;
+        streak_freezes_reset_at: string | null;
+      }>('profiles', user.uid);
       
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
     staleTime: 60000,
   });
 
@@ -143,19 +143,16 @@ export const useCompanionHealth = () => {
 
   // Function to mark user as active (call when user completes any activity)
   const markUserActive = async () => {
-    if (!user?.id) return;
+    if (!user?.uid) return;
 
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      await supabase
-        .from('user_companion')
-        .update({
-          last_activity_date: today,
-          inactive_days: 0,
-          current_mood: 'happy',
-        })
-        .eq('user_id', user.id);
+      await updateDocument('user_companion', user.uid, {
+        last_activity_date: today,
+        inactive_days: 0,
+        current_mood: 'happy',
+      });
 
       // Invalidate queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['companion-health'] });

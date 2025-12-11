@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -181,15 +182,9 @@ export const TodaysPepTalk = memo(() => {
     const runSync = async () => {
       if (!pepTalk?.id || !pepTalk?.audio_url) return;
       try {
-        const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-          body: { id: pepTalk.id }
+        const data = await syncDailyPepTalkTranscript({
+          id: pepTalk.id,
         });
-        
-        // Handle edge function error
-        if (error) {
-          console.warn('Transcript sync returned error:', error);
-          return; // Silent fail - transcript sync is optional enhancement
-        }
         
         if (data?.script) {
           setPepTalk((prev: DailyPepTalk | null) => {

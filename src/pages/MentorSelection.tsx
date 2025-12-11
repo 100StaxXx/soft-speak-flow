@@ -5,42 +5,46 @@ import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getResolvedMentorId } from "@/utils/mentor";
+import { useProfile } from "@/hooks/useProfile";
 
 const MentorSelection = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [mentors, setMentors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
-  const [currentMentorId, setCurrentMentorId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
-      // Fetch mentors
+      // Load ALL mentors from Supabase - no filters
       const { data: mentorsData, error: mentorsError } = await supabase
         .from("mentors")
         .select("*")
-        .eq("is_active", true)
-        .order("created_at");
+        .order("created_at", { ascending: true });
 
-      if (mentorsError) throw mentorsError;
+      if (mentorsError) {
+        console.error("[MentorSelection] Supabase error:", mentorsError);
+        throw mentorsError;
+      }
+
+      console.log(`[MentorSelection] Loaded ${mentorsData?.length || 0} mentors from Supabase`);
       setMentors(mentorsData || []);
-
-      // Fetch current mentor if user is logged in
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("selected_mentor_id")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profile?.selected_mentor_id) {
-          setCurrentMentorId(profile.selected_mentor_id);
-        }
+      
+      if (!mentorsData || mentorsData.length === 0) {
+        console.warn("[MentorSelection] No mentors found in Supabase database");
+        toast({
+          title: "No mentors available",
+          description: "No mentors were found in the database. Please contact support.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Error loading mentors:", error);
+      console.error("[MentorSelection] Error loading mentors from Supabase:", error);
       toast({
         title: "Error loading mentors",
         description: error instanceof Error ? error.message : "Failed to load mentors",
@@ -54,7 +58,7 @@ const MentorSelection = () => {
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]); // fetchData depends on user indirectly via user.id check
+  }, []); // Only fetch mentors once on mount
 
   const handleSelectMentor = async (mentorId: string) => {
     if (!user) {
@@ -72,13 +76,17 @@ const MentorSelection = () => {
       
       const { error } = await supabase
         .from("profiles")
-        .update({ 
-          selected_mentor_id: mentorId,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user.id);
+        .update({ selected_mentor_id: mentorId })
+        .eq("id", user.uid);
 
       if (error) throw error;
+
+      // Invalidate profile query to refresh mentor data across the app
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.uid] });
+      // Also invalidate mentor-related queries
+      await queryClient.invalidateQueries({ queryKey: ["selected-mentor"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentor"] });
 
       toast({
         title: "Mentor Selected!",
@@ -125,7 +133,7 @@ const MentorSelection = () => {
         <MentorGrid 
           mentors={mentors}
           onSelectMentor={handleSelectMentor}
-          currentMentorId={currentMentorId}
+          currentMentorId={getResolvedMentorId(profile)}
           isSelecting={selecting}
         />
       </div>

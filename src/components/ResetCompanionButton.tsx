@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { resetCompanion } from "@/lib/firebase/functions";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -33,8 +33,7 @@ export const ResetCompanionButton = () => {
   const handleReset = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('reset-companion');
-      if (error) throw error;
+      const data = await resetCompanion();
       if (data?.success) {
         // Invalidate companion queries
         await queryClient.invalidateQueries({ queryKey: ['companion'] });

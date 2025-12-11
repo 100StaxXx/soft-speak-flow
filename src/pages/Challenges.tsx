@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
@@ -24,54 +24,65 @@ export default function Challenges() {
   const { data: availableChallenges } = useQuery({
     queryKey: ["challenges"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("challenges")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const data = await getDocuments(
+        "challenges",
+        undefined,
+        "created_at",
+        "desc"
+      );
       return data || [];
     },
   });
 
   // Fetch user's active challenges
   const { data: userChallenges, refetch: refetchUserChallenges } = useQuery({
-    queryKey: ["user-challenges", user?.id],
+    queryKey: ["user-challenges", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("user_challenges")
-        .select(`
-          *,
-          challenges (*)
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const userChallengesData = await getDocuments(
+        "user_challenges",
+        [["user_id", "==", user.uid]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) throw error;
-      return data || [];
+      // Fetch challenge details for each user challenge
+      const challengesWithDetails = await Promise.all(
+        userChallengesData.map(async (uc) => {
+          const challenge = await getDocument("challenges", uc.challenge_id);
+          return {
+            ...uc,
+            challenges: challenge,
+          };
+        })
+      );
+
+      return challengesWithDetails;
     },
   });
 
   // Fetch challenge progress
   const { data: challengeProgress } = useQuery({
-    queryKey: ["challenge-progress", user?.id],
+    queryKey: ["challenge-progress", user?.uid],
     enabled: !!user && !!userChallenges,
     queryFn: async () => {
       if (!userChallenges || userChallenges.length === 0) return [];
 
-      const challengeIds = userChallenges.map((uc) => uc.id);
-      const { data, error } = await supabase
-        .from("challenge_progress")
-        .select("*")
-        .in("user_challenge_id", challengeIds);
+      // Fetch progress for each user challenge
+      const progressPromises = userChallenges.map(async (uc) => {
+        const progress = await getDocuments(
+          "challenge_progress",
+          [["user_challenge_id", "==", uc.id]]
+        );
+        return progress;
+      });
 
-      if (error) throw error;
-      return data || [];
+      const allProgress = await Promise.all(progressPromises);
+      return allProgress.flat();
     },
   });
 
@@ -85,16 +96,16 @@ export default function Challenges() {
 
       const formatDate = (date: Date) => date.toLocaleDateString("en-CA");
 
-      const { error } = await supabase.from("user_challenges").insert({
-        user_id: user.id,
+      const challengeId_doc = `${user.uid}_${challengeId}_${Date.now()}`;
+      await setDocument("user_challenges", challengeId_doc, {
+        id: challengeId_doc,
+        user_id: user.uid,
         challenge_id: challengeId,
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
         current_day: 1,
         status: "active",
-      });
-
-      if (error) throw error;
+      }, false);
 
       toast.success("Challenge started!");
       refetchUserChallenges();

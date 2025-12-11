@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments, setDocument, updateDocument } from "@/lib/firebase/firestore";
+import { firebaseAuth } from "@/lib/firebase/auth";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -77,19 +78,14 @@ const Profile = () => {
   }, [location.state?.showDeleteDialog, location.pathname, navigate]);
 
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
-    queryKey: ["adaptive-push-settings", user?.id],
+    queryKey: ["adaptive-push-settings", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("adaptive_push_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await getDocument("adaptive_push_settings", user.uid);
       return data;
     },
   });
@@ -97,14 +93,14 @@ const Profile = () => {
   const { data: mentors } = useQuery({
     queryKey: ["mentors", "active"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("id, name, slug, avatar_url, is_active")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
+      const data = await getDocuments(
+        "mentors",
+        [["is_active", "==", true]],
+        "name",
+        "asc"
+      );
       const map = new Map<string, any>();
-      for (const m of data || []) {
+      for (const m of data) {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
@@ -120,12 +116,7 @@ const Profile = () => {
         throw new Error('No mentor selected');
       }
       
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await getDocument("mentors", profile.selected_mentor_id);
       return data;
     },
   });
@@ -135,11 +126,7 @@ const Profile = () => {
     try {
       const newState = !adaptivePushSettings?.enabled;
       if (adaptivePushSettings) {
-        const { error } = await supabase
-          .from("adaptive_push_settings")
-          .update({ enabled: newState })
-          .eq("user_id", user.id);
-        if (error) throw error;
+        await updateDocument("adaptive_push_settings", user.uid, { enabled: newState });
       }
       refetchSettings();
     } catch (error) {
@@ -152,15 +139,11 @@ const Profile = () => {
     if (!user || isChangingMentor) return;
     setIsChangingMentor(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          selected_mentor_id: mentorId,
-          // Also ensure timezone is set if not already
-          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        })
-        .eq("id", user.id);
-      if (error) throw error;
+      await updateDocument("profiles", user.uid, {
+        selected_mentor_id: mentorId,
+        // Also ensure timezone is set if not already
+        timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      });
       toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
       window.location.reload();
     } catch (error) {
@@ -188,23 +171,15 @@ const Profile = () => {
 
     setIsDeletingAccount(true);
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      // Import Firebase Functions dynamically to avoid issues if not deployed
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const { firebaseApp } = await import("@/lib/firebase");
+      
+      const functions = getFunctions(firebaseApp);
+      const deleteUserAccount = httpsCallable(functions, "deleteUserAccount");
 
-      if (sessionError || !session?.access_token) {
-        throw new Error("Session expired. Please sign in again.");
-      }
-
-      const { error } = await supabase.functions.invoke("delete-user", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      if (error) {
-        throw new Error(error.message || "Unable to delete account");
-      }
+      // Call the Cloud Function (this will delete the user from Firebase Auth)
+      await deleteUserAccount();
 
       queryClient.clear();
       setShowDeleteDialog(false);
@@ -214,7 +189,14 @@ const Profile = () => {
         description: "Your account and saved progress have been permanently removed.",
       });
 
-      await signOut();
+      // Try to sign out (may fail if user is already deleted, which is fine)
+      try {
+        await signOut();
+      } catch (signOutError) {
+        // User may already be deleted by the Cloud Function, which is expected
+        console.log("Sign out after deletion:", signOutError);
+      }
+
       navigate("/auth", {
         replace: true,
         state: { message: "Your account has been deleted." },
@@ -244,12 +226,13 @@ const Profile = () => {
   const handleCreateAdaptivePushSettings = async () => {
     if (!user) return;
     try {
-      const { error } = await supabase.from("adaptive_push_settings").insert({
-        user_id: user.id,
+      await setDocument("adaptive_push_settings", user.uid, {
+        id: user.uid,
+        user_id: user.uid,
         enabled: true,
         mentor_id: profile?.selected_mentor_id,
-      });
-      if (!error) refetchSettings();
+      }, false);
+      refetchSettings();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to update settings";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });

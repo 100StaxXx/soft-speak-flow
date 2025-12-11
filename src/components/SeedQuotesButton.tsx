@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { seedRealQuotes } from "@/lib/firebase/functions";
 import { toast } from "sonner";
 import { Loader2, Database } from "lucide-react";
 import { useState } from "react";
@@ -10,12 +10,10 @@ export const SeedQuotesButton = () => {
   const handleSeedQuotes = async () => {
     setIsSeeding(true);
     try {
-      const { data, error } = await supabase.functions.invoke("seed-real-quotes");
-
-      if (error) throw error;
+      const data = await seedRealQuotes();
 
       if (data?.success) {
-        toast.success(`Successfully seeded ${data.quotes?.length || 0} quotes!`);
+        toast.success(`Successfully seeded ${data.inserted || 0} quotes!`);
       } else {
         throw new Error("Unexpected response from seed function");
       }

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument, updateDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -66,47 +66,48 @@ export const useTaskMutations = (taskDate: string) => {
       addInProgress.current = true;
 
       try {
-        if (!user?.id) throw new Error('User not authenticated');
+        if (!user?.uid) throw new Error('User not authenticated');
         
-        const { data: existingTasks, error: countError } = await supabase
-          .from('daily_tasks')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('task_date', params.taskDate || taskDate);
+        const existingTasks = await getDocuments(
+          'daily_tasks',
+          [
+            ['user_id', '==', user.uid],
+            ['task_date', '==', params.taskDate || taskDate],
+          ]
+        );
 
-        if (countError) throw countError;
+        // Check max tasks limit (assuming 20 max tasks per day)
+        if (existingTasks.length >= 20) {
+          throw new Error('Maximum quest limit reached for today');
+        }
 
-        const questPosition = (existingTasks?.length || 0) + 1;
+        const questPosition = existingTasks.length + 1;
         const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
         const detectedCategory = detectCategory(params.taskText, params.category);
 
-        const { error } = await supabase
-          .from('daily_tasks')
-          .insert({
-            user_id: user.id,
-            task_text: params.taskText,
-            difficulty: params.difficulty,
-            xp_reward: xpReward,
-            task_date: params.taskDate || taskDate,
-            is_main_quest: params.isMainQuest ?? false,
-            scheduled_time: params.scheduledTime || null,
-            estimated_duration: params.estimatedDuration || null,
-            recurrence_pattern: params.recurrencePattern || null,
-            recurrence_days: params.recurrenceDays || null,
-            is_recurring: !!params.recurrencePattern,
-            reminder_enabled: params.reminderEnabled ?? false,
-            reminder_minutes_before: params.reminderMinutesBefore ?? 15,
-            notes: params.notes || null,
-            category: detectedCategory,
-            is_bonus: false
-          });
-
-        if (error) {
-          if (error.message?.includes('MAX_TASKS_REACHED') || error.message?.includes('Maximum quest limit')) {
-            throw new Error('Maximum quest limit reached for today');
-          }
-          throw error;
-        }
+        const taskId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        await setDocument('daily_tasks', taskId, {
+          id: taskId,
+          user_id: user.uid,
+          task_text: params.taskText,
+          difficulty: params.difficulty,
+          xp_reward: xpReward,
+          task_date: params.taskDate || taskDate,
+          is_main_quest: params.isMainQuest ?? false,
+          scheduled_time: params.scheduledTime || null,
+          estimated_duration: params.estimatedDuration || null,
+          recurrence_pattern: params.recurrencePattern || null,
+          recurrence_days: params.recurrenceDays || null,
+          is_recurring: !!params.recurrencePattern,
+          reminder_enabled: params.reminderEnabled ?? false,
+          reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+          notes: params.notes || null,
+          category: detectedCategory,
+          is_bonus: false,
+          completed: false,
+          completed_at: null,
+          reminder_sent: false,
+        }, false);
       } finally {
         addInProgress.current = false;
       }
@@ -123,52 +124,42 @@ export const useTaskMutations = (taskDate: string) => {
 
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       if (toggleInProgress.current) throw new Error('Please wait...');
       toggleInProgress.current = true;
 
       try {
-        const { data: existingTask, error: existingError } = await supabase
-          .from('daily_tasks')
-          .select('completed_at')
-          .eq('id', taskId)
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const existingTask = await getDocument<{ completed_at: string | null; user_id: string }>('daily_tasks', taskId);
 
-        if (existingError) throw existingError;
+        if (!existingTask) throw new Error('Task not found');
+        if (existingTask.user_id !== user.uid) throw new Error('Unauthorized');
 
-        const wasAlreadyCompleted = existingTask?.completed_at !== null;
+        const wasAlreadyCompleted = existingTask.completed_at !== null;
 
         if (wasAlreadyCompleted && !completed) {
           throw new Error('Cannot uncheck completed tasks');
         }
 
         if (!completed) {
-          const { error } = await supabase
-            .from('daily_tasks')
-            .update({ completed: false, completed_at: null })
-            .eq('id', taskId)
-            .eq('user_id', user.id);
-
-          if (error) throw error;
+          await updateDocument('daily_tasks', taskId, {
+            completed: false,
+            completed_at: null,
+          });
           return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted };
         }
 
-        const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
-        const totalXP = xpReward + bonusXP;
-
-        const { data: updateResult, error: updateError } = await supabase
-          .from('daily_tasks')
-          .update({ completed: true, completed_at: new Date().toISOString() })
-          .eq('id', taskId)
-          .eq('user_id', user.id)
-          .eq('completed', false)
-          .select();
-
-        if (updateError) throw updateError;
-        if (!updateResult || updateResult.length === 0) {
+        // Check if already completed to prevent double XP
+        if (wasAlreadyCompleted) {
           throw new Error('Task was already completed');
         }
+
+        const { bonusXP, toastReason } = await calculateGuildBonus(user.uid, xpReward);
+        const totalXP = xpReward + bonusXP;
+
+        await updateDocument('daily_tasks', taskId, {
+          completed: true,
+          completed_at: new Date().toISOString(),
+        });
 
         await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
 
@@ -207,16 +198,14 @@ export const useTaskMutations = (taskDate: string) => {
 
   const deleteTask = useMutation({
     mutationFn: async (taskId: string) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       if (!taskId) throw new Error('Invalid task ID');
       
-      const { error } = await supabase
-        .from('daily_tasks')
-        .delete()
-        .eq('id', taskId)
-        .eq('user_id', user.id);
+      const task = await getDocument<{ user_id: string }>('daily_tasks', taskId);
+      if (!task) throw new Error('Task not found');
+      if (task.user_id !== user.uid) throw new Error('Unauthorized');
       
-      if (error) throw error;
+      await deleteDocument('daily_tasks', taskId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -229,32 +218,28 @@ export const useTaskMutations = (taskDate: string) => {
 
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
 
-      const { data: task, error: fetchError } = await supabase
-        .from('daily_tasks')
-        .select('id, user_id, task_date')
-        .eq('id', taskId)
-        .eq('user_id', user.id)
-        .eq('task_date', taskDate)
-        .maybeSingle();
+      const task = await getDocument<{ user_id: string; task_date: string }>('daily_tasks', taskId);
+      if (!task) throw new Error('Task not found');
+      if (task.user_id !== user.uid) throw new Error('Unauthorized');
+      if (task.task_date !== taskDate) throw new Error('Task date mismatch');
 
-      if (fetchError) throw fetchError;
-      if (!task) throw new Error('Task not found or access denied');
+      // Set all tasks for this date to not be main quest
+      const tasksForDate = await getDocuments(
+        'daily_tasks',
+        [
+          ['user_id', '==', user.uid],
+          ['task_date', '==', taskDate],
+        ]
+      );
 
-      await supabase
-        .from('daily_tasks')
-        .update({ is_main_quest: false })
-        .eq('user_id', user.id)
-        .eq('task_date', taskDate);
+      for (const t of tasksForDate) {
+        await updateDocument('daily_tasks', t.id, { is_main_quest: false });
+      }
 
-      const { error: updateError } = await supabase
-        .from('daily_tasks')
-        .update({ is_main_quest: true })
-        .eq('id', taskId)
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
+      // Set the selected task as main quest
+      await updateDocument('daily_tasks', taskId, { is_main_quest: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -276,21 +261,19 @@ export const useTaskMutations = (taskDate: string) => {
         notes: string | null;
       }
     }) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
 
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update({
-          task_text: updates.task_text,
-          difficulty: updates.difficulty,
-          scheduled_time: updates.scheduled_time,
-          estimated_duration: updates.estimated_duration,
-          notes: updates.notes,
-        })
-        .eq('id', taskId)
-        .eq('user_id', user.id);
+      const task = await getDocument<{ user_id: string }>('daily_tasks', taskId);
+      if (!task) throw new Error('Task not found');
+      if (task.user_id !== user.uid) throw new Error('Unauthorized');
 
-      if (error) throw error;
+      await updateDocument('daily_tasks', taskId, {
+        task_text: updates.task_text,
+        difficulty: updates.difficulty,
+        scheduled_time: updates.scheduled_time,
+        estimated_duration: updates.estimated_duration,
+        notes: updates.notes,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -314,3 +297,4 @@ export const useTaskMutations = (taskDate: string) => {
     isUpdating: updateTask.isPending,
   };
 };
+

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument, deleteDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -25,64 +25,76 @@ export function useHabits() {
 
   // Fetch habits
   const { data: habits = [], isLoading: habitsLoading } = useQuery({
-    queryKey: ['habits', user?.id],
+    queryKey: ['habits', user?.uid],
     queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       
-      const { data } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-      return (data || []) as Habit[];
+      const data = await getDocuments<Habit>(
+        'habits',
+        [
+          ['user_id', '==', user.uid],
+          ['is_active', '==', true],
+        ]
+      );
+      return data;
     },
     enabled: !!user,
   });
 
   // Fetch completions for today
   const { data: completions = [] } = useQuery({
-    queryKey: ['habit-completions', user?.id],
+    queryKey: ['habit-completions', user?.uid],
     queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       
       const today = format(new Date(), 'yyyy-MM-dd');
-      const { data } = await supabase
-        .from('habit_completions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today);
-      return (data || []) as HabitCompletion[];
+      const data = await getDocuments<HabitCompletion>(
+        'habit_completions',
+        [
+          ['user_id', '==', user.uid],
+          ['date', '==', today],
+        ]
+      );
+      return data;
     },
     enabled: !!user,
   });
 
   const maybeAwardAllHabitsComplete = async () => {
-    if (!user?.id || habits.length === 0) return;
+    if (!user?.uid || habits.length === 0) return;
 
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const { count } = await supabase
-        .from('habit_completions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('date', today);
+      const todayCompletions = await getDocuments(
+        'habit_completions',
+        [
+          ['user_id', '==', user.uid],
+          ['date', '==', today],
+        ]
+      );
 
-      if ((count ?? 0) < habits.length) {
+      if (todayCompletions.length < habits.length) {
         return;
       }
 
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
-      const { data: existingBonus } = await supabase
-        .from('xp_events')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('event_type', 'all_habits_complete')
-        .gte('created_at', startOfDay.toISOString())
-        .maybeSingle();
+      const existingBonuses = await getDocuments(
+        'xp_events',
+        [
+          ['user_id', '==', user.uid],
+          ['event_type', '==', 'all_habits_complete'],
+        ]
+      );
 
-      if (existingBonus) {
+      // Check if any bonus was created today
+      const todayBonus = existingBonuses.find((bonus: any) => {
+        const createdAt = timestampToISO(bonus.created_at as any) || bonus.created_at;
+        return createdAt && new Date(createdAt) >= startOfDay;
+      });
+
+      if (todayBonus) {
         return;
       }
 
@@ -103,28 +115,31 @@ export function useHabits() {
       difficulty: HabitDifficulty; 
       selectedDays: number[] 
     }) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       
-      // Database-level check for max habits
-      const { count } = await supabase
-        .from('habits')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+      // Check for max habits
+      const existingHabits = await getDocuments(
+        'habits',
+        [
+          ['user_id', '==', user.uid],
+          ['is_active', '==', true],
+        ]
+      );
       
-      if (count && count >= 2) {
+      if (existingHabits.length >= 2) {
         throw new Error('Maximum 2 habits allowed');
       }
       
-      const { error } = await supabase.from('habits').insert({
-        user_id: user.id,
+      const habitId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      await setDocument('habits', habitId, {
+        id: habitId,
+        user_id: user.uid,
         title,
         frequency: selectedDays.length === 7 ? 'daily' : 'custom',
         custom_days: selectedDays.length === 7 ? null : selectedDays,
         difficulty,
-      });
-      
-      if (error) throw error;
+        is_active: true,
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -142,59 +157,71 @@ export function useHabits() {
   // Toggle habit completion
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isCompleted }: { habitId: string; isCompleted: boolean }) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.uid) throw new Error('User not authenticated');
       
       const today = format(new Date(), 'yyyy-MM-dd');
       
       if (isCompleted) {
         // Unchecking - remove completion record but DON'T remove XP
-        const { error } = await supabase
-          .from('habit_completions')
-          .delete()
-          .eq('habit_id', habitId)
-          .eq('user_id', user.id)
-          .eq('date', today);
-        if (error) throw error;
+        const completions = await getDocuments(
+          'habit_completions',
+          [
+            ['habit_id', '==', habitId],
+            ['user_id', '==', user.uid],
+            ['date', '==', today],
+          ]
+        );
+
+        for (const completion of completions) {
+          await deleteDocument('habit_completions', completion.id);
+        }
         return { isCompleting: false, isFirstCompletion: false };
       } else {
-        // ATOMIC INSERT: Use unique constraint to prevent duplicates
-        const { data: insertedData, error: insertError } = await supabase
-          .from('habit_completions')
-          .insert({ habit_id: habitId, user_id: user.id, date: today })
-          .select();
+        // Check if already completed (prevent duplicates)
+        const existing = await getDocuments(
+          'habit_completions',
+          [
+            ['habit_id', '==', habitId],
+            ['user_id', '==', user.uid],
+            ['date', '==', today],
+          ]
+        );
 
-        if (insertError) {
-          if (insertError.code === '23505') {
-            return { isCompleting: true, isFirstCompletion: false };
-          }
-          throw insertError;
+        if (existing.length > 0) {
+          return { isCompleting: true, isFirstCompletion: false };
+        }
+
+        // Create completion record
+        const completionId = `${user.uid}_${habitId}_${today}`;
+        await setDocument('habit_completions', completionId, {
+          id: completionId,
+          habit_id: habitId,
+          user_id: user.uid,
+          date: today,
+        }, false);
+        
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) throw new Error('Habit not found');
+        
+        const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
+        await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
+        await maybeAwardAllHabitsComplete();
+        
+        // Update companion attributes in background
+        if (companion?.id) {
+          updateMindFromHabit(companion.id).catch(() => {});
+          updateBodyFromActivity(companion.id).catch(() => {});
         }
         
-        const isFirstCompletion = insertedData && insertedData.length > 0;
-        if (isFirstCompletion) {
-          const habit = habits.find(h => h.id === habitId);
-          if (!habit) throw new Error('Habit not found');
-          
-          const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
-          await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
-          await maybeAwardAllHabitsComplete();
-          
-          // Update companion attributes in background
-          if (companion?.id) {
-            updateMindFromHabit(companion.id).catch(() => {});
-            updateBodyFromActivity(companion.id).catch(() => {});
-          }
-          
-          // Check for streak achievements
-          if (profile?.current_habit_streak) {
-            await checkStreakAchievements(profile.current_habit_streak);
-          }
-          
-          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-          haptics.success();
+        // Check for streak achievements
+        if (profile?.current_habit_streak) {
+          await checkStreakAchievements(profile.current_habit_streak);
         }
         
-        return { isCompleting: true, isFirstCompletion };
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        haptics.success();
+        
+        return { isCompleting: true, isFirstCompletion: true };
       }
     },
     onSuccess: () => {

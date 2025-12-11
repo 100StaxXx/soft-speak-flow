@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { getDocuments, getDocument, setDocument, updateDocument, timestampToISO } from '@/lib/firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useXPRewards } from '@/hooks/useXPRewards';
@@ -38,54 +38,65 @@ export const useAstralEncounters = () => {
 
   // Fetch user's encounter history
   const { data: encounters, isLoading: encountersLoading } = useQuery({
-    queryKey: ['astral-encounters', user?.id],
+    queryKey: ['astral-encounters', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('astral_encounters')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      if (!user?.uid) return [];
+      const data = await getDocuments<AstralEncounter>(
+        'astral_encounters',
+        [['user_id', '==', user.uid]],
+        'created_at',
+        'desc',
+        50
+      );
       
-      if (error) throw error;
-      return data as AstralEncounter[];
+      return data.map(encounter => ({
+        ...encounter,
+        created_at: timestampToISO(encounter.created_at as any) || encounter.created_at || new Date().toISOString(),
+        completed_at: timestampToISO(encounter.completed_at as any) || encounter.completed_at,
+        retry_available_at: timestampToISO(encounter.retry_available_at as any) || encounter.retry_available_at,
+      }));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Fetch collected essences
   const { data: essences, isLoading: essencesLoading } = useQuery({
-    queryKey: ['adversary-essences', user?.id],
+    queryKey: ['adversary-essences', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('adversary_essences')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('absorbed_at', { ascending: false });
+      if (!user?.uid) return [];
+      const data = await getDocuments<AdversaryEssence>(
+        'adversary_essences',
+        [['user_id', '==', user.uid]],
+        'absorbed_at',
+        'desc'
+      );
       
-      if (error) throw error;
-      return data as AdversaryEssence[];
+      return data.map(essence => ({
+        ...essence,
+        absorbed_at: timestampToISO(essence.absorbed_at as any) || essence.absorbed_at || new Date().toISOString(),
+      }));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Fetch cosmic codex entries
   const { data: codexEntries, isLoading: codexLoading } = useQuery({
-    queryKey: ['cosmic-codex', user?.id],
+    queryKey: ['cosmic-codex', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('cosmic_codex_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('times_defeated', { ascending: false });
+      if (!user?.uid) return [];
+      const data = await getDocuments<CosmicCodexEntry>(
+        'cosmic_codex_entries',
+        [['user_id', '==', user.uid]],
+        'times_defeated',
+        'desc'
+      );
       
-      if (error) throw error;
-      return data as CosmicCodexEntry[];
+      return data.map(entry => ({
+        ...entry,
+        last_defeated_at: timestampToISO(entry.last_defeated_at as any) || entry.last_defeated_at,
+      }));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Calculate total stat boosts from essences
@@ -107,7 +118,7 @@ export const useAstralEncounters = () => {
       epicCategory?: string;
       questInterval?: number;
     }) => {
-      if (!user?.id || !companion?.id) {
+      if (!user?.uid || !companion?.id) {
         throw new Error('User or companion not found');
       }
 
@@ -117,25 +128,23 @@ export const useAstralEncounters = () => {
         params.epicCategory
       );
 
-      const { data, error } = await supabase
-        .from('astral_encounters')
-        .insert({
-          user_id: user.id,
-          companion_id: companion.id,
-          adversary_name: adversary.name,
-          adversary_theme: adversary.theme,
-          adversary_tier: adversary.tier,
-          adversary_lore: adversary.lore,
-          mini_game_type: adversary.miniGameType,
-          trigger_type: params.triggerType,
-          trigger_source_id: params.triggerSourceId || null,
-          total_phases: adversary.phases,
-        })
-        .select()
-        .single();
+      const encounterId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const encounterData = {
+        id: encounterId,
+        user_id: user.uid,
+        companion_id: companion.id,
+        adversary_name: adversary.name,
+        adversary_theme: adversary.theme,
+        adversary_tier: adversary.tier,
+        adversary_lore: adversary.lore,
+        mini_game_type: adversary.miniGameType,
+        trigger_type: params.triggerType,
+        trigger_source_id: params.triggerSourceId || null,
+        total_phases: adversary.phases,
+      };
 
-      if (error) throw error;
-      return { encounter: data as AstralEncounter, adversary, questInterval: params.questInterval };
+      await setDocument('astral_encounters', encounterId, encounterData, false);
+      return { encounter: encounterData as AstralEncounter, adversary, questInterval: params.questInterval };
     },
     onSuccess: ({ encounter, adversary, questInterval }) => {
       setActiveEncounter({ encounter, adversary, questInterval });
@@ -157,7 +166,7 @@ export const useAstralEncounters = () => {
       accuracy: number;
       phasesCompleted: number;
     }) => {
-      if (!user?.id || !companion?.id || !activeEncounter) {
+      if (!user?.uid || !companion?.id || !activeEncounter) {
         throw new Error('Missing required data');
       }
 
@@ -168,30 +177,27 @@ export const useAstralEncounters = () => {
       );
 
       // Update encounter
-      const { error: updateError } = await supabase
-        .from('astral_encounters')
-        .update({
-          result,
-          accuracy_score: params.accuracy,
-          xp_earned: xpEarned,
-          essence_earned: result !== 'fail' ? activeEncounter.adversary.essenceName : null,
-          stat_boost_type: result !== 'fail' ? activeEncounter.adversary.statType : null,
-          stat_boost_amount: result !== 'fail' ? activeEncounter.adversary.statBoost : 0,
-          phases_completed: params.phasesCompleted,
-          completed_at: new Date().toISOString(),
-          retry_available_at: result === 'fail' 
-            ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() 
-            : null,
-        })
-        .eq('id', params.encounterId);
-
-      if (updateError) throw updateError;
+      await updateDocument('astral_encounters', params.encounterId, {
+        result,
+        accuracy_score: params.accuracy,
+        xp_earned: xpEarned,
+        essence_earned: result !== 'fail' ? activeEncounter.adversary.essenceName : null,
+        stat_boost_type: result !== 'fail' ? activeEncounter.adversary.statType : null,
+        stat_boost_amount: result !== 'fail' ? activeEncounter.adversary.statBoost : 0,
+        phases_completed: params.phasesCompleted,
+        completed_at: new Date().toISOString(),
+        retry_available_at: result === 'fail' 
+          ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() 
+          : null,
+      });
 
       // If successful, create essence and update codex
       if (result !== 'fail') {
         // Create essence
-        await supabase.from('adversary_essences').insert({
-          user_id: user.id,
+        const essenceId = `${user.uid}_${params.encounterId}_${Date.now()}`;
+        await setDocument('adversary_essences', essenceId, {
+          id: essenceId,
+          user_id: user.uid,
           companion_id: companion.id,
           encounter_id: params.encounterId,
           essence_name: activeEncounter.adversary.essenceName,
@@ -201,31 +207,35 @@ export const useAstralEncounters = () => {
           adversary_name: activeEncounter.adversary.name,
           adversary_theme: activeEncounter.adversary.theme,
           rarity: activeEncounter.adversary.tier,
-        });
+          absorbed_at: new Date().toISOString(),
+        }, false);
 
         // Update or insert codex entry
-        const { data: existingEntry } = await supabase
-          .from('cosmic_codex_entries')
-          .select('id, times_defeated')
-          .eq('user_id', user.id)
-          .eq('adversary_theme', activeEncounter.adversary.theme)
-          .single();
+        const existingEntries = await getDocuments(
+          'cosmic_codex_entries',
+          [
+            ['user_id', '==', user.uid],
+            ['adversary_theme', '==', activeEncounter.adversary.theme],
+          ]
+        );
 
-        if (existingEntry) {
-          await supabase
-            .from('cosmic_codex_entries')
-            .update({
-              times_defeated: existingEntry.times_defeated + 1,
-              last_defeated_at: new Date().toISOString(),
-            })
-            .eq('id', existingEntry.id);
+        if (existingEntries.length > 0) {
+          const existingEntry = existingEntries[0];
+          await updateDocument('cosmic_codex_entries', existingEntry.id, {
+            times_defeated: (existingEntry.times_defeated || 0) + 1,
+            last_defeated_at: new Date().toISOString(),
+          });
         } else {
-          await supabase.from('cosmic_codex_entries').insert({
-            user_id: user.id,
+          const codexId = `${user.uid}_${activeEncounter.adversary.theme}`;
+          await setDocument('cosmic_codex_entries', codexId, {
+            id: codexId,
+            user_id: user.uid,
             adversary_theme: activeEncounter.adversary.theme,
             adversary_name: activeEncounter.adversary.name,
             adversary_lore: activeEncounter.adversary.lore,
-          });
+            times_defeated: 1,
+            last_defeated_at: new Date().toISOString(),
+          }, false);
         }
 
         // Update companion stats - validate statType is a valid field
@@ -237,10 +247,9 @@ export const useAstralEncounters = () => {
         const currentStat = (companion as any)[statField] || 0;
         const newStat = Math.min(100, currentStat + activeEncounter.adversary.statBoost);
 
-        await supabase
-          .from('user_companion')
-          .update({ [statField]: newStat })
-          .eq('id', companion.id);
+        await updateDocument('user_companion', companion.id, {
+          [statField]: newStat,
+        });
 
         // Award XP
         if (xpEarned > 0) {
@@ -274,19 +283,21 @@ export const useAstralEncounters = () => {
     epicCategory?: string,
     questInterval?: number
   ) => {
-    if (!user?.id) return false;
+    if (!user?.uid) return false;
     if (!companion?.id) {
       console.warn('Encounter trigger skipped: companion not ready');
       return false;
     }
 
     // Check for recent incomplete encounter
-    const { data: pendingEncounter } = await supabase
-      .from('astral_encounters')
-      .select('*')
-      .eq('user_id', user.id)
-      .is('completed_at', null)
-      .single();
+    const pendingEncounters = await getDocuments(
+      'astral_encounters',
+      [
+        ['user_id', '==', user.uid],
+      ]
+    );
+
+    const pendingEncounter = pendingEncounters.find(e => !e.completed_at);
 
     if (pendingEncounter) {
       // Resume pending encounter - reconstruct adversary from stored data
@@ -320,7 +331,7 @@ export const useAstralEncounters = () => {
       questInterval
     });
     return true;
-  }, [user?.id, companion?.id, startEncounterMutate]);
+  }, [user?.uid, companion?.id, startEncounterMutate]);
 
   const closeEncounter = useCallback(() => {
     setShowEncounterModal(false);

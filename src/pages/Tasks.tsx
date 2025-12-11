@@ -31,11 +31,11 @@ import { BottomNav } from "@/components/BottomNav";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -173,29 +173,35 @@ export default function Tasks() {
 
   // Tutorial auto-generation
   useEffect(() => {
+    // Reset ref on mount to ensure fresh check
+    tutorialCheckRef.current = false;
+    
     if (!user?.id || !profile) return;
+    
+    // Skip if already checking or tutorial already shown
+    if (tutorialCheckRef.current || showTutorial) return;
     
     const tutorialSeen = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`) === 'true';
     const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
     const profileTutorialSeen = onboardingData.quests_tutorial_seen === true;
     
-    if ((tutorialSeen || profileTutorialSeen) || tutorialCheckRef.current) {
+    // If tutorial already seen, don't show it
+    if (tutorialSeen || profileTutorialSeen) {
       return;
     }
     
-    if (!tutorialSeen && !showTutorial) {
-      tutorialCheckRef.current = true;
-      setShowTutorial(true);
-      
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const questCreationKey = `tutorial_quest_created_${user.id}`;
-      const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
-      
-      if (questAlreadyCreated) {
-        tutorialCheckRef.current = false;
-        return;
-      }
-      
+    // Mark as checking to prevent duplicate checks
+    tutorialCheckRef.current = true;
+    
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const questCreationKey = `tutorial_quest_created_${user.id}`;
+    const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
+    
+    // Show tutorial first, then create quest
+    setShowTutorial(true);
+    
+    // Only create quest if it hasn't been created yet
+    if (!questAlreadyCreated) {
       safeLocalStorage.setItem(questCreationKey, 'true');
       
       const checkAndCreateQuest = async () => {
@@ -220,21 +226,27 @@ export default function Tasks() {
               });
             
             if (insertError) {
+              console.error('Error creating tutorial quest:', insertError);
               safeLocalStorage.removeItem(questCreationKey);
             } else {
               queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
             }
           }
-        } catch {
+        } catch (error) {
+          console.error('Error in tutorial quest creation:', error);
           safeLocalStorage.removeItem(questCreationKey);
         } finally {
+          // Reset ref after quest creation completes
           tutorialCheckRef.current = false;
         }
       };
       
       checkAndCreateQuest();
+    } else {
+      // Quest already created, just reset the ref
+      tutorialCheckRef.current = false;
     }
-  }, [user?.id, profile, showTutorial, queryClient]);
+  }, [user?.id, profile, queryClient]); // Removed showTutorial from dependencies to prevent circular updates
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -433,8 +445,20 @@ export default function Tasks() {
     );
   }
 
-  // No companion - redirect to onboarding
-  if (!companion) {
+  // Show loading while companion is being fetched
+  if (companionLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="text-center space-y-4 p-6">
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Loading your companion...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No companion - redirect to onboarding (only after loading is complete)
+  if (!companion && !companionLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
         <div className="text-center space-y-4 p-6">

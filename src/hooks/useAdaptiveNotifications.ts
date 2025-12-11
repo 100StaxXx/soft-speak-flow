@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { getDocument, getDocuments, setDocument, deleteDocument, timestampToISO } from '@/lib/firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -27,17 +27,11 @@ export const useAdaptiveNotifications = () => {
 
   // Fetch user's adaptive push settings
   const { data: settings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['adaptive-push-settings', user?.id],
+    queryKey: ['adaptive-push-settings', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.uid) return null;
       
-      const { data, error } = await supabase
-        .from('adaptive_push_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (error) throw error;
+      const data = await getDocument('adaptive_push_settings', user.uid);
       
       return data ? {
         enabled: data.enabled ?? true,
@@ -50,56 +44,54 @@ export const useAdaptiveNotifications = () => {
         mentorId: data.mentor_id,
       } : null;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Fetch pending notifications for preview
   const { data: pendingNotifications, isLoading: notificationsLoading } = useQuery({
-    queryKey: ['pending-notifications', user?.id],
+    queryKey: ['pending-notifications', user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.uid) return [];
       
-      const { data, error } = await supabase
-        .from('push_notification_queue')
-        .select('notification_type, title, body, scheduled_for')
-        .eq('user_id', user.id)
-        .eq('delivered', false)
-        .order('scheduled_for', { ascending: true })
-        .limit(5);
+      const data = await getDocuments(
+        'push_notification_queue',
+        [
+          ['user_id', '==', user.uid],
+          ['delivered', '==', false],
+        ],
+        'scheduled_for',
+        'asc',
+        5
+      );
       
-      if (error) throw error;
-      
-      return (data || []).map(n => ({
+      return data.map(n => ({
         type: n.notification_type,
         title: n.title,
         body: n.body,
         scheduledFor: n.scheduled_for,
       })) as NotificationPreview[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Update settings mutation
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<AdaptivePushSettings>) => {
-      if (!user?.id) throw new Error('No user');
+      if (!user?.uid) throw new Error('No user');
       
-      const { error } = await supabase
-        .from('adaptive_push_settings')
-        .upsert({
-          user_id: user.id,
-          enabled: newSettings.enabled,
-          frequency: newSettings.frequency,
-          categories: newSettings.categories,
-          primary_category: newSettings.primaryCategory,
-          time_window: newSettings.timeWindow,
-          intensity: newSettings.intensity,
-          emotional_triggers: newSettings.emotionalTriggers,
-          mentor_id: newSettings.mentorId,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-      
-      if (error) throw error;
+      await setDocument('adaptive_push_settings', user.uid, {
+        id: user.uid,
+        user_id: user.uid,
+        enabled: newSettings.enabled,
+        frequency: newSettings.frequency,
+        categories: newSettings.categories,
+        primary_category: newSettings.primaryCategory,
+        time_window: newSettings.timeWindow,
+        intensity: newSettings.intensity,
+        emotional_triggers: newSettings.emotionalTriggers,
+        mentor_id: newSettings.mentorId,
+        updated_at: new Date().toISOString(),
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adaptive-push-settings'] });
@@ -114,14 +106,17 @@ export const useAdaptiveNotifications = () => {
   // Trigger immediate notification generation for user
   const triggerNotification = useMutation({
     mutationFn: async (type?: string) => {
-      if (!user?.id) throw new Error('No user');
+      if (!user?.uid) throw new Error('No user');
       
-      const { data, error } = await supabase.functions.invoke('generate-smart-notifications', {
-        body: { userId: user.id, forceType: type },
-      });
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-smart-notifications', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ userId: user.uid, forceType: type }),
+      // });
+      // const data = await response.json();
+      // return data;
       
-      if (error) throw error;
-      return data;
+      throw new Error("Notification generation needs Firebase Cloud Function migration");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
@@ -136,15 +131,19 @@ export const useAdaptiveNotifications = () => {
   // Clear all pending notifications
   const clearPending = useMutation({
     mutationFn: async () => {
-      if (!user?.id) throw new Error('No user');
+      if (!user?.uid) throw new Error('No user');
       
-      const { error } = await supabase
-        .from('push_notification_queue')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('delivered', false);
-      
-      if (error) throw error;
+      const pending = await getDocuments(
+        'push_notification_queue',
+        [
+          ['user_id', '==', user.uid],
+          ['delivered', '==', false],
+        ]
+      );
+
+      for (const notification of pending) {
+        await deleteDocument('push_notification_queue', notification.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });
@@ -174,14 +173,13 @@ export const useCompanionNotifications = () => {
   // Send a "thinking of you" notification from companion
   const sendCompanionMessage = useMutation({
     mutationFn: async (messageType: 'encouragement' | 'checkin' | 'celebration') => {
-      if (!user?.id) throw new Error('No user');
+      if (!user?.uid) throw new Error('No user');
       
       // Get companion info
-      const { data: companion } = await supabase
-        .from('user_companion')
-        .select('spirit_animal, current_mood')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const companion = await getDocument<{ spirit_animal: string; current_mood: string | null }>(
+        'user_companion',
+        user.uid
+      );
       
       if (!companion) throw new Error('No companion');
       
@@ -198,22 +196,21 @@ export const useCompanionNotifications = () => {
         companion.current_mood
       );
 
-      const { error } = await supabase
-        .from('push_notification_queue')
-        .insert({
-          user_id: user.id,
-          notification_type: `companion_${messageType}`,
-          title: titles[messageType],
-          body,
-          scheduled_for: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 min from now
-          context: { 
-            companion_species: companion.spirit_animal,
-            companion_mood: companion.current_mood,
-            message_type: messageType,
-          },
-        });
-      
-      if (error) throw error;
+      const notificationId = `${user.uid}_companion_${messageType}_${Date.now()}`;
+      await setDocument('push_notification_queue', notificationId, {
+        id: notificationId,
+        user_id: user.uid,
+        notification_type: `companion_${messageType}`,
+        title: titles[messageType],
+        body,
+        scheduled_for: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 min from now
+        delivered: false,
+        context: { 
+          companion_species: companion.spirit_animal,
+          companion_mood: companion.current_mood,
+          message_type: messageType,
+        },
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });

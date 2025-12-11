@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, setDocument, updateDocument, getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Companion {
   id: string;
@@ -26,6 +27,7 @@ export interface Companion {
   mind?: number;
   soul?: number;
   last_energy_update?: string;
+  display_name?: string; // Generated companion name
   created_at: string;
   updated_at: string;
 }
@@ -46,18 +48,21 @@ export const useCompanion = () => {
   const companionCreationInProgress = useRef(false);
 
   const { data: companion, isLoading, error } = useQuery({
-    queryKey: ["companion", user?.id],
+    queryKey: ["companion", user?.uid],
     queryFn: async () => {
       if (!user) return null;
       
-      const { data, error } = await supabase
-        .from("user_companion")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as Companion | null;
+      const data = await getDocument<Companion>("user_companion", user.uid);
+      
+      if (!data) return null;
+      
+      // Convert Firestore timestamps to ISO strings
+      return {
+        ...data,
+        created_at: timestampToISO(data.created_at as any) || data.created_at || new Date().toISOString(),
+        updated_at: timestampToISO(data.updated_at as any) || data.updated_at || new Date().toISOString(),
+        last_energy_update: timestampToISO(data.last_energy_update as any) || data.last_energy_update || undefined,
+      } as Companion;
     },
     enabled: !!user,
     staleTime: 30000, // 30 seconds - prevents unnecessary refetches
@@ -87,168 +92,150 @@ export const useCompanion = () => {
         const eyeColor = `glowing ${data.favoriteColor}`;
         const furColor = data.favoriteColor;
 
-        // Generate initial companion image with color specifications (with retry)
-        logger.log("Generating companion image...");
-        const imageData = await retryWithBackoff(
-          async () => {
-            const { data: imageResult, error } = await supabase.functions.invoke(
-              "generate-companion-image",
-              {
-                body: {
-                  favoriteColor: data.favoriteColor,
-                  spiritAnimal: data.spiritAnimal,
-                  element: data.coreElement,
-                  stage: 0,
-                  eyeColor,
-                  furColor,
-                },
-              }
-            );
+        // Use placeholder image for now (will be replaced with Firebase Cloud Function later)
+        logger.log("Using placeholder companion image...");
+        const imageData = {
+          imageUrl: "/placeholder-companion.svg" // Placeholder image - will be replaced with generated image later
+        };
+
+      logger.log("Creating companion record in Firestore...");
+
+        // Check if companion already exists
+        const existingCompanion = await getDocument("user_companion", user.uid);
+        let companionData: any;
+        let isNewCompanion = false;
+
+        if (existingCompanion) {
+          // Companion already exists, return existing data
+          logger.log("Companion already exists, returning existing data");
+          companionData = existingCompanion;
+          isNewCompanion = false;
+        } else {
+          // Create new companion
+          const companionId = user.uid; // Use user ID as companion ID
+          
+          // Generate AI companion name via Cloud Function
+          let displayName: string | null = null;
+          try {
+            const { getFunctions, httpsCallable } = await import("firebase/functions");
+            const { firebaseApp } = await import("@/lib/firebase");
             
-            // Handle specific error codes from edge function
-            if (error) {
-              console.error("Companion image generation error:", error);
-              const errorMsg = error.message || String(error);
-              
-              // Check for specific error codes
-              if (errorMsg.includes("INSUFFICIENT_CREDITS") || errorMsg.includes("Insufficient AI credits")) {
-                throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
-              }
-              if (errorMsg.includes("RATE_LIMITED") || errorMsg.includes("AI service is currently busy")) {
-                throw new Error("The service is currently busy. Please wait a moment and try again.");
-              }
-              if (errorMsg.includes("NO_AUTH_HEADER") || errorMsg.includes("INVALID_AUTH") || 
-                  errorMsg.includes("Authentication required") || errorMsg.includes("Invalid authentication")) {
-                throw new Error("Your session has expired. Please refresh the page and try again.");
-              }
-              if (errorMsg.includes("NETWORK_ERROR") || errorMsg.includes("Network error")) {
-                throw new Error("Network error. Please check your connection and try again.");
-              }
-              if (errorMsg.includes("SERVER_CONFIG_ERROR") || errorMsg.includes("AI_SERVICE_NOT_CONFIGURED")) {
-                throw new Error("Service configuration error. Please contact support.");
-              }
-              
-              throw new Error(errorMsg || "Failed to generate companion image. Please try again.");
-            }
+            const functions = getFunctions(firebaseApp);
+            const generateCompanionName = httpsCallable(functions, "generateCompanionName");
             
-            if (!imageResult?.imageUrl) {
-              console.error("No image URL in result:", imageResult);
-              throw new Error("Unable to create your companion's image. Please try again.");
+            const result = await generateCompanionName({
+              spiritAnimal: data.spiritAnimal,
+              favoriteColor: data.favoriteColor,
+              coreElement: data.coreElement,
+              userAttributes: {
+                body: 0,
+                mind: 0,
+                soul: 0,
+              },
+            });
+            
+            const nameData = result.data as { name?: string };
+            if (nameData?.name) {
+              displayName = nameData.name;
+              logger.log("Generated AI companion name:", displayName);
             }
-            return imageResult;
-          },
-          {
-            maxAttempts: 3,
-            initialDelay: 2000,
-            shouldRetry: (error: unknown) => {
-              // Don't retry on payment/credits errors or auth errors
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              if (errorMessage.includes("INSUFFICIENT_CREDITS") ||
-                  errorMessage.includes("temporarily unavailable") ||
-                  errorMessage.includes("Authentication failed") ||
-                  errorMessage.includes("contact support")) {
-                return false;
-              }
-              return true;
-            }
+          } catch (nameError) {
+            logger.warn("Failed to generate AI companion name (non-critical):", nameError);
+            // Continue without name - it can be generated later
           }
-        );
-
-        if (!imageData?.imageUrl) {
-        logger.error("Missing imageUrl after generation:", imageData);
-        throw new Error("Unable to create your companion's image. Please try again.");
-      }
-
-      logger.log("Image generated successfully, creating companion record...");
-
-        // Use atomic database function to create companion (prevents duplicates)
-        const result = await supabase.rpc('create_companion_if_not_exists', {
-          p_user_id: user.id,
-          p_favorite_color: data.favoriteColor,
-          p_spirit_animal: data.spiritAnimal,
-          p_core_element: data.coreElement,
-          p_story_tone: data.storyTone,
-          p_current_image_url: imageData.imageUrl,
-          p_initial_image_url: imageData.imageUrl,
-          p_eye_color: eyeColor,
-          p_fur_color: furColor,
-        }) as { data: CreateCompanionIfNotExistsResult[] | null; error: Error | null };
-
-        if (result.error) {
-          console.error("Database error creating companion:", result.error);
-          throw new Error(`Failed to save companion to database: ${result.error.message}`);
+          
+          const newCompanion = {
+            id: companionId,
+            user_id: user.uid,
+            favorite_color: data.favoriteColor,
+            spirit_animal: data.spiritAnimal,
+            core_element: data.coreElement,
+            story_tone: data.storyTone,
+            current_image_url: imageData.imageUrl,
+            initial_image_url: imageData.imageUrl,
+            eye_color: eyeColor,
+            fur_color: furColor,
+            current_stage: 0,
+            current_xp: 0,
+            body: 0,
+            mind: 0,
+            soul: 0,
+            ...(displayName && { display_name: displayName }),
+          };
+          
+          logger.log("Writing companion to Firestore:", { companionId, newCompanion });
+          try {
+            await setDocument("user_companion", companionId, newCompanion, false);
+            logger.log("Companion created successfully in Firestore");
+          } catch (firestoreError) {
+            logger.error("Firestore write error:", firestoreError);
+            throw new Error(`Failed to create companion in Firestore: ${firestoreError instanceof Error ? firestoreError.message : String(firestoreError)}`);
+          }
+          companionData = { ...newCompanion, is_new: true };
+          isNewCompanion = true;
         }
-        
-        const companionResult = result.data;
-
-        logger.log("RPC call successful, result:", companionResult);
-      
-      if (!companionResult || companionResult.length === 0) {
-        logger.error("No companion data returned from function");
-        throw new Error("Failed to create companion record. Please try again.");
-      }
-
-      const companionData = companionResult[0] as unknown as CreateCompanionIfNotExistsResult;
-      const isNewCompanion = companionData.is_new;
 
       logger.log(`Companion ${isNewCompanion ? 'created' : 'already exists'}:`, companionData.id);
 
-      // Check if stage 0 evolution exists (regardless of whether companion is new)
-      const { data: existingEvolution } = await supabase
-        .from("companion_evolutions")
-        .select("id")
-        .eq("companion_id", companionData.id)
-        .eq("stage", 0)
-        .maybeSingle();
+        // Check if stage 0 evolution exists (regardless of whether companion is new)
+        const existingEvolutions = await getDocuments(
+          "companion_evolutions",
+          [
+            ["companion_id", "==", companionData.id],
+            ["stage", "==", 0],
+          ]
+        );
 
-      // Create stage 0 evolution if missing
-      if (!existingEvolution) {
-        logger.log("Creating stage 0 evolution...");
-        const { data: stageZeroEvolution, error: stageZeroInsertError } = await supabase
-          .from("companion_evolutions")
-          .insert({
-            companion_id: companionData.id,
-            stage: 0,
-            image_url: imageData.imageUrl,
-            xp_at_evolution: 0,
-          })
-          .select()
-          .maybeSingle();
-
-        if (stageZeroInsertError) {
-          console.error("Failed to create stage 0 evolution:", stageZeroInsertError);
-          throw new Error(`Unable to record stage 0 evolution: ${stageZeroInsertError.message}`);
-        }
-
-        if (!stageZeroEvolution) {
-          console.error("Stage 0 evolution insert returned no data");
-          throw new Error("Unable to record stage 0 evolution");
-        }
+        // Create stage 0 evolution if missing
+        if (existingEvolutions.length === 0) {
+          logger.log("Creating stage 0 evolution...");
+          const evolutionId = `${companionData.id}_stage_0`;
+          try {
+            await setDocument("companion_evolutions", evolutionId, {
+              id: evolutionId,
+              companion_id: companionData.id,
+              stage: 0,
+              image_url: imageData.imageUrl,
+              xp_at_evolution: 0,
+            }, false);
+            logger.log("Stage 0 evolution created successfully");
+          } catch (evolutionError) {
+            logger.error("Failed to create stage 0 evolution (non-critical):", evolutionError);
+            // Don't throw - evolution creation is not critical for companion creation
+          }
 
         // Generate stage 0 card in background (don't await - don't block onboarding)
         const generateStageZeroCard = async () => {
           try {
-            const { data: fullCompanionData } = await supabase
-              .from("user_companion")
-              .select("*")
-              .eq("id", companionData.id)
-              .single();
-
-            await supabase.functions.invoke("generate-evolution-card", {
-              body: {
-                companionId: companionData.id,
-                evolutionId: stageZeroEvolution.id,
-                stage: 0,
-                species: companionData.spirit_animal,
-                element: companionData.core_element,
-                color: companionData.favorite_color,
-                userAttributes: {
-                  body: fullCompanionData?.body || 0,
-                  mind: fullCompanionData?.mind || 0,
-                  soul: fullCompanionData?.soul || 0,
-                },
+            const fullCompanionData = await getDocument("user_companion", companionData.id);
+            
+            // Get evolution ID for stage 0
+            const evolutionRecords = await getDocuments(
+              "companion_evolutions",
+              [
+                ["companion_id", "==", companionData.id],
+                ["stage", "==", 0],
+              ]
+            );
+            
+            const evolutionId = evolutionRecords[0]?.id || `${companionData.id}_stage_0`;
+            
+            // Call Firebase Cloud Function to generate evolution card
+            const { generateEvolutionCard } = await import("@/lib/firebase/functions");
+            await generateEvolutionCard({
+              companionId: companionData.id,
+              evolutionId,
+              stage: 0,
+              species: fullCompanionData?.spirit_animal || "Unknown",
+              element: fullCompanionData?.core_element || "Unknown",
+              color: fullCompanionData?.favorite_color || "#000000",
+              userAttributes: {
+                mind: fullCompanionData?.mind || 0,
+                body: fullCompanionData?.body || 0,
+                soul: fullCompanionData?.soul || 0,
               },
             });
+            
             queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
           } catch (cardError) {
             console.error("Stage 0 card generation failed (non-critical):", cardError);
@@ -261,19 +248,13 @@ export const useCompanion = () => {
       // Generate story only for new companions
       if (isNewCompanion) {
         // Auto-generate the first chapter of the companion's story in background with retry
+        // TODO: Migrate to Firebase Cloud Function
         const generateStoryWithRetry = async (attempts = 3) => {
           for (let attempt = 1; attempt <= attempts; attempt++) {
             try {
-              const { data, error } = await supabase.functions.invoke('generate-companion-story', {
-                body: {
-                  companionId: companionData.id,
-                  stage: 0,
-                }
-              });
-
-              if (error) throw error;
-
-              logger.log("Stage 0 story generation started");
+              // TODO: Replace with Firebase Cloud Function call
+              // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-story', {...});
+              logger.log("Stage 0 story generation skipped - needs Firebase Cloud Function");
               queryClient.invalidateQueries({ queryKey: ["companion-story"] });
               queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
               return;
@@ -346,8 +327,8 @@ export const useCompanion = () => {
         if (!companionToUse) {
           logger.warn('Companion not loaded yet, fetching...');
           // Refetch companion data and wait for it to complete
-          await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-          companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+          await queryClient.refetchQueries({ queryKey: ["companion", user.uid] });
+          companionToUse = queryClient.getQueryData(["companion", user.uid]) as Companion | null;
           
           if (!companionToUse) {
             throw new Error("No companion found. Please create one first.");
@@ -392,7 +373,7 @@ export const useCompanion = () => {
     metadata: Record<string, string | number | boolean | undefined>,
     currentUser: typeof user
   ) => {
-    if (!currentUser?.id) {
+    if (!currentUser?.uid) {
       throw new Error("Not authenticated");
     }
     // Note: xpInProgress flag is managed by the caller (awardXP mutation)
@@ -426,13 +407,9 @@ export const useCompanion = () => {
 
 
     // Update companion XP
-    const { error: updateError } = await supabase
-      .from("user_companion")
-      .update({ current_xp: newXP })
-      .eq("id", companionData.id)
-      .eq("user_id", currentUser.id);
-
-    if (updateError) throw updateError;
+    await updateDocument("user_companion", companionData.id, {
+      current_xp: newXP,
+    });
 
     return { shouldEvolve: shouldEvolveNow, newStage, newXP };
   };
@@ -444,36 +421,29 @@ export const useCompanion = () => {
 
     try {
       // Check if user was referred by someone
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", user.id)
-        .maybeSingle();
+      const profile = await getDocument<{ referred_by: string | null }>("profiles", user.uid);
 
-      if (profileError) {
-        console.error("Error fetching profile for referral validation:", profileError);
-        return;
-      }
       if (!profile?.referred_by) return;
 
+      // TODO: Migrate referral completion to Firebase Cloud Function
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          const response = await (supabase.rpc as unknown as (name: string, params: any) => Promise<{ data: any; error: any }>)(
-            'complete_referral_stage3',
-            { 
-              p_referee_id: user.id,
-              p_referrer_id: profile.referred_by
-            }
-          );
-          
-          const { data, error } = response as { data: CompleteReferralStage3Result | null; error: Error | null };
-
-          if (error) throw error;
-          if (!data) throw new Error("No data returned from referral completion");
-          
-          // Data from this RPC should match CompleteReferralStage3Result
-          return data as unknown as CompleteReferralStage3Result;
+          // TODO: Replace with Firebase Cloud Function call
+          // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/complete-referral-stage3', {...});
+          throw new Error("Referral completion needs Firebase Cloud Function migration");
+          /*
+          const response = await fetch('https://YOUR-FIREBASE-FUNCTION/complete-referral-stage3', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              referee_id: user.uid,
+              referrer_id: profile.referred_by
+            }),
+          });
+          const data = await response.json();
+          return data as CompleteReferralStage3Result;
+          */
         },
         {
           maxAttempts: 3,
@@ -544,156 +514,144 @@ export const useCompanion = () => {
         setIsEvolvingLoading(true);
 
         try {
-        // Call the new evolution edge function with strict continuity
-        const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
-          "generate-companion-evolution",
-          {
-            body: {
-              userId: user.id,
-            },
-          }
-        );
-
-        if (evolutionError) {
-          evolutionInProgress.current = false;
-          throw evolutionError;
-        }
+        // TODO: Migrate to Firebase Cloud Function
+        // Call the new evolution function with strict continuity
+        // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-evolution', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ userId: user.uid }),
+        // });
+        // const evolutionData = await response.json();
         
+        // For now, throw error - needs Firebase Cloud Function implementation
+        throw new Error("Companion evolution needs Firebase Cloud Function migration");
+        
+        // TODO: Uncomment when Firebase Cloud Function is ready
+        /*
         if (!evolutionData?.evolved) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);
           logger.log('Evolution not triggered:', evolutionData?.message);
-          return null; // Return null instead of throwing when evolution isn't needed
+          return null;
         }
 
-      const evolutionId = evolutionData.evolution_id;
+        const evolutionId = evolutionData.evolution_id;
         const newStage = evolutionData.new_stage;
         const oldStage = companion.current_stage;
 
-      // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
-      // This handles cases where user skips from Stage 2 to Stage 4+
-      if (oldStage < 3 && newStage >= 3) {
-        await validateReferralAtStage3();
-      }
+        // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
+        // This handles cases where user skips from Stage 2 to Stage 4+
+        if (oldStage < 3 && newStage >= 3) {
+          await validateReferralAtStage3();
+        }
 
-      // Generate evolution cards for all stages up to current stage
-      try {
-        // Check which cards already exist
-        const { data: existingCards } = await supabase
-          .from("companion_evolution_cards")
-          .select("evolution_stage")
-          .eq("companion_id", companion.id);
+        // TODO: Migrate evolution card and story generation to Firebase Cloud Functions
+        // Generate evolution cards for all stages up to current stage
+        try {
+          // Check which cards already exist
+          const existingCards = await getDocuments(
+            "companion_evolution_cards",
+            [["companion_id", "==", companion.id]]
+          );
 
-        const existingStages = new Set(existingCards?.map(c => c.evolution_stage) || []);
+          const existingStages = new Set(existingCards?.map((c: any) => c.evolution_stage) || []);
 
-        // Generate cards for missing stages (stage 0 through current stage)
-        for (let stage = 0; stage <= newStage; stage++) {
-          if (!existingStages.has(stage)) {
-            logger.log(`Generating card for stage ${stage}`);
-            
-            // Get the evolution record for this stage
-            const { data: evolutionRecord } = await supabase
-              .from("companion_evolutions")
-              .select("id")
-              .eq("companion_id", companion.id)
-              .eq("stage", stage)
-              .maybeSingle();
-            
-            // Special handling for stage 0 - ensure evolution record exists
-            let stageEvolutionId = evolutionRecord?.id;
-            
-            if (stage === 0 && !evolutionRecord) {
-              logger.log("Stage 0 evolution record not found, creating one...");
+          // Generate cards for missing stages (stage 0 through current stage)
+          for (let stage = 0; stage <= newStage; stage++) {
+            if (!existingStages.has(stage)) {
+              logger.log(`Generating card for stage ${stage} - needs Firebase Cloud Function`);
               
-              // Get the companion's initial image
-              const { data: companionData } = await supabase
-                .from("user_companion")
-                .select("initial_image_url, created_at")
-                .eq("id", companion.id)
-                .maybeSingle();
+              // Get the evolution record for this stage
+              const evolutionRecords = await getDocuments(
+                "companion_evolutions",
+                [
+                  ["companion_id", "==", companion.id],
+                  ["stage", "==", stage],
+                ]
+              );
               
-              // Create stage 0 evolution record
-              const { data: newStage0Evolution, error: stage0Error } = await supabase
-                .from("companion_evolutions")
-                .insert({
+              // Special handling for stage 0 - ensure evolution record exists
+              let stageEvolutionId = evolutionRecords[0]?.id;
+              
+              if (stage === 0 && evolutionRecords.length === 0) {
+                logger.log("Stage 0 evolution record not found, creating one...");
+                
+                // Get the companion's initial image
+                const companionData = await getDocument("user_companion", companion.id);
+                
+                // Create stage 0 evolution record
+                const evolutionId = `${companion.id}_stage_0`;
+                await setDocument("companion_evolutions", evolutionId, {
+                  id: evolutionId,
                   companion_id: companion.id,
                   stage: 0,
                   image_url: companionData?.initial_image_url || null,
                   xp_at_evolution: 0,
                   evolved_at: companionData?.created_at || new Date().toISOString(),
-                })
-                .select()
-                .maybeSingle();
-              
-              if (!stage0Error && newStage0Evolution) {
-                stageEvolutionId = newStage0Evolution.id;
+                }, false);
+                
+                stageEvolutionId = evolutionId;
                 logger.log("Created stage 0 evolution record:", stageEvolutionId);
-              } else {
-                console.error("Failed to create stage 0 evolution record:", stage0Error);
               }
-            }
-            
-            // Only generate card if we have a valid evolution ID for this stage
-            if (stageEvolutionId) {
-              await supabase.functions.invoke("generate-evolution-card", {
-                body: {
+              
+              // Generate evolution card using Firebase Cloud Function
+              if (stageEvolutionId) {
+                const companionData = await getDocument("user_companion", companion.id);
+                const { generateEvolutionCard } = await import("@/lib/firebase/functions");
+                await generateEvolutionCard({
                   companionId: companion.id,
                   evolutionId: stageEvolutionId,
                   stage: stage,
-                  species: companion.spirit_animal,
-                  element: companion.core_element,
-                  color: companion.favorite_color,
+                  species: companionData?.spirit_animal || "Unknown",
+                  element: companionData?.core_element || "Unknown",
+                  color: companionData?.favorite_color || "#000000",
                   userAttributes: {
-                    body: companion.body || 0,
-                    mind: companion.mind || 0,
-                    soul: companion.soul || 0,
+                    mind: companionData?.mind || 0,
+                    body: companionData?.body || 0,
+                    soul: companionData?.soul || 0,
                   },
-                },
-              });
-            } else {
-              logger.warn(`Skipping card generation for stage ${stage} - no evolution record found`);
+                });
+                logger.log(`Generated evolution card for stage ${stage}`);
+              }
             }
           }
+        } catch (cardError) {
+          console.error("Failed to generate evolution card:", cardError);
+          // Don't fail the evolution if card generation fails
         }
-      } catch (cardError) {
-        console.error("Failed to generate evolution card:", cardError);
-        // Don't fail the evolution if card generation fails
-      }
 
-      // Auto-generate story chapter for this evolution stage
-      const { data: existingStory } = await supabase
-        .from("companion_stories")
-        .select("id")
-        .eq("companion_id", companion.id)
-        .eq("stage", newStage)
-        .maybeSingle();
+        // Auto-generate story chapter for this evolution stage
+        const existingStories = await getDocuments(
+          "companion_stories",
+          [
+            ["companion_id", "==", companion.id],
+            ["stage", "==", newStage],
+          ]
+        );
 
-      if (!existingStory) {
-        // Generate story chapter in the background - properly handled promise
-        (async () => {
-          try {
-            await supabase.functions.invoke("generate-companion-story", {
-              body: {
-                companionId: companion.id,
-                stage: newStage,
-                tonePreference: "heroic",
-                themeIntensity: "moderate",
-              },
-            });
-            logger.log(`Stage ${newStage} story generation started`);
-            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`Failed to auto-generate story for stage ${newStage} (non-critical):`, errorMessage);
-            // Don't throw - story generation is not critical to evolution
-          }
-        })().catch((error) => {
-          console.warn('Story generation promise rejected:', error?.message || error);
-        });
-      }
+        if (existingStories.length === 0) {
+          // TODO: Replace with Firebase Cloud Function call
+          // Generate story chapter in the background - properly handled promise
+          (async () => {
+            try {
+              // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-story', {...});
+              logger.log(`Stage ${newStage} story generation skipped - needs Firebase Cloud Function`);
+              queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+              queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.warn(`Failed to auto-generate story for stage ${newStage} (non-critical):`, errorMessage);
+              // Don't throw - story generation is not critical to evolution
+            }
+          })().catch((error) => {
+            console.warn('Story generation promise rejected:', error?.message || error);
+          });
+        }
 
-          return evolutionData.image_url;
+        // TODO: Uncomment when Firebase Cloud Function is ready
+        // return evolutionData.image_url;
+        */
+        return null; // Temporary - will return image_url when Cloud Function is ready
         } catch (error) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);

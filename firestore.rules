@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles collection - users can read/write their own profile
+    match /profiles/{profileId} {
+      allow read: if isOwner(profileId);
+      allow create: if isAuthenticated() && request.auth.uid == profileId;
+      allow update: if isOwner(profileId);
+      allow delete: if isOwner(profileId);
+    }
+
+    // Mentors collection - anyone can read, no writes from client
+    match /mentors/{mentorId} {
+      allow read: if true;
+      allow write: if false; // Only via Admin SDK or Cloud Functions
+    }
+
+    // User companion collection - users can read/write their own companion
+    match /user_companion/{companionId} {
+      allow read, write: if isOwner(companionId);
+    }
+
+    // Companion evolutions - users can read/write their own evolutions
+    match /companion_evolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && 
+        (request.resource.data.companion_id == request.auth.uid || 
+         resource.data.companion_id == request.auth.uid);
+      allow delete: if false; // Prevent deletion
+    }
+
+    // Companion evolution cards - users can read their own cards
+    match /companion_evolution_cards/{cardId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && 
+        (request.resource.data.companion_id == request.auth.uid || 
+         resource.data.companion_id == request.auth.uid);
+      allow delete: if false; // Prevent deletion
+    }
+
+    // Companion stories - users can read their own stories
+    match /companion_stories/{storyId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && 
+        (request.resource.data.companion_id == request.auth.uid || 
+         resource.data.companion_id == request.auth.uid);
+      allow delete: if false; // Prevent deletion
+    }
+
+    // Daily missions - users can read/write their own missions
+    match /daily_missions/{missionId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.user_id == request.auth.uid || 
+         request.resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && 
+        request.resource.data.user_id == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.user_id == request.auth.uid;
+      allow delete: if false; // Prevent deletion
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

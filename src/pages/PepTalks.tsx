@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,24 +23,27 @@ export default function PepTalks() {
   const { data: pepTalks, isLoading } = useQuery({
     queryKey: ["pep-talks", selectedCategory, selectedTrigger],
     queryFn: async () => {
-      let query = supabase
-        .from("pep_talks")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // Apply category filter
+      // Build filters array
+      const filters: Array<[string, any, any]> = [];
+      
+      // Apply category filter (array-contains for array fields)
       if (selectedCategory) {
-        query = query.contains("topic_category", [selectedCategory]);
+        filters.push(["topic_category", "array-contains", selectedCategory]);
       }
 
-      // Apply emotional trigger filter
+      // Apply emotional trigger filter (array-contains for array fields)
       if (selectedTrigger) {
-        query = query.contains("emotional_triggers", [selectedTrigger]);
+        filters.push(["emotional_triggers", "array-contains", selectedTrigger]);
       }
 
-      const { data, error } = await query.limit(50);
+      const data = await getDocuments(
+        "pep_talks",
+        filters.length > 0 ? filters : undefined,
+        "created_at",
+        "desc",
+        50
+      );
 
-      if (error) throw error;
       return data || [];
     },
   });

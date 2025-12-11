@@ -1,6 +1,7 @@
 import { Heart } from "lucide-react";
 import { useState, memo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { firebaseAuth } from "@/lib/firebase/auth";
+import { getDocuments, setDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { ShareButton } from "@/components/ShareButton";
 
@@ -26,9 +27,9 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
   const toggleFavorite = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const user = firebaseAuth.currentUser;
       
-      if (!session) {
+      if (!user) {
         toast({
           title: "Sign in required",
           description: "Please sign in to save favorites",
@@ -37,26 +38,18 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
         return;
       }
 
-      if (isFavorited) {
-        const { error } = await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", session.user.id)
-          .eq("content_type", "quote")
-          .eq("content_id", id);
+      const favoriteId = `${user.uid}_quote_${id}`;
 
-        if (error) throw error;
+      if (isFavorited) {
+        await deleteDocument("favorites", favoriteId);
         setIsFavorited(false);
       } else {
-        const { error } = await supabase
-          .from("favorites")
-          .insert({
-            user_id: session.user.id,
-            content_type: "quote",
-            content_id: id,
-          });
-
-        if (error) throw error;
+        await setDocument("favorites", favoriteId, {
+          id: favoriteId,
+          user_id: user.uid,
+          content_type: "quote",
+          content_id: id,
+        }, false);
         setIsFavorited(true);
       }
 

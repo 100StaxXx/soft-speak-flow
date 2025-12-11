@@ -1,6 +1,5 @@
 import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 import { logger } from "@/utils/logger";
 
@@ -27,19 +26,21 @@ export function useSubscription() {
   const { user } = useAuth();
 
   const { data: subscriptionData, isLoading, error, refetch } = useQuery({
-    queryKey: ["subscription", user?.id],
+    queryKey: ["subscription", user?.uid],
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase.functions.invoke("check-apple-subscription");
-
-      if (error) throw error;
-      return data as {
-        subscribed: boolean;
-        status?: string;
-        subscription_end?: string;
-        plan?: string;
-      } | null;
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/check-apple-subscription', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ userId: user.uid }),
+      // });
+      // const data = await response.json();
+      // return data;
+      
+      // For now, return null - needs Firebase Cloud Function implementation
+      return null;
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance

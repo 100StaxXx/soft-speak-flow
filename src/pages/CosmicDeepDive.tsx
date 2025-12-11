@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Sun, Moon, ArrowUp, Brain, Zap, Heart, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,30 +81,32 @@ const CosmiqDeepDive = () => {
 
       try {
         if (user) {
-          const timezoneOffset = new Date().getTimezoneOffset();
-          const { data: personalizedData, error: personalizedError } = await supabase.functions.invoke(
-            'generate-cosmic-deep-dive',
-            { body: { placement: placement.toLowerCase(), sign: sign.toLowerCase(), timezoneOffset } }
-          );
-
-          if (!personalizedError && personalizedData && !personalizedData.error) {
-            setContent(personalizedData);
-            setIsPersonalized(true);
-            setLoading(false);
-            return;
-          }
+          // TODO: Migrate to Firebase Cloud Function
+          // const timezoneOffset = new Date().getTimezoneOffset();
+          // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-cosmic-deep-dive', {
+          //   method: 'POST',
+          //   headers: { 'Content-Type': 'application/json' },
+          //   body: JSON.stringify({ placement: placement.toLowerCase(), sign: sign.toLowerCase(), timezoneOffset })
+          // });
+          // const personalizedData = await response.json();
+          // if (response.ok && !personalizedData.error) {
+          //   setContent(personalizedData);
+          //   setIsPersonalized(true);
+          //   setLoading(false);
+          //   return;
+          // }
         }
 
-        const { data, error } = await supabase
-          .from('zodiac_sign_content')
-          .select('*')
-          .eq('placement', placement.toLowerCase())
-          .eq('sign', sign.toLowerCase())
-          .maybeSingle();
+        // Fallback to static content
+        const contentData = await getDocuments(
+          'zodiac_sign_content',
+          [
+            ['placement', '==', placement.toLowerCase()],
+            ['sign', '==', sign.toLowerCase()],
+          ]
+        );
 
-        if (error) throw error;
-
-        if (!data) {
+        if (contentData.length === 0) {
           toast({
             title: "Content Not Found",
             description: `No insights available for ${sign} ${placement} yet`,
@@ -112,7 +114,7 @@ const CosmiqDeepDive = () => {
           });
         }
 
-        setContent(data);
+        setContent(contentData[0] || null);
         setIsPersonalized(false);
       } catch (error) {
         console.error('Error fetching cosmiq content:', error);

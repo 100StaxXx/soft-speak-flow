@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
@@ -26,13 +26,7 @@ export default function MentorChat() {
     queryKey: ['mentor', profile?.selected_mentor_id],
     queryFn: async () => {
       if (!profile?.selected_mentor_id) return null;
-      const { data, error } = await supabase
-        .from('mentors')
-        .select('*')
-        .eq('id', profile.selected_mentor_id)
-        .maybeSingle();
-      
-      if (error) throw error;
+      const data = await getDocument('mentors', profile.selected_mentor_id);
       return data;
     },
     enabled: !!profile?.selected_mentor_id,

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
 import { Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { generateEvolutionVoice } from "@/lib/firebase/functions";
 import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
@@ -81,11 +81,7 @@ const CompanionEvolutionContent = ({
       }
 
       try {
-        const { data, error } = await supabase.functions.invoke('generate-evolution-voice', {
-          body: { mentorSlug, newStage, userId }
-        });
-
-        if (error) throw error;
+        const data = await generateEvolutionVoice({ mentorSlug, newStage, userId });
         if (!isMounted) return;
 
         if (data?.voiceLine) {

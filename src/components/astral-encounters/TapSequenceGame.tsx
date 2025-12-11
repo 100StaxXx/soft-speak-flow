@@ -263,14 +263,15 @@ export const TapSequenceGame = ({
 
       setTimeout(() => setLastTapResult(null), 400);
 
-      // Check if round complete
-      if (currentOrder === orbsPerRound) {
+      // Check if round complete (currentOrder was just incremented, so check new value)
+      if (currentOrder + 1 === orbsPerRound) {
         const newRound = round + 1;
         
         if (newRound > maxRounds) {
           // Game complete
           setGameState('complete');
           const totalOrbs = maxRounds * orbsPerRound;
+          // score was already incremented above, so use score + 1 (the new value)
           const baseAccuracy = Math.round((score + 1) / totalOrbs * 100);
           const comboBonus = Math.min(maxCombo * 3, 15);
           const accuracy = Math.min(100, baseAccuracy + comboBonus);

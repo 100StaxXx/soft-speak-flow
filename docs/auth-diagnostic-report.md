@@ -188,7 +188,7 @@ Updated `src/pages/Auth.tsx` to handle cases where email confirmation is disable
 
 ```bash
 # Link to your Supabase project first
-supabase link --project-ref opbfpbbqvuksuvmtmssd
+supabase link --project-ref tffrgsaawvletgiztfry
 
 # Set the required secrets for native OAuth
 supabase secrets set GOOGLE_WEB_CLIENT_ID="371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com"
@@ -227,7 +227,7 @@ After applying fixes, test each auth method:
 
 ### Frontend (.env)
 ```
-VITE_SUPABASE_URL="https://opbfpbbqvuksuvmtmssd.supabase.co"
+VITE_SUPABASE_URL="https://tffrgsaawvletgiztfry.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="eyJ..."
 VITE_GOOGLE_WEB_CLIENT_ID="371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com"
 VITE_GOOGLE_IOS_CLIENT_ID="371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com"

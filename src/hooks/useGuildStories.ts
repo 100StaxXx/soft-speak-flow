@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
@@ -33,14 +33,18 @@ export const useGuildStories = (epicId?: string) => {
     queryFn: async () => {
       if (!epicId) return [];
 
-      const { data, error } = await supabase
-        .from("guild_stories")
-        .select("*")
-        .eq("epic_id", epicId)
-        .order("chapter_number", { ascending: true });
+      const data = await getDocuments<GuildStory>(
+        "guild_stories",
+        [["epic_id", "==", epicId]],
+        "chapter_number",
+        "asc"
+      );
 
-      if (error) throw error;
-      return data as GuildStory[];
+      return data.map(story => ({
+        ...story,
+        generated_at: timestampToISO(story.generated_at as any) || story.generated_at || new Date().toISOString(),
+        created_at: timestampToISO(story.created_at as any) || story.created_at || new Date().toISOString(),
+      }));
     },
     enabled: !!epicId,
   });
@@ -55,23 +59,18 @@ export const useGuildStories = (epicId?: string) => {
 
       toast.loading("Weaving your companions' tale...", { id: "guild-story-gen" });
 
-      const { data, error } = await supabase.functions.invoke(
-        "generate-guild-story",
-        {
-          body: { epicId }, // userId is derived from JWT on server
-        }
-      );
-
-      if (error) {
-        console.error("Story generation error:", error);
-        throw new Error(error.message || "Unable to generate story right now");
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      return data.story as GuildStory;
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-guild-story', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ epicId }),
+      // });
+      // const data = await response.json();
+      // if (data.error) {
+      //   throw new Error(data.error);
+      // }
+      // return data.story as GuildStory;
+      
+      throw new Error("Guild story generation needs Firebase Cloud Function migration");
     },
     onSuccess: () => {
       toast.dismiss("guild-story-gen");

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct, openManageSubscriptions } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
 
@@ -104,11 +103,14 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available");
       }
       
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
-
-      if (error) throw error;
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/verify-apple-receipt', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ receipt }),
+      // });
+      // if (!response.ok) throw new Error('Receipt verification failed');
+      
+      throw new Error("Apple receipt verification needs Firebase Cloud Function migration");
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
@@ -193,14 +195,14 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available for subscription");
       }
 
-      // Verify with backend
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
-
-      if (error) {
-        throw error;
-      }
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/verify-apple-receipt', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ receipt }),
+      // });
+      // if (!response.ok) throw new Error('Receipt verification failed');
+      
+      throw new Error("Apple receipt verification needs Firebase Cloud Function migration");
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });

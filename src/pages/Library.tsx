@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
@@ -21,50 +21,40 @@ export default function Library() {
 
   // Fetch favorites
   const { data: favorites, isLoading: loadingFavorites } = useQuery({
-    queryKey: ["favorites", user?.id],
+    queryKey: ["favorites", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("favorites")
-        .select(`
-          id,
-          content_type,
-          content_id,
-          created_at
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const data = await getDocuments(
+        "favorites",
+        [["user_id", "==", user.uid]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) throw error;
       return data || [];
     },
   });
 
   // Fetch downloads
   const { data: downloads, isLoading: loadingDownloads } = useQuery({
-    queryKey: ["downloads", user?.id],
+    queryKey: ["downloads", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("downloads")
-        .select(`
-          id,
-          content_type,
-          content_id,
-          created_at
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const data = await getDocuments(
+        "downloads",
+        [["user_id", "==", user.uid]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) throw error;
       return data || [];
     },
   });
@@ -77,13 +67,10 @@ export default function Library() {
       const quoteIds = favorites?.filter(f => f.content_type === "quote").map(f => f.content_id) || [];
       if (quoteIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*")
-        .in("id", quoteIds);
-
-      if (error) throw error;
-      return data || [];
+      // Fetch all quotes and filter client-side (Firestore 'in' has 10-item limit)
+      // TODO: Optimize with batch queries if needed
+      const allQuotes = await getDocuments("quotes");
+      return allQuotes.filter(q => quoteIds.includes(q.id));
     },
   });
 
@@ -95,24 +82,17 @@ export default function Library() {
       const pepTalkIds = favorites?.filter(f => f.content_type === "pep_talk").map(f => f.content_id) || [];
       if (pepTalkIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .in("id", pepTalkIds);
-
-      if (error) throw error;
-      return data || [];
+      // Fetch all pep talks and filter client-side (Firestore 'in' has 10-item limit)
+      // TODO: Optimize with batch queries if needed
+      const allPepTalks = await getDocuments("pep_talks");
+      return allPepTalks.filter(p => pepTalkIds.includes(p.id));
     },
   });
 
   const handleRemoveFavorite = async (favoriteId: string) => {
     try {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("id", favoriteId);
-
-      if (error) throw error;
+      const { deleteDocument } = await import("@/lib/firebase/firestore");
+      await deleteDocument("favorites", favoriteId);
       toast.success("Removed from favorites");
     } catch (error) {
       toast.error("Failed to remove favorite");

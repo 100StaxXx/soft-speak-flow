@@ -7,11 +7,15 @@ import { getResolvedMentorId } from "./mentor";
  */
 export const getAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("selected_mentor_id, onboarding_completed, onboarding_data")
       .eq("id", userId)
-      .maybeSingle();
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
 
     const resolvedMentorId = getResolvedMentorId(profile);
 
@@ -45,32 +49,56 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
  * Also updates timezone to match user's current device
  */
 export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id, timezone")
-    .eq("id", userId)
-    .maybeSingle();
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("profiles")
+      .select("id, timezone")
+      .eq("id", userId)
+      .single();
 
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  if (!existing) {
-    // Create new profile with user's timezone
-    const { error } = await supabase.from("profiles").upsert({
-      id: userId,
-      email: email ?? null,
-      timezone: userTimezone,
-    }, {
-      onConflict: 'id'
-    });
-    
-    if (error && !error.message.includes('duplicate')) {
-      console.error('Error creating profile:', error);
-      throw error;
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // Profile doesn't exist, create it
+      console.log(`[ensureProfile] Creating new profile for user ${userId}`);
+      const { error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          email: email ?? null,
+          timezone: userTimezone,
+          is_premium: false,
+          preferences: null,
+          selected_mentor_id: null,
+          onboarding_completed: false,
+          onboarding_data: {},
+        });
+
+      if (createError) {
+        // Ignore duplicate errors (race condition)
+        if (createError.code !== '23505') { // 23505 = unique violation
+          console.error('[ensureProfile] Error creating profile:', createError);
+          throw createError;
+        } else {
+          console.log(`[ensureProfile] Profile already exists (race condition) for user ${userId}`);
+        }
+      } else {
+        console.log(`[ensureProfile] Profile created successfully for user ${userId}`);
+      }
+    } else if (existing) {
+      console.log(`[ensureProfile] Profile already exists for user ${userId}`);
+      if (existing.timezone !== userTimezone) {
+        // Update timezone if it's different
+        await supabase
+          .from("profiles")
+          .update({ timezone: userTimezone })
+          .eq("id", userId);
+      }
+    } else if (fetchError) {
+      throw fetchError;
     }
-  } else if (existing.timezone !== userTimezone) {
-    // Update timezone if it's different
-    await supabase.from("profiles").update({
-      timezone: userTimezone
-    }).eq("id", userId);
+  } catch (error) {
+    console.error('[ensureProfile] Unexpected error:', error);
+    throw error;
   }
 };

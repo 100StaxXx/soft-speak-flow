@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,18 +34,18 @@ export default function Partners() {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "create-influencer-code",
-        {
-          body: formData,
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      toast.success("Your referral code is ready!");
-      navigate(`/creator/dashboard?code=${data.code}`);
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/create-influencer-code', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(formData)
+      // });
+      // const data = await response.json();
+      // if (!response.ok || data.error) throw new Error(data.error || 'Failed to create code');
+      // toast.success("Your referral code is ready!");
+      // navigate(`/creator/dashboard?code=${data.code}`);
+      
+      throw new Error("Influencer code creation needs Firebase Cloud Function migration");
     } catch (error) {
       console.error("Failed to create code:", error);
       toast.error(

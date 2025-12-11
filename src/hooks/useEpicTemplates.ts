@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, updateDocument, timestampToISO } from "@/lib/firebase/firestore";
 
 export interface EpicTemplate {
   id: string;
@@ -26,18 +26,26 @@ export const useEpicTemplates = () => {
   const { data: templates, isLoading } = useQuery<EpicTemplate[]>({
     queryKey: ["epic-templates"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("epic_templates")
-        .select("*")
-        .order("is_featured", { ascending: false })
-        .order("popularity_count", { ascending: false });
+      // Firestore doesn't support multiple orderBy easily, so we'll fetch and sort client-side
+      const data = await getDocuments<EpicTemplate>(
+        "epic_templates",
+        undefined,
+        "popularity_count",
+        "desc"
+      );
 
-      if (error) throw error;
-      
-      return (data || []).map(t => ({
+      // Sort: featured first, then by popularity
+      const sorted = data.sort((a, b) => {
+        if (a.is_featured && !b.is_featured) return -1;
+        if (!a.is_featured && b.is_featured) return 1;
+        return (b.popularity_count || 0) - (a.popularity_count || 0);
+      });
+
+      return sorted.map(t => ({
         ...t,
-        habits: Array.isArray(t.habits) ? t.habits : JSON.parse(t.habits as string || '[]'),
-      })) as EpicTemplate[];
+        habits: Array.isArray(t.habits) ? t.habits : (typeof t.habits === 'string' ? JSON.parse(t.habits || '[]') : []),
+        created_at: timestampToISO(t.created_at as any) || t.created_at || new Date().toISOString(),
+      }));
     },
   });
 
@@ -46,19 +54,14 @@ export const useEpicTemplates = () => {
       // Read-then-write for popularity increment
       // Note: This could still have race conditions in high-concurrency scenarios
       // For a popularity counter, occasional missed increments are acceptable
-      const { data: template, error } = await supabase
-        .from("epic_templates")
-        .select("popularity_count")
-        .eq("id", templateId)
-        .single();
+      const template = await getDocument<{ popularity_count: number }>("epic_templates", templateId);
         
       if (template) {
-        await supabase
-          .from("epic_templates")
-          .update({ popularity_count: (template.popularity_count || 0) + 1 })
-          .eq("id", templateId);
-      } else if (error) {
-        console.error('Error incrementing popularity:', error);
+        await updateDocument("epic_templates", templateId, {
+          popularity_count: (template.popularity_count || 0) + 1,
+        });
+      } else {
+        console.error('Template not found for popularity increment:', templateId);
       }
     },
     onSuccess: () => {

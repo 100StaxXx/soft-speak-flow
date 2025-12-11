@@ -11,7 +11,7 @@ import { SearchHero } from "@/components/search/SearchHero";
 import { SuggestedSearches } from "@/components/library/SuggestedSearches";
 import { FeaturedQuoteCard } from "@/components/library/FeaturedQuoteCard";
 import { FeaturedPepTalkCard } from "@/components/library/FeaturedPepTalkCard";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -24,11 +24,13 @@ const Search = () => {
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["featured-quotes"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("quotes")
-        .select("id, text, author")
-        .order("created_at", { ascending: false })
-        .limit(4);
+      const data = await getDocuments(
+        "quotes",
+        undefined,
+        "created_at",
+        "desc",
+        4
+      );
       return data || [];
     },
   });
@@ -36,11 +38,13 @@ const Search = () => {
   const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
     queryKey: ["featured-pep-talks"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("pep_talks")
-        .select("id, title, category, description")
-        .order("created_at", { ascending: false })
-        .limit(3);
+      const data = await getDocuments(
+        "pep_talks",
+        undefined,
+        "created_at",
+        "desc",
+        3
+      );
       return data || [];
     },
   });

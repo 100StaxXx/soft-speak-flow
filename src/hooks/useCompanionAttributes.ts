@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
@@ -20,33 +20,27 @@ export const useCompanionAttributes = () => {
       if (!user) throw new Error("Not authenticated");
 
       // Get current companion data
-      const { data: companion, error: fetchError } = await supabase
-        .from("user_companion")
-        .select(attribute)
-        .eq("id", companionId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
+      const companion = await getDocument<{
+        [key: string]: any;
+        user_id: string;
+      }>("user_companion", companionId);
 
       if (!companion) {
         throw new Error("Companion not found");
+      }
+
+      if (companion.user_id !== user.uid) {
+        throw new Error("Unauthorized");
       }
 
       const currentValue = companion[attribute] ?? (attribute === 'body' ? 100 : 0);
       const newValue = Math.max(0, Math.min(100, currentValue + amount));
 
       // Update the attribute
-      const { error: updateError } = await supabase
-        .from("user_companion")
-        .update({ 
-          [attribute]: newValue,
-          last_energy_update: new Date().toISOString()
-        })
-        .eq("id", companionId)
-        .eq("user_id", user.id);
-
-      if (updateError) throw updateError;
+      await updateDocument("user_companion", companionId, {
+        [attribute]: newValue,
+        last_energy_update: new Date().toISOString(),
+      });
 
       return { attribute, newValue, change: amount };
     },

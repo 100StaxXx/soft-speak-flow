@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -78,7 +78,15 @@ const Horoscope = () => {
   const generateHoroscope = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-daily-horoscope', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      // });
+      // const data = await response.json();
+      // if (!response.ok) throw new Error(data.error || 'Failed to load horoscope');
+      
+      throw new Error("Horoscope generation needs Firebase Cloud Function migration");
 
       // Check for zodiac/onboarding error anywhere in the error object
       // This handles the 400 response with "No zodiac sign found"
@@ -192,16 +200,11 @@ const Horoscope = () => {
     
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          birthdate: birthDate?.trim() || null,
-          birth_time: normalizedBirthTime,
-          birth_location: birthLocation?.trim() || null,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateDocument("profiles", user.uid, {
+        birthdate: birthDate?.trim() || null,
+        birth_time: normalizedBirthTime,
+        birth_location: birthLocation?.trim() || null,
+      });
 
       toast({
         title: "Saved!",
@@ -209,8 +212,8 @@ const Horoscope = () => {
       });
 
       // Invalidate and refetch profile immediately
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.uid] });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
       
       // Wait for profile state to update
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -270,7 +273,25 @@ const Horoscope = () => {
     
     setRevealing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
+      // TODO: Migrate to Firebase Cloud Function
+      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/calculate-cosmic-profile', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      // });
+      // const data = await response.json();
+      // if (!response.ok) {
+      //   if (data.error?.includes('already generated today') || data.error?.includes('once per 24 hours')) {
+      //     toast({
+      //       title: "Already Generated",
+      //       description: "You can only generate one cosmiq profile per day",
+      //       variant: "destructive",
+      //     });
+      //     return;
+      //   }
+      //   throw new Error(data.error || 'Failed to calculate profile');
+      // }
+      
+      throw new Error("Cosmic profile calculation needs Firebase Cloud Function migration");
 
       if (error) {
         // Handle rate limit (429) specifically

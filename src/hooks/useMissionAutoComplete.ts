@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { useActivityFeed } from "./useActivityFeed";
 import { MISSION_ACTIVITY_MAP } from "@/config/missionTemplates";
@@ -31,27 +31,24 @@ export const useMissionAutoComplete = () => {
     const checkAndCompleteMissions = async () => {
       try {
         // Get today's incomplete missions
-        const { data: missions, error: missionsError } = await supabase
-          .from('daily_missions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('mission_date', today)
-          .eq('completed', false)
-          .eq('auto_complete', true);
+        const allMissions = await getDocuments(
+          'daily_missions',
+          [
+            ['user_id', '==', user.uid],
+            ['mission_date', '==', today],
+            ['completed', '==', false],
+            ['auto_complete', '==', true],
+          ]
+        );
 
-        if (missionsError) {
-          console.error("Error fetching missions:", missionsError);
-          return;
-        }
-
-        if (!missions || missions.length === 0 || !mounted) return;
+        if (allMissions.length === 0 || !mounted) return;
 
         // Get today's activities
         const todayActivities = activities.filter(a => 
           new Date(a.created_at).getTime() >= todayStartMs
         );
 
-        for (const mission of missions) {
+        for (const mission of allMissions) {
           if (!mounted) break;
 
           const missionConfig = MISSION_ACTIVITY_MAP[mission.mission_type];
@@ -88,34 +85,29 @@ export const useMissionAutoComplete = () => {
 
           // Update progress
           if (newProgress !== mission.progress_current && mounted) {
-            const { error: progressError } = await supabase
-              .from('daily_missions')
-              .update({ progress_current: newProgress })
-              .eq('id', mission.id)
-              .eq('user_id', user.id);
-
-            if (!progressError) {
+            try {
+              await updateDocument('daily_missions', mission.id, {
+                progress_current: newProgress,
+              });
               queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+            } catch (progressError) {
+              console.error("Error updating mission progress:", progressError);
             }
           }
 
           // Complete mission if criteria met
           if (shouldComplete && !mission.completed && mounted) {
-            // ATOMIC: Only update if not already completed (prevent double XP)
-            const { data: updateResult, error } = await supabase
-              .from('daily_missions')
-              .update({ 
-                completed: true, 
+            // ATOMIC: Check if still not completed before updating
+            const currentMission = await getDocument<{ completed: boolean }>('daily_missions', mission.id);
+            
+            if (currentMission && !currentMission.completed && mounted) {
+              await updateDocument('daily_missions', mission.id, {
+                completed: true,
                 completed_at: new Date().toISOString(),
-                progress_current: mission.progress_target 
-              })
-              .eq('id', mission.id)
-              .eq('user_id', user.id)
-              .eq('completed', false) // CRITICAL: only update if not already completed
-              .select();
+                progress_current: mission.progress_target,
+              });
 
-            // VERIFY: Only award XP if the update actually changed a row
-            if (!error && updateResult && updateResult.length > 0 && mounted) {
+              if (mounted) {
               // Award XP
               await awardCustomXP(
                 mission.xp_reward, 
@@ -141,8 +133,9 @@ export const useMissionAutoComplete = () => {
                 colors: ['#A76CFF', '#C084FC', '#E879F9'],
               });
 
-              // Invalidate queries
-              queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+                // Invalidate queries
+                queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
+              }
             }
           }
         }

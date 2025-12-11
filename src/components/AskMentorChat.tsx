@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
+import { firebaseAuth } from "@/lib/firebase/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -84,9 +85,13 @@ export const AskMentorChat = ({
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
   
-  // Use ref for messages to avoid stale closure in sendMessage callback
+  // Use refs to avoid stale closures and race conditions
   const messagesRef = useRef<Message[]>([]);
+  const dailyMessageCountRef = useRef(dailyMessageCount);
+  const dailyLimitRef = useRef(dailyLimit);
   messagesRef.current = messages;
+  dailyMessageCountRef.current = dailyMessageCount;
+  dailyLimitRef.current = dailyLimit;
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
@@ -96,11 +101,11 @@ export const AskMentorChat = ({
       return;
     }
 
-    // Check daily limit
-    if (dailyMessageCount >= dailyLimit) {
+    // Check daily limit using ref to prevent race conditions
+    if (dailyMessageCountRef.current >= dailyLimitRef.current) {
       toast({ 
         title: "Daily limit reached", 
-        description: `You've reached your daily limit of ${dailyLimit} messages. Reset tomorrow!`,
+        description: `You've reached your daily limit of ${dailyLimitRef.current} messages. Reset tomorrow!`,
         variant: "destructive" 
       });
       return;
@@ -114,16 +119,14 @@ export const AskMentorChat = ({
       // Use ref to get fresh conversation history (avoids stale closure)
       const currentMessages = messagesRef.current;
       
-      const { data, error } = await supabase.functions.invoke("mentor-chat", {
-        body: {
-          message: text,
-          mentorName,
-          mentorTone,
-          conversationHistory: currentMessages.slice(-10)
-        },
+      // Call Firebase Cloud Function instead of Supabase Edge Function
+      const { mentorChat } = await import("@/lib/firebase/functions");
+      const data = await mentorChat({
+        message: text,
+        mentorName,
+        mentorTone,
+        conversationHistory: currentMessages.slice(-10)
       });
-
-      if (error) throw error;
 
       if (!data || !data.response) {
         throw new Error("Invalid response from mentor");
@@ -135,13 +138,19 @@ export const AskMentorChat = ({
       // Update limit from server if provided
       if (data.dailyLimit) {
         setDailyLimit(data.dailyLimit);
+        dailyLimitRef.current = data.dailyLimit;
       }
       
       // Use server's count if available, otherwise increment locally
       if (data.messagesUsed !== undefined) {
         setDailyMessageCount(data.messagesUsed);
+        dailyMessageCountRef.current = data.messagesUsed;
       } else {
-        setDailyMessageCount(prev => prev + 1);
+        setDailyMessageCount(prev => {
+          const newCount = prev + 1;
+          dailyMessageCountRef.current = newCount;
+          return newCount;
+        });
       }
 
       // Save conversation history (non-blocking - don't fail if this errors)
@@ -175,7 +184,11 @@ export const AskMentorChat = ({
       });
 
       // Still increment count and save to history
-      setDailyMessageCount(prev => prev + 1);
+      setDailyMessageCount(prev => {
+        const newCount = prev + 1;
+        dailyMessageCountRef.current = newCount;
+        return newCount;
+      });
 
       // Save both messages even with fallback (non-blocking)
       // Only save if mentorId is defined to maintain data integrity

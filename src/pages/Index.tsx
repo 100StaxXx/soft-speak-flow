@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -39,31 +39,37 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     text: string;
     author: string | null;
   } | null>(null);
+  const hasBackfilledRef = useRef(false);
 
   // Combined initialization effect for better performance
   const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
 
   // Backfill mentor selection for users who completed onboarding but never persisted the mentor ID
+  // Only run once per profile/user combination to prevent multiple updates
   useEffect(() => {
     const syncMentorSelection = async () => {
-      if (!user || !profile) return;
+      if (!user || !profile || hasBackfilledRef.current) return;
 
       const onboardingMentorId = (profile.onboarding_data as { mentorId?: string | null } | null)?.mentorId;
       const needsBackfill = profile.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId;
 
-      if (!needsBackfill) return;
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ selected_mentor_id: onboardingMentorId })
-        .eq("id", user.id);
-
-      if (error) {
-        console.error("Failed to backfill mentor selection:", error);
+      if (!needsBackfill) {
+        hasBackfilledRef.current = true; // Mark as processed even if no backfill needed
         return;
       }
 
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      hasBackfilledRef.current = true; // Mark as processing to prevent duplicate runs
+      
+      try {
+        await updateDocument("profiles", user.uid, {
+          selected_mentor_id: onboardingMentorId,
+        });
+
+        await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
+      } catch (error) {
+        console.error("Error backfilling mentor selection:", error);
+        hasBackfilledRef.current = false; // Reset on error so it can retry
+      }
     };
 
     void syncMentorSelection();
@@ -79,11 +85,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       if (!resolvedMentorId) return;
 
       try {
-        const { data: mentorData } = await supabase
-          .from("mentors")
-          .select("avatar_url, slug")
-          .eq("id", resolvedMentorId)
-          .maybeSingle();
+        const mentorData = await getDocument<{ avatar_url: string | null; slug: string }>(
+          "mentors",
+          resolvedMentorId
+        );
 
         if (!isMounted || !mentorData) return;
 
@@ -95,35 +100,38 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
         // Get today's pep talk to find related quote
         const today = new Date().toLocaleDateString("en-CA");
-        const { data: dailyPepTalk } = await supabase
-          .from("daily_pep_talks")
-          .select("emotional_triggers, topic_category")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentorData.slug)
-          .maybeSingle();
+        const dailyPepTalks = await getDocuments(
+          "daily_pep_talks",
+          [
+            ["for_date", "==", today],
+            ["mentor_slug", "==", mentorData.slug],
+          ]
+        );
 
+        const dailyPepTalk = dailyPepTalks[0];
         if (!isMounted || !dailyPepTalk) return;
 
         // Try to fetch a quote that matches category first, then fall back to any quote
-        let { data: quotes } = await supabase
-          .from("quotes")
-          .select("text, author")
-          .eq("category", dailyPepTalk.topic_category)
-          .limit(10);
+        let quotes = await getDocuments(
+          "quotes",
+          [["category", "==", dailyPepTalk.topic_category]],
+          undefined,
+          undefined,
+          10
+        );
 
         // If no category match, get any quotes
-        if (!quotes || quotes.length === 0) {
-          const { data: allQuotes } = await supabase
-            .from("quotes")
-            .select("text, author")
-            .limit(20);
-          quotes = allQuotes;
+        if (quotes.length === 0) {
+          quotes = await getDocuments("quotes", undefined, undefined, undefined, 20);
         }
 
         // Pick a random quote
-        if (isMounted && quotes && quotes.length > 0) {
+        if (isMounted && quotes.length > 0) {
           const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-          setTodaysQuote(randomQuote);
+          setTodaysQuote({
+            text: randomQuote.text || '',
+            author: randomQuote.author || null,
+          });
         }
       } catch (error) {
         console.error('Error fetching mentor data:', error);
@@ -134,14 +142,18 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     const checkHabits = async () => {
       if (!user) return;
       try {
-        const { data } = await supabase
-          .from("habits")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1);
+        const habits = await getDocuments(
+          "habits",
+          [
+            ["user_id", "==", user.uid],
+            ["is_active", "==", true],
+          ],
+          undefined,
+          undefined,
+          1
+        );
         if (isMounted) {
-          setHasActiveHabits(!!data && data.length > 0);
+          setHasActiveHabits(habits.length > 0);
         }
       } catch (error) {
         console.error('Error checking habits:', error);
@@ -170,6 +182,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       setIsReady(true);
     }
   }, [user, profileLoading, companionLoading]);
+
+  // Redirect to onboarding if no profile exists (new user)
+  useEffect(() => {
+    if (user && !profileLoading && !companionLoading && !profile) {
+      console.log('[Index] No profile found for new user, redirecting to onboarding');
+      navigate('/onboarding');
+    }
+  }, [user, profile, profileLoading, companionLoading, navigate]);
 
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
   useEffect(() => {
@@ -203,25 +223,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }
 
   // Show error state if critical data failed to load
+  // But redirect to onboarding for new users instead of showing error
   if (!profileLoading && !companionLoading && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-4 max-w-md">
-          <div className="h-12 w-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold mb-2">Unable to Load Profile</h2>
-            <p className="text-muted-foreground mb-4">
-              We couldn't load your profile data. Please check your connection and try again.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-            >
-              Retry
-            </button>
-          </div>
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Setting up your account...</p>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 import { useProfile } from "./useProfile";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument } from "@/lib/firebase/firestore";
 
 interface MentorPersonality {
   name: string;
@@ -55,11 +55,14 @@ export const useMentorPersonality = (): MentorPersonality | null => {
     queryKey: ['mentor-personality', profile?.selected_mentor_id],
     queryFn: async () => {
       if (!profile?.selected_mentor_id) return null;
-      const { data } = await supabase
-        .from('mentors')
-        .select('name, slug, tone_description, style, avatar_url, primary_color')
-        .eq('id', profile.selected_mentor_id)
-        .maybeSingle();
+      const data = await getDocument<{
+        name: string;
+        slug: string;
+        tone_description: string;
+        style: string;
+        avatar_url: string | null;
+        primary_color: string;
+      }>('mentors', profile.selected_mentor_id);
       return data;
     },
     enabled: !!profile?.selected_mentor_id,

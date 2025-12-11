@@ -3,8 +3,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import { SocialLogin } from '@capgo/capacitor-social-login';
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@/hooks/useAuth";
+import { signUp, signIn, resetPassword, signInWithGoogle, signInWithGoogleCredential, signInWithAppleCredential } from "@/lib/firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
+import { convertFirebaseUser } from "@/lib/firebase/auth";
+import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,17 +57,25 @@ const Auth = () => {
   const { toast } = useToast();
   const { session: authSession } = useAuth();
 
-  const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
-    if (!session) return;
+  const handlePostAuthNavigation = useCallback(async (user: { uid: string; email: string | null } | null, source: string) => {
+    if (!user) return;
 
     try {
       hasRedirected.current = true;
-      await ensureProfile(session.user.id, session.user.email);
-      const path = await getAuthRedirectPath(session.user.id);
+      console.log(`[Auth ${source}] Ensuring profile exists for user ${user.uid}`);
+      
+      // Create profile and wait for it to complete
+      await ensureProfile(user.uid, user.email);
+      console.log(`[Auth ${source}] Profile ensured for user ${user.uid}`);
+      
+      // Check if profile exists and get redirect path
+      const path = await getAuthRedirectPath(user.uid);
       console.log(`[Auth ${source}] Navigating to ${path}`);
       navigate(path);
     } catch (error) {
       console.error(`[Auth ${source}] Navigation error:`, error);
+      // If profile creation fails, still navigate to onboarding
+      // The profile will be created by useProfile hook
       navigate('/onboarding');
     }
   }, [navigate]);
@@ -154,82 +165,52 @@ const Auth = () => {
     setAppleNativeReady(pluginAvailable);
   }, []);
 
-  // Handle OAuth callback parameters that return the user to /auth with a valid code/token
+  // Handle OAuth redirect result (for localhost redirect flow)
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      if (typeof window === "undefined" || hasRedirected.current) return;
-
-      const url = new URL(window.location.href);
-      const hasAccessToken = url.hash.includes("access_token");
-      const code = url.searchParams.get("code");
-
-      // Only run when coming back from an OAuth provider
-      if (!code && !hasAccessToken) return;
-
+    const handleRedirectResult = async () => {
       try {
-        // If Supabase didn't automatically exchange the code, do it manually
-        if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-          await handlePostAuthNavigation(data.session, "oauthCodeExchange");
-        } else {
-          // Hash-based tokens (implicit flow)
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await handlePostAuthNavigation(session, "oauthHashSession");
+        const result = await getRedirectResult(firebaseAuth);
+        if (result && result.user && !hasRedirected.current) {
+          console.log('[Auth] OAuth redirect result detected, handling...');
+          const authUser = convertFirebaseUser(result.user);
+          if (authUser) {
+            await handlePostAuthNavigation(authUser, 'oauthRedirect');
           }
         }
       } catch (error) {
-        console.error("[OAuth Callback] Failed to complete OAuth login:", error);
-        toast({
-          title: "Error",
-          description: "Something went wrong signing you in. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        // Clean up URL parameters to avoid re-processing on re-render
-        if (code) {
-          url.searchParams.delete("code");
-          const cleanedUrl = `${url.pathname}${url.search}${url.hash}`;
-          window.history.replaceState(window.history.state, "", cleanedUrl);
-        } else if (hasAccessToken) {
-          window.location.hash = "";
-        }
+        console.error('[Auth] Error handling redirect result:', error);
       }
     };
+    
+    handleRedirectResult();
+  }, [handlePostAuthNavigation]);
 
-    handleOAuthCallback();
-  }, [handlePostAuthNavigation, toast]);
-
-  // Separate effect for session check and auth state listener
+  // Firebase auth state listener
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await handlePostAuthNavigation(session, 'checkSession');
+    // Check current session
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser && !hasRedirected.current) {
+      const authUser = convertFirebaseUser(currentUser);
+      if (authUser) {
+        handlePostAuthNavigation(authUser, 'checkSession');
       }
-    };
+    }
 
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
-      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
-        // Skip if already redirected by direct OAuth call, checkSession, or previous event
-        if (hasRedirected.current) {
-          console.log(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
-          return;
-        }
-        
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      if (user && !hasRedirected.current) {
         const timestamp = Date.now();
-        console.log(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
+        console.log(`[Auth onAuthStateChanged] User signed in at ${timestamp}, redirecting...`);
+        const authUser = convertFirebaseUser(user);
+        if (authUser) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await handlePostAuthNavigation(authUser, 'onAuthStateChanged');
+        }
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
       // Clean up any pending OAuth fallback timeouts to prevent memory leaks
       if (googleFallbackTimeout.current) {
         clearTimeout(googleFallbackTimeout.current);
@@ -272,45 +253,22 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: sanitizedEmail,
-          password,
-        });
-
-        if (error) throw error;
-
-        const { data: { session } } = await supabase.auth.getSession();
-        await handlePostAuthNavigation(session, 'passwordSignIn');
+        const userCredential = await signIn(sanitizedEmail, password);
+        const authUser = convertFirebaseUser(userCredential.user);
+        await handlePostAuthNavigation(authUser, 'passwordSignIn');
       } else {
-        const { data: signUpData, error } = await supabase.auth.signUp({
-          email: sanitizedEmail,
-          password,
-          options: {
-            emailRedirectTo: getRedirectUrlWithPath('/'),
-            data: {
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-            }
-          },
-        });
-
-        if (error) {
-          // Special handling for email already registered
-          if (error.message.includes('already registered')) {
+        try {
+          const userCredential = await signUp(sanitizedEmail, password, {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          });
+          const authUser = convertFirebaseUser(userCredential.user);
+          await handlePostAuthNavigation(authUser, 'signUpImmediate');
+        } catch (error: any) {
+          // Firebase error handling
+          if (error.code === 'auth/email-already-in-use') {
             throw new Error('This email is already registered. Please sign in instead.');
           }
           throw error;
-        }
-        
-        // Check if we have a session (email confirmation disabled in Supabase)
-        // If session exists, user is immediately logged in - navigate them
-        if (signUpData?.session) {
-          await handlePostAuthNavigation(signUpData.session, 'signUpImmediate');
-        } else {
-          // Email confirmation required - show message
-          toast({
-            title: "Check your email",
-            description: "We've sent you a confirmation link to complete your registration.",
-          });
         }
       }
     } catch (error) {
@@ -352,24 +310,13 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-        redirectTo: getRedirectUrlWithPath('/auth/reset-password'),
+      await resetPassword(sanitizedEmail);
+      toast({
+        title: "Check your email",
+        description: "We've sent you a password reset link",
       });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-      } else {
-        toast({
-          title: "Check your email",
-          description: "We've sent you a password reset link",
-        });
-        setIsForgotPassword(false);
-        setEmail("");
-      }
+      setIsForgotPassword(false);
+      setEmail("");
     } catch (error) {
       toast({
         variant: "destructive",
@@ -393,7 +340,7 @@ const Auth = () => {
 
       // Native Google Sign-In for iOS/Android
       if (provider === 'google' && providerSupportsNative && googleNativeReady) {
-        console.log('[Google OAuth] Initiating native Google sign-in');
+        console.log('[Google OAuth] Initiating native Google sign-in with Firebase');
         
         const result = await SocialLogin.login({
           provider: 'google',
@@ -404,77 +351,22 @@ const Auth = () => {
 
         // The plugin sometimes returns the payload under `result`, sometimes directly at the root
         const nativeResponse = (result as unknown as { result?: Record<string, unknown> })?.result ?? result;
-
-        // Prefer explicit responseType when available but don't block when it's missing
-        const responseType = (nativeResponse as { responseType?: string })?.responseType;
         const idToken = (nativeResponse as { idToken?: string })?.idToken;
+        const accessToken = (nativeResponse as { accessToken?: string })?.accessToken;
 
         // Check if we got a valid response
         if (idToken) {
           console.log('[Google OAuth] ID token received:', `${idToken.substring(0, 20)}...`);
-
-          if (responseType && responseType !== 'online') {
-            console.warn(`[Google OAuth] Unexpected responseType (${responseType}), continuing with idToken flow`);
+          if (accessToken) {
+            console.log('[Google OAuth] Access token also received');
           }
 
-          // Continue using the idToken even if the provider/responseType metadata is missing
-
-          console.log('[Google OAuth] Calling google-native-auth edge function');
+          // Sign in with Firebase using the Google credential
+          const userCredential = await signInWithGoogleCredential(idToken, accessToken);
+          const authUser = convertFirebaseUser(userCredential.user);
           
-          // Call our edge function to handle native Google auth
-          const { data: sessionData, error: functionError } = await supabase.functions.invoke('google-native-auth', {
-            body: { idToken }
-          });
-
-          console.log('[Google OAuth] Edge function response:', { 
-            hasAccessToken: !!sessionData?.access_token,
-            hasRefreshToken: !!sessionData?.refresh_token,
-            error: functionError?.message 
-          });
-
-          if (functionError) throw functionError;
-          if (!sessionData?.access_token || !sessionData?.refresh_token) {
-            throw new Error('Failed to get session tokens from edge function');
-          }
-
-          // Set the session with tokens from edge function
-          const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-            access_token: sessionData.access_token,
-            refresh_token: sessionData.refresh_token,
-          });
-
-          if (sessionError) throw sessionError;
-
-          // Ensure Supabase client state has the session before navigating
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          const sessionToUse = newSession ?? currentSession;
-
-          if (!sessionToUse) {
-            throw new Error('Failed to establish Supabase session after Google sign-in');
-          }
-
-          const sessionSetTime = Date.now();
-          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-          await handlePostAuthNavigation(sessionToUse, 'googleNative');
-
-          // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-          if (sessionToUse.user) {
-            googleFallbackTimeout.current = setTimeout(async () => {
-              try {
-                // Check if already redirected by onAuthStateChange
-                if (window.location.pathname !== '/auth') {
-                  console.log(`[Google OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
-                  return;
-                }
-                console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-                await handlePostAuthNavigation(sessionToUse, 'googleNativeFallback');
-              } catch (error) {
-                console.error('[Google OAuth Fallback] Error during redirect:', error);
-                // Fallback to onboarding if something goes wrong
-                navigate('/onboarding');
-              }
-            }, 800);
-          }
+          console.log('[Google OAuth] Firebase sign-in successful');
+          await handlePostAuthNavigation(authUser, 'googleNative');
           return;
         } else {
           console.error('[Google OAuth] Missing idToken in native response:', result);
@@ -484,9 +376,9 @@ const Auth = () => {
 
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
-        console.log('[Apple OAuth] Initiating native Apple sign-in');
+        console.log('[Apple OAuth] Initiating native Apple sign-in with Firebase');
         
-        // Generate secure random nonce (Supabase provides this method)
+        // Generate secure random nonce for Firebase
         const rawNonce = crypto.randomUUID();
         console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
         
@@ -521,76 +413,12 @@ const Auth = () => {
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
-        console.log('[Apple OAuth] Calling apple-native-auth edge function');
-
-        // Call our edge function to handle native Apple auth
-        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: { identityToken: result.response.identityToken }
-        });
-
-        console.log('[Apple OAuth] Edge function response:', { 
-          hasAccessToken: !!sessionData?.access_token,
-          hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionError?.message,
-          errorCode: sessionData?.code
-        });
-
-        if (functionError) {
-          if (sessionData?.code === 'APPLE_EMAIL_MISSING') {
-            console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            toast({
-              title: "Finish setting up Apple Sign-In",
-              description: "We couldn’t create an account with your Apple ID. Open Settings → Apple ID → Password & Security → Sign in with Apple, remove Revolution, then try again to share your email.",
-            });
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          throw new Error(sessionData?.error || functionError.message || 'Apple Sign-In failed');
-        }
-        if (!sessionData?.access_token || !sessionData?.refresh_token) {
-          throw new Error('Failed to get session tokens from edge function');
-        }
-
-        // Set the session with tokens from edge function
-        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-        });
-
-        if (sessionError) throw sessionError;
-
-        // Ensure Supabase client state reflects the session before navigating
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        const sessionToUse = newSession ?? currentSession;
-
-        if (!sessionToUse) {
-          throw new Error('Failed to establish Supabase session after Apple sign-in');
-        }
-
-        const sessionSetTime = Date.now();
-        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        await handlePostAuthNavigation(sessionToUse, 'appleNative');
-
-        // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-        if (sessionToUse.user) {
-          appleFallbackTimeout.current = setTimeout(async () => {
-            try {
-              // Check if already redirected by onAuthStateChange
-              if (window.location.pathname !== '/auth') {
-                console.log(`[Apple OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
-                return;
-              }
-              console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-              await handlePostAuthNavigation(sessionToUse, 'appleNativeFallback');
-            } catch (error) {
-              console.error('[Apple OAuth Fallback] Error during redirect:', error);
-              // Fallback to onboarding if something goes wrong
-              navigate('/onboarding');
-            }
-          }, 800);
-        }
+        // Sign in with Firebase using the Apple credential
+        const userCredential = await signInWithAppleCredential(result.response.identityToken, rawNonce);
+        const authUser = convertFirebaseUser(userCredential.user);
+        
+        console.log('[Apple OAuth] Firebase sign-in successful');
+        await handlePostAuthNavigation(authUser, 'appleNative');
         return;
       }
 
@@ -602,23 +430,39 @@ const Auth = () => {
         }
       }
 
-      console.log(`[${provider} OAuth] Using web OAuth flow`);
-      console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
+      // Web OAuth flow using Firebase
+      console.log(`[${provider} OAuth] Using web OAuth flow with Firebase`);
       
-      const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: getRedirectUrlWithPath('/'),
-        },
-      });
-
-      console.log(`[${provider} OAuth] OAuth response:`, { 
-        hasUrl: !!oauthData?.url, 
-        provider: oauthData?.provider,
-        error: error?.message 
-      });
-
-      if (error) throw error;
+      if (provider === 'google') {
+        try {
+          const userCredential = await signInWithGoogle();
+          // signInWithGoogle returns null for localhost redirect flow
+          // The redirect result is handled by getRedirectResult in useEffect above
+          if (!userCredential) {
+            console.log('[Google OAuth] Redirect flow initiated, waiting for redirect result...');
+            // Don't reset loading state here - the redirect will happen
+            // The loading state will be reset when the page reloads after redirect
+            return;
+          }
+          const authUser = convertFirebaseUser(userCredential.user);
+          await handlePostAuthNavigation(authUser, 'googleWeb');
+        } catch (error: any) {
+          console.error('[Google OAuth] Error in signInWithGoogle:', error);
+          // Re-throw to be caught by outer catch block
+          throw error;
+        }
+      } else if (provider === 'apple') {
+        // Apple Sign-In on web requires redirect flow or popup
+        // For now, we'll use a redirect approach or show a message
+        // Note: Apple Sign-In on web is more complex and may require additional setup
+        toast({
+          title: "Apple Sign-In",
+          description: "Please use Apple Sign-In on iOS devices, or use email/password authentication.",
+          variant: "destructive",
+        });
+        setOauthLoading(null);
+        return;
+      }
     } catch (error) {
       console.error(`[${provider} OAuth] Error caught:`, {
         message: error.message,

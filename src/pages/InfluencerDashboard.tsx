@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument } from "@/lib/firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,23 +73,19 @@ const InfluencerDashboard = () => {
     queryFn: async () => {
       if (!verifiedCode) return null;
 
-      const { data, error } = await supabase
-        .from("referral_codes")
-        .select("*")
-        .eq("code", verifiedCode)
-        .eq("owner_type", "influencer")
-        .maybeSingle();
+      const codes = await getDocuments(
+        "referral_codes",
+        [
+          ["code", "==", verifiedCode],
+          ["owner_type", "==", "influencer"],
+        ]
+      );
 
-      if (error) {
-        console.error("Error fetching influencer code:", error);
-        throw error;
-      }
-      
-      if (!data) {
+      if (codes.length === 0) {
         throw new Error("Invalid or expired influencer code");
       }
       
-      return data as ReferralCode;
+      return codes[0] as ReferralCode;
     },
     enabled: !!verifiedCode,
   });
@@ -100,14 +96,19 @@ const InfluencerDashboard = () => {
     queryFn: async () => {
       if (!verifiedCode) return [];
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, created_at, subscription_status")
-        .eq("referred_by_code", verifiedCode)
-        .order("created_at", { ascending: false });
+      const profiles = await getDocuments(
+        "profiles",
+        [["referred_by_code", "==", verifiedCode]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) throw error;
-      return data as Conversion[];
+      return profiles.map(p => ({
+        id: p.id,
+        email: p.email,
+        created_at: p.created_at,
+        subscription_status: p.subscription_status,
+      })) as Conversion[];
     },
     enabled: !!verifiedCode,
   });
@@ -118,14 +119,14 @@ const InfluencerDashboard = () => {
     queryFn: async () => {
       if (!referralCode?.id) return [];
 
-      const { data, error } = await supabase
-        .from("referral_payouts")
-        .select("*")
-        .eq("referral_code_id", referralCode.id)
-        .order("created_at", { ascending: false });
+      const payoutData = await getDocuments(
+        "referral_payouts",
+        [["referral_code_id", "==", referralCode.id]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) throw error;
-      return data as Payout[];
+      return payoutData as Payout[];
     },
     enabled: !!referralCode?.id,
   });

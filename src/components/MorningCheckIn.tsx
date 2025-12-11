@@ -6,7 +6,7 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { Textarea } from "@/components/ui/textarea";
 import { MoodSelector } from "./MoodSelector";
 import { Sunrise, Target, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { generateCheckInResponse } from "@/lib/firebase/functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
@@ -138,14 +138,8 @@ const MorningCheckInContent = () => {
 
       // Generate mentor response in background with error handling
       try {
-        const { error: invocationError } = await supabase.functions.invoke('generate-check-in-response', {
-          body: { checkInId: checkIn.id }
-        });
-        
-        if (invocationError) {
-          logger.error('Edge function invocation error:', invocationError);
-          // Don't block the UI - mentor response is optional
-        }
+        await generateCheckInResponse({ checkInId: checkIn.id });
+        // Don't block the UI - mentor response is optional
       } catch (error) {
         logger.error('Edge function invocation failed:', error);
         // Don't block the UI - mentor response is optional

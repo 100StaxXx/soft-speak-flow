@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { onSnapshot, query, collection, orderBy, limit } from 'firebase/firestore';
+import { firebaseDb } from '@/lib/firebase';
 
 export function useLessonNotifications() {
   useEffect(() => {
@@ -10,17 +11,16 @@ export function useLessonNotifications() {
     }
 
     // Subscribe to new lessons
-    const channel = supabase
-      .channel('lesson-notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'lessons'
-        },
-        (payload) => {
-          const lesson = payload.new;
+    const lessonsQuery = query(
+      collection(firebaseDb, 'lessons'),
+      orderBy('created_at', 'desc'),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(lessonsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const lesson = change.doc.data();
           
           // Show toast notification
           toast.success('New Lesson Available!', {
@@ -37,15 +37,13 @@ export function useLessonNotifications() {
             });
           }
         }
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Lesson notifications subscription error:', status, err?.message);
-        }
       });
+    }, (error) => {
+      console.warn('Lesson notifications subscription error:', error);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 }

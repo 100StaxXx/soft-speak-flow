@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { generateGuildStory } from "@/lib/firebase/functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Sparkles, Loader2, Users, ChevronDown, ChevronUp } from "lucide-react";
@@ -162,16 +162,9 @@ export const GuildStoriesSection = () => {
 
       toast.loading("Weaving your companions' tale...", { id: "guild-story-gen" });
 
-      const { data, error } = await supabase.functions.invoke(
-        "generate-guild-story",
-        {
-          body: { epicId }, // userId is derived from JWT on server
-        }
-      );
-
-      if (error) {
-        throw new Error(error.message || "Unable to generate story right now");
-      }
+      const data = await generateGuildStory({
+        guildId: epicId,
+      });
 
       if (data.error) {
         throw new Error(data.error);

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, setDocument, deleteDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
@@ -16,40 +16,41 @@ export const useMutedUsers = (epicId?: string) => {
   const queryClient = useQueryClient();
 
   const { data: mutedUsers, isLoading } = useQuery<MutedUser[]>({
-    queryKey: ["muted-users", user?.id, epicId],
+    queryKey: ["muted-users", user?.uid, epicId],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.uid) return [];
 
-      let query = supabase
-        .from("muted_guild_users")
-        .select("*")
-        .eq("user_id", user.id);
+      // Get all mutes for this user
+      const allMutes = await getDocuments<MutedUser>(
+        "muted_guild_users",
+        [["user_id", "==", user.uid]]
+      );
 
-      // Include both epic-specific mutes and global mutes (epic_id is null)
-      if (epicId) {
-        query = query.or(`epic_id.eq.${epicId},epic_id.is.null`);
-      }
+      // Filter: include epic-specific mutes and global mutes (epic_id is null)
+      const filtered = epicId
+        ? allMutes.filter(m => m.epic_id === epicId || m.epic_id === null)
+        : allMutes;
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as MutedUser[];
+      return filtered.map(m => ({
+        ...m,
+        muted_at: timestampToISO(m.muted_at as any) || m.muted_at || new Date().toISOString(),
+      }));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   const muteUser = useMutation({
     mutationFn: async ({ mutedUserId, epicId: muteEpicId }: { mutedUserId: string; epicId?: string }) => {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.uid) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("muted_guild_users")
-        .insert({
-          user_id: user.id,
-          muted_user_id: mutedUserId,
-          epic_id: muteEpicId || null,
-        });
-
-      if (error) throw error;
+      const muteId = `${user.uid}_${mutedUserId}_${muteEpicId || 'global'}`;
+      await setDocument("muted_guild_users", muteId, {
+        id: muteId,
+        user_id: user.uid,
+        muted_user_id: mutedUserId,
+        epic_id: muteEpicId || null,
+        muted_at: new Date().toISOString(),
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["muted-users"] });
@@ -63,22 +64,25 @@ export const useMutedUsers = (epicId?: string) => {
 
   const unmuteUser = useMutation({
     mutationFn: async ({ mutedUserId, epicId: muteEpicId }: { mutedUserId: string; epicId?: string }) => {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.uid) throw new Error("Not authenticated");
 
-      let query = supabase
-        .from("muted_guild_users")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("muted_user_id", mutedUserId);
+      // Find the mute record to delete
+      const mutes = await getDocuments(
+        "muted_guild_users",
+        [
+          ["user_id", "==", user.uid],
+          ["muted_user_id", "==", mutedUserId],
+        ]
+      );
 
-      if (muteEpicId) {
-        query = query.eq("epic_id", muteEpicId);
-      } else {
-        query = query.is("epic_id", null);
+      // Filter by epic_id if provided
+      const toDelete = muteEpicId
+        ? mutes.find(m => m.epic_id === muteEpicId)
+        : mutes.find(m => m.epic_id === null);
+
+      if (toDelete) {
+        await deleteDocument("muted_guild_users", toDelete.id);
       }
-
-      const { error } = await query;
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["muted-users"] });

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, setDocument, updateDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
-import type { Json } from "@/integrations/supabase/types";
 
 // Define activity data types based on activity types
 export interface HabitActivityData {
@@ -49,18 +48,22 @@ export const useActivityFeed = () => {
   const queryClient = useQueryClient();
 
   const { data: activities, isLoading } = useQuery({
-    queryKey: ['activity-feed', user?.id],
+    queryKey: ['activity-feed', user?.uid],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('activity_feed')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const data = await getDocuments<ActivityFeedItem>(
+        'activity_feed',
+        [['user_id', '==', user.uid]],
+        'created_at',
+        'desc',
+        50
+      );
       
-      if (error) throw error;
-      return data as ActivityFeedItem[];
+      // Convert Firestore timestamps to ISO strings
+      return data.map(activity => ({
+        ...activity,
+        created_at: timestampToISO(activity.created_at as any) || activity.created_at || new Date().toISOString(),
+      })) as ActivityFeedItem[];
     },
     enabled: !!user,
   });
@@ -75,29 +78,27 @@ export const useActivityFeed = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
       
-      const { data: activity, error } = await supabase
-        .from('activity_feed')
-        .insert([{
-          user_id: user.id,
-          activity_type: type,
-          activity_data: data as Json,
-        }])
-        .select()
-        .maybeSingle();
+      const activityId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const activity = {
+        id: activityId,
+        user_id: user.uid,
+        activity_type: type,
+        activity_data: data,
+        mentor_comment: null,
+        mentor_voice_url: null,
+        is_read: false,
+      };
 
-      if (error) throw error;
-      if (!activity) throw new Error("Failed to create activity");
+      await setDocument('activity_feed', activityId, activity, false);
 
+      // TODO: Migrate to Firebase Cloud Function
       // Trigger AI comment generation in background (non-blocking)
-      supabase.functions.invoke('generate-activity-comment', {
-        body: { activityId: activity.id }
-      }).then(({ error: invokeError }) => {
-        if (invokeError) {
-          console.error('Failed to generate activity comment:', invokeError);
-        }
-      }).catch((err) => {
-        console.error('Activity comment generation failed:', err);
-      });
+      // fetch('https://YOUR-FIREBASE-FUNCTION/generate-activity-comment', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ activityId }),
+      // }).catch((err) => {
+      //   console.error('Activity comment generation failed:', err);
+      // });
 
       return activity;
     },
@@ -109,13 +110,12 @@ export const useActivityFeed = () => {
   const markAsRead = useMutation({
     mutationFn: async (activityId: string) => {
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from('activity_feed')
-        .update({ is_read: true })
-        .eq('id', activityId)
-        .eq('user_id', user.id);
       
-      if (error) throw error;
+      const activity = await getDocument<{ user_id: string }>('activity_feed', activityId);
+      if (!activity) throw new Error("Activity not found");
+      if (activity.user_id !== user.uid) throw new Error("Unauthorized");
+      
+      await updateDocument('activity_feed', activityId, { is_read: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activity-feed'] });

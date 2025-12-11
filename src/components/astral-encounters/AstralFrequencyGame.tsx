@@ -146,6 +146,7 @@ export const AstralFrequencyGame = ({
   const sliderValueRef = useRef(sliderValue);
   const targetFrequencyRef = useRef(targetFrequency);
   const alignedTimeRef = useRef(alignedTime);
+  const comboRef = useRef(combo);
   const lastAlignedRef = useRef(false);
 
   // Keep refs in sync
@@ -153,6 +154,7 @@ export const AstralFrequencyGame = ({
   useEffect(() => { sliderValueRef.current = sliderValue; }, [sliderValue]);
   useEffect(() => { targetFrequencyRef.current = targetFrequency; }, [targetFrequency]);
   useEffect(() => { alignedTimeRef.current = alignedTime; }, [alignedTime]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
 
   // Use particle system
   const { particles, emit: emitParticles } = useParticleSystem(20);
@@ -252,7 +254,7 @@ export const AstralFrequencyGame = ({
     } else {
       const newAlignedTime = Math.max(0, alignedTimeRef.current - deltaTime * 0.3);
       setAlignedTime(newAlignedTime);
-      if (newAlignedTime === 0 && combo > 0) {
+      if (newAlignedTime === 0 && comboRef.current > 0) {
         setCombo(0);
       }
     }

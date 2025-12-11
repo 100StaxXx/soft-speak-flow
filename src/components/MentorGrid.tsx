@@ -56,6 +56,15 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
 
   const activeMentor = orderedMentors.find(m => m.id === selectedMentor);
 
+  // Show message if no mentors
+  if (mentors.length === 0) {
+    return (
+      <div className="relative w-full max-w-6xl mx-auto text-center py-16">
+        <p className="text-steel text-lg">No mentors available. Please contact support.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full max-w-6xl mx-auto">
       {/* Full Screen Mentor View */}

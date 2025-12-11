@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments, setDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,19 @@ export default function Reflection() {
   const [currentMoodSelection, setCurrentMoodSelection] = useState<string | null>(null);
 
   const loadTodayReflection = async () => {
-    if (!user?.id) return;
+    if (!user?.uid) return;
     
     try {
       const today = new Date().toLocaleDateString('en-CA');
-      const { data, error } = await supabase
-        .from('user_reflections')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('reflection_date', today)
-        .maybeSingle();
+      const reflections = await getDocuments(
+        'user_reflections',
+        [
+          ['user_id', '==', user.uid],
+          ['reflection_date', '==', today],
+        ]
+      );
 
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = reflections[0] || null;
       
       if (data) {
         setTodayReflection(data);
@@ -58,7 +59,7 @@ export default function Reflection() {
       loadTodayReflection();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]); // loadTodayReflection depends on user.id
+  }, [user?.uid]); // loadTodayReflection depends on user.uid
 
   const handleSubmit = async () => {
     if (!selectedMood || !user) return;
@@ -66,31 +67,29 @@ export default function Reflection() {
     setIsSubmitting(true);
     try {
       const today = new Date().toLocaleDateString('en-CA');
+      const reflectionId = `${user.uid}_${today}`;
       
-      const { data: reflection, error } = await supabase
-        .from('user_reflections')
-        .upsert({
-          user_id: user.id,
-          reflection_date: today,
-          mood: selectedMood,
-          note: note || null
-        }, {
-          onConflict: 'user_id,reflection_date'
-        })
-        .select()
-        .maybeSingle();
+      const reflectionData = {
+        id: reflectionId,
+        user_id: user.uid,
+        reflection_date: today,
+        mood: selectedMood,
+        note: note || null,
+      };
 
-      if (error) throw error;
-      if (!reflection) throw new Error("Failed to save reflection");
+      await setDocument('user_reflections', reflectionId, reflectionData, true);
 
+      // TODO: Migrate to Firebase Cloud Function
       // Trigger AI reply generation in background
-      supabase.functions.invoke('generate-reflection-reply', {
-        body: {
-          reflectionId: reflection.id,
-          mood: selectedMood,
-          note: note
-        }
-      });
+      // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-reflection-reply', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     reflectionId: reflectionId,
+      //     mood: selectedMood,
+      //     note: note
+      //   })
+      // });
 
       // Log to activity feed
       logActivity({
@@ -106,12 +105,12 @@ export default function Reflection() {
         description: "You checked in for today.",
       });
 
-      setTodayReflection(reflection);
+      setTodayReflection(reflectionData);
     } catch (error) {
       console.error('Error saving reflection:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to save reflection",
         variant: "destructive"
       });
     } finally {

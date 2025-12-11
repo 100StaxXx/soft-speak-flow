@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
 
@@ -30,23 +30,43 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
   const endDate = format(end, 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['calendar-tasks', user?.id, startDate, endDate, view],
+    queryKey: ['calendar-tasks', user?.uid, startDate, endDate, view],
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('task_date', startDate)
-        .lte('task_date', endDate)
-        .order('scheduled_time', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: false });
+      // Firestore doesn't support range queries directly, so we fetch all tasks and filter
+      // For better performance, you might want to use composite indexes
+      const allTasks = await getDocuments(
+        'daily_tasks',
+        [['user_id', '==', user.uid]],
+        'created_at',
+        'desc'
+      );
 
-      if (error) throw error;
-      return data || [];
+      // Filter by date range and convert timestamps
+      const filteredTasks = allTasks
+        .filter((task: any) => {
+          const taskDate = task.task_date;
+          return taskDate >= startDate && taskDate <= endDate;
+        })
+        .map((task: any) => ({
+          ...task,
+          created_at: timestampToISO(task.created_at as any) || task.created_at || new Date().toISOString(),
+          completed_at: timestampToISO(task.completed_at as any) || task.completed_at,
+        }))
+        .sort((a: any, b: any) => {
+          // Sort by scheduled_time first, then created_at
+          if (a.scheduled_time && b.scheduled_time) {
+            return a.scheduled_time.localeCompare(b.scheduled_time);
+          }
+          if (a.scheduled_time) return -1;
+          if (b.scheduled_time) return 1;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+      return filteredTasks;
     },
     enabled: !!user,
     staleTime: 2 * 60 * 1000, // 2 minutes - calendar data changes infrequently

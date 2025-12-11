@@ -31,7 +31,7 @@ const AttemptDots = memo(({
             ? i < hits 
               ? 'bg-green-500 border-green-400' 
               : 'bg-red-500 border-red-400'
-            : i === attempts
+            : i === attempts && attempts < maxAttempts
               ? 'border-primary bg-primary/20 scale-pulse'
               : 'border-muted bg-muted/20'
         }`}
@@ -238,7 +238,8 @@ export const EnergyBeamGame = ({
       
       if (newAttempts >= maxAttempts) {
         setGameState('complete');
-        const finalHits = hits + (isInSweetSpot ? 1 : 0);
+        // hits was already incremented above if isInSweetSpot is true
+        const finalHits = hits;
         const accuracy = Math.round((finalHits / maxAttempts) * 100);
         const comboBonus = Math.min(maxCombo * 5, 20);
         const finalAccuracy = Math.min(100, accuracy + comboBonus);
