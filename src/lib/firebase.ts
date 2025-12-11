@@ -23,10 +23,12 @@ if (missingFields.length > 0) {
   console.error('❌', errorMsg);
   console.error('   Missing fields:', missingFields);
   // Throw error to prevent app from running with invalid config
+  // ErrorBoundary will catch this and display a helpful message
   throw new Error(errorMsg);
 }
 
 // Initialize Firebase with config from environment variables
+// Using inline exports for Vite/Rollup static analysis compatibility
 export const firebaseApp: FirebaseApp = initializeApp(firebaseConfig);
 export const firebaseAuth: Auth = getAuth(firebaseApp);
 export const firebaseDb: Firestore = getFirestore(firebaseApp);
