@@ -6,7 +6,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -117,35 +117,19 @@ export const TodaysPepTalk = memo(() => {
       try {
         const today = new Date().toLocaleDateString("en-CA");
 
-        const { data: mentor, error: mentorError } = await supabase
-          .from("mentors")
-          .select("slug, name")
-          .eq("id", profile.selected_mentor_id)
-          .maybeSingle();
+        const mentor = await getDocument("mentors", profile.selected_mentor_id);
 
-        if (mentorError) {
-          console.error("Error fetching mentor:", mentorError);
+        if (!mentor || !mentor.slug) {
           setLoading(false);
           return;
         }
 
-        if (!mentor) {
-          setLoading(false);
-          return;
-        }
+        const pepTalks = await getDocuments("daily_pep_talks", [
+          ["for_date", "==", today],
+          ["mentor_slug", "==", mentor.slug]
+        ]);
 
-        const { data, error: pepTalkError } = await supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle();
-
-        if (pepTalkError) {
-          console.error("Error fetching pep talk:", pepTalkError);
-          setLoading(false);
-          return;
-        }
+        const data = pepTalks.length > 0 ? pepTalks[0] : null;
 
         if (data) {
           // Validate and sanitize transcript data
@@ -224,13 +208,15 @@ export const TodaysPepTalk = memo(() => {
     const checkXPStatus = async () => {
       if (!pepTalk?.id || !profile?.id) return;
       
-      const { data } = await supabase
-        .from('xp_events')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('event_type', 'pep_talk_listen')
-        .eq('event_metadata->>pep_talk_id', pepTalk.id)
-        .maybeSingle();
+      const xpEvents = await getDocuments('xp_events', [
+        ['user_id', '==', profile.id],
+        ['event_type', '==', 'pep_talk_listen']
+      ]);
+      
+      // Filter for matching pep_talk_id in metadata (Firestore doesn't support JSON field queries directly)
+      const data = xpEvents.find((event: any) => 
+        event.event_metadata?.pep_talk_id === pepTalk.id
+      ) || null;
       
       setHasAwardedXP(!!data);
     };

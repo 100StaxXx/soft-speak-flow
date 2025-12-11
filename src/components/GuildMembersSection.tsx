@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useGuildRivalry } from "@/hooks/useGuildRivalry";
 import { useGuildShouts } from "@/hooks/useGuildShouts";
@@ -49,64 +49,66 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
     const fetchMembers = async () => {
       setIsLoading(true);
       
-      const { data: membersData, error } = await supabase
-        .from("epic_members")
-        .select("user_id, total_contribution, joined_at")
-        .eq("epic_id", epicId)
-        .order("total_contribution", { ascending: false });
+      try {
+        // Get epic members
+        const membersData = await getDocuments("epic_members", [
+          ["epic_id", "==", epicId]
+        ], "total_contribution", "desc");
 
-      if (error || !membersData) {
+        if (!membersData || membersData.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Extract all user IDs for batch queries (avoid N+1 problem)
+        const userIds = membersData.map((m: any) => m.user_id);
+
+        // Fetch profiles and companions in parallel using individual document fetches
+        // This is more reliable than 'in' queries which have limitations
+        const profilePromises = userIds.map((userId: string) => 
+          getDocument("profiles", userId).catch(() => null)
+        );
+        const companionPromises = userIds.map((userId: string) => 
+          getDocument("user_companion", userId).catch(() => null)
+        );
+
+        const [profileResults, companionResults] = await Promise.all([
+          Promise.all(profilePromises),
+          Promise.all(companionPromises)
+        ]);
+
+        // Create lookup maps for O(1) access
+        const profilesMap = new Map(
+          profileResults
+            .filter((p: any) => p !== null)
+            .map((p: any) => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
+        );
+        const companionsMap = new Map(
+          companionResults
+            .filter((c: any) => c !== null)
+            .map((c: any) => [c.id || c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
+        );
+
+        // Enrich members with profile and companion data
+        const enrichedMembers = membersData.map((member: any) => ({
+          ...member,
+          profile: profilesMap.get(member.user_id),
+          companion: companionsMap.get(member.user_id),
+        }));
+
+        setMembers(enrichedMembers);
+      } catch (error) {
+        console.error("Error fetching guild members:", error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      // Extract all user IDs for batch queries (avoid N+1 problem)
-      const userIds = membersData.map(m => m.user_id);
-
-      // Batch fetch profiles and companions in parallel
-      const [profilesRes, companionsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email, onboarding_data, faction").in("id", userIds),
-        supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
-      ]);
-
-      // Create lookup maps for O(1) access
-      const profilesMap = new Map(
-        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
-      );
-      const companionsMap = new Map(
-        (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
-      );
-
-      // Enrich members with profile and companion data
-      const enrichedMembers = membersData.map(member => ({
-        ...member,
-        profile: profilesMap.get(member.user_id),
-        companion: companionsMap.get(member.user_id),
-      }));
-
-      setMembers(enrichedMembers);
-      setIsLoading(false);
     };
 
     fetchMembers();
 
-    // Real-time subscription
-    const channel = supabase
-      .channel(`members-${epicId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'epic_members', filter: `epic_id=eq.${epicId}` },
-        () => fetchMembers()
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Guild members subscription error:', status, err?.message);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Note: Real-time subscriptions would need to be implemented with Firestore onSnapshot
+    // For now, we'll just fetch on mount and when epicId changes
+    // TODO: Add Firestore real-time listener if needed
   }, [epicId]);
 
   const getRankIcon = (index: number) => {

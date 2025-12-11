@@ -1,6 +1,6 @@
 import { useEffect, useState, memo } from "react";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 import { format } from "date-fns";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
@@ -35,46 +35,45 @@ export const HeroQuoteBanner = memo(() => {
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
-      const { data: mentorData } = await supabase
-        .from("mentors")
-        .select("name, avatar_url, slug")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
+      const mentorData = await getDocument("mentors", profile.selected_mentor_id);
 
       if (!mentorData) {
         setLoading(false);
         return;
       }
 
-      setMentor(mentorData);
+      setMentor({
+        name: mentorData.name,
+        avatar_url: mentorData.avatar_url || null,
+        slug: mentorData.slug
+      });
       
       // Dynamically load only the needed mentor image
       const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
       setMentorImageUrl(imageUrl);
 
       // Get today's pep talk to find related quote
-      const { data: dailyPepTalk } = await supabase
-        .from("daily_pep_talks")
-        .select("emotional_triggers, topic_category")
-        .eq("for_date", today)
-        .eq("mentor_slug", mentorData.slug)
-        .maybeSingle();
+      const dailyPepTalks = await getDocuments("daily_pep_talks", [
+        ["for_date", "==", today],
+        ["mentor_slug", "==", mentorData.slug]
+      ]);
+
+      const dailyPepTalk = dailyPepTalks[0];
 
       if (dailyPepTalk) {
-        // Fetch a quote that matches the pep talk's themes
-        // Build the query safely - first try matching by category, then fall back
-        let quoteQuery = supabase.from("quotes").select("*");
+        // Fetch quotes that match the pep talk's themes
+        const filters: Array<[string, any, any]> = [];
         
         if (dailyPepTalk.topic_category) {
-          quoteQuery = quoteQuery.eq("category", dailyPepTalk.topic_category);
+          filters.push(["category", "==", dailyPepTalk.topic_category]);
         }
         
-        const { data: quotes } = await quoteQuery.limit(10);
+        const quotes = await getDocuments("quotes", filters.length > 0 ? filters : undefined, undefined, undefined, 10);
         
         if (quotes && quotes.length > 0) {
           // If we have emotional triggers, try to find a matching quote
           const triggers = dailyPepTalk.emotional_triggers || [];
-          const matchingQuote = quotes.find(q => 
+          const matchingQuote = quotes.find((q: any) => 
             q.emotional_triggers?.some((t: string) => triggers.includes(t))
           ) || quotes[0];
           

@@ -15,7 +15,7 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument } from "@/lib/firebase/firestore";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -38,14 +38,12 @@ const MorningCheckInContent = () => {
     queryFn: async () => {
       if (!user) return null;
       
-      const { data } = await supabase
-        .from('daily_check_ins')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('check_in_type', 'morning')
-        .eq('check_in_date', today)
-        .maybeSingle();
-      return data;
+      const checkIns = await getDocuments('daily_check_ins', [
+        ['user_id', '==', user.id],
+        ['check_in_type', '==', 'morning'],
+        ['check_in_date', '==', today]
+      ]);
+      return checkIns.length > 0 ? checkIns[0] : null;
     },
     enabled: !!user,
     // Poll every 2 seconds if check-in exists but mentor response is still pending
@@ -84,15 +82,13 @@ const MorningCheckInContent = () => {
 
     try {
       // Double-check right before insert (cache could be stale)
-      const { data: recentCheck } = await supabase
-        .from('daily_check_ins')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('check_in_type', 'morning')
-        .eq('check_in_date', today)
-        .maybeSingle();
+      const recentChecks = await getDocuments('daily_check_ins', [
+        ['user_id', '==', user.id],
+        ['check_in_type', '==', 'morning'],
+        ['check_in_date', '==', today]
+      ]);
 
-      if (recentCheck) {
+      if (recentChecks.length > 0) {
         toast({ 
           title: "Already checked in", 
           description: "You've already completed your check-in today",
@@ -103,32 +99,28 @@ const MorningCheckInContent = () => {
         return;
       }
 
-      const { data: checkIn, error } = await supabase
-        .from('daily_check_ins')
-        .insert({
-          user_id: user.id,
-          check_in_type: 'morning',
-          check_in_date: today,
-          mood,
-          intention: intention.trim(),
-          completed_at: new Date().toISOString(),
-        })
-        .select()
-        .maybeSingle();
+      // Create check-in document
+      const checkInId = `checkin_${user.id}_${today}_${Date.now()}`;
+      const checkIn = {
+        id: checkInId,
+        user_id: user.id,
+        check_in_type: 'morning',
+        check_in_date: today,
+        mood,
+        intention: intention.trim(),
+        completed_at: new Date().toISOString(),
+      };
 
-      if (error) {
-        logger.error('Check-in error:', error);
-        throw error;
-      }
+      await setDocument('daily_check_ins', checkInId, checkIn, false);
 
       // Award XP only on successful INSERT (not update)
       awardCheckInComplete();
       
       // Check for first check-in achievement
-      const { count } = await supabase
-        .from('daily_check_ins')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+      const allCheckIns = await getDocuments('daily_check_ins', [
+        ['user_id', '==', user.id]
+      ]);
+      const count = allCheckIns.length;
       
       if (count === 1) {
         await checkFirstTimeAchievements('checkin');

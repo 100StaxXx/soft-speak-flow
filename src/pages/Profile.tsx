@@ -22,7 +22,6 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
 import { FactionBadge } from "@/components/FactionBadge";
-import { supabase } from "@/integrations/supabase/client";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -172,12 +171,8 @@ const Profile = () => {
 
     setIsDeletingAccount(true);
     try {
-      // Import Firebase Functions dynamically to avoid issues if not deployed
-      const { getFunctions, httpsCallable } = await import("firebase/functions");
-      const { firebaseApp } = await import("@/lib/firebase");
-      
-      const functions = getFunctions(firebaseApp);
-      const deleteUserAccount = httpsCallable(functions, "deleteUserAccount");
+      // Import the helper function
+      const { deleteUserAccount } = await import("@/lib/firebase/functions");
 
       // Call the Cloud Function (this will delete the user from Firebase Auth)
       await deleteUserAccount();

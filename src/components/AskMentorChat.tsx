@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
 import { firebaseAuth } from "@/lib/firebase/auth";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -95,8 +94,7 @@ export const AskMentorChat = ({
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-    if (authError || !currentUser) {
+    if (!user) {
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
       return;
     }
@@ -153,14 +151,8 @@ export const AskMentorChat = ({
         });
       }
 
-      // Save conversation history (non-blocking - don't fail if this errors)
-      // Only save if mentorId is defined to maintain data integrity
-      if (mentorId) {
-        void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
-        ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
-      }
+      // Note: Conversation history is already saved by the mentorChat Firebase function
+      // No need to save again here to avoid duplicates
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -190,14 +182,8 @@ export const AskMentorChat = ({
         return newCount;
       });
 
-      // Save both messages even with fallback (non-blocking)
-      // Only save if mentorId is defined to maintain data integrity
-      if (mentorId) {
-        void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
-        ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
-      }
+      // Note: Fallback messages are not saved to database (they're offline responses)
+      // Only successful API responses are saved by the mentorChat Firebase function
     } finally {
       setIsLoading(false);
     }

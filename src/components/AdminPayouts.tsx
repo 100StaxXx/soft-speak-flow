@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { processPaypalPayout } from "@/lib/firebase/functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,25 +76,40 @@ export const AdminPayouts = () => {
   const { data: payouts, isLoading: payoutsLoading } = useQuery({
     queryKey: ["admin-referral-payouts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("referral_payouts")
-        .select(`
-          *,
-          referral_code:referral_codes!referral_code_id(
-            code,
-            owner_type,
-            owner_user_id,
-            influencer_name,
-            influencer_email,
-            influencer_handle,
-            payout_identifier
-          ),
-          referee:profiles!referee_id(email)
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as ReferralPayout[];
+      // Get all payouts
+      const payoutsData = await getDocuments("referral_payouts", undefined, "created_at", "desc");
+      
+      // Enrich with referral code and referee info
+      const enrichedPayouts = await Promise.all(
+        payoutsData.map(async (payout: any) => {
+          let referralCode = null;
+          let referee = null;
+          
+          if (payout.referral_code_id) {
+            referralCode = await getDocument("referral_codes", payout.referral_code_id);
+          }
+          
+          if (payout.referee_id) {
+            referee = await getDocument("profiles", payout.referee_id);
+          }
+          
+          return {
+            ...payout,
+            referral_code: referralCode ? {
+              code: referralCode.code,
+              owner_type: referralCode.owner_type,
+              owner_user_id: referralCode.owner_user_id,
+              influencer_name: referralCode.influencer_name,
+              influencer_email: referralCode.influencer_email,
+              influencer_handle: referralCode.influencer_handle,
+              payout_identifier: referralCode.payout_identifier
+            } : null,
+            referee: referee ? { email: referee.email } : null
+          };
+        })
+      );
+      
+      return enrichedPayouts as ReferralPayout[];
     },
   });
 
@@ -154,16 +169,11 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
-
-      if (error) throw error;
+      await updateDocument("referral_payouts", payoutId, {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        admin_notes: notes || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
@@ -185,16 +195,11 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "rejected",
-          rejected_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
-
-      if (error) throw error;
+      await updateDocument("referral_payouts", payoutId, {
+        status: "rejected",
+        rejected_at: new Date().toISOString(),
+        admin_notes: notes || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
@@ -236,16 +241,15 @@ export const AdminPayouts = () => {
       );
       if (!pendingPayouts || pendingPayouts.length === 0) return;
 
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-        })
-        .eq("referral_code_id", referralCodeId)
-        .eq("status", "pending");
-
-      if (error) throw error;
+      // Update all pending payouts for this referral code
+      await Promise.all(
+        pendingPayouts.map((payout) =>
+          updateDocument("referral_payouts", payout.id, {
+            status: "approved",
+            approved_at: new Date().toISOString(),
+          })
+        )
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });

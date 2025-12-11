@@ -128,16 +128,12 @@ export const GuildStoriesSection = () => {
     mutationFn: async (storyId: string) => {
       if (!user?.id) return;
 
-      const { error } = await supabase
-        .from("guild_story_reads")
-        .upsert({
-          user_id: user.id,
-          story_id: storyId,
-        }, {
-          onConflict: 'user_id,story_id',
-        });
-
-      if (error) throw error;
+      const { setDocument } = await import('@/lib/firebase/firestore');
+      const readId = `${user.id}_${storyId}`;
+      await setDocument("guild_story_reads", readId, {
+        user_id: user.id,
+        story_id: storyId,
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["unread-guild-stories"] });

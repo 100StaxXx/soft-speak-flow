@@ -31,14 +31,25 @@ const appleServiceId = defineSecret("APPLE_SERVICE_ID");
 const appleIosBundleId = defineSecret("APPLE_IOS_BUNDLE_ID");
 const appleWebhookAudience = defineSecret("APPLE_WEBHOOK_AUDIENCE");
 
+// Define secret for Gemini API
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
+
 /**
  * Generate a companion name using AI
  * Uses the same rules as the original Supabase edge function
  */
-export const generateCompanionName = functions.https.onCall(
-  async (request) => {
+export const generateCompanionName = onCall(
+  {
+    secrets: [geminiApiKey],
+  },
+  async (request: CallableRequest<{
+    spiritAnimal: string;
+    favoriteColor: string;
+    coreElement: string;
+    userAttributes?: { mind?: number; body?: number; soul?: number };
+  }>) => {
     if (!request.auth) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "unauthenticated",
         "User must be authenticated to generate companion name"
       );
@@ -47,27 +58,21 @@ export const generateCompanionName = functions.https.onCall(
     const { spiritAnimal, favoriteColor, coreElement, userAttributes } = request.data;
 
     if (!spiritAnimal || !favoriteColor || !coreElement) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "Missing required fields: spiritAnimal, favoriteColor, coreElement"
       );
     }
 
     try {
-      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-      if (!GEMINI_API_KEY) {
-        throw new functions.https.HttpsError(
-          "internal",
-          "GEMINI_API_KEY not configured"
-        );
-      }
+      const apiKey = geminiApiKey.value();
 
       // Determine personality based on user attributes
-      const personality = userAttributes?.body > 60
+      const personality = (userAttributes?.body ?? 0) > 60
         ? "powerful and energetic"
-        : userAttributes?.mind > 60
+        : (userAttributes?.mind ?? 0) > 60
         ? "wise and focused"
-        : userAttributes?.soul > 60
+        : (userAttributes?.soul ?? 0) > 60
         ? "compassionate and deeply connected"
         : "mysterious and evolving";
 
@@ -114,70 +119,28 @@ Generate a card with these exact fields in JSON:
 
 Make it LEGENDARY. This is the birth of a companion.`;
 
-      // Call Gemini API directly
-      const aiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: `${systemPrompt}\n\n${userPrompt}` }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.9,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 2048,
-            },
-          }),
-        }
-      );
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        console.error("Gemini API error:", errorText);
-        throw new functions.https.HttpsError(
-          "internal",
-          `AI generation failed: ${aiResponse.status} - ${errorText}`
-        );
-      }
-
-      const aiData = await aiResponse.json();
-      const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!content) {
-        throw new functions.https.HttpsError(
-          "internal",
-          "Gemini API did not return content"
-        );
-      }
+      // Call Gemini API using helper
+      const geminiResponse = await callGemini(userPrompt, systemPrompt, {
+        temperature: 0.9,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      }, apiKey);
 
       // Parse JSON from AI response
       let cardData;
       try {
-        // Extract JSON if wrapped in markdown code blocks
-        const jsonMatch =
-          content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) ||
-          content.match(/(\{[\s\S]*\})/);
-        const jsonString = jsonMatch ? jsonMatch[1] : content;
-        cardData = JSON.parse(jsonString);
+        cardData = parseGeminiJSON(geminiResponse.text);
       } catch (e) {
-        console.error("Failed to parse AI response:", content);
-        throw new functions.https.HttpsError(
+        console.error("Failed to parse AI response:", geminiResponse.text);
+        throw new HttpsError(
           "internal",
           "AI response was not valid JSON"
         );
       }
 
       if (!cardData.creature_name) {
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
           "internal",
           "AI did not generate a creature name"
         );
@@ -191,9 +154,12 @@ Make it LEGENDARY. This is the birth of a companion.`;
       };
     } catch (error) {
       console.error("Error generating companion name:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "internal",
         `Failed to generate companion name: ${errorMessage}`
       );
@@ -323,57 +289,67 @@ export const deleteUserAccount = functions.https.onCall(
  * Mentor Chat - AI-powered mentor conversation
  * Migrated from Supabase Edge Function to Firebase Cloud Function
  */
-export const mentorChat = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "User must be authenticated"
-    );
-  }
-
-  const { message, conversationHistory, mentorName, mentorTone } = request.data;
-
-  if (!message || !mentorName || !mentorTone) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Missing required fields: message, mentorName, mentorTone"
-    );
-  }
-
-  try {
-    const userId = request.auth.uid;
-    const db = admin.firestore();
-
-    // Check daily message limit (10 messages per day)
-    const DAILY_MESSAGE_LIMIT = 10;
-    const startOfDay = new Date();
-    startOfDay.setUTCHours(0, 0, 0, 0);
-
-    const todayMessages = await db
-      .collection("mentor_chats")
-      .where("user_id", "==", userId)
-      .where("role", "==", "user")
-      .where("created_at", ">=", startOfDay)
-      .get();
-
-    if (todayMessages.size >= DAILY_MESSAGE_LIMIT) {
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        `Daily limit of ${DAILY_MESSAGE_LIMIT} messages reached`
+export const mentorChat = onCall(
+  {
+    secrets: [geminiApiKey],
+  },
+  async (request: CallableRequest<{
+    message: string;
+    conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+    mentorName: string;
+    mentorTone: string;
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
       );
     }
 
-    // Build conversation context
-    const contextualInfo =
-      conversationHistory && conversationHistory.length > 0
-        ? `Recent conversation context:\n${conversationHistory
-            .slice(-3)
-            .map((m: any) => `${m.role}: ${m.content}`)
-            .join("\n")}`
-        : "";
+    const { message, conversationHistory, mentorName, mentorTone } = request.data;
 
-    // Build system prompt
-    const systemPrompt = `You are ${mentorName}, a supportive and motivating mentor. Your tone and style: ${mentorTone}
+    if (!message || !mentorName || !mentorTone) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required fields: message, mentorName, mentorTone"
+      );
+    }
+
+    try {
+      const userId = request.auth.uid;
+      const db = admin.firestore();
+      const apiKey = geminiApiKey.value();
+
+      // Check daily message limit (10 messages per day)
+      const DAILY_MESSAGE_LIMIT = 10;
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      const todayMessages = await db
+        .collection("mentor_chats")
+        .where("user_id", "==", userId)
+        .where("role", "==", "user")
+        .where("created_at", ">=", startOfDay)
+        .get();
+
+      if (todayMessages.size >= DAILY_MESSAGE_LIMIT) {
+        throw new HttpsError(
+          "resource-exhausted",
+          `Daily limit of ${DAILY_MESSAGE_LIMIT} messages reached`
+        );
+      }
+
+      // Build conversation context
+      const contextualInfo =
+        conversationHistory && conversationHistory.length > 0
+          ? `Recent conversation context:\n${conversationHistory
+              .slice(-3)
+              .map((m: any) => `${m.role}: ${m.content}`)
+              .join("\n")}`
+          : "";
+
+      // Build system prompt
+      const systemPrompt = `You are ${mentorName}, a supportive and motivating mentor. Your tone and style: ${mentorTone}
 
 Guidelines:
 - Be concise (2-4 sentences maximum)
@@ -383,60 +359,61 @@ Guidelines:
 - Be empathetic and understanding
 - Focus on growth and positive outcomes`;
 
-    // Build user prompt
-    const userPrompt = contextualInfo
-      ? `${contextualInfo}\n\nUser's current message: ${message}\n\nRespond as ${mentorName} would, staying true to your tone and style.`
-      : `User's message: ${message}\n\nRespond as ${mentorName} would, staying true to your tone and style.`;
+      // Build user prompt
+      const userPrompt = contextualInfo
+        ? `${contextualInfo}\n\nUser's current message: ${message}\n\nRespond as ${mentorName} would, staying true to your tone and style.`
+        : `User's message: ${message}\n\nRespond as ${mentorName} would, staying true to your tone and style.`;
 
-    // Call Gemini API
-    const geminiResponse = await callGemini(userPrompt, systemPrompt, {
-      temperature: 0.8,
-      maxOutputTokens: 500,
-    });
+      // Call Gemini API
+      const geminiResponse = await callGemini(userPrompt, systemPrompt, {
+        temperature: 0.8,
+        maxOutputTokens: 500,
+      }, apiKey);
 
-    const assistantMessage = geminiResponse.text.trim();
+      const assistantMessage = geminiResponse.text.trim();
 
-    // Save conversation to Firestore
-    const batch = db.batch();
-    const userMsgRef = db.collection("mentor_chats").doc();
-    const assistantMsgRef = db.collection("mentor_chats").doc();
+      // Save conversation to Firestore
+      const batch = db.batch();
+      const userMsgRef = db.collection("mentor_chats").doc();
+      const assistantMsgRef = db.collection("mentor_chats").doc();
 
-    batch.set(userMsgRef, {
-      user_id: userId,
-      role: "user",
-      content: message,
-      mentor_name: mentorName,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      batch.set(userMsgRef, {
+        user_id: userId,
+        role: "user",
+        content: message,
+        mentor_name: mentorName,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    batch.set(assistantMsgRef, {
-      user_id: userId,
-      role: "assistant",
-      content: assistantMessage,
-      mentor_name: mentorName,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      batch.set(assistantMsgRef, {
+        user_id: userId,
+        role: "assistant",
+        content: assistantMessage,
+        mentor_name: mentorName,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    await batch.commit();
+      await batch.commit();
 
-    return {
-      response: assistantMessage,
-      dailyLimit: DAILY_MESSAGE_LIMIT,
-      messagesUsed: todayMessages.size + 1,
-    };
-  } catch (error) {
-    console.error("Error in mentorChat:", error);
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
+      return {
+        response: assistantMessage,
+        dailyLimit: DAILY_MESSAGE_LIMIT,
+        messagesUsed: todayMessages.size + 1,
+      };
+    } catch (error) {
+      console.error("Error in mentorChat:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpsError(
+        "internal",
+        `Failed to generate mentor response: ${errorMessage}`
+      );
     }
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    throw new functions.https.HttpsError(
-      "internal",
-      `Failed to generate mentor response: ${errorMessage}`
-    );
   }
-});
+);
 
 /**
  * Generate Evolution Card - AI-powered companion evolution card generation

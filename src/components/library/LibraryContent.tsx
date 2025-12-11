@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, MessageSquare, ArrowRight } from "lucide-react";
@@ -19,24 +19,26 @@ export const LibraryContent = () => {
   const { data: quotesCount = 0 } = useQuery({
     queryKey: ["quotes-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("quotes").select("*", { count: "exact", head: true });
-      return count || 0;
+      // Get all quotes to count (Firestore doesn't have count queries)
+      // Limit to reasonable number for performance
+      const quotes = await getDocuments("quotes", undefined, undefined, undefined, 1000);
+      return quotes.length;
     },
   });
 
   const { data: pepTalksCount = 0 } = useQuery({
     queryKey: ["pep-talks-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("pep_talks").select("*", { count: "exact", head: true });
-      return count || 0;
+      const pepTalks = await getDocuments("pep_talks", undefined, undefined, undefined, 1000);
+      return pepTalks.length;
     },
   });
 
   const { data: challengesCount = 0 } = useQuery({
     queryKey: ["challenges-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("challenges").select("*", { count: "exact", head: true });
-      return count || 0;
+      const challenges = await getDocuments("challenges", undefined, undefined, undefined, 1000);
+      return challenges.length;
     },
   });
 

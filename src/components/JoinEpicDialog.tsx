@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface JoinEpicDialogProps {
 }
 
 export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
+  const { user } = useAuth();
   const [inviteCode, setInviteCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [epicLimitReached, setEpicLimitReached] = useState(false);
@@ -56,8 +58,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       }
 
       // Check if user is logged in
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
+      if (!user) {
         toast.error("Please sign in to join guilds");
         setIsLoading(false);
         return;
@@ -67,14 +68,14 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       const { data: ownedEpics } = await supabase
         .from('epics')
         .select('id')
-        .eq('user_id', user.user.id)
+        .eq('user_id', user.uid)
         .eq('status', 'active');
       
       const { data: joinedEpics } = await supabase
         .from('epic_members')
         .select('epic_id, epics!inner(user_id, status)')
-        .eq('user_id', user.user.id)
-        .neq('epics.user_id', user.user.id)
+        .eq('user_id', user.uid)
+        .neq('epics.user_id', user.uid)
         .eq('epics.status', 'active');
 
       const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
@@ -90,7 +91,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
         .from('epic_members')
         .select('id')
         .eq('epic_id', epic.id)
-        .eq('user_id', user.user.id)
+        .eq('user_id', user.uid)
         .maybeSingle();
 
       if (existingMember) {
@@ -104,7 +105,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
         .from('epic_members')
         .insert({
           epic_id: epic.id,
-          user_id: user.user.id,
+          user_id: user.uid,
         });
 
       if (memberError) throw memberError;
@@ -112,7 +113,7 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       // Copy habits to user's account (preserve all habit properties)
       if (epic.epic_habits && epic.epic_habits.length > 0) {
         const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
-          user_id: user.user.id,
+          user_id: user.uid,
           title: eh.habits.title,
           difficulty: eh.habits.difficulty,
           frequency: eh.habits.frequency || 'daily',

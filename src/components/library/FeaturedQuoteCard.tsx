@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { Quote, Heart } from "lucide-react";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
+import { getDocuments, setDocument, deleteDocument } from "@/lib/firebase/firestore";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 interface FeaturedQuoteCardProps {
@@ -14,40 +15,65 @@ interface FeaturedQuoteCardProps {
 }
 
 export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
+  const { user } = useAuth();
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  // Check if quote is favorited on mount
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!user?.uid) return;
+      
+      try {
+        const favorites = await getDocuments("favorites", [
+          ["user_id", "==", user.uid],
+          ["content_type", "==", "quote"],
+          ["content_id", "==", quote.id]
+        ]);
+        setIsFavorited(favorites.length > 0);
+      } catch (error) {
+        console.error("Error checking favorite:", error);
+      }
+    };
+    
+    checkFavorite();
+  }, [user?.uid, quote.id]);
+
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    if (!user?.uid) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorites",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Sign in required",
-          description: "Please sign in to save favorites",
-          variant: "destructive",
-        });
-        return;
-      }
-
+      const favoriteId = `${user.uid}_quote_${quote.id}`;
+      
       if (isFavorited) {
-        await supabase.from("favorites").delete()
-          .eq("user_id", session.user.id)
-          .eq("content_type", "quote")
-          .eq("content_id", quote.id);
+        await deleteDocument("favorites", favoriteId);
         setIsFavorited(false);
       } else {
-        await supabase.from("favorites").insert({
-          user_id: session.user.id,
+        await setDocument("favorites", favoriteId, {
+          user_id: user.uid,
           content_type: "quote",
           content_id: quote.id,
-        });
+        }, false);
         setIsFavorited(true);
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update favorite",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
