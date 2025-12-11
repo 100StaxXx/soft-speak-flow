@@ -8,6 +8,25 @@ import { playMissionComplete } from "@/utils/soundEffects";
 import { useState, useEffect } from "react";
 import { MISSION_TEMPLATES } from "@/config/missionTemplates";
 
+/**
+ * useDailyMissions Hook
+ * 
+ * ARCHITECTURAL DECISION: Client-side mission generation
+ * 
+ * Missions are currently generated client-side from MISSION_TEMPLATES rather than
+ * using the Firebase Function (generateDailyMissions) for the following reasons:
+ * 
+ * 1. Performance: Instant generation without network latency
+ * 2. Offline capability: Works without internet connection
+ * 3. Reliability: No dependency on Firebase Function availability
+ * 4. Cost: Avoids Firebase Function invocation costs
+ * 
+ * The Firebase Function (generateDailyMissions) exists but is not used.
+ * If you want to switch to server-side generation for personalization/AI features,
+ * uncomment the function call in the queryFn and remove client-side generation.
+ * 
+ * @see src/lib/firebase/functions.ts:88 - generateDailyMissions function
+ */
 export const useDailyMissions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -217,6 +236,8 @@ export const useDailyMissions = () => {
       
       return { ...mission, completed: true, completed_at: new Date().toISOString() };
     },
+    retry: 2,
+    retryDelay: 1000,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
       toast({ title: "Mission Complete!", description: "XP awarded!" });

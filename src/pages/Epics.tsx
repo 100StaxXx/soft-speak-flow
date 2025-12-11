@@ -8,6 +8,7 @@ import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -28,6 +29,7 @@ const Epics = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
   const {
     activeEpics,
     completedEpics,
@@ -109,6 +111,23 @@ const Epics = () => {
           >
             <Sparkles className="w-4 h-4 mr-2" />
             Star Paths
+          </Button>
+        </motion.div>
+
+        {/* Shared Epics Link */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.12 }}
+          className="mb-4"
+        >
+          <Button
+            onClick={() => navigate('/shared-epics')}
+            variant="ghost"
+            className="w-full h-10 text-sm"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Browse Public Epics
           </Button>
         </motion.div>
 

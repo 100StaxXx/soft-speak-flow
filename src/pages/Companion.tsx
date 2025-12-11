@@ -22,11 +22,13 @@ import { PageInfoModal } from "@/components/PageInfoModal";
 import { useState, memo } from "react";
 
 // Memoized tab content to prevent unnecessary re-renders
-const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: { 
-  companion: any; 
-  nextEvolutionXP: number; 
+interface OverviewTabProps {
+  companion: { current_xp?: number; current_stage?: number } | null;
+  nextEvolutionXP: number;
   progressToNext: number;
-}) => (
+}
+
+const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: OverviewTabProps) => (
   <div className="space-y-6 mt-6">
     <CompanionDisplay />
     <NextEvolutionPreview 

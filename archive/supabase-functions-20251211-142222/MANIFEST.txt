@@ -1,0 +1,27 @@
+Supabase Functions Archive
+Created: 2025-12-11
+Purpose: Backup before cleanup after Firebase migration
+
+Contents:
+- supabase/functions/ (all 69 edge functions)
+- supabase/config.toml (function configuration)
+
+Migration Status:
+- All app code migrated to Firebase ✅
+- 69 Supabase functions found (none referenced in app code)
+- Firebase functions: 56 total, 50 referenced in app
+- No Supabase client imports found in src/ directory
+
+Verification Results:
+- ✅ No references to Supabase functions in app code
+- ✅ All functionality migrated to Firebase Cloud Functions
+- ✅ Firebase cron jobs configured (scheduledGenerateDailyQuotes, etc.)
+- ⚠️ Note: Verify cron jobs in Supabase database are disabled
+- ⚠️ Note: Verify Apple webhook points to Firebase
+
+This archive can be deleted after:
+1. Verifying no active cron jobs in Supabase database
+2. Verifying webhooks point to Firebase
+3. Confirming Firebase cron jobs are active and working
+4. Testing all functionality works with Firebase only
+

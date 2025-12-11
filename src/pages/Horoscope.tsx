@@ -81,7 +81,13 @@ const Horoscope = () => {
     setLoading(true);
     try {
       if (!profile?.zodiac_sign) {
-        throw new Error("Please set your zodiac sign first");
+        // Don't throw error, just show zodiac selector
+        setHoroscope(null);
+        setZodiac(null);
+        setIsPersonalized(false);
+        setDate(new Date().toLocaleDateString('en-CA'));
+        setLoading(false);
+        return;
       }
 
       const data = await generateDailyHoroscope({
@@ -116,7 +122,7 @@ const Horoscope = () => {
       
       toast({
         title: "Error",
-        description: errMsg || "Failed to load your horoscope",
+        description: errMsg || "Failed to load your horoscope. Please try again later.",
         variant: "destructive",
       });
       setHoroscope("Unable to load your cosmiq insights at this moment. Please try again later.");

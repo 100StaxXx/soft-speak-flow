@@ -15,7 +15,7 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
-import { getCheckIn, createCheckIn, getCheckInsCount } from "@/lib/firebase/dailyCheckIns";
+import { getDocuments, setDocument } from "@/lib/firebase/firestore";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -77,15 +77,11 @@ const MorningCheckInContent = () => {
 
     try {
       // Double-check right before insert (cache could be stale)
-<<<<<<< HEAD
-      const recentCheck = await getCheckIn(user.uid, today, 'morning');
-=======
       const recentChecks = await getDocuments('daily_check_ins', [
         ['user_id', '==', user.id],
         ['check_in_type', '==', 'morning'],
         ['check_in_date', '==', today]
       ]);
->>>>>>> origin/main
 
       if (recentChecks.length > 0) {
         toast({ 
@@ -98,41 +94,28 @@ const MorningCheckInContent = () => {
         return;
       }
 
-<<<<<<< HEAD
-      const checkIn = await createCheckIn({
-        user_id: user.uid,
-=======
       // Create check-in document
       const checkInId = `checkin_${user.id}_${today}_${Date.now()}`;
       const checkIn = {
         id: checkInId,
         user_id: user.id,
->>>>>>> origin/main
         check_in_type: 'morning',
         check_in_date: today,
         mood,
         intention: intention.trim(),
         completed_at: new Date().toISOString(),
-<<<<<<< HEAD
-      });
-=======
       };
 
       await setDocument('daily_check_ins', checkInId, checkIn, false);
->>>>>>> origin/main
 
       // Award XP only on successful INSERT (not update)
       awardCheckInComplete();
       
       // Check for first check-in achievement
-<<<<<<< HEAD
-      const count = await getCheckInsCount(user.uid);
-=======
       const allCheckIns = await getDocuments('daily_check_ins', [
         ['user_id', '==', user.id]
       ]);
       const count = allCheckIns.length;
->>>>>>> origin/main
       
       if (count === 1) {
         await checkFirstTimeAchievements('checkin');

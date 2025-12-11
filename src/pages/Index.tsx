@@ -42,6 +42,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const hasBackfilledRef = useRef(false);
   const redirectCountRef = useRef(0);
   const lastRedirectTimeRef = useRef<number>(0);
+  const companionLoadStartRef = useRef<number | null>(null);
+  const COMPANION_LOAD_TIMEOUT = 30000; // 30 seconds
 
   // Combined initialization effect for better performance
   const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
@@ -175,11 +177,47 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     };
   }, [resolvedMentorId, user]);
 
+  // Track companion loading start time
+  useEffect(() => {
+    if (companionLoading && companionLoadStartRef.current === null) {
+      // Start tracking when loading begins
+      companionLoadStartRef.current = Date.now();
+    } else if (!companionLoading) {
+      // Reset when loading completes
+      companionLoadStartRef.current = null;
+    }
+  }, [companionLoading]);
+
+  // Check for companion loading timeout using interval
+  useEffect(() => {
+    if (!user || !companionLoading || companionLoadStartRef.current === null) {
+      return;
+    }
+
+    // Check for timeout every second while loading
+    const timeoutCheckInterval = setInterval(() => {
+      // Check ref directly (always current) - effect only runs when companionLoading is true
+      if (companionLoadStartRef.current !== null) {
+        const loadDuration = Date.now() - companionLoadStartRef.current;
+        if (loadDuration > COMPANION_LOAD_TIMEOUT) {
+          console.warn('[Index] Companion loading timeout - proceeding without companion');
+          setIsReady(true);
+          companionLoadStartRef.current = null; // Reset to prevent multiple timeouts
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => {
+      clearInterval(timeoutCheckInterval);
+    };
+  }, [user, companionLoading]);
+
   // Wait for all critical data to load before marking ready
   useEffect(() => {
     if (!user) return;
     
     // Wait for both profile and companion to finish loading
+    // (Timeout is handled in the effect above)
     if (!profileLoading && !companionLoading) {
       setIsReady(true);
     }
@@ -194,12 +232,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }, [user, profile, profileLoading, companionLoading, navigate]);
 
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
-  // Includes redirect loop prevention
+  // Includes redirect loop prevention and explicit onboarding completion check
   useEffect(() => {
     if (!enableOnboardingGuard) return;
     if (!user || !isReady || !profile) return;
 
-    // If onboarding is explicitly completed, don't force users back into the flow
+    // CRITICAL: If onboarding is explicitly completed, NEVER redirect regardless of other conditions
+    // This prevents loops where users complete onboarding but companion is missing
     if (profile.onboarding_completed === true) {
       // Reset redirect counter when onboarding is complete
       redirectCountRef.current = 0;
@@ -237,7 +276,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
     const missingMentor = !resolvedMentorId;
     const explicitlyIncomplete = profile.onboarding_completed === false;
-    const missingCompanion = !companion && !companionLoading;
+    // Only check for missing companion if onboarding is not completed
+    // This prevents redirect loops when companion fails to load after onboarding
+    const missingCompanion = !companion && !companionLoading && profile.onboarding_completed !== true;
 
     if (missingMentor || explicitlyIncomplete || missingCompanion) {
       console.log('[Index] Redirecting to onboarding:', {

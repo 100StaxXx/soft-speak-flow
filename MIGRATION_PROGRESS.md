@@ -1,61 +1,151 @@
-# Firebase Migration Progress Report
+# Supabase to Firebase Migration Progress
 
-## ✅ Database Operations Migration: **100% COMPLETE**
+## ✅ Completed Functions
 
-All Supabase database operations (`supabase.from()`) have been successfully migrated to Firestore!
+### Critical Functions Added (Just Now)
 
-### Files Migrated in This Session:
+1. **scheduledDeliverScheduledNotifications** ✅
+   - Processes `push_notification_queue` every 5 minutes
+   - Sends web push and APNs notifications
+   - Marks notifications as delivered
 
-1. ✅ **AdminReferralTesting.tsx** - Migrated referral code queries and payout operations
-2. ✅ **AdminPayouts.tsx** - Migrated payout queries, approvals, and bulk operations
-3. ✅ **ActivityTimeline.tsx** - Migrated activity deletion
-4. ✅ **MorningCheckIn.tsx** - Migrated check-in queries and creation
-5. ✅ **TodaysPepTalk.tsx** - Migrated mentor and pep talk queries
-6. ✅ **GuildStoriesSection.tsx** - Migrated epic, member, and story queries
+2. **scheduledProcessDailyDecay** ✅
+   - Runs daily at 2 AM UTC
+   - Handles companion stat decay
+   - Manages streak freezes
+   - Resets expired streak freezes
+   - Triggers neglected companion images
 
-### Previously Migrated Files:
+3. **scheduledDeliverAdaptivePushes** ✅
+   - Runs every 10 minutes
+   - Processes `adaptive_push_queue`
+   - Enforces rate limits (1/day, 5/week)
 
-- ✅ Profile.tsx
-- ✅ Tasks.tsx
-- ✅ AskMentorChat.tsx
-- ✅ LibraryContent.tsx
-- ✅ FeaturedQuoteCard.tsx
-- ✅ QuoteOfTheDay.tsx
-- ✅ HeroQuoteBanner.tsx
-- ✅ GuildMembersSection.tsx
+4. **triggerAdaptiveEvent** ✅
+   - Callable function for triggering adaptive pushes
+   - Validates rate limits
+   - Generates AI-powered push messages
 
-## 📊 Migration Statistics
+5. **scheduledCheckTaskReminders** ✅
+   - Runs every minute
+   - Checks tasks needing reminders
+   - Sends APNs notifications for iOS
 
-- **Total Files Migrated:** 15+ files
-- **Database Operations Migrated:** All `supabase.from()` calls
-- **Build Status:** ✅ Passing
-- **Linting Errors:** 0
-- **TypeScript Errors:** 0
+### Already Migrated Functions
 
-## 🔍 Remaining Supabase Imports
+The following functions were already in Firebase Cloud Functions:
 
-Some files still import Supabase but are using it for:
-- **Authentication** (may still be needed during transition)
-- **Storage operations** (Firebase Storage migration pending)
-- **Legacy/unused code** (can be cleaned up later)
+- ✅ deleteUserAccount
+- ✅ mentorChat
+- ✅ generateCompanionName
+- ✅ generateEvolutionCard
+- ✅ generateCompanionStory
+- ✅ generateDailyMissions
+- ✅ generateQuotes
+- ✅ generateWeeklyInsights
+- ✅ generateWeeklyChallenges
+- ✅ generateSmartNotifications
+- ✅ generateProactiveNudges
+- ✅ generateReflectionReply
+- ✅ generateGuildStory
+- ✅ generateCosmicPostcard
+- ✅ generateCosmicDeepDive
+- ✅ generateDailyHoroscope
+- ✅ generateMentorScript
+- ✅ generateMentorContent
+- ✅ generateLesson
+- ✅ generateCompanionImage
+- ✅ generateCompletePepTalk
+- ✅ generateCheckInResponse
+- ✅ generateAdaptivePush
+- ✅ calculateCosmicProfile
+- ✅ generateActivityComment
+- ✅ generateMoodPush
+- ✅ generateInspireQuote
+- ✅ generateQuoteImage
+- ✅ generateSampleCard
+- ✅ generateNeglectedCompanionImage
+- ✅ generateZodiacImages
+- ✅ getSingleQuote
+- ✅ batchGenerateLessons
+- ✅ generateCompanionEvolution
+- ✅ generateDailyQuotes
+- ✅ generateDailyMentorPepTalks
+- ✅ generateMentorAudio
+- ✅ generateFullMentorAudio
+- ✅ generateEvolutionVoice
+- ✅ transcribeAudio
+- ✅ syncDailyPepTalkTranscript
+- ✅ seedRealQuotes
+- ✅ resetCompanion
+- ✅ createInfluencerCode
+- ✅ processPaypalPayout
+- ✅ scheduledGenerateDailyQuotes
+- ✅ scheduledGenerateDailyMentorPepTalks
+- ✅ scheduledScheduleDailyMentorPushes
+- ✅ scheduledDispatchDailyPushes
+- ✅ sendApnsNotification
+- ✅ completeReferralStage3
+- ✅ resolveStreakFreeze
+- ✅ verifyAppleReceipt
+- ✅ checkAppleSubscription
+- ✅ appleWebhook
 
-These are **NOT** database operations and don't need immediate migration.
+## 🔄 Still Need Migration
 
-## 🎯 Next Steps
+### Scheduled Functions (Need Cloud Scheduler)
 
-1. ✅ **Database Operations** - COMPLETE
-2. ⏳ **Storage Operations** - Can be migrated to Firebase Storage if needed
-3. ⏳ **Auth Operations** - Evaluate if Supabase Auth is still needed or migrate to Firebase Auth
-4. ⏳ **Clean up unused imports** - Remove Supabase imports from files that no longer use them
+1. **deliver-adaptive-pushes** - ✅ Migrated as `scheduledDeliverAdaptivePushes`
+2. **deliver-scheduled-notifications** - ✅ Migrated as `scheduledDeliverScheduledNotifications`
+3. **process-daily-decay** - ✅ Migrated as `scheduledProcessDailyDecay`
+4. **check-task-reminders** - ✅ Migrated as `scheduledCheckTaskReminders`
 
-## ✨ Impact
+### Callable Functions
 
-- **Single Database System:** All data operations now use Firestore
-- **Consistent Patterns:** Unified data access across the codebase
-- **Better Performance:** Firestore offers better real-time capabilities
-- **Easier Maintenance:** One database system to manage
+1. **trigger-adaptive-event** - ✅ Migrated as `triggerAdaptiveEvent`
 
----
+### Edge Functions Still Using Supabase
 
-**Migration Status: Database operations fully migrated to Firebase!** 🎉
+These functions exist in `supabase/functions/` but may not be actively used or are low priority:
 
+- dispatch-daily-quote-pushes
+- dispatch-daily-pushes-native
+- schedule-adaptive-pushes (may be handled by other functions)
+- send-shout-notification
+- request-referral-payout
+- daily-lesson-scheduler
+
+## Frontend Status
+
+✅ **All fixed:**
+- `LibraryContent.tsx` - Now uses Firestore
+- `HabitCard.tsx` - Now uses Firestore
+
+## Next Steps
+
+1. **Test the new scheduled functions:**
+   - Verify they deploy correctly
+   - Test rate limiting
+   - Verify data integrity
+
+2. **Update Firebase Cloud Scheduler jobs:**
+   - Ensure all scheduled functions have corresponding Cloud Scheduler jobs
+   - Verify cron schedules match
+
+3. **Monitor and validate:**
+   - Watch logs for errors
+   - Verify functions execute on schedule
+   - Check data updates correctly
+
+4. **Clean up (after validation):**
+   - Remove `supabase/` directory
+   - Remove Supabase environment variables
+   - Update deployment docs
+
+## Notes
+
+- Most AI generation functions were already migrated
+- Critical notification and scheduling functions are now migrated
+- All functions use Firestore instead of Supabase
+- Frontend is fully migrated to Firebase
+- The remaining Edge Functions in `supabase/functions/` can be removed once validation is complete
