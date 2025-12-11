@@ -71,7 +71,19 @@ export const useCompanion = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data as Companion | null;
+      if (!data) return null;
+
+      // Ensure timestamps are consistently represented as ISO strings to
+      // keep cache entries aligned across environments.
+      const normalizeDate = (value?: string | null) =>
+        value ? new Date(value).toISOString() : value ?? undefined;
+
+      return {
+        ...data,
+        created_at: normalizeDate(data.created_at) ?? new Date().toISOString(),
+        updated_at: normalizeDate(data.updated_at) ?? new Date().toISOString(),
+        last_energy_update: normalizeDate(data.last_energy_update),
+      } as Companion;
     },
   });
 
