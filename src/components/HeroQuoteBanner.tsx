@@ -58,13 +58,8 @@ export const HeroQuoteBanner = memo(() => {
         ["for_date", "==", today],
         ["mentor_slug", "==", mentorData.slug]
       ]);
-<<<<<<< HEAD
-      
-      const dailyPepTalk = dailyPepTalks.length > 0 ? dailyPepTalks[0] : null;
-=======
 
-      const dailyPepTalk = dailyPepTalks[0];
->>>>>>> origin/main
+      const dailyPepTalk = dailyPepTalks.length > 0 ? dailyPepTalks[0] : null;
 
       if (dailyPepTalk) {
         // Fetch quotes that match the pep talk's themes

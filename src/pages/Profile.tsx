@@ -598,11 +598,10 @@ const Profile = () => {
                         if (!user?.uid) return;
                         try {
                           await updateProfile(user.uid, { astral_encounters_enabled: checked });
-                        } catch (error) {
-                          sonnerToast.error('Failed to update setting');
-                        } else {
                           queryClient.invalidateQueries({ queryKey: ['profile'] });
                           sonnerToast.success(checked ? 'Astral Encounters enabled' : 'Astral Encounters disabled');
+                        } catch (error) {
+                          sonnerToast.error('Failed to update setting');
                         }
                       }}
                     />

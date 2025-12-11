@@ -97,8 +97,8 @@ export const useActivityFeed = () => {
         activityData: activity,
         context: 'user_activity',
       }).catch((err) => {
-      //   console.error('Activity comment generation failed:', err);
-      // });
+        console.error('Activity comment generation failed:', err);
+      });
 
       return activity;
     },

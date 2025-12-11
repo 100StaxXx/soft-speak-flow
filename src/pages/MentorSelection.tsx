@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useProfile } from "@/hooks/useProfile";
-import { getAllMentors, Mentor } from "@/lib/firebase/mentors";
+import { getMentors, Mentor } from "@/lib/firebase/mentors";
 import { updateProfile } from "@/lib/firebase/profiles";
 
 const MentorSelection = () => {

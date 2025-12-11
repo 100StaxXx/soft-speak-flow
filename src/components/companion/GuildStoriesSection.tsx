@@ -93,16 +93,12 @@ export const GuildStoriesSection = () => {
     mutationFn: async (storyId: string) => {
       if (!user?.uid) return;
 
-<<<<<<< HEAD
-      await markGuildStoryAsRead(user.uid, storyId);
-=======
       const { setDocument } = await import('@/lib/firebase/firestore');
-      const readId = `${user.id}_${storyId}`;
+      const readId = `${user.uid}_${storyId}`;
       await setDocument("guild_story_reads", readId, {
-        user_id: user.id,
+        user_id: user.uid,
         story_id: storyId,
       }, false);
->>>>>>> origin/main
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["unread-guild-stories"] });

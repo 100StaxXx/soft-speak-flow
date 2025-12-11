@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
-import type { Session } from "@/hooks/useAuth";
 import { signUp, signIn, resetPassword, signInWithGoogle, signInWithGoogleCredential, signInWithAppleCredential } from "@/lib/firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
 import { convertFirebaseUser } from "@/lib/firebase/auth";
