@@ -24,12 +24,6 @@ verify_jwt = false
 [functions.generate-guild-story]
 verify_jwt = true
 
-[functions.google-native-auth]
-verify_jwt = false
-
-[functions.apple-native-auth]
-verify_jwt = false
-
 [functions.generate-tutorial-tts]
 verify_jwt = false
 

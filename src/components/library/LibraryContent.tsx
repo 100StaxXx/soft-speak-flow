@@ -20,7 +20,9 @@ export const LibraryContent = () => {
   const { data: quotesCount = 0 } = useQuery({
     queryKey: ["quotes-count"],
     queryFn: async () => {
-      const quotes = await getDocuments("quotes");
+      // Get all quotes to count (Firestore doesn't have count queries)
+      // Limit to reasonable number for performance
+      const quotes = await getDocuments("quotes", undefined, undefined, undefined, 1000);
       return quotes.length;
     },
   });
@@ -28,7 +30,7 @@ export const LibraryContent = () => {
   const { data: pepTalksCount = 0 } = useQuery({
     queryKey: ["pep-talks-count"],
     queryFn: async () => {
-      const pepTalks = await getDocuments("pep_talks");
+      const pepTalks = await getDocuments("pep_talks", undefined, undefined, undefined, 1000);
       return pepTalks.length;
     },
   });
@@ -36,7 +38,7 @@ export const LibraryContent = () => {
   const { data: challengesCount = 0 } = useQuery({
     queryKey: ["challenges-count"],
     queryFn: async () => {
-      const challenges = await getDocuments("challenges");
+      const challenges = await getDocuments("challenges", undefined, undefined, undefined, 1000);
       return challenges.length;
     },
   });

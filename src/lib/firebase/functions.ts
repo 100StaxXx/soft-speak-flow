@@ -652,3 +652,13 @@ export async function checkAppleSubscription() {
   }>("checkAppleSubscription", {});
 }
 
+/**
+ * Delete User Account - Permanently deletes the authenticated user's account and all associated data
+ */
+export async function deleteUserAccount() {
+  return callFirebaseFunction<{}, {
+    success: boolean;
+    message?: string;
+  }>("deleteUserAccount", {});
+}
+

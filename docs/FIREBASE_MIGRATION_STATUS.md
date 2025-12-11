@@ -182,3 +182,4 @@ The following Supabase edge functions still need to be migrated to Firebase Clou
 - Secrets are managed via Firebase Functions params
 - Scheduled functions need Cloud Scheduler setup
 
+

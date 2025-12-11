@@ -6,6 +6,10 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
+<<<<<<< HEAD
+=======
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
+>>>>>>> origin/main
 import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
 import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
 import { getMentor } from "@/lib/firebase/mentors";
@@ -118,13 +122,27 @@ export const TodaysPepTalk = memo(() => {
       try {
         const today = new Date().toLocaleDateString("en-CA");
 
+<<<<<<< HEAD
         const mentor = await getMentor(profile.selected_mentor_id);
+=======
+        const mentor = await getDocument("mentors", profile.selected_mentor_id);
+
+>>>>>>> origin/main
         if (!mentor || !mentor.slug) {
           setLoading(false);
           return;
         }
 
+<<<<<<< HEAD
         const data = await getDailyPepTalk(today, mentor.slug);
+=======
+        const pepTalks = await getDocuments("daily_pep_talks", [
+          ["for_date", "==", today],
+          ["mentor_slug", "==", mentor.slug]
+        ]);
+
+        const data = pepTalks.length > 0 ? pepTalks[0] : null;
+>>>>>>> origin/main
 
         if (data) {
           // Validate and sanitize transcript data
@@ -203,13 +221,15 @@ export const TodaysPepTalk = memo(() => {
     const checkXPStatus = async () => {
       if (!pepTalk?.id || !profile?.id) return;
       
-      const { data } = await supabase
-        .from('xp_events')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('event_type', 'pep_talk_listen')
-        .eq('event_metadata->>pep_talk_id', pepTalk.id)
-        .maybeSingle();
+      const xpEvents = await getDocuments('xp_events', [
+        ['user_id', '==', profile.id],
+        ['event_type', '==', 'pep_talk_listen']
+      ]);
+      
+      // Filter for matching pep_talk_id in metadata (Firestore doesn't support JSON field queries directly)
+      const data = xpEvents.find((event: any) => 
+        event.event_metadata?.pep_talk_id === pepTalk.id
+      ) || null;
       
       setHasAwardedXP(!!data);
     };

@@ -6,8 +6,8 @@ import { Quote as QuoteIcon, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { format } from "date-fns";
 import { getMentor } from "@/lib/firebase/mentors";
-import { getDocuments } from "@/lib/firebase/firestore";
 import { getQuotes } from "@/lib/firebase/quotes";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 interface QuoteData {
   id: string;

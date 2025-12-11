@@ -1,0 +1,16 @@
+// TEMPORARY RULES FOR MIGRATION - REPLACE AFTER MIGRATION
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Temporarily allow all reads and writes for mentors collection
+    match /mentors/{mentorId} {
+      allow read, write: if true;
+    }
+    
+    // Keep your existing rules for other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

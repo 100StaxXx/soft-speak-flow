@@ -13,10 +13,23 @@ export const BattleMatchmaking = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
 
+  interface BattleCard {
+    id: string;
+    card_id: string;
+    evolution_stage: number;
+    creature_name: string;
+    element: string;
+    stats: Record<string, number>;
+    rarity: string;
+    image_url: string | null;
+    energy_cost?: number | null;
+    bond_level?: number | null;
+  }
+
   // Check if user has evolution cards
   const { data: cards, isLoading } = useQuery({
     queryKey: ["battle-cards", user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<BattleCard[]> => {
       if (!user) return [];
 
       const data = await getDocuments(
@@ -26,7 +39,18 @@ export const BattleMatchmaking = () => {
         "desc"
       );
 
-      return data || [];
+      return (data || []).map((doc) => ({
+        id: doc.id as string,
+        card_id: doc.card_id as string,
+        evolution_stage: doc.evolution_stage as number,
+        creature_name: doc.creature_name as string,
+        element: doc.element as string,
+        stats: doc.stats as Record<string, number>,
+        rarity: doc.rarity as string,
+        image_url: doc.image_url as string | null,
+        energy_cost: doc.energy_cost as number | null | undefined,
+        bond_level: doc.bond_level as number | null | undefined,
+      }));
     },
     enabled: !!user,
   });

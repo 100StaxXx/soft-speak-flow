@@ -152,19 +152,8 @@ export const AskMentorChat = ({
         });
       }
 
-      // Save conversation history (non-blocking - don't fail if this errors)
-      // Only save if mentorId is defined to maintain data integrity
-      // Note: Chat history is now saved by the Firebase function, so this is redundant
-      // But we'll keep it as a backup in case the function fails
-      if (mentorId) {
-        try {
-          await createMentorChat(currentUser.uid, mentorId, 'user', text);
-          await createMentorChat(currentUser.uid, mentorId, 'assistant', data.response);
-        } catch (error) {
-          console.error('Failed to save chat history:', error);
-          // Non-blocking - don't fail the whole operation
-        }
-      }
+      // Note: Conversation history is already saved by the mentorChat Firebase function
+      // No need to save again here to avoid duplicates
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -194,13 +183,8 @@ export const AskMentorChat = ({
         return newCount;
       });
 
-      // Save both messages even with fallback (non-blocking)
-      // Only save if mentorId is defined to maintain data integrity
-      // Note: Chat history is now saved by the Firebase function, so this is redundant
-      if (mentorId) {
-        // Chat history is handled by the mentorChat Firebase function
-        // No need to save here as it's already saved on the backend
-      }
+      // Note: Fallback messages are not saved to database (they're offline responses)
+      // Only successful API responses are saved by the mentorChat Firebase function
     } finally {
       setIsLoading(false);
     }

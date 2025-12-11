@@ -4,7 +4,6 @@ import { format } from "date-fns";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getMentor } from "@/lib/firebase/mentors";
-import { getDocuments } from "@/lib/firebase/firestore";
 import { getQuotes } from "@/lib/firebase/quotes";
 
 interface QuoteData {
@@ -37,18 +36,18 @@ export const HeroQuoteBanner = memo(() => {
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
-      const { data: mentorData } = await supabase
-        .from("mentors")
-        .select("name, avatar_url, slug")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
+      const mentorData = await getDocument("mentors", profile.selected_mentor_id);
 
       if (!mentorData) {
         setLoading(false);
         return;
       }
 
-      setMentor(mentorData);
+      setMentor({
+        name: mentorData.name,
+        avatar_url: mentorData.avatar_url || null,
+        slug: mentorData.slug
+      });
       
       // Dynamically load only the needed mentor image
       const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
@@ -59,8 +58,13 @@ export const HeroQuoteBanner = memo(() => {
         ["for_date", "==", today],
         ["mentor_slug", "==", mentorData.slug]
       ]);
+<<<<<<< HEAD
       
       const dailyPepTalk = dailyPepTalks.length > 0 ? dailyPepTalks[0] : null;
+=======
+
+      const dailyPepTalk = dailyPepTalks[0];
+>>>>>>> origin/main
 
       if (dailyPepTalk) {
         // Fetch quotes that match the pep talk's themes

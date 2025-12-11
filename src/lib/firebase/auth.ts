@@ -151,7 +151,6 @@ export const signInWithAppleCredential = async (idToken: string, rawNonce?: stri
   return userCredential;
 };
 
-// Note: Profile management is handled in Supabase, not Firestore
-// This function is kept for compatibility but should use the ensureProfile from authRedirect.ts
-// which uses Supabase
+// Profile management is handled in Firestore via ensureProfile (see authRedirect.ts)
+// This legacy helper remains for compatibility but should defer to the Firebase-based profile flow
 

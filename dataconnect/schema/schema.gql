@@ -1,0 +1,45 @@
+type User @table {
+  username: String!
+  email: String!
+  createdAt: Timestamp!
+  xp: Int!
+  level: Int!
+  avatarUrl: String
+  bio: String
+}
+
+type Goal @table {
+  user: User!
+  name: String!
+  description: String!
+  difficulty: String!
+  targetDate: Date!
+  status: String!
+  createdAt: Timestamp!
+  category: String
+}
+
+type Task @table {
+  goal: Goal!
+  name: String!
+  description: String!
+  dueDate: Date!
+  completed: Boolean!
+  xpAwarded: Int!
+  createdAt: Timestamp!
+  recurrence: String
+}
+
+type Badge @table {
+  name: String!
+  description: String!
+  imageUrl: String!
+  xpBonus: Int!
+  requirements: String
+}
+
+type UserBadge @table(key: ["user", "badge"]) {
+  user: User!
+  badge: Badge!
+  awardedAt: Timestamp!
+}

@@ -22,9 +22,10 @@ interface GeminiResponse {
 export async function callGemini(
   prompt: string,
   systemPrompt?: string,
-  config: GeminiConfig = {}
+  config: GeminiConfig = {},
+  apiKey?: string
 ): Promise<GeminiResponse> {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY not configured");
   }

@@ -52,6 +52,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
       setIsLoading(true);
       
       try {
+<<<<<<< HEAD
         const membersData = await getEpicMembers(epicId);
 
         // Extract all user IDs for batch queries (avoid N+1 problem)
@@ -87,11 +88,61 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
             current_image_url: companionsMap.get(member.user_id)?.current_image_url || null,
             spirit_animal: companionsMap.get(member.user_id)?.spirit_animal || null,
           } : undefined,
+=======
+        // Get epic members
+        const membersData = await getDocuments("epic_members", [
+          ["epic_id", "==", epicId]
+        ], "total_contribution", "desc");
+
+        if (!membersData || membersData.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Extract all user IDs for batch queries (avoid N+1 problem)
+        const userIds = membersData.map((m: any) => m.user_id);
+
+        // Fetch profiles and companions in parallel using individual document fetches
+        // This is more reliable than 'in' queries which have limitations
+        const profilePromises = userIds.map((userId: string) => 
+          getDocument("profiles", userId).catch(() => null)
+        );
+        const companionPromises = userIds.map((userId: string) => 
+          getDocument("user_companion", userId).catch(() => null)
+        );
+
+        const [profileResults, companionResults] = await Promise.all([
+          Promise.all(profilePromises),
+          Promise.all(companionPromises)
+        ]);
+
+        // Create lookup maps for O(1) access
+        const profilesMap = new Map(
+          profileResults
+            .filter((p: any) => p !== null)
+            .map((p: any) => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
+        );
+        const companionsMap = new Map(
+          companionResults
+            .filter((c: any) => c !== null)
+            .map((c: any) => [c.id || c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
+        );
+
+        // Enrich members with profile and companion data
+        const enrichedMembers = membersData.map((member: any) => ({
+          ...member,
+          profile: profilesMap.get(member.user_id),
+          companion: companionsMap.get(member.user_id),
+>>>>>>> origin/main
         }));
 
         setMembers(enrichedMembers);
       } catch (error) {
+<<<<<<< HEAD
         console.error('Failed to fetch guild members:', error);
+=======
+        console.error("Error fetching guild members:", error);
+>>>>>>> origin/main
       } finally {
         setIsLoading(false);
       }
@@ -99,8 +150,14 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
 
     fetchMembers();
 
+<<<<<<< HEAD
     // Note: Real-time subscriptions would need to be implemented using Firestore onSnapshot
     // For now, we'll just fetch on mount and when epicId changes
+=======
+    // Note: Real-time subscriptions would need to be implemented with Firestore onSnapshot
+    // For now, we'll just fetch on mount and when epicId changes
+    // TODO: Add Firestore real-time listener if needed
+>>>>>>> origin/main
   }, [epicId]);
 
   const getRankIcon = (index: number) => {

@@ -219,7 +219,7 @@ You agree to resolve disputes individually and waive any right to participate in
 The App may contain links to third-party websites or services that are not owned or controlled by us. We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party services.
 
 Third-party services include:
-- Supabase (data storage and authentication)
+- Firebase (authentication and data storage)
 - Stripe (payment processing)
 - Artificial Intelligence services (for mentor chat and personalized content generation)
 - Mobile app platforms (Apple App Store, Google Play Store)

@@ -134,7 +134,7 @@ export default function PrivacyPolicy() {
                   <ul className="text-xs sm:text-sm space-y-1 list-none pl-0">
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
-                      <span>Supabase (database & authentication)</span>
+                      <span>Firebase (authentication & database)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>

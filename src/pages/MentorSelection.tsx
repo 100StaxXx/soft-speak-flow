@@ -9,6 +9,8 @@ import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useProfile } from "@/hooks/useProfile";
+import { getAllMentors, Mentor } from "@/lib/firebase/mentors";
+import { updateProfile } from "@/lib/firebase/profiles";
 
 const MentorSelection = () => {
   const { user } = useAuth();
@@ -16,7 +18,7 @@ const MentorSelection = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [mentors, setMentors] = useState<any[]>([]);
+  const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
 
@@ -27,7 +29,7 @@ const MentorSelection = () => {
 
       console.log(`[MentorSelection] Loaded ${mentorsData?.length || 0} mentors from Firestore`);
       setMentors(mentorsData || []);
-      
+
       if (!mentorsData || mentorsData.length === 0) {
         console.warn("[MentorSelection] No mentors found in Firestore database");
         toast({
