@@ -64,12 +64,12 @@ const Auth = () => {
       hasRedirected.current = true;
       console.log(`[Auth ${source}] Ensuring profile exists for user ${user.uid}`);
       
-      // Create profile and wait for it to complete
-      await ensureProfile(user.uid, user.email);
+      // Create profile and get it back to avoid duplicate reads
+      const profile = await ensureProfile(user.uid, user.email);
       console.log(`[Auth ${source}] Profile ensured for user ${user.uid}`);
       
-      // Check if profile exists and get redirect path
-      const path = await getAuthRedirectPath(user.uid);
+      // Pass profile to avoid duplicate getProfile call
+      const path = await getAuthRedirectPath(user.uid, profile);
       console.log(`[Auth ${source}] Navigating to ${path}`);
       navigate(path);
     } catch (error) {

@@ -80,8 +80,8 @@ export const signInWithGoogle = async () => {
       console.log('[Google Auth] Attempting popup sign-in...');
       const userCredential = await signInWithPopup(firebaseAuth, provider);
       
-      // Ensure profile exists
-      await ensureProfile(userCredential.user.uid, userCredential.user.email || null);
+      // Profile will be ensured by handlePostAuthNavigation in Auth.tsx
+      // No need to do it here to avoid duplicate work
       
       return userCredential;
     } catch (popupError: any) {
@@ -130,8 +130,8 @@ export const signInWithGoogleCredential = async (idToken: string, accessToken?: 
     : provider.credential(idToken);
   const userCredential = await signInWithCredential(firebaseAuth, credential);
   
-  // Ensure profile exists
-  await ensureProfile(userCredential.user.uid, userCredential.user.email || null);
+  // Profile will be ensured by handlePostAuthNavigation in Auth.tsx
+  // No need to do it here to avoid duplicate work
   
   return userCredential;
 };
@@ -146,8 +146,8 @@ export const signInWithAppleCredential = async (idToken: string, rawNonce?: stri
   
   const userCredential = await signInWithCredential(firebaseAuth, credential);
   
-  // Ensure profile exists
-  await ensureProfile(userCredential.user.uid, userCredential.user.email || null);
+  // Profile will be ensured by handlePostAuthNavigation in Auth.tsx
+  // No need to do it here to avoid duplicate work
   
   return userCredential;
 };

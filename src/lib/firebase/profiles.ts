@@ -100,12 +100,14 @@ export const createProfile = async (userId: string, email: string | null, data?:
 
   await setDocument("profiles", userId, newProfile, false);
   
-  const created = await getProfile(userId);
-  if (!created) {
-    throw new Error("Failed to create profile");
-  }
-  
-  return created;
+  // Return the profile directly instead of re-reading from Firestore
+  // This avoids an extra network round trip and speeds up account creation
+  const now = new Date().toISOString();
+  return {
+    ...newProfile,
+    created_at: now,
+    updated_at: now,
+  } as Profile;
 };
 
 export const updateProfile = async (
