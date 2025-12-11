@@ -43,7 +43,7 @@ export default function Reflection() {
       const data = reflections[0] || null;
       
       if (data) {
-        setTodayReflection(data);
+        setTodayReflection({ mood: data.mood, note: data.note || null, ai_reply: data.ai_reply || null });
         setSelectedMood(data.mood as Mood);
         setNote(data.note || "");
       }
@@ -105,7 +105,7 @@ export default function Reflection() {
         description: "You checked in for today.",
       });
 
-      setTodayReflection(reflectionData);
+      setTodayReflection({ mood: selectedMood, note: note || null, ai_reply: null });
     } catch (error) {
       console.error('Error saving reflection:', error);
       toast({

@@ -19,7 +19,7 @@ export default function SharedEpics() {
 
   const { data: publicEpics, isLoading } = useQuery({
     queryKey: ['public-epics'],
-    queryFn: async () => {
+    queryFn: async (): Promise<any[]> => {
       // Fetch public active epics
       const epics = await getDocuments(
         'epics',

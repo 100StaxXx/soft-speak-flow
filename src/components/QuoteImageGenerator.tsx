@@ -33,7 +33,7 @@ export const QuoteImageGenerator = ({
         style: `${category || ""} ${intensity || ""} ${emotionalTrigger || ""}`.trim() || undefined,
       });
 
-      const imageUrl = data?.imageData?.imageUrl || data?.imageUrl;
+      const imageUrl = (data as any)?.imageData?.imageUrl || (data as any)?.imageUrl;
       if (imageUrl) {
         setGeneratedImage(imageUrl);
         toast.success("Quote image generated!");

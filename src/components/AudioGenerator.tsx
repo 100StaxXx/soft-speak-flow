@@ -79,9 +79,10 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
       // Step 2: Generate audio from the script
       toast.info("Generating audio...");
+      const pepTalkData = (contentData as any).pepTalk || contentData;
       const audioData = await generateMentorAudio({
         mentorSlug: selectedMentor,
-        script: contentData.pepTalk?.script || contentData.script,
+        script: pepTalkData.script || (contentData as any).script,
       });
 
       // Step 3: Transcribe the audio
@@ -104,11 +105,10 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
       // Pass all data to parent component including transcript
       if (onFullPepTalkGenerated) {
-        const pepTalk = contentData.pepTalk || contentData;
         onFullPepTalkGenerated({
-          title: pepTalk.title || contentData.title,
-          quote: pepTalk.quote || contentData.quote,
-          description: pepTalk.description || contentData.description,
+          title: pepTalkData.title || (contentData as any).title,
+          quote: pepTalkData.quote || (contentData as any).quote,
+          description: pepTalkData.description || (contentData as any).description,
           topic_category: topicCategories,
           emotional_triggers: emotionalTriggers,
           audio_url: audioData.audioUrl,

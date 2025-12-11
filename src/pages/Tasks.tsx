@@ -990,8 +990,8 @@ export default function Tasks() {
         open={needsStreakDecision}
         currentStreak={currentStreak}
         freezesAvailable={freezesAvailable}
-        onUseFreeze={useFreeze}
-        onResetStreak={resetStreak}
+        onUseFreeze={async () => { await useFreeze(); }}
+        onResetStreak={async () => { await resetStreak(); }}
         isResolving={isResolving}
       />
 

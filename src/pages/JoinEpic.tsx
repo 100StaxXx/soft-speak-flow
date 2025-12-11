@@ -20,7 +20,7 @@ const JoinEpic = () => {
   // Fetch epic details by invite code
   const { data: epic, isLoading } = useQuery({
     queryKey: ["epic-preview", code],
-    queryFn: async () => {
+    queryFn: async (): Promise<any> => {
       if (!code) throw new Error("No invite code provided");
 
       // Fetch epic by invite code

@@ -108,8 +108,8 @@ const Search = () => {
                         <Skeleton className="h-32 rounded-2xl" />
                       </>
                     ) : (
-                      featuredQuotes?.map((quote, index) => (
-                        <FeaturedQuoteCard key={quote.id} quote={quote} index={index} />
+                      featuredQuotes?.map((quote: any, index) => (
+                        <FeaturedQuoteCard key={quote.id} quote={{ id: quote.id, text: quote.text, author: quote.author }} index={index} />
                       ))
                     )}
                   </div>
@@ -142,8 +142,8 @@ const Search = () => {
                         <Skeleton className="h-40 rounded-2xl" />
                       </>
                     ) : (
-                      featuredPepTalks?.map((pepTalk, index) => (
-                        <FeaturedPepTalkCard key={pepTalk.id} pepTalk={pepTalk} index={index} />
+                      featuredPepTalks?.map((pepTalk: any, index) => (
+                        <FeaturedPepTalkCard key={pepTalk.id} pepTalk={{ id: pepTalk.id, title: pepTalk.title, category: pepTalk.category, description: pepTalk.description }} index={index} />
                       ))
                     )}
                   </div>
