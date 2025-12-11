@@ -15,7 +15,8 @@
     "ios:build": "npm run build && npx cap sync ios",
     "ios:open": "npm run ios:build && npx cap open ios",
     "migrate:data": "node scripts/migrate-data-to-firestore.js",
-    "import:data": "node scripts/import-csv-to-firestore.js"
+    "import:data": "node scripts/import-csv-to-firestore.js",
+    "audit:db": "node scripts/invoke-database-audit.cjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
