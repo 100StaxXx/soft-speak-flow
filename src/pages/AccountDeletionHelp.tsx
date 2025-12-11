@@ -82,13 +82,13 @@ export default function AccountDeletionHelp() {
           </div>
         </div>
 
-        <Alert>
-          <Shield className="h-4 w-4" />
-          <AlertTitle>Immediate, irreversible deletion</AlertTitle>
-          <AlertDescription>
-            Once confirmed, we call our Supabase edge function that erases every row tied to your user ID and then removes your authentication profile. There is no way to restore the data.
-          </AlertDescription>
-        </Alert>
+          <Alert>
+            <Shield className="h-4 w-4" />
+            <AlertTitle>Immediate, irreversible deletion</AlertTitle>
+            <AlertDescription>
+            Once confirmed, we call our Firebase Cloud Function that erases every Firestore document tied to your user ID and then removes your Firebase authentication profile. There is no way to restore the data.
+            </AlertDescription>
+          </Alert>
 
         <Card>
           <CardHeader>
