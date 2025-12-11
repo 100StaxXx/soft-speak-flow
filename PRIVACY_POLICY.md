@@ -122,10 +122,10 @@ We do not sell your personal information. We may share your information only in 
 ### 4.1 Service Providers
 We share information with third-party service providers who perform services on our behalf:
 
-**Supabase** (Database and Authentication)
+**Firebase** (Authentication and Database)
 - Stores your account data, wellness information, and app content
 - Provides secure authentication services
-- Privacy Policy: [https://supabase.com/privacy](https://supabase.com/privacy)
+- Privacy Policy: [https://firebase.google.com/support/privacy](https://firebase.google.com/support/privacy)
 
 **Stripe** (Payment Processing)
 - Processes subscription payments and in-app purchases securely

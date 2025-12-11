@@ -4,7 +4,7 @@ import { firebaseAuth } from "@/lib/firebase";
 import { signOut as firebaseSignOut } from "@/lib/firebase/auth";
 import { convertFirebaseUser, AuthUser } from "@/lib/firebase/auth";
 
-// Firebase session type (compatible with Supabase Session type for migration)
+// Firebase session type, shaped like the old Supabase Session for compatibility
 export interface Session {
   user: AuthUser;
   access_token?: string;

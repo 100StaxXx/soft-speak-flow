@@ -334,7 +334,7 @@ const Profile = () => {
                     <MessageCircle className="h-5 w-5 text-primary mt-0.5" />
                     <div>
                       <p className="font-semibold text-foreground">Adaptive mentor chat + nudges</p>
-                      <p>Choose an AI mentor, fire off one-tap prompts from Quick Chat, and receive mentor-authored nudges stored per user in Supabase.</p>
+                      <p>Choose an AI mentor, fire off one-tap prompts from Quick Chat, and receive mentor-authored nudges stored per user in Firebase.</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
