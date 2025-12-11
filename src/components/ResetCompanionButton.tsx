@@ -44,7 +44,7 @@ export const ResetCompanionButton = () => {
         // Open creation dialog immediately
         setCreateDialogOpen(true);
       } else {
-        throw new Error(data?.error || 'Failed to reset companion');
+        throw new Error(data?.message || 'Failed to reset companion');
       }
     } catch (err) {
       console.error('Reset companion failed:', err);

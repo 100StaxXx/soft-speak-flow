@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -88,44 +89,14 @@ const Horoscope = () => {
       
       throw new Error("Horoscope generation needs Firebase Cloud Function migration");
 
-      // Check for zodiac/onboarding error anywhere in the error object
-      // This handles the 400 response with "No zodiac sign found"
-      const errorString = JSON.stringify(error) + (error?.message || '');
-      if (error && (errorString.toLowerCase().includes('zodiac') || errorString.toLowerCase().includes('onboarding'))) {
-        console.log('User needs to complete onboarding - no zodiac sign');
-        setHoroscope(null);
-        setZodiac(null);
-        setIsPersonalized(false);
-        setDate(new Date().toLocaleDateString('en-CA'));
-        setLoading(false);
-        return;
-      }
-
-      // Handle other errors
-      if (error) {
-        throw new Error(error.message || 'Failed to load horoscope');
-      }
-
-      // Check for error in data body
-      if (data?.error) {
-        if (data.error.toLowerCase().includes('zodiac') || data.error.toLowerCase().includes('onboarding')) {
-          setHoroscope(null);
-          setZodiac(null);
-          setIsPersonalized(false);
-          setDate(new Date().toLocaleDateString('en-CA'));
-          setLoading(false);
-          return;
-        }
-        throw new Error(data.error);
-      }
-
-      setHoroscope(data.horoscope);
-      setZodiac(data.zodiac);
-      setIsPersonalized(data.isPersonalized);
-      setDate(data.date);
-      setCosmiqTip(data.cosmiqTip || null);
-      setEnergyForecast(data.energyForecast || null);
-      setPlacementInsights(data.placementInsights || null);
+      // NOTE: Code below is unreachable until Firebase migration is complete
+      // setHoroscope(data.horoscope);
+      // setZodiac(data.zodiac);
+      // setIsPersonalized(data.isPersonalized);
+      // setDate(data.date);
+      // setCosmiqTip(data.cosmiqTip || null);
+      // setEnergyForecast(data.energyForecast || null);
+      // setPlacementInsights(data.placementInsights || null);
     } catch (err) {
       console.error('Error generating horoscope:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -293,41 +264,7 @@ const Horoscope = () => {
       
       throw new Error("Cosmic profile calculation needs Firebase Cloud Function migration");
 
-      if (error) {
-        // Handle rate limit (429) specifically
-        if (error.message?.includes('already generated today') || error.message?.includes('once per 24 hours')) {
-          toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw error;
-      }
-      
-      if (data && typeof data === 'object' && 'error' in data) {
-        const errorMsg = data.error as string;
-        // Handle rate limit from response data
-        if (errorMsg.includes('already generated today') || errorMsg.includes('once per 24 hours')) {
-          toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw new Error(errorMsg);
-      }
-
-      toast({
-        title: "✨ Cosmiq Profile Revealed!",
-        description: "Your celestial map has been calculated.",
-      });
-
-      setTimeout(() => {
-        window.location.href = window.location.pathname;
-      }, 1000);
+      // NOTE: Code below is unreachable until Firebase migration is complete
     } catch (error) {
       console.error('Error:', error);
       toast({

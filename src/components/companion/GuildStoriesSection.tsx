@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GuildStoryChapter } from "@/components/GuildStoryChapter";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -166,11 +167,11 @@ export const GuildStoriesSection = () => {
         guildId: epicId,
       });
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (data && typeof data === 'object' && 'error' in data) {
+        throw new Error((data as { error: string }).error);
       }
 
-      return data.story as GuildStory;
+      return (data as { story: GuildStory }).story;
     },
     onSuccess: () => {
       toast.dismiss("guild-story-gen");

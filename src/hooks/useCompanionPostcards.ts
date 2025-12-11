@@ -80,13 +80,9 @@ export const useCompanionPostcards = () => {
       
       throw new Error("Postcard generation needs Firebase Cloud Function migration");
     },
-    onSuccess: (data) => {
-      if (!data?.existing) {
-        queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
-        toast.success("📸 New cosmic postcard unlocked!", {
-          description: `Your companion visited ${data?.postcard?.location_name}!`,
-        });
-      }
+    onSuccess: () => {
+      // Will not be called since mutation always throws
+      queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
     },
     onError: (error) => {
       console.error("Failed to generate postcard:", error);

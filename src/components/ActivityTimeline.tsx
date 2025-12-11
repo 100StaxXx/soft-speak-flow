@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { globalAudio } from "@/utils/globalAudio";
+import { supabase } from "@/integrations/supabase/client";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
