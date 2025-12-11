@@ -351,11 +351,13 @@
       "title": "Morning Momentum",
       "description": "Start your day with energy and intention",
       "category": "morning",
+      "quote": "This is your day. Not yesterday's, not tomorrow's—this one, right here.",
       "duration_seconds": 180,
-      "mentor_id": "mentor_atlas",
+      "mentor_slug": "atlas",
       "tags": ["morning", "motivation", "energy"],
-      "transcript": "Good morning. This is your day. Not yesterday's, not tomorrow's—this one, right here. You've got 24 hours to make something happen, and I'm here to remind you that you're capable of more than you think. Take a deep breath. Set your intention. And let's make today count.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -364,11 +366,13 @@
       "title": "Break Through the Wall",
       "description": "Push past resistance and break through barriers",
       "category": "motivation",
+      "quote": "Walls are meant to be broken. You're stronger than that wall.",
       "duration_seconds": 240,
-      "mentor_id": "mentor_darius",
+      "mentor_slug": "darius",
       "tags": ["breakthrough", "resistance", "strength"],
-      "transcript": "You're hitting a wall. I see it. But here's what you need to know—walls are meant to be broken. That resistance you're feeling? That's your comfort zone trying to keep you safe. But safe isn't where growth happens. Push through. Break through. You're stronger than that wall, and it's time to prove it.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -377,11 +381,13 @@
       "title": "Be Here Now",
       "description": "Find peace in the present moment",
       "category": "mindfulness",
+      "quote": "Everything you need is right here, right now.",
       "duration_seconds": 200,
-      "mentor_id": "mentor_lumi",
+      "mentor_slug": "lumi",
       "tags": ["mindfulness", "presence", "peace"],
-      "transcript": "Where are you right now? Not physically—mentally. Are you worrying about tomorrow? Regretting yesterday? Come back. Come back to this moment. This breath. This space. Everything you need is right here, right now. The past is gone. The future isn't here yet. But this moment? This moment is yours. Be here.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -390,11 +396,13 @@
       "title": "You Deserve Kindness",
       "description": "Practice self-compassion and gentle self-care",
       "category": "healing",
+      "quote": "You deserve kindness. Especially from yourself.",
       "duration_seconds": 220,
-      "mentor_id": "mentor_sienna",
+      "mentor_slug": "sienna",
       "tags": ["self-compassion", "healing", "kindness"],
-      "transcript": "I need you to hear this: you deserve kindness. Especially from yourself. You've been so hard on yourself, holding yourself to impossible standards, beating yourself up for every mistake. Stop. Just stop. You're human. You're doing your best. And your best is enough. Treat yourself with the same compassion you'd show a friend. You deserve it.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -403,11 +411,13 @@
       "title": "Think Different",
       "description": "Break free from limiting patterns and see new possibilities",
       "category": "creativity",
+      "quote": "The possibilities are endless when you're willing to think differently.",
       "duration_seconds": 210,
-      "mentor_id": "mentor_nova",
+      "mentor_slug": "nova",
       "tags": ["innovation", "creativity", "possibility"],
-      "transcript": "What if you tried something completely different? What if the way you've always done it isn't the only way? I see you stuck in patterns, following the same path because it's familiar. But familiar isn't always best. Let's break free. Let's innovate. Let's create something new. The possibilities are endless when you're willing to think differently.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -416,11 +426,13 @@
       "title": "See the Pattern",
       "description": "Understand your patterns and make wiser choices",
       "category": "wisdom",
+      "quote": "When you see the pattern, you can change it.",
       "duration_seconds": 230,
-      "mentor_id": "mentor_eli",
+      "mentor_slug": "eli",
       "tags": ["wisdom", "reflection", "understanding"],
-      "transcript": "Let's pause and look at the pattern. What keeps happening? What choices lead you here? Understanding isn't about blame—it's about clarity. When you see the pattern, you can change it. When you understand why, you can choose differently. Take a moment. Reflect. See what's really happening, and then make a choice from that place of understanding.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -429,11 +441,13 @@
       "title": "Unleash the Energy",
       "description": "Tap into your inner fire and build unstoppable momentum",
       "category": "energy",
+      "quote": "That energy wants to move. Don't waste it. UNLEASH IT.",
       "duration_seconds": 190,
-      "mentor_id": "mentor_kai",
+      "mentor_slug": "kai",
       "tags": ["energy", "momentum", "action"],
-      "transcript": "You've got energy inside you right now. I can feel it. But you're holding it back, playing it safe, keeping it contained. STOP THAT. Let it out. Channel it. Use it. That energy wants to move, wants to create, wants to break through. Don't waste it. Don't suppress it. UNLEASH IT. Let's go!",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -442,11 +456,13 @@
       "title": "Access Your Power",
       "description": "Tap into your unshakeable inner strength",
       "category": "strength",
+      "quote": "You are stronger than you know, and it's time to prove it to yourself.",
       "duration_seconds": 250,
-      "mentor_id": "mentor_stryker",
+      "mentor_slug": "stryker",
       "tags": ["strength", "power", "resilience"],
-      "transcript": "You have power inside you that you haven't even tapped into yet. I'm not talking about physical strength—I'm talking about the kind of strength that gets you through anything. The kind that doesn't break, doesn't quit, doesn't give up. Access it. Feel it. Use it. You are stronger than you know, and it's time to prove it to yourself.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -455,11 +471,13 @@
       "title": "You're Not Alone",
       "description": "Find comfort and peace in difficult moments",
       "category": "comfort",
+      "quote": "You don't have to carry it alone. I'm here.",
       "duration_seconds": 200,
-      "mentor_id": "mentor_solace",
+      "mentor_slug": "solace",
       "tags": ["comfort", "support", "peace"],
-      "transcript": "I know it's hard right now. I know you're carrying weight. But you don't have to carry it alone. I'm here. And more importantly, you're here—still standing, still breathing, still moving forward even when it feels impossible. That's strength. That's resilience. And you have it. Let yourself feel the comfort of knowing you're not alone in this.",
-      "audio_url": null,
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
       "is_premium": false,
       "created_at": "2024-01-01T00:00:00Z"
     }
@@ -637,7 +655,7 @@
       "id": "stage_2",
       "stage": 2,
       "stage_name": "Sproutling",
-      "xp_required": 120,
+      "xp_required": 100,
       "description": "Breaking free from the shell, you're discovering your first abilities. Growth is visible, and momentum is building.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -653,7 +671,7 @@
       "id": "stage_4",
       "stage": 4,
       "stage_name": "Juvenile",
-      "xp_required": 500,
+      "xp_required": 450,
       "description": "Growing stronger and more confident. You're learning what you're capable of and building the foundation for greater things.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -661,7 +679,7 @@
       "id": "stage_5",
       "stage": 5,
       "stage_name": "Apprentice",
-      "xp_required": 1200,
+      "xp_required": 800,
       "description": "The student phase. You're actively learning, practicing, and refining your skills. Progress is steady and meaningful.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -669,7 +687,7 @@
       "id": "stage_6",
       "stage": 6,
       "stage_name": "Scout",
-      "xp_required": 2500,
+      "xp_required": 1300,
       "description": "Venturing further, exploring new territories. You're becoming more independent and discovering your unique path forward.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -677,7 +695,7 @@
       "id": "stage_7",
       "stage": 7,
       "stage_name": "Fledgling",
-      "xp_required": 5000,
+      "xp_required": 2000,
       "description": "Testing your wings, preparing for flight. You're gaining confidence and ready to take on bigger challenges.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -685,7 +703,7 @@
       "id": "stage_8",
       "stage": 8,
       "stage_name": "Warrior",
-      "xp_required": 10000,
+      "xp_required": 2900,
       "description": "A true fighter. You've faced challenges and emerged stronger. Your determination is clear, and your strength is growing.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -693,7 +711,7 @@
       "id": "stage_9",
       "stage": 9,
       "stage_name": "Guardian",
-      "xp_required": 20000,
+      "xp_required": 4000,
       "description": "Protecting what matters. You've developed the strength to not only care for yourself but to support others on their journey.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -701,7 +719,7 @@
       "id": "stage_10",
       "stage": 10,
       "stage_name": "Champion",
-      "xp_required": 35000,
+      "xp_required": 5400,
       "description": "A proven winner. You've achieved significant milestones and demonstrated what's possible through consistent effort.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -709,7 +727,7 @@
       "id": "stage_11",
       "stage": 11,
       "stage_name": "Ascended",
-      "xp_required": 50000,
+      "xp_required": 7100,
       "description": "Rising above. You've transcended previous limitations and are operating at a new level of capability and understanding.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -717,7 +735,7 @@
       "id": "stage_12",
       "stage": 12,
       "stage_name": "Vanguard",
-      "xp_required": 75000,
+      "xp_required": 9100,
       "description": "Leading the way. You're at the forefront, setting new standards and inspiring others through your example.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -725,7 +743,7 @@
       "id": "stage_13",
       "stage": 13,
       "stage_name": "Titan",
-      "xp_required": 100000,
+      "xp_required": 11400,
       "description": "Immense power and presence. You've become a force to be reckoned with, capable of handling challenges that would overwhelm most.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -733,7 +751,7 @@
       "id": "stage_14",
       "stage": 14,
       "stage_name": "Mythic",
-      "xp_required": 150000,
+      "xp_required": 14000,
       "description": "Legendary status. Your achievements have become the stuff of stories, inspiring others and setting new benchmarks.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -741,7 +759,7 @@
       "id": "stage_15",
       "stage": 15,
       "stage_name": "Prime",
-      "xp_required": 200000,
+      "xp_required": 17000,
       "description": "Peak form. You're operating at your absolute best, with all your abilities refined and integrated into a powerful whole.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -749,7 +767,7 @@
       "id": "stage_16",
       "stage": 16,
       "stage_name": "Regal",
-      "xp_required": 300000,
+      "xp_required": 20400,
       "description": "Royal presence. You carry yourself with the dignity and authority of one who has earned their place through consistent excellence.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -757,7 +775,7 @@
       "id": "stage_17",
       "stage": 17,
       "stage_name": "Eternal",
-      "xp_required": 450000,
+      "xp_required": 24200,
       "description": "Timeless essence. You've achieved a level of mastery that transcends the moment, creating lasting impact and enduring legacy.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -765,7 +783,7 @@
       "id": "stage_18",
       "stage": 18,
       "stage_name": "Transcendent",
-      "xp_required": 650000,
+      "xp_required": 28400,
       "description": "Beyond ordinary limits. You've moved past conventional boundaries and are operating in a realm of pure potential and possibility.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -773,7 +791,7 @@
       "id": "stage_19",
       "stage": 19,
       "stage_name": "Apex",
-      "xp_required": 1000000,
+      "xp_required": 33000,
       "description": "The pinnacle. You stand at the absolute peak, having mastered every challenge and achieved the highest level of excellence.",
       "created_at": "2024-01-01T00:00:00Z"
     },
@@ -781,7 +799,7 @@
       "id": "stage_20",
       "stage": 20,
       "stage_name": "Ultimate",
-      "xp_required": 1500000,
+      "xp_required": 38000,
       "description": "The final evolution. You've reached the ultimate form, embodying the full potential of your journey. This is mastery in its purest expression.",
       "created_at": "2024-01-01T00:00:00Z"
     }
@@ -793,7 +811,7 @@
       "description": "Take time to reflect on your day and process your experiences",
       "category": "mindfulness",
       "difficulty": "easy",
-      "xp_reward": 10,
+      "xp_reward": 8,
       "estimated_minutes": 5,
       "tags": ["reflection", "mindfulness", "daily"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -815,7 +833,7 @@
       "description": "Set or review your goals for the week ahead",
       "category": "productivity",
       "difficulty": "medium",
-      "xp_reward": 15,
+      "xp_reward": 16,
       "estimated_minutes": 15,
       "tags": ["goals", "planning", "productivity"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -826,7 +844,7 @@
       "description": "Spend time learning a new skill or topic that interests you",
       "category": "growth",
       "difficulty": "medium",
-      "xp_reward": 20,
+      "xp_reward": 16,
       "estimated_minutes": 30,
       "tags": ["learning", "growth", "education"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -837,7 +855,7 @@
       "description": "Work on a creative project or express yourself artistically",
       "category": "creativity",
       "difficulty": "medium",
-      "xp_reward": 18,
+      "xp_reward": 16,
       "estimated_minutes": 45,
       "tags": ["creativity", "art", "expression"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -848,7 +866,7 @@
       "description": "Engage in physical exercise or movement for at least 20 minutes",
       "category": "health",
       "difficulty": "medium",
-      "xp_reward": 15,
+      "xp_reward": 16,
       "estimated_minutes": 20,
       "tags": ["exercise", "health", "fitness"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -859,7 +877,7 @@
       "description": "Reach out to a friend or loved one for meaningful connection",
       "category": "connection",
       "difficulty": "easy",
-      "xp_reward": 10,
+      "xp_reward": 8,
       "estimated_minutes": 10,
       "tags": ["social", "connection", "relationships"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -870,7 +888,7 @@
       "description": "Tidy and organize one area of your living or working space",
       "category": "productivity",
       "difficulty": "easy",
-      "xp_reward": 12,
+      "xp_reward": 8,
       "estimated_minutes": 15,
       "tags": ["organization", "productivity", "decluttering"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -881,7 +899,7 @@
       "description": "Engage in a self-care activity that nourishes your mind, body, or spirit",
       "category": "wellness",
       "difficulty": "easy",
-      "xp_reward": 10,
+      "xp_reward": 8,
       "estimated_minutes": 20,
       "tags": ["self-care", "wellness", "nourishment"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -892,7 +910,7 @@
       "description": "Do something that pushes you slightly outside your comfort zone",
       "category": "growth",
       "difficulty": "hard",
-      "xp_reward": 25,
+      "xp_reward": 28,
       "estimated_minutes": 30,
       "tags": ["challenge", "growth", "courage"],
       "created_at": "2024-01-01T00:00:00Z"
@@ -1064,6 +1082,144 @@
       "is_premium": true,
       "created_at": "2024-01-01T00:00:00Z"
     }
-  ]
+  ],
+  "cosmic_flavor_data": {
+    "factions": [
+      {
+        "id": "starfall",
+        "name": "STARFALL FLEET",
+        "subtitle": "Blazing Through the Unknown",
+        "description": "Warriors of momentum who believe that action is the ultimate teacher. The Fleet charges forward, turning obstacles into fuel and doubt into determination.",
+        "motto": "We don't follow paths, we burn new ones.",
+        "philosophy": [
+          "Action over hesitation",
+          "Bold moves create breakthroughs",
+          "Fear is fuel for the fearless",
+          "Progress beats perfection"
+        ],
+        "traits": ["Courageous", "Driven", "Resilient", "Bold"],
+        "idealFor": "Those who thrive on challenge and want to build unstoppable momentum in their growth journey.",
+        "color": "#FF6600"
+      },
+      {
+        "id": "void",
+        "name": "Void Collective",
+        "subtitle": "Masters of the In Between",
+        "description": "Seekers of depth who find power in pause. The Collective understands that true transformation happens in moments of stillness, where clarity emerges from chaos.",
+        "motto": "In stillness, we find infinite power.",
+        "philosophy": [
+          "Depth over speed",
+          "Reflection reveals truth",
+          "The void holds all answers",
+          "Patience is strength"
+        ],
+        "traits": ["Introspective", "Wise", "Centered", "Mysterious"],
+        "idealFor": "Those who value mindfulness and want to cultivate inner wisdom alongside outer achievement.",
+        "color": "#7F26D9"
+      },
+      {
+        "id": "stellar",
+        "name": "Stellar Voyagers",
+        "subtitle": "Navigators of Infinite Possibility",
+        "description": "Explorers who believe that growth comes from curiosity and connection. The Voyagers seek balance, harmony, and meaningful experiences across the cosmos.",
+        "motto": "Every journey teaches, every connection transforms.",
+        "philosophy": [
+          "Curiosity opens doors",
+          "Connection creates growth",
+          "Balance is strength",
+          "Every experience matters"
+        ],
+        "traits": ["Curious", "Balanced", "Connected", "Harmonious"],
+        "idealFor": "Those who seek balance and want to grow through exploration and meaningful connections.",
+        "color": "#00BFFF"
+      }
+    ],
+    "elements": [
+      {
+        "id": "fire",
+        "name": "Fire",
+        "description": "Passion, energy, and transformation through action",
+        "color": "#FF4500",
+        "traits": ["passionate", "energetic", "transformative", "bold"]
+      },
+      {
+        "id": "water",
+        "name": "Water",
+        "description": "Emotion, flow, and adaptation through feeling",
+        "color": "#1E90FF",
+        "traits": ["emotional", "flowing", "adaptive", "intuitive"]
+      },
+      {
+        "id": "earth",
+        "name": "Earth",
+        "description": "Stability, growth, and foundation through grounding",
+        "color": "#8B4513",
+        "traits": ["stable", "grounded", "nurturing", "practical"]
+      },
+      {
+        "id": "air",
+        "name": "Air",
+        "description": "Thought, communication, and freedom through movement",
+        "color": "#87CEEB",
+        "traits": ["intellectual", "communicative", "free", "light"]
+      },
+      {
+        "id": "spirit",
+        "name": "Spirit",
+        "description": "Transcendence, connection, and unity through essence",
+        "color": "#9370DB",
+        "traits": ["transcendent", "connected", "unified", "essence"]
+      }
+    ],
+    "spirit_animals": [
+      {
+        "id": "wolf",
+        "name": "Wolf",
+        "description": "Loyalty, intuition, and strong social bonds",
+        "traits": ["loyal", "intuitive", "social", "protective"]
+      },
+      {
+        "id": "eagle",
+        "name": "Eagle",
+        "description": "Vision, freedom, and perspective from above",
+        "traits": ["visionary", "free", "perspective", "soaring"]
+      },
+      {
+        "id": "bear",
+        "name": "Bear",
+        "description": "Strength, introspection, and protective power",
+        "traits": ["strong", "introspective", "protective", "grounded"]
+      },
+      {
+        "id": "dolphin",
+        "name": "Dolphin",
+        "description": "Joy, playfulness, and intelligent communication",
+        "traits": ["joyful", "playful", "intelligent", "communicative"]
+      },
+      {
+        "id": "phoenix",
+        "name": "Phoenix",
+        "description": "Rebirth, transformation, and rising from ashes",
+        "traits": ["transformative", "resilient", "renewing", "powerful"]
+      },
+      {
+        "id": "owl",
+        "name": "Owl",
+        "description": "Wisdom, mystery, and seeing through darkness",
+        "traits": ["wise", "mysterious", "perceptive", "nocturnal"]
+      },
+      {
+        "id": "tiger",
+        "name": "Tiger",
+        "description": "Power, courage, and fierce independence",
+        "traits": ["powerful", "courageous", "independent", "fierce"]
+      },
+      {
+        "id": "butterfly",
+        "name": "Butterfly",
+        "description": "Transformation, beauty, and lightness of being",
+        "traits": ["transformative", "beautiful", "light", "graceful"]
+      }
+    ]
+  }
 }
-
