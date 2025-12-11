@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useMentor } from "@/hooks/useMentor";
 import { BottomNav } from "@/components/BottomNav";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
@@ -20,6 +21,7 @@ import { motion } from "framer-motion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import { MentorSkeleton } from "@/components/mentor/MentorSkeleton";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -29,6 +31,7 @@ const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
+  const { mentor, isLoading: mentorLoading } = useMentor();
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -76,19 +79,11 @@ const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
     let isMounted = true;
 
     const fetchMentorData = async () => {
-      if (!resolvedMentorId) return;
+      if (!mentor) return;
 
       try {
-        const { data: mentorData } = await supabase
-          .from("mentors")
-          .select("avatar_url, slug")
-          .eq("id", resolvedMentorId)
-          .maybeSingle();
-
-        if (!isMounted || !mentorData) return;
-
         // Dynamically load only the mentor image we need (saves ~20MB!)
-        const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+        const imageUrl = mentor.avatar_url || await loadMentorImage(mentor.slug || 'darius');
         if (isMounted) {
           setMentorImage(imageUrl);
         }
@@ -99,7 +94,7 @@ const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
           .from("daily_pep_talks")
           .select("emotional_triggers, topic_category")
           .eq("for_date", today)
-          .eq("mentor_slug", mentorData.slug)
+          .eq("mentor_slug", mentor.slug)
           .maybeSingle();
 
         if (!isMounted || !dailyPepTalk) return;
@@ -159,7 +154,7 @@ const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
     return () => {
       isMounted = false;
     };
-  }, [resolvedMentorId, user]);
+  }, [mentor, user]);
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {
@@ -189,16 +184,13 @@ const Index = ({ enableOnboardingGuard = true }: IndexProps) => {
   }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
 
   // Show loading state while critical data loads
-  if (isTransitioning || !isReady) {
+  if (isTransitioning || !isReady || mentorLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground">
-            {isTransitioning ? "Switching mentor..." : "Loading..."}
-          </p>
-        </div>
-      </div>
+      <PageTransition>
+        <StarfieldBackground />
+        <MentorSkeleton />
+        <BottomNav />
+      </PageTransition>
     );
   }
 

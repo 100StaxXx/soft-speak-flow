@@ -13,6 +13,7 @@ import { FactionBadge } from "@/components/FactionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Award, TrendingUp, BookOpen, Sparkles, MapPin } from "lucide-react";
 import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
+import { CompanionSkeleton } from "@/components/companion/CompanionSkeleton";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
@@ -102,12 +103,8 @@ const Companion = () => {
   if (isLoading) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-            <p className="text-muted-foreground">Loading your companion...</p>
-          </div>
-        </div>
+        <StarfieldBackground />
+        <CompanionSkeleton />
         <BottomNav />
       </PageTransition>
     );

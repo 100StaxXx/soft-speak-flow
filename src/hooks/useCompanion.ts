@@ -45,11 +45,25 @@ export const useCompanion = () => {
   const xpInProgress = useRef(false);
   const companionCreationInProgress = useRef(false);
 
+  const cachedCompanion = useMemo(() => {
+    if (!user?.id) return null;
+    return queryClient.getQueryData<Companion>(["companion", user.id]) ?? null;
+  }, [queryClient, user?.id]);
+
   const { data: companion, isLoading, error } = useQuery({
     queryKey: ["companion", user?.id],
+    enabled: !!user,
+    initialData: cachedCompanion,
+    placeholderData: cachedCompanion,
+    staleTime: 5 * 60 * 1000, // 5 minutes to avoid thrashing when switching tabs
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 3, // Increased from 2 to 3 for better reliability after onboarding
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
     queryFn: async () => {
       if (!user) return null;
-      
+
       const { data, error } = await supabase
         .from("user_companion")
         .select("*")
@@ -59,10 +73,6 @@ export const useCompanion = () => {
       if (error) throw error;
       return data as Companion | null;
     },
-    enabled: !!user,
-    staleTime: 30000, // 30 seconds - prevents unnecessary refetches
-    retry: 3, // Increased from 2 to 3 for better reliability after onboarding
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
 
   const createCompanion = useMutation({
