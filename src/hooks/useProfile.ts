@@ -17,14 +17,27 @@ export const useProfile = () => {
         if (!profileData) {
           // Auto-create profile on first login if missing
           console.log(`[useProfile] Profile not found for user ${user.uid}, creating new profile`);
-          profileData = await createProfile(user.uid, user.email ?? null);
-          console.log(`[useProfile] Profile created for user ${user.uid}`);
+          try {
+            profileData = await createProfile(user.uid, user.email ?? null);
+            console.log(`[useProfile] Profile created for user ${user.uid}`);
+          } catch (createError: any) {
+            // If profile creation fails, try to fetch again (might have been created by race condition)
+            console.warn(`[useProfile] Profile creation failed, retrying fetch:`, createError);
+            profileData = await getProfile(user.uid);
+            // If still null, return null instead of throwing (prevents crashes)
+            if (!profileData) {
+              console.error(`[useProfile] Could not create or fetch profile for user ${user.uid}`);
+              return null;
+            }
+          }
         }
 
         return profileData;
       } catch (error) {
         console.error("[useProfile] Error fetching profile:", error);
-        throw error;
+        // Return null instead of throwing to prevent crashes
+        // The app can handle a null profile gracefully
+        return null;
       }
     },
     enabled: !!user,

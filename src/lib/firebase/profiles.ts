@@ -42,7 +42,16 @@ export interface Profile {
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   try {
-    const data = await getDocument<Profile>("profiles", userId);
+    // Add timeout to prevent hanging on iOS
+    const dataPromise = getDocument<Profile>("profiles", userId);
+    const timeoutPromise = new Promise<null>((resolve) => 
+      setTimeout(() => {
+        console.warn("[getProfile] Timeout fetching profile, returning null");
+        resolve(null);
+      }, 8000)
+    );
+    
+    const data = await Promise.race([dataPromise, timeoutPromise]);
     if (!data) return null;
     
     // Convert Firestore timestamps to ISO strings
@@ -56,7 +65,9 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
     } as Profile;
   } catch (error) {
     console.error("[getProfile] Error fetching profile:", error);
-    throw error;
+    // Return null instead of throwing to prevent crashes
+    // The calling code can handle null profiles
+    return null;
   }
 };
 
@@ -98,7 +109,24 @@ export const createProfile = async (userId: string, email: string | null, data?:
     ...data, // Override with any provided data
   };
 
-  await setDocument("profiles", userId, newProfile, false);
+  try {
+    // Add timeout to prevent hanging on iOS
+    const setDocPromise = setDocument("profiles", userId, newProfile, false);
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Profile creation timeout')), 10000)
+    );
+    
+    await Promise.race([setDocPromise, timeoutPromise]);
+  } catch (error: any) {
+    // Check if it's a duplicate/race condition error
+    if (error.code === 'already-exists' || error.message?.includes('already exists')) {
+      // Profile was created by another process, fetch it
+      const existing = await getProfile(userId);
+      if (existing) return existing;
+    }
+    // Re-throw other errors
+    throw error;
+  }
   
   // Return the profile directly instead of re-reading from Firestore
   // This avoids an extra network round trip and speeds up account creation

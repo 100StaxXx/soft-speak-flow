@@ -57,26 +57,105 @@ const Auth = () => {
   const { toast } = useToast();
   const { session: authSession } = useAuth();
 
+  // Add global error handler for unhandled promise rejections (prevents iOS crashes)
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[Auth] Unhandled promise rejection:', event.reason);
+      // Prevent the default browser behavior (which can cause crashes on iOS)
+      event.preventDefault();
+      // Show user-friendly error
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [toast]);
+
   const handlePostAuthNavigation = useCallback(async (user: { uid: string; email: string | null } | null, source: string) => {
     if (!user) return;
+
+    // Prevent multiple simultaneous navigation attempts
+    if (hasRedirected.current) {
+      console.log(`[Auth ${source}] Already redirected, skipping duplicate navigation`);
+      return;
+    }
 
     try {
       hasRedirected.current = true;
       console.log(`[Auth ${source}] Ensuring profile exists for user ${user.uid}`);
       
       // Create profile and get it back to avoid duplicate reads
-      const profile = await ensureProfile(user.uid, user.email);
+      // Wrap in Promise.race with timeout to prevent hanging on iOS
+      const profilePromise = ensureProfile(user.uid, user.email);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile creation timeout')), 10000)
+      );
+      
+      const profile = await Promise.race([profilePromise, timeoutPromise]).catch((error) => {
+        console.error(`[Auth ${source}] Profile creation error:`, error);
+        // Return null to continue with navigation even if profile creation fails
+        return null;
+      }) as any;
+      
       console.log(`[Auth ${source}] Profile ensured for user ${user.uid}`);
       
       // Pass profile to avoid duplicate getProfile call
-      const path = await getAuthRedirectPath(user.uid, profile);
+      // If profile creation failed, getAuthRedirectPath will fetch it
+      const path = await Promise.race([
+        getAuthRedirectPath(user.uid, profile || undefined),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Redirect path timeout')), 5000)
+        )
+      ]).catch((error) => {
+        console.error(`[Auth ${source}] Redirect path error:`, error);
+        // Default to onboarding if we can't determine path
+        return '/onboarding';
+      }) as string;
+      
       console.log(`[Auth ${source}] Navigating to ${path}`);
-      navigate(path);
+      
+      // Use setTimeout to ensure navigation happens after current execution context
+      // This helps prevent crashes on iOS
+      setTimeout(() => {
+        if (!isMounted.current) {
+          console.log(`[Auth ${source}] Component unmounted, skipping navigation`);
+          return;
+        }
+        try {
+          navigate(path);
+        } catch (navError) {
+          console.error(`[Auth ${source}] Navigation error:`, navError);
+          // Fallback navigation only if component is still mounted
+          if (isMounted.current && typeof window !== 'undefined') {
+            window.location.href = path;
+          }
+        }
+      }, 0);
     } catch (error) {
       console.error(`[Auth ${source}] Navigation error:`, error);
       // If profile creation fails, still navigate to onboarding
       // The profile will be created by useProfile hook
-      navigate('/onboarding');
+      setTimeout(() => {
+        if (!isMounted.current) {
+          console.log(`[Auth ${source}] Component unmounted, skipping fallback navigation`);
+          return;
+        }
+        try {
+          navigate('/onboarding');
+        } catch (navError) {
+          console.error(`[Auth ${source}] Fallback navigation error:`, navError);
+          // Fallback navigation only if component is still mounted
+          if (isMounted.current && typeof window !== 'undefined') {
+            window.location.href = '/onboarding';
+          }
+        }
+      }, 0);
     }
   }, [navigate]);
   
@@ -89,6 +168,15 @@ const Auth = () => {
   
   // Ref to prevent re-renders during initialization
   const initializationComplete = useRef(false);
+  
+  // Ref to track if component is mounted (prevent navigation after unmount)
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Track whether the native SocialLogin plugin is ready for use
   const [googleNativeReady, setGoogleNativeReady] = useState(false);
@@ -365,8 +453,19 @@ const Auth = () => {
           const userCredential = await signInWithGoogleCredential(idToken, accessToken);
           const authUser = convertFirebaseUser(userCredential.user);
           
+          if (!authUser) {
+            throw new Error('Failed to convert Firebase user');
+          }
+          
           console.log('[Google OAuth] Firebase sign-in successful');
-          await handlePostAuthNavigation(authUser, 'googleNative');
+          // Wrap in try-catch to prevent crashes on iOS
+          try {
+            await handlePostAuthNavigation(authUser, 'googleNative');
+          } catch (navError) {
+            console.error('[Google OAuth] Navigation error:', navError);
+            // Still try to navigate even if there's an error
+            setTimeout(() => navigate('/onboarding'), 0);
+          }
           return;
         } else {
           console.error('[Google OAuth] Missing idToken in native response:', result);
@@ -417,8 +516,19 @@ const Auth = () => {
         const userCredential = await signInWithAppleCredential(result.response.identityToken, rawNonce);
         const authUser = convertFirebaseUser(userCredential.user);
         
+        if (!authUser) {
+          throw new Error('Failed to convert Firebase user');
+        }
+        
         console.log('[Apple OAuth] Firebase sign-in successful');
-        await handlePostAuthNavigation(authUser, 'appleNative');
+        // Wrap in try-catch to prevent crashes on iOS
+        try {
+          await handlePostAuthNavigation(authUser, 'appleNative');
+        } catch (navError) {
+          console.error('[Apple OAuth] Navigation error:', navError);
+          // Still try to navigate even if there's an error
+          setTimeout(() => navigate('/onboarding'), 0);
+        }
         return;
       }
 
