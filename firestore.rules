@@ -32,7 +32,8 @@ service cloud.firestore {
 
     // Companion evolutions - users can read/write their own evolutions
     match /companion_evolutions/{evolutionId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+        resource.data.companion_id == request.auth.uid;
       allow create, update: if isAuthenticated() && 
         (request.resource.data.companion_id == request.auth.uid || 
          resource.data.companion_id == request.auth.uid);
@@ -41,7 +42,8 @@ service cloud.firestore {
 
     // Companion evolution cards - users can read their own cards
     match /companion_evolution_cards/{cardId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+        resource.data.companion_id == request.auth.uid;
       allow create, update: if isAuthenticated() && 
         (request.resource.data.companion_id == request.auth.uid || 
          resource.data.companion_id == request.auth.uid);
@@ -50,7 +52,8 @@ service cloud.firestore {
 
     // Companion stories - users can read their own stories
     match /companion_stories/{storyId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+        resource.data.companion_id == request.auth.uid;
       allow create, update: if isAuthenticated() && 
         (request.resource.data.companion_id == request.auth.uid || 
          resource.data.companion_id == request.auth.uid);

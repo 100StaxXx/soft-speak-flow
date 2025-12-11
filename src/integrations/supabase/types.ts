@@ -4205,6 +4205,13 @@ export type Database = {
           owner_user_id: string
         }[]
       }
+      validate_referral_code_secure: {
+        Args: { p_code: string }
+        Returns: {
+          code_id: string
+          is_valid: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
