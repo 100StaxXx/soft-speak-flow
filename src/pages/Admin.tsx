@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDocuments, getDocument, setDocument, deleteDocument } from "@/lib/firebase/firestore";
+import { getDocuments, getDocument, setDocument, deleteDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { 
   generateMentorAudio, 
@@ -160,12 +160,7 @@ const Admin = () => {
 
   const fetchMentors = async () => {
     try {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("*")
-        .order("name", { ascending: true });
-      
-      if (error) throw error;
+      const data = await getDocuments("mentors", undefined, "name", "asc");
       setMentors(data || []);
     } catch (error) {
       console.error("Error fetching mentors:", error);
@@ -176,7 +171,7 @@ const Admin = () => {
   const fetchPepTalks = async () => {
     try {
       const data = await getDocuments("pep_talks", undefined, "created_at", "desc");
-      setPepTalks(data || []);
+      setPepTalks((data || []) as PepTalk[]);
     } catch (error) {
       toast.error("Failed to load pep talks");
     }
@@ -393,9 +388,9 @@ const Admin = () => {
         color: companionTestData.favoriteColor,
       });
 
-      const imageUrl = data?.imageData?.imageUrl || data?.imageUrl;
+      const imageUrl = (data as any)?.imageData?.imageUrl || (data as any)?.imageUrl;
       setGeneratedCompanionImage(imageUrl);
-      setGeneratedPrompt(data.prompt || "Prompt not returned");
+      setGeneratedPrompt((data as any).prompt || "Prompt not returned");
       toast.success("Companion image generated successfully!");
     } catch (error) {
       console.error("Error generating companion image:", error);
@@ -443,7 +438,7 @@ const Admin = () => {
           element: postcardTestData.element,
           color: postcardTestData.favoriteColor,
         });
-        sourceImageUrl = companionData?.imageData?.imageUrl || companionData?.imageUrl;
+        sourceImageUrl = (companionData as any)?.imageData?.imageUrl || (companionData as any)?.imageUrl;
         toast.success("Companion image generated!");
       }
 
@@ -493,20 +488,20 @@ const Admin = () => {
 
       // Step 2: Generate audio from the script
       toast.info("Generating audio...");
+      const pepTalkData = (contentData as any).pepTalk || contentData;
       const audioData = await generateMentorAudio({
         mentorSlug: mentor.slug,
-        script: contentData.pepTalk?.script || contentData.script,
+        script: pepTalkData.script || (contentData as any).script,
       });
 
 
       // Update form with all generated data
-      const pepTalk = contentData.pepTalk || contentData;
       setFormData(prev => ({
         ...prev,
-        title: pepTalk.title || contentData.title,
-        quote: pepTalk.quote || contentData.quote,
-        description: pepTalk.description || contentData.description,
-        category: pepTalk.category || contentData.category || formData.category,
+        title: pepTalkData.title || (contentData as any).title,
+        quote: pepTalkData.quote || (contentData as any).quote,
+        description: pepTalkData.description || (contentData as any).description,
+        category: pepTalkData.category || (contentData as any).category || formData.category,
         audio_url: audioData.audioUrl,
       }));
 

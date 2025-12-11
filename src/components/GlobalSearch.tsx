@@ -189,8 +189,8 @@ export const GlobalSearch = ({
                       <h3 className="font-semibold">Pep Talks</h3>
                     </div>
                     <div className="space-y-3">
-                      {pepTalks.map((talk) => (
-                        <PepTalkCard key={talk.id} {...talk} />
+                      {pepTalks.map((talk: any) => (
+                        <PepTalkCard key={talk.id} id={talk.id} title={talk.title} category={talk.category} description={talk.description} quote={talk.quote} />
                       ))}
                     </div>
                   </div>
@@ -203,8 +203,8 @@ export const GlobalSearch = ({
                       <h3 className="font-semibold">Quotes</h3>
                     </div>
                     <div className="grid gap-3">
-                      {quotes.map((quote) => (
-                        <QuoteCard key={quote.id} quote={quote} />
+                      {quotes.map((quote: any) => (
+                        <QuoteCard key={quote.id} quote={{ id: quote.id, text: quote.text, author: quote.author }} />
                       ))}
                     </div>
                   </div>
@@ -321,7 +321,7 @@ export const GlobalSearch = ({
             {quotesLoading ? (
               <Skeleton className="h-32 w-full" />
             ) : quotes && quotes.length > 0 ? (
-              quotes.map((quote) => <QuoteCard key={quote.id} quote={quote} />)
+              quotes.map((quote: any) => <QuoteCard key={quote.id} quote={{ id: quote.id, text: quote.text, author: quote.author }} />)
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No quotes found</p>
@@ -333,7 +333,7 @@ export const GlobalSearch = ({
             {pepTalksLoading ? (
               <Skeleton className="h-32 w-full" />
             ) : pepTalks && pepTalks.length > 0 ? (
-              pepTalks.map((talk) => <PepTalkCard key={talk.id} {...talk} />)
+              pepTalks.map((talk: any) => <PepTalkCard key={talk.id} id={talk.id} title={talk.title} category={talk.category} description={talk.description} quote={talk.quote} />)
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No pep talks found</p>

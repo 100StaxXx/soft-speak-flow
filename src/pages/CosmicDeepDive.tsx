@@ -114,7 +114,7 @@ const CosmiqDeepDive = () => {
           });
         }
 
-        setContent(contentData[0] || null);
+        setContent(contentData[0] as CosmiqContent || null);
         setIsPersonalized(false);
       } catch (error) {
         console.error('Error fetching cosmiq content:', error);

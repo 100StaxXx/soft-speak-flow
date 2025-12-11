@@ -38,6 +38,8 @@ export interface Profile {
   faction: string | null;
   // Referral
   referred_by: string | null;
+  // Astral Encounters
+  astral_encounters_enabled?: boolean | null;
 }
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {

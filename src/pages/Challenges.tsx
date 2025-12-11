@@ -38,7 +38,7 @@ export default function Challenges() {
   const { data: userChallenges, refetch: refetchUserChallenges } = useQuery({
     queryKey: ["user-challenges", user?.uid],
     enabled: !!user,
-    queryFn: async () => {
+    queryFn: async (): Promise<any[]> => {
       if (!user?.uid) {
         throw new Error('User not authenticated');
       }
@@ -52,7 +52,7 @@ export default function Challenges() {
 
       // Fetch challenge details for each user challenge
       const challengesWithDetails = await Promise.all(
-        userChallengesData.map(async (uc) => {
+        userChallengesData.map(async (uc: any) => {
           const challenge = await getDocument("challenges", uc.challenge_id);
           return {
             ...uc,
@@ -73,7 +73,7 @@ export default function Challenges() {
       if (!userChallenges || userChallenges.length === 0) return [];
 
       // Fetch progress for each user challenge
-      const progressPromises = userChallenges.map(async (uc) => {
+      const progressPromises = userChallenges.map(async (uc: any) => {
         const progress = await getDocuments(
           "challenge_progress",
           [["user_challenge_id", "==", uc.id]]
