@@ -40,6 +40,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     author: string | null;
   } | null>(null);
   const hasBackfilledRef = useRef(false);
+  const redirectCountRef = useRef(0);
+  const lastRedirectTimeRef = useRef<number>(0);
 
   // Combined initialization effect for better performance
   const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
@@ -192,18 +194,58 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }, [user, profile, profileLoading, companionLoading, navigate]);
 
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
+  // Includes redirect loop prevention
   useEffect(() => {
     if (!enableOnboardingGuard) return;
     if (!user || !isReady || !profile) return;
 
     // If onboarding is explicitly completed, don't force users back into the flow
-    if (profile.onboarding_completed === true) return;
+    if (profile.onboarding_completed === true) {
+      // Reset redirect counter when onboarding is complete
+      redirectCountRef.current = 0;
+      lastRedirectTimeRef.current = 0;
+      return;
+    }
+
+    // Redirect loop prevention: max 3 redirects within 5 seconds
+    const now = Date.now();
+    const timeSinceLastRedirect = now - lastRedirectTimeRef.current;
+    
+    if (timeSinceLastRedirect < 5000) {
+      // Within 5 seconds of last redirect
+      redirectCountRef.current += 1;
+    } else {
+      // Reset counter if more than 5 seconds have passed
+      redirectCountRef.current = 1;
+    }
+    
+    lastRedirectTimeRef.current = now;
+
+    // Prevent infinite loops - max 3 redirects
+    if (redirectCountRef.current > 3) {
+      console.error('[Index] Redirect loop detected - stopping redirects to prevent infinite loop');
+      console.error('[Index] Profile state:', {
+        onboarding_completed: profile.onboarding_completed,
+        selected_mentor_id: profile.selected_mentor_id,
+        resolvedMentorId,
+        companion: !!companion,
+        companionLoading,
+      });
+      redirectCountRef.current = 0; // Reset for next attempt
+      return;
+    }
 
     const missingMentor = !resolvedMentorId;
     const explicitlyIncomplete = profile.onboarding_completed === false;
     const missingCompanion = !companion && !companionLoading;
 
     if (missingMentor || explicitlyIncomplete || missingCompanion) {
+      console.log('[Index] Redirecting to onboarding:', {
+        missingMentor,
+        explicitlyIncomplete,
+        missingCompanion,
+        redirectCount: redirectCountRef.current,
+      });
       navigate("/onboarding");
     }
   }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
