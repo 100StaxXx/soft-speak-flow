@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getAchievements } from "@/lib/firebase/achievements";
 import { AchievementBadge } from "./AchievementBadge";
 import { Trophy, TrendingUp } from "lucide-react";
 import { Card } from "./ui/card";
@@ -15,24 +15,17 @@ export const AchievementsPanel = ({ showEmptyState = false }: AchievementsPanelP
   const { user } = useAuth();
 
   const { data: achievements, isLoading } = useQuery({
-    queryKey: ["achievements", user?.id],
+    queryKey: ["achievements", user?.uid],
     enabled: !!user,
     staleTime: 0, // Always fetch fresh data
     refetchOnMount: true, // Refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("achievements")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("earned_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
+      return await getAchievements(user.uid);
     },
   });
 

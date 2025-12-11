@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
+import { getCompanionEvolution } from "@/lib/firebase/companionEvolutions";
+import { getMentor } from "@/lib/firebase/mentors";
+import { getDocument, onSnapshot } from "@/lib/firebase/firestore";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
@@ -20,103 +22,74 @@ export const GlobalEvolutionListener = () => {
   const [previousStage, setPreviousStage] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
 
-    // Subscribe to companion updates
-    const channel = supabase
-      .channel('companion-evolution')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_companion',
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          // Type guard for payload structure
-          const newData = payload.new as Record<string, unknown> | null;
-          const oldData = payload.old as Record<string, unknown> | null;
+    // Track previous stage to detect changes
+    let previousStage: number | null = null;
 
-          // Validate required fields exist and are numbers
-          if (!newData || !oldData) {
-            console.warn('Evolution listener: Missing payload data');
-            return;
-          }
-
-          const newStage = typeof newData.current_stage === 'number' ? newData.current_stage : null;
-          const oldStage = typeof oldData.current_stage === 'number' ? oldData.current_stage : null;
-
-          if (newStage === null || oldStage === null) {
-            console.warn('Evolution listener: Invalid stage values');
-            return;
-          }
-
-          // Check if stage changed (evolution happened)
-          if (newStage > oldStage) {
-            // Validate companion id exists
-            const companionId = typeof newData.id === 'string' ? newData.id : null;
-            if (!companionId) {
-              console.warn('Evolution listener: Missing companion id');
-              return;
-            }
-
-            // Fetch the latest evolution record to ensure we have the correct image
-            const { data: evolutionRecord } = await supabase
-              .from('companion_evolutions')
-              .select('image_url')
-              .eq('companion_id', companionId)
-              .eq('stage', newStage)
-              .order('evolved_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
-            const imageUrl = evolutionRecord?.image_url || currentImageUrl;
-
-            // Fetch mentor slug if we have a selected mentor
-            let mentorSlug: string | undefined;
-            if (profile?.selected_mentor_id) {
-              const { data: mentor } = await supabase
-                .from('mentors')
-                .select('slug')
-                .eq('id', profile.selected_mentor_id)
-                .maybeSingle();
-              
-              mentorSlug = mentor?.slug;
-            }
-
-            setPreviousStage(oldStage);
-            setEvolutionData({
-              stage: newStage,
-              imageUrl,
-              mentorSlug,
-            });
-            setIsEvolving(true);
-            
-            // Notify walkthrough that evolution is starting
-            window.dispatchEvent(new CustomEvent('evolution-loading-start'));
-
-            // Invalidate companion query to refresh data
-            if (user?.id) {
-              queryClient.invalidateQueries({ queryKey: ['companion', user.id] });
-            }
-          }
+    // Subscribe to companion updates using Firestore real-time listener
+    const unsubscribe = onSnapshot(
+      { collection: "user_companion", docId: user.uid },
+      async (snapshot) => {
+        const newData = snapshot;
+        
+        if (!newData) {
+          console.warn('Evolution listener: Missing companion data');
+          return;
         }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          // Successfully subscribed to realtime updates
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Log but don't crash - realtime is a nice-to-have for evolution animation
-          console.warn('Evolution listener subscription error:', status, err?.message);
+
+        const newStage = typeof newData.current_stage === 'number' ? newData.current_stage : null;
+        
+        if (newStage === null) {
+          console.warn('Evolution listener: Invalid stage value');
+          return;
         }
-      });
+
+        // Check if stage changed (evolution happened)
+        if (previousStage !== null && newStage > previousStage) {
+          // Validate companion id exists
+          const companionId = typeof newData.id === 'string' ? newData.id : user.uid;
+          
+          // Fetch the latest evolution record to ensure we have the correct image
+          const evolutionRecord = await getCompanionEvolution(companionId, newStage);
+          
+          const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
+          const imageUrl = evolutionRecord?.image_url || currentImageUrl;
+
+          // Fetch mentor slug if we have a selected mentor
+          let mentorSlug: string | undefined;
+          if (profile?.selected_mentor_id) {
+            const mentor = await getMentor(profile.selected_mentor_id);
+            mentorSlug = mentor?.slug;
+          }
+
+          setPreviousStage(previousStage);
+          setEvolutionData({
+            stage: newStage,
+            imageUrl,
+            mentorSlug,
+          });
+          setIsEvolving(true);
+          
+          // Notify walkthrough that evolution is starting
+          window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+
+          // Invalidate companion query to refresh data
+          queryClient.invalidateQueries({ queryKey: ['companion', user.uid] });
+        }
+        
+        // Update previous stage for next comparison
+        previousStage = newStage;
+      },
+      (error) => {
+        console.warn('Evolution listener subscription error:', error);
+      }
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [user, user?.id, profile?.selected_mentor_id, queryClient]); // Include all used dependencies
+  }, [user, user?.uid, profile?.selected_mentor_id, queryClient]);
 
   if (!isEvolving || !evolutionData) {
     return null;
@@ -128,7 +101,7 @@ export const GlobalEvolutionListener = () => {
       newStage={evolutionData.stage}
       newImageUrl={evolutionData.imageUrl}
       mentorSlug={evolutionData.mentorSlug}
-      userId={user?.id}
+      userId={user?.uid}
       onComplete={() => {
         setIsEvolving(false);
         setEvolutionData(null);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Sparkles, RefreshCw } from "lucide-react";
 import { EMOTIONAL_TRIGGERS, TOPIC_CATEGORIES } from "@/config/categories";
 import { Badge } from "@/components/ui/badge";
@@ -34,24 +34,23 @@ export const InspireSection = () => {
       useTrigger: boolean,
       requireAuthor = true
     ) => {
-      let query = supabase
-        .from('quotes')
-        .select('*');
-
-      if (requireAuthor) {
-        query = query.not('author', 'is', null);
-      }
+      const filters: Array<[string, any, any]> = [];
 
       if (useCategory && selectedCategory) {
-        query = query.eq('category', selectedCategory);
+        filters.push(['category', '==', selectedCategory]);
       }
       if (useTrigger && selectedTrigger) {
-        query = query.contains('emotional_triggers', [selectedTrigger]);
+        filters.push(['emotional_triggers', 'array-contains', selectedTrigger]);
       }
 
-      const { data, error } = await query.limit(20);
-      if (error) throw error;
-      return data || [];
+      let quotes = await getDocuments('quotes', filters.length > 0 ? filters : undefined, 'created_at', 'desc', 20);
+
+      // Filter by author requirement in memory (Firestore doesn't support "not null" easily)
+      if (requireAuthor) {
+        quotes = quotes.filter((q: any) => q.author != null);
+      }
+
+      return quotes;
     };
     try {
       // Try exact match first

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getDocument, getDocuments, setDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityFeed } from "@/hooks/useActivityFeed";
+import { generateReflectionReply } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -79,14 +80,14 @@ export default function Reflection() {
 
       await setDocument('user_reflections', reflectionId, reflectionData, true);
 
-      // TODO: Migrate to Firebase Cloud Function
-      // Trigger AI reply generation in background
-      // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-reflection-reply', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     reflectionId: reflectionId,
-      //     mood: selectedMood,
+      // Trigger AI reply generation in background (non-blocking)
+      generateReflectionReply({
+        reflectionText: note || '',
+        mood: selectedMood || undefined,
+      }).catch((err) => {
+        console.error('Failed to generate reflection reply:', err);
+        // Silent fail - don't interrupt user flow
+      });
       //     note: note
       //   })
       // });

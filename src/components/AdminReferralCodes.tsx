@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getReferralCodes, updateReferralCode } from "@/lib/firebase/referralCodes";
+import { getReferralPayouts } from "@/lib/firebase/referralPayouts";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,36 +50,29 @@ export const AdminReferralCodes = () => {
   const { data: codes, isLoading } = useQuery({
     queryKey: ["admin-referral-codes"],
     queryFn: async () => {
-      const { data: codesData, error: codesError } = await supabase
-        .from("referral_codes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (codesError) throw codesError;
+      const codesData = await getReferralCodes();
+      const allPayouts = await getReferralPayouts();
 
       // Fetch conversion counts and earnings for each code
       const codesWithStats = await Promise.all(
         codesData.map(async (code) => {
           // Count conversions (profiles that used this code)
-          const { count: conversionCount } = await supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .eq("referred_by_code", code.code);
+          const profiles = await getDocuments<{ referred_by_code?: string }>(
+            "profiles",
+            [["referred_by_code", "==", code.code]]
+          );
+          const conversionCount = profiles.length;
 
           // Sum earnings from payouts
-          const { data: payouts } = await supabase
-            .from("referral_payouts")
-            .select("amount")
-            .eq("referral_code_id", code.id);
-
-          const totalEarnings = payouts?.reduce(
-            (sum, p) => sum + Number(p.amount),
-            0
-          ) || 0;
+          const codePayouts = allPayouts.filter(
+            (p) => p.referral_code_id === code.id
+          );
+          const totalEarnings =
+            codePayouts.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
           return {
             ...code,
-            conversion_count: conversionCount || 0,
+            conversion_count: conversionCount,
             total_earnings: totalEarnings,
           };
         })
@@ -91,12 +86,7 @@ export const AdminReferralCodes = () => {
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ codeId, isActive }: { codeId: string; isActive: boolean }) => {
       setTogglingId(codeId);
-      const { error } = await supabase
-        .from("referral_codes")
-        .update({ is_active: !isActive })
-        .eq("id", codeId);
-
-      if (error) throw error;
+      await updateReferralCode(codeId, { is_active: !isActive });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-codes"] });

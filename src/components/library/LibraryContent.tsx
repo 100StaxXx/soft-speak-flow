@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { getDocuments } from "@/lib/firebase/firestore";
+import { getQuotes } from "@/lib/firebase/quotes";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, MessageSquare, ArrowRight } from "lucide-react";
 import { LibraryHero } from "./LibraryHero";
@@ -19,24 +20,24 @@ export const LibraryContent = () => {
   const { data: quotesCount = 0 } = useQuery({
     queryKey: ["quotes-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("quotes").select("*", { count: "exact", head: true });
-      return count || 0;
+      const quotes = await getDocuments("quotes");
+      return quotes.length;
     },
   });
 
   const { data: pepTalksCount = 0 } = useQuery({
     queryKey: ["pep-talks-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("pep_talks").select("*", { count: "exact", head: true });
-      return count || 0;
+      const pepTalks = await getDocuments("pep_talks");
+      return pepTalks.length;
     },
   });
 
   const { data: challengesCount = 0 } = useQuery({
     queryKey: ["challenges-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("challenges").select("*", { count: "exact", head: true });
-      return count || 0;
+      const challenges = await getDocuments("challenges");
+      return challenges.length;
     },
   });
 
@@ -55,12 +56,8 @@ export const LibraryContent = () => {
   const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
     queryKey: ["featured-pep-talks"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("pep_talks")
-        .select("id, title, category, description")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      return data || [];
+      const pepTalks = await getDocuments<{ id: string; title?: string; category?: string; description?: string }>("pep_talks", undefined, "created_at", "desc", 3);
+      return pepTalks;
     },
   });
 

@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 interface GuildBonusResult {
   bonusXP: number;
@@ -18,30 +18,69 @@ export const calculateGuildBonus = async (
   }
 
   try {
-    const { data: epicHabits, error: epicError } = await supabase
-      .from('epic_habits')
-      .select('epic_id, epics!inner(is_public, status)')
-      .eq('epics.status', 'active')
-      .eq('epics.is_public', true);
+    // Get all active public epics
+    const activePublicEpics = await getDocuments(
+      "epics",
+      [
+        ["status", "==", "active"],
+        ["is_public", "==", true],
+      ]
+    );
 
-    if (epicError) {
-      console.error('Failed to fetch epic habits:', epicError);
+    if (!activePublicEpics || activePublicEpics.length === 0) {
       return { bonusXP: 0, toastReason: 'Task Complete!' };
+    }
+
+    const epicIds = activePublicEpics.map((epic: any) => epic.id);
+
+    // Get epic habits for these epics (batch queries if more than 10)
+    let epicHabits: any[] = [];
+    if (epicIds.length <= 10) {
+      epicHabits = await getDocuments(
+        "epic_habits",
+        [["epic_id", "in", epicIds]]
+      );
+    } else {
+      // Batch queries for more than 10 epics
+      const batches = [];
+      for (let i = 0; i < epicIds.length; i += 10) {
+        const batch = epicIds.slice(i, i + 10);
+        batches.push(getDocuments("epic_habits", [["epic_id", "in", batch]]));
+      }
+      const results = await Promise.all(batches);
+      epicHabits = results.flat();
     }
 
     if (!epicHabits || epicHabits.length === 0) {
       return { bonusXP: 0, toastReason: 'Task Complete!' };
     }
 
-    const { data: memberships, error: memberError } = await supabase
-      .from('epic_members')
-      .select('epic_id')
-      .eq('user_id', userId)
-      .in('epic_id', epicHabits.map((eh: { epic_id: string }) => eh.epic_id));
+    const habitEpicIds = [...new Set(epicHabits.map((eh: any) => eh.epic_id))];
 
-    if (memberError) {
-      console.error('Failed to fetch memberships:', memberError);
-      return { bonusXP: 0, toastReason: 'Task Complete!' };
+    // Check if user is a member of any of these epics (batch queries if more than 10)
+    let memberships: any[] = [];
+    if (habitEpicIds.length <= 10) {
+      memberships = await getDocuments(
+        "epic_members",
+        [
+          ["user_id", "==", userId],
+          ["epic_id", "in", habitEpicIds],
+        ]
+      );
+    } else {
+      // Batch queries for more than 10 epics
+      const batches = [];
+      for (let i = 0; i < habitEpicIds.length; i += 10) {
+        const batch = habitEpicIds.slice(i, i + 10);
+        batches.push(
+          getDocuments("epic_members", [
+            ["user_id", "==", userId],
+            ["epic_id", "in", batch],
+          ])
+        );
+      }
+      const results = await Promise.all(batches);
+      memberships = results.flat();
     }
 
     if (memberships && memberships.length > 0) {

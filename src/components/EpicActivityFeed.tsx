@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle2, Flame, UserPlus, Trophy } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
+import { getEpicActivityFeed } from "@/lib/firebase/epicActivityFeed";
+import { getProfile } from "@/lib/firebase/profiles";
 
 interface ActivityItem {
   id: string;
@@ -29,24 +30,28 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
 
   const fetchActivities = async () => {
     try {
-      const { data, error } = await supabase
-        .from("epic_activity_feed")
-        .select("*")
-        .eq("epic_id", epicId)
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
+      const data = await getEpicActivityFeed(epicId, 20);
       
-      // Fetch user emails separately
+      // Fetch user profiles separately
       if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(a => a.user_id))];
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, email, onboarding_data")
-          .in("id", userIds);
+        const userIds = [...new Set(data.map(a => a.user_id).filter(Boolean))] as string[];
+        const profileMap = new Map();
         
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        for (const userId of userIds) {
+          try {
+            const profile = await getProfile(userId);
+            if (profile) {
+              profileMap.set(userId, {
+                id: profile.id,
+                email: profile.email,
+                onboarding_data: profile.onboarding_data,
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to fetch profile for ${userId}:`, error);
+          }
+        }
+        
         const enrichedActivities = data.map(activity => ({
           ...activity,
           activity_data: typeof activity.activity_data === 'object' && activity.activity_data !== null 
@@ -69,33 +74,10 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
   useEffect(() => {
     fetchActivities();
 
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('epic-activity-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'epic_activity_feed',
-          filter: `epic_id=eq.${epicId}`
-        },
-        () => {
-          // Add new activity to top of feed
-          fetchActivities();
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Epic activity feed subscription error:', status, err?.message);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Note: Real-time subscriptions would need to be implemented using Firestore onSnapshot
+    // For now, we'll just fetch on mount and when epicId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epicId]); // fetchActivities is stable and depends on epicId indirectly
+  }, [epicId]);
 
   const getActivityIcon = (type: string) => {
     switch (type) {

@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { updateProfile } from "@/lib/firebase/profiles";
+import { generateDailyHoroscope, calculateCosmicProfile } from "@/lib/firebase/functions";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -79,24 +80,26 @@ const Horoscope = () => {
   const generateHoroscope = async () => {
     setLoading(true);
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-daily-horoscope', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      // });
-      // const data = await response.json();
-      // if (!response.ok) throw new Error(data.error || 'Failed to load horoscope');
-      
-      throw new Error("Horoscope generation needs Firebase Cloud Function migration");
+      if (!profile?.zodiac_sign) {
+        throw new Error("Please set your zodiac sign first");
+      }
 
-      // NOTE: Code below is unreachable until Firebase migration is complete
-      // setHoroscope(data.horoscope);
-      // setZodiac(data.zodiac);
-      // setIsPersonalized(data.isPersonalized);
-      // setDate(data.date);
-      // setCosmiqTip(data.cosmiqTip || null);
-      // setEnergyForecast(data.energyForecast || null);
-      // setPlacementInsights(data.placementInsights || null);
+      const data = await generateDailyHoroscope({
+        zodiacSign: profile.zodiac_sign,
+        date: new Date().toISOString(),
+      });
+
+      if (!data?.horoscope) {
+        throw new Error("Failed to generate horoscope");
+      }
+
+      setHoroscope(data.horoscope);
+      setZodiac(data.zodiac || profile.zodiac_sign);
+      setIsPersonalized(data.isPersonalized || false);
+      setDate(data.date || new Date().toLocaleDateString('en-CA'));
+      setCosmiqTip(data.cosmiqTip || null);
+      setEnergyForecast(data.energyForecast || null);
+      setPlacementInsights(data.placementInsights || null);
     } catch (err) {
       console.error('Error generating horoscope:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -244,25 +247,14 @@ const Horoscope = () => {
     
     setRevealing(true);
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/calculate-cosmic-profile', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      // });
-      // const data = await response.json();
-      // if (!response.ok) {
-      //   if (data.error?.includes('already generated today') || data.error?.includes('once per 24 hours')) {
-      //     toast({
-      //       title: "Already Generated",
-      //       description: "You can only generate one cosmiq profile per day",
-      //       variant: "destructive",
-      //     });
-      //     return;
-      //   }
-      //   throw new Error(data.error || 'Failed to calculate profile');
-      // }
+      const data = await calculateCosmicProfile();
       
-      throw new Error("Cosmic profile calculation needs Firebase Cloud Function migration");
+      if (!data?.cosmicProfile) {
+        throw new Error('Failed to calculate profile');
+      }
+      
+      // Update profile with cosmic data
+      // The function should handle the profile update, but we can also do it here if needed
 
       // NOTE: Code below is unreachable until Firebase migration is complete
     } catch (error) {
@@ -472,12 +464,7 @@ const Horoscope = () => {
               onSelect={async (sign) => {
                 if (!user) return;
                 try {
-                  const { error } = await supabase
-                    .from('profiles')
-                    .update({ zodiac_sign: sign })
-                    .eq('id', user.id);
-                  
-                  if (error) throw error;
+                  await updateProfile(user.uid, { zodiac_sign: sign });
                   
                   // Invalidate profile and regenerate horoscope
                   await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });

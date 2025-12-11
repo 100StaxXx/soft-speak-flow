@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { Quote, Heart } from "lucide-react";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { addFavorite, removeFavorite, isFavorite } from "@/lib/firebase/favorites";
 
 interface FeaturedQuoteCardProps {
   quote: {
@@ -14,40 +15,45 @@ interface FeaturedQuoteCardProps {
 }
 
 export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
+  const { user } = useAuth();
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  // Check favorite status on mount
+  useEffect(() => {
+    if (user) {
+      isFavorite(user.id, quote.id).then(setIsFavorited).catch(() => {});
+    }
+  }, [user, quote.id]);
+
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorites",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Sign in required",
-          description: "Please sign in to save favorites",
-          variant: "destructive",
-        });
-        return;
-      }
-
       if (isFavorited) {
-        await supabase.from("favorites").delete()
-          .eq("user_id", session.user.id)
-          .eq("content_type", "quote")
-          .eq("content_id", quote.id);
+        await removeFavorite(user.id, quote.id);
         setIsFavorited(false);
       } else {
-        await supabase.from("favorites").insert({
-          user_id: session.user.id,
-          content_type: "quote",
-          content_id: quote.id,
-        });
+        await addFavorite(user.id, quote.id);
         setIsFavorited(true);
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update favorite",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

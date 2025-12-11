@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Bell, Play, Sparkles } from "lucide-react";
+import { getMentor } from "@/lib/firebase/mentors";
+import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
@@ -29,24 +30,20 @@ export const TodaysPush = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-
-      if (!mentor) return;
+      const mentor = await getMentor(profile.selected_mentor_id);
+      if (!mentor || !mentor.slug) return;
 
       // Check if there's a daily pep talk for today
-      const { data: dailyPepTalk } = await supabase
-        .from("daily_pep_talks")
-        .select("*")
-        .eq("for_date", today)
-        .eq("mentor_slug", mentor.slug)
-        .maybeSingle();
+      const dailyPepTalk = await getDailyPepTalk(today, mentor.slug);
 
       if (dailyPepTalk) {
-        setTodaysPepTalk({ ...dailyPepTalk, mentor_name: mentor.name });
+        setTodaysPepTalk({ 
+          ...dailyPepTalk, 
+          mentor_name: mentor.name,
+          topic_category: Array.isArray(dailyPepTalk.topic_category) 
+            ? dailyPepTalk.topic_category[0] 
+            : dailyPepTalk.topic_category || undefined,
+        });
       }
     };
 

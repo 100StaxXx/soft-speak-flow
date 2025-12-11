@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDocument, getDocuments, setDocument, deleteDocument, timestampToISO } from '@/lib/firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { generateSmartNotifications } from '@/lib/firebase/functions';
 
 interface AdaptivePushSettings {
   enabled: boolean;
@@ -108,15 +109,15 @@ export const useAdaptiveNotifications = () => {
     mutationFn: async (type?: string) => {
       if (!user?.uid) throw new Error('No user');
       
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-smart-notifications', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ userId: user.uid, forceType: type }),
-      // });
-      // const data = await response.json();
-      // return data;
+      const hour = new Date().getHours();
+      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
       
-      throw new Error("Notification generation needs Firebase Cloud Function migration");
+      const data = await generateSmartNotifications({
+        context: type || 'adaptive',
+        timeOfDay,
+      });
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-notifications'] });

@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { globalAudio } from "@/utils/globalAudio";
-import { supabase } from "@/integrations/supabase/client";
+import { markActivityAsRead } from "@/lib/firebase/activityFeed";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
@@ -105,10 +105,8 @@ export const ActivityTimeline = () => {
     // If swiped more than 60px, delete
     if (swipeDistance < -60) {
       try {
-        await supabase
-          .from('activity_feed')
-          .delete()
-          .eq('id', activityId);
+        const { deleteDocument } = await import("@/lib/firebase/firestore");
+        await deleteDocument('activity_feed', activityId);
         
         toast.success("Activity removed");
         queryClient.invalidateQueries({ queryKey: ['activity-feed'] });

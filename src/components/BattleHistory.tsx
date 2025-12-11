@@ -2,34 +2,19 @@ import { Card } from "@/components/ui/card";
 import { Trophy, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { getBattleHistory } from "@/lib/firebase/battles";
 import { Badge } from "@/components/ui/badge";
 
 export const BattleHistory = () => {
   const { user } = useAuth();
 
   const { data: matches, isLoading } = useQuery({
-    queryKey: ["battle-history", user?.id],
+    queryKey: ["battle-history", user?.uid],
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from("battle_participants")
-        .select(`
-          *,
-          battle_matches (
-            id,
-            status,
-            completed_at
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
+      return await getBattleHistory(user.uid, 10);
     },
     enabled: !!user,
   });

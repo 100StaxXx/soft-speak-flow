@@ -9,6 +9,7 @@ import { Copy, Link as LinkIcon, Sparkles, ArrowRight } from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { createInfluencerCode } from "@/lib/firebase/functions";
 
 export default function Creator() {
   const navigate = useNavigate();
@@ -30,18 +31,15 @@ export default function Creator() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/create-influencer-code', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // });
-      // const data = await response.json();
-      // if (!response.ok || data.error) throw new Error(data.error || 'Failed to create code');
-      // setResult(data);
-      // toast.success("Your referral code is ready!");
+      const data = await createInfluencerCode({
+        name: formData.name,
+        email: formData.email,
+        handle: formData.handle,
+        paypalEmail: formData.paypalEmail,
+      });
       
-      throw new Error("Influencer code creation needs Firebase Cloud Function migration");
+      setResult(data);
+      toast.success("Your referral code is ready!");
     } catch (error) {
       console.error("Failed to create code:", error);
       toast.error(

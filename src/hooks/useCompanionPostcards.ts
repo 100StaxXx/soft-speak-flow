@@ -63,22 +63,16 @@ export const useCompanionPostcards = () => {
     }) => {
       if (!user?.uid) throw new Error("Not authenticated");
 
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-cosmic-postcard', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     userId: user.uid,
-      //     companionId,
-      //     epicId,
-      //     milestonePercent,
-      //     companionData,
-      //   }),
-      // });
-      // const data = await response.json();
-      // if (data?.error) throw new Error(data.error);
-      // return data;
-      
-      throw new Error("Postcard generation needs Firebase Cloud Function migration");
+      const data = await generateCosmicPostcard({
+        companionId,
+        occasion: `milestone-${milestonePercent}`,
+      });
+
+      if (!data?.postcard) {
+        throw new Error("Failed to generate postcard");
+      }
+
+      return data.postcard;
     },
     onSuccess: () => {
       // Will not be called since mutation always throws

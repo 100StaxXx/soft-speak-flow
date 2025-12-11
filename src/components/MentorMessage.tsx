@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getMentor } from "@/lib/firebase/mentors";
 
 interface MentorMessageProps {
   mentorId?: string;
@@ -37,27 +37,23 @@ export const MentorMessage = ({ mentorId, type = "motivation", className = "" }:
       if (!mentorId) return;
 
       try {
-        const { data: mentor } = await supabase
-          .from("mentors")
-          .select("name, welcome_message, tone_description")
-          .eq("id", mentorId)
-          .maybeSingle();
-
+        const mentor = await getMentor(mentorId);
         if (mentor) {
           setMentorName(mentor.name);
           
+          const toneDescription = mentor.tone_description || "";
           switch (type) {
             case "welcome":
-              setMessage(mentor.welcome_message || `Welcome back. Let's push forward.`);
+              setMessage((mentor as any).welcome_message || `Welcome back. Let's push forward.`);
               break;
             case "success":
-              setMessage(getSuccessMessage(mentor.tone_description, messageSeed));
+              setMessage(getSuccessMessage(toneDescription, messageSeed));
               break;
             case "habit":
-              setMessage(getHabitMessage(mentor.tone_description, messageSeed));
+              setMessage(getHabitMessage(toneDescription, messageSeed));
               break;
             default:
-              setMessage(getMotivationMessage(mentor.tone_description, messageSeed));
+              setMessage(getMotivationMessage(toneDescription, messageSeed));
           }
         }
       } catch (error) {

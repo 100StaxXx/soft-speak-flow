@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDocument, getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { generateCompanionStory } from "@/lib/firebase/functions";
 
 export interface CompanionStory {
   id: string;
@@ -78,18 +79,16 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
 
       toast.loading("Your story is being written...", { id: "story-gen" });
 
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-story', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     companionId: params.companionId,
-      //     stage: params.stage,
-      //   }),
-      // });
-      // const data = await response.json();
-      // return data as CompanionStory;
-      
-      throw new Error("Story generation needs Firebase Cloud Function migration");
+      const data = await generateCompanionStory({
+        companionId: params.companionId,
+        stage: params.stage,
+      });
+
+      if (!data?.story) {
+        throw new Error("Failed to generate story");
+      }
+
+      return data.story as CompanionStory;
     },
     onSuccess: () => {
       toast.dismiss("story-gen");

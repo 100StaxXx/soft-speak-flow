@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getMentors } from "@/lib/firebase/mentors";
+import { getQuotes } from "@/lib/firebase/quotes";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,13 +56,8 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
 
   const fetchMentors = async () => {
     try {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("*")
-        .order("name");
-
-      if (error) throw error;
-      setMentors(data || []);
+      const data = await getMentors(false); // Get all mentors, not just active
+      setMentors(data);
     } catch (error) {
       console.error("Error fetching mentors:", error);
     } finally {
@@ -71,22 +68,24 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
   const fetchMentorContent = async (mentorId: string) => {
     try {
       // Fetch quotes
-      const { data: quotesData } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("mentor_id", mentorId)
-        .limit(3);
-
-      setQuotes(quotesData || []);
+      const quotesData = await getQuotes(mentorId, 3);
+      setQuotes(quotesData.map(q => ({ id: q.id, text: q.quote, mentor_id: q.mentor_id || mentorId })));
 
       // Fetch pep talks
-      const { data: pepTalksData } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .eq("mentor_id", mentorId)
-        .limit(3);
-
-      setPepTalks(pepTalksData || []);
+      const pepTalksData = await getDocuments(
+        "pep_talks",
+        [["mentor_id", "==", mentorId]],
+        undefined,
+        undefined,
+        3
+      );
+      setPepTalks(pepTalksData.map(pt => ({
+        id: pt.id,
+        title: pt.title,
+        description: pt.description,
+        quote: pt.quote,
+        mentor_id: pt.mentor_id || mentorId,
+      })));
     } catch (error) {
       console.error("Error fetching mentor content:", error);
     }

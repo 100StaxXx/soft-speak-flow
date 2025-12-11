@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
+import { getCompanionEvolution } from "@/lib/firebase/companionEvolutions";
 import { Button } from "./ui/button";
 import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Users } from "lucide-react";
 import { Separator } from "./ui/separator";
@@ -47,19 +47,8 @@ export const CompanionStoryJournal = () => {
           return companion.current_image_url || '/placeholder-egg.svg';
         }
         
-        const { data, error } = await supabase
-          .from("companion_evolutions")
-          .select("image_url")
-          .eq("companion_id", companion.id)
-          .eq("stage", debouncedStage)
-          .maybeSingle();
-        
-        if (error && error.code !== 'PGRST116') {
-          console.error('Failed to fetch evolution image:', error);
-          return companion.current_image_url || '/placeholder-companion.svg';
-        }
-        
-        return data?.image_url || companion.current_image_url || '/placeholder-companion.svg';
+        const evolution = await getCompanionEvolution(companion.id, debouncedStage);
+        return evolution?.image_url || companion.current_image_url || '/placeholder-companion.svg';
       } catch (error) {
         console.error('Error in evolution image query:', error);
         return companion.current_image_url || '/placeholder-companion.svg';

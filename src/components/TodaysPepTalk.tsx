@@ -6,8 +6,9 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
+import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
+import { getMentor } from "@/lib/firebase/mentors";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -117,35 +118,13 @@ export const TodaysPepTalk = memo(() => {
       try {
         const today = new Date().toLocaleDateString("en-CA");
 
-        const { data: mentor, error: mentorError } = await supabase
-          .from("mentors")
-          .select("slug, name")
-          .eq("id", profile.selected_mentor_id)
-          .maybeSingle();
-
-        if (mentorError) {
-          console.error("Error fetching mentor:", mentorError);
+        const mentor = await getMentor(profile.selected_mentor_id);
+        if (!mentor || !mentor.slug) {
           setLoading(false);
           return;
         }
 
-        if (!mentor) {
-          setLoading(false);
-          return;
-        }
-
-        const { data, error: pepTalkError } = await supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle();
-
-        if (pepTalkError) {
-          console.error("Error fetching pep talk:", pepTalkError);
-          setLoading(false);
-          return;
-        }
+        const data = await getDailyPepTalk(today, mentor.slug);
 
         if (data) {
           // Validate and sanitize transcript data

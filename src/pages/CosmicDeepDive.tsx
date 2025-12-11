@@ -81,20 +81,17 @@ const CosmiqDeepDive = () => {
 
       try {
         if (user) {
-          // TODO: Migrate to Firebase Cloud Function
-          // const timezoneOffset = new Date().getTimezoneOffset();
-          // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-cosmic-deep-dive', {
-          //   method: 'POST',
-          //   headers: { 'Content-Type': 'application/json' },
-          //   body: JSON.stringify({ placement: placement.toLowerCase(), sign: sign.toLowerCase(), timezoneOffset })
-          // });
-          // const personalizedData = await response.json();
-          // if (response.ok && !personalizedData.error) {
-          //   setContent(personalizedData);
-          //   setIsPersonalized(true);
-          //   setLoading(false);
-          //   return;
-          // }
+          const personalizedData = await generateCosmicDeepDive({
+            topic: `${placement}-${sign}`,
+            userContext: profile?.zodiac_sign,
+          });
+          
+          if (personalizedData?.deepDive) {
+            setContent(personalizedData.deepDive as any);
+            setIsPersonalized(true);
+            setLoading(false);
+            return;
+          }
         }
 
         // Fallback to static content

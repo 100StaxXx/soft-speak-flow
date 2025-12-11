@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { generateMentorScript, generateMentorAudio, generateFullMentorAudio } from "@/lib/firebase/functions";
 
 interface GenerateAudioOptions {
   mentorSlug: string;
@@ -20,15 +21,13 @@ export const useAudioGeneration = () => {
 
   const generateScript = async (options: GenerateScriptOptions): Promise<string | null> => {
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-mentor-script', {
-      //   method: 'POST',
-      //   body: JSON.stringify(options),
-      // });
-      // const data = await response.json();
-      // return data?.script || null;
+      const data = await generateMentorScript({
+        mentorSlug: options.mentorSlug,
+        topic: options.category || 'motivation',
+        tone: options.intensity,
+      });
       
-      throw new Error("Script generation needs Firebase Cloud Function migration");
+      return data?.script || null;
     } catch (error) {
       console.error("Error generating script:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to generate script";
@@ -42,15 +41,12 @@ export const useAudioGeneration = () => {
     script: string
   ): Promise<string | null> => {
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-mentor-audio', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ mentorSlug, script }),
-      // });
-      // const data = await response.json();
-      // return data?.audioUrl || null;
+      const data = await generateMentorAudio({
+        mentorSlug,
+        script,
+      });
       
-      throw new Error("Audio generation needs Firebase Cloud Function migration");
+      return data?.audioUrl || null;
     } catch (error) {
       console.error("Error generating audio:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to generate audio";
@@ -64,20 +60,21 @@ export const useAudioGeneration = () => {
   ): Promise<{ script: string; audioUrl: string } | null> => {
     setIsGenerating(true);
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-full-mentor-audio', {
-      //   method: 'POST',
-      //   body: JSON.stringify(options),
-      // });
-      // const data = await response.json();
-      // if (data?.script && data?.audioUrl) {
-      //   return {
-      //     script: data.script,
-      //     audioUrl: data.audioUrl,
-      //   };
-      // }
+      const data = await generateFullMentorAudio({
+        mentorSlug: options.mentorSlug,
+        topicCategory: options.category,
+        intensity: options.intensity,
+        emotionalTriggers: options.emotionalTriggers,
+      });
       
-      throw new Error("Full audio generation needs Firebase Cloud Function migration");
+      if (data?.script && data?.audioUrl) {
+        return {
+          script: data.script,
+          audioUrl: data.audioUrl,
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error("Error generating full audio:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to generate audio";
