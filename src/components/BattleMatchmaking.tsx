@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Swords, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { BattleCardSelector } from "./BattleCardSelector";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 export const BattleMatchmaking = () => {
   const { user } = useAuth();
@@ -18,14 +18,14 @@ export const BattleMatchmaking = () => {
     queryKey: ["battle-cards", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("evolution_stage", { ascending: false });
 
-      if (error) throw error;
+      const data = await getDocuments(
+        "companion_evolution_cards",
+        [["user_id", "==", user.uid]],
+        "evolution_stage",
+        "desc"
+      );
+
       return data || [];
     },
     enabled: !!user,

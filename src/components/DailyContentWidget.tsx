@@ -3,10 +3,10 @@ import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Bell, Quote, Play, Sparkles, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 
 interface DailyContent {
   pepTalk?: { title: string; summary: string; audio_url?: string; id: string } | null;
@@ -29,12 +29,8 @@ export const DailyContentWidget = () => {
 
       const today = format(new Date(), 'yyyy-MM-dd');
 
-      // Get mentor details
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
+      // Get mentor details from Firestore
+      const mentor = await getDocument<{ slug: string; name: string }>("mentors", profile.selected_mentor_id);
 
       if (!mentor) {
         setLoading(false);
@@ -43,32 +39,36 @@ export const DailyContentWidget = () => {
 
       // Fetch both pep talk and quote in parallel
       const [pepTalkResult, quoteResult] = await Promise.all([
-        supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle(),
-        supabase
-          .from("daily_quotes")
-          .select(`
-            *,
-            quotes:quote_id (*)
-          `)
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle()
+        getDocuments<{
+          id: string;
+          title: string;
+          summary: string;
+          audio_url?: string;
+        }>("daily_pep_talks", [
+          ["for_date", "==", today],
+          ["mentor_slug", "==", mentor.slug],
+        ], undefined, undefined, 1),
+        getDocuments<{
+          id: string;
+          quote_id: string;
+        }>("daily_quotes", [
+          ["for_date", "==", today],
+          ["mentor_slug", "==", mentor.slug],
+        ], undefined, undefined, 1)
       ]);
 
-      // Extract quote from the daily_quotes join result
-      const quoteData = quoteResult.data?.quotes as unknown as { text: string; author: string | null; category: string | null } | null;
-      
+      const pepTalk = pepTalkResult[0];
+      const dailyQuote = quoteResult[0];
+      const quoteData = dailyQuote?.quote_id
+        ? await getDocument<{ text: string; author?: string | null; category?: string | null }>("quotes", dailyQuote.quote_id)
+        : null;
+
       setContent({
-        pepTalk: pepTalkResult.data ? {
-          id: pepTalkResult.data.id,
-          title: pepTalkResult.data.title,
-          summary: pepTalkResult.data.summary,
-          audio_url: pepTalkResult.data.audio_url
+        pepTalk: pepTalk ? {
+          id: pepTalk.id,
+          title: pepTalk.title,
+          summary: pepTalk.summary,
+          audio_url: pepTalk.audio_url
         } : null,
         quote: quoteData ? {
           text: quoteData.text,
