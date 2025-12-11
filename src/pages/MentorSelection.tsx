@@ -11,6 +11,7 @@ import { getResolvedMentorId } from "@/utils/mentor";
 import { useProfile } from "@/hooks/useProfile";
 import { getMentors, Mentor } from "@/lib/firebase/mentors";
 import { updateProfile } from "@/lib/firebase/profiles";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const MentorSelection = () => {
   const { user } = useAuth();
@@ -106,8 +107,9 @@ const MentorSelection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto space-y-16">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center space-y-6 animate-fade-in">
           <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
@@ -126,8 +128,9 @@ const MentorSelection = () => {
           currentMentorId={getResolvedMentorId(profile)}
           isSelecting={selecting}
         />
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 

@@ -84,6 +84,18 @@ export async function generateCompanionStory(data: {
 
 /**
  * Generate Daily Missions - AI-powered daily mission generation
+ * 
+ * NOTE: This function exists but is currently UNUSED.
+ * Missions are generated client-side from MISSION_TEMPLATES for better
+ * performance, offline capability, and reliability.
+ * 
+ * @see src/hooks/useDailyMissions.ts - Current implementation using client-side generation
+ * @see COMPONENT_DEPENDENCY_AUDIT.md - Architectural decision documentation
+ * 
+ * To use this function instead of client-side generation:
+ * 1. Import this function in useDailyMissions.ts
+ * 2. Replace client-side template selection with function call
+ * 3. Remove MISSION_TEMPLATES usage
  */
 export async function generateDailyMissions(data?: {
   forceRegenerate?: boolean;

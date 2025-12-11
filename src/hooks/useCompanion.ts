@@ -302,6 +302,8 @@ export const useCompanion = () => {
       console.error("Failed to create companion:", error);
       // Don't show toast here - let the parent component handle error display
     },
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   const awardXP = useMutation({
@@ -590,22 +592,35 @@ export const useCompanion = () => {
               
               // Generate evolution card using Firebase Cloud Function
               if (stageEvolutionId) {
-                const companionData = await getDocument("user_companion", companion.id);
-                const { generateEvolutionCard } = await import("@/lib/firebase/functions");
-                await generateEvolutionCard({
-                  companionId: companion.id,
-                  evolutionId: stageEvolutionId,
-                  stage: stage,
-                  species: companionData?.spirit_animal || "Unknown",
-                  element: companionData?.core_element || "Unknown",
-                  color: companionData?.favorite_color || "#000000",
-                  userAttributes: {
-                    mind: companionData?.mind || 0,
-                    body: companionData?.body || 0,
-                    soul: companionData?.soul || 0,
-                  },
-                });
-                logger.log(`Generated evolution card for stage ${stage}`);
+                try {
+                  const companionData = await getDocument("user_companion", companion.id);
+                  const { generateEvolutionCard } = await import("@/lib/firebase/functions");
+                  await generateEvolutionCard({
+                    companionId: companion.id,
+                    evolutionId: stageEvolutionId,
+                    stage: stage,
+                    species: companionData?.spirit_animal || "Unknown",
+                    element: companionData?.core_element || "Unknown",
+                    color: companionData?.favorite_color || "#000000",
+                    userAttributes: {
+                      mind: companionData?.mind || 0,
+                      body: companionData?.body || 0,
+                      soul: companionData?.soul || 0,
+                    },
+                  });
+                  logger.log(`Generated evolution card for stage ${stage}`);
+                } catch (cardGenError) {
+                  const errorMessage = cardGenError instanceof Error ? cardGenError.message : String(cardGenError);
+                  logger.error(`Failed to generate evolution card for stage ${stage}:`, errorMessage);
+                  // Log to error tracking service if available
+                  console.error('[Firebase Function Error] generateEvolutionCard failed:', {
+                    companionId: companion.id,
+                    evolutionId: stageEvolutionId,
+                    stage,
+                    error: errorMessage,
+                  });
+                  // Continue evolution process - card can be regenerated later
+                }
               }
             }
           }

@@ -46,6 +46,7 @@ import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EpicsTab } from "@/features/epics/components/EpicsTab";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -468,7 +469,8 @@ export default function Tasks() {
   const sideQuests = tasks.filter(t => !t.is_main_quest);
 
   return (
-    <div className="min-h-screen pb-20 relative">
+    <ErrorBoundary>
+      <div className="min-h-screen pb-20 relative">
       <StarfieldBackground />
       
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
@@ -981,6 +983,7 @@ export default function Tasks() {
       />
 
       <BottomNav />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
