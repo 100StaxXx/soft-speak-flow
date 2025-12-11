@@ -16,7 +16,11 @@
     "ios:open": "npm run ios:build && npx cap open ios",
     "migrate:data": "node scripts/migrate-data-to-firestore.js",
     "import:data": "node scripts/import-csv-to-firestore.js",
-    "audit:db": "node scripts/invoke-database-audit.cjs"
+    "audit:db": "node scripts/invoke-database-audit.cjs",
+    "verify:migration": "tsx scripts/verify-migration.ts",
+    "seed:catalog": "tsx scripts/seed-cosmiq-catalog.ts",
+    "verify:catalog": "tsx scripts/verify-catalog-seed.ts",
+    "cleanup:supabase": "bash scripts/cleanup-supabase.sh"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -60,7 +64,6 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@supabase/supabase-js": "^2.81.1",
     "@tanstack/react-query": "^5.83.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
