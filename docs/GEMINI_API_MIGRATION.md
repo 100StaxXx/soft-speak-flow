@@ -8,12 +8,12 @@ Set your Gemini API key in Firebase Functions:
 
 ```bash
 firebase functions:secrets:set GEMINI_API_KEY
-# When prompted, paste: AIzaSyCylcLYCVyGjG_7PRnLgr7vSLpHmfap-WY
+# When prompted, paste your API key from Google Cloud Console
 ```
 
 Or for local development, add to `.env`:
 ```
-GEMINI_API_KEY=AIzaSyCylcLYCVyGjG_7PRnLgr7vSLpHmfap-WY
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 ```
 
 ## API Format Differences
