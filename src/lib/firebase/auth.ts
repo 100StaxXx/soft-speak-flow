@@ -19,6 +19,7 @@ export { firebaseAuth };
 
 export interface AuthUser {
   uid: string;
+  id: string; // Alias for uid - backward compatibility
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
@@ -29,6 +30,7 @@ export const convertFirebaseUser = (user: FirebaseUser | null): AuthUser | null 
   if (!user) return null;
   return {
     uid: user.uid,
+    id: user.uid, // Alias for backward compatibility
     email: user.email,
     displayName: user.displayName,
     photoURL: user.photoURL,
@@ -121,13 +123,10 @@ export const signInWithGoogle = async () => {
 
 // Sign in with Google (native - using idToken from Capacitor plugin)
 export const signInWithGoogleCredential = async (idToken: string, accessToken?: string) => {
-  const provider = new GoogleAuthProvider();
-  // GoogleAuthProvider.credential() accepts either:
-  // - credential(idToken) for just ID token
-  // - credential(idToken, accessToken) for both tokens (preferred when available)
+  // GoogleAuthProvider.credential() is a static method
   const credential = accessToken 
-    ? provider.credential(idToken, accessToken)
-    : provider.credential(idToken);
+    ? GoogleAuthProvider.credential(idToken, accessToken)
+    : GoogleAuthProvider.credential(idToken);
   const userCredential = await signInWithCredential(firebaseAuth, credential);
   
   // Profile will be ensured by handlePostAuthNavigation in Auth.tsx

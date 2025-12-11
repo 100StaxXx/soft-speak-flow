@@ -58,32 +58,11 @@ export const useCompanionRegenerate = () => {
       
       throw new Error("Companion regeneration needs Firebase Cloud Function migration");
 
-      // if (!imageResult?.imageUrl) {
-      //   throw new Error("Failed to generate new image");
-      // }
-
-      // // Update companion with new image and increment regeneration count
-      // // Note: Firestore doesn't support conditional updates like Supabase, so we check again
-      // const currentCompanion = await getDocument("user_companion", companion.id);
-      // if (currentCompanion.image_regenerations_used !== regenerationsUsed) {
-      //   throw new Error("Regeneration already consumed. Please refresh to continue.");
-      // }
-
-      // await updateDocument("user_companion", companion.id, {
-      //   current_image_url: imageResult.imageUrl,
-      //   image_regenerations_used: regenerationsUsed + 1,
-      // });
-
-      // const totalUsed = regenerationsUsed + 1;
-
-      // return { 
-      //   imageUrl: imageResult.imageUrl, 
-      //   regenerationsRemaining: Math.max(0, MAX_REGENERATIONS - totalUsed) 
-      // };
+      // NOTE: Code below is unreachable until Firebase migration is complete
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
+      // Will not be called since mutation always throws
       queryClient.invalidateQueries({ queryKey: ["companion"] });
-      toast.success(`New look unlocked! ${data.regenerationsRemaining} regeneration${data.regenerationsRemaining === 1 ? '' : 's'} remaining.`);
     },
     onError: (error) => {
       console.error("Regeneration failed:", error);

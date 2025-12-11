@@ -15,6 +15,7 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
+import { supabase } from "@/integrations/supabase/client";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();

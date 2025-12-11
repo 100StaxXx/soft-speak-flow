@@ -111,7 +111,8 @@ export const useActivityFeed = () => {
     mutationFn: async (activityId: string) => {
       if (!user) throw new Error("Not authenticated");
       
-      const activity = await getDocument<{ user_id: string }>('activity_feed', activityId);
+      const activities = await getDocuments<{ user_id: string }>('activity_feed', [['id', '==', activityId]]);
+      const activity = activities?.[0];
       if (!activity) throw new Error("Activity not found");
       if (activity.user_id !== user.uid) throw new Error("Unauthorized");
       

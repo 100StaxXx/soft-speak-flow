@@ -22,6 +22,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
 import { FactionBadge } from "@/components/FactionBadge";
+import { supabase } from "@/integrations/supabase/client";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";

@@ -338,8 +338,8 @@ const Auth = () => {
 
   // Extra safety net: if the auth context already has a session, redirect immediately
   useEffect(() => {
-    if (!authSession || hasRedirected.current) return;
-    handlePostAuthNavigation(authSession, 'authContext');
+    if (!authSession?.user || hasRedirected.current) return;
+    handlePostAuthNavigation({ uid: authSession.user.uid || authSession.user.id, email: authSession.user.email || '' }, 'authContext');
   }, [authSession, handlePostAuthNavigation]);
 
   // Import the redirect URL helper at the top of the component
