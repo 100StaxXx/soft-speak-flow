@@ -6,8 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bell, AlertCircle, MapPin } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { updateProfile } from "@/lib/firebase/profiles";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
 import { 
@@ -43,7 +43,7 @@ export const PushNotificationSettings = () => {
 
   useEffect(() => {
     if (user) {
-      hasActiveNativePushSubscription(user.id).then(setPushEnabled);
+      hasActiveNativePushSubscription(user.uid).then(setPushEnabled);
     }
   }, [user]);
 
@@ -53,12 +53,12 @@ export const PushNotificationSettings = () => {
     try {
       if (enabled) {
         // Subscribe to native push notifications
-        await initializeNativePush(user.id);
+        await initializeNativePush(user.uid);
         setPushEnabled(true);
         toast({ title: "Notifications Enabled", description: "You'll receive daily notifications" });
       } else {
         // Unsubscribe from push notifications
-        await unregisterNativePush(user.id);
+        await unregisterNativePush(user.uid);
         setPushEnabled(false);
         toast({ title: "Notifications Disabled", description: "You won't receive push notifications" });
       }
@@ -82,12 +82,7 @@ export const PushNotificationSettings = () => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_push_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await updateProfile(user.uid, { daily_push_enabled: enabled });
       toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
@@ -111,12 +106,7 @@ export const PushNotificationSettings = () => {
     }
     
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_quote_push_enabled: enabled })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await updateProfile(user.uid, { daily_quote_push_enabled: enabled });
       toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
@@ -129,12 +119,7 @@ export const PushNotificationSettings = () => {
   const handleUpdateTime = async (field: string, value: string) => {
     if (!user) return;
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ [field]: value })
-        .eq("id", user.id);
-      
-      if (error) throw error;
+      await updateProfile(user.uid, { [field]: value });
       toast({ title: "Time Updated", description: "Your push notification time has been updated" });
       // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);

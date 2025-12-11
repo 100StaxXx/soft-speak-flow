@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { generateCompanionImage } from "@/lib/firebase/functions";
 
 const MAX_REGENERATIONS = 2;
 
@@ -41,24 +42,26 @@ export const useCompanionRegenerate = () => {
         throw new Error("You've used all your regenerations");
       }
 
-      // TODO: Migrate to Firebase Cloud Function
-      // Call the image generation function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-image', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     favoriteColor: companion.favorite_color,
-      //     spiritAnimal: companion.spirit_animal,
-      //     element: companion.core_element,
-      //     stage: companion.current_stage,
-      //     eyeColor: companion.eye_color,
-      //     furColor: companion.fur_color,
-      //   }),
-      // });
-      // const imageResult = await response.json();
-      
-      throw new Error("Companion regeneration needs Firebase Cloud Function migration");
+      // Generate new companion image using Firebase Cloud Function
+      const imageResult = await generateCompanionImage({
+        companionId: companion.id,
+        stage: companion.current_stage,
+        species: companion.spirit_animal,
+        element: companion.core_element,
+        color: companion.favorite_color,
+      });
 
-      // NOTE: Code below is unreachable until Firebase migration is complete
+      if (!imageResult?.imageData?.imageUrl) {
+        throw new Error("Failed to generate companion image");
+      }
+
+      // Update companion with new image and increment regeneration count
+      await updateDocument("user_companion", companion.id, {
+        current_image_url: imageResult.imageData.imageUrl,
+        image_regenerations_used: regenerationsUsed + 1,
+      });
+
+      return imageResult;
     },
     onSuccess: () => {
       // Will not be called since mutation always throws

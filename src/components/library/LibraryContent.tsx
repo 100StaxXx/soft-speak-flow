@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getDocuments } from "@/lib/firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { getDocuments } from "@/lib/firebase/firestore";
+import { getQuotes } from "@/lib/firebase/quotes";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, MessageSquare, ArrowRight } from "lucide-react";
 import { LibraryHero } from "./LibraryHero";
@@ -57,12 +58,8 @@ export const LibraryContent = () => {
   const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
     queryKey: ["featured-pep-talks"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("pep_talks")
-        .select("id, title, category, description")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      return data || [];
+      const pepTalks = await getDocuments<{ id: string; title?: string; category?: string; description?: string }>("pep_talks", undefined, "created_at", "desc", 3);
+      return pepTalks;
     },
   });
 

@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { getDocuments, getDocument, updateDocument, setDocument } from "@/lib/firebase/firestore";
 import { createInfluencerCode, processPaypalPayout } from "@/lib/firebase/functions";
+import { getReferralCode, updateReferralCode } from "@/lib/firebase/referralCodes";
+import { getReferralPayouts, createReferralPayout, updateReferralPayout } from "@/lib/firebase/referralPayouts";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 
 export const AdminReferralTesting = () => {
   const { user } = useAuth();
@@ -70,20 +71,15 @@ export const AdminReferralTesting = () => {
       addResult("Testing signup flow", 'success', `Using code: ${testCode}`);
       
       // Check if code exists and is valid
-      const codes = await getDocuments('referral_codes', [
-        ['code', '==', testCode],
-        ['is_active', '==', true]
-      ]);
-
-      if (!codes || codes.length === 0) throw new Error("Code not found or inactive");
-      const code = codes[0];
+      const code = await getReferralCode(testCode);
+      if (!code) throw new Error("Code not found or inactive");
 
       addResult("Code validation", 'success', `Code found: ${code.code}, Signups: ${code.total_signups || 0}`);
 
       // In a real scenario, this would happen during user onboarding
       // For testing, we'll manually increment the signup count
-      await updateDocument('referral_codes', code.id, { 
-        total_signups: (code.total_signups || 0) + 1 
+      await updateReferralCode(code.id, {
+        total_signups: (code.total_signups || 0) + 1,
       });
 
       addResult("Signup tracked", 'success', "User signup recorded successfully");
@@ -107,12 +103,8 @@ export const AdminReferralTesting = () => {
       addResult("Simulating subscription", 'success', `Testing conversion for code: ${testCode}`);
       
       // Get the referral code info
-      const codes = await getDocuments('referral_codes', [
-        ['code', '==', testCode]
-      ]);
-
-      if (!codes || codes.length === 0) throw new Error("Code not found");
-      const codeData = codes[0];
+      const codeData = await getReferralCode(testCode);
+      if (!codeData) throw new Error("Code not found");
 
       addResult("Code fetched", 'success', `Code ID: ${codeData.id}`);
 
@@ -131,32 +123,29 @@ export const AdminReferralTesting = () => {
       const payoutAmount = mockWebhookData.amount * 0.5;
 
       // For testing, we need a valid user ID. Get current user or use a test ID
-      const testReferrerId = user?.uid || '00000000-0000-0000-0000-000000000000';
+      const testReferrerId = user?.uid || codeData.owner_user_id || '00000000-0000-0000-0000-000000000000';
       const testRefereeId = user?.uid || '00000000-0000-0000-0000-000000000000';
 
       // Create payout record
-      const payoutId = `payout_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      await setDocument('referral_payouts', payoutId, {
+      const payout = await createReferralPayout({
         referral_code_id: codeData.id,
         referrer_id: testReferrerId,
         referee_id: testRefereeId,
         amount: payoutAmount,
         payout_type: 'first_month',
-        status: 'pending'
-      }, false);
-
-      const payout = { id: payoutId, referral_code_id: codeData.id, referrer_id: testReferrerId, referee_id: testRefereeId, amount: payoutAmount };
+        status: 'pending',
+      });
 
       addResult("Payout created", 'success', `Payout ID: ${payout.id}, Amount: $${payoutAmount.toFixed(2)}`);
 
       // Update code stats (optional tracking columns)
       try {
-        await updateDocument('referral_codes', codeData.id, {
+        await updateReferralCode(codeData.id, {
           total_conversions: (codeData.total_conversions || 0) + 1,
-          total_revenue: ((codeData.total_revenue as number) || 0) + mockWebhookData.amount
+          total_revenue: ((codeData.total_revenue as number) || 0) + mockWebhookData.amount,
         });
-      } catch (updateError: any) {
-        addResult("Warning", 'error', `Stats update failed: ${updateError.message} (non-critical)`);
+      } catch (error: any) {
+        addResult("Warning", 'error', `Stats update failed: ${error.message} (non-critical)`);
       }
 
       addResult("Stats updated", 'success', "Conversion and revenue tracked");
@@ -175,34 +164,27 @@ export const AdminReferralTesting = () => {
       addResult("Testing payout approval", 'success', "Fetching pending payouts");
       
       // Get pending payouts
-      const payouts = await getDocuments('referral_payouts', [
-        ['status', '==', 'pending']
-      ], 'created_at', 'desc', 1);
-
-      if (!payouts || payouts.length === 0) {
+      const allPayouts = await getReferralPayouts();
+      const pendingPayouts = allPayouts.filter(p => p.status === 'pending');
+      
+      if (pendingPayouts.length === 0) {
         throw new Error("No pending payouts found. Create a subscription conversion first.");
       }
 
-      const payout = payouts[0];
+      const payout = pendingPayouts[0];
       
       // Get referral code info separately
-      if (payout.referral_code_id) {
-        const codeData = await getDocument('referral_codes', payout.referral_code_id);
-          
-        if (codeData) {
-          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${codeData.code}`);
-          addResult("Payout check", 'success', `Identifier: ${codeData.payout_identifier || 'Not set'}`);
-        } else {
-          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
-        }
+      if (payout.referral_code) {
+        addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${payout.referral_code.code}`);
+        addResult("Payout check", 'success', `Identifier: ${payout.referral_code.payout_identifier || 'Not set'}`);
       } else {
         addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
       }
 
       // Approve the payout
-      await updateDocument('referral_payouts', payout.id, { 
+      await updateReferralPayout(payout.id, {
         status: 'approved',
-        approved_at: new Date().toISOString()
+        approved_at: new Date().toISOString(),
       });
 
       addResult("Payout approved", 'success', "Status updated to approved");
@@ -221,23 +203,15 @@ export const AdminReferralTesting = () => {
       addResult("Testing PayPal integration", 'success', "Note: This requires valid PayPal credentials");
       
       // Get an approved payout
-      const payouts = await getDocuments('referral_payouts', [
-        ['status', '==', 'approved']
-      ], 'created_at', 'desc', 1);
-
-      if (!payouts || payouts.length === 0) {
+      const allPayouts = await getReferralPayouts();
+      const approvedPayouts = allPayouts.filter(p => p.status === 'approved');
+      
+      if (approvedPayouts.length === 0) {
         throw new Error("No approved payouts found. Approve a payout first.");
       }
 
-      const payout = payouts[0];
-      
-      // Get referral code separately if referral_code_id exists
-      let codeData = null;
-      if (payout.referral_code_id) {
-        codeData = await getDocument('referral_codes', payout.referral_code_id);
-      }
-        
-      addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}${codeData ? `, Code: ${codeData.code}` : ''}`);
+      const payout = approvedPayouts[0];
+      addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}${payout.referral_code ? `, Code: ${payout.referral_code.code}` : ''}`);
 
       // Call the PayPal payout function
       const data = await processPaypalPayout({

@@ -1,7 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, PushNotificationSchema, ActionPerformed, Token } from '@capacitor/push-notifications';
 import { logger } from '@/utils/logger';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  savePushSubscription as savePushSubscriptionToFirestore,
+  saveNativePushToken,
+  deletePushSubscription as deletePushSubscriptionFromFirestore,
+  deleteNativePushToken,
+  hasActivePushSubscription as hasActivePushSubscriptionInFirestore,
+} from '@/lib/firebase/pushSubscriptions';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_WEB_PUSH_KEY as string;
 
@@ -123,67 +129,45 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
 
 async function savePushSubscription(userId: string, subscription: PushSubscription): Promise<void> {
   const subJSON = subscription.toJSON();
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert({
-      user_id: userId,
+  try {
+    await savePushSubscriptionToFirestore(userId, {
+      userId,
       endpoint: subscription.endpoint,
       p256dh: subJSON.keys?.p256dh || '',
       auth: subJSON.keys?.auth || '',
-      user_agent: navigator.userAgent,
-      platform: 'web'
-    }, {
-      onConflict: 'user_id,endpoint'
+      userAgent: navigator.userAgent,
+      platform: 'web',
     });
-
-  if (error) {
+  } catch (error) {
     logger.error('Error saving push subscription:', error);
     throw error;
   }
 }
 
 async function saveNativePushToken(userId: string, token: string): Promise<void> {
-  const platform = Capacitor.getPlatform();
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert({
-      user_id: userId,
-      endpoint: token,
-      p256dh: '',
-      auth: '',
-      user_agent: navigator.userAgent,
-      platform
-    }, {
-      onConflict: 'user_id,endpoint'
-    });
-
-  if (error) {
+  const platform = Capacitor.getPlatform() as 'ios' | 'android';
+  try {
+    await saveNativePushToken(userId, token, platform);
+  } catch (error) {
     logger.error('Error saving native push token:', error);
     throw error;
   }
 }
 
 async function deleteNativePushToken(userId: string): Promise<void> {
-  const platform = Capacitor.getPlatform();
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .delete()
-    .match({ user_id: userId, platform });
-
-  if (error) {
+  const platform = Capacitor.getPlatform() as 'ios' | 'android';
+  try {
+    await deleteNativePushToken(userId, platform);
+  } catch (error) {
     logger.error('Error deleting native push token:', error);
     throw error;
   }
 }
 
 async function deletePushSubscription(userId: string, endpoint: string): Promise<void> {
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .delete()
-    .eq('user_id', userId)
-    .eq('endpoint', endpoint);
-
-  if (error) {
+  try {
+    await deletePushSubscriptionFromFirestore(userId, endpoint);
+  } catch (error) {
     logger.error('Error deleting push subscription:', error);
     throw error;
   }
@@ -191,14 +175,7 @@ async function deletePushSubscription(userId: string, endpoint: string): Promise
 
 export async function hasActivePushSubscription(userId: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
-      .from('push_subscriptions')
-      .select('id')
-      .eq('user_id', userId)
-      .limit(1);
-
-    if (error) throw error;
-    return (data?.length || 0) > 0;
+    return await hasActivePushSubscriptionInFirestore(userId);
   } catch (error) {
     logger.error('Error checking push subscription:', error);
     return false;

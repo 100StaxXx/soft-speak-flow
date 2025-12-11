@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { getMentors } from "@/lib/firebase/mentors";
+import { updateProfile } from "@/lib/firebase/profiles";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -22,13 +24,14 @@ const MentorSelection = () => {
 
   const fetchData = async () => {
     try {
-      const mentorsData = await getAllMentors();
+      // Load ALL mentors from Firestore - no filters (activeOnly = false)
+      const mentorsData = await getMentors(false);
 
-      console.log(`[MentorSelection] Loaded ${mentorsData?.length || 0} mentors from Firebase`);
+      console.log(`[MentorSelection] Loaded ${mentorsData?.length || 0} mentors from Firestore`);
       setMentors(mentorsData || []);
 
       if (!mentorsData || mentorsData.length === 0) {
-        console.warn("[MentorSelection] No mentors found in Firebase");
+        console.warn("[MentorSelection] No mentors found in Firestore database");
         toast({
           title: "No mentors available",
           description: "No mentors were found in the database. Please contact support.",
@@ -36,7 +39,7 @@ const MentorSelection = () => {
         });
       }
     } catch (error) {
-      console.error("[MentorSelection] Error loading mentors from Firebase:", error);
+      console.error("[MentorSelection] Error loading mentors from Firestore:", error);
       toast({
         title: "Error loading mentors",
         description: error instanceof Error ? error.message : "Failed to load mentors",

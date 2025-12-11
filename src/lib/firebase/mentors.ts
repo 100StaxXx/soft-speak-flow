@@ -1,71 +1,46 @@
-import { getDocuments, getDocument } from "./firestore";
+import { getDocuments, getDocument, timestampToISO } from "./firestore";
 
 export interface Mentor {
   id: string;
   name: string;
-  slug: string;
-  description: string;
-  tone_description: string;
+  voice?: string;
   avatar_url?: string;
-  tags: string[];
-  mentor_type: string;
-  target_user_type?: string;
+  tone_description?: string;
+  slug?: string;
+  archetype?: string;
   short_title?: string;
-  primary_color?: string;
+  style_description?: string;
   target_user?: string;
-  themes?: string[];
   intensity_level?: string;
+  gender_energy?: string;
+  primary_color?: string;
+  signature_line?: string;
   is_active?: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
-// Fetch all mentors from Firestore
-export const getAllMentors = async (): Promise<Mentor[]> => {
-  try {
-    const mentors = await getDocuments<Mentor>(
-      "mentors",
-      [["is_active", "==", true]], // Only active mentors
-      "name",
-      "asc"
-    );
-    return mentors;
-  } catch (error) {
-    console.error("Error fetching mentors from Firestore:", error);
-    // Fallback: try without filter
-    try {
-      const mentors = await getDocuments<Mentor>("mentors", undefined, "name", "asc");
-      return mentors;
-    } catch (fallbackError) {
-      console.error("Error fetching all mentors:", fallbackError);
-      return [];
-    }
-  }
+export const getMentor = async (mentorId: string): Promise<Mentor | null> => {
+  const mentor = await getDocument<Mentor>("mentors", mentorId);
+  if (!mentor) return null;
+
+  return {
+    ...mentor,
+    created_at: timestampToISO(mentor.created_at as any) || mentor.created_at || undefined,
+    updated_at: timestampToISO(mentor.updated_at as any) || mentor.updated_at || undefined,
+  };
 };
 
-// Fetch a single mentor by ID
-export const getMentorById = async (mentorId: string): Promise<Mentor | null> => {
-  try {
-    return await getDocument<Mentor>("mentors", mentorId);
-  } catch (error) {
-    console.error("Error fetching mentor by ID:", error);
-    return null;
-  }
-};
+export const getMentors = async (activeOnly = true): Promise<Mentor[]> => {
+  const filters: Array<[string, any, any]> | undefined = activeOnly
+    ? [["is_active", "==", true]]
+    : undefined;
 
-// Fetch a mentor by slug
-export const getMentorBySlug = async (slug: string): Promise<Mentor | null> => {
-  try {
-    const mentors = await getDocuments<Mentor>(
-      "mentors",
-      [["slug", "==", slug]],
-      undefined,
-      undefined,
-      1
-    );
-    return mentors.length > 0 ? mentors[0] : null;
-  } catch (error) {
-    console.error("Error fetching mentor by slug:", error);
-    return null;
-  }
-};
+  const mentors = await getDocuments<Mentor>("mentors", filters, "name", "asc");
 
+  return mentors.map((mentor) => ({
+    ...mentor,
+    created_at: timestampToISO(mentor.created_at as any) || mentor.created_at || undefined,
+    updated_at: timestampToISO(mentor.updated_at as any) || mentor.updated_at || undefined,
+  }));
+};

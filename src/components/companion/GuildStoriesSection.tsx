@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { generateGuildStory } from "@/lib/firebase/functions";
+import { getUserEpics } from "@/lib/firebase/epics";
+import { getGuildStories, markGuildStoryAsRead } from "@/lib/firebase/guildStories";
+import { getEpicMembers } from "@/lib/firebase/epics";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Sparkles, Loader2, Users, ChevronDown, ChevronUp } from "lucide-react";
@@ -9,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GuildStoryChapter } from "@/components/GuildStoryChapter";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -54,86 +56,53 @@ export const GuildStoriesSection = () => {
 
   // Fetch all epics the user is a member of with their stories
   const { data: epicsWithStories, isLoading } = useQuery<EpicWithStories[]>({
-    queryKey: ["user-guild-stories", user?.id],
+    queryKey: ["user-guild-stories", user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.uid) return [];
 
       // Get epics where user is owner or member
-      const { data: ownedEpics } = await supabase
-        .from("epics")
-        .select("id, title")
-        .eq("user_id", user.id)
-        .eq("status", "active");
+      const { owned, joined } = await getUserEpics(user.uid);
 
-      const { data: memberEpics } = await supabase
-        .from("epic_members")
-        .select("epic_id, epics(id, title)")
-        .eq("user_id", user.id);
-
-      const allEpicIds = new Set<string>();
-      const epicMap = new Map<string, { id: string; title: string }>();
-
-      ownedEpics?.forEach(epic => {
-        allEpicIds.add(epic.id);
-        epicMap.set(epic.id, epic);
-      });
-
-      memberEpics?.forEach(m => {
-        if (m.epics) {
-          const epic = m.epics as { id: string; title: string };
-          allEpicIds.add(epic.id);
-          epicMap.set(epic.id, epic);
-        }
-      });
-
-      if (allEpicIds.size === 0) return [];
+      const allEpics = [...owned, ...joined];
+      if (allEpics.length === 0) return [];
 
       // Fetch stories and member counts for all epics in parallel
-      const epicIdsArray = Array.from(allEpicIds);
-      
       const results = await Promise.all(
-        epicIdsArray.map(async (epicId) => {
-          const epic = epicMap.get(epicId);
-          if (!epic) return null;
-
-          const [{ data: stories }, { count: memberCount }] = await Promise.all([
-            supabase
-              .from("guild_stories")
-              .select("*")
-              .eq("epic_id", epicId)
-              .order("chapter_number", { ascending: true }),
-            supabase
-              .from("epic_members")
-              .select("*", { count: "exact", head: true })
-              .eq("epic_id", epicId),
+        allEpics.map(async (epic) => {
+          const [stories, members] = await Promise.all([
+            getGuildStories(epic.id),
+            getEpicMembers(epic.id),
           ]);
 
           return {
             id: epic.id,
             title: epic.title,
-            memberCount: memberCount || 0,
-            stories: (stories || []) as GuildStory[],
+            memberCount: members.length,
+            stories: stories as GuildStory[],
           };
         })
       );
 
-      // Filter out null results
-      return results.filter((r): r is EpicWithStories => r !== null);
+      return results;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   // Mark story as read
   const markStoryAsRead = useMutation({
     mutationFn: async (storyId: string) => {
-      if (!user?.id) return;
+      if (!user?.uid) return;
 
+<<<<<<< HEAD
+      await markGuildStoryAsRead(user.uid, storyId);
+=======
       const { setDocument } = await import('@/lib/firebase/firestore');
       const readId = `${user.id}_${storyId}`;
       await setDocument("guild_story_reads", readId, {
         user_id: user.id,
         story_id: storyId,
       }, false);
+>>>>>>> origin/main
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["unread-guild-stories"] });
@@ -144,7 +113,7 @@ export const GuildStoriesSection = () => {
 
   // Mark stories as read when viewing
   useEffect(() => {
-    if (!selectedEpic || !user?.id) return;
+    if (!selectedEpic || !user?.uid) return;
 
     // Mark all stories for the selected epic as read
     selectedEpic.stories.forEach(story => {

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getHabitCompletions } from "@/lib/firebase/habitCompletions";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, subDays, startOfDay } from "date-fns";
 import { Flame } from "lucide-react";
@@ -9,42 +10,37 @@ export const HabitCalendar = () => {
   const { user } = useAuth();
 
   const { data: completions = [] } = useQuery({
-    queryKey: ["habit-calendar", user?.id],
+    queryKey: ["habit-calendar", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
       const thirtyDaysAgo = format(subDays(new Date(), 30), "yyyy-MM-dd");
-      const { data, error } = await supabase
-        .from("habit_completions")
-        .select("date")
-        .eq("user_id", user.id)
-        .gte("date", thirtyDaysAgo)
-        .order("date", { ascending: true });
+      const data = await getHabitCompletions(user.uid, thirtyDaysAgo);
       
-      if (error) throw error;
-      return data;
+      return data.map(c => ({ date: c.date }));
     },
   });
 
   const { data: habits = [] } = useQuery({
-    queryKey: ["active-habits", user?.id],
+    queryKey: ["active-habits", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("habits")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("is_active", true);
+      const data = await getDocuments(
+        "habits",
+        [
+          ["user_id", "==", user.uid],
+          ["is_active", "==", true]
+        ]
+      );
       
-      if (error) throw error;
-      return data;
+      return data.map(h => ({ id: h.id }));
     },
   });
 

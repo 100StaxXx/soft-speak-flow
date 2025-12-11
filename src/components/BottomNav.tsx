@@ -3,8 +3,8 @@ import { Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { getMentor } from "@/lib/firebase/mentors";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
@@ -24,13 +24,14 @@ export const BottomNav = memo(() => {
         throw new Error('No mentor selected');
       }
 
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("slug, name, primary_color") // Select only needed fields
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const mentor = await getMentor(resolvedMentorId);
+      if (!mentor) return null;
+      
+      return {
+        slug: mentor.slug,
+        name: mentor.name,
+        primary_color: mentor.primary_color,
+      };
     },
   });
 

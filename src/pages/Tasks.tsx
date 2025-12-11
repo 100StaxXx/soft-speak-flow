@@ -36,6 +36,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
+import { getDailyTasks, createDailyTask, updateDailyTask } from "@/lib/firebase/dailyTasks";
+import { updateProfile } from "@/lib/firebase/profiles";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -205,31 +207,22 @@ export default function Tasks() {
       
       const checkAndCreateQuest = async () => {
         try {
-          const { data: existingQuest } = await supabase
-            .from('daily_tasks')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('task_text', 'Join Cosmiq')
-            .maybeSingle();
+          if (!user?.uid) return;
+          
+          const existingTasks = await getDailyTasks(user.uid, today);
+          const existingQuest = existingTasks.find(t => t.task_text === 'Join Cosmiq');
           
           if (!existingQuest) {
-            const { error: insertError } = await supabase
-              .from('daily_tasks')
-              .insert({
-                user_id: user.id,
-                task_text: 'Join Cosmiq',
-                difficulty: 'easy',
-                xp_reward: 10,
-                task_date: today,
-                is_main_quest: false,
-              });
-            
-            if (insertError) {
-              console.error('Error creating tutorial quest:', insertError);
-              safeLocalStorage.removeItem(questCreationKey);
-            } else {
-              queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-            }
+            await createDailyTask({
+              user_id: user.uid,
+              task_text: 'Join Cosmiq',
+              difficulty: 'easy',
+              xp_reward: 10,
+              task_date: today,
+              is_main_quest: false,
+              completed: false,
+            });
+            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
           }
         } catch (error) {
           console.error('Error in tutorial quest creation:', error);
@@ -264,18 +257,15 @@ export default function Tasks() {
   }, [tutorialQuestPending, scrollToTutorialQuest]);
 
   const handleTutorialClose = async () => {
-    if (!user?.id) return;
-    safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
+    if (!user?.uid) return;
+    safeLocalStorage.setItem(`tutorial_dismissed_${user.uid}`, 'true');
     setShowTutorial(false);
     
     if (profile) {
       const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
       const updatedData = { ...onboardingData, quests_tutorial_seen: true };
-      await supabase
-        .from('profiles')
-        .update({ onboarding_data: updatedData })
-        .eq('id', user.id);
-      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      await updateProfile(user.uid, { onboarding_data: updatedData });
+      queryClient.invalidateQueries({ queryKey: ['profile', user.uid] });
     }
   };
 
@@ -377,10 +367,7 @@ export default function Tasks() {
     setIsUpdating(true);
     
     try {
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update(updates)
-        .eq('id', taskId)
+      await updateDailyTask(taskId, updates)
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -590,14 +577,11 @@ export default function Tasks() {
                   onDateSelect={setSelectedDate}
                   tasks={allCalendarTasks}
                   onTaskDrop={async (taskId, newDate, newTime) => {
-                    const { error } = await supabase
-                      .from('daily_tasks')
-                      .update({
-                        task_date: format(newDate, 'yyyy-MM-dd'),
-                        scheduled_time: newTime,
-                        reminder_sent: false
-                      })
-                      .eq('id', taskId);
+                    await updateDailyTask(taskId, {
+                      task_date: format(newDate, 'yyyy-MM-dd'),
+                      scheduled_time: newTime || null,
+                      reminder_sent: false
+                    });
 
                     if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -639,10 +623,7 @@ export default function Tasks() {
                       const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
                       updates.push(
-                        supabase
-                          .from('daily_tasks')
-                          .update({ scheduled_time: timeStr, estimated_duration: duration })
-                          .eq('id', task.id)
+                        updateDailyTask(task.id, { scheduled_time: timeStr, estimated_duration: duration })
                       );
 
                       currentTimeMinutes += duration + 15;
@@ -680,14 +661,11 @@ export default function Tasks() {
                   onDateSelect={setSelectedDate}
                   tasks={allCalendarTasks}
                   onTaskDrop={async (taskId, newDate, newTime) => {
-                    const { error } = await supabase
-                      .from('daily_tasks')
-                      .update({
-                        task_date: format(newDate, 'yyyy-MM-dd'),
-                        scheduled_time: newTime,
-                        reminder_sent: false
-                      })
-                      .eq('id', taskId);
+                    await updateDailyTask(taskId, {
+                      task_date: format(newDate, 'yyyy-MM-dd'),
+                      scheduled_time: newTime || null,
+                      reminder_sent: false
+                    });
 
                     if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });

@@ -22,6 +22,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
 import { FactionBadge } from "@/components/FactionBadge";
+import { updateProfile } from "@/lib/firebase/profiles";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -594,12 +595,10 @@ const Profile = () => {
                       id="astral-encounters"
                       checked={profile?.astral_encounters_enabled !== false}
                       onCheckedChange={async (checked) => {
-                        if (!user?.id) return;
-                        const { error } = await supabase
-                          .from('profiles')
-                          .update({ astral_encounters_enabled: checked })
-                          .eq('id', user.id);
-                        if (error) {
+                        if (!user?.uid) return;
+                        try {
+                          await updateProfile(user.uid, { astral_encounters_enabled: checked });
+                        } catch (error) {
                           sonnerToast.error('Failed to update setting');
                         } else {
                           queryClient.invalidateQueries({ queryKey: ['profile'] });

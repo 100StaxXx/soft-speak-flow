@@ -6,6 +6,7 @@ import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { transcribeAudio } from "@/lib/firebase/functions";
 
 interface CaptionWord {
   word: string;
@@ -75,25 +76,19 @@ const PepTalkDetail = () => {
     toast.info("Transcribing audio... This may take a minute.");
     
     try {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/transcribe-audio', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ audioUrl: pepTalk.audio_url })
-      // });
-      // const data = await response.json();
+      const data = await transcribeAudio({
+        audioUrl: pepTalk.audio_url,
+      });
 
-      // if (data?.transcript && Array.isArray(data.transcript)) {
-      //   // Update the database with the new transcript
-      //   await updateDocument('pep_talks', id, { transcript: data.transcript });
-      //   toast.success("Transcript generated successfully!");
-      //   // Refresh the pep talk to show the new transcript
-      //   await fetchPepTalk(id);
-      // } else {
-      //   throw new Error('No transcript data returned');
-      // }
-      
-      throw new Error("Transcription needs Firebase Cloud Function migration");
+      if (data?.transcript && Array.isArray(data.transcript)) {
+        // Update the database with the new transcript
+        await updateDocument('pep_talks', id!, { transcript: data.transcript });
+        toast.success("Transcript generated successfully!");
+        // Refresh the pep talk to show the new transcript
+        await fetchPepTalk(id!);
+      } else {
+        throw new Error('No transcript data returned');
+      }
     } catch (error) {
       console.error('Transcription error:', error);
       toast.error("Failed to generate transcript");

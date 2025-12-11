@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Star, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getHabitCompletions } from "@/lib/firebase/habitCompletions";
+import { setDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -38,35 +39,28 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const habitIds = useMemo(() => habits.map(h => h.id), [habits]);
 
   const fetchTodayCompletions = useCallback(async () => {
-    if (!user?.id || habitIds.length === 0) return;
+    if (!user?.uid || habitIds.length === 0) return;
     
     setLoadingCompletions(true);
     try {
-      const { data } = await supabase
-        .from('habit_completions')
-        .select('habit_id')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .in('habit_id', habitIds);
-      
-      if (data) {
-        setCompletedToday(new Set(data.map(d => d.habit_id).filter(Boolean)));
-      }
+      const completions = await getHabitCompletions(user.uid, today, today);
+      const todayCompletions = completions.filter(c => habitIds.includes(c.habit_id));
+      setCompletedToday(new Set(todayCompletions.map(c => c.habit_id).filter(Boolean)));
     } finally {
       setLoadingCompletions(false);
     }
-  }, [user?.id, habitIds, today]);
+  }, [user?.uid, habitIds, today]);
 
   // Fetch today's completions when drawer opens
   useEffect(() => {
-    if (open && user?.id) {
+    if (open && user?.uid) {
       fetchTodayCompletions();
     }
-  }, [open, user?.id, fetchTodayCompletions]);
+  }, [open, user?.uid, fetchTodayCompletions]);
 
   const handleToggleHabit = async (habitId: string, checked: boolean) => {
-    console.log('[EpicCheckIn] handleToggleHabit called', { habitId, checked, userId: user?.id });
-    if (!user?.id) {
+    console.log('[EpicCheckIn] handleToggleHabit called', { habitId, checked, userId: user?.uid });
+    if (!user?.uid) {
       console.log('[EpicCheckIn] No user ID, returning early');
       return;
     }
@@ -87,25 +81,27 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     try {
       if (checked) {
         // Complete habit
-        const { error } = await supabase
-          .from('habit_completions')
-          .insert({
-            user_id: user.id,
+        const completionId = `${user.uid}_${habitId}_${today}`;
+        try {
+          await setDocument('habit_completions', completionId, {
+            user_id: user.uid,
             habit_id: habitId,
             date: today,
-          });
-        
-        if (error && error.code !== '23505') throw error; // Ignore duplicate errors
+            completed_at: new Date().toISOString(),
+          }, false);
+        } catch (error: any) {
+          // Ignore duplicate errors (document already exists)
+          if (!error.message?.includes('already exists')) {
+            throw error;
+          }
+        }
       } else {
-        // Uncomplete habit
-        const { error } = await supabase
-          .from('habit_completions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('habit_id', habitId)
-          .eq('date', today);
-        
-        if (error) throw error;
+        // Uncomplete habit - find and delete the completion
+        const completions = await getHabitCompletions(user.uid, today, today);
+        const completion = completions.find(c => c.habit_id === habitId && c.date === today);
+        if (completion?.id) {
+          await deleteDocument('habit_completions', completion.id);
+        }
       }
       
       // Invalidate queries to refresh progress
@@ -122,24 +118,30 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   };
 
   const handleCompleteAll = async () => {
-    if (!user?.id) return;
+    if (!user?.uid) return;
     
     const uncompleted = habits.filter(h => !completedToday.has(h.id));
     if (uncompleted.length === 0) return;
     
     setSubmitting(true);
     try {
-      const insertions = uncompleted.map(h => ({
-        user_id: user.id,
-        habit_id: h.id,
-        date: today,
-      }));
-      
-      const { error } = await supabase
-        .from('habit_completions')
-        .upsert(insertions, { onConflict: 'user_id,habit_id,date' });
-      
-      if (error) throw error;
+      // Create all completions
+      for (const habit of uncompleted) {
+        const completionId = `${user.uid}_${habit.id}_${today}`;
+        try {
+          await setDocument('habit_completions', completionId, {
+            user_id: user.uid,
+            habit_id: habit.id,
+            date: today,
+            completed_at: new Date().toISOString(),
+          }, false);
+        } catch (error: any) {
+          // Ignore duplicate errors
+          if (!error.message?.includes('already exists')) {
+            throw error;
+          }
+        }
+      }
       
       setCompletedToday(new Set(habits.map(h => h.id)));
       setShowSuccess(true);

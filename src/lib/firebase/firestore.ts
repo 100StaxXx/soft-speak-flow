@@ -19,6 +19,8 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
+  onSnapshot as firestoreOnSnapshot,
+  Unsubscribe,
 } from "firebase/firestore";
 import { firebaseDb } from "../firebase";
 
@@ -200,5 +202,29 @@ export const removeFromArray = async (
     [field]: arrayRemove(value),
     updated_at: serverTimestamp(),
   });
+};
+
+// Real-time listener for a single document
+export const onSnapshot = (
+  params: { collection: string; docId: string },
+  callback: (data: DocumentData | null) => void | Promise<void>,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const docRef = doc(firebaseDb, params.collection, params.docId);
+  
+  return firestoreOnSnapshot(
+    docRef,
+    (snapshot) => {
+      const data = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+      callback(data);
+    },
+    (error) => {
+      if (onError) {
+        onError(error);
+      } else {
+        console.error("Firestore snapshot error:", error);
+      }
+    }
+  );
 };
 

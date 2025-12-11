@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument } from "@/lib/firebase/firestore";
 
 interface MentorTheme {
   primary: string;
@@ -52,11 +52,7 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
 
       try {
         // Fetch theme data BEFORE showing transition
-        const { data: mentor } = await supabase
-          .from("mentors")
-          .select("theme_config")
-          .eq("id", mentorId)
-          .maybeSingle();
+        const mentor = await getDocument("mentors", mentorId);
 
         if (!isMounted) return;
 

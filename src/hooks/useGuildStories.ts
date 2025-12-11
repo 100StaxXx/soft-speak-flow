@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { generateGuildStory } from "@/lib/firebase/functions";
 
 export interface GuildStory {
   id: string;
@@ -59,18 +60,15 @@ export const useGuildStories = (epicId?: string) => {
 
       toast.loading("Weaving your companions' tale...", { id: "guild-story-gen" });
 
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-guild-story', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ epicId }),
-      // });
-      // const data = await response.json();
-      // if (data.error) {
-      //   throw new Error(data.error);
-      // }
-      // return data.story as GuildStory;
-      
-      throw new Error("Guild story generation needs Firebase Cloud Function migration");
+      const data = await generateGuildStory({
+        guildId: epicId,
+      });
+
+      if (!data?.story) {
+        throw new Error("Failed to generate guild story");
+      }
+
+      return data.story as GuildStory;
     },
     onSuccess: () => {
       toast.dismiss("guild-story-gen");

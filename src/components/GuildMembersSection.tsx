@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { getDocuments, getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { getEpicMembers } from "@/lib/firebase/epics";
+import { getProfile } from "@/lib/firebase/profiles";
+import { getCompanionsByUserIds } from "@/lib/firebase/userCompanion";
 import { useGuildRivalry } from "@/hooks/useGuildRivalry";
 import { useGuildShouts } from "@/hooks/useGuildShouts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +52,43 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
       setIsLoading(true);
       
       try {
+<<<<<<< HEAD
+        const membersData = await getEpicMembers(epicId);
+
+        // Extract all user IDs for batch queries (avoid N+1 problem)
+        const userIds = membersData.map(m => m.user_id).filter(Boolean) as string[];
+
+        // Batch fetch profiles and companions in parallel
+        const [companionsMap] = await Promise.all([
+          getCompanionsByUserIds(userIds),
+        ]);
+
+        // Fetch profiles individually (Firestore doesn't support batch get for multiple documents easily)
+        const profilesMap = new Map();
+        for (const userId of userIds) {
+          try {
+            const profile = await getProfile(userId);
+            if (profile) {
+              profilesMap.set(userId, {
+                email: profile.email,
+                onboarding_data: profile.onboarding_data,
+                faction: profile.faction,
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to fetch profile for ${userId}:`, error);
+          }
+        }
+
+        // Enrich members with profile and companion data
+        const enrichedMembers = membersData.map(member => ({
+          ...member,
+          profile: profilesMap.get(member.user_id),
+          companion: companionsMap.get(member.user_id) ? {
+            current_image_url: companionsMap.get(member.user_id)?.current_image_url || null,
+            spirit_animal: companionsMap.get(member.user_id)?.spirit_animal || null,
+          } : undefined,
+=======
         // Get epic members
         const membersData = await getDocuments("epic_members", [
           ["epic_id", "==", epicId]
@@ -94,11 +133,16 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
           ...member,
           profile: profilesMap.get(member.user_id),
           companion: companionsMap.get(member.user_id),
+>>>>>>> origin/main
         }));
 
         setMembers(enrichedMembers);
       } catch (error) {
+<<<<<<< HEAD
+        console.error('Failed to fetch guild members:', error);
+=======
         console.error("Error fetching guild members:", error);
+>>>>>>> origin/main
       } finally {
         setIsLoading(false);
       }
@@ -106,9 +150,14 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
 
     fetchMembers();
 
+<<<<<<< HEAD
+    // Note: Real-time subscriptions would need to be implemented using Firestore onSnapshot
+    // For now, we'll just fetch on mount and when epicId changes
+=======
     // Note: Real-time subscriptions would need to be implemented with Firestore onSnapshot
     // For now, we'll just fetch on mount and when epicId changes
     // TODO: Add Firestore real-time listener if needed
+>>>>>>> origin/main
   }, [epicId]);
 
   const getRankIcon = (index: number) => {
@@ -187,7 +236,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
         </CardHeader>
         <CardContent className="space-y-2">
           {members.map((member, index) => {
-            const isCurrentUser = member.user_id === user?.id;
+            const isCurrentUser = member.user_id === user?.uid;
             const isRival = rivalry?.rival_id === member.user_id;
             const displayName = getDisplayName(member);
 

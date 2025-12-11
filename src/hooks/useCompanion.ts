@@ -248,13 +248,15 @@ export const useCompanion = () => {
       // Generate story only for new companions
       if (isNewCompanion) {
         // Auto-generate the first chapter of the companion's story in background with retry
-        // TODO: Migrate to Firebase Cloud Function
         const generateStoryWithRetry = async (attempts = 3) => {
           for (let attempt = 1; attempt <= attempts; attempt++) {
             try {
-              // TODO: Replace with Firebase Cloud Function call
-              // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-story', {...});
-              logger.log("Stage 0 story generation skipped - needs Firebase Cloud Function");
+              const { generateCompanionStory } = await import("@/lib/firebase/functions");
+              await generateCompanionStory({
+                companionId: companion.id,
+                stage: 0,
+              });
+              logger.log("Stage 0 story generated successfully");
               queryClient.invalidateQueries({ queryKey: ["companion-story"] });
               queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
               return;
@@ -511,30 +513,15 @@ export const useCompanion = () => {
         setIsEvolvingLoading(true);
 
         try {
-        // TODO: Migrate to Firebase Cloud Function
-        // Call the new evolution function with strict continuity
-        // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-evolution', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ userId: user.uid }),
-        // });
-        // const evolutionData = await response.json();
-        
-        // For now, throw error - needs Firebase Cloud Function implementation
-        throw new Error("Companion evolution needs Firebase Cloud Function migration");
-        
-        // TODO: Uncomment when Firebase Cloud Function is ready
-        /*
-        if (!evolutionData?.evolved) {
-          evolutionInProgress.current = false;
-          setIsEvolvingLoading(false);
-          logger.log('Evolution not triggered:', evolutionData?.message);
-          return null;
-        }
-
-        const evolutionId = evolutionData.evolution_id;
-        const newStage = evolutionData.new_stage;
+        // Update companion stage and XP in Firestore
         const oldStage = companion.current_stage;
+        
+        await updateDocument('user_companion', companion.id, {
+          current_stage: newStage,
+          current_xp: currentXP,
+        });
+
+        logger.log(`Companion evolved from stage ${oldStage} to stage ${newStage}`);
 
         // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
         // This handles cases where user skips from Stage 2 to Stage 4+
@@ -542,7 +529,17 @@ export const useCompanion = () => {
           await validateReferralAtStage3();
         }
 
-        // TODO: Migrate evolution card and story generation to Firebase Cloud Functions
+        // Create evolution record
+        const evolutionId = `${companion.id}_stage_${newStage}_${Date.now()}`;
+        await setDocument('companion_evolutions', evolutionId, {
+          id: evolutionId,
+          companion_id: companion.id,
+          stage: newStage,
+          image_url: companion.current_image_url || null,
+          xp_at_evolution: currentXP,
+          evolved_at: new Date().toISOString(),
+        }, false);
+
         // Generate evolution cards for all stages up to current stage
         try {
           // Check which cards already exist
@@ -556,7 +553,7 @@ export const useCompanion = () => {
           // Generate cards for missing stages (stage 0 through current stage)
           for (let stage = 0; stage <= newStage; stage++) {
             if (!existingStages.has(stage)) {
-              logger.log(`Generating card for stage ${stage} - needs Firebase Cloud Function`);
+              logger.log(`Generating card for stage ${stage}`);
               
               // Get the evolution record for this stage
               const evolutionRecords = await getDocuments(
@@ -627,12 +624,15 @@ export const useCompanion = () => {
         );
 
         if (existingStories.length === 0) {
-          // TODO: Replace with Firebase Cloud Function call
           // Generate story chapter in the background - properly handled promise
           (async () => {
             try {
-              // await fetch('https://YOUR-FIREBASE-FUNCTION/generate-companion-story', {...});
-              logger.log(`Stage ${newStage} story generation skipped - needs Firebase Cloud Function`);
+              const { generateCompanionStory } = await import("@/lib/firebase/functions");
+              await generateCompanionStory({
+                companionId: companion.id,
+                stage: newStage,
+              });
+              logger.log(`Generated story for stage ${newStage}`);
               queryClient.invalidateQueries({ queryKey: ["companion-story"] });
               queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
             } catch (error) {
@@ -645,10 +645,7 @@ export const useCompanion = () => {
           });
         }
 
-        // TODO: Uncomment when Firebase Cloud Function is ready
-        // return evolutionData.image_url;
-        */
-        return null; // Temporary - will return image_url when Cloud Function is ready
+        return companion.current_image_url || null;
         } catch (error) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);

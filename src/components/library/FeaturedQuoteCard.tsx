@@ -1,9 +1,14 @@
 import { motion } from "framer-motion";
 import { Quote, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
+<<<<<<< HEAD
+=======
 import { getDocuments, setDocument, deleteDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+>>>>>>> origin/main
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { addFavorite, removeFavorite, isFavorite } from "@/lib/firebase/favorites";
 
 interface FeaturedQuoteCardProps {
   quote: {
@@ -20,30 +25,16 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Check if quote is favorited on mount
+  // Check favorite status on mount
   useEffect(() => {
-    const checkFavorite = async () => {
-      if (!user?.uid) return;
-      
-      try {
-        const favorites = await getDocuments("favorites", [
-          ["user_id", "==", user.uid],
-          ["content_type", "==", "quote"],
-          ["content_id", "==", quote.id]
-        ]);
-        setIsFavorited(favorites.length > 0);
-      } catch (error) {
-        console.error("Error checking favorite:", error);
-      }
-    };
-    
-    checkFavorite();
-  }, [user?.uid, quote.id]);
+    if (user) {
+      isFavorite(user.id, quote.id).then(setIsFavorited).catch(() => {});
+    }
+  }, [user, quote.id]);
 
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (!user?.uid) {
+    if (!user) {
       toast({
         title: "Sign in required",
         description: "Please sign in to save favorites",
@@ -54,9 +45,11 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
 
     setIsLoading(true);
     try {
-      const favoriteId = `${user.uid}_quote_${quote.id}`;
-      
       if (isFavorited) {
+        await removeFavorite(user.id, quote.id);
+        setIsFavorited(false);
+      } else {
+        await addFavorite(user.id, quote.id);
         await deleteDocument("favorites", favoriteId);
         setIsFavorited(false);
       } else {
@@ -65,6 +58,7 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
           content_type: "quote",
           content_id: quote.id,
         }, false);
+>>>>>>> origin/main
         setIsFavorited(true);
       }
     } catch (error) {

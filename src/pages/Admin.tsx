@@ -195,13 +195,9 @@ const Admin = () => {
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // TODO: Migrate to Firebase Storage
-      // const storageRef = ref(storage, `pep-talk-audio/${filePath}`);
-      // await uploadBytes(storageRef, audioFile);
-      // const publicUrl = await getDownloadURL(storageRef);
-      // return publicUrl;
-      
-      throw new Error("Audio upload needs Firebase Storage migration");
+      const { uploadFile } = await import("@/lib/firebase/storage");
+      const publicUrl = await uploadFile('pep-talk-audio', filePath, audioFile);
+      return publicUrl;
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload audio file");

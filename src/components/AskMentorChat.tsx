@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
-import { firebaseAuth } from "@/lib/firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { createMentorChat, getDailyMessageCount } from "@/lib/firebase/mentorChats";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 
@@ -98,6 +98,7 @@ export const AskMentorChat = ({
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
       return;
     }
+    const currentUser = user;
 
     // Check daily limit using ref to prevent race conditions
     if (dailyMessageCountRef.current >= dailyLimitRef.current) {
@@ -187,7 +188,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
+  }, [user, dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
 
   useEffect(() => {
     // Check today's message count on mount only
@@ -195,18 +196,13 @@ export const AskMentorChat = ({
     const checkDailyLimit = async () => {
       if (!user) return;
 
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      const { count } = await supabase
-        .from('mentor_chats')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('role', 'user')
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-      
-      setDailyMessageCount(count || 0);
+      try {
+        const count = await getDailyMessageCount(user.uid);
+        setDailyMessageCount(count);
+      } catch (error) {
+        console.error('Failed to get daily message count:', error);
+        setDailyMessageCount(0);
+      }
     };
     checkDailyLimit();
   }, [user]); // Only run on mount and user change, not on every message

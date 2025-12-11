@@ -1,9 +1,10 @@
 import { useEffect, useState, memo } from "react";
 import { useProfile } from "@/hooks/useProfile";
-import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 import { format } from "date-fns";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { getMentor } from "@/lib/firebase/mentors";
+import { getQuotes } from "@/lib/firebase/quotes";
 
 interface QuoteData {
   id: string;
@@ -57,8 +58,13 @@ export const HeroQuoteBanner = memo(() => {
         ["for_date", "==", today],
         ["mentor_slug", "==", mentorData.slug]
       ]);
+<<<<<<< HEAD
+      
+      const dailyPepTalk = dailyPepTalks.length > 0 ? dailyPepTalks[0] : null;
+=======
 
       const dailyPepTalk = dailyPepTalks[0];
+>>>>>>> origin/main
 
       if (dailyPepTalk) {
         // Fetch quotes that match the pep talk's themes

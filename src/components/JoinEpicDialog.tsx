@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getEpicByInviteCode, joinEpic, getUserEpics, getEpicHabits } from "@/lib/firebase/epics";
+import { getDocuments, setDocument } from "@/lib/firebase/firestore";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -35,6 +36,11 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       return;
     }
 
+    if (!user) {
+      toast.error("Please sign in to join guilds");
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -42,43 +48,34 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       const code = inviteCode.trim().toUpperCase().replace('EPIC-', '');
       const fullCode = `EPIC-${code}`;
 
-      // Look up the epic by invite code (include frequency and custom_days)
-      const { data: epic, error: epicError } = await supabase
-        .from('epics')
-        .select('*, epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days))')
-        .eq('invite_code', fullCode)
-        .eq('is_public', true)
-        .maybeSingle();
-
-      if (epicError) throw epicError;
+      // Look up the epic by invite code
+      const epic = await getEpicByInviteCode(fullCode);
       if (!epic) {
         toast.error("Epic not found. Check the code and try again.");
         setIsLoading(false);
         return;
       }
 
-      // Check if user is logged in
-      if (!user) {
-        toast.error("Please sign in to join guilds");
-        setIsLoading(false);
-        return;
+      // Get epic habits
+      const epicHabits = await getEpicHabits(epic.id);
+      
+      // Get habit details for each epic habit
+      const habitIds = epicHabits.map(eh => eh.habit_id).filter(Boolean) as string[];
+      const habits = [];
+      for (const habitId of habitIds) {
+        const habit = await getDocuments<{ id: string; title: string; difficulty: string; frequency?: string; custom_days?: number[] | null }>(
+          "habits",
+          [["id", "==", habitId]],
+          undefined,
+          undefined,
+          1
+        );
+        if (habit[0]) habits.push(habit[0]);
       }
 
       // Check epic limit (owned + joined)
-      const { data: ownedEpics } = await supabase
-        .from('epics')
-        .select('id')
-        .eq('user_id', user.uid)
-        .eq('status', 'active');
-      
-      const { data: joinedEpics } = await supabase
-        .from('epic_members')
-        .select('epic_id, epics!inner(user_id, status)')
-        .eq('user_id', user.uid)
-        .neq('epics.user_id', user.uid)
-        .eq('epics.status', 'active');
-
-      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
+      const { owned, joined } = await getUserEpics(user.uid);
+      const totalActiveEpics = owned.length + joined.length;
       
       if (totalActiveEpics >= MAX_EPICS) {
         setEpicLimitReached(true);
@@ -87,57 +84,53 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
         return;
       }
 
-      const { data: existingMember } = await supabase
-        .from('epic_members')
-        .select('id')
-        .eq('epic_id', epic.id)
-        .eq('user_id', user.uid)
-        .maybeSingle();
+      // Check if already a member
+      const existingMembers = await getDocuments(
+        "epic_members",
+        [
+          ["epic_id", "==", epic.id],
+          ["user_id", "==", user.uid]
+        ],
+        undefined,
+        undefined,
+        1
+      );
 
-      if (existingMember) {
+      if (existingMembers.length > 0) {
         toast.error("You're already in this guild!");
         setIsLoading(false);
         return;
       }
 
       // Join the epic
-      const { error: memberError } = await supabase
-        .from('epic_members')
-        .insert({
-          epic_id: epic.id,
-          user_id: user.uid,
-        });
-
-      if (memberError) throw memberError;
+      await joinEpic(epic.id, user.uid);
 
       // Copy habits to user's account (preserve all habit properties)
-      if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+      if (habits.length > 0) {
+        const habitsToCreate = habits.map(habit => ({
           user_id: user.uid,
-          title: eh.habits.title,
-          difficulty: eh.habits.difficulty,
-          frequency: eh.habits.frequency || 'daily',
-          custom_days: eh.habits.custom_days || null,
+          title: habit.title,
+          difficulty: habit.difficulty,
+          frequency: habit.frequency || 'daily',
+          custom_days: habit.custom_days || null,
+          is_active: true,
         }));
 
-        const { data: newHabits, error: habitsError } = await supabase
-          .from('habits')
-          .insert(habitsToCreate)
-          .select();
-
-        if (habitsError) throw habitsError;
+        const newHabits = [];
+        for (const habitData of habitsToCreate) {
+          const habitId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          await setDocument("habits", habitId, habitData, false);
+          newHabits.push({ id: habitId });
+        }
 
         // Link new habits back to the epic
-        const habitLinks = newHabits?.map((habit: { id: string }) => ({
-          epic_id: epic.id,
-          habit_id: habit.id,
-        })) || [];
-
-        const { error: linkError } = await supabase
-          .from('epic_habits')
-          .insert(habitLinks);
-
-        if (linkError) throw linkError;
+        for (const habit of newHabits) {
+          const linkId = `${epic.id}_${habit.id}`;
+          await setDocument("epic_habits", linkId, {
+            epic_id: epic.id,
+            habit_id: habit.id,
+          }, false);
+        }
       }
 
       toast.success(`Joined "${epic.title}" guild! 🎯`);

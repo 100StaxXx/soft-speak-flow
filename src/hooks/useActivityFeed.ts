@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDocuments, setDocument, updateDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
+import { generateActivityComment } from "@/lib/firebase/functions";
 
 // Define activity data types based on activity types
 export interface HabitActivityData {
@@ -91,12 +92,11 @@ export const useActivityFeed = () => {
 
       await setDocument('activity_feed', activityId, activity, false);
 
-      // TODO: Migrate to Firebase Cloud Function
       // Trigger AI comment generation in background (non-blocking)
-      // fetch('https://YOUR-FIREBASE-FUNCTION/generate-activity-comment', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ activityId }),
-      // }).catch((err) => {
+      generateActivityComment({
+        activityData: activity,
+        context: 'user_activity',
+      }).catch((err) => {
       //   console.error('Activity comment generation failed:', err);
       // });
 

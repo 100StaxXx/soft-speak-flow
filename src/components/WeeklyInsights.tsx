@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -27,46 +27,61 @@ export const WeeklyInsights = () => {
   };
 
   const { data: weeklyData, refetch } = useQuery({
-    queryKey: ['weekly-insights', user?.id],
+    queryKey: ['weekly-insights', user?.uid],
     queryFn: async () => {
       if (!user) return null;
       
       const { start, end } = getWeekRange();
       
       // Get habits completed this week
-      const { data: habitCompletions } = await supabase
-        .from('habit_completions')
-        .select('*, habits(title)')
-        .eq('user_id', user.id)
-        .gte('completed_at', start)
-        .lte('completed_at', end);
+      const habitCompletions = await getDocuments(
+        'habit_completions',
+        [
+          ['user_id', '==', user.uid],
+          ['completed_at', '>=', start],
+          ['completed_at', '<=', end]
+        ],
+        'completed_at',
+        'desc'
+      );
       
       // Get check-ins this week
-      const { data: checkIns } = await supabase
-        .from('daily_check_ins')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', start)
-        .lte('created_at', end);
+      const checkIns = await getDocuments(
+        'daily_check_ins',
+        [
+          ['user_id', '==', user.uid],
+          ['created_at', '>=', start],
+          ['created_at', '<=', end]
+        ],
+        'created_at',
+        'desc'
+      );
       
       // Get completed quests (daily_missions) this week - filter by mission_date instead of completed_at
       // This ensures missions completed during onboarding/tutorial show up if they're for this week
-      const { data: quests } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('completed', true)
-        .gte('mission_date', start.split('T')[0])
-        .lte('mission_date', end.split('T')[0]);
+      const quests = await getDocuments(
+        'daily_missions',
+        [
+          ['user_id', '==', user.uid],
+          ['completed', '==', true],
+          ['mission_date', '>=', start.split('T')[0]],
+          ['mission_date', '<=', end.split('T')[0]]
+        ],
+        'mission_date',
+        'desc'
+      );
 
       // Get activity feed for insights
-      const { data: activities } = await supabase
-        .from('activity_feed')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .order('created_at', { ascending: false });
+      const activities = await getDocuments(
+        'activity_feed',
+        [
+          ['user_id', '==', user.uid],
+          ['created_at', '>=', start],
+          ['created_at', '<=', end]
+        ],
+        'created_at',
+        'desc'
+      );
       
       return {
         habitCompletions: habitCompletions || [],

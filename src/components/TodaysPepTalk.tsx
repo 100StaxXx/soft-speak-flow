@@ -6,8 +6,13 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
+<<<<<<< HEAD
+=======
 import { getDocument, getDocuments } from "@/lib/firebase/firestore";
+>>>>>>> origin/main
 import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
+import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
+import { getMentor } from "@/lib/firebase/mentors";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -117,19 +122,27 @@ export const TodaysPepTalk = memo(() => {
       try {
         const today = new Date().toLocaleDateString("en-CA");
 
+<<<<<<< HEAD
+        const mentor = await getMentor(profile.selected_mentor_id);
+=======
         const mentor = await getDocument("mentors", profile.selected_mentor_id);
 
+>>>>>>> origin/main
         if (!mentor || !mentor.slug) {
           setLoading(false);
           return;
         }
 
+<<<<<<< HEAD
+        const data = await getDailyPepTalk(today, mentor.slug);
+=======
         const pepTalks = await getDocuments("daily_pep_talks", [
           ["for_date", "==", today],
           ["mentor_slug", "==", mentor.slug]
         ]);
 
         const data = pepTalks.length > 0 ? pepTalks[0] : null;
+>>>>>>> origin/main
 
         if (data) {
           // Validate and sanitize transcript data

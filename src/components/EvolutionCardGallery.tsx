@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getCompanionEvolutionCards } from "@/lib/firebase/companionEvolutionCards";
+import { getDocument } from "@/lib/firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -26,39 +27,36 @@ export const EvolutionCardGallery = () => {
   const { user } = useAuth();
 
   const { data: cards, isLoading } = useQuery({
-    queryKey: ["evolution-cards", user?.id],
+    queryKey: ["evolution-cards", user?.uid],
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("evolution_stage", { ascending: true });
-
-      if (error) throw error;
+      const data = await getCompanionEvolutionCards(user.uid);
       
-      const evolutionIds = (data || [])
+      const evolutionIds = data
         .map(card => card.evolution_id)
         .filter((id): id is string => Boolean(id));
 
       let evolutionImageLookup: Record<string, string | null> = {};
 
       if (evolutionIds.length > 0) {
-        const { data: evolutionRows, error: evolutionError } = await supabase
-          .from("companion_evolutions")
-          .select("id, image_url")
-          .in("id", evolutionIds);
-
-        if (evolutionError) throw evolutionError;
-
-        evolutionImageLookup = (evolutionRows || []).reduce((acc, row) => {
-          acc[row.id] = row.image_url ?? null;
-          return acc;
-        }, {} as Record<string, string | null>);
+        // Fetch evolution images
+        for (const evolutionId of evolutionIds) {
+          try {
+            const evolution = await getDocument<{ id: string; image_url?: string | null }>(
+              "companion_evolutions",
+              evolutionId
+            );
+            if (evolution) {
+              evolutionImageLookup[evolutionId] = evolution.image_url ?? null;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch evolution ${evolutionId}:`, error);
+          }
+        }
       }
 
-      const cardsWithImages = (data || []).map(card => {
+      const cardsWithImages = data.map(card => {
         // Prioritize card's own image_url to prevent display issues
         // Only fallback to evolution lookup if card doesn't have its own image
         const cardImageUrl = card.image_url;
