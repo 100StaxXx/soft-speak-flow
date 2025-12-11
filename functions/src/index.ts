@@ -2,7 +2,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { defineSecret } from "firebase-functions/params";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import type { CallableRequest } from "firebase-functions/v2/https";
+import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 import { callGemini, parseGeminiJSON } from "./gemini";
 
 admin.initializeApp();
@@ -22,6 +24,12 @@ const apnsTeamId = defineSecret("APNS_TEAM_ID");
 const apnsBundleId = defineSecret("APNS_BUNDLE_ID");
 const apnsAuthKey = defineSecret("APNS_AUTH_KEY");
 const apnsEnvironment = defineSecret("APNS_ENVIRONMENT");
+
+// Define secrets for Apple Subscriptions
+const appleSharedSecret = defineSecret("APPLE_SHARED_SECRET");
+const appleServiceId = defineSecret("APPLE_SERVICE_ID");
+const appleIosBundleId = defineSecret("APPLE_IOS_BUNDLE_ID");
+const appleWebhookAudience = defineSecret("APPLE_WEBHOOK_AUDIENCE");
 
 /**
  * Generate a companion name using AI
@@ -3545,3 +3553,744 @@ async function generateAPNsJWT(keyId: string, teamId: string, privateKey: string
 
   return token;
 }
+
+/**
+ * Complete Referral Stage 3 - Atomically processes referral completion when a user reaches Stage 3
+ * Prevents race conditions and ensures all-or-nothing behavior
+ */
+export const completeReferralStage3 = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "User must be authenticated"
+    );
+  }
+
+  const { referee_id, referrer_id } = request.data;
+
+  // Validate inputs
+  if (!referee_id || !referrer_id) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "referee_id and referrer_id are required"
+    );
+  }
+
+  if (referee_id === referrer_id) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Cannot refer yourself"
+    );
+  }
+
+  // Verify the caller is the referee
+  if (request.auth.uid !== referee_id) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "You can only complete your own referral"
+    );
+  }
+
+  const db = admin.firestore();
+
+  try {
+    // Use a transaction to ensure atomicity
+    return await db.runTransaction(async (transaction) => {
+      // Step 1: Check if already completed
+      const completionRef = db.collection("referral_completions")
+        .where("referee_id", "==", referee_id)
+        .where("referrer_id", "==", referrer_id)
+        .limit(1);
+
+      const completionSnapshot = await transaction.get(completionRef);
+      
+      if (!completionSnapshot.empty) {
+        // Already completed
+        return {
+          success: false,
+          reason: "already_completed",
+          message: "This referral has already been counted"
+        };
+      }
+
+      // Step 2: Get referrer profile to check current count
+      const referrerProfileRef = db.collection("profiles").doc(referrer_id);
+      const referrerProfileDoc = await transaction.get(referrerProfileRef);
+
+      if (!referrerProfileDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          `Referrer profile not found: ${referrer_id}`
+        );
+      }
+
+      const referrerProfile = referrerProfileDoc.data()!;
+      const currentCount = referrerProfile.referral_count || 0;
+      const newCount = currentCount + 1;
+
+      // Step 3: Insert completion record (acts as lock)
+      const completionId = `${referee_id}_${referrer_id}`;
+      const completionDocRef = db.collection("referral_completions").doc(completionId);
+      transaction.set(completionDocRef, {
+        referee_id,
+        referrer_id,
+        stage_reached: 3,
+        completed_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Step 4: Increment referral count
+      transaction.update(referrerProfileRef, {
+        referral_count: newCount,
+      });
+
+      // Step 5: Check for skin unlocks (milestones at 1, 3, 5)
+      let skinUnlocked = false;
+      let unlockedSkinId: string | null = null;
+
+      if (newCount === 1 || newCount === 3 || newCount === 5) {
+        // Find the skin for this milestone
+        const skinsRef = db.collection("companion_skins")
+          .where("unlock_type", "==", "referral")
+          .where("unlock_requirement", "==", newCount)
+          .limit(1);
+
+        const skinsSnapshot = await transaction.get(skinsRef);
+        
+        if (!skinsSnapshot.empty) {
+          const skinDoc = skinsSnapshot.docs[0];
+          unlockedSkinId = skinDoc.id;
+
+          // Check if user already has this skin
+          const userSkinRef = db.collection("user_companion_skins")
+            .where("user_id", "==", referrer_id)
+            .where("skin_id", "==", unlockedSkinId)
+            .limit(1);
+
+          const userSkinSnapshot = await transaction.get(userSkinRef);
+
+          if (userSkinSnapshot.empty) {
+            // Unlock the skin
+            const userSkinId = `${referrer_id}_${unlockedSkinId}`;
+            const userSkinDocRef = db.collection("user_companion_skins").doc(userSkinId);
+            transaction.set(userSkinDocRef, {
+              user_id: referrer_id,
+              skin_id: unlockedSkinId,
+              acquired_via: `referral_milestone_${newCount}`,
+              acquired_at: admin.firestore.FieldValue.serverTimestamp(),
+              is_equipped: false,
+            });
+            skinUnlocked = true;
+          }
+        }
+      }
+
+      // Step 6: Clear referred_by from referee profile
+      const refereeProfileRef = db.collection("profiles").doc(referee_id);
+      transaction.update(refereeProfileRef, {
+        referred_by: null,
+      });
+
+      // All operations succeeded
+      return {
+        success: true,
+        newCount,
+        skinUnlocked,
+        unlockedSkinId: unlockedSkinId || undefined,
+        milestoneReached: newCount === 1 || newCount === 3 || newCount === 5,
+      };
+    });
+  } catch (error) {
+    console.error("Error in completeReferralStage3:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      `Failed to complete referral: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+});
+
+/**
+ * Resolve Streak Freeze - Handles streak freeze resolution (use freeze or reset streak)
+ */
+export const resolveStreakFreeze = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "User must be authenticated"
+    );
+  }
+
+  const { action } = request.data;
+
+  if (action !== "use_freeze" && action !== "reset_streak") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "action must be 'use_freeze' or 'reset_streak'"
+    );
+  }
+
+  const userId = request.auth.uid;
+  const db = admin.firestore();
+
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const profileRef = db.collection("profiles").doc(userId);
+      const profileDoc = await transaction.get(profileRef);
+
+      if (!profileDoc.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Profile not found"
+        );
+      }
+
+      const profile = profileDoc.data()!;
+      const currentStreak = profile.current_habit_streak || 0;
+      const freezesAvailable = profile.streak_freezes_available || 0;
+      const isAtRisk = profile.streak_at_risk || false;
+
+      // Verify streak is actually at risk
+      if (!isAtRisk) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Streak is not at risk"
+        );
+      }
+
+      if (action === "use_freeze") {
+        // Use a freeze
+        if (freezesAvailable <= 0) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "No freezes available"
+          );
+        }
+
+        transaction.update(profileRef, {
+          streak_at_risk: false,
+          streak_at_risk_since: null,
+          streak_freezes_available: freezesAvailable - 1,
+        });
+
+        return {
+          success: true,
+          newStreak: currentStreak,
+          freezesRemaining: freezesAvailable - 1,
+          action: "freeze_used",
+        };
+      } else {
+        // Reset streak
+        transaction.update(profileRef, {
+          current_habit_streak: 0,
+          streak_at_risk: false,
+          streak_at_risk_since: null,
+        });
+
+        return {
+          success: true,
+          newStreak: 0,
+          freezesRemaining: freezesAvailable,
+          action: "streak_reset",
+        };
+      }
+    });
+  } catch (error) {
+    console.error("Error in resolveStreakFreeze:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      "internal",
+      `Failed to resolve streak freeze: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+});
+
+// ============================================================================
+// Apple Subscription Functions
+// ============================================================================
+
+const PROD_VERIFY_URL = "https://buy.itunes.apple.com/verifyReceipt";
+const SANDBOX_VERIFY_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
+const DEFAULT_MONTHLY_PRICE_CENTS = 999; // $9.99
+const DEFAULT_YEARLY_PRICE_CENTS = 5999; // $59.99
+
+interface AppleReceiptInfo {
+  product_id?: string;
+  original_transaction_id?: string;
+  transaction_id?: string;
+  expires_date_ms?: string;
+  purchase_date_ms?: string;
+  original_purchase_date_ms?: string;
+  cancellation_date_ms?: string | null;
+}
+
+interface AppleVerifyResponse {
+  status: number;
+  environment?: string;
+  latest_receipt_info?: AppleReceiptInfo[];
+  receipt?: { [key: string]: unknown };
+}
+
+type SubscriptionStatus = "active" | "trialing" | "cancelled" | "past_due" | "expired";
+
+function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
+  const normalized = (productId ?? "").toLowerCase();
+  if (normalized.includes("year") || normalized.includes("annual") || normalized.includes("yearly")) {
+    return "yearly";
+  }
+  return "monthly";
+}
+
+function parseAppleDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const asNumber = Number(value);
+  if (!Number.isFinite(asNumber)) return null;
+  return new Date(asNumber);
+}
+
+function buildSubscriptionStatus(expiresAt: Date, cancelledAt?: Date | null): SubscriptionStatus {
+  if (cancelledAt && cancelledAt <= new Date()) return "cancelled";
+  if (expiresAt <= new Date()) return "expired";
+  return "active";
+}
+
+function selectLatestReceipt(receiptInfo: AppleReceiptInfo[]): AppleReceiptInfo | null {
+  if (!Array.isArray(receiptInfo) || receiptInfo.length === 0) return null;
+  return [...receiptInfo].sort((a, b) => {
+    const aTime = Number(a.expires_date_ms ?? a.purchase_date_ms ?? 0);
+    const bTime = Number(b.expires_date_ms ?? b.purchase_date_ms ?? 0);
+    return bTime - aTime;
+  })[0];
+}
+
+async function callAppleVerification(receipt: string, url: string, sharedSecret: string): Promise<AppleVerifyResponse> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      "receipt-data": receipt,
+      password: sharedSecret,
+      "exclude-old-transactions": true,
+    }),
+  });
+
+  return await response.json();
+}
+
+async function verifyReceiptWithApple(receipt: string, sharedSecret: string) {
+  if (!receipt) {
+    throw new Error("Receipt data required");
+  }
+
+  const prodResult = await callAppleVerification(receipt, PROD_VERIFY_URL, sharedSecret);
+  if (prodResult.status === 0) {
+    return { result: prodResult, environment: prodResult.environment ?? "Production" };
+  }
+
+  // Sandbox fallback (Apple returns 21007 when a sandbox receipt is sent to production endpoint)
+  if (prodResult.status === 21007) {
+    const sandboxResult = await callAppleVerification(receipt, SANDBOX_VERIFY_URL, sharedSecret);
+    if (sandboxResult.status === 0) {
+      return { result: sandboxResult, environment: sandboxResult.environment ?? "Sandbox" };
+    }
+    throw new Error(`Sandbox verification failed: ${sandboxResult.status}`);
+  }
+
+  throw new Error(`Receipt verification failed: ${prodResult.status}`);
+}
+
+function extractLatestTransaction(verifyResult: AppleVerifyResponse) {
+  const receiptInfo = verifyResult.latest_receipt_info ?? [];
+  const latest = selectLatestReceipt(receiptInfo);
+  if (!latest) return null;
+
+  const expiresAt = parseAppleDate(latest.expires_date_ms);
+  const purchaseDate = parseAppleDate(latest.purchase_date_ms ?? latest.original_purchase_date_ms);
+
+  if (!expiresAt || !purchaseDate) {
+    return null;
+  }
+
+  return {
+    productId: latest.product_id ?? "",
+    transactionId: latest.original_transaction_id ?? latest.transaction_id ?? "",
+    expiresAt,
+    purchaseDate,
+    cancellationDate: parseAppleDate(latest.cancellation_date_ms ?? undefined),
+  };
+}
+
+async function upsertSubscriptionToFirestore(
+  db: admin.firestore.Firestore,
+  payload: {
+    userId: string;
+    transactionId: string;
+    productId: string;
+    plan: "monthly" | "yearly";
+    expiresAt: Date;
+    purchaseDate: Date;
+    cancellationDate?: Date | null;
+    environment?: string;
+    source: "receipt" | "webhook";
+  }
+) {
+  const status = buildSubscriptionStatus(payload.expiresAt, payload.cancellationDate);
+  const now = admin.firestore.Timestamp.now();
+  const amountCents = payload.plan === "monthly" ? DEFAULT_MONTHLY_PRICE_CENTS : DEFAULT_YEARLY_PRICE_CENTS;
+
+  // Check if payment already exists
+  const paymentQuery = await db.collection("payment_history")
+    .where("stripe_payment_intent_id", "==", payload.transactionId)
+    .limit(1)
+    .get();
+
+  const existingPayment = !paymentQuery.empty;
+
+  // Upsert subscription
+  const subscriptionRef = db.collection("subscriptions").doc(payload.userId);
+  await subscriptionRef.set({
+    user_id: payload.userId,
+    stripe_subscription_id: payload.transactionId,
+    stripe_customer_id: payload.transactionId,
+    plan: payload.plan,
+    status,
+    current_period_start: admin.firestore.Timestamp.fromDate(payload.purchaseDate),
+    current_period_end: admin.firestore.Timestamp.fromDate(payload.expiresAt),
+    cancel_at: payload.cancellationDate ? admin.firestore.Timestamp.fromDate(payload.expiresAt) : null,
+    cancelled_at: payload.cancellationDate ? admin.firestore.Timestamp.fromDate(payload.cancellationDate) : null,
+    updated_at: now,
+    environment: payload.environment ?? null,
+    source: payload.source,
+  }, { merge: true });
+
+  // Update profile
+  const profileRef = db.collection("profiles").doc(payload.userId);
+  await profileRef.update({
+    is_premium: status === "active" || status === "trialing",
+    subscription_status: status,
+    subscription_expires_at: admin.firestore.Timestamp.fromDate(payload.expiresAt),
+    updated_at: now,
+  });
+
+  // Create payment history if it doesn't exist
+  if (!existingPayment) {
+    const subscriptionDoc = await subscriptionRef.get();
+    await db.collection("payment_history").add({
+      user_id: payload.userId,
+      subscription_id: subscriptionDoc.id,
+      stripe_payment_intent_id: payload.transactionId,
+      stripe_invoice_id: payload.transactionId,
+      amount: amountCents,
+      currency: "usd",
+      status: status === "active" ? "succeeded" : "pending",
+      created_at: admin.firestore.Timestamp.fromDate(payload.purchaseDate),
+      updated_at: now,
+      metadata: {
+        product_id: payload.productId,
+        environment: payload.environment ?? "unknown",
+      },
+    });
+  }
+
+  return subscriptionRef;
+}
+
+/**
+ * Verify Apple Receipt - Verifies an Apple receipt and updates subscription status
+ */
+export const verifyAppleReceipt = onCall(
+  {
+    secrets: [appleSharedSecret],
+  },
+  async (request: CallableRequest<{ receipt: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const { receipt } = request.data;
+
+    if (!receipt) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Receipt data is required"
+      );
+    }
+
+    const userId = request.auth.uid;
+    const db = admin.firestore();
+    const sharedSecret = appleSharedSecret.value();
+
+    try {
+      // Verify receipt with Apple
+      const { result, environment } = await verifyReceiptWithApple(receipt, sharedSecret);
+
+      // Extract latest transaction
+      const transaction = extractLatestTransaction(result);
+      if (!transaction) {
+        throw new HttpsError(
+          "invalid-argument",
+          "No valid transaction found in receipt"
+        );
+      }
+
+      // Determine plan from product ID
+      const plan = resolvePlanFromProduct(transaction.productId);
+
+      // Upsert subscription
+      await upsertSubscriptionToFirestore(db, {
+        userId,
+        transactionId: transaction.transactionId,
+        productId: transaction.productId,
+        plan,
+        expiresAt: transaction.expiresAt,
+        purchaseDate: transaction.purchaseDate,
+        cancellationDate: transaction.cancellationDate,
+        environment,
+        source: "receipt",
+      });
+
+      return {
+        success: true,
+        plan,
+        status: buildSubscriptionStatus(transaction.expiresAt, transaction.cancellationDate),
+        expiresAt: transaction.expiresAt.toISOString(),
+        environment,
+      };
+    } catch (error) {
+      console.error("Error in verifyAppleReceipt:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError(
+        "internal",
+        `Failed to verify receipt: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+);
+
+/**
+ * Check Apple Subscription - Returns the current subscription status for a user
+ */
+export const checkAppleSubscription = onCall(
+  async (request: CallableRequest) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const userId = request.auth.uid;
+    const db = admin.firestore();
+
+    try {
+      const subscriptionDoc = await db.collection("subscriptions").doc(userId).get();
+
+      if (!subscriptionDoc.exists) {
+        return { subscribed: false };
+      }
+
+      const subscription = subscriptionDoc.data()!;
+      const expiresAt = subscription.current_period_end?.toDate();
+      const isActive = !!(expiresAt && expiresAt > new Date() && subscription.status !== "cancelled");
+
+      return {
+        subscribed: isActive,
+        status: subscription.status as SubscriptionStatus,
+        plan: subscription.plan as "monthly" | "yearly" | undefined,
+        subscription_end: expiresAt?.toISOString(),
+      };
+    } catch (error) {
+      console.error("Error in checkAppleSubscription:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError(
+        "internal",
+        `Failed to check subscription: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+);
+
+/**
+ * Apple Webhook - HTTP endpoint for App Store Server Notifications
+ * This must be an HTTP function (not onCall) because Apple sends POST requests
+ */
+export const appleWebhook = onRequest(
+  {
+    secrets: [appleSharedSecret, appleServiceId, appleIosBundleId, appleWebhookAudience],
+  },
+  async (req: ExpressRequest, res: ExpressResponse) => {
+  // Handle CORS
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  try {
+    const payload = req.body as any;
+    const db = admin.firestore();
+
+    console.log("Received Apple notification:", {
+      type: payload.notification_type ?? payload?.notificationType,
+      timestamp: new Date().toISOString(),
+    });
+
+    // For now, we'll handle the legacy format (without JWT verification)
+    // TODO: Add JWT verification using jose library for production
+    const notificationType = payload.notification_type ?? payload?.notificationType;
+    const latestReceiptInfo = payload.latest_receipt_info;
+
+    if (!latestReceiptInfo) {
+      console.error("No receipt info in notification");
+      res.status(200).send("OK");
+      return;
+    }
+
+    // Extract subscription details
+    const originalTransactionId = latestReceiptInfo.original_transaction_id;
+    const productId = latestReceiptInfo.product_id;
+    const expiresDateMs = latestReceiptInfo.expires_date_ms;
+    const purchaseDateMs = latestReceiptInfo.purchase_date_ms;
+    const cancellationDateMs = latestReceiptInfo.cancellation_date_ms;
+
+    // Find user by transaction ID
+    const subscriptionQuery = await db.collection("subscriptions")
+      .where("stripe_subscription_id", "==", originalTransactionId)
+      .limit(1)
+      .get();
+
+    if (subscriptionQuery.empty) {
+      console.log("No subscription found for transaction:", originalTransactionId);
+      res.status(200).send("OK");
+      return;
+    }
+
+    const subscriptionDoc = subscriptionQuery.docs[0];
+    const userId = subscriptionDoc.data().user_id;
+
+    // Determine plan from product ID
+    const plan = resolvePlanFromProduct(productId);
+
+    // Process notification based on type
+    const expiresAt = parseAppleDate(expiresDateMs);
+    const purchaseDate = parseAppleDate(purchaseDateMs);
+    const cancellationDate = parseAppleDate(cancellationDateMs);
+
+    if (!expiresAt || !purchaseDate) {
+      console.error("Invalid dates in notification");
+      res.status(200).send("OK");
+      return;
+    }
+
+    switch (notificationType) {
+      case "INITIAL_BUY":
+      case "DID_RENEW":
+      case "DID_RECOVER":
+        // Activate subscription
+        await upsertSubscriptionToFirestore(db, {
+          userId,
+          transactionId: originalTransactionId,
+          productId,
+          plan,
+          expiresAt,
+          purchaseDate,
+          cancellationDate: null,
+          source: "webhook",
+        });
+        break;
+
+      case "DID_CHANGE_RENEWAL_STATUS":
+        // Update renewal status
+        const willRenew = payload.auto_renew_status === "true" || payload.auto_renew_status === true;
+        await db.collection("subscriptions").doc(userId).update({
+          status: willRenew ? "active" : "cancelled",
+          cancel_at: willRenew ? null : admin.firestore.Timestamp.fromDate(expiresAt),
+          updated_at: admin.firestore.Timestamp.now(),
+        });
+        break;
+
+      case "DID_CHANGE_RENEWAL_PREF":
+        // Plan changed
+        await upsertSubscriptionToFirestore(db, {
+          userId,
+          transactionId: originalTransactionId,
+          productId,
+          plan,
+          expiresAt,
+          purchaseDate,
+          cancellationDate: null,
+          source: "webhook",
+        });
+        break;
+
+      case "DID_FAIL_TO_RENEW":
+        // Billing issue
+        await db.collection("subscriptions").doc(userId).update({
+          status: "past_due",
+          current_period_end: admin.firestore.Timestamp.fromDate(expiresAt),
+          updated_at: admin.firestore.Timestamp.now(),
+        });
+        await db.collection("profiles").doc(userId).update({
+          subscription_status: "past_due",
+          updated_at: admin.firestore.Timestamp.now(),
+        });
+        break;
+
+      case "CANCEL":
+      case "REVOKE":
+        // Cancelled
+        await upsertSubscriptionToFirestore(db, {
+          userId,
+          transactionId: originalTransactionId,
+          productId,
+          plan,
+          expiresAt,
+          purchaseDate,
+          cancellationDate: cancellationDate || new Date(),
+          source: "webhook",
+        });
+        break;
+
+      case "REFUND":
+        // Refunded - revoke access
+        await db.collection("subscriptions").doc(userId).update({
+          status: "cancelled",
+          cancelled_at: admin.firestore.Timestamp.now(),
+          updated_at: admin.firestore.Timestamp.now(),
+        });
+        await db.collection("profiles").doc(userId).update({
+          is_premium: false,
+          subscription_status: "cancelled",
+          updated_at: admin.firestore.Timestamp.now(),
+        });
+        break;
+
+      default:
+        console.log("Unhandled notification type:", notificationType);
+    }
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("Error processing Apple notification:", error);
+    // Always return 200 to prevent Apple from retrying
+    res.status(200).send("OK");
+  }
+});

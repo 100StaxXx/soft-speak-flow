@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { resolveStreakFreeze } from "@/lib/firebase/functions";
 
 interface StreakAtRiskData {
   streak_at_risk: boolean;
@@ -42,14 +43,7 @@ export function useStreakAtRisk() {
 
   const resolveStreakMutation = useMutation({
     mutationFn: async (action: "use_freeze" | "reset_streak") => {
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/resolve-streak-freeze', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ action }),
-      // });
-      // const data = await response.json();
-      // return data;
-      throw new Error("Streak freeze resolution needs Firebase Cloud Function migration");
+      return await resolveStreakFreeze({ action });
     },
     onSuccess: (result, action) => {
       queryClient.invalidateQueries({ queryKey: ["streak-at-risk"] });

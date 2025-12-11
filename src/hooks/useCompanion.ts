@@ -10,7 +10,7 @@ import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
-import { supabase } from "@/integrations/supabase/client";
+import { completeReferralStage3 } from "@/lib/firebase/functions";
 
 export interface Companion {
   id: string;
@@ -425,25 +425,22 @@ export const useCompanion = () => {
 
       if (!profile?.referred_by) return;
 
-      // TODO: Migrate referral completion to Firebase Cloud Function
       // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
       const result = await retryWithBackoff<CompleteReferralStage3Result>(
         async () => {
-          // TODO: Replace with Firebase Cloud Function call
-          // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/complete-referral-stage3', {...});
-          throw new Error("Referral completion needs Firebase Cloud Function migration");
-          /*
-          const response = await fetch('https://YOUR-FIREBASE-FUNCTION/complete-referral-stage3', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              referee_id: user.uid,
-              referrer_id: profile.referred_by
-            }),
+          const response = await completeReferralStage3({
+            referee_id: user.uid,
+            referrer_id: profile.referred_by
           });
-          const data = await response.json();
-          return data as CompleteReferralStage3Result;
-          */
+          // Map response to match CompleteReferralStage3Result type
+          return {
+            success: response.success,
+            reason: response.reason,
+            message: response.message,
+            new_count: response.newCount,
+            milestone_reached: response.milestoneReached,
+            skin_unlocked: response.skinUnlocked,
+          } as CompleteReferralStage3Result;
         },
         {
           maxAttempts: 3,

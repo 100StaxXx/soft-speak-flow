@@ -74,8 +74,8 @@ supabase secrets set --project-ref tffrgsaawvletgiztfry \
   APNS_AUTH_KEY="<APNS_P8_CONTENTS>" \
   APNS_BUNDLE_ID="com.darrylgraham.revolution" \
   APNS_ENVIRONMENT="production" \
-  VITE_GOOGLE_WEB_CLIENT_ID="371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com" \
-  VITE_GOOGLE_IOS_CLIENT_ID="371878262982-msdt2oq5rl858ft64d33onhrg5l67ofu.apps.googleusercontent.com" \
+  VITE_GOOGLE_WEB_CLIENT_ID="<YOUR_GOOGLE_WEB_CLIENT_ID>" \
+  VITE_GOOGLE_IOS_CLIENT_ID="<YOUR_GOOGLE_IOS_CLIENT_ID>" \
   PAYPAL_CLIENT_ID="<YOUR_PAYPAL_CLIENT_ID>" \
   PAYPAL_SECRET="<YOUR_PAYPAL_SECRET>"
 ```
@@ -188,7 +188,7 @@ SELECT cron.schedule(
 
 ### 6.1 Google OAuth
 In Supabase Dashboard → Authentication → Providers → Google:
-- Client ID: `371878262982-tjcop6qvno6nsl68vurt44211g1835cp.apps.googleusercontent.com`
+- Client ID: `<YOUR_GOOGLE_WEB_CLIENT_ID>` (get from Google Cloud Console)
 - Client Secret: Your Google Client Secret
 
 In Google Cloud Console, add redirect URL:
@@ -221,9 +221,11 @@ In Supabase Dashboard → Storage, create these public buckets:
 
 ## Phase 8: Update Apple Webhook
 
-In App Store Connect → App Information:
-- Production Server URL: `https://tffrgsaawvletgiztfry.supabase.co/functions/v1/apple-webhook`
+In App Store Connect → App Information → App Store Server Notifications:
+- Production Server URL: `https://us-central1-cosmiq-prod.cloudfunctions.net/appleWebhook`
 - Version: Version 2
+
+**Note**: The Apple webhook has been migrated to Firebase Cloud Functions. Make sure to update the URL in App Store Connect.
 
 ---
 

@@ -461,7 +461,7 @@ const Admin = () => {
         locationDescription: postcard.locationDescription,
         caption: postcard.caption,
       });
-      toast.success(`Postcard generated at ${data.locationName}!`);
+      toast.success(`Postcard generated at ${postcard.locationName}!`);
     } catch (error: any) {
       console.error("Error generating postcard:", error);
       toast.error(error.message || "Failed to generate postcard");

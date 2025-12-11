@@ -88,4 +88,3 @@ const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 ## Functions to Update
 
 All Supabase Edge Functions in `supabase/functions/generate-*` that use Lovable AI Gateway should be migrated to use direct Gemini API calls.
-

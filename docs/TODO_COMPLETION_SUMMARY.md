@@ -21,7 +21,7 @@
 3. **Frontend Environment Variable** ✅
    - Documentation created: `docs/FRONTEND_ENV_SETUP.md`
    - Instructions provided for setting `VITE_WEB_PUSH_KEY`
-   - Value: `BOQz9DrqwYdOPwda_zhei3g-VZo2KFE0Itl19I6fTVTI-BlizrAx4IK3y13uNV9rZFEfQ9Y88dxviC1sP8wXD2g`
+   - Value should be set in your `.env` file (see documentation)
 
 4. **APNS Function** ✅
    - `sendApnsNotification` function created

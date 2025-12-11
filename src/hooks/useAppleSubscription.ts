@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct, openManageSubscriptions } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
+import { verifyAppleReceipt } from '@/lib/firebase/functions';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
 
@@ -103,14 +104,8 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available");
       }
       
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/verify-apple-receipt', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ receipt }),
-      // });
-      // if (!response.ok) throw new Error('Receipt verification failed');
-      
-      throw new Error("Apple receipt verification needs Firebase Cloud Function migration");
+      // Verify receipt with Firebase
+      await verifyAppleReceipt({ receipt });
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
@@ -195,14 +190,8 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available for subscription");
       }
 
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/verify-apple-receipt', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ receipt }),
-      // });
-      // if (!response.ok) throw new Error('Receipt verification failed');
-      
-      throw new Error("Apple receipt verification needs Firebase Cloud Function migration");
+      // Verify receipt with Firebase
+      await verifyAppleReceipt({ receipt });
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });

@@ -2,6 +2,7 @@ import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { logger } from "@/utils/logger";
+import { checkAppleSubscription } from "@/lib/firebase/functions";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
@@ -30,17 +31,7 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user) return null;
 
-      // TODO: Migrate to Firebase Cloud Function
-      // const response = await fetch('https://YOUR-FIREBASE-FUNCTION/check-apple-subscription', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ userId: user.uid }),
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      // For now, return null - needs Firebase Cloud Function implementation
-      return null;
+      return await checkAppleSubscription();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance

@@ -593,3 +593,62 @@ export async function processPaypalPayout(data: {
   }>("processPaypalPayout", data);
 }
 
+/**
+ * Complete Referral Stage 3 - Atomically processes referral completion when a user reaches Stage 3
+ */
+export async function completeReferralStage3(data: {
+  referee_id: string;
+  referrer_id: string;
+}) {
+  return callFirebaseFunction<typeof data, {
+    success: boolean;
+    reason?: string;
+    message?: string;
+    newCount?: number;
+    skinUnlocked?: boolean;
+    unlockedSkinId?: string;
+    milestoneReached?: boolean;
+  }>("completeReferralStage3", data);
+}
+
+/**
+ * Resolve Streak Freeze - Handles streak freeze resolution (use freeze or reset streak)
+ */
+export async function resolveStreakFreeze(data: {
+  action: "use_freeze" | "reset_streak";
+}) {
+  return callFirebaseFunction<typeof data, {
+    success: boolean;
+    newStreak: number;
+    freezesRemaining: number;
+    action: "freeze_used" | "streak_reset";
+  }>("resolveStreakFreeze", data);
+}
+
+/**
+ * Verify Apple Receipt - Verifies an Apple receipt and updates subscription status
+ */
+export async function verifyAppleReceipt(data: {
+  receipt: string;
+}) {
+  return callFirebaseFunction<typeof data, {
+    success: boolean;
+    plan: "monthly" | "yearly";
+    status: string;
+    expiresAt: string;
+    environment?: string;
+  }>("verifyAppleReceipt", data);
+}
+
+/**
+ * Check Apple Subscription - Returns the current subscription status for a user
+ */
+export async function checkAppleSubscription() {
+  return callFirebaseFunction<{}, {
+    subscribed: boolean;
+    status?: string;
+    plan?: "monthly" | "yearly";
+    subscription_end?: string;
+  }>("checkAppleSubscription", {});
+}
+

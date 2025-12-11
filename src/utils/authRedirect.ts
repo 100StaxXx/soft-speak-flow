@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getProfile, createProfile, updateProfile } from "@/lib/firebase/profiles";
 import { getResolvedMentorId } from "./mentor";
 
 /**
@@ -7,23 +7,12 @@ import { getResolvedMentorId } from "./mentor";
  */
 export const getAuthRedirectPath = async (userId: string): Promise<string> => {
   try {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("selected_mentor_id, onboarding_completed, onboarding_data")
-      .eq("id", userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    const profile = await getProfile(userId);
 
     const resolvedMentorId = getResolvedMentorId(profile);
 
     if (profile?.onboarding_completed && !profile.selected_mentor_id && resolvedMentorId) {
-      await supabase
-        .from("profiles")
-        .update({ selected_mentor_id: resolvedMentorId })
-        .eq("id", userId);
+      await updateProfile(userId, { selected_mentor_id: resolvedMentorId });
     }
 
     // If onboarding is completed, always go to tasks
@@ -48,24 +37,16 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
  * Ensures a profile exists for a user, creating one if needed
  * Also updates timezone to match user's current device
  */
-export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
+export const ensureProfile = async (userId: string, email: string | null, metadata?: { timezone?: string }): Promise<void> => {
   try {
-    const { data: existing, error: fetchError } = await supabase
-      .from("profiles")
-      .select("id, timezone")
-      .eq("id", userId)
-      .single();
+    const existing = await getProfile(userId);
+    const userTimezone = metadata?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    if (fetchError && fetchError.code === 'PGRST116') {
+    if (!existing) {
       // Profile doesn't exist, create it
       console.log(`[ensureProfile] Creating new profile for user ${userId}`);
-      const { error: createError } = await supabase
-        .from("profiles")
-        .insert({
-          id: userId,
-          email: email ?? null,
+      try {
+        await createProfile(userId, email, {
           timezone: userTimezone,
           is_premium: false,
           preferences: null,
@@ -73,29 +54,22 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
           onboarding_completed: false,
           onboarding_data: {},
         });
-
-      if (createError) {
+        console.log(`[ensureProfile] Profile created successfully for user ${userId}`);
+      } catch (createError: any) {
         // Ignore duplicate errors (race condition)
-        if (createError.code !== '23505') { // 23505 = unique violation
+        if (createError.code === 'already-exists' || createError.message?.includes('already exists')) {
+          console.log(`[ensureProfile] Profile already exists (race condition) for user ${userId}`);
+        } else {
           console.error('[ensureProfile] Error creating profile:', createError);
           throw createError;
-        } else {
-          console.log(`[ensureProfile] Profile already exists (race condition) for user ${userId}`);
         }
-      } else {
-        console.log(`[ensureProfile] Profile created successfully for user ${userId}`);
       }
-    } else if (existing) {
+    } else {
       console.log(`[ensureProfile] Profile already exists for user ${userId}`);
+      // Update timezone if it's different
       if (existing.timezone !== userTimezone) {
-        // Update timezone if it's different
-        await supabase
-          .from("profiles")
-          .update({ timezone: userTimezone })
-          .eq("id", userId);
+        await updateProfile(userId, { timezone: userTimezone });
       }
-    } else if (fetchError) {
-      throw fetchError;
     }
   } catch (error) {
     console.error('[ensureProfile] Unexpected error:', error);

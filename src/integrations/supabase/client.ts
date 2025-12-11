@@ -27,16 +27,30 @@ const supabaseStorage = {
 let supabase: ReturnType<typeof createClient<Database>>;
 
 if (SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
+  console.log('✅ Supabase client initialized with URL:', SUPABASE_URL);
   supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       storage: supabaseStorage,
       persistSession: true,
       autoRefreshToken: true,
-    }
+    },
+    db: {
+      schema: 'public',
+    },
+    global: {
+      headers: {
+        'x-client-info': 'cosmiq-web',
+      },
+    },
   });
 } else {
   // Mock client for migration period - prevents crashes but logs warnings
-  console.warn('⚠️ Supabase client not initialized - migrating to Firebase. Some features may not work.');
+  console.error('❌ Supabase client not initialized - missing environment variables!');
+  console.error('Missing:', { 
+    SUPABASE_URL: !SUPABASE_URL, 
+    SUPABASE_PUBLISHABLE_KEY: !SUPABASE_PUBLISHABLE_KEY 
+  });
+  console.warn('⚠️ Using placeholder client - mentors will NOT load!');
   supabase = createClient<Database>('https://placeholder.supabase.co', 'placeholder-key', {
     auth: {
       storage: supabaseStorage,
