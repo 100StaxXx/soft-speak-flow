@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getDocuments, getDocument, setDocument, deleteDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -7,7 +7,8 @@ import {
   generateCompanionImage, 
   generateSampleCard, 
   generateCosmicPostcard,
-  generateCompletePepTalk
+  generateCompletePepTalk,
+  generateDailyMentorPepTalks
 } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ const Admin = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [generatingDailyPepTalks, setGeneratingDailyPepTalks] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Companion Image Tester State
@@ -150,6 +152,9 @@ const Admin = () => {
 
     checkAdmin();
   }, [user, authLoadingFromHook]); // toast from sonner is stable
+
+  const [searchParams] = useSearchParams();
+  const hasAutoTriggered = useRef(false);
 
   useEffect(() => {
     if (isAdmin) {
@@ -511,6 +516,60 @@ const Admin = () => {
     }
   };
 
+  const handleGenerateDailyPepTalks = async () => {
+    setGeneratingDailyPepTalks(true);
+    try {
+      toast.info("Generating daily pep talks for all mentors...");
+      const result = await generateDailyMentorPepTalks();
+      
+      if (result?.results) {
+        const successCount = result.results.filter((r: any) => r.status === "generated").length;
+        const skippedCount = result.results.filter((r: any) => r.status === "skipped").length;
+        const errorCount = result.results.filter((r: any) => r.status === "error").length;
+        
+        if (errorCount > 0) {
+          const errors = result.results
+            .filter((r: any) => r.status === "error")
+            .map((r: any) => `${r.mentor}: ${r.error || "Unknown error"}`)
+            .join(", ");
+          toast.warning(
+            `Generated ${successCount}, skipped ${skippedCount}, ${errorCount} errors. Errors: ${errors}`,
+            { duration: 8000 }
+          );
+        } else {
+          toast.success(
+            `Successfully generated ${successCount} daily pep talks. ${skippedCount} were already generated.`,
+            { duration: 5000 }
+          );
+        }
+      } else {
+        toast.success("Daily pep talks generation completed!");
+      }
+    } catch (error) {
+      console.error("Error generating daily pep talks:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate daily pep talks");
+    } finally {
+      setGeneratingDailyPepTalks(false);
+    }
+  };
+
+  // Temporary: Auto-trigger daily pep talks generation on admin page load (testing)
+  useEffect(() => {
+    if (
+      isAdmin &&
+      !generatingDailyPepTalks &&
+      !hasAutoTriggered.current
+    ) {
+      hasAutoTriggered.current = true;
+      console.log('🔧 Auto-triggering daily pep talks generation (testing mode)');
+      // Small delay to ensure page is fully loaded
+      setTimeout(() => {
+        handleGenerateDailyPepTalks();
+      }, 1000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, generatingDailyPepTalks]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 flex items-center justify-center">
@@ -586,6 +645,45 @@ const Admin = () => {
                 </Button>
               </div>
             ))}
+          </div>
+        </Card>
+
+        {/* Daily Operations */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">📅 Daily Operations</h2>
+          <p className="text-muted-foreground mb-6">
+            Manually trigger daily operations that normally run automatically via scheduled functions
+          </p>
+          
+          <div className="space-y-4">
+            <div className="p-4 border rounded-2xl bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold text-lg">Generate Daily Pep Talks</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate today's pep talks for all mentors. This normally runs automatically at 00:01 UTC daily.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleGenerateDailyPepTalks}
+                disabled={generatingDailyPepTalks}
+                variant="default"
+                className="mt-4"
+              >
+                {generatingDailyPepTalks ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Generate Today's Pep Talks
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
 

@@ -71,7 +71,7 @@ export const QuoteOfTheDay = () => {
           
           setTodaysQuote({
             id: matchingQuote.id,
-            text: matchingQuote.quote,
+            text: matchingQuote.text || '',
             author: matchingQuote.author || null,
             category: topicCategory || null,
           });

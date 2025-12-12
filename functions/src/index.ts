@@ -1860,6 +1860,98 @@ export const generateDailyQuotes = functions.https.onCall(async (request) => {
 /**
  * Generate Daily Mentor Pep Talks - AI-powered daily pep talk generation for all mentors
  */
+// Temporary HTTP endpoint for triggering via service account (testing only)
+export const triggerDailyPepTalksHttp = onRequest(
+  {
+    secrets: [geminiApiKey],
+    cors: true,
+  },
+  async (req: ExpressRequest, res: ExpressResponse) => {
+    // Simple auth check - expect a secret key in the request
+    const secretKey = req.headers['x-secret-key'] || req.query.secret;
+    const expectedSecret = process.env.TRIGGER_SECRET || 'temp-trigger-secret-123';
+    
+    if (secretKey !== expectedSecret) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      const db = admin.firestore();
+      const today = new Date().toISOString().split("T")[0];
+      const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+      const results = [];
+
+      for (const mentorSlug of mentorSlugs) {
+        try {
+          const existingSnapshot = await db
+            .collection("daily_pep_talks")
+            .where("mentor_slug", "==", mentorSlug)
+            .where("for_date", "==", today)
+            .limit(1)
+            .get();
+
+          if (!existingSnapshot.empty) {
+            results.push({ mentor: mentorSlug, status: "skipped" });
+            continue;
+          }
+
+          const mentorSnapshot = await db
+            .collection("mentors")
+            .where("slug", "==", mentorSlug)
+            .limit(1)
+            .get();
+
+          if (mentorSnapshot.empty) {
+            results.push({ mentor: mentorSlug, status: "error", error: "Mentor not found" });
+            continue;
+          }
+
+          const mentor = mentorSnapshot.docs[0].data();
+          const prompt = `Generate a daily motivational pep talk for mentor ${mentorSlug}. The mentor's personality is: ${mentor.description || "motivational and inspiring"}. Return JSON: {"script": "Full pep talk script (2-3 minutes of speaking)", "title": "Engaging title", "summary": "Brief summary"}`;
+
+          const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
+            temperature: 0.8,
+            maxOutputTokens: 2048,
+            apiKey: geminiApiKey.value(),
+          });
+
+          const pepTalk = parseGeminiJSON(response.text);
+
+          if (!pepTalk.script || !pepTalk.title) {
+            results.push({ mentor: mentorSlug, status: "error", error: "Invalid response from AI" });
+            continue;
+          }
+
+          await db.collection("daily_pep_talks").add({
+            mentor_slug: mentorSlug,
+            mentor_id: mentorSnapshot.docs[0].id,
+            title: pepTalk.title,
+            summary: pepTalk.summary || "",
+            script: pepTalk.script,
+            audio_url: null,
+            for_date: today,
+            topic_category: "motivation",
+            intensity: "balanced",
+            emotional_triggers: [],
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          results.push({ mentor: mentorSlug, status: "generated" });
+        } catch (error) {
+          console.error(`Error generating pep talk for ${mentorSlug}:`, error);
+          results.push({ mentor: mentorSlug, status: "error", error: error instanceof Error ? error.message : "Unknown error" });
+        }
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error("Error in triggerDailyPepTalksHttp:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }
+);
+
 export const generateDailyMentorPepTalks = functions.https.onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");

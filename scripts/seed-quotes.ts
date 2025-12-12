@@ -274,7 +274,6 @@ async function checkQuotesExist(
   
   for (let i = 0; i < quotes.length; i += batchSize) {
     const batch = quotes.slice(i, i + batchSize);
-    const texts = batch.map(q => q.text);
     
     // Check each quote individually (could be optimized with a compound query if needed)
     for (const quote of batch) {
@@ -413,6 +412,9 @@ async function seedQuotesWithAutoFetch(
     } else if (dryRun) {
       inserted += batchInserted;
       console.log(`   ✅ Validated ${batchInserted} quotes (${inserted}/${targetCount} total validated, ${quoteQueue.length} in queue)`);
+    } else if (batchQuotes.length > 0 && batchInserted === 0) {
+      // All quotes in this batch were duplicates
+      console.log(`   ⏭️  Skipped ${batchQuotes.length} quotes (all duplicates)`);
     }
   }
 
