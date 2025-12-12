@@ -1,3 +1,39 @@
+# ⚠️ ARCHIVED: Supabase Migration Guide
+
+**Status:** This document is **ARCHIVED** and kept for historical reference only.
+
+**Current Status:** The migration from Supabase to Firebase has been **COMPLETED**. This app now uses Firebase exclusively.
+
+---
+
+## Migration Complete ✅
+
+The Cosmiq app has been fully migrated from Supabase to Firebase. All active code now uses:
+
+- ✅ **Firebase Authentication** (replaces Supabase Auth)
+- ✅ **Firestore Database** (replaces Supabase PostgreSQL)
+- ✅ **Firebase Cloud Functions** (replaces Supabase Edge Functions)
+- ✅ **Firebase Storage** (replaces Supabase Storage)
+
+---
+
+## For Current Setup
+
+If you're setting up the app for the first time, see:
+
+- **`FIREBASE-SETUP.md`** - Firebase project setup
+- **`SET_FIREBASE_SECRETS.md`** - Firebase Functions secrets configuration
+- **`FRONTEND_ENV_SETUP.md`** - Frontend environment variables
+
+---
+
+## Historical Reference
+
+The content below is kept for historical reference only and should **NOT** be used for current setup.
+
+<details>
+<summary>Click to view archived Supabase setup instructions</summary>
+
 # Supabase Migration Guide: Fresh Start on New Project
 
 ## Overview
@@ -98,179 +134,11 @@ supabase secrets set --project-ref tffrgsaawvletgiztfry \
 | APPLE_PRIVATE_KEY | Apple Auth Private Key | ✅ |
 | APPLE_SERVICE_ID | com.darrylgraham.revolution.web | ✅ |
 | APPLE_SHARED_SECRET | App Store shared secret | ✅ |
-| APPLE_IOS_BUNDLE_ID | com.darrylgraham.revolution | ✅ |
-| APNS_KEY_ID | APNs Key ID | ✅ |
-| APNS_TEAM_ID | APNs Team ID | ✅ |
-| APNS_AUTH_KEY | APNs Auth Key (P8) | ✅ |
-| APNS_BUNDLE_ID | APNs Bundle ID | ✅ |
-| GOOGLE_CLIENT_ID | Google OAuth Client ID | Optional |
-| VITE_GOOGLE_WEB_CLIENT_ID | Google Web Client ID | Optional |
-| VITE_GOOGLE_IOS_CLIENT_ID | Google iOS Client ID | Optional |
-| DISCORD_BOT_TOKEN | Discord bot token | Optional |
-| DISCORD_WEBHOOK_URL | Discord webhook URL | Optional |
-| DISCORD_GUILD_ID | Discord Guild ID | Optional |
-| PAYPAL_CLIENT_ID | PayPal Client ID | Optional |
-| PAYPAL_SECRET | PayPal Secret | Optional |
-| STRIPE_SECRET_KEY | Stripe Secret Key | Optional |
-| VITE_NATIVE_REDIRECT_BASE | https://app.cosmiq.quest | ✅ |
+
+</details>
 
 ---
 
-## Phase 4: Deploy Edge Functions
-
-### 4.1 Deploy All Functions
-```bash
-# Deploy all edge functions (70+)
-for fn in $(ls supabase/functions | grep -v '^_'); do
-  echo "Deploying $fn..."
-  supabase functions deploy "$fn" --project-ref tffrgsaawvletgiztfry
-done
-```
-
----
-
-## Phase 5: Configure Cron Jobs
-
-Run in Supabase SQL Editor:
-```sql
--- Daily pushes (1 PM UTC)
-SELECT cron.schedule(
-  'dispatch-daily-pushes-native',
-  '0 13 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/dispatch-daily-pushes-native',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer <YOUR_ANON_KEY>' -- TODO: Replace with actual anon key for tffrgsaawvletgiztfry
-    ),
-    body := '{}'::jsonb
-  ) AS request_id
-  $$
-);
-
--- Daily quote pushes (2:30 PM UTC)
-SELECT cron.schedule(
-  'dispatch-daily-quote-pushes',
-  '30 14 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/dispatch-daily-quote-pushes',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer <YOUR_ANON_KEY>' -- TODO: Replace with actual anon key for tffrgsaawvletgiztfry
-    ),
-    body := '{}'::jsonb
-  ) AS request_id
-  $$
-);
-
--- Daily decay (5 AM UTC)
-SELECT cron.schedule(
-  'process-daily-decay',
-  '0 5 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://tffrgsaawvletgiztfry.supabase.co/functions/v1/process-daily-decay',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer <YOUR_ANON_KEY>' -- TODO: Replace with actual anon key for tffrgsaawvletgiztfry
-    ),
-    body := '{}'::jsonb
-  ) AS request_id
-  $$
-);
-```
-
----
-
-## Phase 6: Configure OAuth Providers
-
-### 6.1 Google OAuth
-In Supabase Dashboard → Authentication → Providers → Google:
-- Client ID: `<YOUR_GOOGLE_WEB_CLIENT_ID>` (get from Google Cloud Console)
-- Client Secret: Your Google Client Secret
-
-In Google Cloud Console, add redirect URL:
-- `https://tffrgsaawvletgiztfry.supabase.co/auth/v1/callback`
-
-### 6.2 Apple Sign In
-In Supabase Dashboard → Authentication → Providers → Apple:
-- Service ID: `com.darrylgraham.revolution.web`
-- Team ID: `B6VW78ABTR`
-- Key ID: `FPGVLVRK63`
-- Private Key: Your Apple Private Key
-
----
-
-## Phase 7: Create Storage Buckets
-
-In Supabase Dashboard → Storage, create these public buckets:
-- `pep-talk-audio`
-- `audio-pep-talks`
-- `video-pep-talks`
-- `quotes-json`
-- `mentors-avatars`
-- `voice-samples`
-- `playlists-assets`
-- `hero-media`
-- `mentor-audio`
-- `evolution-cards`
-
----
-
-## Phase 8: Update Apple Webhook
-
-In App Store Connect → App Information → App Store Server Notifications:
-- Production Server URL: `https://us-central1-cosmiq-prod.cloudfunctions.net/appleWebhook`
-- Version: Version 2
-
-**Note**: The Apple webhook has been migrated to Firebase Cloud Functions. Make sure to update the URL in App Store Connect.
-
----
-
-## Phase 9: Regenerate Types & Rebuild
-
-```bash
-# Regenerate TypeScript types
-./REGENERATE_TYPES.sh
-
-# Build app
-npm run build
-
-# Sync iOS
-npx cap sync ios
-```
-
----
-
-## Phase 10: Validation Checklist
-
-- [ ] User signup/login works
-- [ ] Companion creation succeeds
-- [ ] Quest completion awards XP
-- [ ] Subscription purchase works
-- [ ] Push notifications fire
-- [ ] Mentor chat responds
-- [ ] Daily missions generate
-- [ ] Storage files upload/download
-
----
-
-## Troubleshooting
-
-### Edge functions 500 errors
-```bash
-supabase functions logs <function-name> --project-ref tffrgsaawvletgiztfry
-```
-
-### Missing secrets
-```bash
-supabase secrets list --project-ref tffrgsaawvletgiztfry
-```
-
-### Cron jobs not firing
-```sql
-SELECT * FROM cron.job;
-SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
-```
+**Last Updated:** 2025-01-27  
+**Migration Completed:** 2024-12-11  
+**Status:** Archived for historical reference

@@ -36,6 +36,7 @@ function initializeFirebaseAdmin() {
   }
 
   const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
   let app;
 
   if (serviceAccountPath) {
@@ -43,12 +44,26 @@ function initializeFirebaseAdmin() {
       const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8')) as ServiceAccount;
       app = initializeApp({
         credential: cert(serviceAccount),
+        projectId: projectId || serviceAccount.project_id,
       });
+      console.log('✅ Initialized Firebase Admin with service account');
     } catch (error) {
-      app = initializeApp();
+      console.warn('⚠️  Could not load service account, trying default credentials...');
+      app = initializeApp(projectId ? { projectId } : undefined);
     }
   } else {
-    app = initializeApp();
+    // Use default credentials (useful for local development with Firebase emulator or gcloud auth)
+    try {
+      app = initializeApp(projectId ? { projectId } : undefined);
+      console.log('✅ Initialized Firebase Admin with default credentials' + (projectId ? ` (project: ${projectId})` : ''));
+    } catch (error) {
+      console.error('❌ Failed to initialize Firebase Admin');
+      console.error('   Please set one of:');
+      console.error('   - GOOGLE_APPLICATION_CREDENTIALS (path to service account JSON)');
+      console.error('   - FIREBASE_PROJECT_ID or VITE_FIREBASE_PROJECT_ID (with gcloud auth)');
+      console.error('   See: https://firebase.google.com/docs/admin/setup');
+      process.exit(1);
+    }
   }
 
   return getFirestore(app);

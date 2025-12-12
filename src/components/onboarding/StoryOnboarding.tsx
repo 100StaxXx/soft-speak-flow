@@ -123,6 +123,7 @@ export const StoryOnboarding = () => {
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorsLoading, setMentorsLoading] = useState(true);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
@@ -134,10 +135,49 @@ export const StoryOnboarding = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage]);
 
+  // Load mentors when mentor-grid stage is shown (in case they weren't loaded yet)
+  useEffect(() => {
+    if (stage === "mentor-grid" && mentors.length === 0 && !mentorsLoading) {
+      const loadMentorsForGrid = async () => {
+        try {
+          setMentorsLoading(true);
+          console.log("[StoryOnboarding] Loading mentors for grid...");
+          const mentorsData = await getAllMentors();
+          if (mentorsData && mentorsData.length > 0) {
+            const mappedMentors: Mentor[] = mentorsData.map(m => ({
+              id: m.id,
+              name: m.name,
+              description: m.description || "",
+              tone_description: m.tone_description || "",
+              avatar_url: m.avatar_url ?? undefined,
+              tags: m.tags || [],
+              mentor_type: m.mentor_type || "",
+              target_user_type: m.target_user_type ?? undefined,
+              slug: m.slug || "",
+              short_title: m.short_title || "",
+              primary_color: m.primary_color || "#7B68EE",
+              target_user: m.target_user || "",
+              themes: m.themes ?? undefined,
+              intensity_level: m.intensity_level ?? undefined,
+            }));
+            setMentors(mappedMentors);
+            console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for grid`);
+          }
+        } catch (error) {
+          console.error("[StoryOnboarding] Error loading mentors for grid:", error);
+        } finally {
+          setMentorsLoading(false);
+        }
+      };
+      loadMentorsForGrid();
+    }
+  }, [stage, mentors.length, mentorsLoading]);
+
   // Load mentors on mount from Firestore
   useEffect(() => {
     const loadMentors = async () => {
       try {
+        setMentorsLoading(true);
         console.log("[StoryOnboarding] Loading mentors from Firestore...");
         const mentorsData = await getAllMentors();
         
@@ -165,6 +205,8 @@ export const StoryOnboarding = () => {
         }
       } catch (error) {
         console.error("[StoryOnboarding] ❌ Exception loading mentors from Firestore:", error);
+      } finally {
+        setMentorsLoading(false);
       }
     };
     loadMentors();
@@ -244,6 +286,47 @@ export const StoryOnboarding = () => {
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
 
+    // Ensure mentors are loaded before attempting to match
+    let mentorsToUse = mentors;
+    if (mentorsLoading || mentors.length === 0) {
+      console.log("[StoryOnboarding] Mentors not loaded yet, fetching now...");
+      try {
+        const mentorsData = await getAllMentors();
+        if (mentorsData && mentorsData.length > 0) {
+          const mappedMentors: Mentor[] = mentorsData.map(m => ({
+            id: m.id,
+            name: m.name,
+            description: m.description || "",
+            tone_description: m.tone_description || "",
+            avatar_url: m.avatar_url ?? undefined,
+            tags: m.tags || [],
+            mentor_type: m.mentor_type || "",
+            target_user_type: m.target_user_type ?? undefined,
+            slug: m.slug || "",
+            short_title: m.short_title || "",
+            primary_color: m.primary_color || "#7B68EE",
+            target_user: m.target_user || "",
+            themes: m.themes ?? undefined,
+            intensity_level: m.intensity_level ?? undefined,
+          }));
+          setMentors(mappedMentors);
+          setMentorsLoading(false);
+          mentorsToUse = mappedMentors;
+          console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for matching`);
+        }
+      } catch (error) {
+        console.error("[StoryOnboarding] Error loading mentors:", error);
+      }
+    }
+
+    // If still no mentors after fetch attempt, show error and go to grid
+    if (mentorsToUse.length === 0) {
+      console.error("[StoryOnboarding] No mentors available for matching");
+      toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+      setStage("mentor-grid");
+      return;
+    }
+
     // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
     const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
 
@@ -271,7 +354,7 @@ export const StoryOnboarding = () => {
       exactMatches: number;
       intensityMatch: boolean;
     }
-    const mentorScores: MentorScore[] = mentors.map(mentor => {
+    const mentorScores: MentorScore[] = mentorsToUse.map(mentor => {
       const mentorCanonicalTags = (() => {
         const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
         if (normalized.length > 0) {
@@ -356,9 +439,9 @@ export const StoryOnboarding = () => {
     // Fallback: if no match or score is 0, default to a reasonable mentor
     if (!bestMatch || topScore === 0) {
       // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
-      bestMatch = mentors.find(m => m.slug === "atlas")
-        || mentors.find(m => m.slug === "eli")
-        || mentors[0];
+      bestMatch = mentorsToUse.find(m => m.slug === "atlas")
+        || mentorsToUse.find(m => m.slug === "eli")
+        || mentorsToUse[0];
     }
 
     if (bestMatch) {
