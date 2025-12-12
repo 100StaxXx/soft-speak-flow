@@ -127,7 +127,7 @@ EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -175,17 +175,34 @@ const AppContent = memo(() => {
     }
   }, [session]);
   
-  // Hide splash screen once profile data is loaded (or failed to load)
+  // Hide splash screen once auth is loaded (not profile - profile can load in background)
+  // This prevents iOS watchdog timeout (0xbadf00d) from blocking network calls
   useEffect(() => {
-    if (!profileLoading && !splashHidden) {
+    // Safety net: Force hide splash after 10 seconds max to prevent watchdog timeout
+    const maxTimeout = setTimeout(() => {
+      if (!splashHidden) {
+        console.warn('[App] Force hiding splash screen after 10s timeout');
+        hideSplashScreen();
+        setSplashHidden(true);
+      }
+    }, 10000);
+
+    // Normal hide: Hide after auth loads (not profile - profile is non-blocking)
+    if (!authLoading && !splashHidden) {
       // Small delay to ensure smooth transition
       const timer = setTimeout(() => {
         hideSplashScreen();
         setSplashHidden(true);
-      }, 100);
-      return () => clearTimeout(timer);
+        clearTimeout(maxTimeout);
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(maxTimeout);
+      };
     }
-  }, [profileLoading, splashHidden]);
+
+    return () => clearTimeout(maxTimeout);
+  }, [authLoading, splashHidden]);
   
   const resolvedMentorId = getResolvedMentorId(profile);
 

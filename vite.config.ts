@@ -142,6 +142,8 @@ export default defineConfig(({ mode }) => ({
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
-    drop: mode === 'production' ? ['console', 'debugger'] : [],
+    // Drop console.log/debug/info in production, but keep error/warn for debugging
+    pure: mode === 'production' ? ['console.log', 'console.debug', 'console.info'] : [],
+    drop: mode === 'production' ? ['debugger'] : [],
   },
 }));
