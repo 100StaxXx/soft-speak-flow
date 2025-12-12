@@ -18,11 +18,43 @@ export const useAuth = () => {
 
   useEffect(() => {
     let isInitialCheck = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    console.log('[useAuth] Setting up auth state listener...');
+    
+    // Safety timeout: If auth state doesn't resolve within 10 seconds, stop loading
+    // This prevents infinite loading if Firebase fails to initialize
+    timeoutId = setTimeout(() => {
+      if (isInitialCheck) {
+        console.warn('[useAuth] ⚠️ Auth state check timeout after 10s - proceeding without user');
+        setLoading(false);
+        isInitialCheck = false;
+      }
+    }, 10000);
+    
+    // Check if Firebase auth is initialized
+    if (!firebaseAuth) {
+      console.error('[useAuth] ❌ Firebase auth not initialized - check Firebase config');
+      setLoading(false);
+      if (timeoutId) clearTimeout(timeoutId);
+      return;
+    }
+    
+    console.log('[useAuth] ✅ Firebase auth available, waiting for auth state...');
     
     // Set up Firebase auth state listener
+    console.log('[useAuth] Registering onAuthStateChanged listener...');
     const unsubscribe = onAuthStateChanged(
       firebaseAuth,
       async (firebaseUser: FirebaseUser | null) => {
+        console.log('[useAuth] 🔥 Auth state changed:', firebaseUser ? `User: ${firebaseUser.email}` : 'No user');
+        
+        // Clear timeout since we got a response
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
         const authUser = convertFirebaseUser(firebaseUser);
         
         if (authUser) {
@@ -45,7 +77,12 @@ export const useAuth = () => {
         isInitialCheck = false;
       },
       (error) => {
-        console.error('Firebase auth state error:', error);
+        // Clear timeout on error
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        console.error('[useAuth] Firebase auth state error:', error);
         setUser(null);
         setSession(null);
         setLoading(false);
@@ -53,7 +90,10 @@ export const useAuth = () => {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

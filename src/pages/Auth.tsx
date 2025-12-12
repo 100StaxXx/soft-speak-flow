@@ -72,7 +72,16 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { session: authSession } = useAuth();
+  const { session: authSession, loading: authLoading } = useAuth();
+
+  // Hide splash screen immediately when Auth page loads (don't wait for auth check)
+  useEffect(() => {
+    import('@/utils/capacitor').then(({ hideSplashScreen }) => {
+      hideSplashScreen().catch(() => {
+        // Ignore errors - splash screen might not be available on web
+      });
+    });
+  }, []);
 
   // Add global error handler for unhandled promise rejections (prevents iOS crashes)
   useEffect(() => {

@@ -23,9 +23,10 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   useEffect(() => {
     // Redirect to auth if not logged in
     if (!authLoading && !user) {
+      console.log('[ProtectedRoute] Not authenticated, redirecting to /auth', { pathname: location.pathname });
       navigate("/auth");
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, location.pathname]);
 
   // Animate progress bar while loading
   useEffect(() => {
@@ -49,6 +50,19 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
       }
     };
   }, [authLoading]);
+
+  // Log loading state for debugging (only when loading)
+  useEffect(() => {
+    if (!authLoading) return;
+    
+    const logInterval = setInterval(() => {
+      console.log('[ProtectedRoute] ⏳ Still loading auth...', { 
+        pathname: location.pathname,
+        hasUser: !!user 
+      });
+    }, 2000); // Log every 2 seconds to avoid spam
+    return () => clearInterval(logInterval);
+  }, [authLoading, location.pathname, user]);
 
   // Show loading ONLY while checking auth (not profile/access)
   // Profile can load in the background - don't block navigation
