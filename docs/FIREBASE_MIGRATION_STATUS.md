@@ -183,3 +183,4 @@ The following Supabase edge functions still need to be migrated to Firebase Clou
 - Scheduled functions need Cloud Scheduler setup
 
 
+
