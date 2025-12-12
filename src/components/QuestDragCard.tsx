@@ -2,21 +2,14 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Clock, Zap, Flame, Mountain, Star, Sparkles, Brain, Dumbbell, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DragTask, isValidCategory } from "@/types/quest";
 
 interface QuestDragCardProps {
-  task: {
-    id: string;
-    task_text: string;
-    scheduled_time?: string | null;
-    estimated_duration?: number | null;
-    is_main_quest?: boolean | null;
-    difficulty?: string | null;
-    category?: 'mind' | 'body' | 'soul' | null;
-    xp_reward?: number;
-    completed?: boolean | null;
-  };
+  task: DragTask;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  compact?: boolean;
+  showTime?: boolean;
 }
 
 // Category configuration with icons and colors
@@ -66,12 +59,12 @@ const difficultyConfig = {
   },
 };
 
-export const QuestDragCard = ({ task, isDragging, onDragStart }: QuestDragCardProps) => {
+export const QuestDragCard = ({ task, isDragging, onDragStart, compact = false, showTime = true }: QuestDragCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
-  
+
   const difficulty = task.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
   const config = difficulty ? difficultyConfig[difficulty] : null;
-  const category = task.category as 'mind' | 'body' | 'soul' | undefined;
+  const category = isValidCategory(task.category) ? task.category : undefined;
   const categoryInfo = category ? categoryConfig[category] : null;
 
   const formatTime = (time: string) => {
@@ -117,9 +110,9 @@ export const QuestDragCard = ({ task, isDragging, onDragStart }: QuestDragCardPr
         )}
 
         {/* Card Content */}
-        <div className="relative p-3 flex items-start gap-3">
+        <div className={cn("relative flex items-start gap-3", compact ? "p-2" : "p-3")}>
           {/* Difficulty Icon */}
-          {config && !task.is_main_quest && (
+          {config && !task.is_main_quest && !compact && (
             <div className={cn("flex-shrink-0 mt-0.5", config.textColor)}>
               {React.createElement(config.icon, { className: "h-4 w-4" })}
             </div>
@@ -130,16 +123,17 @@ export const QuestDragCard = ({ task, isDragging, onDragStart }: QuestDragCardPr
             <div className="flex items-start gap-2">
               {task.is_main_quest && <Star className="h-4 w-4 text-[hsl(45,100%,60%)] flex-shrink-0 mt-0.5 animate-pulse" />}
               <p className={cn(
-                "text-sm font-medium leading-relaxed",
+                "font-medium leading-relaxed",
+                compact ? "text-xs" : "text-sm",
                 task.completed && "line-through text-muted-foreground",
                 task.is_main_quest && "text-base font-semibold"
               )}>
                 {task.task_text}
               </p>
             </div>
-            
+
             {/* Category Badge */}
-            {categoryInfo && !task.is_main_quest && (
+            {categoryInfo && !task.is_main_quest && !compact && (
               <div className="flex items-center gap-1">
                 <div className={cn(
                   "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r border",
@@ -152,28 +146,30 @@ export const QuestDragCard = ({ task, isDragging, onDragStart }: QuestDragCardPr
             )}
 
             {/* Quest Meta Info */}
-            <div className="flex items-center gap-3 text-xs flex-wrap">
-              {task.scheduled_time && (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  {formatTime(task.scheduled_time)}
+            {!compact && (
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                {showTime && task.scheduled_time && (
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    {formatTime(task.scheduled_time)}
+                  </div>
+                )}
+
+                {task.estimated_duration && (
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    {formatDuration(task.estimated_duration)}
+                  </div>
+                )}
+
+                <div className={cn(
+                  "font-semibold",
+                  task.is_main_quest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
+                )}>
+                  +{task.xp_reward} XP
                 </div>
-              )}
-              
-              {task.estimated_duration && (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  {formatDuration(task.estimated_duration)}
-                </div>
-              )}
-              
-              <div className={cn(
-                "font-semibold",
-                task.is_main_quest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
-              )}>
-                +{task.xp_reward} XP
               </div>
-            </div>
+            )}
           </div>
         </div>
 

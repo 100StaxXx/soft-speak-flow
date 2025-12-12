@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { getDocuments, getDocument, setDocument, deleteDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
+import { 
+  generateMentorAudio, 
+  generateCompanionImage, 
+  generateSampleCard, 
+  generateCosmicPostcard,
+  generateCompletePepTalk,
+  generateDailyMentorPepTalks,
+  generateCompanionName
+} from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +58,7 @@ const Admin = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [generatingDailyPepTalks, setGeneratingDailyPepTalks] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Companion Image Tester State
@@ -97,6 +107,24 @@ const Admin = () => {
     locationDescription: string;
     caption: string;
   } | null>(null);
+
+  // Companion Name Generator State
+  const [nameTestData, setNameTestData] = useState({
+    spiritAnimal: "wolf",
+    coreElement: "fire",
+    favoriteColor: "crimson",
+    mind: 50,
+    body: 50,
+    soul: 50,
+  });
+  const [generatingName, setGeneratingName] = useState(false);
+  const [generatedName, setGeneratedName] = useState<{
+    name: string;
+    traits: string[];
+    storyText: string;
+    loreSeed: string;
+  } | null>(null);
+  const [nameTestAttempts, setNameTestAttempts] = useState<number[]>([]);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -124,13 +152,13 @@ const Admin = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc("has_role", {
-        _user_id: user.id,
-        _role: "admin",
-      });
-
-      if (error || !data) {
-        console.debug('Admin check failed', { error, data, userId: user.id });
+      // TODO: Migrate admin role check to Firestore custom claims or a user_roles collection
+      // For now, check if user has admin role in profile or custom claims
+      const profile = await getDocument("profiles", user.uid);
+      const isAdminUser = profile?.role === "admin" || profile?.is_admin === true;
+      
+      if (!isAdminUser) {
+        console.debug('Admin check failed', { userId: user.uid });
         toast.error("Access Denied: You don't have permission to access this page.");
         setIsAdmin(false);
         setAuthLoading(false);
@@ -144,6 +172,9 @@ const Admin = () => {
     checkAdmin();
   }, [user, authLoadingFromHook]); // toast from sonner is stable
 
+  const [searchParams] = useSearchParams();
+  const hasAutoTriggered = useRef(false);
+
   useEffect(() => {
     if (isAdmin) {
       fetchPepTalks();
@@ -152,29 +183,22 @@ const Admin = () => {
   }, [isAdmin]);
 
   const fetchMentors = async () => {
-    const { data, error } = await supabase
-      .from("mentors")
-      .select("*")
-      .order("name");
-
-    if (error) {
+    try {
+      const data = await getDocuments("mentors", undefined, "name", "asc");
+      setMentors(data || []);
+    } catch (error) {
+      console.error("Error fetching mentors:", error);
       toast.error("Failed to load mentors");
-      return;
     }
-    setMentors(data || []);
   };
 
   const fetchPepTalks = async () => {
-    const { data, error } = await supabase
-      .from("pep_talks")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
+    try {
+      const data = await getDocuments("pep_talks", undefined, "created_at", "desc");
+      setPepTalks((data || []) as PepTalk[]);
+    } catch (error) {
       toast.error("Failed to load pep talks");
-      return;
     }
-    setPepTalks(data || []);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,16 +219,8 @@ const Admin = () => {
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError, data } = await supabase.storage
-        .from("pep-talk-audio")
-        .upload(filePath, audioFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("pep-talk-audio")
-        .getPublicUrl(filePath);
-
+      const { uploadFile } = await import("@/lib/firebase/storage");
+      const publicUrl = await uploadFile('pep-talk-audio', filePath, audioFile);
       return publicUrl;
     } catch (error) {
       console.error("Upload error:", error);
@@ -242,27 +258,22 @@ const Admin = () => {
       audio_url: audioUrl || formData.audio_url,
     };
 
-    if (editingId) {
-      const { error } = await supabase
-        .from("pep_talks")
-        .update(pepTalkData)
-        .eq("id", editingId);
-
-      if (error) {
-        toast.error("Failed to update pep talk");
-        setUploading(false);
-        return;
+    try {
+      if (editingId) {
+        await updateDocument("pep_talks", editingId, pepTalkData);
+        toast.success("Pep talk updated successfully");
+      } else {
+        const pepTalkId = `pep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await setDocument("pep_talks", pepTalkId, {
+          id: pepTalkId,
+          ...pepTalkData,
+        }, false);
+        toast.success("Pep talk created successfully");
       }
-      toast.success("Pep talk updated successfully");
-    } else {
-      const { error } = await supabase.from("pep_talks").insert([pepTalkData]);
-
-      if (error) {
-        toast.error("Failed to create pep talk");
-        setUploading(false);
-        return;
-      }
-      toast.success("Pep talk created successfully");
+    } catch (error) {
+      toast.error(editingId ? "Failed to update pep talk" : "Failed to create pep talk");
+      setUploading(false);
+      return;
     }
 
     setIsPreview(false);
@@ -299,15 +310,13 @@ const Admin = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this pep talk?")) return;
 
-    const { error } = await supabase.from("pep_talks").delete().eq("id", id);
-
-    if (error) {
+    try {
+      await deleteDocument("pep_talks", id);
+      toast.success("Pep talk deleted successfully");
+      fetchPepTalks();
+    } catch (error) {
       toast.error("Failed to delete pep talk");
-      return;
     }
-
-    toast.success("Pep talk deleted successfully");
-    fetchPepTalks();
   };
 
   const resetForm = () => {
@@ -352,14 +361,10 @@ const Admin = () => {
 
     setPreviewingVoice(mentorSlug);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-mentor-audio", {
-        body: {
-          mentorSlug,
-          script: previewText,
-        },
+      const data = await generateMentorAudio({
+        mentorSlug,
+        script: previewText,
       });
-
-      if (error) throw error;
 
       // Play the audio (unless globally muted)
       if (!globalAudio.getMuted()) {
@@ -395,21 +400,17 @@ const Admin = () => {
     setGeneratedPrompt(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-companion-image", {
-        body: {
-          spiritAnimal: companionTestData.spiritAnimal,
-          element: companionTestData.element,
-          stage: companionTestData.stage,
-          favoriteColor: companionTestData.favoriteColor,
-          eyeColor: companionTestData.eyeColor || undefined,
-          furColor: companionTestData.furColor || undefined,
-        },
+      const data = await generateCompanionImage({
+        companionId: "test",
+        stage: companionTestData.stage || 0,
+        species: companionTestData.spiritAnimal,
+        element: companionTestData.element,
+        color: companionTestData.favoriteColor,
       });
 
-      if (error) throw error;
-
-      setGeneratedCompanionImage(data.imageUrl);
-      setGeneratedPrompt(data.prompt || "Prompt not returned");
+      const imageUrl = (data as any)?.imageData?.imageUrl || (data as any)?.imageUrl;
+      setGeneratedCompanionImage(imageUrl);
+      setGeneratedPrompt((data as any).prompt || "Prompt not returned");
       toast.success("Companion image generated successfully!");
     } catch (error) {
       console.error("Error generating companion image:", error);
@@ -419,27 +420,61 @@ const Admin = () => {
     }
   };
 
+  const handleGenerateCompanionName = async () => {
+    setGeneratingName(true);
+    setGeneratedName(null);
+    setNameTestAttempts([]);
+    const startTime = Date.now();
+
+    try {
+      const data = await generateCompanionName({
+        spiritAnimal: nameTestData.spiritAnimal,
+        favoriteColor: nameTestData.favoriteColor,
+        coreElement: nameTestData.coreElement,
+        userAttributes: {
+          mind: nameTestData.mind,
+          body: nameTestData.body,
+          soul: nameTestData.soul,
+        },
+      });
+
+      const elapsed = Date.now() - startTime;
+      setNameTestAttempts([elapsed]);
+      setGeneratedName({
+        name: data.name,
+        traits: data.traits || [],
+        storyText: data.storyText || "",
+        loreSeed: data.loreSeed || "",
+      });
+      
+      // Check if name seems generic
+      const lowerName = data.name.toLowerCase();
+      const genericWords = ['pup', 'puppy', 'cub', 'wolf', 'fox', 'dragon', 'fire', 'storm', 'lightning'];
+      const isGeneric = genericWords.some(word => lowerName.includes(word));
+      
+      if (isGeneric) {
+        toast.warning(`Generated name "${data.name}" may be too generic!`);
+      } else {
+        toast.success(`Generated unique name: "${data.name}"!`);
+      }
+    } catch (error: any) {
+      console.error("Error generating companion name:", error);
+      toast.error(error.message || "Failed to generate companion name");
+    } finally {
+      setGeneratingName(false);
+    }
+  };
+
   const handleGenerateSampleCard = async () => {
     setGeneratingSampleCard(true);
     setGeneratedSampleCard(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-sample-card", {
-        body: {
-          spiritAnimal: sampleCardData.spiritAnimal,
-          element: sampleCardData.element,
-          stage: sampleCardData.stage,
-          favoriteColor: sampleCardData.favoriteColor,
-          eyeColor: sampleCardData.eyeColor || undefined,
-          furColor: sampleCardData.furColor || undefined,
-          mind: sampleCardData.mind,
-          body: sampleCardData.body,
-          soul: sampleCardData.soul,
-          customName: sampleCardData.customName || undefined,
-        },
+      const data = await generateSampleCard({
+        species: sampleCardData.spiritAnimal,
+        element: sampleCardData.element,
+        stage: sampleCardData.stage,
       });
-
-      if (error) throw error;
 
       setGeneratedSampleCard(data.card);
       toast.success("Sample card generated!");
@@ -461,47 +496,32 @@ const Admin = () => {
       // If no source image provided, generate a companion image first
       if (!sourceImageUrl) {
         toast.info("Generating companion image first...");
-        const { data: companionData, error: companionError } = await supabase.functions.invoke("generate-companion-image", {
-          body: {
-            spiritAnimal: postcardTestData.spiritAnimal,
-            element: postcardTestData.element,
-            stage: 5,
-            favoriteColor: postcardTestData.favoriteColor,
-            eyeColor: postcardTestData.eyeColor,
-            furColor: postcardTestData.furColor,
-          },
+        const companionData = await generateCompanionImage({
+          companionId: "test",
+          stage: 5,
+          species: postcardTestData.spiritAnimal,
+          element: postcardTestData.element,
+          color: postcardTestData.favoriteColor,
         });
-
-        if (companionError) throw companionError;
-        sourceImageUrl = companionData.imageUrl;
+        sourceImageUrl = (companionData as any)?.imageData?.imageUrl || (companionData as any)?.imageUrl;
         toast.success("Companion image generated!");
       }
 
       toast.info("Generating cosmic postcard...");
       
-      const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard-test", {
-        body: {
-          milestonePercent: postcardTestData.milestonePercent,
-          sourceImageUrl,
-          companionData: {
-            spirit_animal: postcardTestData.spiritAnimal,
-            core_element: postcardTestData.element,
-            favorite_color: postcardTestData.favoriteColor,
-            eye_color: postcardTestData.eyeColor,
-            fur_color: postcardTestData.furColor,
-          },
-        },
+      const data = await generateCosmicPostcard({
+        companionId: "test",
+        occasion: `Milestone: ${postcardTestData.milestonePercent}%`,
       });
 
-      if (error) throw error;
-
+      const postcard = data?.postcard || data;
       setGeneratedPostcard({
-        imageUrl: data.imageUrl,
-        locationName: data.locationName,
-        locationDescription: data.locationDescription,
-        caption: data.caption,
+        imageUrl: postcard.imageUrl || postcard.imageData?.imageUrl,
+        locationName: postcard.locationName,
+        locationDescription: postcard.locationDescription,
+        caption: postcard.caption,
       });
-      toast.success(`Postcard generated at ${data.locationName}!`);
+      toast.success(`Postcard generated at ${postcard.locationName}!`);
     } catch (error: any) {
       console.error("Error generating postcard:", error);
       toast.error(error.message || "Failed to generate postcard");
@@ -526,39 +546,27 @@ const Admin = () => {
     try {
       // Step 1: Generate complete pep talk content
       toast.info("Generating pep talk content...");
-      const { data: contentData, error: contentError } = await supabase.functions.invoke(
-        "generate-complete-pep-talk",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            category: formData.category || "motivation",
-          },
-        }
-      );
-
-      if (contentError) throw contentError;
+      const contentData = await generateCompletePepTalk({
+        mentorSlug: mentor.slug,
+        topicCategory: formData.category || "motivation",
+      });
 
       // Step 2: Generate audio from the script
       toast.info("Generating audio...");
-      const { data: audioData, error: audioError } = await supabase.functions.invoke(
-        "generate-mentor-audio",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            script: contentData.script,
-          },
-        }
-      );
+      const pepTalkData = (contentData as any).pepTalk || contentData;
+      const audioData = await generateMentorAudio({
+        mentorSlug: mentor.slug,
+        script: pepTalkData.script || (contentData as any).script,
+      });
 
-      if (audioError) throw audioError;
 
       // Update form with all generated data
       setFormData(prev => ({
         ...prev,
-        title: contentData.title,
-        quote: contentData.quote,
-        description: contentData.description,
-        category: contentData.category,
+        title: pepTalkData.title || (contentData as any).title,
+        quote: pepTalkData.quote || (contentData as any).quote,
+        description: pepTalkData.description || (contentData as any).description,
+        category: pepTalkData.category || (contentData as any).category || formData.category,
         audio_url: audioData.audioUrl,
       }));
 
@@ -571,6 +579,60 @@ const Admin = () => {
       setAiGenerating(false);
     }
   };
+
+  const handleGenerateDailyPepTalks = async () => {
+    setGeneratingDailyPepTalks(true);
+    try {
+      toast.info("Generating daily pep talks for all mentors...");
+      const result = await generateDailyMentorPepTalks();
+      
+      if (result?.results) {
+        const successCount = result.results.filter((r: any) => r.status === "generated").length;
+        const skippedCount = result.results.filter((r: any) => r.status === "skipped").length;
+        const errorCount = result.results.filter((r: any) => r.status === "error").length;
+        
+        if (errorCount > 0) {
+          const errors = result.results
+            .filter((r: any) => r.status === "error")
+            .map((r: any) => `${r.mentor}: ${r.error || "Unknown error"}`)
+            .join(", ");
+          toast.warning(
+            `Generated ${successCount}, skipped ${skippedCount}, ${errorCount} errors. Errors: ${errors}`,
+            { duration: 8000 }
+          );
+        } else {
+          toast.success(
+            `Successfully generated ${successCount} daily pep talks. ${skippedCount} were already generated.`,
+            { duration: 5000 }
+          );
+        }
+      } else {
+        toast.success("Daily pep talks generation completed!");
+      }
+    } catch (error) {
+      console.error("Error generating daily pep talks:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate daily pep talks");
+    } finally {
+      setGeneratingDailyPepTalks(false);
+    }
+  };
+
+  // Temporary: Auto-trigger daily pep talks generation on admin page load (testing)
+  useEffect(() => {
+    if (
+      isAdmin &&
+      !generatingDailyPepTalks &&
+      !hasAutoTriggered.current
+    ) {
+      hasAutoTriggered.current = true;
+      console.log('🔧 Auto-triggering daily pep talks generation (testing mode)');
+      // Small delay to ensure page is fully loaded
+      setTimeout(() => {
+        handleGenerateDailyPepTalks();
+      }, 1000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, generatingDailyPepTalks]);
 
   if (authLoading) {
     return (
@@ -647,6 +709,45 @@ const Admin = () => {
                 </Button>
               </div>
             ))}
+          </div>
+        </Card>
+
+        {/* Daily Operations */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">📅 Daily Operations</h2>
+          <p className="text-muted-foreground mb-6">
+            Manually trigger daily operations that normally run automatically via scheduled functions
+          </p>
+          
+          <div className="space-y-4">
+            <div className="p-4 border rounded-2xl bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold text-lg">Generate Daily Pep Talks</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate today's pep talks for all mentors. This normally runs automatically at 00:01 UTC daily.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleGenerateDailyPepTalks}
+                disabled={generatingDailyPepTalks}
+                variant="default"
+                className="mt-4"
+              >
+                {generatingDailyPepTalks ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Generate Today's Pep Talks
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -833,6 +934,180 @@ const Admin = () => {
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Companion Name Generator Tester */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">✨ Companion Name Generator Tester</h2>
+          <p className="text-muted-foreground mb-6">Test companion name generation to verify it avoids generic names</p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="nameSpiritAnimal">Spirit Animal</Label>
+                <select
+                  id="nameSpiritAnimal"
+                  value={nameTestData.spiritAnimal}
+                  onChange={(e) => setNameTestData({ ...nameTestData, spiritAnimal: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="wolf">Wolf</option>
+                  <option value="lion">Lion</option>
+                  <option value="tiger">Tiger</option>
+                  <option value="eagle">Eagle</option>
+                  <option value="bear">Bear</option>
+                  <option value="phoenix">Phoenix</option>
+                  <option value="dragon">Dragon</option>
+                  <option value="fox">Fox</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="nameElement">Core Element</Label>
+                <select
+                  id="nameElement"
+                  value={nameTestData.coreElement}
+                  onChange={(e) => setNameTestData({ ...nameTestData, coreElement: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="fire">Fire</option>
+                  <option value="water">Water</option>
+                  <option value="earth">Earth</option>
+                  <option value="air">Air</option>
+                  <option value="lightning">Lightning</option>
+                  <option value="ice">Ice</option>
+                  <option value="light">Light</option>
+                  <option value="shadow">Shadow</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="nameColor">Favorite Color</Label>
+                <Input
+                  id="nameColor"
+                  value={nameTestData.favoriteColor}
+                  onChange={(e) => setNameTestData({ ...nameTestData, favoriteColor: e.target.value })}
+                  className="rounded-2xl min-h-[44px] text-base"
+                  placeholder="crimson, azure, emerald..."
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="nameMind">Mind: {nameTestData.mind}</Label>
+                <input
+                  type="range"
+                  id="nameMind"
+                  min="0"
+                  max="100"
+                  value={nameTestData.mind}
+                  onChange={(e) => setNameTestData({ ...nameTestData, mind: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nameBody">Body: {nameTestData.body}</Label>
+                <input
+                  type="range"
+                  id="nameBody"
+                  min="0"
+                  max="100"
+                  value={nameTestData.body}
+                  onChange={(e) => setNameTestData({ ...nameTestData, body: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nameSoul">Soul: {nameTestData.soul}</Label>
+                <input
+                  type="range"
+                  id="nameSoul"
+                  min="0"
+                  max="100"
+                  value={nameTestData.soul}
+                  onChange={(e) => setNameTestData({ ...nameTestData, soul: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={handleGenerateCompanionName}
+              disabled={generatingName}
+              className="w-full rounded-2xl min-h-[48px] text-base"
+            >
+              {generatingName ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Generating Name...
+                </>
+              ) : (
+                "✨ Generate Companion Name"
+              )}
+            </Button>
+
+            {generatedName && (
+              <div className="space-y-4 p-4 md:p-6 border rounded-2xl bg-card">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-lg font-semibold">Generated Name:</Label>
+                    {nameTestAttempts.length > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        Generated in {nameTestAttempts[0]}ms
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4 bg-primary/10 rounded-2xl">
+                    <p className="text-2xl font-bold text-primary">{generatedName.name}</p>
+                  </div>
+                </div>
+
+                {generatedName.traits && generatedName.traits.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Traits:</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {generatedName.traits.map((trait, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 bg-muted rounded-full text-sm"
+                        >
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {generatedName.storyText && (
+                  <div className="space-y-2">
+                    <Label>Story:</Label>
+                    <Textarea
+                      value={generatedName.storyText}
+                      readOnly
+                      className="rounded-2xl min-h-[150px] text-sm"
+                    />
+                  </div>
+                )}
+
+                {generatedName.loreSeed && (
+                  <div className="space-y-2">
+                    <Label>Lore Seed:</Label>
+                    <p className="p-3 bg-muted/50 rounded-2xl text-sm italic">
+                      {generatedName.loreSeed}
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Note:</strong> The name should be unique and NOT contain generic words like "pup", "cub", "wolf", "fire", etc.
+                    If it does, the validation should catch it and retry automatically.
+                  </p>
                 </div>
               </div>
             )}

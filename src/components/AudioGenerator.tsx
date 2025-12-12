@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Music } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { generateCompletePepTalk, generateMentorAudio, transcribeAudio } from "@/lib/firebase/functions";
 import { toast } from "sonner";
 import { getMentorVoiceConfig } from "@/config/mentorVoices";
 
@@ -70,52 +70,31 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
     try {
       // Step 1: Generate complete pep talk content
       toast.info("Generating pep talk content...");
-      const { data: contentData, error: contentError } = await supabase.functions.invoke(
-        "generate-complete-pep-talk",
-        {
-        body: {
-          mentorSlug: selectedMentor,
-          topic_category: topicCategories,
-          intensity,
-          emotionalTriggers,
-        },
-        }
-      );
-
-      if (contentError) throw contentError;
+      const contentData = await generateCompletePepTalk({
+        mentorSlug: selectedMentor,
+        topicCategory: topicCategories,
+        intensity,
+        emotionalTriggers,
+      });
 
       // Step 2: Generate audio from the script
       toast.info("Generating audio...");
-      const { data: audioData, error: audioError } = await supabase.functions.invoke(
-        "generate-mentor-audio",
-        {
-          body: {
-            mentorSlug: selectedMentor,
-            script: contentData.script,
-          },
-        }
-      );
-
-      if (audioError) throw audioError;
+      const pepTalkData = (contentData as any).pepTalk || contentData;
+      const audioData = await generateMentorAudio({
+        mentorSlug: selectedMentor,
+        script: pepTalkData.script || (contentData as any).script,
+      });
 
       // Step 3: Transcribe the audio
       toast.info("Transcribing audio...");
       let transcript: Array<{ word: string; start: number; end: number }> = [];
       
       try {
-        const { data: transcriptData, error: transcriptError } = await supabase.functions.invoke(
-          "transcribe-audio",
-          {
-            body: {
-              audioUrl: audioData.audioUrl,
-            },
-          }
-        );
+        const transcriptData = await transcribeAudio({
+          audioUrl: audioData.audioUrl,
+        });
 
-        if (transcriptError) {
-          console.error("Transcription error:", transcriptError);
-          toast.warning("Audio generated but transcription failed");
-        } else if (transcriptData?.transcript) {
+        if (transcriptData?.transcript) {
           transcript = transcriptData.transcript;
           toast.success("Complete pep talk with transcript generated!");
         }
@@ -127,9 +106,9 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       // Pass all data to parent component including transcript
       if (onFullPepTalkGenerated) {
         onFullPepTalkGenerated({
-          title: contentData.title,
-          quote: contentData.quote,
-          description: contentData.description,
+          title: pepTalkData.title || (contentData as any).title,
+          quote: pepTalkData.quote || (contentData as any).quote,
+          description: pepTalkData.description || (contentData as any).description,
           topic_category: topicCategories,
           emotional_triggers: emotionalTriggers,
           audio_url: audioData.audioUrl,

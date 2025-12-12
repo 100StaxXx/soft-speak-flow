@@ -6,14 +6,30 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
-import { useState, useEffect, useMemo, memo } from "react";
+import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  memo,
+  useRef,
+  useCallback,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { getStageName } from "@/config/companionStages";
+
+const LONG_PRESS_DURATION_MS = 800;
+const MOVE_CANCEL_THRESHOLD_PX = 12;
+const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
 
 // Convert hex color to color name (moved outside component for performance)
 const getColorName = (hexColor: string): string => {
@@ -71,6 +87,7 @@ export const CompanionDisplay = memo(() => {
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
+  const { regenerate, isRegenerating, maxRegenerations } = useCompanionRegenerate();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -79,6 +96,77 @@ export const CompanionDisplay = memo(() => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  
+  // Long press detection refs
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressing = useRef(false);
+  const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
+  const previousImageUrl = useRef<string | null>(null);
+  const regenerationsUsed = (companion as any)?.image_regenerations_used ?? 0;
+  const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
+  
+  // Long press handlers for hidden regenerate feature
+  const handlePressStart = useCallback((
+    event: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>
+  ) => {
+    if (!companion || isRegenerating || regenerationsRemaining <= 0) return;
+    
+    if ("touches" in event && event.touches[0]) {
+      const touch = event.touches[0];
+      touchStartPoint.current = { x: touch.clientX, y: touch.clientY };
+    } else {
+      touchStartPoint.current = null;
+    }
+    
+    isLongPressing.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPressing.current = true;
+      setShowRegenerateDialog(true);
+    }, LONG_PRESS_DURATION_MS);
+  }, [companion, isRegenerating, regenerationsRemaining]);
+  
+  const handlePressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartPoint.current = null;
+  }, []);
+
+  const handlePressMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!touchStartPoint.current || !longPressTimer.current) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    const deltaX = Math.abs(touch.clientX - touchStartPoint.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPoint.current.y);
+
+    if (deltaX > MOVE_CANCEL_THRESHOLD_PX || deltaY > MOVE_CANCEL_THRESHOLD_PX) {
+      handlePressEnd();
+    }
+  }, [handlePressEnd]);
+
+  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (!companion || isRegenerating || regenerationsRemaining <= 0) return;
+    setShowRegenerateDialog(true);
+  }, [companion, isRegenerating, regenerationsRemaining]);
+  
+  const handleRegenerateConfirm = useCallback(() => {
+    if (!companion) return;
+    regenerate({
+      id: companion.id,
+      spirit_animal: companion.spirit_animal,
+      core_element: companion.core_element,
+      favorite_color: companion.favorite_color,
+      current_stage: companion.current_stage,
+      eye_color: companion.eye_color,
+      fur_color: companion.fur_color,
+    });
+    setShowRegenerateDialog(false);
+  }, [companion, regenerate]);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -132,9 +220,10 @@ export const CompanionDisplay = memo(() => {
     // The companion query will be invalidated and refetched with new data
     // For the evolution animation, we use the image URL from the mutation
     // and the stage from the companion data after refetch
-    const imageUrl = typeof evolveCompanion.data === 'string' 
-      ? evolveCompanion.data 
-      : (evolveCompanion.data as { current_image_url?: string } | undefined)?.current_image_url || "";
+    const mutationData = evolveCompanion.data as string | { current_image_url?: string } | undefined;
+    const imageUrl = typeof mutationData === 'string' 
+      ? mutationData 
+      : mutationData?.current_image_url || "";
     
     // Use companion's current stage + 1 since mutation triggers after XP threshold
     const newStage = companion ? companion.current_stage : 0;
@@ -155,14 +244,31 @@ export const CompanionDisplay = memo(() => {
     }
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
+  // Calculate effective image URL (must be before the useEffect that depends on it)
+  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
+    ? health.neglectedImageUrl 
+    : companion?.current_image_url;
+  const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
+
+  // Track image URL changes to reset loading state
+  useEffect(() => {
+    if (previousImageUrl.current === effectiveImageUrl) return;
+    previousImageUrl.current = effectiveImageUrl;
+    setImageLoaded(false);
+    setImageError(false);
+  }, [effectiveImageUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
-  // Determine which image to show based on mood state
-  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
-    ? health.neglectedImageUrl 
-    : companion.current_image_url;
-  
   // Get mood-based filter styles
   const moodStyles = getMoodFilterStyles(health.moodState);
 
@@ -234,7 +340,20 @@ export const CompanionDisplay = memo(() => {
               aria-hidden="true" 
             />
             <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
-            <div className="relative">
+            <div 
+              className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
+              role="button"
+              tabIndex={0}
+              aria-label={`Press and hold to regenerate your companion. ${regenerationsRemaining} regeneration${regenerationsRemaining === 1 ? '' : 's'} remaining.`}
+              onMouseDown={handlePressStart}
+              onMouseUp={handlePressEnd}
+              onMouseLeave={handlePressEnd}
+              onTouchStart={handlePressStart}
+              onTouchMove={handlePressMove}
+              onTouchEnd={handlePressEnd}
+              onTouchCancel={handlePressEnd}
+              onKeyDown={handleKeyDown}
+            >
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
@@ -265,9 +384,9 @@ export const CompanionDisplay = memo(() => {
               )}
               <img
                 key={imageKey}
-                src={displayImageUrl || ""}
+                src={effectiveImageUrl}
                 alt={`${stageName} companion at stage ${companion.current_stage}${health.moodState !== 'happy' ? ` (${health.moodState})` : ''}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'}`}
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''}`}
                 style={{ ...skinStyles, ...moodStyles }}
                 onLoad={() => {
                   setImageLoaded(true);
@@ -279,6 +398,7 @@ export const CompanionDisplay = memo(() => {
                 }}
                 loading="lazy"
                 decoding="async"
+                draggable={false}
               />
               {/* Mood badge overlay */}
               {moodBadge && (
@@ -344,6 +464,15 @@ export const CompanionDisplay = memo(() => {
           setShowWelcomeBack(false);
           setWelcomeBackDismissed(true);
         }} 
+      />
+
+      {/* Hidden Regenerate Dialog */}
+      <CompanionRegenerateDialog
+        isOpen={showRegenerateDialog}
+        onClose={() => setShowRegenerateDialog(false)}
+        onConfirm={handleRegenerateConfirm}
+        isRegenerating={isRegenerating}
+        regenerationsRemaining={regenerationsRemaining}
       />
     </>
   );

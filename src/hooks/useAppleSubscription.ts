@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct } from '@/utils/appleIAP';
+import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct, openManageSubscriptions } from '@/utils/appleIAP';
 import { useToast } from './use-toast';
+import { verifyAppleReceipt } from '@/lib/firebase/functions';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
 
@@ -14,6 +14,7 @@ export function useAppleSubscription() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [hasAttemptedProductFetch, setHasAttemptedProductFetch] = useState(false);
+  const [manageLoading, setManageLoading] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     if (!isIAPAvailable()) {
@@ -103,11 +104,8 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available");
       }
       
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
-
-      if (error) throw error;
+      // Verify receipt with Firebase
+      await verifyAppleReceipt({ receipt });
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
@@ -192,14 +190,8 @@ export function useAppleSubscription() {
         throw new Error("No receipt data available for subscription");
       }
 
-      // Verify with backend
-      const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
-      });
-
-      if (error) {
-        throw error;
-      }
+      // Verify receipt with Firebase
+      await verifyAppleReceipt({ receipt });
 
       // Invalidate subscription cache to unlock app immediately
       await queryClient.invalidateQueries({ queryKey: ['subscription'] });
@@ -221,10 +213,34 @@ export function useAppleSubscription() {
     }
   };
 
+  const handleManageSubscriptions = async () => {
+    setManageLoading(true);
+
+    try {
+      await openManageSubscriptions();
+      toast({
+        title: "Manage Subscription",
+        description: "Opening Apple's subscription settings...",
+      });
+    } catch (error) {
+      console.error('Manage subscription error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Please try again";
+      toast({
+        title: "Unable to open subscriptions",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setManageLoading(false);
+    }
+  };
+
   return {
     handlePurchase,
     handleRestore,
+    handleManageSubscriptions,
     loading,
+    manageLoading,
     products,
     productsLoading,
     productError,

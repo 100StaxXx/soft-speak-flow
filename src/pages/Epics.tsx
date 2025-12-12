@@ -8,6 +8,7 @@ import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -28,6 +29,7 @@ const Epics = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
   const {
     activeEpics,
     completedEpics,
@@ -112,6 +114,23 @@ const Epics = () => {
           </Button>
         </motion.div>
 
+        {/* Shared Epics Link */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.12 }}
+          className="mb-4"
+        >
+          <Button
+            onClick={() => navigate('/shared-epics')}
+            variant="ghost"
+            className="w-full h-10 text-sm"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Browse Public Epics
+          </Button>
+        </motion.div>
+
         {/* Create Epic Button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -162,28 +181,20 @@ const Epics = () => {
                 animate={{ opacity: 1 }}
                 className="text-center py-12 bg-secondary/20 rounded-lg border-2 border-dashed border-primary/20"
               >
-                <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <Sparkles className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
                 <h3 className="text-lg font-semibold mb-2">No Active Epics</h3>
-                <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
-                  Begin your first legendary quest! Browse star paths or create your own epic.
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  Begin your first legendary quest! Discover guided paths designed to help you build powerful habits and achieve your goals.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <Button
-                    onClick={() => setTemplatesDialogOpen(true)}
-                    variant="outline"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Star Paths
-                  </Button>
-                  {!hasReachedLimit && (
-                    <Button
-                      onClick={() => setCreateDialogOpen(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Custom
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  onClick={() => setTemplatesDialogOpen(true)}
+                  className="bg-gradient-to-r from-amber-500 via-purple-500 to-pink-500 hover:from-amber-600 hover:via-purple-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-12 px-8 text-base font-semibold"
+                  size="lg"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Explore Star Paths
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </Button>
               </motion.div>
             ) : (
               activeEpics.map((epic) => (

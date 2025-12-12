@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Sparkles, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { getStageName } from "@/config/companionStages";
+import { getDocument, getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 
 interface CompanionEvolutionHistoryProps {
   companionId: string;
@@ -15,26 +15,30 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
     queryKey: ["companion-evolutions", companionId],
     queryFn: async () => {
       // Get companion creation info for Stage 0
-      const { data: companion, error: companionError } = await supabase
-        .from("user_companion")
-        .select("created_at, initial_image_url")
-        .eq("id", companionId)
-        .maybeSingle();
+      const companion = await getDocument<{ created_at: any; initial_image_url?: string }>(
+        "user_companion",
+        companionId
+      );
 
-      if (companionError) throw companionError;
       if (!companion) return [];
 
       // Get evolution history
-      const { data: evolutionData, error } = await supabase
-        .from("companion_evolutions")
-        .select("*")
-        .eq("companion_id", companionId)
-        .order("evolved_at", { ascending: false });
+      const evolutionData = await getDocuments<{
+        id: string;
+        companion_id: string;
+        stage: number;
+        image_url?: string;
+        evolved_at: any;
+        xp_at_evolution: number;
+      }>("companion_evolutions", [["companion_id", "==", companionId]], "evolved_at", "desc");
 
-      if (error) throw error;
+      const normalizedEvolutions = evolutionData.map((evo) => ({
+        ...evo,
+        evolved_at: timestampToISO(evo.evolved_at as any) || evo.evolved_at,
+      }));
 
       // Check if Stage 0 already exists in evolution data
-      const hasStage0 = evolutionData?.some(evo => evo.stage === 0);
+      const hasStage0 = normalizedEvolutions?.some(evo => evo.stage === 0);
 
       // Only create Stage 0 entry if it doesn't exist in the database
       if (!hasStage0) {
@@ -43,16 +47,16 @@ export const CompanionEvolutionHistory = ({ companionId }: CompanionEvolutionHis
           companion_id: companionId,
           stage: 0,
           image_url: companion.initial_image_url,
-          evolved_at: companion.created_at,
+          evolved_at: timestampToISO(companion.created_at as any) || companion.created_at,
           xp_at_evolution: 0,
         };
 
         // Combine Stage 0 with evolutions
-        return [stage0Entry, ...(evolutionData || [])];
+        return [stage0Entry, ...(normalizedEvolutions || [])];
       }
 
       // Stage 0 already exists in database, just return the data
-      return evolutionData || [];
+      return normalizedEvolutions || [];
     },
   });
 

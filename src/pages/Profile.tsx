@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getDocument, getDocuments, setDocument, updateDocument } from "@/lib/firebase/firestore";
+import { firebaseAuth } from "@/lib/firebase/auth";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2 } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +22,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { CompanionSkins } from "@/components/CompanionSkins";
 import { ReferralCodeRedeemCard } from "@/components/ReferralCodeRedeemCard";
 import { FactionBadge } from "@/components/FactionBadge";
+import { updateProfile } from "@/lib/firebase/profiles";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
@@ -47,6 +51,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("account");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingMentor, setIsChangingMentor] = useState(false);
@@ -54,6 +59,8 @@ const Profile = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const isDeleteConfirmationValid = deleteConfirmationText.trim().toLowerCase() === "delete";
 
   // Check if we should open a specific tab from navigation state
   useEffect(() => {
@@ -62,20 +69,24 @@ const Profile = () => {
     }
   }, [location.state]);
 
+  // Automatically open the delete dialog when deep-linked from the help page
+  useEffect(() => {
+    if (location.state?.showDeleteDialog) {
+      setActiveTab("account");
+      setShowDeleteDialog(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.showDeleteDialog, location.pathname, navigate]);
+
   const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
-    queryKey: ["adaptive-push-settings", user?.id],
+    queryKey: ["adaptive-push-settings", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from("adaptive_push_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await getDocument("adaptive_push_settings", user.uid);
       return data;
     },
   });
@@ -83,14 +94,14 @@ const Profile = () => {
   const { data: mentors } = useQuery({
     queryKey: ["mentors", "active"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("id, name, slug, avatar_url, is_active")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
+      const data = await getDocuments(
+        "mentors",
+        [["is_active", "==", true]],
+        "name",
+        "asc"
+      );
       const map = new Map<string, any>();
-      for (const m of data || []) {
+      for (const m of data) {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
@@ -106,12 +117,7 @@ const Profile = () => {
         throw new Error('No mentor selected');
       }
       
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await getDocument("mentors", profile.selected_mentor_id);
       return data;
     },
   });
@@ -121,11 +127,7 @@ const Profile = () => {
     try {
       const newState = !adaptivePushSettings?.enabled;
       if (adaptivePushSettings) {
-        const { error } = await supabase
-          .from("adaptive_push_settings")
-          .update({ enabled: newState })
-          .eq("user_id", user.id);
-        if (error) throw error;
+        await updateDocument("adaptive_push_settings", user.uid, { enabled: newState });
       }
       refetchSettings();
     } catch (error) {
@@ -138,15 +140,11 @@ const Profile = () => {
     if (!user || isChangingMentor) return;
     setIsChangingMentor(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          selected_mentor_id: mentorId,
-          // Also ensure timezone is set if not already
-          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        })
-        .eq("id", user.id);
-      if (error) throw error;
+      await updateDocument("profiles", user.uid, {
+        selected_mentor_id: mentorId,
+        // Also ensure timezone is set if not already
+        timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      });
       toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
       window.location.reload();
     } catch (error) {
@@ -170,22 +168,32 @@ const Profile = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (!user || isDeletingAccount) return;
+    if (!user || isDeletingAccount || !isDeleteConfirmationValid) return;
 
     setIsDeletingAccount(true);
     try {
-      const { error } = await supabase.functions.invoke("delete-user-account");
-      if (error) {
-        throw new Error(error.message || "Unable to delete account");
-      }
+      // Import the helper function
+      const { deleteUserAccount } = await import("@/lib/firebase/functions");
 
+      // Call the Cloud Function (this will delete the user from Firebase Auth)
+      await deleteUserAccount();
+
+      queryClient.clear();
       setShowDeleteDialog(false);
+      setDeleteConfirmationText("");
       toast({
         title: "Account deleted",
         description: "Your account and saved progress have been permanently removed.",
       });
 
-      await signOut();
+      // Try to sign out (may fail if user is already deleted, which is fine)
+      try {
+        await signOut();
+      } catch (signOutError) {
+        // User may already be deleted by the Cloud Function, which is expected
+        console.log("Sign out after deletion:", signOutError);
+      }
+
       navigate("/auth", {
         replace: true,
         state: { message: "Your account has been deleted." },
@@ -215,12 +223,13 @@ const Profile = () => {
   const handleCreateAdaptivePushSettings = async () => {
     if (!user) return;
     try {
-      const { error } = await supabase.from("adaptive_push_settings").insert({
-        user_id: user.id,
+      await setDocument("adaptive_push_settings", user.uid, {
+        id: user.uid,
+        user_id: user.uid,
         enabled: true,
         mentor_id: profile?.selected_mentor_id,
-      });
-      if (!error) refetchSettings();
+      }, false);
+      refetchSettings();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to update settings";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
@@ -311,6 +320,41 @@ const Profile = () => {
 
               <SubscriptionManagement />
 
+              <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/5 border-primary/20 shadow-inner">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Why Cosmiq is different
+                  </CardTitle>
+                  <CardDescription>
+                    App Review feedback called out saturated horoscope apps—here&apos;s what makes Cosmiq unique.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-muted-foreground">
+                  <div className="flex gap-3">
+                    <MessageCircle className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Adaptive mentor chat + nudges</p>
+                      <p>Choose an AI mentor, fire off one-tap prompts from Quick Chat, and receive mentor-authored nudges stored per user in Firebase.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Evolving companion game loop</p>
+                      <p>Story-driven onboarding assigns a faction, zodiac profile, and living companion that unlocks 21 visual evolutions and quests.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Shield className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Referral cosmetics, not fortune spam</p>
+                      <p>Referral rewards only unlock limited companion skins—no recycled horoscope feeds or paywalled readings.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Your Mentor</CardTitle>
@@ -395,6 +439,28 @@ const Profile = () => {
                 
                 <ReferralCodeRedeemCard />
                 <ReferralDashboard />
+                <Card className="border-dashed border-primary/40 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="h-5 w-5 text-primary" />
+                      Referral FAQ
+                    </CardTitle>
+                    <CardDescription>Answers to App Review&apos;s questions about codes vs. rewards.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li>
+                        <span className="font-semibold text-foreground">Referral code:</span> a unique tag minted on signup so friends can credit you. Entering a code never unlocks extra content for the new user—it just ties their profile to the referrer for rewards tracking.
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Referral rewards:</span> purely cosmetic companion skins automatically delivered to the referrer once a tagged friend reaches Stage 3. No paywalled horoscopes, chats, or quests unlock.
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Digital content unlocked:</span> limited-run skin variants listed below in Companion Skins. They only change appearance for the referrer and never impact the recipient&apos;s access tier.
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
                 <CompanionSkins />
               </div>
 
@@ -411,11 +477,24 @@ const Profile = () => {
                     This action cannot be undone. You will lose access to your companion, streaks, referrals, and any
                     personalized content tied to this account.
                   </p>
+                  <p className="text-sm text-muted-foreground">
+                    You can delete your account at any time. This will permanently remove your data from our servers.
+                  </p>
+                  <Button
+                    variant="link"
+                    className="px-0 text-sm text-primary"
+                    onClick={() => navigate("/account-deletion")}
+                  >
+                    How account deletion works
+                  </Button>
                   <AlertDialog
                     open={showDeleteDialog}
                     onOpenChange={(open) => {
                       if (isDeletingAccount) return;
                       setShowDeleteDialog(open);
+                      if (!open) {
+                        setDeleteConfirmationText("");
+                      }
                     }}
                   >
                     <AlertDialogTrigger asChild>
@@ -425,25 +504,42 @@ const Profile = () => {
                         disabled={isDeletingAccount}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
-                        {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                        {isDeletingAccount ? "Deleting..." : "Delete account"}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete your account, your companion progress, and your saved data. This
-                          action cannot be undone.
+                          This will permanently delete your account, your companion, and your progress. This can&apos;t be
+                          undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+                      <div className="space-y-2">
+                        <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
+                        <Input
+                          id="delete-confirmation-input"
+                          value={deleteConfirmationText}
+                          onChange={(event) => setDeleteConfirmationText(event.target.value)}
+                          placeholder='Type "delete"'
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          disabled={isDeletingAccount}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          This extra step prevents accidental deletions.
+                        </p>
+                      </div>
                       <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           onClick={handleDeleteAccount}
-                          disabled={isDeletingAccount}
+                          disabled={isDeletingAccount || !isDeleteConfirmationValid}
                         >
-                          {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                          {isDeletingAccount ? "Deleting..." : "Delete account"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -484,11 +580,32 @@ const Profile = () => {
               
               <Card>
                 <CardHeader>
-                  <CardTitle>App Preferences</CardTitle>
-                  <CardDescription>Customize your experience</CardDescription>
+                  <CardTitle>Gameplay</CardTitle>
+                  <CardDescription>Customize your game experience</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">More preferences coming soon...</p>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="astral-encounters">Astral Encounters</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable mini-game boss battles that appear as you complete quests
+                      </p>
+                    </div>
+                    <Switch
+                      id="astral-encounters"
+                      checked={profile?.astral_encounters_enabled !== false}
+                      onCheckedChange={async (checked) => {
+                        if (!user?.uid) return;
+                        try {
+                          await updateProfile(user.uid, { astral_encounters_enabled: checked });
+                          queryClient.invalidateQueries({ queryKey: ['profile'] });
+                          sonnerToast.success(checked ? 'Astral Encounters enabled' : 'Astral Encounters disabled');
+                        } catch (error) {
+                          sonnerToast.error('Failed to update setting');
+                        }
+                      }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

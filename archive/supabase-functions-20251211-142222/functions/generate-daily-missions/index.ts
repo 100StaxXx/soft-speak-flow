@@ -1,0 +1,296 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PromptBuilder } from "../_shared/promptBuilder.ts";
+import { OutputValidator } from "../_shared/outputValidator.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface GeneratedMission {
+  mission: string;
+  xp: number;
+  category: string;
+  difficulty?: string;
+}
+
+const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
+
+1. **Connection Mission** (Good Human Day)
+   Purpose: light positive interaction.
+   Approved patterns:
+   - "Text someone you appreciate and let them know why."
+   - "Send a simple check-in message to a friend or family member."
+   - "Give someone a small compliment today."
+   - "Express gratitude to someone who helped you recently."
+   XP: 5-10
+   Difficulty: easy
+
+2. **Quick Win Mission** (Momentum Builder)
+   Purpose: create an instant sense of progress or order. Should take 1-5 minutes.
+   Approved patterns:
+   - "Do one tiny task you've been avoiding."
+   - "Organize one small area for two minutes."
+   - "Take care of something that will take less than five minutes."
+   - "Make your bed to start the day with a win."
+   - "Throw away or delete one thing you no longer need."
+   XP: 5-10
+   Difficulty: easy or medium
+
+3. **Identity Mission** (Discipline & Future Self)
+   Purpose: something that reinforces the person they want to become.
+   These can be larger or all-day missions.
+   Approved patterns:
+   - "Complete all your quests today."
+   - "Plan tomorrow before you go to bed."
+   - "Schedule something you've been putting off."
+   - "Take one action your future self would thank you for."
+   - "Act for two minutes as the most disciplined version of yourself."
+   XP: 10-15
+   Difficulty: medium or hard`;
+
+// Category-specific XP and difficulty validation
+const CATEGORY_RULES: Record<string, { xpRange: [number, number]; difficulties: string[] }> = {
+  connection: { xpRange: [5, 10], difficulties: ['easy'] },
+  quick_win: { xpRange: [5, 10], difficulties: ['easy', 'medium'] },
+  identity: { xpRange: [10, 15], difficulties: ['medium', 'hard'] },
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const startTime = Date.now();
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { userId, forceRegenerate = false } = await req.json();
+    
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'userId is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting check
+    const rateLimit = await checkRateLimit(supabase, userId, 'daily-missions', RATE_LIMITS['daily-missions']);
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit, corsHeaders);
+    }
+
+    const today = new Date().toLocaleDateString('en-CA');
+
+    // Check if missions already exist for today
+    const { data: existing } = await supabase
+      .from('daily_missions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('mission_date', today);
+
+    if (existing && existing.length > 0 && !forceRegenerate) {
+      return new Response(
+        JSON.stringify({ missions: existing, generated: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get user's profile for context
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_habit_streak')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const streak = profile?.current_habit_streak || 0;
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
+    }
+
+    console.log(`Generating AI missions for user ${userId} (streak: ${streak})`);
+
+    // Build personalized prompt using template system
+    const promptBuilder = new PromptBuilder(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const userContext = streak > 0 
+      ? `Make them personal and encouraging, acknowledging their ${streak} day streak.`
+      : 'Make them encouraging to help build momentum.';
+
+    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+      templateKey: 'daily_missions',
+      userId: userId,
+      variables: {
+        missionCount: 3,
+        userStreak: streak,
+        userContext,
+        categoryGuidelines: CATEGORY_GUIDELINES
+      }
+    });
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.9,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI API error:', errorText);
+      throw new Error(`Failed to generate missions with AI: ${errorText}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const generatedText = aiData.choices[0].message.content;
+    
+    console.log('AI response:', generatedText);
+
+    // Parse AI response
+    let missions: GeneratedMission[];
+    try {
+      const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      missions = JSON.parse(cleanedText);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', generatedText);
+      throw new Error('Invalid AI response format');
+    }
+
+    // Validate output with category-specific rules
+    const validator = new OutputValidator(validationRules, outputConstraints);
+    const validationResult = validator.validate(missions);
+
+    // Additional category-specific validation
+    const categoryErrors: string[] = [];
+    for (const mission of missions) {
+      const category = mission.category?.toLowerCase();
+      const rules = CATEGORY_RULES[category];
+      
+      if (rules) {
+        const [minXp, maxXp] = rules.xpRange;
+        if (mission.xp < minXp || mission.xp > maxXp) {
+          categoryErrors.push(`${category} mission XP should be ${minXp}-${maxXp}, got ${mission.xp}`);
+        }
+        if (mission.difficulty && !rules.difficulties.includes(mission.difficulty)) {
+          categoryErrors.push(`${category} mission difficulty should be ${rules.difficulties.join('/')}, got ${mission.difficulty}`);
+        }
+      }
+      
+      // Check mission text length (max 80 chars)
+      if (mission.mission && mission.mission.length > 80) {
+        categoryErrors.push(`Mission text too long: ${mission.mission.length} chars (max 80)`);
+      }
+    }
+
+    // Log validation results
+    const responseTime = Date.now() - startTime;
+    const allErrors = [...validationResult.errors, ...categoryErrors];
+    await supabase
+      .from('ai_output_validation_log')
+      .insert({
+        user_id: userId,
+        template_key: 'daily_missions',
+        input_data: { streak, userContext },
+        output_data: { missions },
+        validation_passed: allErrors.length === 0,
+        validation_errors: allErrors.length > 0 ? allErrors : null,
+        model_used: 'google/gemini-2.5-flash',
+        response_time_ms: responseTime
+      });
+
+    if (allErrors.length > 0) {
+      console.warn('Validation warnings (proceeding anyway):', allErrors);
+      // Don't fail on validation - just log warnings and continue
+    }
+
+    console.log('Parsed missions:', missions);
+
+    // Determine auto_complete based on category (Identity missions that are full-day get auto_complete)
+    const getAutoComplete = (category: string, missionText: string): boolean => {
+      const lowerText = missionText.toLowerCase();
+      // These patterns should auto-complete when detected
+      if (lowerText.includes('complete all your quests') || 
+          lowerText.includes('complete all your habits') ||
+          lowerText.includes('complete all habits')) {
+        return true;
+      }
+      return false;
+    };
+
+    // Map to database format
+    const missionsToInsert = missions.map((m) => ({
+      user_id: userId,
+      mission_date: today,
+      mission_text: m.mission,
+      mission_type: m.category || 'general',
+      category: m.category || 'general',
+      xp_reward: m.xp || 10,
+      difficulty: m.difficulty || 'medium',
+      auto_complete: getAutoComplete(m.category, m.mission),
+      completed: false,
+      progress_target: 1,
+      progress_current: 0,
+      is_bonus: false,
+    }));
+
+    // Insert missions with conflict handling to prevent race condition duplicates
+    // Uses unique index on (user_id, mission_date, category)
+    const { error: insertError } = await supabase
+      .from('daily_missions')
+      .upsert(missionsToInsert, { 
+        onConflict: 'user_id,mission_date,category',
+        ignoreDuplicates: true 
+      });
+
+    if (insertError) {
+      console.error('Error inserting missions:', insertError);
+      throw insertError;
+    }
+
+    // Fetch the actual missions (in case some were skipped due to conflict)
+    const { data: created, error: fetchError } = await supabase
+      .from('daily_missions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('mission_date', today);
+
+    if (fetchError) {
+      console.error('Error fetching missions:', fetchError);
+      throw fetchError;
+    }
+
+    console.log(`Generated ${created?.length || 0} missions for user ${userId}`);
+
+    return new Response(
+      JSON.stringify({ missions: created, generated: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error generating missions:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

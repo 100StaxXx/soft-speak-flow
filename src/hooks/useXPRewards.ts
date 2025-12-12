@@ -2,7 +2,7 @@ import { useCompanion, XP_REWARDS } from "@/hooks/useCompanion";
 import { useXPToast } from "@/contexts/XPContext";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { updateDocument, getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
@@ -10,14 +10,11 @@ import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async (userId: string) => {
   const today = new Date().toISOString().split('T')[0];
-  await supabase
-    .from('user_companion')
-    .update({
-      last_activity_date: today,
-      inactive_days: 0,
-      current_mood: 'happy',
-    })
-    .eq('user_id', userId);
+  await updateDocument('user_companion', userId, {
+    last_activity_date: today,
+    inactive_days: 0,
+    current_mood: 'happy',
+  });
 };
 
 /**
@@ -44,14 +41,10 @@ export const useXPRewards = () => {
 
   // Fetch current habit streak for resilience updates
   const { data: profile } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: ['profile', user?.uid],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('current_habit_streak')
-        .eq('id', user.id)
-        .maybeSingle();
+      const data = await getDocument<{ current_habit_streak: number | null }>('profiles', user.uid);
       return data;
     },
     enabled: !!user,
@@ -62,8 +55,8 @@ export const useXPRewards = () => {
     
     try {
       // Mark user as active (resets companion decay)
-      if (user?.id) {
-        markUserActive(user.id).then(() => {
+      if (user?.uid) {
+        markUserActive(user.uid).then(() => {
           queryClient.invalidateQueries({ queryKey: ['companion-health'] });
         });
       }
@@ -152,8 +145,8 @@ export const useXPRewards = () => {
 
     try {
       // Mark user as active (resets companion decay)
-      if (user?.id) {
-        markUserActive(user.id).then(() => {
+      if (user?.uid) {
+        markUserActive(user.uid).then(() => {
           queryClient.invalidateQueries({ queryKey: ['companion-health'] });
         });
       }
@@ -251,11 +244,16 @@ export const useXPRewards = () => {
     if (displayReason) {
       showXPToast(xpAmount, displayReason);
     }
-    awardXP.mutate({
-      eventType,
-      xpAmount,
-      metadata,
-    });
+
+    try {
+      await awardXP.mutateAsync({
+        eventType,
+        xpAmount,
+        metadata,
+      });
+    } catch (error) {
+      logger.error('Error awarding custom XP:', error);
+    }
   };
 
   return {

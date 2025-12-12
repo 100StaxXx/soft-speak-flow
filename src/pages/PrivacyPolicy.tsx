@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
                 Last Updated: November 21, 2025
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Cosmiq LLC • alilrevolution@gmail.com
+                Cosmiq LLC • admin@cosmiq.quest
               </p>
             </div>
           </CardHeader>
@@ -134,7 +134,7 @@ export default function PrivacyPolicy() {
                   <ul className="text-xs sm:text-sm space-y-1 list-none pl-0">
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
-                      <span>Supabase (database & authentication)</span>
+                      <span>Firebase (authentication & database)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
@@ -287,11 +287,11 @@ export default function PrivacyPolicy() {
                   <p className="text-sm text-muted-foreground">
                     Email:{" "}
                     <a
-                      href="mailto:alilrevolution@gmail.com"
+                      href="mailto:admin@cosmiq.quest"
                       className="text-primary hover:underline"
                       aria-label="Email Cosmiq LLC privacy team"
                     >
-                      alilrevolution@gmail.com
+                      admin@cosmiq.quest
                     </a>
                   </p>
                   <p className="text-sm text-muted-foreground">Location: New Mexico, USA</p>

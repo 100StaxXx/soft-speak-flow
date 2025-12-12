@@ -1,10 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getCompanionEvolutionCards } from "@/lib/firebase/companionEvolutionCards";
+import { getDocument } from "@/lib/firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EvolutionCardFlip } from "./EvolutionCardFlip";
+
+interface EvolutionCardStats {
+  strength?: number;
+  agility?: number;
+  vitality?: number;
+  intellect?: number;
+  spirit?: number;
+  affinity?: number;
+  [key: string]: number | undefined;
+}
 
 interface EvolutionCard {
   id: string;
@@ -13,7 +24,7 @@ interface EvolutionCard {
   creature_name: string;
   species: string;
   element: string;
-  stats: any;
+  stats: EvolutionCardStats | Record<string, unknown>;
   traits: string[] | null;
   story_text: string;
   rarity: string;
@@ -26,39 +37,36 @@ export const EvolutionCardGallery = () => {
   const { user } = useAuth();
 
   const { data: cards, isLoading } = useQuery({
-    queryKey: ["evolution-cards", user?.id],
+    queryKey: ["evolution-cards", user?.uid],
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("evolution_stage", { ascending: true });
-
-      if (error) throw error;
+      const data = await getCompanionEvolutionCards(user.uid);
       
-      const evolutionIds = (data || [])
+      const evolutionIds = data
         .map(card => card.evolution_id)
         .filter((id): id is string => Boolean(id));
 
       let evolutionImageLookup: Record<string, string | null> = {};
 
       if (evolutionIds.length > 0) {
-        const { data: evolutionRows, error: evolutionError } = await supabase
-          .from("companion_evolutions")
-          .select("id, image_url")
-          .in("id", evolutionIds);
-
-        if (evolutionError) throw evolutionError;
-
-        evolutionImageLookup = (evolutionRows || []).reduce((acc, row) => {
-          acc[row.id] = row.image_url ?? null;
-          return acc;
-        }, {} as Record<string, string | null>);
+        // Fetch evolution images
+        for (const evolutionId of evolutionIds) {
+          try {
+            const evolution = await getDocument<{ id: string; image_url?: string | null }>(
+              "companion_evolutions",
+              evolutionId
+            );
+            if (evolution) {
+              evolutionImageLookup[evolutionId] = evolution.image_url ?? null;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch evolution ${evolutionId}:`, error);
+          }
+        }
       }
 
-      const cardsWithImages = (data || []).map(card => {
+      const cardsWithImages = data.map(card => {
         // Prioritize card's own image_url to prevent display issues
         // Only fallback to evolution lookup if card doesn't have its own image
         const cardImageUrl = card.image_url;
@@ -70,15 +78,23 @@ export const EvolutionCardGallery = () => {
         };
       });
       
-      // Deduplicate cards by card_id
-      const uniqueCards = new Map<string, any>();
+      // Deduplicate cards by card_id (handles potential race conditions in card generation)
+      const uniqueCards = new Map<string, EvolutionCard>();
       cardsWithImages.forEach(card => {
+        const normalizedCard: EvolutionCard = {
+          ...card,
+          stats: card.stats || {},
+          traits: card.traits || null,
+        };
         if (!uniqueCards.has(card.card_id)) {
-          uniqueCards.set(card.card_id, card);
+          uniqueCards.set(card.card_id, normalizedCard);
+        } else {
+          // Log duplicate detection for monitoring
+          console.warn(`[EvolutionCardGallery] Duplicate card_id detected: ${card.card_id}. This may indicate a race condition in card generation.`);
         }
       });
       
-      const mappedCards = Array.from(uniqueCards.values()) as EvolutionCard[];
+      const mappedCards = Array.from(uniqueCards.values());
       return mappedCards;
     },
     enabled: !!user,

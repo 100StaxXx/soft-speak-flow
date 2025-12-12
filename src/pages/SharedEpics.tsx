@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Share2, Users } from "lucide-react";
@@ -19,119 +19,181 @@ export default function SharedEpics() {
 
   const { data: publicEpics, isLoading } = useQuery({
     queryKey: ['public-epics'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('epics')
-        .select(`
-          *,
-          epic_habits(
-            habit:habits(id, title, difficulty, frequency, custom_days)
-          )
-        `)
-        .eq('is_public', true)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+    queryFn: async (): Promise<any[]> => {
+      // Fetch public active epics
+      const epics = await getDocuments(
+        'epics',
+        [
+          ['is_public', '==', true],
+          ['status', '==', 'active'],
+        ],
+        'created_at',
+        'desc'
+      );
 
-      if (error) throw error;
-      return data;
+      // For each epic, fetch its habits
+      const epicsWithHabits = await Promise.all(
+        epics.map(async (epic) => {
+          // Fetch epic_habits for this epic
+          const epicHabits = await getDocuments(
+            'epic_habits',
+            [['epic_id', '==', epic.id]]
+          );
+
+          // Fetch habit details for each epic_habit
+          const habits = await Promise.all(
+            epicHabits.map(async (eh) => {
+              const habit = await getDocument('habits', eh.habit_id);
+              return {
+                ...eh,
+                habit: habit ? {
+                  id: habit.id,
+                  title: habit.title,
+                  difficulty: habit.difficulty,
+                  frequency: habit.frequency,
+                  custom_days: habit.custom_days,
+                } : null,
+              };
+            })
+          );
+
+          return {
+            ...epic,
+            epic_habits: habits.filter(h => h.habit !== null),
+          };
+        })
+      );
+
+      return epicsWithHabits;
     }
   });
 
   const joinEpic = useMutation({
     mutationFn: async (epicId: string) => {
-      if (!user?.id) throw new Error('Not authenticated');
+      if (!user?.uid) throw new Error('Not authenticated');
 
       // Check epic limit (owned + joined)
-      const { data: ownedEpics } = await supabase
-        .from('epics')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+      const ownedEpics = await getDocuments(
+        'epics',
+        [
+          ['user_id', '==', user.uid],
+          ['status', '==', 'active'],
+        ]
+      );
       
-      const { data: joinedEpics } = await supabase
-        .from('epic_members')
-        .select('epic_id, epics!inner(user_id, status)')
-        .eq('user_id', user.id)
-        .neq('epics.user_id', user.id)
-        .eq('epics.status', 'active');
+      // Fetch joined epics (where user is a member but not the owner)
+      const allMemberships = await getDocuments(
+        'epic_members',
+        [['user_id', '==', user.uid]]
+      );
+      
+      // Filter to only active epics where user is not the owner
+      const joinedEpicIds = await Promise.all(
+        allMemberships.map(async (membership) => {
+          const epic = await getDocument('epics', membership.epic_id);
+          if (epic && epic.status === 'active' && epic.user_id !== user.uid) {
+            return membership.epic_id;
+          }
+          return null;
+        })
+      );
+      const joinedEpics = joinedEpicIds.filter(id => id !== null);
 
-      const totalActiveEpics = (ownedEpics?.length || 0) + (joinedEpics?.length || 0);
+      const totalActiveEpics = ownedEpics.length + joinedEpics.length;
       
       if (totalActiveEpics >= MAX_EPICS) {
         throw new Error(`You can only have ${MAX_EPICS} active epics at a time. Complete or abandon an epic to join a new one.`);
       }
 
-      // Fetch the epic with habits
-      const { data: epic, error: fetchError } = await supabase
-        .from('epics')
-        .select(`
-          *,
-          epic_habits(
-            habit:habits(id, title, difficulty, frequency, custom_days)
-          )
-        `)
-        .eq('id', epicId)
-        .eq('is_public', true)
-        .maybeSingle();
+      // Fetch the epic
+      const epic = await getDocument('epics', epicId);
+      if (!epic || !epic.is_public) throw new Error('Epic not found');
 
-      if (fetchError) throw fetchError;
-      if (!epic) throw new Error('Epic not found');
+      // Fetch epic habits
+      const epicHabits = await getDocuments(
+        'epic_habits',
+        [['epic_id', '==', epicId]]
+      );
+
+      // Fetch habit details
+      const habits = await Promise.all(
+        epicHabits.map(async (eh) => {
+          const habit = await getDocument('habits', eh.habit_id);
+          return habit ? {
+            id: habit.id,
+            title: habit.title,
+            difficulty: habit.difficulty,
+            frequency: habit.frequency,
+            custom_days: habit.custom_days,
+          } : null;
+        })
+      );
+
+      const epicWithHabits = {
+        ...epic,
+        epic_habits: habits.filter(h => h !== null).map(h => ({ habit: h })),
+      };
 
       // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('epic_members')
-        .select('id')
-        .eq('epic_id', epicId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const existingMemberships = await getDocuments(
+        'epic_members',
+        [
+          ['epic_id', '==', epicId],
+          ['user_id', '==', user.uid],
+        ]
+      );
 
-      if (existingMember) {
+      if (existingMemberships.length > 0) {
         throw new Error("You're already part of this guild!");
       }
 
       // Join the epic as a member (not create a copy!)
-      const { error: memberError } = await supabase
-        .from('epic_members')
-        .insert({
-          epic_id: epicId,
-          user_id: user.id,
-        });
-
-      if (memberError) throw memberError;
+      const memberId = `${epicId}_${user.uid}`;
+      await setDocument('epic_members', memberId, {
+        id: memberId,
+        epic_id: epicId,
+        user_id: user.uid,
+      }, false);
 
       // Copy habits to user's account and link to the ORIGINAL epic
-      if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habit: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
-          user_id: user.id,
-          title: eh.habit.title,
-          difficulty: eh.habit.difficulty,
-          frequency: eh.habit.frequency || 'daily',
-          custom_days: eh.habit.custom_days || null,
-        }));
+      if (epicWithHabits.epic_habits && epicWithHabits.epic_habits.length > 0) {
+        const { batchWrite } = await import("@/lib/firebase/firestore");
+        const operations: Array<{ type: "set"; collection: string; docId: string; data: any }> = [];
 
-        const { data: newHabits, error: habitsError } = await supabase
-          .from('habits')
-          .insert(habitsToCreate)
-          .select();
+        for (const eh of epicWithHabits.epic_habits) {
+          const habitId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          operations.push({
+            type: "set",
+            collection: "habits",
+            docId: habitId,
+            data: {
+              id: habitId,
+              user_id: user.uid,
+              title: eh.habit.title,
+              difficulty: eh.habit.difficulty,
+              frequency: eh.habit.frequency || 'daily',
+              custom_days: eh.habit.custom_days || null,
+            },
+          });
 
-        if (habitsError) throw habitsError;
-
-        // Link new habits to the ORIGINAL epic (not a copy)
-        if (newHabits && newHabits.length > 0) {
-          const habitLinks = newHabits.map((habit: { id: string }) => ({
-            epic_id: epicId,
-            habit_id: habit.id,
-          }));
-
-          const { error: linkError } = await supabase
-            .from('epic_habits')
-            .insert(habitLinks);
-
-          if (linkError) throw linkError;
+          // Link new habit to the ORIGINAL epic (not a copy)
+          const linkId = `${epicId}_${habitId}`;
+          operations.push({
+            type: "set",
+            collection: "epic_habits",
+            docId: linkId,
+            data: {
+              id: linkId,
+              epic_id: epicId,
+              habit_id: habitId,
+            },
+          });
         }
+
+        await batchWrite(operations);
       }
 
-      return epic;
+      return epicWithHabits;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['epics'] });

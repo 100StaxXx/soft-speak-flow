@@ -1,0 +1,20 @@
+[33m0a35303[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #269 from 100StaxXx/codex/add-subscription-management-features
+[33ma7aae1e[m[33m ([m[1;31morigin/codex/add-subscription-management-features[m[33m)[m Add subscription management entry and restore improvements
+[33m26af9bd[m Merge pull request #268 from 100StaxXx/codex/fix-mentor-tab-routing-and-onboarding-loop
+[33m94a89a5[m[33m ([m[1;31morigin/codex/fix-mentor-tab-routing-and-onboarding-loop[m[33m)[m Add dedicated mentor route and onboarding gate
+[33m586cd70[m Merge pull request #267 from 100StaxXx/codex/implement-account-deletion-flow-for-ios-app
+[33m5e425f9[m[33m ([m[1;31morigin/codex/implement-account-deletion-flow-for-ios-app[m[33m)[m Add account deletion flow and edge function
+[33me7fa852[m Add error handling to Supabase subscriptions (#266)
+[33mb1a8760[m Refactor Auth.tsx to simplify redirect logic (#265)
+[33m5055ac9[m Fix Supabase project ref in .env and update Xcode project
+[33m75a464f[m Refactor: Update Supabase project ID and URL (#263)
+[33m8e9f93a[m[33m ([m[1;31morigin/cursor/fix-api-access-errors-5e0c[m[33m, [m[1;31morigin/cursor/configure-environment-variables-77b7[m[33m)[m Fix: Update auth to use Supabase secrets and improve flows (#261)
+[33m70af148[m[33m ([m[1;31morigin/cursor/debug-login-create-account-50c8[m[33m)[m Local updates and environment config fixes
+[33m2096fff[m Merge pull request #259 from 100StaxXx/codex/check-for-errors-after-supabase-change
+[33m6768f43[m[33m ([m[1;31morigin/codex/check-for-errors-after-supabase-change[m[33m)[m Fix native auth redirect selection
+[33m4509be4[m Refactor: Calculate effective image URL before useEffect (#257)
+[33mc226a49[m Merge pull request #258 from 100StaxXx/claude/fix-supabase-errors-01HJk1amQLEdXYrLKugo19yh
+[33m8c29a23[m[33m ([m[1;31morigin/claude/fix-supabase-errors-01HJk1amQLEdXYrLKugo19yh[m[33m)[m Fix critical Supabase migration bugs after credential change
+[33m2a65c23[m[33m ([m[1;31morigin/cursor/sync-project-files-and-directories-d457[m[33m)[m Update Supabase credentials in .env (#253)
+[33m4b896ce[m feat: Add tutorial quest scrolling and highlighting (#256)
+[33m46f1039[m Refactor mentor matching and tag canonicalization (#255)

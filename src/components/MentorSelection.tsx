@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getMentors } from "@/lib/firebase/mentors";
+import { getQuotes } from "@/lib/firebase/quotes";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface Mentor {
+interface MentorModalData {
   id: string;
   name: string;
   description: string;
@@ -30,14 +32,18 @@ interface PepTalk {
   mentor_id: string;
 }
 
-interface MentorSelectionProps {
-  recommendedMentor: Mentor;
+interface MentorSelectionModalProps {
+  recommendedMentor: MentorModalData;
   onMentorSelected: (mentorId: string) => void;
 }
 
-export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorSelectionProps) => {
-  const [mentors, setMentors] = useState<Mentor[]>([]);
-  const [selectedMentor, setSelectedMentor] = useState<Mentor>(recommendedMentor);
+/**
+ * MentorSelectionModal - A modal/dialog component for selecting mentors
+ * Note: This is different from the MentorSelection page component
+ */
+export const MentorSelectionModal = ({ recommendedMentor, onMentorSelected }: MentorSelectionModalProps) => {
+  const [mentors, setMentors] = useState<MentorModalData[]>([]);
+  const [selectedMentor, setSelectedMentor] = useState<MentorModalData>(recommendedMentor);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +60,18 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
 
   const fetchMentors = async () => {
     try {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("*")
-        .order("name");
-
-      if (error) throw error;
-      setMentors(data || []);
+      const data = await getMentors(false); // Get all mentors, not just active
+      // Map to MentorModalData format
+      const mappedMentors: MentorModalData[] = data.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.tone_description || '',
+        identity_description: m.style_description || null,
+        tone_description: m.tone_description || '',
+        style: m.archetype || null,
+        tags: [],
+      }));
+      setMentors(mappedMentors);
     } catch (error) {
       console.error("Error fetching mentors:", error);
     } finally {
@@ -70,25 +81,30 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
 
   const fetchMentorContent = async (mentorId: string) => {
     try {
-      // Fetch quotes
-      const { data: quotesData } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("mentor_id", mentorId)
-        .limit(3);
+      // Fetch quotes with null safety
+      const quotesData = (await getQuotes(mentorId, 3)) || [];
+      setQuotes(quotesData.map(q => ({ id: q.id, text: q.text || '', mentor_id: q.mentor_id || mentorId })));
 
-      setQuotes(quotesData || []);
-
-      // Fetch pep talks
-      const { data: pepTalksData } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .eq("mentor_id", mentorId)
-        .limit(3);
-
-      setPepTalks(pepTalksData || []);
+      // Fetch pep talks with null safety
+      const pepTalksData = (await getDocuments(
+        "pep_talks",
+        [["mentor_id", "==", mentorId]],
+        undefined,
+        undefined,
+        3
+      )) || [];
+      setPepTalks(pepTalksData.map(pt => ({
+        id: pt.id,
+        title: pt.title,
+        description: pt.description,
+        quote: pt.quote,
+        mentor_id: pt.mentor_id || mentorId,
+      })));
     } catch (error) {
       console.error("Error fetching mentor content:", error);
+      // Set empty arrays on error to prevent UI issues
+      setQuotes([]);
+      setPepTalks([]);
     }
   };
 

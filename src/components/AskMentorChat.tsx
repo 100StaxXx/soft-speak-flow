@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { createMentorChat, getDailyMessageCount } from "@/lib/firebase/mentorChats";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 
@@ -84,23 +84,27 @@ export const AskMentorChat = ({
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
   
-  // Use ref for messages to avoid stale closure in sendMessage callback
+  // Use refs to avoid stale closures and race conditions
   const messagesRef = useRef<Message[]>([]);
+  const dailyMessageCountRef = useRef(dailyMessageCount);
+  const dailyLimitRef = useRef(dailyLimit);
   messagesRef.current = messages;
+  dailyMessageCountRef.current = dailyMessageCount;
+  dailyLimitRef.current = dailyLimit;
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-    if (authError || !currentUser) {
+    if (!user) {
       toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
       return;
     }
+    const currentUser = user;
 
-    // Check daily limit
-    if (dailyMessageCount >= dailyLimit) {
+    // Check daily limit using ref to prevent race conditions
+    if (dailyMessageCountRef.current >= dailyLimitRef.current) {
       toast({ 
         title: "Daily limit reached", 
-        description: `You've reached your daily limit of ${dailyLimit} messages. Reset tomorrow!`,
+        description: `You've reached your daily limit of ${dailyLimitRef.current} messages. Reset tomorrow!`,
         variant: "destructive" 
       });
       return;
@@ -114,16 +118,14 @@ export const AskMentorChat = ({
       // Use ref to get fresh conversation history (avoids stale closure)
       const currentMessages = messagesRef.current;
       
-      const { data, error } = await supabase.functions.invoke("mentor-chat", {
-        body: {
-          message: text,
-          mentorName,
-          mentorTone,
-          conversationHistory: currentMessages.slice(-10)
-        },
+      // Call Firebase Cloud Function instead of Supabase Edge Function
+      const { mentorChat } = await import("@/lib/firebase/functions");
+      const data = await mentorChat({
+        message: text,
+        mentorName,
+        mentorTone,
+        conversationHistory: currentMessages.slice(-10)
       });
-
-      if (error) throw error;
 
       if (!data || !data.response) {
         throw new Error("Invalid response from mentor");
@@ -135,23 +137,23 @@ export const AskMentorChat = ({
       // Update limit from server if provided
       if (data.dailyLimit) {
         setDailyLimit(data.dailyLimit);
+        dailyLimitRef.current = data.dailyLimit;
       }
       
       // Use server's count if available, otherwise increment locally
       if (data.messagesUsed !== undefined) {
         setDailyMessageCount(data.messagesUsed);
+        dailyMessageCountRef.current = data.messagesUsed;
       } else {
-        setDailyMessageCount(prev => prev + 1);
+        setDailyMessageCount(prev => {
+          const newCount = prev + 1;
+          dailyMessageCountRef.current = newCount;
+          return newCount;
+        });
       }
 
-      // Save conversation history (non-blocking - don't fail if this errors)
-      // Only save if mentorId is defined to maintain data integrity
-      if (mentorId) {
-        void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: data.response }
-        ]).then(({ error }) => { if (error) console.error('Failed to save chat history:', error); });
-      }
+      // Note: Conversation history is already saved by the mentorChat Firebase function
+      // No need to save again here to avoid duplicates
     } catch (error) {
       console.error("Mentor chat error:", error);
 
@@ -175,20 +177,18 @@ export const AskMentorChat = ({
       });
 
       // Still increment count and save to history
-      setDailyMessageCount(prev => prev + 1);
+      setDailyMessageCount(prev => {
+        const newCount = prev + 1;
+        dailyMessageCountRef.current = newCount;
+        return newCount;
+      });
 
-      // Save both messages even with fallback (non-blocking)
-      // Only save if mentorId is defined to maintain data integrity
-      if (mentorId) {
-        void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
-        ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
-      }
+      // Note: Fallback messages are not saved to database (they're offline responses)
+      // Only successful API responses are saved by the mentorChat Firebase function
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
+  }, [user, dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
 
   useEffect(() => {
     // Check today's message count on mount only
@@ -196,18 +196,13 @@ export const AskMentorChat = ({
     const checkDailyLimit = async () => {
       if (!user) return;
 
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      const { count } = await supabase
-        .from('mentor_chats')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('role', 'user')
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-      
-      setDailyMessageCount(count || 0);
+      try {
+        const count = await getDailyMessageCount(user.uid);
+        setDailyMessageCount(count);
+      } catch (error) {
+        console.error('Failed to get daily message count:', error);
+        setDailyMessageCount(0);
+      }
     };
     checkDailyLimit();
   }, [user]); // Only run on mount and user change, not on every message

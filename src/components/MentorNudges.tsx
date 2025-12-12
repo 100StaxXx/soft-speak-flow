@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getMentorNudges, dismissNudge } from "@/lib/firebase/mentorNudges";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, AlertCircle, Target, Calendar } from "lucide-react";
@@ -13,31 +13,18 @@ export const MentorNudges = () => {
   const [dismissedNudges, setDismissedNudges] = useState<string[]>([]);
 
   const { data: nudges = [] } = useQuery({
-    queryKey: ['mentor-nudges', user?.id],
+    queryKey: ['mentor-nudges', user?.uid],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('mentor_nudges')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('dismissed_at', null)
-        .order('delivered_at', { ascending: false })
-        .limit(3);
-      
-      if (error) throw error;
-      return data || [];
+      return await getMentorNudges(user.uid, 3);
     },
     enabled: !!user,
     refetchInterval: 60000, // Check every minute
   });
 
-  const dismissNudge = async (nudgeId: string) => {
+  const handleDismissNudge = async (nudgeId: string) => {
     setDismissedNudges(prev => [...prev, nudgeId]);
-    
-    await supabase
-      .from('mentor_nudges')
-      .update({ dismissed_at: new Date().toISOString() })
-      .eq('id', nudgeId);
+    await dismissNudge(nudgeId);
   };
 
   const activeNudges = nudges.filter(n => !dismissedNudges.includes(n.id));
@@ -74,7 +61,7 @@ export const MentorNudges = () => {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 -mt-1"
-                    onClick={() => dismissNudge(nudge.id)}
+                    onClick={() => handleDismissNudge(nudge.id)}
                     aria-label="Dismiss nudge"
                   >
                     <X className="h-3 w-3" />

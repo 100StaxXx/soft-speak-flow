@@ -1,8 +1,8 @@
 import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 import { logger } from "@/utils/logger";
+import { checkAppleSubscription } from "@/lib/firebase/functions";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
@@ -27,19 +27,11 @@ export function useSubscription() {
   const { user } = useAuth();
 
   const { data: subscriptionData, isLoading, error, refetch } = useQuery({
-    queryKey: ["subscription", user?.id],
+    queryKey: ["subscription", user?.uid],
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase.functions.invoke("check-apple-subscription");
-
-      if (error) throw error;
-      return data as {
-        subscribed: boolean;
-        status?: string;
-        subscription_end?: string;
-        plan?: string;
-      } | null;
+      return await checkAppleSubscription();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance

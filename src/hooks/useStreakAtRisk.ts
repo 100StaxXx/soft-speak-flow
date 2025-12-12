@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { resolveStreakFreeze } from "@/lib/firebase/functions";
 
 interface StreakAtRiskData {
   streak_at_risk: boolean;
@@ -16,40 +17,33 @@ export function useStreakAtRisk() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["streak-at-risk", user?.id],
+    queryKey: ["streak-at-risk", user?.uid],
     queryFn: async (): Promise<StreakAtRiskData | null> => {
-      if (!user?.id) return null;
+      if (!user?.uid) return null;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("streak_at_risk, streak_at_risk_since, current_habit_streak, streak_freezes_available")
-        .eq("id", user.id)
-        .single();
+      const profile = await getDocument<{
+        streak_at_risk: boolean;
+        streak_at_risk_since: string | null;
+        current_habit_streak: number;
+        streak_freezes_available: number;
+      }>("profiles", user.uid);
 
-      if (error) {
-        console.error("Error fetching streak at risk:", error);
-        return null;
-      }
+      if (!profile) return null;
 
       return {
-        streak_at_risk: data.streak_at_risk ?? false,
-        streak_at_risk_since: data.streak_at_risk_since,
-        current_habit_streak: data.current_habit_streak ?? 0,
-        streak_freezes_available: data.streak_freezes_available ?? 0,
+        streak_at_risk: profile.streak_at_risk ?? false,
+        streak_at_risk_since: profile.streak_at_risk_since,
+        current_habit_streak: profile.current_habit_streak ?? 0,
+        streak_freezes_available: profile.streak_freezes_available ?? 0,
       };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
     staleTime: 30000, // 30 seconds
   });
 
   const resolveStreakMutation = useMutation({
     mutationFn: async (action: "use_freeze" | "reset_streak") => {
-      const { data, error } = await supabase.functions.invoke("resolve-streak-freeze", {
-        body: { action },
-      });
-
-      if (error) throw error;
-      return data;
+      return await resolveStreakFreeze({ action });
     },
     onSuccess: (result, action) => {
       queryClient.invalidateQueries({ queryKey: ["streak-at-risk"] });

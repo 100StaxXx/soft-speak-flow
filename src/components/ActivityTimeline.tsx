@@ -10,12 +10,13 @@ import { useState, useRef, useCallback } from "react";
 import { useWelcomeMessage } from "@/hooks/useWelcomeMessage";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { Textarea } from "./ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { generateActivityComment } from "@/lib/firebase/functions";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { globalAudio } from "@/utils/globalAudio";
+import { deleteDocument } from "@/lib/firebase/firestore";
 
 const activityIcons: Record<string, any> = {
   welcome: Sparkles,
@@ -61,14 +62,9 @@ export const ActivityTimeline = () => {
     setIsSubmitting(true);
     try {
       // Generate AI response to the user's reply
-      const { data, error } = await supabase.functions.invoke('generate-activity-comment', {
-        body: { 
-          activityId,
-          userReply: replyText.trim()
-        }
+      const data = await generateActivityComment({
+        activityData: { activityId, userReply: replyText.trim() }
       });
-
-      if (error) throw error;
 
       toast.success("Reply sent!");
       setReplyText("");
@@ -109,10 +105,7 @@ export const ActivityTimeline = () => {
     // If swiped more than 60px, delete
     if (swipeDistance < -60) {
       try {
-        await supabase
-          .from('activity_feed')
-          .delete()
-          .eq('id', activityId);
+        await deleteDocument('activity_feed', activityId);
         
         toast.success("Activity removed");
         queryClient.invalidateQueries({ queryKey: ['activity-feed'] });

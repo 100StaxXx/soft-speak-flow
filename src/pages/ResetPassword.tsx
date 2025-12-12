@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { firebaseAuth } from "@/lib/firebase/auth";
+import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,49 +22,54 @@ const ResetPassword = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
-    // Check if we have a valid recovery token in the URL hash
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
+    // Firebase password reset links contain 'oobCode' in query params
+    const oobCode = searchParams.get('oobCode');
+    const mode = searchParams.get('mode');
     
-    if (!accessToken || type !== 'recovery') {
-      toast({
-        variant: "destructive",
-        title: "Invalid Link",
-        description: "This password reset link is invalid or has expired",
-      });
-      navigate("/auth");
-      return;
+    if (!oobCode || mode !== 'resetPassword') {
+      // Also check URL hash for compatibility
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hashOobCode = hashParams.get('oobCode');
+      const hashMode = hashParams.get('mode');
+      
+      const code = oobCode || hashOobCode;
+      const resetMode = mode || hashMode;
+      
+      if (!code || resetMode !== 'resetPassword') {
+        toast({
+          variant: "destructive",
+          title: "Invalid Link",
+          description: "This password reset link is invalid or has expired",
+        });
+        navigate("/auth");
+        return;
+      }
     }
 
-    // Wait for Supabase to process the recovery token via onAuthStateChange
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // Supabase has successfully processed the recovery token
-        if (session) {
+    // Verify the reset code is valid
+    const verifyCode = async () => {
+      try {
+        const code = searchParams.get('oobCode') || new URLSearchParams(window.location.hash.substring(1)).get('oobCode');
+        if (code) {
+          await verifyPasswordResetCode(firebaseAuth, code);
           setValidToken(true);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Session Error",
-            description: "Unable to establish password reset session. Please try again.",
-          });
-          navigate("/auth");
         }
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Link",
+          description: error instanceof Error ? error.message : "This password reset link is invalid or has expired",
+        });
+        navigate("/auth");
       }
-    });
+    };
 
-    // Also check if session already exists (in case event already fired)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setValidToken(true);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    verifyCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]); // toast is stable from useToast hook
+  }, [navigate, searchParams]); // toast is stable from useToast hook
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,28 +96,25 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-      } else {
-        toast({
-          title: "Password Updated",
-          description: "Your password has been successfully reset",
-        });
-        navigate("/auth");
+      // Get the oobCode from URL params or hash
+      const oobCode = searchParams.get('oobCode') || new URLSearchParams(window.location.hash.substring(1)).get('oobCode');
+      
+      if (!oobCode) {
+        throw new Error("Reset code not found");
       }
+
+      await confirmPasswordReset(firebaseAuth, oobCode, password);
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been successfully reset",
+      });
+      navigate("/auth");
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
       });
     } finally {
       setLoading(false);

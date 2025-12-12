@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateMentorScript, generateMentorAudio, generateFullMentorAudio } from "@/lib/firebase/functions";
 
 interface GenerateAudioOptions {
   mentorSlug: string;
@@ -21,11 +21,12 @@ export const useAudioGeneration = () => {
 
   const generateScript = async (options: GenerateScriptOptions): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke("generate-mentor-script", {
-        body: options,
+      const data = await generateMentorScript({
+        mentorSlug: options.mentorSlug,
+        topic: options.category || 'motivation',
+        tone: options.intensity,
       });
-
-      if (error) throw error;
+      
       return data?.script || null;
     } catch (error) {
       console.error("Error generating script:", error);
@@ -40,11 +41,11 @@ export const useAudioGeneration = () => {
     script: string
   ): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke("generate-mentor-audio", {
-        body: { mentorSlug, script },
+      const data = await generateMentorAudio({
+        mentorSlug,
+        script,
       });
-
-      if (error) throw error;
+      
       return data?.audioUrl || null;
     } catch (error) {
       console.error("Error generating audio:", error);
@@ -59,20 +60,21 @@ export const useAudioGeneration = () => {
   ): Promise<{ script: string; audioUrl: string } | null> => {
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-full-mentor-audio", {
-        body: options,
+      const data = await generateFullMentorAudio({
+        mentorSlug: options.mentorSlug,
+        topicCategory: options.category,
+        intensity: options.intensity,
+        emotionalTriggers: options.emotionalTriggers,
       });
-
-      if (error) throw error;
-
+      
       if (data?.script && data?.audioUrl) {
         return {
           script: data.script,
           audioUrl: data.audioUrl,
         };
       }
-
-      throw new Error("Invalid response from server");
+      
+      return null;
     } catch (error) {
       console.error("Error generating full audio:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to generate audio";

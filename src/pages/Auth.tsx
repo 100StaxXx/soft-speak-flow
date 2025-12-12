@@ -1,9 +1,30 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
-import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
-import { SocialLogin } from '@capgo/capacitor-social-login';
-import { supabase } from "@/integrations/supabase/client";
+import { signUp, signIn, resetPassword, signInWithGoogle, signInWithGoogleCredential, signInWithAppleCredential } from "@/lib/firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
+import { convertFirebaseUser } from "@/lib/firebase/auth";
+import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
+
+// Dynamic imports for Capacitor plugins to improve initial load time
+let SignInWithApple: typeof import('@capacitor-community/apple-sign-in').SignInWithApple;
+let SocialLogin: typeof import('@capgo/capacitor-social-login').SocialLogin;
+type SignInWithAppleResponse = import('@capacitor-community/apple-sign-in').SignInWithAppleResponse;
+
+const loadCapacitorPlugins = async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const [applePlugin, socialPlugin] = await Promise.all([
+        import('@capacitor-community/apple-sign-in'),
+        import('@capgo/capacitor-social-login')
+      ]);
+      SignInWithApple = applePlugin.SignInWithApple;
+      SocialLogin = socialPlugin.SocialLogin;
+    } catch (error) {
+      console.warn('[Auth] Failed to load Capacitor plugins:', error);
+    }
+  }
+};
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +34,7 @@ import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
+import { useAuth } from "@/hooks/useAuth";
 
 const authSchema = z.object({
   email: z.string()
@@ -48,7 +70,120 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const { session: authSession, loading: authLoading } = useAuth();
+
+  // Hide splash screen immediately when Auth page loads (don't wait for auth check)
+  useEffect(() => {
+    import('@/utils/capacitor').then(({ hideSplashScreen }) => {
+      hideSplashScreen().catch(() => {
+        // Ignore errors - splash screen might not be available on web
+      });
+    });
+  }, []);
+
+  // Add global error handler for unhandled promise rejections (prevents iOS crashes)
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[Auth] Unhandled promise rejection:', event.reason);
+      // Prevent the default browser behavior (which can cause crashes on iOS)
+      event.preventDefault();
+      // Show user-friendly error
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [toast]);
+
+  const handlePostAuthNavigation = useCallback(async (user: { uid: string; email: string | null } | null, source: string) => {
+    if (!user) return;
+
+    // Prevent multiple simultaneous navigation attempts
+    if (hasRedirected.current) {
+      console.log(`[Auth ${source}] Already redirected, skipping duplicate navigation`);
+      return;
+    }
+
+    try {
+      hasRedirected.current = true;
+      console.log(`[Auth ${source}] Ensuring profile exists for user ${user.uid}`);
+      
+      // Create profile and get it back to avoid duplicate reads
+      // Wrap in Promise.race with timeout to prevent hanging on iOS
+      const profilePromise = ensureProfile(user.uid, user.email);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile creation timeout')), 10000)
+      );
+      
+      const profile = await Promise.race([profilePromise, timeoutPromise]).catch((error) => {
+        console.error(`[Auth ${source}] Profile creation error:`, error);
+        // Return null to continue with navigation even if profile creation fails
+        return null;
+      }) as any;
+      
+      console.log(`[Auth ${source}] Profile ensured for user ${user.uid}`);
+      
+      // Pass profile to avoid duplicate getProfile call
+      // If profile creation failed, getAuthRedirectPath will fetch it
+      const path = await Promise.race([
+        getAuthRedirectPath(user.uid, profile || undefined),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Redirect path timeout')), 5000)
+        )
+      ]).catch((error) => {
+        console.error(`[Auth ${source}] Redirect path error:`, error);
+        // Default to onboarding if we can't determine path
+        return '/onboarding';
+      }) as string;
+      
+      console.log(`[Auth ${source}] Navigating to ${path}`);
+      
+      // Use setTimeout to ensure navigation happens after current execution context
+      // This helps prevent crashes on iOS
+      setTimeout(() => {
+        if (!isMounted.current) {
+          console.log(`[Auth ${source}] Component unmounted, skipping navigation`);
+          return;
+        }
+        try {
+          navigate(path);
+        } catch (navError) {
+          console.error(`[Auth ${source}] Navigation error:`, navError);
+          // Fallback navigation only if component is still mounted
+          if (isMounted.current && typeof window !== 'undefined') {
+            window.location.href = path;
+          }
+        }
+      }, 0);
+    } catch (error) {
+      console.error(`[Auth ${source}] Navigation error:`, error);
+      // If profile creation fails, still navigate to onboarding
+      // The profile will be created by useProfile hook
+      setTimeout(() => {
+        if (!isMounted.current) {
+          console.log(`[Auth ${source}] Component unmounted, skipping fallback navigation`);
+          return;
+        }
+        try {
+          navigate('/onboarding');
+        } catch (navError) {
+          console.error(`[Auth ${source}] Fallback navigation error:`, navError);
+          // Fallback navigation only if component is still mounted
+          if (isMounted.current && typeof window !== 'undefined') {
+            window.location.href = '/onboarding';
+          }
+        }
+      }, 0);
+    }
+  }, [navigate]);
   
   // Refs to track OAuth fallback timeouts (for cleanup)
   const googleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -59,21 +194,47 @@ const Auth = () => {
   
   // Ref to prevent re-renders during initialization
   const initializationComplete = useRef(false);
+  
+  // Ref to track if component is mounted (prevent navigation after unmount)
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Track whether the native SocialLogin plugin is ready for use
+  const [googleNativeReady, setGoogleNativeReady] = useState(false);
+  const [appleNativeReady, setAppleNativeReady] = useState(false);
+
+  // If we ever land back on /auth, allow redirects to run again
+  useEffect(() => {
+    if (location.pathname === '/auth' && hasRedirected.current) {
+      hasRedirected.current = false;
+    }
+  }, [location.pathname]);
 
   // Separate effect for OAuth initialization to prevent re-renders
+  // Load plugins dynamically to improve initial page load
   useEffect(() => {
     if (initializationComplete.current) return;
-    
+
     const initializeAuth = async () => {
-      // Initialize SocialLogin plugin for native platforms
+      // Load Capacitor plugins only if on native platform
       if (Capacitor.isNativePlatform()) {
+        await loadCapacitorPlugins();
+      }
+
+      // Initialize SocialLogin plugin for native platforms
+      if (Capacitor.isNativePlatform() && SocialLogin && Capacitor.isPluginAvailable('SocialLogin')) {
         try {
           const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
           const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
-          
-          console.log('[OAuth Init] Initializing with:', { 
-            hasWebClientId: !!webClientId, 
-            hasIOSClientId: !!iOSClientId 
+
+          console.log('[OAuth Init] Initializing with:', {
+            hasWebClientId: !!webClientId,
+            hasIOSClientId: !!iOSClientId
           });
 
           if (!webClientId || !iOSClientId) {
@@ -88,58 +249,91 @@ const Auth = () => {
               mode: 'online'
             }
           });
-          
+
           console.log('[OAuth Init] SocialLogin initialized successfully');
+          setGoogleNativeReady(true);
         } catch (error) {
           console.error('[OAuth Init] Failed to initialize SocialLogin:', error);
+          setGoogleNativeReady(false);
         }
+      } else {
+        console.warn('[OAuth Init] SocialLogin plugin unavailable - using web OAuth fallback');
+        setGoogleNativeReady(false);
       }
       initializationComplete.current = true;
     };
 
-    initializeAuth();
+    // Defer initialization slightly to allow page to render first
+    setTimeout(() => {
+      initializeAuth();
+    }, 0);
   }, []); // No dependencies - run only once
 
-  // Separate effect for session check and auth state listener
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        hasRedirected.current = true; // Mark that we're handling initial redirect
-        await ensureProfile(session.user.id, session.user.email);
-        const path = await getAuthRedirectPath(session.user.id);
-        navigate(path);
+    if (!Capacitor.isNativePlatform()) {
+      setAppleNativeReady(false);
+      return;
+    }
+
+    const platform = Capacitor.getPlatform?.() ?? 'web';
+    if (platform !== 'ios') {
+      setAppleNativeReady(false);
+      return;
+    }
+
+    const pluginAvailable = Capacitor.isPluginAvailable?.('SignInWithApple') ?? false;
+    if (!pluginAvailable) {
+      console.warn('[OAuth Init] SignInWithApple plugin unavailable - falling back to web OAuth for Apple');
+    }
+    setAppleNativeReady(pluginAvailable);
+  }, []);
+
+  // Handle OAuth redirect result (for localhost redirect flow)
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(firebaseAuth);
+        if (result && result.user && !hasRedirected.current) {
+          console.log('[Auth] OAuth redirect result detected, handling...');
+          const authUser = convertFirebaseUser(result.user);
+          if (authUser) {
+            await handlePostAuthNavigation(authUser, 'oauthRedirect');
+          }
+        }
+      } catch (error) {
+        console.error('[Auth] Error handling redirect result:', error);
       }
     };
+    
+    handleRedirectResult();
+  }, [handlePostAuthNavigation]);
 
-    checkSession();
+  // Firebase auth state listener
+  useEffect(() => {
+    // Check current session
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser && !hasRedirected.current) {
+      const authUser = convertFirebaseUser(currentUser);
+      if (authUser) {
+        handlePostAuthNavigation(authUser, 'checkSession');
+      }
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
-      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
-        // Skip INITIAL_SESSION if checkSession already handled the redirect
-        if (event === 'INITIAL_SESSION' && hasRedirected.current) {
-          console.log('[Auth onAuthStateChange] Skipping INITIAL_SESSION - already redirected by checkSession');
-          return;
-        }
-        
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      if (user && !hasRedirected.current) {
         const timestamp = Date.now();
-        console.log(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        try {
+        console.log(`[Auth onAuthStateChanged] User signed in at ${timestamp}, redirecting...`);
+        const authUser = convertFirebaseUser(user);
+        if (authUser) {
           await new Promise(resolve => setTimeout(resolve, 100));
-          await ensureProfile(session.user.id, session.user.email);
-          const path = await getAuthRedirectPath(session.user.id);
-          console.log(`[Auth onAuthStateChange] Navigating to ${path} at ${Date.now()} (${Date.now() - timestamp}ms elapsed)`);
-          navigate(path);
-        } catch (error) {
-          console.error('Error in auth state change:', error);
-          navigate('/onboarding');
+          await handlePostAuthNavigation(authUser, 'onAuthStateChanged');
         }
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
       // Clean up any pending OAuth fallback timeouts to prevent memory leaks
       if (googleFallbackTimeout.current) {
         clearTimeout(googleFallbackTimeout.current);
@@ -148,7 +342,13 @@ const Auth = () => {
         clearTimeout(appleFallbackTimeout.current);
       }
     };
-  }, [navigate]);
+  }, [handlePostAuthNavigation]);
+
+  // Extra safety net: if the auth context already has a session, redirect immediately
+  useEffect(() => {
+    if (!authSession?.user || hasRedirected.current) return;
+    handlePostAuthNavigation({ uid: authSession.user.uid || authSession.user.id, email: authSession.user.email || '' }, 'authContext');
+  }, [authSession, handlePostAuthNavigation]);
 
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
@@ -176,44 +376,58 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: sanitizedEmail,
-          password,
-        });
-
-        if (error) throw error;
+        const userCredential = await signIn(sanitizedEmail, password);
+        const authUser = convertFirebaseUser(userCredential.user);
+        await handlePostAuthNavigation(authUser, 'passwordSignIn');
       } else {
-        const { error } = await supabase.auth.signUp({
-          email: sanitizedEmail,
-          password,
-          options: {
-            emailRedirectTo: getRedirectUrlWithPath('/'),
-            data: {
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-            }
-          },
-        });
-
-        if (error) {
-          // Special handling for email already registered
-          if (error.message.includes('already registered')) {
+        try {
+          const userCredential = await signUp(sanitizedEmail, password, {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          });
+          const authUser = convertFirebaseUser(userCredential.user);
+          await handlePostAuthNavigation(authUser, 'signUpImmediate');
+        } catch (error: any) {
+          // Firebase error handling
+          if (error.code === 'auth/email-already-in-use') {
             throw new Error('This email is already registered. Please sign in instead.');
           }
           throw error;
         }
-        
-        // For sign-up, show success message
-        if (!isLogin) {
-          toast({
-            title: "Check your email",
-            description: "We've sent you a confirmation link to complete your registration.",
-          });
+      }
+    } catch (error: any) {
+      console.error('[Auth] Signup error:', error);
+      let errorMessage = 'Failed to create account. Please try again.';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.code) {
+        // Handle Firebase error codes
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email is already registered. Please sign in instead.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address.';
+            break;
+          case 'auth/operation-not-allowed':
+            errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password is too weak. Please choose a stronger password.';
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your connection and try again.';
+            break;
+          default:
+            errorMessage = error.message || 'Failed to create account. Please try again.';
         }
       }
-    } catch (error) {
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -249,24 +463,13 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-        redirectTo: getRedirectUrlWithPath('/auth/reset-password'),
+      await resetPassword(sanitizedEmail);
+      toast({
+        title: "Check your email",
+        description: "We've sent you a password reset link",
       });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-      } else {
-        toast({
-          title: "Check your email",
-          description: "We've sent you a password reset link",
-        });
-        setIsForgotPassword(false);
-        setEmail("");
-      }
+      setIsForgotPassword(false);
+      setEmail("");
     } catch (error) {
       toast({
         variant: "destructive",
@@ -284,9 +487,13 @@ const Auth = () => {
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
     
     try {
+      const isNative = Capacitor.isNativePlatform();
+      const platform = Capacitor.getPlatform?.() ?? 'web';
+      const providerSupportsNative = provider === 'google' ? isNative : (isNative && platform === 'ios');
+
       // Native Google Sign-In for iOS/Android
-      if (provider === 'google' && Capacitor.isNativePlatform()) {
-        console.log('[Google OAuth] Initiating native Google sign-in');
+      if (provider === 'google' && providerSupportsNative && googleNativeReady && SocialLogin) {
+        console.log('[Google OAuth] Initiating native Google sign-in with Firebase');
         
         const result = await SocialLogin.login({
           provider: 'google',
@@ -295,78 +502,47 @@ const Auth = () => {
 
         console.log('[Google OAuth] SocialLogin result:', JSON.stringify(result, null, 2));
 
+        // The plugin sometimes returns the payload under `result`, sometimes directly at the root
+        const nativeResponse = (result as unknown as { result?: Record<string, unknown> })?.result ?? result;
+        const idToken = (nativeResponse as { idToken?: string })?.idToken;
+        const accessToken = (nativeResponse as { accessToken?: string })?.accessToken;
+
         // Check if we got a valid response
-        if (result.provider === 'google' && result.result.responseType === 'online') {
-          const { idToken } = result.result;
-          
-          console.log('[Google OAuth] ID token received:', idToken ? `${idToken.substring(0, 20)}...` : 'MISSING');
-          
-          if (!idToken) {
-            throw new Error('No ID token received from Google sign-in');
+        if (idToken) {
+          console.log('[Google OAuth] ID token received:', `${idToken.substring(0, 20)}...`);
+          if (accessToken) {
+            console.log('[Google OAuth] Access token also received');
           }
 
-          console.log('[Google OAuth] Calling google-native-auth edge function');
+          // Sign in with Firebase using the Google credential
+          const userCredential = await signInWithGoogleCredential(idToken, accessToken);
+          const authUser = convertFirebaseUser(userCredential.user);
           
-          // Call our edge function to handle native Google auth
-          const { data: sessionData, error: functionError } = await supabase.functions.invoke('google-native-auth', {
-            body: { idToken }
-          });
-
-          console.log('[Google OAuth] Edge function response:', { 
-            hasAccessToken: !!sessionData?.access_token,
-            hasRefreshToken: !!sessionData?.refresh_token,
-            error: functionError?.message 
-          });
-
-          if (functionError) throw functionError;
-          if (!sessionData?.access_token || !sessionData?.refresh_token) {
-            throw new Error('Failed to get session tokens from edge function');
+          if (!authUser) {
+            throw new Error('Failed to convert Firebase user');
           }
-
-          // Set the session with tokens from edge function
-          const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-            access_token: sessionData.access_token,
-            refresh_token: sessionData.refresh_token,
-          });
-
-          if (sessionError) throw sessionError;
           
-          const sessionSetTime = Date.now();
-          console.log(`[Google OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
-          // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
-          
-          // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-          if (newSession?.user) {
-            googleFallbackTimeout.current = setTimeout(async () => {
-              try {
-                // Check if already redirected by onAuthStateChange
-                if (window.location.pathname !== '/auth') {
-                  console.log(`[Google OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
-                  return;
-                }
-                console.log(`[Google OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-                await ensureProfile(newSession.user.id, newSession.user.email);
-                const path = await getAuthRedirectPath(newSession.user.id);
-                navigate(path);
-              } catch (error) {
-                console.error('[Google OAuth Fallback] Error during redirect:', error);
-                // Fallback to onboarding if something goes wrong
-                navigate('/onboarding');
-              }
-            }, 800);
+          console.log('[Google OAuth] Firebase sign-in successful');
+          // Wrap in try-catch to prevent crashes on iOS
+          try {
+            await handlePostAuthNavigation(authUser, 'googleNative');
+          } catch (navError) {
+            console.error('[Google OAuth] Navigation error:', navError);
+            // Still try to navigate even if there's an error
+            setTimeout(() => navigate('/onboarding'), 0);
           }
           return;
         } else {
-          console.error('[Google OAuth] Unexpected response type:', result);
-          throw new Error('Unexpected Google sign-in response');
+          console.error('[Google OAuth] Missing idToken in native response:', result);
+          throw new Error('Google sign-in did not return an ID token');
         }
       }
 
       // Native Apple Sign-In for iOS
-      if (provider === 'apple' && Capacitor.isNativePlatform()) {
-        console.log('[Apple OAuth] Initiating native Apple sign-in');
+      if (provider === 'apple' && providerSupportsNative && appleNativeReady && SignInWithApple) {
+        console.log('[Apple OAuth] Initiating native Apple sign-in with Firebase');
         
-        // Generate secure random nonce (Supabase provides this method)
+        // Generate secure random nonce for Firebase
         const rawNonce = crypto.randomUUID();
         console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
         
@@ -401,77 +577,67 @@ const Auth = () => {
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
-        console.log('[Apple OAuth] Calling apple-native-auth edge function');
-
-        // Call our edge function to handle native Apple auth
-        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: { identityToken: result.response.identityToken }
-        });
-
-        console.log('[Apple OAuth] Edge function response:', { 
-          hasAccessToken: !!sessionData?.access_token,
-          hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionError?.message 
-        });
-
-        if (functionError) throw functionError;
-        if (!sessionData?.access_token || !sessionData?.refresh_token) {
-          throw new Error('Failed to get session tokens from edge function');
+        // Sign in with Firebase using the Apple credential
+        const userCredential = await signInWithAppleCredential(result.response.identityToken, rawNonce);
+        const authUser = convertFirebaseUser(userCredential.user);
+        
+        if (!authUser) {
+          throw new Error('Failed to convert Firebase user');
         }
-
-        // Set the session with tokens from edge function
-        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-        });
-
-        if (sessionError) throw sessionError;
         
-        const sessionSetTime = Date.now();
-        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, onAuthStateChange will handle redirect`);
-        // Let onAuthStateChange handle the redirect (it now listens for TOKEN_REFRESHED)
-        
-        // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
-        if (newSession?.user) {
-          appleFallbackTimeout.current = setTimeout(async () => {
-            try {
-              // Check if already redirected by onAuthStateChange
-              if (window.location.pathname !== '/auth') {
-                console.log(`[Apple OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
-                return;
-              }
-              console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
-              await ensureProfile(newSession.user.id, newSession.user.email);
-              const path = await getAuthRedirectPath(newSession.user.id);
-              navigate(path);
-            } catch (error) {
-              console.error('[Apple OAuth Fallback] Error during redirect:', error);
-              // Fallback to onboarding if something goes wrong
-              navigate('/onboarding');
-            }
-          }, 800);
+        console.log('[Apple OAuth] Firebase sign-in successful');
+        // Wrap in try-catch to prevent crashes on iOS
+        try {
+          await handlePostAuthNavigation(authUser, 'appleNative');
+        } catch (navError) {
+          console.error('[Apple OAuth] Navigation error:', navError);
+          // Still try to navigate even if there's an error
+          setTimeout(() => navigate('/onboarding'), 0);
         }
         return;
       }
 
       // Web OAuth flow for Google and web Apple Sign-In
-      console.log(`[${provider} OAuth] Using web OAuth flow`);
-      console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
+      if (providerSupportsNative) {
+        const providerReady = provider === 'google' ? googleNativeReady : appleNativeReady;
+        if (!providerReady) {
+          console.warn(`[${provider} OAuth] Native plugin unavailable - falling back to web flow`);
+        }
+      }
+
+      // Web OAuth flow using Firebase
+      console.log(`[${provider} OAuth] Using web OAuth flow with Firebase`);
       
-      const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: getRedirectUrlWithPath('/'),
-        },
-      });
-
-      console.log(`[${provider} OAuth] OAuth response:`, { 
-        hasUrl: !!oauthData?.url, 
-        provider: oauthData?.provider,
-        error: error?.message 
-      });
-
-      if (error) throw error;
+      if (provider === 'google') {
+        try {
+          const userCredential = await signInWithGoogle();
+          // signInWithGoogle returns null for localhost redirect flow
+          // The redirect result is handled by getRedirectResult in useEffect above
+          if (!userCredential) {
+            console.log('[Google OAuth] Redirect flow initiated, waiting for redirect result...');
+            // Don't reset loading state here - the redirect will happen
+            // The loading state will be reset when the page reloads after redirect
+            return;
+          }
+          const authUser = convertFirebaseUser(userCredential.user);
+          await handlePostAuthNavigation(authUser, 'googleWeb');
+        } catch (error: any) {
+          console.error('[Google OAuth] Error in signInWithGoogle:', error);
+          // Re-throw to be caught by outer catch block
+          throw error;
+        }
+      } else if (provider === 'apple') {
+        // Apple Sign-In on web requires redirect flow or popup
+        // For now, we'll use a redirect approach or show a message
+        // Note: Apple Sign-In on web is more complex and may require additional setup
+        toast({
+          title: "Apple Sign-In",
+          description: "Please use Apple Sign-In on iOS devices, or use email/password authentication.",
+          variant: "destructive",
+        });
+        setOauthLoading(null);
+        return;
+      }
     } catch (error) {
       console.error(`[${provider} OAuth] Error caught:`, {
         message: error.message,
@@ -600,37 +766,49 @@ const Auth = () => {
                   <span>Or continue with</span>
                   <span className="h-px flex-1 bg-obsidian/40" />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3">
+                  {/* Apple Sign In - Full width, prominent */}
                   <Button
                     type="button"
                     variant="secondary"
                     size="lg"
-                    className="w-full h-14 justify-start gap-3 normal-case tracking-normal bg-obsidian/60 hover:bg-obsidian"
+                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-obsidian to-black text-pure-white border border-white/10 shadow-lg shadow-royal-purple/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('apple')}
-                    disabled={loading || oauthLoading === 'apple'}
+                    disabled={loading || oauthLoading !== null}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian text-pure-white text-base font-semibold">
-                      A
-                    </span>
-                    <span className="flex flex-col items-start leading-tight">
-                      <span className="text-sm font-semibold text-pure-white">Continue with Apple</span>
-                      <span className="text-[11px] font-normal text-steel">Use your Apple ID</span>
+                    {oauthLoading === 'apple' ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-obsidian border-t-transparent" />
+                    ) : (
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                      </svg>
+                    )}
+                    <span className="text-base font-semibold">
+                      {oauthLoading === 'apple' ? 'Signing in...' : 'Continue with Apple'}
                     </span>
                   </Button>
+
+                  {/* Google Sign In - Full width */}
                   <Button
                     type="button"
                     variant="secondary"
                     size="lg"
-                    className="w-full h-14 justify-start gap-3 normal-case tracking-normal bg-pure-white text-obsidian hover:bg-pure-white"
+                    className="w-full h-14 justify-center gap-3 normal-case tracking-normal bg-gradient-to-r from-pure-white to-slate-100 text-obsidian border border-steel/30 shadow-md shadow-obsidian/10 hover:shadow-royal-purple/20 hover:scale-[1.01] transition-transform"
                     onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading === 'google'}
+                    disabled={loading || oauthLoading !== null}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-pure-white text-obsidian text-base font-semibold border border-obsidian/20">
-                      G
-                    </span>
-                    <span className="flex flex-col items-start leading-tight">
-                      <span className="text-sm font-semibold">Continue with Google</span>
-                      <span className="text-[11px] font-normal text-steel">Use your Google Account</span>
+                    {oauthLoading === 'google' ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-pure-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-5 w-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                    )}
+                    <span className="text-base font-semibold">
+                      {oauthLoading === 'google' ? 'Signing in...' : 'Continue with Google'}
                     </span>
                   </Button>
                 </div>

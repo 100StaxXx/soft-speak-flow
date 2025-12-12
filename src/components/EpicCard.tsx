@@ -14,17 +14,17 @@ import {
 import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { GuildActivityFeed } from "./GuildActivityFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -80,10 +80,13 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
+  const { checkEpicCheckpoint } = useEncounterTrigger();
+  
   // Initialize to -1 on first render to catch any milestones that may have been
   // crossed before this component mounted. Server handles duplicate prevention.
   const previousProgressRef = useRef<number>(-1);
   const hasInitializedRef = useRef<boolean>(false);
+  const encounterCheckRef = useRef<number>(-1);
   
   const daysRemaining = Math.ceil(
     (new Date(epic.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -145,6 +148,31 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     
     // Update ref for next comparison
     previousProgressRef.current = currentProgress;
+    
+    // Dispatch event for Astral Encounter trigger on epic milestone crossings only
+    const milestones = [25, 50, 75, 100];
+    const prevCheck = encounterCheckRef.current < 0 ? 0 : encounterCheckRef.current;
+    
+    // Find if we crossed a milestone
+    const crossedMilestone = milestones.find(
+      m => prevCheck < m && currentProgress >= m
+    );
+    
+    if (crossedMilestone) {
+      encounterCheckRef.current = currentProgress;
+      window.dispatchEvent(
+        new CustomEvent('epic-progress-checkpoint', {
+          detail: {
+            epicId: epic.id,
+            previousProgress: prevCheck,
+            currentProgress,
+          },
+        })
+      );
+    } else if (currentProgress !== encounterCheckRef.current) {
+      // Update ref even if no milestone crossed (for accurate next comparison)
+      encounterCheckRef.current = currentProgress;
+    }
   }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 
   const handleShareEpic = async () => {

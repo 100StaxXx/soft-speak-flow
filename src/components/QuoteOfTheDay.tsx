@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonQuote } from "@/components/SkeletonCard";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Quote as QuoteIcon, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { format } from "date-fns";
+import { getMentor } from "@/lib/firebase/mentors";
+import { getQuotes } from "@/lib/firebase/quotes";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 interface QuoteData {
   id: string;
@@ -30,45 +32,61 @@ export const QuoteOfTheDay = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // Get mentor details
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-
-      if (!mentor) {
+      const mentor = await getMentor(profile.selected_mentor_id);
+      if (!mentor || !mentor.slug) {
         setLoading(false);
         return;
       }
 
       // Get today's pep talk to find related quote
-      const { data: dailyPepTalk } = await supabase
-        .from("daily_pep_talks")
-        .select("emotional_triggers, topic_category")
-        .eq("for_date", today)
-        .eq("mentor_slug", mentor.slug)
-        .maybeSingle();
+      const dailyPepTalks = await getDocuments<{ emotional_triggers?: string[]; topic_category?: string | string[] }>(
+        "daily_pep_talks",
+        [
+          ["for_date", "==", today],
+          ["mentor_slug", "==", mentor.slug]
+        ],
+        undefined,
+        undefined,
+        1
+      );
 
-      if (dailyPepTalk) {
-        // Fetch a quote that matches the pep talk's themes
-        // Build the query safely - first try matching by category, then fall back
-        let quoteQuery = supabase.from("quotes").select("*");
+      const dailyPepTalk = dailyPepTalks[0];
+      
+      // Always fetch quotes, even if no daily pep talk exists
+      // This ensures users see a quote after onboarding even if they missed the daily trigger
+      const quotes = await getQuotes(undefined, 10);
+      
+      if (quotes && quotes.length > 0) {
+        let matchingQuote = quotes[0]; // Default to first quote
+        let topicCategory: string | null = null;
         
-        if (dailyPepTalk.topic_category) {
-          quoteQuery = quoteQuery.eq("category", dailyPepTalk.topic_category);
-        }
-        
-        const { data: quotes } = await quoteQuery.limit(10);
-        
-        if (quotes && quotes.length > 0) {
-          // If we have emotional triggers, try to find a matching quote
+        // If we have a daily pep talk, try to find a matching quote
+        if (dailyPepTalk) {
           const triggers = dailyPepTalk.emotional_triggers || [];
-          const matchingQuote = quotes.find(q => 
-            q.emotional_triggers?.some((t: string) => triggers.includes(t))
-          ) || quotes[0];
+          topicCategory = Array.isArray(dailyPepTalk.topic_category) 
+            ? dailyPepTalk.topic_category[0] 
+            : dailyPepTalk.topic_category;
           
-          setTodaysQuote(matchingQuote);
+          // Try to find a matching quote by category or triggers
+          matchingQuote = quotes.find(q => {
+            // Match by category if available
+            if (topicCategory && q.category === topicCategory) {
+              return true;
+            }
+            // Match by emotional triggers if available
+            if (triggers.length > 0 && q.emotional_triggers?.some((t: string) => triggers.includes(t))) {
+              return true;
+            }
+            return false;
+          }) || quotes[0];
         }
+        
+        setTodaysQuote({
+          id: matchingQuote.id,
+          text: matchingQuote.text || '',
+          author: matchingQuote.author || null,
+          category: topicCategory,
+        });
       }
       
       setLoading(false);

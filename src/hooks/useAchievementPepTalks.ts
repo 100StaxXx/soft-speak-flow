@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 
 interface AchievementPepTalk {
@@ -16,31 +16,35 @@ export const useAchievementPepTalks = () => {
   const { user } = useAuth();
 
   const { data: unlockedPepTalks = [], isLoading } = useQuery({
-    queryKey: ["achievement-pep-talks", user?.id],
+    queryKey: ["achievement-pep-talks", user?.uid],
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from("achievements")
-        .select("*")
-        .eq("user_id", user.id)
-        .not("metadata->>pepTalkMessage", "is", null)
-        .order("earned_at", { ascending: false });
+      const allAchievements = await getDocuments(
+        "achievements",
+        [["user_id", "==", user.uid]],
+        "earned_at",
+        "desc"
+      );
 
-      if (error) throw error;
-
-      return data.map((achievement) => {
-        const metadata = achievement.metadata as Record<string, any> | null;
-        return {
-          id: achievement.id,
-          title: achievement.title,
-          tier: achievement.tier,
-          earnedAt: achievement.earned_at,
-          pepTalkDuration: metadata?.pepTalkDuration,
-          pepTalkMessage: metadata?.pepTalkMessage,
-          pepTalkCategory: metadata?.pepTalkCategory,
-        };
-      }) as AchievementPepTalk[];
+      // Filter achievements that have pepTalkMessage in metadata
+      return allAchievements
+        .filter(achievement => {
+          const metadata = achievement.metadata as Record<string, any> | null;
+          return metadata?.pepTalkMessage;
+        })
+        .map((achievement) => {
+          const metadata = achievement.metadata as Record<string, any> | null;
+          return {
+            id: achievement.id,
+            title: achievement.title,
+            tier: achievement.tier,
+            earnedAt: timestampToISO(achievement.earned_at as any) || achievement.earned_at || new Date().toISOString(),
+            pepTalkDuration: metadata?.pepTalkDuration,
+            pepTalkMessage: metadata?.pepTalkMessage,
+            pepTalkCategory: metadata?.pepTalkCategory,
+          };
+        }) as AchievementPepTalk[];
     },
     enabled: !!user,
   });

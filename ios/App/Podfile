@@ -1,4 +1,47 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+require 'fileutils'
+
+def mutate_file(path)
+  return unless File.exist?(path)
+
+  stat = File.stat(path)
+  original_permissions = stat.mode & 0o7777
+  made_writable = false
+
+  if (original_permissions & 0o200).zero?
+    File.chmod(original_permissions | 0o200, path)
+    made_writable = true
+  end
+
+  yield(path)
+ensure
+  if made_writable && File.exist?(path)
+    File.chmod(original_permissions, path)
+  end
+end
+
+# Ensure Capgo's hook script runs during pod install so unused providers stay disabled.
+def configure_social_login_podspec
+  plugin_root = File.expand_path('../../node_modules/@capgo/capacitor-social-login', __dir__)
+  script_path = File.join(plugin_root, 'scripts', 'configure-dependencies.js')
+  config_path = File.expand_path('App/capacitor.config.json', __dir__)
+
+  return unless File.exist?(script_path)
+
+  capacitor_config = File.exist?(config_path) ? File.read(config_path) : nil
+  env = {
+    'CAPACITOR_PLATFORM_NAME' => 'ios',
+    'CAPACITOR_ROOT_DIR' => File.expand_path('..', __dir__)
+  }
+  env['CAPACITOR_CONFIG'] = capacitor_config if capacitor_config
+
+  Dir.chdir(plugin_root) do
+    success = system(env, 'node', script_path)
+    puts('[SocialLogin] Failed to configure dependencies; falling back to defaults') unless success
+  end
+end
+
+configure_social_login_podspec
 
 platform :ios, '16.0'
 use_frameworks!
@@ -7,6 +50,7 @@ def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCommunityAppleSignIn', :path => '../../node_modules/@capacitor-community/apple-sign-in'
+  pod 'CapacitorBrowser', :path => '../../node_modules/@capacitor/browser'
   pod 'CapacitorFilesystem', :path => '../../node_modules/@capacitor/filesystem'
   pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
   pod 'CapacitorScreenOrientation', :path => '../../node_modules/@capacitor/screen-orientation'
@@ -17,6 +61,7 @@ def capacitor_pods
 end
 
 target 'App' do
+  pod 'IONFilesystemLib', :path => '../IONFilesystemLib'
   capacitor_pods
   # Add your Pods here
 end
@@ -51,14 +96,14 @@ post_install do |installer|
   end
 
   alamofire_response_serialization = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'ResponseSerialization.swift')
-  if File.exist?(alamofire_response_serialization)
+  mutate_file(alamofire_response_serialization) do |file|
     original = 'public protocol DataDecoder: Sendable'
     patched = '@preconcurrency public protocol DataDecoder: Sendable'
 
-    file_contents = File.read(alamofire_response_serialization)
+    file_contents = File.read(file)
     unless file_contents.include?(patched)
       File.write(
-        alamofire_response_serialization,
+        file,
         file_contents.sub(original, patched)
       )
     end
@@ -68,39 +113,37 @@ post_install do |installer|
     plist_extension = 'extension PropertyListDecoder: DataDecoder {}'
     plist_replacement = "@available(iOS 16.0, *)\nextension PropertyListDecoder: DataDecoder {}"
 
-    updated_contents = File.read(alamofire_response_serialization)
+    updated_contents = File.read(file)
     if updated_contents.include?(json_extension) && !updated_contents.include?(json_replacement)
       updated_contents = updated_contents.sub(json_extension, json_replacement)
     end
     if updated_contents.include?(plist_extension) && !updated_contents.include?(plist_replacement)
       updated_contents = updated_contents.sub(plist_extension, plist_replacement)
     end
-    File.write(alamofire_response_serialization, updated_contents)
+    File.write(file, updated_contents)
   end
 
   gid_activity_indicator = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
-  if File.exist?(gid_activity_indicator)
-    file_contents = File.read(gid_activity_indicator)
+  mutate_file(gid_activity_indicator) do |file|
+    file_contents = File.read(file)
     if file_contents.include?('UIActivityIndicatorViewStyleGray')
       File.write(
-        gid_activity_indicator,
+        file,
         file_contents.gsub('UIActivityIndicatorViewStyleGray', 'UIActivityIndicatorViewStyleMedium')
       )
     end
   end
 
   alamofire_event_monitor = File.join(__dir__, 'Pods', 'Alamofire', 'Source', 'Features', 'EventMonitor.swift')
-  if File.exist?(alamofire_event_monitor)
-    file_contents = File.read(alamofire_event_monitor)
+  mutate_file(alamofire_event_monitor) do |file|
+    file_contents = File.read(file)
     shim = "extension InputStream: @unchecked Sendable {}"
     unless file_contents.include?(shim)
       file_contents = file_contents.sub('import Foundation', "import Foundation\n\n#{shim}")
-      File.write(alamofire_event_monitor, file_contents)
+      File.write(file, file_contents)
     end
   end
-
-  gid_activity_indicator = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources', 'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
-  if File.exist?(gid_activity_indicator)
+  mutate_file(gid_activity_indicator) do |file|
     original = <<~'ORIGINAL'
       UIActivityIndicatorViewStyle style;
       if (@available(iOS 13.0, *)) {
@@ -123,12 +166,32 @@ post_install do |installer|
       #endif
     PATCHED
 
-    file_contents = File.read(gid_activity_indicator)
+    file_contents = File.read(file)
     unless file_contents.include?('#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000')
       File.write(
-        gid_activity_indicator,
+        file,
         file_contents.sub(original, patched)
       )
     end
+  end
+
+  xcframework_root = File.join(__dir__, 'Pods')
+  device_slice = 'ios-arm64'
+  excluded_tokens = %w[simulator maccatalyst]
+
+  Dir.glob(File.join(xcframework_root, '**', '*.xcframework')).each do |xcframework|
+    device_slice_path = File.join(xcframework, device_slice)
+    next if Dir.exist?(device_slice_path)
+
+    fallback = Dir.glob(File.join(xcframework, "#{device_slice}_*")).find do |candidate|
+      File.directory?(candidate) && excluded_tokens.none? { |token| File.basename(candidate).include?(token) }
+    end
+
+    next unless fallback
+
+    FileUtils.rm_rf(device_slice_path)
+    FileUtils.mkdir_p(device_slice_path)
+    FileUtils.cp_r(File.join(fallback, '.'), device_slice_path)
+    puts "Created #{device_slice} slice for #{File.basename(xcframework)} using #{File.basename(fallback)}"
   end
 end

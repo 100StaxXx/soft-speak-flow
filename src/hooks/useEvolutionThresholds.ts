@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 export interface EvolutionThreshold {
   stage: number;
@@ -15,13 +15,13 @@ export const useEvolutionThresholds = () => {
   const { data: thresholds, isLoading, error } = useQuery({
     queryKey: ['evolution-thresholds'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('evolution_thresholds')
-        .select('*')
-        .order('stage', { ascending: true });
-
-      if (error) throw error;
-      return data as EvolutionThreshold[];
+      const data = await getDocuments<EvolutionThreshold>(
+        'evolution_thresholds',
+        undefined,
+        'stage',
+        'asc'
+      );
+      return data;
     },
     staleTime: Infinity, // Never refetch - thresholds rarely change
     gcTime: Infinity, // Keep in cache forever (renamed from cacheTime in React Query v5)

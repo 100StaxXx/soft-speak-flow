@@ -1,24 +1,32 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getProfile, createProfile, updateProfile } from "@/lib/firebase/profiles";
+import { getResolvedMentorId } from "./mentor";
 
 /**
  * Centralized auth redirect logic
  * Determines where to send users based on their auth and profile state
+ * @param profile - Optional profile to avoid duplicate reads
  */
-export const getAuthRedirectPath = async (userId: string): Promise<string> => {
+export const getAuthRedirectPath = async (userId: string, profile?: any): Promise<string> => {
   try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("selected_mentor_id, onboarding_completed")
-      .eq("id", userId)
-      .maybeSingle();
+    // Only fetch profile if not provided (optimization to avoid duplicate reads)
+    const userProfile = profile || await getProfile(userId);
+
+    const resolvedMentorId = getResolvedMentorId(userProfile);
+
+    if (userProfile?.onboarding_completed && !userProfile.selected_mentor_id && resolvedMentorId) {
+      // Don't await - update in background to avoid blocking navigation
+      updateProfile(userId, { selected_mentor_id: resolvedMentorId }).catch(err => {
+        console.error("Error updating mentor ID:", err);
+      });
+    }
 
     // If onboarding is completed, always go to tasks
-    if (profile?.onboarding_completed) {
+    if (userProfile?.onboarding_completed) {
       return "/tasks";
     }
 
     // No profile or no mentor selected -> onboarding
-    if (!profile || !profile.selected_mentor_id) {
+    if (!userProfile || !resolvedMentorId) {
       return "/onboarding";
     }
 
@@ -33,34 +41,50 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
 /**
  * Ensures a profile exists for a user, creating one if needed
  * Also updates timezone to match user's current device
+ * @returns The profile (existing or newly created) to avoid duplicate reads
  */
-export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id, timezone")
-    .eq("id", userId)
-    .maybeSingle();
+export const ensureProfile = async (userId: string, email: string | null, metadata?: { timezone?: string }): Promise<any> => {
+  try {
+    const existing = await getProfile(userId);
+    const userTimezone = metadata?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  if (!existing) {
-    // Create new profile with user's timezone
-    const { error } = await supabase.from("profiles").upsert({
-      id: userId,
-      email: email ?? null,
-      timezone: userTimezone,
-    }, {
-      onConflict: 'id'
-    });
-    
-    if (error && !error.message.includes('duplicate')) {
-      console.error('Error creating profile:', error);
-      throw error;
+    if (!existing) {
+      // Profile doesn't exist, create it
+      console.log(`[ensureProfile] Creating new profile for user ${userId}`);
+      try {
+        const newProfile = await createProfile(userId, email, {
+          timezone: userTimezone,
+          is_premium: false,
+          preferences: null,
+          selected_mentor_id: null,
+          onboarding_completed: false,
+          onboarding_data: {},
+        });
+        console.log(`[ensureProfile] Profile created successfully for user ${userId}`);
+        return newProfile;
+      } catch (createError: any) {
+        // Ignore duplicate errors (race condition) - try to fetch existing profile
+        if (createError.code === 'already-exists' || createError.message?.includes('already exists')) {
+          console.log(`[ensureProfile] Profile already exists (race condition) for user ${userId}`);
+          // Fetch the profile that was created by the race condition
+          const raceProfile = await getProfile(userId);
+          if (raceProfile) return raceProfile;
+        }
+        console.error('[ensureProfile] Error creating profile:', createError);
+        throw createError;
+      }
+    } else {
+      console.log(`[ensureProfile] Profile already exists for user ${userId}`);
+      // Update timezone if it's different (don't await to avoid blocking)
+      if (existing.timezone !== userTimezone) {
+        updateProfile(userId, { timezone: userTimezone }).catch(err => {
+          console.error("Error updating timezone:", err);
+        });
+      }
+      return existing;
     }
-  } else if (existing.timezone !== userTimezone) {
-    // Update timezone if it's different
-    await supabase.from("profiles").update({
-      timezone: userTimezone
-    }).eq("id", userId);
+  } catch (error) {
+    console.error('[ensureProfile] Unexpected error:', error);
+    throw error;
   }
 };

@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument, updateDocument, deleteDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
-import { useXPToast } from "@/contexts/XPContext";
+import { useXPRewards } from "@/hooks/useXPRewards";
 
 // Type for habits created during epic creation
 interface CreatedHabit {
@@ -29,34 +29,51 @@ interface CreatedEpic {
 export const useEpics = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { showXPToast } = useXPToast();
+  const { awardCustomXP } = useXPRewards();
 
   // Fetch all epics for the user
   const { data: epics, isLoading, error: epicsError } = useQuery({
-    queryKey: ["epics", user?.id],
+    queryKey: ["epics", user?.uid],
     queryFn: async () => {
       // Double-check user exists (defensive - enabled should prevent this)
-      if (!user?.id) return [];
+      if (!user?.uid) return [];
       
-      const { data, error } = await supabase
-        .from("epics")
-        .select(`
-          *,
-          epic_habits(
-            habit_id,
-            habits(id, title, difficulty)
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const epicsData = await getDocuments(
+        "epics",
+        [["user_id", "==", user.uid]],
+        "created_at",
+        "desc"
+      );
 
-      if (error) {
-        console.error('Failed to fetch epics:', error);
-        throw error;
-      }
-      return data || [];
+      // Fetch epic habits for each epic
+      const epicsWithHabits = await Promise.all(
+        epicsData.map(async (epic: any) => {
+          const epicHabits = await getDocuments(
+            "epic_habits",
+            [["epic_id", "==", epic.id]]
+          );
+
+          // Fetch habit details for each epic habit
+          const habits = await Promise.all(
+            epicHabits.map(async (eh: any) => {
+              const habit = await getDocument("habits", eh.habit_id);
+              return habit ? { ...eh, habits: habit } : null;
+            })
+          );
+
+          return {
+            ...epic,
+            epic_habits: habits.filter(Boolean),
+            created_at: timestampToISO(epic.created_at as any) || epic.created_at,
+            updated_at: timestampToISO(epic.updated_at as any) || epic.updated_at,
+            completed_at: timestampToISO(epic.completed_at as any) || epic.completed_at,
+          };
+        })
+      );
+
+      return epicsWithHabits;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
     staleTime: 3 * 60 * 1000, // 3 minutes - epics don't change frequently
     refetchOnWindowFocus: false,
     retry: 2, // Retry failed requests up to 2 times
@@ -93,102 +110,71 @@ export const useEpics = () => {
 
       try {
         // Create habits first
-        const { data: habits, error: habitError } = await supabase
-          .from("habits")
-          .insert(
-            epicData.habits.map(habit => ({
-              user_id: user.id,
-              title: habit.title,
-              difficulty: habit.difficulty,
-              frequency: habit.frequency,
-              custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
-            }))
-          )
-          .select();
-
-        if (habitError) {
-          console.error("Failed to create habits:", habitError);
-          throw new Error(`Failed to create habits: ${habitError.message}`);
+        const habitIds: string[] = [];
+        for (const habit of epicData.habits) {
+          const habitId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          await setDocument("habits", habitId, {
+            id: habitId,
+            user_id: user.uid,
+            title: habit.title,
+            difficulty: habit.difficulty,
+            frequency: habit.frequency,
+            custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
+          }, false);
+          habitIds.push(habitId);
         }
 
-        if (!habits || habits.length === 0) {
-          throw new Error("No habits were created");
-        }
-
-        createdHabits = habits;
+        createdHabits = habitIds.map(id => ({ id } as CreatedHabit));
 
         // Generate unique invite code
         const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
         // Create the epic
-        const { data: epic, error: epicError } = await supabase
-          .from("epics")
-          .insert({
-            user_id: user.id,
-            title: epicData.title,
-            description: epicData.description,
-            target_days: epicData.target_days,
-            is_public: true,
-            xp_reward: Math.floor(epicData.target_days * 10),
-            invite_code: inviteCode,
-            theme_color: epicData.theme_color || 'heroic',
-          })
-          .select()
-          .single();
+        const epicId = `${user.uid}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const epic = {
+          id: epicId,
+          user_id: user.uid,
+          title: epicData.title,
+          description: epicData.description || null,
+          target_days: epicData.target_days,
+          is_public: true,
+          xp_reward: Math.floor(epicData.target_days * 10),
+          invite_code: inviteCode,
+          theme_color: epicData.theme_color || 'heroic',
+          status: 'active',
+        };
 
-        if (epicError) {
-          console.error("Failed to create epic:", epicError);
-          // Rollback: delete created habits
-          await supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id));
-          throw new Error(`Failed to create epic: ${epicError.message}`);
-        }
-
-        if (!epic) {
-          throw new Error("Epic creation returned no data");
-        }
-
-        createdEpic = epic;
+        await setDocument("epics", epicId, epic, false);
+        createdEpic = epic as CreatedEpic;
 
         // Link habits to epic
-        const { error: linkError } = await supabase
-          .from("epic_habits")
-          .insert(
-            createdHabits.map((habit) => ({
-              epic_id: epic.id,
-              habit_id: habit.id,
-            }))
-          );
-
-        if (linkError) {
-          console.error("Failed to link habits:", linkError);
-          // Rollback: delete epic and habits
-          await supabase.from("epics").delete().eq("id", epic.id);
-          await supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id));
-          throw new Error(`Failed to link habits: ${linkError.message}`);
+        for (const habitId of habitIds) {
+          const linkId = `${epicId}_${habitId}`;
+          await setDocument("epic_habits", linkId, {
+            id: linkId,
+            epic_id: epicId,
+            habit_id: habitId,
+          }, false);
         }
 
-        return epic;
+        return epic as CreatedEpic;
       } catch (error) {
         // Final cleanup in case of any unexpected error
         if (createdEpic) {
-          void supabase.from("epics").delete().eq("id", createdEpic.id).then(({ error: delErr }) => {
-            if (delErr) console.error('Failed to cleanup epic:', delErr);
-          });
+          try {
+            await deleteDocument("epics", createdEpic.id);
+          } catch (delErr) {
+            console.error('Failed to cleanup epic:', delErr);
+          }
         }
         if (createdHabits.length > 0) {
-          void supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id))
-            .then(({ error: delErr }) => {
-              if (delErr) console.error('Failed to cleanup habits:', delErr);
-            });
+          for (const habit of createdHabits) {
+            try {
+              await deleteDocument("habits", habit.id);
+            } catch (delErr) {
+              console.error('Failed to cleanup habit:', delErr);
+            }
+          }
         }
         throw error;
       }
@@ -220,20 +206,20 @@ export const useEpics = () => {
       }
 
       // Get epic details for XP reward - verify ownership
-      const { data: epic, error: fetchError } = await supabase
-        .from("epics")
-        .select("xp_reward, title, progress_percentage, status, user_id")
-        .eq("id", epicId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error("Failed to fetch epic:", fetchError);
-        throw new Error(`Failed to fetch epic: ${fetchError.message}`);
-      }
+      const epic = await getDocument<{
+        xp_reward: number;
+        title: string;
+        progress_percentage: number;
+        status: string;
+        user_id: string;
+      }>("epics", epicId);
 
       if (!epic) {
-        throw new Error("Epic not found or you don't have permission");
+        throw new Error("Epic not found");
+      }
+
+      if (epic.user_id !== user.uid) {
+        throw new Error("You don't have permission to update this epic");
       }
 
       // Prevent double-completion XP award
@@ -241,25 +227,28 @@ export const useEpics = () => {
         throw new Error("Epic is already completed");
       }
 
-      const { error } = await supabase
-        .from("epics")
-        .update({
-          status,
-          completed_at: status === "completed" ? new Date().toISOString() : null,
-        })
-        .eq("id", epicId)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      await updateDocument("epics", epicId, {
+        status,
+        completed_at: status === "completed" ? new Date().toISOString() : null,
+      });
 
       return { epic, status, wasAlreadyCompleted: epic.status === "completed" };
     },
-    onSuccess: ({ epic, status, wasAlreadyCompleted }) => {
+    onSuccess: async ({ epic, status, wasAlreadyCompleted }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       
       if (status === "completed" && !wasAlreadyCompleted) {
         // Only award XP if this is the FIRST time completing
-        showXPToast(epic.xp_reward, `Epic "${epic.title}" Completed!`);
+        try {
+          await awardCustomXP(
+            epic.xp_reward,
+            "epic_complete",
+            `Epic "${epic.title}" Completed!`,
+            { epic_id: variables?.epicId }
+          );
+        } catch (error) {
+          console.error("Failed to award epic completion XP:", error);
+        }
         toast.success("Epic Completed! 🏆", {
           description: `You've conquered the ${epic.title} epic! Your companion grows stronger!`,
         });
@@ -289,25 +278,24 @@ export const useEpics = () => {
       }
 
       // Check if habit is already linked to prevent duplicates
-      const { data: existing } = await supabase
-        .from("epic_habits")
-        .select('id')
-        .eq('epic_id', epicId)
-        .eq('habit_id', habitId)
-        .maybeSingle();
+      const existing = await getDocuments(
+        "epic_habits",
+        [
+          ["epic_id", "==", epicId],
+          ["habit_id", "==", habitId],
+        ]
+      );
 
-      if (existing) {
+      if (existing.length > 0) {
         throw new Error('Habit is already linked to this epic');
       }
 
-      const { error } = await supabase
-        .from("epic_habits")
-        .insert({ epic_id: epicId, habit_id: habitId });
-
-      if (error) {
-        console.error('Failed to link habit to epic:', error);
-        throw error;
-      }
+      const linkId = `${epicId}_${habitId}`;
+      await setDocument("epic_habits", linkId, {
+        id: linkId,
+        epic_id: epicId,
+        habit_id: habitId,
+      }, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
@@ -332,15 +320,21 @@ export const useEpics = () => {
         throw new Error('Invalid epic or habit ID');
       }
 
-      const { error } = await supabase
-        .from("epic_habits")
-        .delete()
-        .eq("epic_id", epicId)
-        .eq("habit_id", habitId);
+      // Find and delete the epic_habit link
+      const links = await getDocuments(
+        "epic_habits",
+        [
+          ["epic_id", "==", epicId],
+          ["habit_id", "==", habitId],
+        ]
+      );
 
-      if (error) {
-        console.error('Failed to remove habit from epic:', error);
-        throw error;
+      if (links.length === 0) {
+        throw new Error('Habit is not linked to this epic');
+      }
+
+      for (const link of links) {
+        await deleteDocument("epic_habits", link.id);
       }
     },
     onSuccess: () => {

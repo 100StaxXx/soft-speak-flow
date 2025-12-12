@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ChevronLeft } from "lucide-react";
 import { type FactionType } from "./FactionSelector";
 
 interface QuestionOption {
@@ -50,10 +51,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What area of growth calls to you most right now?",
     options: [
-      { text: "Strengthening my discipline and performance", tags: ["discipline", "tough_love", "performance", "elite"] },
-      { text: "Cultivating inner peace and clarity", tags: ["calm", "mindfulness", "clarity", "presence"] },
-      { text: "Deepening healing and emotional resilience", tags: ["healing", "supportive", "soft", "recovery"] },
-      { text: "Building confidence and forward momentum", tags: ["confidence", "self_belief", "momentum", "uplifting"] },
+      { text: "Strengthening my discipline and performance", tags: ["discipline", "momentum"] },
+      { text: "Cultivating inner peace and clarity", tags: ["calm", "spiritual"] },
+      { text: "Deepening healing and emotional resilience", tags: ["healing", "supportive"] },
+      { text: "Building confidence and forward momentum", tags: ["confidence", "momentum"] },
     ],
   },
   {
@@ -61,10 +62,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What kind of guidance resonates with you most?",
     options: [
-      { text: "Direct and honest guidance", tags: ["tough_love", "direct", "intense"] },
-      { text: "Gentle and supportive encouragement", tags: ["warm", "soft", "supportive", "feminine"] },
-      { text: "Calm and thoughtful wisdom", tags: ["stoic", "deep", "grounded", "calm"] },
-      { text: "High-energy motivation", tags: ["high_energy", "energetic", "elite", "uplifting"] },
+      { text: "Direct and honest guidance", tags: ["discipline", "confidence"] },
+      { text: "Gentle and supportive encouragement", tags: ["supportive", "healing"] },
+      { text: "Calm and thoughtful wisdom", tags: ["calm", "spiritual"] },
+      { text: "High-energy motivation", tags: ["momentum", "confidence"] },
     ],
   },
   {
@@ -72,10 +73,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Where could you use a little extra support or strength right now?",
     options: [
-      { text: "Staying consistent on my path", tags: ["discipline", "habits", "execution", "grind"] },
-      { text: "Feeling mentally scattered or tense", tags: ["mindfulness", "calm", "presence", "anxiety_relief"] },
-      { text: "Moving forward from emotional heaviness", tags: ["healing", "relationships", "heartbreak", "self_worth"] },
-      { text: "Believing in myself more deeply", tags: ["confidence", "self_belief", "supportive", "momentum"] },
+      { text: "Staying consistent on my path", tags: ["discipline", "momentum"] },
+      { text: "Feeling mentally scattered or tense", tags: ["calm", "supportive"] },
+      { text: "Moving forward from emotional heaviness", tags: ["healing", "supportive"] },
+      { text: "Believing in myself more deeply", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -83,10 +84,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What kind of energy do you want from your mentor?",
     options: [
-      { text: "Focused, intense energy", tags: ["intense", "elite", "high_energy"] },
-      { text: "Calm, grounded presence", tags: ["calm", "grounded", "neutral"] },
-      { text: "Warm, uplifting support", tags: ["warm", "encouraging", "accessible", "uplifting"] },
-      { text: "Spiritual and intuitive guidance", tags: ["spiritual", "intuition", "higher_self"] },
+      { text: "Focused, intense energy", tags: ["discipline", "momentum"] },
+      { text: "Calm, grounded presence", tags: ["calm", "supportive"] },
+      { text: "Warm, uplifting support", tags: ["supportive", "confidence"] },
+      { text: "Spiritual and intuitive guidance", tags: ["spiritual", "calm"] },
     ],
   },
   {
@@ -94,10 +95,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Who are you becoming?",
     options: [
-      { text: "Mentally strong and unshakeable", tags: ["stoic", "discipline", "clarity", "strong"] },
-      { text: "Peaceful and centered", tags: ["inner_peace", "calm", "mindfulness", "presence"] },
-      { text: "Confident and self-assured", tags: ["confidence", "self_belief", "momentum", "performance"] },
-      { text: "Emotionally whole and grounded", tags: ["healing", "self_compassion", "soft", "recovery"] },
+      { text: "Mentally strong and unshakeable", tags: ["discipline", "calm"] },
+      { text: "Peaceful and centered", tags: ["calm", "spiritual"] },
+      { text: "Confident and self-assured", tags: ["confidence", "momentum"] },
+      { text: "Emotionally whole and grounded", tags: ["healing", "supportive"] },
     ],
   },
 ];
@@ -137,6 +138,8 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   };
   const factionColor = factionColors[faction];
 
+  const canGoBack = currentIndex > 0;
+
   const handleAnswer = (option: QuestionOption) => {
     const newAnswer: OnboardingAnswer = {
       questionId: currentQuestion.id,
@@ -154,8 +157,14 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
     }
   };
 
+  const handleBack = () => {
+    if (!canGoBack) return;
+    setAnswers((prev) => prev.slice(0, -1));
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
+
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col p-6">
+    <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-6 pt-safe-top safe-area-bottom">
       {/* Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
         {starPositions.map((star, i) => (
@@ -182,17 +191,30 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="pt-safe-top mb-10 z-10"
+        className="mb-8 z-10"
       >
-        <div className="flex items-center justify-between text-white/60 text-sm mb-3">
-          <span className="tracking-wide">Your Path Unfolds</span>
-          <span className="font-medium tabular-nums">{currentIndex + 1} of {questions.length}</span>
+        <div className="flex items-center justify-between text-white/70 text-xs uppercase tracking-wide mb-4 gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            disabled={!canGoBack}
+            className="gap-2 text-white/80 hover:text-white disabled:opacity-40 disabled:hover:text-white/70 border border-white/10 rounded-full px-3 py-1 bg-black/30 backdrop-blur-sm"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <span className="flex-1 text-center text-sm font-semibold">Your Path Unfolds</span>
+          <span className="text-sm font-medium tabular-nums min-w-[72px] text-right">
+            {currentIndex + 1} of {questions.length}
+          </span>
         </div>
         <Progress value={progress} className="h-2" />
       </motion.div>
 
       {/* Question Content */}
-      <div className="flex-1 flex flex-col justify-center z-10">
+      <div className="flex-1 flex flex-col justify-center items-center z-10">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -200,6 +222,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.3 }}
+            className="w-full max-w-2xl"
           >
             {/* Narrative Text */}
             <motion.p
@@ -222,7 +245,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             </motion.h2>
 
             {/* Options */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4 w-full max-w-xl mx-auto">
               {currentQuestion.options.map((option, index) => (
                 <motion.div
                   key={option.text}
@@ -233,18 +256,18 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
-                    className="w-full flex min-h-[60px] py-3.5 px-3.5 text-left justify-start items-start sm:items-center text-white border-white/20 hover:border-white/40 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all whitespace-normal"
+                    className="w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white border border-white/15 rounded-2xl hover:border-white/40 bg-black/30 backdrop-blur-xl hover:bg-black/40 transition-all shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,
                     }}
                   >
                     <span
-                      className="w-9 h-9 min-w-[36px] rounded-full flex items-center justify-center mr-3 sm:mr-4 text-sm font-bold shrink-0"
-                      style={{ backgroundColor: `${factionColor}30`, color: factionColor }}
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold border border-white/20 bg-white/5 text-white tracking-wide"
+                      style={{ boxShadow: `0 0 15px ${factionColor}33`, color: factionColor }}
                     >
                       {String.fromCharCode(65 + index)}
                     </span>
-                    <span className="flex-1 min-w-0 text-[15px] sm:text-base leading-snug whitespace-normal break-words">
+                    <span className="text-sm sm:text-base leading-relaxed whitespace-normal break-words flex-1">
                       {option.text}
                     </span>
                   </Button>

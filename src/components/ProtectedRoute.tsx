@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
@@ -14,20 +14,26 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   const { user, loading: authLoading } = useAuth();
   const { hasAccess, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
+  const location = useLocation();
   const [progress, setProgress] = useState(0);
+
+  // Don't block onboarding with paywall - users need to complete onboarding first
+  const isOnboarding = location.pathname === "/onboarding";
 
   useEffect(() => {
     // Redirect to auth if not logged in
     if (!authLoading && !user) {
+      console.log('[ProtectedRoute] Not authenticated, redirecting to /auth', { pathname: location.pathname });
       navigate("/auth");
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, location.pathname]);
 
   // Animate progress bar while loading
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (authLoading || accessLoading) {
+    // Only block on auth loading, not profile/access loading
+    if (authLoading) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -43,10 +49,24 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
         clearInterval(timer);
       }
     };
-  }, [authLoading, accessLoading]);
+  }, [authLoading]);
 
-  // Show loading while checking auth
-  if (authLoading || accessLoading) {
+  // Log loading state for debugging (only when loading)
+  useEffect(() => {
+    if (!authLoading) return;
+    
+    const logInterval = setInterval(() => {
+      console.log('[ProtectedRoute] ⏳ Still loading auth...', { 
+        pathname: location.pathname,
+        hasUser: !!user 
+      });
+    }, 2000); // Log every 2 seconds to avoid spam
+    return () => clearInterval(logInterval);
+  }, [authLoading, location.pathname, user]);
+
+  // Show loading ONLY while checking auth (not profile/access)
+  // Profile can load in the background - don't block navigation
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -63,10 +83,18 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   // Don't render children until auth is confirmed
   if (!user) return null;
 
-  // Show hard paywall if no access (trial expired and not subscribed)
-  if (!hasAccess) {
+  // Skip access check during onboarding - users need to complete onboarding first
+  // The paywall should only block access to protected features AFTER onboarding is complete
+  if (isOnboarding) {
+    return <>{children}</>;
+  }
+
+  // Only check access if it's loaded - don't block if still loading
+  // Profile/access can load in background, pages will handle their own loading states
+  if (!accessLoading && !hasAccess) {
     return <TrialExpiredPaywall />;
   }
 
+  // Render children - profile/access will load in background
   return <>{children}</>;
 };

@@ -6,7 +6,10 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
+import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
+import { getDailyPepTalk, getDailyPepTalks } from "@/lib/firebase/dailyPepTalks";
+import { getMentor } from "@/lib/firebase/mentors";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -116,34 +119,19 @@ export const TodaysPepTalk = memo(() => {
       try {
         const today = new Date().toLocaleDateString("en-CA");
 
-        const { data: mentor, error: mentorError } = await supabase
-          .from("mentors")
-          .select("slug, name")
-          .eq("id", profile.selected_mentor_id)
-          .maybeSingle();
-
-        if (mentorError) {
-          console.error("Error fetching mentor:", mentorError);
+        const mentor = await getMentor(profile.selected_mentor_id);
+        if (!mentor || !mentor.slug) {
           setLoading(false);
           return;
         }
 
-        if (!mentor) {
-          setLoading(false);
-          return;
-        }
-
-        const { data, error: pepTalkError } = await supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle();
-
-        if (pepTalkError) {
-          console.error("Error fetching pep talk:", pepTalkError);
-          setLoading(false);
-          return;
+        let data = await getDailyPepTalk(today, mentor.slug);
+        
+        // If no daily pep talk exists, get the most recent one for this mentor
+        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+        if (!data) {
+          const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
+          data = recentPepTalks[0] || null;
         }
 
         if (data) {
@@ -181,15 +169,9 @@ export const TodaysPepTalk = memo(() => {
     const runSync = async () => {
       if (!pepTalk?.id || !pepTalk?.audio_url) return;
       try {
-        const { data, error } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-          body: { id: pepTalk.id }
+        const data = await syncDailyPepTalkTranscript({
+          id: pepTalk.id,
         });
-        
-        // Handle edge function error
-        if (error) {
-          console.warn('Transcript sync returned error:', error);
-          return; // Silent fail - transcript sync is optional enhancement
-        }
         
         if (data?.script) {
           setPepTalk((prev: DailyPepTalk | null) => {
@@ -229,13 +211,15 @@ export const TodaysPepTalk = memo(() => {
     const checkXPStatus = async () => {
       if (!pepTalk?.id || !profile?.id) return;
       
-      const { data } = await supabase
-        .from('xp_events')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('event_type', 'pep_talk_listen')
-        .eq('event_metadata->>pep_talk_id', pepTalk.id)
-        .maybeSingle();
+      const xpEvents = await getDocuments('xp_events', [
+        ['user_id', '==', profile.id],
+        ['event_type', '==', 'pep_talk_listen']
+      ]);
+      
+      // Filter for matching pep_talk_id in metadata (Firestore doesn't support JSON field queries directly)
+      const data = xpEvents.find((event: any) => 
+        event.event_metadata?.pep_talk_id === pepTalk.id
+      ) || null;
       
       setHasAwardedXP(!!data);
     };

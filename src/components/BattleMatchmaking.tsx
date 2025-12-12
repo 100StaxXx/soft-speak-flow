@@ -3,30 +3,54 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Swords, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { BattleCardSelector } from "./BattleCardSelector";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 export const BattleMatchmaking = () => {
   const { user } = useAuth();
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
 
+  interface BattleCard {
+    id: string;
+    card_id: string;
+    evolution_stage: number;
+    creature_name: string;
+    element: string;
+    stats: Record<string, number>;
+    rarity: string;
+    image_url: string | null;
+    energy_cost?: number | null;
+    bond_level?: number | null;
+  }
+
   // Check if user has evolution cards
   const { data: cards, isLoading } = useQuery({
     queryKey: ["battle-cards", user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<BattleCard[]> => {
       if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("evolution_stage", { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      const data = await getDocuments(
+        "companion_evolution_cards",
+        [["user_id", "==", user.uid]],
+        "evolution_stage",
+        "desc"
+      );
+
+      return (data || []).map((doc) => ({
+        id: doc.id as string,
+        card_id: doc.card_id as string,
+        evolution_stage: doc.evolution_stage as number,
+        creature_name: doc.creature_name as string,
+        element: doc.element as string,
+        stats: doc.stats as Record<string, number>,
+        rarity: doc.rarity as string,
+        image_url: doc.image_url as string | null,
+        energy_cost: doc.energy_cost as number | null | undefined,
+        bond_level: doc.bond_level as number | null | undefined,
+      }));
     },
     enabled: !!user,
   });

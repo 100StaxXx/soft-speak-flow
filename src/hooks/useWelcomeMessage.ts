@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument } from "@/lib/firebase/firestore";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 export const useWelcomeMessage = () => {
@@ -15,21 +15,21 @@ export const useWelcomeMessage = () => {
       hasChecked.current = true;
 
       // Check if welcome already exists in database
-      const { data: existingWelcome } = await supabase
-        .from('activity_feed')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('activity_type', 'welcome')
-        .maybeSingle();
+      const existingWelcomes = await getDocuments(
+        'activity_feed',
+        [
+          ['user_id', '==', user.uid],
+          ['activity_type', '==', 'welcome'],
+        ]
+      );
       
-      if (existingWelcome) return;
+      if (existingWelcomes.length > 0) return;
 
       // Get user's name from profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email, onboarding_data')
-        .eq('id', user.id)
-        .maybeSingle();
+      const profile = await getDocument<{
+        email: string | null;
+        onboarding_data: Record<string, unknown> | null;
+      }>('profiles', user.uid);
 
       const userName = getUserDisplayName(profile) || 'friend';
 
@@ -56,16 +56,19 @@ export const useWelcomeMessage = () => {
       }
 
       // Add welcome to activity feed
-      const { error } = await supabase
-        .from('activity_feed')
-        .insert({
-          user_id: user.id,
+      try {
+        const welcomeId = `${user.uid}_welcome_${Date.now()}`;
+        await setDocument('activity_feed', welcomeId, {
+          id: welcomeId,
+          user_id: user.uid,
           activity_type: 'welcome',
           activity_data: {},
           mentor_comment: welcomeText,
-        });
-
-      if (error) console.error('Error adding welcome:', error);
+          is_read: false,
+        }, false);
+      } catch (error) {
+        console.error('Error adding welcome:', error);
+      }
     };
 
     addWelcomeMessage();

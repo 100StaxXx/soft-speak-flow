@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -14,17 +14,24 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MentorNudges } from "@/components/MentorNudges";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
+import { getResolvedMentorId } from "@/utils/mentor";
 import { Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 
-const Index = () => {
+type IndexProps = {
+  enableOnboardingGuard?: boolean;
+};
+
+const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [mentorImage, setMentorImage] = useState<string>("");
@@ -32,8 +39,46 @@ const Index = () => {
     text: string;
     author: string | null;
   } | null>(null);
+  const hasBackfilledRef = useRef(false);
+  const redirectCountRef = useRef(0);
+  const lastRedirectTimeRef = useRef<number>(0);
+  const companionLoadStartRef = useRef<number | null>(null);
+  const COMPANION_LOAD_TIMEOUT = 30000; // 30 seconds
 
   // Combined initialization effect for better performance
+  const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
+
+  // Backfill mentor selection for users who completed onboarding but never persisted the mentor ID
+  // Only run once per profile/user combination to prevent multiple updates
+  useEffect(() => {
+    const syncMentorSelection = async () => {
+      if (!user || !profile || hasBackfilledRef.current) return;
+
+      const onboardingMentorId = (profile.onboarding_data as { mentorId?: string | null } | null)?.mentorId;
+      const needsBackfill = profile.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId;
+
+      if (!needsBackfill) {
+        hasBackfilledRef.current = true; // Mark as processed even if no backfill needed
+        return;
+      }
+
+      hasBackfilledRef.current = true; // Mark as processing to prevent duplicate runs
+      
+      try {
+        await updateDocument("profiles", user.uid, {
+          selected_mentor_id: onboardingMentorId,
+        });
+
+        await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
+      } catch (error) {
+        console.error("Error backfilling mentor selection:", error);
+        hasBackfilledRef.current = false; // Reset on error so it can retry
+      }
+    };
+
+    void syncMentorSelection();
+  }, [profile, queryClient, user]);
+
   useEffect(() => {
     // Scroll to top on mount
     window.scrollTo(0, 0);
@@ -41,14 +86,13 @@ const Index = () => {
     let isMounted = true;
 
     const fetchMentorData = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!resolvedMentorId) return;
 
       try {
-        const { data: mentorData } = await supabase
-          .from("mentors")
-          .select("avatar_url, slug")
-          .eq("id", profile.selected_mentor_id)
-          .maybeSingle();
+        const mentorData = await getDocument<{ avatar_url: string | null; slug: string }>(
+          "mentors",
+          resolvedMentorId
+        );
 
         if (!isMounted || !mentorData) return;
 
@@ -60,35 +104,40 @@ const Index = () => {
 
         // Get today's pep talk to find related quote
         const today = new Date().toLocaleDateString("en-CA");
-        const { data: dailyPepTalk } = await supabase
-          .from("daily_pep_talks")
-          .select("emotional_triggers, topic_category")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentorData.slug)
-          .maybeSingle();
+        const dailyPepTalks = await getDocuments(
+          "daily_pep_talks",
+          [
+            ["for_date", "==", today],
+            ["mentor_slug", "==", mentorData.slug],
+          ]
+        );
 
-        if (!isMounted || !dailyPepTalk) return;
-
-        // Try to fetch a quote that matches category first, then fall back to any quote
-        let { data: quotes } = await supabase
-          .from("quotes")
-          .select("text, author")
-          .eq("category", dailyPepTalk.topic_category)
-          .limit(10);
-
-        // If no category match, get any quotes
-        if (!quotes || quotes.length === 0) {
-          const { data: allQuotes } = await supabase
-            .from("quotes")
-            .select("text, author")
-            .limit(20);
-          quotes = allQuotes;
+        const dailyPepTalk = dailyPepTalks[0];
+        
+        // Try to fetch a quote that matches category if we have a daily pep talk
+        let quotes: any[] = [];
+        if (dailyPepTalk?.topic_category) {
+          quotes = await getDocuments(
+            "quotes",
+            [["category", "==", dailyPepTalk.topic_category]],
+            undefined,
+            undefined,
+            10
+          );
         }
 
-        // Pick a random quote
-        if (isMounted && quotes && quotes.length > 0) {
+        // If no category match or no daily pep talk, get any quotes
+        if (quotes.length === 0) {
+          quotes = await getDocuments("quotes", undefined, undefined, undefined, 20);
+        }
+
+        // Pick a random quote (always show a quote even if no daily pep talk)
+        if (isMounted && quotes.length > 0) {
           const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-          setTodaysQuote(randomQuote);
+          setTodaysQuote({
+            text: randomQuote.text || '',
+            author: randomQuote.author || null,
+          });
         }
       } catch (error) {
         console.error('Error fetching mentor data:', error);
@@ -99,14 +148,18 @@ const Index = () => {
     const checkHabits = async () => {
       if (!user) return;
       try {
-        const { data } = await supabase
-          .from("habits")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1);
+        const habits = await getDocuments(
+          "habits",
+          [
+            ["user_id", "==", user.uid],
+            ["is_active", "==", true],
+          ],
+          undefined,
+          undefined,
+          1
+        );
         if (isMounted) {
-          setHasActiveHabits(!!data && data.length > 0);
+          setHasActiveHabits(habits.length > 0);
         }
       } catch (error) {
         console.error('Error checking habits:', error);
@@ -124,29 +177,122 @@ const Index = () => {
     return () => {
       isMounted = false;
     };
-  }, [profile?.selected_mentor_id, user]);
+  }, [resolvedMentorId, user]);
+
+  // Track companion loading start time
+  useEffect(() => {
+    if (companionLoading && companionLoadStartRef.current === null) {
+      // Start tracking when loading begins
+      companionLoadStartRef.current = Date.now();
+    } else if (!companionLoading) {
+      // Reset when loading completes
+      companionLoadStartRef.current = null;
+    }
+  }, [companionLoading]);
+
+  // Check for companion loading timeout using interval
+  useEffect(() => {
+    if (!user || !companionLoading || companionLoadStartRef.current === null) {
+      return;
+    }
+
+    // Check for timeout every second while loading
+    const timeoutCheckInterval = setInterval(() => {
+      // Check ref directly (always current) - effect only runs when companionLoading is true
+      if (companionLoadStartRef.current !== null) {
+        const loadDuration = Date.now() - companionLoadStartRef.current;
+        if (loadDuration > COMPANION_LOAD_TIMEOUT) {
+          console.warn('[Index] Companion loading timeout - proceeding without companion');
+          setIsReady(true);
+          companionLoadStartRef.current = null; // Reset to prevent multiple timeouts
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => {
+      clearInterval(timeoutCheckInterval);
+    };
+  }, [user, companionLoading]);
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {
     if (!user) return;
     
     // Wait for both profile and companion to finish loading
+    // (Timeout is handled in the effect above)
     if (!profileLoading && !companionLoading) {
       setIsReady(true);
     }
   }, [user, profileLoading, companionLoading]);
 
-  // Check for incomplete onboarding and redirect (only after data is ready)
+  // Redirect to onboarding if no profile exists (new user)
   useEffect(() => {
-    if (!user || !isReady) return;
-    
-    if (profile) {
-      // If onboarding is not complete or user has no mentor, redirect to onboarding
-      if (!profile.onboarding_completed || !profile.selected_mentor_id) {
-        navigate("/onboarding");
-      }
+    if (user && !profileLoading && !companionLoading && !profile) {
+      console.log('[Index] No profile found for new user, redirecting to onboarding');
+      navigate('/onboarding');
     }
-  }, [user, isReady, profile, navigate]);
+  }, [user, profile, profileLoading, companionLoading, navigate]);
+
+  // Check for incomplete onboarding pieces and redirect (only after data is ready)
+  // Includes redirect loop prevention and explicit onboarding completion check
+  useEffect(() => {
+    if (!enableOnboardingGuard) return;
+    if (!user || !isReady || !profile) return;
+
+    // CRITICAL: If onboarding is explicitly completed, NEVER redirect regardless of other conditions
+    // This prevents loops where users complete onboarding but companion is missing
+    if (profile.onboarding_completed === true) {
+      // Reset redirect counter when onboarding is complete
+      redirectCountRef.current = 0;
+      lastRedirectTimeRef.current = 0;
+      return;
+    }
+
+    // Redirect loop prevention: max 3 redirects within 5 seconds
+    const now = Date.now();
+    const timeSinceLastRedirect = now - lastRedirectTimeRef.current;
+    
+    if (timeSinceLastRedirect < 5000) {
+      // Within 5 seconds of last redirect
+      redirectCountRef.current += 1;
+    } else {
+      // Reset counter if more than 5 seconds have passed
+      redirectCountRef.current = 1;
+    }
+    
+    lastRedirectTimeRef.current = now;
+
+    // Prevent infinite loops - max 3 redirects
+    if (redirectCountRef.current > 3) {
+      console.error('[Index] Redirect loop detected - stopping redirects to prevent infinite loop');
+      console.error('[Index] Profile state:', {
+        onboarding_completed: profile.onboarding_completed,
+        selected_mentor_id: profile.selected_mentor_id,
+        resolvedMentorId,
+        companion: !!companion,
+        companionLoading,
+      });
+      redirectCountRef.current = 0; // Reset for next attempt
+      return;
+    }
+
+    const missingMentor = !resolvedMentorId;
+    const explicitlyIncomplete = profile.onboarding_completed === false;
+    // Only check for missing companion if onboarding is not explicitly completed
+    // This prevents redirect loops when companion fails to load after onboarding
+    // Note: We already return early if onboarding_completed === true (line 244), so at this point it's either false or undefined
+    const missingCompanion = !companion && !companionLoading;
+
+    if (missingMentor || explicitlyIncomplete || missingCompanion) {
+      console.log('[Index] Redirecting to onboarding:', {
+        missingMentor,
+        explicitlyIncomplete,
+        missingCompanion,
+        redirectCount: redirectCountRef.current,
+      });
+      navigate("/onboarding");
+    }
+  }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
 
   // Show loading state while critical data loads
   if (isTransitioning || !isReady) {
@@ -163,24 +309,38 @@ const Index = () => {
   }
 
   // Show error state if critical data failed to load
+  // But redirect to onboarding for new users instead of showing error
   if (!profileLoading && !companionLoading && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-4 max-w-md">
-          <div className="h-12 w-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-            <span className="text-2xl">⚠️</span>
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Setting up your account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!enableOnboardingGuard && isReady && !resolvedMentorId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-accent/10 px-4 py-12">
+        <div className="max-w-lg mx-auto text-center space-y-6 bg-card/70 backdrop-blur-sm border border-border/50 rounded-3xl p-8 shadow-soft">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary shadow-glow">
+            <Sparkles className="h-8 w-8" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold mb-2">Unable to Load Profile</h2>
-            <p className="text-muted-foreground mb-4">
-              We couldn't load your profile data. Please check your connection and try again.
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">Choose your mentor to get started</h1>
+            <p className="text-muted-foreground">
+              Pick a mentor to unlock personalized guidance. You can always change your mentor later.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-            >
-              Retry
-            </button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate("/mentor-selection")} className="flex-1 min-w-[180px]">
+              Select Mentor
+            </Button>
+            <Button variant="ghost" onClick={() => navigate("/tasks")} className="flex-1 min-w-[180px]">
+              View Quests
+            </Button>
           </div>
         </div>
       </div>

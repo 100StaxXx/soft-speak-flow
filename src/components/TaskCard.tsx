@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,15 +9,17 @@ interface TaskCardProps {
     id: string;
     task_text: string;
     completed: boolean;
-    difficulty?: string;
+    difficulty?: string | null;
     xp_reward: number;
-    is_main_quest?: boolean;
+    is_main_quest?: boolean | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
     recurrence_pattern?: string | null;
+    notes?: string | null;
   };
   onToggle: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
   onSetMainQuest?: () => void;
   showPromoteButton?: boolean;
   isMainQuest?: boolean;
@@ -28,6 +30,7 @@ export const TaskCard = ({
   task,
   onToggle,
   onDelete,
+  onEdit,
   onSetMainQuest,
   showPromoteButton,
   isMainQuest,
@@ -94,7 +97,10 @@ export const TaskCard = ({
   }, [task.completed, justCompleted]);
 
   return (
-    <div className="relative">
+    <div 
+      className="relative"
+      data-tutorial-quest={isTutorialQuest ? "true" : undefined}
+    >
       {/* Floating XP Animation */}
       {showXP && (
         <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
@@ -112,7 +118,8 @@ export const TaskCard = ({
       
       <Card
         className={cn(
-          "relative overflow-hidden transition-all duration-300 cursor-pointer group",
+          "relative transition-all duration-300 cursor-pointer group",
+          isTutorialQuest && !task.completed ? "overflow-visible" : "overflow-hidden",
           // Main Quest Styling - Gold cosmiq glow
           isMainQuest && [
             "border-2 border-stardust-gold",
@@ -153,7 +160,7 @@ export const TaskCard = ({
           {/* Animated Arrow Indicator for Tutorial Quest */}
           {isTutorialQuest && !task.completed && (
             <div
-              className="absolute left-1/2 -top-16 -translate-x-1/2 pointer-events-none z-20 flex flex-col items-center gap-1"
+              className="absolute left-1/2 -top-20 -translate-x-1/2 pointer-events-none z-[60] flex flex-col items-center gap-2"
               style={{
                 animation: 'bounceDown 1.2s ease-in-out infinite',
               }}
@@ -167,7 +174,7 @@ export const TaskCard = ({
                 Click here!
               </div>
               <ArrowDown
-                className="h-8 w-8 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))] filter brightness-125"
+                className="h-8 w-8 -translate-y-1 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))] filter brightness-125"
                 strokeWidth={3}
               />
             </div>
@@ -206,7 +213,13 @@ export const TaskCard = ({
                 {task.task_text}
               </p>
             </div>
-          
+
+            {task.notes && (
+              <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">
+                {task.notes}
+              </p>
+            )}
+
             <div className="flex items-center gap-3 mt-1 flex-wrap">
               {task.difficulty && (
                 <span className={cn("text-xs", difficultyColors[task.difficulty as keyof typeof difficultyColors])}>
@@ -245,6 +258,22 @@ export const TaskCard = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Edit Button */}
+            {onEdit && !task.completed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Edit task"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            
             {/* Promote to Main Quest Button */}
             {showPromoteButton && onSetMainQuest && !task.completed && (
               <Button

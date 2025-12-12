@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { getAllMentors } from "@/lib/firebase/mentors";
+import { getProfile, updateProfile } from "@/lib/firebase/profiles";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { StoryPrologue } from "./StoryPrologue";
@@ -19,34 +20,49 @@ import { MentorResult } from "@/components/MentorResult";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
+import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
 
-const waitForCompanionDisplayName = async (companionId: string) => {
-  const MAX_ATTEMPTS = 10;
-  const DELAY_MS = 1500;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const { data, error } = await supabase
-      .from("companion_evolution_cards")
-      .select("creature_name")
-      .eq("companion_id", companionId)
-      .eq("evolution_stage", 0)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Failed to fetch companion display name:", error);
+/**
+ * Wait for companion display name - checks companion document first, then evolution cards
+ */
+const waitForCompanionDisplayName = async (companionId: string): Promise<string | null> => {
+  try {
+    // First, check if companion document has display_name
+    const { getDocument } = await import("@/lib/firebase/firestore");
+    const companion = await getDocument<{ display_name?: string }>("user_companion", companionId);
+    
+    if (companion?.display_name) {
+      return companion.display_name;
     }
-
-    const name = data?.creature_name?.trim();
-    if (name) {
-      return name;
+    
+    // Fallback: check evolution cards for creature_name
+    const { getDocuments } = await import("@/lib/firebase/firestore");
+    const existingCards = await getDocuments(
+      "companion_evolution_cards",
+      [["companion_id", "==", companionId]],
+      "evolution_stage",
+      "asc",
+      1
+    );
+    
+    if (existingCards.length > 0 && existingCards[0].creature_name) {
+      // Store it in companion document for future use
+      try {
+        const { updateDocument } = await import("@/lib/firebase/firestore");
+        await updateDocument("user_companion", companionId, {
+          display_name: existingCards[0].creature_name,
+        });
+      } catch (updateError) {
+        console.warn("Failed to store companion name from card (non-critical):", updateError);
+      }
+      return existingCards[0].creature_name;
     }
-
-    if (attempt < MAX_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error getting companion display name:", error);
+    return null;
   }
-
-  return null;
 };
 
 type OnboardingStage = 
@@ -77,6 +93,21 @@ interface Mentor {
   intensity_level?: string;
 }
 
+const ENERGY_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
+  "Focused, intense energy": "high",
+  "Calm, grounded presence": "gentle",
+  "Warm, uplifting support": "medium",
+  "Spiritual and intuitive guidance": "gentle",
+};
+
+const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
+  const normalized = value?.toLowerCase();
+  if (!normalized) return "medium";
+  if (["gentle", "soft", "low"].includes(normalized)) return "gentle";
+  if (["high", "strong", "intense"].includes(normalized)) return "high";
+  return "medium";
+};
+
 
 export const StoryOnboarding = () => {
   const navigate = useNavigate();
@@ -84,82 +115,107 @@ export const StoryOnboarding = () => {
   const queryClient = useQueryClient();
   const { createCompanion } = useCompanion();
   
+  // All useState hooks must be together
   const [stage, setStage] = useState<OnboardingStage>("prologue");
   const [userName, setUserName] = useState("");
-
-  // Auto scroll to top when stage changes
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [stage]);
-
   const [faction, setFaction] = useState<FactionType | null>(null);
   const [birthdate, setBirthdate] = useState("");
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorsLoading, setMentorsLoading] = useState(true);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
 
-  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  // All useEffect hooks after all useState hooks
+  // Auto scroll to top when stage changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stage]);
 
-  const waitForCompanionDisplayName = async (companionId: string) => {
-    const maxAttempts = 30;
-    const delayMs = 1000;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("creature_name")
-        .eq("companion_id", companionId)
-        .order("evolution_stage", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching companion name:", error);
-        return null;
-      }
-
-      if (data?.creature_name) {
-        return data.creature_name as string;
-      }
-
-      if (attempt < maxAttempts) {
-        await wait(delayMs);
-      }
+  // Load mentors when mentor-grid stage is shown (in case they weren't loaded yet)
+  useEffect(() => {
+    if (stage === "mentor-grid" && mentors.length === 0) {
+      const loadMentorsForGrid = async () => {
+        // Only load if we're not already loading
+        if (mentorsLoading) return;
+        
+        try {
+          setMentorsLoading(true);
+          console.log("[StoryOnboarding] Loading mentors for grid...");
+          const mentorsData = await getAllMentors();
+          console.log("[StoryOnboarding] Raw mentors data:", mentorsData);
+          if (mentorsData && mentorsData.length > 0) {
+            const mappedMentors: Mentor[] = mentorsData.map(m => ({
+              id: m.id,
+              name: m.name,
+              description: (m as any).description || (m as any).signature_line || m.tone_description || "",
+              tone_description: m.tone_description || "",
+              avatar_url: m.avatar_url ?? undefined,
+              tags: (m as any).tags || [],
+              mentor_type: (m as any).mentor_type || m.archetype || "",
+              target_user_type: (m as any).target_user_type ?? undefined,
+              slug: m.slug || "",
+              short_title: m.short_title || "",
+              primary_color: m.primary_color || "#7B68EE",
+              target_user: m.target_user || "",
+              themes: (m as any).themes ?? undefined,
+              intensity_level: m.intensity_level ?? undefined,
+            }));
+            setMentors(mappedMentors);
+            console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for grid:`, mappedMentors.map(m => m.name));
+          } else {
+            console.warn("[StoryOnboarding] ⚠️ No mentors returned from getAllMentors()");
+          }
+        } catch (error) {
+          console.error("[StoryOnboarding] ❌ Error loading mentors for grid:", error);
+          // Show error toast to user
+          toast.error("Failed to load mentors. Please check your connection and try again.");
+        } finally {
+          setMentorsLoading(false);
+        }
+      };
+      loadMentorsForGrid();
     }
+  }, [stage, mentors.length, mentorsLoading]);
 
-    return null;
-  };
-
-  // Load mentors on mount
+  // Load mentors on mount from Firestore
   useEffect(() => {
     const loadMentors = async () => {
-      const { data } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("is_active", true);
-      if (data) {
-        // Map to our Mentor interface with defaults for required fields
-        const mappedMentors: Mentor[] = data.map(m => ({
-          id: m.id,
-          name: m.name,
-          description: m.description,
-          tone_description: m.tone_description,
-          avatar_url: m.avatar_url ?? undefined,
-          tags: m.tags || [],
-          mentor_type: m.mentor_type,
-          target_user_type: m.target_user_type ?? undefined,
-          slug: m.slug || "",
-          short_title: m.short_title || "",
-          primary_color: m.primary_color || "#7B68EE",
-          target_user: m.target_user || "",
-          themes: m.themes ?? undefined,
-          intensity_level: m.intensity_level ?? undefined,
-        }));
-        setMentors(mappedMentors);
+      try {
+        setMentorsLoading(true);
+        console.log("[StoryOnboarding] Loading mentors from Firestore...");
+        const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data from mount:", mentorsData);
+        
+        if (mentorsData && mentorsData.length > 0) {
+          console.log(`[StoryOnboarding] ✅ Loaded ${mentorsData.length} mentors from Firestore:`, mentorsData.map(m => m.name));
+          const mappedMentors: Mentor[] = mentorsData.map(m => ({
+            id: m.id,
+            name: m.name,
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
+            tone_description: m.tone_description || "",
+            avatar_url: m.avatar_url ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
+            slug: m.slug || "",
+            short_title: m.short_title || "",
+            primary_color: m.primary_color || "#7B68EE",
+            target_user: m.target_user || "",
+            themes: (m as any).themes ?? undefined,
+            intensity_level: m.intensity_level ?? undefined,
+          }));
+          setMentors(mappedMentors);
+        } else {
+          console.warn("[StoryOnboarding] ⚠️ No mentors found in Firestore");
+        }
+      } catch (error) {
+        console.error("[StoryOnboarding] ❌ Exception loading mentors from Firestore:", error);
+      } finally {
+        setMentorsLoading(false);
       }
     };
     loadMentors();
@@ -170,20 +226,19 @@ export const StoryOnboarding = () => {
     
     // Save name to profile
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .single();
+      try {
+        const profile = await getProfile(user.uid);
+        const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
 
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-
-      await supabase.from("profiles").update({
-        onboarding_data: {
-          ...existingData,
-          userName: name,
-        },
-      }).eq("id", user.id);
+        await updateProfile(user.uid, {
+          onboarding_data: {
+            ...existingData,
+            userName: name,
+          },
+        });
+      } catch (error) {
+        console.warn("Error updating profile (non-critical):", error);
+      }
     }
     
     setStage("destiny");
@@ -198,9 +253,13 @@ export const StoryOnboarding = () => {
     
     // Save faction to profile
     if (user) {
-      await supabase.from("profiles").update({
-        faction: selectedFaction,
-      }).eq("id", user.id);
+      try {
+        await updateProfile(user.uid, {
+          faction: selectedFaction,
+        });
+      } catch (error) {
+        console.warn("Error updating profile (non-critical):", error);
+      }
     }
     
     setStage("cosmic-birth");
@@ -212,23 +271,22 @@ export const StoryOnboarding = () => {
     
     // Save to profile
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .single();
-      
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      
-      await supabase.from("profiles").update({
-        birthdate: bd,
-        zodiac_sign: sign,
-        onboarding_data: {
-          ...existingData,
+      try {
+        const profile = await getProfile(user.uid);
+        const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+        
+        await updateProfile(user.uid, {
           birthdate: bd,
-          zodiacSign: sign,
-        },
-      }).eq("id", user.id);
+          zodiac_sign: sign,
+          onboarding_data: {
+            ...existingData,
+            birthdate: bd,
+            zodiacSign: sign,
+          },
+        });
+      } catch (error) {
+        console.warn("Error updating profile (non-critical):", error);
+      }
     }
     
     setStage("questionnaire");
@@ -237,82 +295,105 @@ export const StoryOnboarding = () => {
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
 
+    // Ensure mentors are loaded before attempting to match
+    let mentorsToUse = mentors;
+    if (mentorsLoading || mentors.length === 0) {
+      console.log("[StoryOnboarding] Mentors not loaded yet, fetching now...");
+      try {
+        const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data for matching:", mentorsData);
+        if (mentorsData && mentorsData.length > 0) {
+          const mappedMentors: Mentor[] = mentorsData.map(m => ({
+            id: m.id,
+            name: m.name,
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
+            tone_description: m.tone_description || "",
+            avatar_url: m.avatar_url ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
+            slug: m.slug || "",
+            short_title: m.short_title || "",
+            primary_color: m.primary_color || "#7B68EE",
+            target_user: m.target_user || "",
+            themes: (m as any).themes ?? undefined,
+            intensity_level: m.intensity_level ?? undefined,
+          }));
+          setMentors(mappedMentors);
+          setMentorsLoading(false);
+          mentorsToUse = mappedMentors;
+          console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for matching`);
+        }
+      } catch (error) {
+        console.error("[StoryOnboarding] Error loading mentors:", error);
+      }
+    }
+
+    // If still no mentors after fetch attempt, show error and go to grid
+    if (mentorsToUse.length === 0) {
+      console.error("[StoryOnboarding] No mentors available for matching");
+      toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+      setStage("mentor-grid");
+      return;
+    }
+
     // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
     const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
 
-    // Build weighted tags - duplicate tags based on question weight
-    const weightedUserTags: string[] = [];
+    // Build canonical tag weight map instead of duplicating strings
+    const canonicalTagWeights: Record<string, number> = {};
     questionAnswers.forEach((answer, index) => {
       const weight = QUESTION_WEIGHTS[index] ?? 1.0;
-      const repeats = Math.round(weight * 10); // Multiply by 10 for finer granularity
-      for (let i = 0; i < repeats; i++) {
-        weightedUserTags.push(...answer.tags.map(t => t.toLowerCase()));
-      }
+      answer.tags.forEach(tag => {
+        const canonical = getCanonicalTag(tag);
+        if (!canonical) return;
+        canonicalTagWeights[canonical] = (canonicalTagWeights[canonical] ?? 0) + weight;
+      });
     });
 
     // Extract desired intensity from Q4 (energy_preference)
     const energyAnswer = questionAnswers.find(a => a.questionId === "energy_preference");
-    let desiredIntensity = "medium"; // default
-    if (energyAnswer) {
-      const answerText = energyAnswer.answer;
-      if (answerText === "Focused, intense energy") {
-        desiredIntensity = "high";
-      } else if (answerText === "Calm, grounded presence") {
-        desiredIntensity = "medium";
-      } else if (answerText === "Warm, uplifting support") {
-        desiredIntensity = "medium";
-      } else if (answerText === "Spiritual and intuitive guidance") {
-        desiredIntensity = "medium";
-      }
-    }
+    const desiredIntensity: "high" | "medium" | "gentle" = energyAnswer
+      ? ENERGY_TO_INTENSITY[energyAnswer.answer] ?? "medium"
+      : "medium";
 
     // Calculate scores for each mentor
     interface MentorScore {
       mentor: Mentor;
       score: number;
       exactMatches: number;
-      partialMatches: number;
       intensityMatch: boolean;
     }
+    const mentorScores: MentorScore[] = mentorsToUse.map(mentor => {
+      const mentorCanonicalTags = (() => {
+        const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
+        if (normalized.length > 0) {
+          return normalized;
+        }
+        return MENTOR_FALLBACK_TAGS[mentor.slug] ?? [];
+      })();
 
-    const mentorScores: MentorScore[] = mentors.map(mentor => {
-      const mentorAllTags = [...(mentor.tags || []), ...(mentor.themes || [])];
       let score = 0;
       let exactMatches = 0;
-      let partialMatches = 0;
 
-      // Count matches for each weighted user tag
-      weightedUserTags.forEach(userTag => {
-        mentorAllTags.forEach(mentorTag => {
-          const userTagLower = userTag.toLowerCase();
-          const mentorTagLower = mentorTag.toLowerCase();
-
-          if (userTagLower === mentorTagLower) {
-            // Exact match: +1.0
-            score += 1.0;
-            exactMatches += 1;
-          } else if (
-            userTagLower.includes(mentorTagLower) ||
-            mentorTagLower.includes(userTagLower)
-          ) {
-            // Partial match: +0.5
-            score += 0.5;
-            partialMatches += 1;
-          }
-        });
+      mentorCanonicalTags.forEach(tag => {
+        const tagWeight = canonicalTagWeights[tag];
+        if (tagWeight) {
+          score += tagWeight;
+          exactMatches += 1;
+        }
       });
 
-      // Intensity alignment bonus
-      const intensityMatch = mentor.intensity_level?.toLowerCase() === desiredIntensity.toLowerCase();
+      const mentorIntensity = normalizeIntensityLevel(mentor.intensity_level);
+      const intensityMatch = mentorIntensity === desiredIntensity;
       if (intensityMatch) {
-        score += 1.0;
+        score += 0.8;
       }
 
       return {
         mentor,
         score,
         exactMatches,
-        partialMatches,
         intensityMatch,
       };
     });
@@ -368,9 +449,9 @@ export const StoryOnboarding = () => {
     // Fallback: if no match or score is 0, default to a reasonable mentor
     if (!bestMatch || topScore === 0) {
       // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
-      bestMatch = mentors.find(m => m.slug === "atlas")
-        || mentors.find(m => m.slug === "eli")
-        || mentors[0];
+      bestMatch = mentorsToUse.find(m => m.slug === "atlas")
+        || mentorsToUse.find(m => m.slug === "eli")
+        || mentorsToUse[0];
     }
 
     if (bestMatch) {
@@ -386,16 +467,8 @@ export const StoryOnboarding = () => {
       const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
       setMentorExplanation(explanation);
 
-      // Save questionnaire responses
-      if (user) {
-        for (const answer of questionAnswers) {
-          await supabase.from("questionnaire_responses").upsert({
-            user_id: user.id,
-            question_id: answer.questionId,
-            answer_tags: answer.tags,
-          }, { onConflict: "user_id,question_id" });
-        }
-      }
+      // Save questionnaire responses (TODO: Migrate questionnaire_responses to Firestore if needed)
+      // For now, skip - questionnaire data is stored in onboarding_data
 
       setStage("mentor-result");
       return;
@@ -408,32 +481,31 @@ export const StoryOnboarding = () => {
 
   const handleMentorConfirm = async (mentor: Mentor, explanationOverride?: MentorExplanation | null) => {
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .single();
-      
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      const explanationToSave = explanationOverride ?? mentorExplanation;
-      
-      await supabase.from("profiles").update({
-        selected_mentor_id: mentor.id,
-        onboarding_data: {
-          ...existingData,
-          mentorId: mentor.id,
-          mentorName: mentor.name,
-          explanation: explanationToSave ? {
-            title: explanationToSave.title,
-            subtitle: explanationToSave.subtitle,
-            paragraph: explanationToSave.paragraph,
-            bullets: explanationToSave.bullets,
-          } : null,
-        },
-      }).eq("id", user.id);
-      
-      // Force immediate refetch to ensure fresh data
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      try {
+        const profile = await getProfile(user.uid);
+        const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+        const explanationToSave = explanationOverride ?? mentorExplanation;
+        
+        await updateProfile(user.uid, {
+          selected_mentor_id: mentor.id,
+          onboarding_data: {
+            ...existingData,
+            mentorId: mentor.id,
+            mentorName: mentor.name,
+            explanation: explanationToSave ? {
+              title: explanationToSave.title,
+              subtitle: explanationToSave.subtitle,
+              paragraph: explanationToSave.paragraph,
+              bullets: explanationToSave.bullets,
+            } : null,
+          },
+        });
+        
+        // Force immediate refetch to ensure fresh data
+        await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
+      } catch (error) {
+        console.warn("Error updating profile (non-critical):", error);
+      }
     }
     
     setStage("companion");
@@ -483,28 +555,42 @@ export const StoryOnboarding = () => {
       }
 
       // Mark onboarding complete and save story tone
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .single();
-      
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      
-      await supabase.from("profiles").update({
-        onboarding_completed: true,
-        onboarding_data: {
-          ...existingData,
-          walkthrough_completed: true,
-          story_tone: preferences.storyTone,
-        },
-      }).eq("id", user.id);
+      try {
+        const profile = await getProfile(user.uid);
+        const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
+        
+        await updateProfile(user.uid, {
+          onboarding_completed: true,
+          onboarding_data: {
+            ...existingData,
+            walkthrough_completed: true,
+            story_tone: preferences.storyTone,
+          },
+        });
+      } catch (profileError) {
+        console.warn("Error updating profile after companion creation (non-critical):", profileError);
+      }
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+      try {
+        await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
+      } catch (profileRefetchError) {
+        console.warn("Error refetching profile (non-critical):", profileRefetchError);
+      }
+      
+      // Wait for companion to be refetched before proceeding
+      try {
+        await queryClient.refetchQueries({ queryKey: ["companion", user.uid] });
+      } catch (companionRefetchError) {
+        console.warn("Error refetching companion (non-critical):", companionRefetchError);
+      }
+      
+      // Small delay to ensure Firestore has propagated the data
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Wait for companion display name (may have been generated during creation)
       const companionDisplayName = await waitForCompanionDisplayName(companionData.id);
+      
       if (!companionDisplayName) {
         console.warn("Companion name was not ready in time; falling back to spirit animal.");
       }
@@ -513,15 +599,43 @@ export const StoryOnboarding = () => {
       setStage("journey-begins");
     } catch (error) {
       console.error("Error creating companion:", error);
-      toast.error("Something went wrong. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Full error details:", { error, errorMessage, stack: error instanceof Error ? error.stack : undefined });
+      toast.error(`Error: ${errorMessage}`);
     } finally {
       setIsCreatingCompanion(false);
     }
   };
 
-  const handleJourneyComplete = () => {
-    toast.success("Welcome to Cosmiq! Your journey begins.");
-    navigate("/tasks");
+  const handleJourneyComplete = async () => {
+    try {
+      // Ensure companion is loaded before navigating
+      if (user) {
+        try {
+          // Refetch companion (Firestore) - this might fail but that's okay
+          await queryClient.refetchQueries({ queryKey: ["companion", user.uid] });
+        } catch (companionError) {
+          console.warn("Error refetching companion (non-critical):", companionError);
+        }
+        
+        try {
+          // Refetch profile (Firestore)
+          await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
+        } catch (profileError) {
+          console.warn("Error refetching profile (non-critical):", profileError);
+        }
+        
+        // Small delay to ensure data is available
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      toast.success("Welcome to Cosmiq! Your journey begins.");
+      navigate("/tasks");
+    } catch (error) {
+      console.error("Error before navigation:", error);
+      // Error already logged, just navigate
+      // Navigate anyway - the tasks page will handle missing companion gracefully
+      navigate("/tasks");
+    }
   };
 
   return (
@@ -624,17 +738,33 @@ export const StoryOnboarding = () => {
               <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
-            <MentorGrid
-              mentors={mentors.map(m => ({
-                ...m,
-                archetype: m.mentor_type,
-                style_description: m.tone_description,
-                signature_line: m.description,
-                themes: m.themes || [],
-              }))}
-              onSelectMentor={handleMentorSelectFromGrid}
-              recommendedMentorId={recommendedMentor?.id}
-            />
+            {mentorsLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-muted-foreground">Loading mentors...</p>
+                </div>
+              </div>
+            ) : mentors.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <p className="text-muted-foreground">No mentors available</p>
+                  <p className="text-sm text-muted-foreground">If mentors don't appear, check the browser console for errors.</p>
+                </div>
+              </div>
+            ) : (
+              <MentorGrid
+                mentors={mentors.map(m => ({
+                  ...m,
+                  archetype: m.mentor_type,
+                  style_description: m.tone_description,
+                  signature_line: m.description,
+                  themes: m.themes || [],
+                }))}
+                onSelectMentor={handleMentorSelectFromGrid}
+                recommendedMentorId={recommendedMentor?.id}
+              />
+            )}
           </motion.div>
         )}
 

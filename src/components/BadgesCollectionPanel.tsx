@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getAchievements } from "@/lib/firebase/achievements";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
@@ -22,16 +22,15 @@ export const BadgesCollectionPanel = () => {
   const [selectedBadge, setSelectedBadge] = useState<{ badge: BadgeDefinition; earned: boolean } | null>(null);
 
   const { data: earnedAchievements, isLoading } = useQuery({
-    queryKey: ["achievements", user?.id],
+    queryKey: ["achievements", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from("achievements")
-        .select("achievement_type, earned_at")
-        .eq("user_id", user.id);
-      if (error) throw error;
-      return data || [];
+      if (!user?.uid) return [];
+      const achievements = await getAchievements(user.uid);
+      return achievements.map(a => ({
+        achievement_type: (a.metadata as any)?.achievement_type || a.title,
+        earned_at: a.earned_at,
+      }));
     },
   });
 

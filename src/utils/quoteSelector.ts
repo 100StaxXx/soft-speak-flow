@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 
 interface QuoteFilters {
   category?: string;
@@ -15,40 +15,34 @@ interface QuoteFilters {
 export const fetchContextualQuotes = async (filters: QuoteFilters) => {
   const { category, emotionalTriggers, mentorId, intensity, limit = 1 } = filters;
 
-  let query = supabase
-    .from("quotes")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  // Apply filters
+  // Build filters array
+  const filtersArray: Array<[string, any, any]> = [];
+  
   if (category) {
-    query = query.eq("category", category);
+    filtersArray.push(["category", "==", category]);
   }
 
   if (mentorId) {
-    query = query.eq("mentor_id", mentorId);
+    filtersArray.push(["mentor_id", "==", mentorId]);
   }
 
   if (intensity) {
-    query = query.eq("intensity", intensity);
+    filtersArray.push(["intensity", "==", intensity]);
   }
 
-  // Filter by emotional triggers if provided
+  // Get quotes with filters
+  let quotes = await getDocuments("quotes", filtersArray.length > 0 ? filtersArray : undefined, "created_at", "desc", limit * 3);
+
+  // Filter by emotional triggers if provided (Firestore doesn't support array-overlaps directly)
   if (emotionalTriggers && emotionalTriggers.length > 0) {
-    query = query.overlaps("emotional_triggers", emotionalTriggers);
-  }
-
-  query = query.limit(limit * 3); // Get more than needed for rotation
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching quotes:", error);
-    return [];
+    quotes = quotes.filter((q: any) => {
+      const quoteTriggers = q.emotional_triggers || [];
+      return emotionalTriggers.some(trigger => quoteTriggers.includes(trigger));
+    });
   }
 
   // Shuffle and return limited results for variety
-  const shuffled = data?.sort(() => Math.random() - 0.5) || [];
+  const shuffled = quotes.sort(() => Math.random() - 0.5);
   return shuffled.slice(0, limit);
 };
 
@@ -56,16 +50,13 @@ export const fetchContextualQuotes = async (filters: QuoteFilters) => {
  * Get a random quote (for loading screens, empty states)
  */
 export const getRandomQuote = async () => {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .limit(50);
+  const quotes = await getDocuments("quotes", undefined, undefined, undefined, 50);
 
-  if (error || !data || data.length === 0) {
+  if (!quotes || quotes.length === 0) {
     return null;
   }
 
-  return data[Math.floor(Math.random() * data.length)];
+  return quotes[Math.floor(Math.random() * quotes.length)];
 };
 
 /**
@@ -78,28 +69,14 @@ export const getQuoteOfTheDay = async () => {
   const [year, month, day] = today.split("-").map(Number);
   const seed = year * 10000 + month * 100 + day;
 
-  // First, get the total count of quotes
-  const { count, error: countError } = await supabase
-    .from("quotes")
-    .select("*", { count: 'exact', head: true });
+  // Get all quotes ordered by id for consistent selection
+  const quotes = await getDocuments("quotes", undefined, "id", "asc");
 
-  if (countError || !count || count === 0) {
+  if (!quotes || quotes.length === 0) {
     return null;
   }
 
-  // Calculate which quote to fetch based on the seed
-  const index = seed % count;
-
-  // Fetch just that one quote using consistent ordering by id
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .order("id", { ascending: true })
-    .range(index, index);
-
-  if (error || !data || data.length === 0) {
-    return null;
-  }
-
-  return data[0];
+  // Calculate which quote to return based on the seed
+  const index = seed % quotes.length;
+  return quotes[index];
 };

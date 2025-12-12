@@ -1,20 +1,29 @@
 import { Capacitor } from '@capacitor/core';
 
 /**
- * Get the correct redirect URL for authentication flows
- * Critical for iOS: window.location.origin doesn't work on Capacitor native platforms
- * 
- * @returns The production domain for native platforms, current origin for web
+ * Read and normalize the production domain used for native (Capacitor) redirects.
+ * Throws early if the environment variable is missing so we don't silently
+ * send users to a placeholder domain in production builds.
+ */
+function getNativeRedirectBase(): string {
+  const base = import.meta.env.VITE_NATIVE_REDIRECT_BASE?.trim();
+  if (!base) {
+    throw new Error('Missing VITE_NATIVE_REDIRECT_BASE for native auth redirects');
+  }
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
+/**
+ * Get the correct redirect URL for authentication flows.
+ * Critical for iOS: window.location.origin doesn't work on Capacitor native platforms.
+ *
+ * @returns The production domain for native platforms, current origin for web.
  */
 export const getRedirectUrl = (): string => {
-  // For native iOS/Android, use the production domain
   if (Capacitor.isNativePlatform()) {
-    // TODO: Replace with your actual production domain when deployed
-    // For now, using the Lovable preview domain
-    return 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com';
+    return getNativeRedirectBase();
   }
-  
-  // For web, use current origin
+
   return window.location.origin;
 };
 
@@ -24,7 +33,6 @@ export const getRedirectUrl = (): string => {
  */
 export const getRedirectUrlWithPath = (path: string = '/'): string => {
   const baseUrl = getRedirectUrl();
-  // Ensure path starts with /
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${baseUrl}${normalizedPath}`;
 };

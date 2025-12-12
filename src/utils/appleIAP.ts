@@ -20,9 +20,10 @@ export interface IAPProduct {
 }
 
 // Apple IAP Product IDs - configure these in App Store Connect
+// These must match exactly what you create in App Store Connect
 export const IAP_PRODUCTS = {
-  MONTHLY: 'com.revolutions.app.premium.monthly',
-  YEARLY: 'com.revolutions.app.premium.yearly',
+  MONTHLY: 'cosmiq_premium_monthly',
+  YEARLY: 'cosmiq_premium_yearly',
 };
 
 // Check if IAP is available (iOS native only)
@@ -79,4 +80,13 @@ export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> =
     console.error('Get products failed:', error);
     return [];
   }
+};
+
+export const openManageSubscriptions = async (): Promise<void> => {
+  if (isIAPAvailable()) {
+    await NativePurchases.manageSubscriptions();
+    return;
+  }
+
+  window.open('https://apps.apple.com/account/subscriptions', '_blank');
 };

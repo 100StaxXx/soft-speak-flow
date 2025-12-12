@@ -9,31 +9,39 @@ import { QuestDropZone } from "./QuestDropZone";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { toast } from "sonner";
-
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  completed: boolean;
-  is_main_quest: boolean;
-  difficulty: string | null;
-  xp_reward: number;
-}
+import { CalendarTask } from "@/types/quest";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: Task[];
+  tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
+  onTimeSlotLongPress?: (date: Date, time: string) => void;
 }
 
-export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop }: CalendarWeekViewProps) => {
+export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop, onTimeSlotLongPress }: CalendarWeekViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
-  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const handleLongPressStart = (date: Date, hour: number) => {
+    const timer = setTimeout(() => {
+      playSound('pop');
+      const time = format(new Date().setHours(hour, 0), 'HH:mm');
+      onTimeSlotLongPress?.(date, time);
+    }, 500);
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
 
   const getTasksForDateTime = (date: Date, hour: number) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -146,7 +154,7 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                         e.preventDefault();
                         const taskId = e.dataTransfer.getData('taskId');
                         const time = format(new Date().setHours(hour, 0), 'HH:mm');
-                        
+
                         if (!hasConflict) {
                           playSound('complete');
                           onTaskDrop(taskId, day, time);
@@ -158,6 +166,11 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                         }
                         setDraggedTask(null);
                       }}
+                      onTouchStart={() => handleLongPressStart(day, hour)}
+                      onTouchEnd={handleLongPressEnd}
+                      onMouseDown={() => handleLongPressStart(day, hour)}
+                      onMouseUp={handleLongPressEnd}
+                      onMouseLeave={handleLongPressEnd}
                     >
                       {hourTasks.map(task => (
                         <QuestDragCard

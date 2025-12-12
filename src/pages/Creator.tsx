@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +9,7 @@ import { Copy, Link as LinkIcon, Sparkles, ArrowRight } from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { createInfluencerCode } from "@/lib/firebase/functions";
 
 export default function Creator() {
   const navigate = useNavigate();
@@ -31,17 +31,18 @@ export default function Creator() {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "create-influencer-code",
-        {
-          body: formData,
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setResult(data);
+      const data = await createInfluencerCode({
+        name: formData.name,
+        email: formData.email,
+        handle: formData.handle,
+        paypalEmail: formData.paypal_email,
+      });
+      
+      setResult({
+        code: data.code,
+        link: data.link,
+        promo_caption: data.promo_caption || '',
+      });
       toast.success("Your referral code is ready!");
     } catch (error) {
       console.error("Failed to create code:", error);

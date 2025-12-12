@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useCallback } from "react";
@@ -23,20 +23,24 @@ export const useCompanionPostcards = () => {
   const queryClient = useQueryClient();
 
   const { data: postcards, isLoading, error } = useQuery({
-    queryKey: ["companion-postcards", user?.id],
+    queryKey: ["companion-postcards", user?.uid],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.uid) return [];
       
-      const { data, error } = await supabase
-        .from("companion_postcards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("generated_at", { ascending: false });
+      const data = await getDocuments<CompanionPostcard>(
+        "companion_postcards",
+        [["user_id", "==", user.uid]],
+        "generated_at",
+        "desc"
+      );
 
-      if (error) throw error;
-      return data as CompanionPostcard[];
+      return data.map(postcard => ({
+        ...postcard,
+        generated_at: timestampToISO(postcard.generated_at as any) || postcard.generated_at || new Date().toISOString(),
+        created_at: timestampToISO(postcard.created_at as any) || postcard.created_at || new Date().toISOString(),
+      }));
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
   });
 
   const generatePostcard = useMutation({
@@ -57,30 +61,24 @@ export const useCompanionPostcards = () => {
         fur_color?: string;
       };
     }) => {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.uid) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase.functions.invoke("generate-cosmic-postcard", {
-        body: {
-          userId: user.id,
-          companionId,
-          epicId,
-          milestonePercent,
-          companionData,
-        },
+      // Import generateCosmicPostcard from functions
+      const { generateCosmicPostcard } = await import("@/lib/firebase/functions");
+      const data = await generateCosmicPostcard({
+        companionId,
+        occasion: `milestone-${milestonePercent}`,
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      
-      return data;
-    },
-    onSuccess: (data) => {
-      if (!data?.existing) {
-        queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
-        toast.success("📸 New cosmic postcard unlocked!", {
-          description: `Your companion visited ${data?.postcard?.location_name}!`,
-        });
+      if (!data?.postcard) {
+        throw new Error("Failed to generate postcard");
       }
+
+      return data.postcard;
+    },
+    onSuccess: () => {
+      // Will not be called since mutation always throws
+      queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
     },
     onError: (error) => {
       console.error("Failed to generate postcard:", error);

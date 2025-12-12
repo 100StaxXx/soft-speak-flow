@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { Bell, Play, Sparkles } from "lucide-react";
+import { getMentor } from "@/lib/firebase/mentors";
+import { getDailyPepTalk, getDailyPepTalks } from "@/lib/firebase/dailyPepTalks";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
@@ -26,27 +27,40 @@ export const TodaysPush = () => {
     const fetchTodaysPepTalk = async () => {
       if (!profile?.selected_mentor_id) return;
 
-      const today = format(new Date(), 'yyyy-MM-dd');
+      try {
+        const today = format(new Date(), 'yyyy-MM-dd');
 
-      // Get mentor details
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
+        // Get mentor details
+        const mentor = await getMentor(profile.selected_mentor_id);
+        if (!mentor || !mentor.slug) return;
 
-      if (!mentor) return;
+        // Check if there's a daily pep talk for today
+        let dailyPepTalk = await getDailyPepTalk(today, mentor.slug);
+        
+        // If no daily pep talk exists, get the most recent one for this mentor
+        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+        if (!dailyPepTalk) {
+          try {
+            const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
+            dailyPepTalk = recentPepTalks[0] || null;
+          } catch (error) {
+            console.error("Error fetching recent pep talk:", error);
+            // Continue without pep talk if fallback fails
+          }
+        }
 
-      // Check if there's a daily pep talk for today
-      const { data: dailyPepTalk } = await supabase
-        .from("daily_pep_talks")
-        .select("*")
-        .eq("for_date", today)
-        .eq("mentor_slug", mentor.slug)
-        .maybeSingle();
-
-      if (dailyPepTalk) {
-        setTodaysPepTalk({ ...dailyPepTalk, mentor_name: mentor.name });
+        if (dailyPepTalk) {
+          setTodaysPepTalk({ 
+            ...dailyPepTalk, 
+            mentor_name: mentor.name,
+            topic_category: Array.isArray(dailyPepTalk.topic_category) 
+              ? dailyPepTalk.topic_category[0] 
+              : dailyPepTalk.topic_category || undefined,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching today's pep talk:", error);
+        // Component will render nothing if fetch fails
       }
     };
 

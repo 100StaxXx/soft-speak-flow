@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { generateCompanionStory } from "@/lib/firebase/functions";
 
 export interface CompanionStory {
   id: string;
@@ -28,19 +29,21 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     queryFn: async () => {
       if (!companionId || stage === undefined) return null;
 
-      const { data, error } = await supabase
-        .from("companion_stories")
-        .select("*")
-        .eq("companion_id", companionId)
-        .eq("stage", stage)
-        .maybeSingle();
+      const stories = await getDocuments<CompanionStory>(
+        "companion_stories",
+        [
+          ["companion_id", "==", companionId],
+          ["stage", "==", stage],
+        ]
+      );
 
-      // maybeSingle() returns null for no rows - only throw on actual errors
-      if (error) {
-        console.error('Failed to fetch companion story:', error);
-        throw error;
-      }
-      return data as CompanionStory | null;
+      if (stories.length === 0) return null;
+
+      const storyData = stories[0];
+      return {
+        ...storyData,
+        generated_at: timestampToISO(storyData.generated_at as any) || storyData.generated_at || new Date().toISOString(),
+      } as CompanionStory;
     },
     enabled: !!companionId && stage !== undefined,
     placeholderData: (previousData) => previousData, // Prevent flashing during stage navigation
@@ -52,14 +55,17 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     queryFn: async () => {
       if (!companionId) return [];
 
-      const { data, error } = await supabase
-        .from("companion_stories")
-        .select("*")
-        .eq("companion_id", companionId)
-        .order("stage", { ascending: true });
+      const data = await getDocuments<CompanionStory>(
+        "companion_stories",
+        [["companion_id", "==", companionId]],
+        "stage",
+        "asc"
+      );
 
-      if (error) throw error;
-      return data as CompanionStory[];
+      return data.map(story => ({
+        ...story,
+        generated_at: timestampToISO(story.generated_at as any) || story.generated_at || new Date().toISOString(),
+      })) as CompanionStory[];
     },
     enabled: !!companionId,
   });
@@ -73,21 +79,16 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
 
       toast.loading("Your story is being written...", { id: "story-gen" });
 
-      const { data, error } = await supabase.functions.invoke(
-        "generate-companion-story",
-        {
-          body: { 
-            companionId: params.companionId, 
-            stage: params.stage,
-          },
-        }
-      );
+      const data = await generateCompanionStory({
+        companionId: params.companionId,
+        stage: params.stage,
+      });
 
-      if (error) {
-        console.error("Story generation error:", error);
-        throw new Error("Unable to write your story right now. Please try again.");
+      if (!data?.story) {
+        throw new Error("Failed to generate story");
       }
-      return data as CompanionStory;
+
+      return data.story as CompanionStory;
     },
     onSuccess: () => {
       toast.dismiss("story-gen");

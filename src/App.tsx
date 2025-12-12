@@ -5,10 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, Suspense, lazy, memo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { useProfile } from "@/hooks/useProfile";
+import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -23,9 +26,10 @@ import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
+import { AstralEncounterProvider } from "@/components/astral-encounters";
 
 // Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
+const Home = lazy(() => import("./pages/Home"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -35,6 +39,7 @@ const Premium = lazy(() => import("./pages/Premium"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const Mentor = lazy(() => import("./pages/Mentor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Reflection = lazy(() => import("./pages/Reflection"));
@@ -57,6 +62,9 @@ const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 
 const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
+const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
+const MoodHistory = lazy(() => import("./pages/MoodHistory"));
+const PushSettings = lazy(() => import("./pages/PushSettings"));
 
 
 // Create query client outside component for better performance and stability
@@ -119,7 +127,7 @@ EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -140,6 +148,18 @@ const AppContent = memo(() => {
     }
   }, [location.pathname, navigate]);
   
+  // Respond to native push navigation events
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const url = (event as CustomEvent<string>).detail;
+      if (typeof url === 'string') {
+        navigate(url);
+      }
+    };
+    window.addEventListener('native-push-navigation', handler as EventListener);
+    return () => window.removeEventListener('native-push-navigation', handler as EventListener);
+  }, [navigate]);
+  
   // Initialize native push on login
   useEffect(() => {
     if (session?.user) {
@@ -155,59 +175,95 @@ const AppContent = memo(() => {
     }
   }, [session]);
   
-  // Hide splash screen once profile data is loaded (or failed to load)
+  // Hide splash screen once auth is loaded OR if on auth route
+  // This prevents iOS watchdog timeout (0xbadf00d) from blocking network calls
   useEffect(() => {
-    if (!profileLoading && !splashHidden) {
+    // Hide immediately if on auth route (no need to wait for auth check)
+    const isAuthRoute = location.pathname === '/auth' || location.pathname.startsWith('/auth/');
+    if (isAuthRoute && !splashHidden) {
+      const timer = setTimeout(() => {
+        console.log('[App] Hiding splash screen - on auth route');
+        hideSplashScreen();
+        setSplashHidden(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+
+    // Safety net: Force hide splash after 10 seconds max to prevent watchdog timeout
+    const maxTimeout = setTimeout(() => {
+      if (!splashHidden) {
+        console.warn('[App] Force hiding splash screen after 10s timeout');
+        hideSplashScreen();
+        setSplashHidden(true);
+      }
+    }, 10000);
+
+    // Normal hide: Hide after auth loads (not profile - profile is non-blocking)
+    if (!authLoading && !splashHidden && !isAuthRoute) {
       // Small delay to ensure smooth transition
       const timer = setTimeout(() => {
         hideSplashScreen();
         setSplashHidden(true);
-      }, 100);
-      return () => clearTimeout(timer);
+        clearTimeout(maxTimeout);
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(maxTimeout);
+      };
     }
-  }, [profileLoading, splashHidden]);
+
+    return () => clearTimeout(maxTimeout);
+  }, [authLoading, splashHidden, location.pathname]);
   
+  const resolvedMentorId = getResolvedMentorId(profile);
+
   return (
-    <ThemeProvider mentorId={profile?.selected_mentor_id}>
+    <ThemeProvider mentorId={resolvedMentorId}>
       <XPProvider>
-        <Suspense fallback={<LoadingFallback />}>
-          <EvolutionAwareContent />
-          <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/auth/reset-password" element={<ResetPassword />} />
-          <Route path="/creator" element={<Creator />} />
-          <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
-          <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-          <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
-          <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
-          <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-          <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
-          <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
-          <Route path="/join/:code" element={<JoinEpic />} />
-          <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-          <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
-          <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-          <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
-          
-          <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
-          <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-          <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
-          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
-          <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
-          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-          <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
-          <Route path="/partners" element={<Partners />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        <AstralEncounterProvider>
+          <Suspense fallback={<LoadingFallback />}>
+            <EvolutionAwareContent />
+            <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/creator" element={<Creator />} />
+            <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
+            <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
+            
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+            <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
+            <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+            <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
+            <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+            <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+            <Route path="/join/:code" element={<JoinEpic />} />
+            <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
+            <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
+            <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+            <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
+            
+            <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
+            <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+            <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+            <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
+            <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
+            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
+            <Route path="/partners" element={<Partners />} />
+            <Route path="/account-deletion" element={<AccountDeletionHelp />} />
+            <Route path="/mood-history" element={<ProtectedRoute><MoodHistory /></ProtectedRoute>} />
+            <Route path="/push-settings" element={<PushSettings />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AstralEncounterProvider>
       </XPProvider>
     </ThemeProvider>
   );
@@ -219,6 +275,36 @@ const App = () => {
   useEffect(() => {
     // Lock orientation to portrait on native apps
     lockToPortrait();
+    
+    // Debug: Log Firebase status on app start
+    import('@/utils/firebaseDebug').then(({ logFirebaseStatus }) => {
+      logFirebaseStatus();
+    }).catch(() => {
+      // Ignore if debug utility fails
+    });
+  }, []);
+
+  // Firebase auth state listener (for debugging)
+  useEffect(() => {
+    try {
+      if (!firebaseAuth) {
+        console.error('❌ [App] Firebase auth not initialized - check your .env file');
+        return;
+      }
+      console.log('✅ [App] Firebase auth initialized, setting up listener...');
+      const unsub = onAuthStateChanged(
+        firebaseAuth, 
+        (user) => {
+          console.log("🔥 [App] Firebase auth state:", user ? `Logged in: ${user.email}` : "Logged out");
+        },
+        (error) => {
+          console.error("❌ [App] Firebase auth listener error:", error);
+        }
+      );
+      return () => unsub();
+    } catch (error) {
+      console.error("❌ [App] Firebase auth listener setup error:", error);
+    }
   }, []);
 
   return (

@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getTodayXPEvents } from "@/lib/firebase/xpEvents";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { XPBreakdownInfoTooltip } from "./XPBreakdownInfoTooltip";
@@ -14,27 +14,22 @@ export const XPBreakdown = () => {
   const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
   const { data: todayXP } = useQuery({
-    queryKey: ['xp-breakdown', today, user?.id],
+    queryKey: ['xp-breakdown', today, user?.uid],
     queryFn: async () => {
       if (!user) return null;
 
-      const { data } = await supabase
-        .from('xp_events')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfTodayIso)
-        .order('created_at', { ascending: false });
+      const events = await getTodayXPEvents(user.uid);
 
-      if (!data) return { total: 0, byType: {} };
+      if (!events || events.length === 0) return { total: 0, byType: {}, events: [] };
 
-      const byType = data.reduce((acc, event) => {
+      const byType = events.reduce((acc, event) => {
         acc[event.event_type] = (acc[event.event_type] || 0) + event.xp_earned;
         return acc;
       }, {} as Record<string, number>);
 
-      const total = data.reduce((sum, event) => sum + event.xp_earned, 0);
+      const total = events.reduce((sum, event) => sum + event.xp_earned, 0);
 
-      return { total, byType, events: data };
+      return { total, byType, events };
     },
     enabled: !!user,
   });

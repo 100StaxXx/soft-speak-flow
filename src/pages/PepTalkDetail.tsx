@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { TimedCaptions } from "@/components/TimedCaptions";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { transcribeAudio } from "@/lib/firebase/functions";
 
 interface CaptionWord {
   word: string;
@@ -35,13 +36,11 @@ const PepTalkDetail = () => {
 
   const fetchPepTalk = async (pepTalkId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .eq("id", pepTalkId)
-        .maybeSingle();
+      const data = await getDocument<PepTalk>("pep_talks", pepTalkId);
 
-      if (error) throw error;
+      if (!data) {
+        throw new Error("Pep talk not found");
+      }
       
       // Parse transcript from JSON to proper type
       const transcript = Array.isArray(data.transcript) 
@@ -77,24 +76,16 @@ const PepTalkDetail = () => {
     toast.info("Transcribing audio... This may take a minute.");
     
     try {
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: { audioUrl: pepTalk.audio_url }
+      const data = await transcribeAudio({
+        audioUrl: pepTalk.audio_url,
       });
-
-      if (error) throw error;
 
       if (data?.transcript && Array.isArray(data.transcript)) {
         // Update the database with the new transcript
-        const { error: updateError } = await supabase
-          .from('pep_talks')
-          .update({ transcript: data.transcript })
-          .eq('id', id);
-
-        if (updateError) throw updateError;
-
+        await updateDocument('pep_talks', id!, { transcript: data.transcript });
         toast.success("Transcript generated successfully!");
         // Refresh the pep talk to show the new transcript
-        await fetchPepTalk(id);
+        await fetchPepTalk(id!);
       } else {
         throw new Error('No transcript data returned');
       }

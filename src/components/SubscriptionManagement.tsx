@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Capacitor } from '@capacitor/core';
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
 
 type PlanOption = {
@@ -24,11 +23,13 @@ type PlanOption = {
 export function SubscriptionManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan } = useSubscription();
-  const { 
-    handlePurchase, 
-    handleRestore, 
-    loading: purchasing, 
+  const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan, isCancelled } = useSubscription();
+  const {
+    handlePurchase,
+    handleRestore,
+    handleManageSubscriptions,
+    loading: purchasing,
+    manageLoading,
     isAvailable,
     products,
     productsLoading,
@@ -71,6 +72,26 @@ export function SubscriptionManagement() {
   const selectedPlanOption = planOptions.find((plan) => plan.id === selectedPlan);
   const selectedProduct = selectedPlanOption ? productMap[selectedPlanOption.productId] : undefined;
 
+  const subscriptionStatusText = subscription
+    ? `You're on Cosmiq Premium (${plan === 'yearly' ? 'Yearly' : 'Monthly'})`
+    : "You're on the free plan";
+
+  const statusLabel = subscription
+    ? subscription.status === "cancelled"
+      ? "Cancelling"
+      : subscription.status === "past_due"
+        ? "Past due"
+        : "Active"
+    : "Inactive";
+
+  const renewalText = subscription
+    ? nextBillingDate
+      ? isCancelled
+        ? `Access until ${nextBillingDate.toLocaleDateString()}`
+        : `Renews on ${nextBillingDate.toLocaleDateString()}`
+      : "Renewal date not available yet"
+    : "Manage or restore to update your status";
+
   const getPriceForProduct = (productId: string) => {
     const product = productMap[productId];
     if (product?.price) {
@@ -84,22 +105,6 @@ export function SubscriptionManagement() {
     if (productError) return false;
     if (!hasLoadedProducts) return false;
     return Boolean(productMap[productId]);
-  };
-
-  const handleManageSubscription = async () => {
-    if (Capacitor.isNativePlatform()) {
-      // On iOS, direct users to Settings
-      toast({
-        title: "Manage Subscription",
-        description: "Open Settings > [Your Name] > Subscriptions to manage your Cosmiq subscription",
-      });
-    } else {
-      toast({
-        title: "iOS Only",
-        description: "Subscription management is only available on iOS devices",
-        variant: "destructive",
-      });
-    }
   };
 
   if (isLoading) {
@@ -125,6 +130,10 @@ export function SubscriptionManagement() {
           <CardDescription className="text-base">
             Unlock all quests, mentor chat, Cosmiq Insights, and every future feature across iPhone and iPad.
           </CardDescription>
+
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground">
+            {subscriptionStatusText}
+          </div>
 
           {productsLoading && (
             <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 px-3 py-2 text-sm text-muted-foreground">
@@ -202,20 +211,28 @@ export function SubscriptionManagement() {
           <Button
             onClick={() => selectedPlanOption && handlePurchase(selectedPlanOption.productId)}
             disabled={
+              !isAvailable ||
               !selectedPlanOption ||
               !canPurchasePlan(selectedPlanOption.productId)
             }
             className="w-full"
           >
-            {purchasing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Subscribe ${selectedPlanOption?.label ?? ''} • ${selectedProduct?.price ?? selectedPlanOption?.fallbackPrice}${selectedPlanOption?.billingPeriodLabel}`
-            )}
+            {(!isAvailable && "Available on iOS only") ||
+              (purchasing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Subscribe ${selectedPlanOption?.label ?? ''} • ${selectedProduct?.price ?? selectedPlanOption?.fallbackPrice}${selectedPlanOption?.billingPeriodLabel}`
+              ))}
           </Button>
+          
+          {!isAvailable && (
+            <p className="text-xs text-muted-foreground text-center">
+              Purchases must be completed inside the Cosmiq iOS app. Open the iOS app to subscribe.
+            </p>
+          )}
 
           <div className="space-y-2">
             {[
@@ -231,17 +248,25 @@ export function SubscriptionManagement() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button 
-              variant="outline" 
-              className="w-full" 
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              variant="outline"
+              className="w-full sm:flex-1"
               onClick={() => navigate("/premium")}
             >
               View premium details
             </Button>
             <Button
+              variant="outline"
+              className="w-full sm:flex-1"
+              disabled={manageLoading}
+              onClick={handleManageSubscriptions}
+            >
+              {manageLoading ? "Opening..." : "Manage subscription"}
+            </Button>
+            <Button
               variant="ghost"
-              className="w-full"
+              className="w-full sm:flex-1"
               disabled={purchasing}
               onClick={handleRestore}
             >
@@ -266,11 +291,16 @@ export function SubscriptionManagement() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <div className="space-y-1 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+          <p className="font-semibold text-foreground">{subscriptionStatusText}</p>
+          <p className="text-sm text-muted-foreground">{renewalText}</p>
+        </div>
+
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Status</span>
             <Badge variant={isActive ? "default" : "secondary"}>
-              {isActive ? "Active" : "Inactive"}
+              {statusLabel}
             </Badge>
           </div>
 
@@ -290,7 +320,7 @@ export function SubscriptionManagement() {
 
           {nextBillingDate && (
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Renews On</span>
+              <span className="text-sm text-muted-foreground">{isCancelled ? "Access until" : "Renews on"}</span>
               <span className="font-medium">
                 {nextBillingDate.toLocaleDateString()}
               </span>
@@ -301,12 +331,13 @@ export function SubscriptionManagement() {
 
       <CardFooter className="flex flex-col gap-2">
         <Button
-          onClick={handleManageSubscription}
+          onClick={handleManageSubscriptions}
           variant="outline"
           className="w-full"
+          disabled={manageLoading}
         >
           <Settings className="mr-2 h-4 w-4" />
-          Manage in iOS Settings
+          {manageLoading ? "Opening subscriptions..." : "Manage in iOS Settings"}
         </Button>
         <Button
           onClick={handleRestore}

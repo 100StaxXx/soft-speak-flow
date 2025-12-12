@@ -1,46 +1,44 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getMentors, Mentor } from "@/lib/firebase/mentors";
+import { updateProfile } from "@/lib/firebase/profiles";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getResolvedMentorId } from "@/utils/mentor";
+import { useProfile } from "@/hooks/useProfile";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const MentorSelection = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [mentors, setMentors] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
-  const [currentMentorId, setCurrentMentorId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
-      // Fetch mentors
-      const { data: mentorsData, error: mentorsError } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at");
+      // Load ALL mentors from Firestore - no filters (activeOnly = false)
+      const mentorsData = await getMentors(false);
 
-      if (mentorsError) throw mentorsError;
+      console.log(`[MentorSelection] Loaded ${mentorsData?.length || 0} mentors from Firestore`);
       setMentors(mentorsData || []);
 
-      // Fetch current mentor if user is logged in
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("selected_mentor_id")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profile?.selected_mentor_id) {
-          setCurrentMentorId(profile.selected_mentor_id);
-        }
+      if (!mentorsData || mentorsData.length === 0) {
+        console.warn("[MentorSelection] No mentors found in Firestore database");
+        toast({
+          title: "No mentors available",
+          description: "No mentors were found in the database. Please contact support.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Error loading mentors:", error);
+      console.error("[MentorSelection] Error loading mentors from Firestore:", error);
       toast({
         title: "Error loading mentors",
         description: error instanceof Error ? error.message : "Failed to load mentors",
@@ -54,7 +52,7 @@ const MentorSelection = () => {
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]); // fetchData depends on user indirectly via user.id check
+  }, []); // Only fetch mentors once on mount
 
   const handleSelectMentor = async (mentorId: string) => {
     if (!user) {
@@ -70,15 +68,14 @@ const MentorSelection = () => {
     try {
       setSelecting(true);
       
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          selected_mentor_id: mentorId,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user.id);
+      await updateProfile(user.uid, { selected_mentor_id: mentorId });
 
-      if (error) throw error;
+      // Invalidate profile query to refresh mentor data across the app
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.uid] });
+      // Also invalidate mentor-related queries
+      await queryClient.invalidateQueries({ queryKey: ["selected-mentor"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentor"] });
 
       toast({
         title: "Mentor Selected!",
@@ -86,7 +83,7 @@ const MentorSelection = () => {
       });
       
       // Navigate without full reload
-      navigate("/", { replace: true });
+      navigate("/mentor", { replace: true });
     } catch (error) {
       console.error("Error selecting mentor:", error);
       toast({
@@ -108,8 +105,9 @@ const MentorSelection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto space-y-16">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center space-y-6 animate-fade-in">
           <div className="h-1 w-24 bg-royal-gold mx-auto animate-scale-in" />
@@ -123,13 +121,27 @@ const MentorSelection = () => {
 
         {/* Mentor Grid */}
         <MentorGrid 
-          mentors={mentors}
+          mentors={mentors.map(m => ({
+            id: m.id,
+            name: m.name,
+            slug: m.slug || m.id,
+            archetype: m.archetype || '',
+            short_title: m.short_title || '',
+            tone_description: m.tone_description || '',
+            style_description: m.style_description || '',
+            target_user: m.target_user || '',
+            signature_line: m.signature_line || '',
+            primary_color: m.primary_color || '#6366f1',
+            avatar_url: m.avatar_url,
+            themes: [],
+          }))}
           onSelectMentor={handleSelectMentor}
-          currentMentorId={currentMentorId}
+          currentMentorId={getResolvedMentorId(profile)}
           isSelecting={selecting}
         />
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 

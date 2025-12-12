@@ -1,29 +1,39 @@
 import { Card } from "@/components/ui/card";
 import { Trophy, Medal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 
 export const BattleLeaderboard = () => {
   const { data: rankings, isLoading } = useQuery({
     queryKey: ["battle-leaderboard"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("battle_rankings")
-        .select(`
-          *,
-          profiles (
-            email,
-            onboarding_data
-          )
-        `)
-        .order("rank_points", { ascending: false })
-        .limit(20);
+      const data = await getDocuments<{
+        id: string;
+        user_id: string;
+        rank_points: number;
+        total_matches: number;
+        wins: number;
+        total_xp_earned: number;
+      }>("battle_rankings", [], "rank_points", "desc", 20);
 
-      if (error) throw error;
-      return data || [];
+      const rankingsWithProfiles = await Promise.all(
+        data.map(async (ranking) => {
+          const profile = await getDocument<{ email?: string; onboarding_data?: any }>(
+            "profiles",
+            ranking.user_id
+          );
+
+          return {
+            ...ranking,
+            profiles: profile || {},
+          } as any;
+        })
+      );
+
+      return rankingsWithProfiles || [];
     },
   });
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { createInfluencerCode } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,16 +35,13 @@ export default function Partners() {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "create-influencer-code",
-        {
-          body: formData,
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
+      const data = await createInfluencerCode({
+        name: formData.name,
+        email: formData.email,
+        handle: formData.handle,
+        paypalEmail: formData.paypal_email,
+      });
+      
       toast.success("Your referral code is ready!");
       navigate(`/creator/dashboard?code=${data.code}`);
     } catch (error) {

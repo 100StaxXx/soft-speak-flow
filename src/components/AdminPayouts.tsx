@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { processPaypalPayout } from "@/lib/firebase/functions";
+import { getReferralPayouts, updateReferralPayout } from "@/lib/firebase/referralPayouts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,25 +76,7 @@ export const AdminPayouts = () => {
   const { data: payouts, isLoading: payoutsLoading } = useQuery({
     queryKey: ["admin-referral-payouts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("referral_payouts")
-        .select(`
-          *,
-          referral_code:referral_codes!referral_code_id(
-            code,
-            owner_type,
-            owner_user_id,
-            influencer_name,
-            influencer_email,
-            influencer_handle,
-            payout_identifier
-          ),
-          referee:profiles!referee_id(email)
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as ReferralPayout[];
+      return await getReferralPayouts();
     },
   });
 
@@ -153,16 +136,11 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
-
-      if (error) throw error;
+      await updateReferralPayout(payoutId, {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        admin_notes: notes || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
@@ -184,16 +162,11 @@ export const AdminPayouts = () => {
       payoutId: string;
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "rejected",
-          rejected_at: new Date().toISOString(),
-          admin_notes: notes || null,
-        })
-        .eq("id", payoutId);
-
-      if (error) throw error;
+      await updateReferralPayout(payoutId, {
+        status: "rejected",
+        rejected_at: new Date().toISOString(),
+        admin_notes: notes || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
@@ -210,15 +183,9 @@ export const AdminPayouts = () => {
   const processPayoutMutation = useMutation({
     mutationFn: async (payoutId: string) => {
       setProcessingId(payoutId);
-      const { data, error } = await supabase.functions.invoke(
-        "process-paypal-payout",
-        {
-          body: { payout_id: payoutId },
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      const data = await processPaypalPayout({
+        payoutId,
+      });
       return data;
     },
     onSuccess: (data) => {
@@ -241,16 +208,15 @@ export const AdminPayouts = () => {
       );
       if (!pendingPayouts || pendingPayouts.length === 0) return;
 
-      const { error } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          approved_at: new Date().toISOString(),
-        })
-        .eq("referral_code_id", referralCodeId)
-        .eq("status", "pending");
-
-      if (error) throw error;
+      // Update all pending payouts
+      await Promise.all(
+        pendingPayouts.map((payout) =>
+          updateReferralPayout(payout.id, {
+            status: "approved",
+            approved_at: new Date().toISOString(),
+          })
+        )
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });

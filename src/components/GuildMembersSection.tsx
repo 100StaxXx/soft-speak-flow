@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getEpicMembers } from "@/lib/firebase/epics";
+import { getProfile } from "@/lib/firebase/profiles";
+import { getCompanionsByUserIds } from "@/lib/firebase/userCompanion";
 import { useGuildRivalry } from "@/hooks/useGuildRivalry";
 import { useGuildShouts } from "@/hooks/useGuildShouts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,60 +51,59 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
     const fetchMembers = async () => {
       setIsLoading(true);
       
-      const { data: membersData, error } = await supabase
-        .from("epic_members")
-        .select("user_id, total_contribution, joined_at")
-        .eq("epic_id", epicId)
-        .order("total_contribution", { ascending: false });
+      try {
+        const membersData = await getEpicMembers(epicId);
 
-      if (error || !membersData) {
+        // Extract all user IDs for batch queries (avoid N+1 problem)
+        const userIds = membersData.map(m => m.user_id).filter(Boolean) as string[];
+
+        // Batch fetch profiles and companions in parallel
+        const [companionsMap] = await Promise.all([
+          getCompanionsByUserIds(userIds),
+        ]);
+
+        // Fetch profiles individually (Firestore doesn't support batch get for multiple documents easily)
+        const profilesMap = new Map();
+        for (const userId of userIds) {
+          try {
+            const profile = await getProfile(userId);
+            if (profile) {
+              profilesMap.set(userId, {
+                email: profile.email,
+                onboarding_data: profile.onboarding_data,
+                faction: profile.faction,
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to fetch profile for ${userId}:`, error);
+          }
+        }
+
+        // Enrich members with profile and companion data
+        const enrichedMembers: LeaderboardMember[] = membersData.map(member => ({
+          user_id: member.user_id,
+          total_contribution: member.total_contribution ?? 0,
+          joined_at: member.joined_at || new Date().toISOString(),
+          profile: profilesMap.get(member.user_id),
+          companion: companionsMap.get(member.user_id) ? {
+            current_image_url: companionsMap.get(member.user_id)?.current_image_url || null,
+            spirit_animal: companionsMap.get(member.user_id)?.spirit_animal || null,
+          } : undefined,
+        }));
+
+        setMembers(enrichedMembers);
+      } catch (error) {
+        console.error("Error fetching guild members:", error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      // Extract all user IDs for batch queries (avoid N+1 problem)
-      const userIds = membersData.map(m => m.user_id);
-
-      // Batch fetch profiles and companions in parallel
-      const [profilesRes, companionsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email, onboarding_data, faction").in("id", userIds),
-        supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
-      ]);
-
-      // Create lookup maps for O(1) access
-      const profilesMap = new Map(
-        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
-      );
-      const companionsMap = new Map(
-        (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
-      );
-
-      // Enrich members with profile and companion data
-      const enrichedMembers = membersData.map(member => ({
-        ...member,
-        profile: profilesMap.get(member.user_id),
-        companion: companionsMap.get(member.user_id),
-      }));
-
-      setMembers(enrichedMembers);
-      setIsLoading(false);
     };
 
     fetchMembers();
 
-    // Real-time subscription
-    const channel = supabase
-      .channel(`members-${epicId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'epic_members', filter: `epic_id=eq.${epicId}` },
-        () => fetchMembers()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Note: Real-time subscriptions would need to be implemented with Firestore onSnapshot
+    // For now, we'll just fetch on mount and when epicId changes
+    // TODO: Add Firestore real-time listener if needed
   }, [epicId]);
 
   const getRankIcon = (index: number) => {
@@ -181,7 +182,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
         </CardHeader>
         <CardContent className="space-y-2">
           {members.map((member, index) => {
-            const isCurrentUser = member.user_id === user?.id;
+            const isCurrentUser = member.user_id === user?.uid;
             const isRival = rivalry?.rival_id === member.user_id;
             const displayName = getDisplayName(member);
 

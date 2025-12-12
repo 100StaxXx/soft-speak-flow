@@ -1,106 +1,173 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { SearchBar } from "./SearchBar";
 import { Card } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Badge } from "./ui/badge";
 import { QuoteCard } from "./QuoteCard";
 import { PepTalkCard } from "./PepTalkCard";
-import { BookOpen, MessageSquare, Trophy, Target } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { BookOpen, MessageSquare, Sparkles, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 
-export const GlobalSearch = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+interface GlobalSearchProps {
+  initialQuery?: string;
+  searchQuery?: string;
+  hideSearchBar?: boolean;
+  onSearchChange?: (query: string) => void;
+}
+
+export const GlobalSearch = ({
+  initialQuery = "",
+  searchQuery,
+  hideSearchBar = false,
+  onSearchChange,
+}: GlobalSearchProps) => {
+  const [internalQuery, setInternalQuery] = useState(initialQuery);
+  const isControlled = typeof searchQuery === "string";
+  const currentQuery = isControlled ? searchQuery : internalQuery;
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { data: quotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["search-quotes", searchQuery],
-    enabled: searchQuery.length >= 2,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*")
-        .or(`text.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%`)
-        .limit(10);
+  useEffect(() => {
+    if (!isControlled) {
+      setInternalQuery(initialQuery);
+    }
+  }, [initialQuery, isControlled]);
 
-      if (error) throw error;
-      return data;
+  const handleQueryChange = (value: string) => {
+    if (!isControlled) {
+      setInternalQuery(value);
+    }
+    onSearchChange?.(value);
+  };
+
+  // Firestore doesn't have native text search, so we fetch and filter client-side
+  // TODO: Consider implementing Algolia or similar for better search performance
+  const { data: quotes, isLoading: quotesLoading } = useQuery({
+    queryKey: ["search-quotes", currentQuery],
+    enabled: currentQuery.length >= 2,
+    queryFn: async () => {
+      const allQuotes = await getDocuments("quotes", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allQuotes
+        .filter(q => 
+          (q.text?.toLowerCase().includes(queryLower)) ||
+          (q.author?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
   const { data: pepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["search-pep-talks", searchQuery],
-    enabled: searchQuery.length >= 2,
+    queryKey: ["search-pep-talks", currentQuery],
+    enabled: currentQuery.length >= 2,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pep_talks")
-        .select("*")
-        .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,quote.ilike.%${searchQuery}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const allPepTalks = await getDocuments("pep_talks", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allPepTalks
+        .filter(p => 
+          (p.title?.toLowerCase().includes(queryLower)) ||
+          (p.description?.toLowerCase().includes(queryLower)) ||
+          (p.quote?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
   const { data: challenges, isLoading: challengesLoading } = useQuery({
-    queryKey: ["search-challenges", searchQuery],
-    enabled: searchQuery.length >= 2,
+    queryKey: ["search-challenges", currentQuery],
+    enabled: currentQuery.length >= 2,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("challenges")
-        .select("*")
-        .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const allChallenges = await getDocuments("challenges", undefined, undefined, undefined, 100);
+      const queryLower = currentQuery.toLowerCase();
+      return allChallenges
+        .filter(c => 
+          (c.title?.toLowerCase().includes(queryLower)) ||
+          (c.description?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
     },
   });
 
   const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ['search-tasks', searchQuery, user?.id],
+    queryKey: ['search-tasks', currentQuery, user?.uid],
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .ilike('task_text', `%${searchQuery}%`)
-        .order('task_date', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
+      const userTasks = await getDocuments(
+        'daily_tasks',
+        [['user_id', '==', user.uid]],
+        'task_date',
+        'desc',
+        100
+      );
+      const queryLower = currentQuery.toLowerCase();
+      return userTasks
+        .filter(t => t.task_text?.toLowerCase().includes(queryLower))
+        .slice(0, 10);
     },
-    enabled: searchQuery.length >= 2 && !!user,
+    enabled: currentQuery.length >= 2 && !!user,
   });
 
-  const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading;
-  const hasResults = (quotes && quotes.length > 0) || (pepTalks && pepTalks.length > 0) || (challenges && challenges.length > 0) || (tasks && tasks.length > 0);
+  const { data: epics, isLoading: epicsLoading } = useQuery({
+    queryKey: ['search-epics', currentQuery, user?.uid],
+    queryFn: async () => {
+      if (!user?.uid) {
+        throw new Error('User not authenticated');
+      }
+
+      // Fetch user's epics (owned and joined)
+      const ownedEpics = await getDocuments('epics', [['user_id', '==', user.uid]], 'created_at', 'desc', 50);
+      const memberships = await getDocuments('epic_members', [['user_id', '==', user.uid]]);
+      const joinedEpicIds = memberships.map(m => m.epic_id);
+      const joinedEpics = joinedEpicIds.length > 0 
+        ? await Promise.all(joinedEpicIds.map(id => getDocuments('epics', [['id', '==', id]])))
+        : [];
+      const allUserEpics = [...ownedEpics, ...joinedEpics.flat()];
+      
+      const queryLower = currentQuery.toLowerCase();
+      return allUserEpics
+        .filter(e => 
+          (e.title?.toLowerCase().includes(queryLower)) ||
+          (e.description?.toLowerCase().includes(queryLower))
+        )
+        .slice(0, 10);
+    },
+    enabled: currentQuery.length >= 2 && !!user,
+  });
+
+  const isLoading = quotesLoading || pepTalksLoading || challengesLoading || tasksLoading || epicsLoading;
+  const hasResults =
+    (quotes && quotes.length > 0) ||
+    (pepTalks && pepTalks.length > 0) ||
+    (challenges && challenges.length > 0) ||
+    (tasks && tasks.length > 0) ||
+    (epics && epics.length > 0);
 
   return (
     <div className="space-y-4">
-      <SearchBar
-        onSearch={setSearchQuery}
-        placeholder="Search quotes, pep talks, challenges, quests..."
-      />
+      {!hideSearchBar && (
+        <SearchBar
+          onSearch={handleQueryChange}
+          placeholder="Search quotes, pep talks, challenges, quests, and epics..."
+          value={currentQuery}
+        />
+      )}
 
-      {searchQuery.length >= 2 && (
+      {currentQuery.length >= 2 && (
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="pep-talks">Pep Talks</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
             <TabsTrigger value="quests">Quests</TabsTrigger>
+            <TabsTrigger value="epics">Epics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4 mt-4">
@@ -111,7 +178,7 @@ export const GlobalSearch = () => {
               </div>
             ) : !hasResults ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
+                <p className="text-muted-foreground">No results found for "{currentQuery}"</p>
               </Card>
             ) : (
               <div className="space-y-6">
@@ -120,11 +187,10 @@ export const GlobalSearch = () => {
                     <div className="flex items-center gap-2 mb-3">
                       <MessageSquare className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Pep Talks</h3>
-                      <Badge variant="secondary">{pepTalks.length}</Badge>
                     </div>
                     <div className="space-y-3">
-                      {pepTalks.map((talk) => (
-                        <PepTalkCard key={talk.id} {...talk} />
+                      {pepTalks.map((talk: any) => (
+                        <PepTalkCard key={talk.id} id={talk.id} title={talk.title} category={talk.category} description={talk.description} quote={talk.quote} />
                       ))}
                     </div>
                   </div>
@@ -135,11 +201,10 @@ export const GlobalSearch = () => {
                     <div className="flex items-center gap-2 mb-3">
                       <BookOpen className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Quotes</h3>
-                      <Badge variant="secondary">{quotes.length}</Badge>
                     </div>
                     <div className="grid gap-3">
-                      {quotes.map((quote) => (
-                        <QuoteCard key={quote.id} quote={quote} />
+                      {quotes.map((quote: any) => (
+                        <QuoteCard key={quote.id} quote={{ id: quote.id, text: quote.text, author: quote.author }} />
                       ))}
                     </div>
                   </div>
@@ -150,7 +215,6 @@ export const GlobalSearch = () => {
                     <div className="flex items-center gap-2 mb-3">
                       <Target className="h-4 w-4 text-primary" />
                       <h3 className="font-semibold">Challenges</h3>
-                      <Badge variant="secondary">{challenges.length}</Badge>
                     </div>
                     <div className="space-y-3">
                       {challenges.map((challenge) => (
@@ -165,6 +229,35 @@ export const GlobalSearch = () => {
                             <Badge variant="outline">{challenge.duration_days} days</Badge>
                             {challenge.category && (
                               <Badge variant="secondary">{challenge.category}</Badge>
+                            )}
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {epics && epics.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold">Epics</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {epics.map((epic) => (
+                        <Card
+                          key={epic.id}
+                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          onClick={() => navigate("/epics")}
+                        >
+                          <h4 className="font-semibold mb-1">{epic.title}</h4>
+                          {epic.description && (
+                            <p className="text-sm text-muted-foreground">{epic.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <Badge variant="outline">{epic.target_days} days</Badge>
+                            {epic.status && (
+                              <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
                             )}
                           </div>
                         </Card>
@@ -228,7 +321,7 @@ export const GlobalSearch = () => {
             {quotesLoading ? (
               <Skeleton className="h-32 w-full" />
             ) : quotes && quotes.length > 0 ? (
-              quotes.map((quote) => <QuoteCard key={quote.id} quote={quote} />)
+              quotes.map((quote: any) => <QuoteCard key={quote.id} quote={{ id: quote.id, text: quote.text, author: quote.author }} />)
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No quotes found</p>
@@ -240,7 +333,7 @@ export const GlobalSearch = () => {
             {pepTalksLoading ? (
               <Skeleton className="h-32 w-full" />
             ) : pepTalks && pepTalks.length > 0 ? (
-              pepTalks.map((talk) => <PepTalkCard key={talk.id} {...talk} />)
+              pepTalks.map((talk: any) => <PepTalkCard key={talk.id} id={talk.id} title={talk.title} category={talk.category} description={talk.description} quote={talk.quote} />)
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No pep talks found</p>
@@ -271,6 +364,35 @@ export const GlobalSearch = () => {
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No challenges found</p>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="epics" className="space-y-3 mt-4">
+            {epicsLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : epics && epics.length > 0 ? (
+              epics.map((epic) => (
+                <Card
+                  key={epic.id}
+                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate("/epics")}
+                >
+                  <h4 className="font-semibold mb-1">{epic.title}</h4>
+                  {epic.description && (
+                    <p className="text-sm text-muted-foreground">{epic.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{epic.target_days} days</Badge>
+                    {epic.status && (
+                      <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
+                    )}
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No epics found</p>
               </Card>
             )}
           </TabsContent>
@@ -324,7 +446,7 @@ export const GlobalSearch = () => {
         </Tabs>
       )}
 
-      {searchQuery.length > 0 && searchQuery.length < 2 && (
+      {currentQuery.length > 0 && currentQuery.length < 2 && (
         <Card className="p-4 text-center">
           <p className="text-sm text-muted-foreground">Type at least 2 characters to search</p>
         </Card>

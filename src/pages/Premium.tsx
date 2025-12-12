@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw, CreditCard } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
@@ -230,6 +231,14 @@ export default function Premium() {
                 </div>
               ))}
             </div>
+
+            <Alert className="bg-primary/5 border-primary/30">
+              <CreditCard className="h-4 w-4" />
+              <AlertTitle>Billing clarity</AlertTitle>
+              <AlertDescription>
+                Cosmiq uses Apple&apos;s native subscription sheet (StoreKit) when you tap Subscribe. There is no separate Apple Pay button—PassKit is only bundled because the Capgo Native Purchases plugin links it. You can manage or cancel anytime in Settings ▸ {`[Your Name]`} ▸ Subscriptions.
+              </AlertDescription>
+            </Alert>
 
             {/* Apple IAP Notice */}
             {!isAvailable && (

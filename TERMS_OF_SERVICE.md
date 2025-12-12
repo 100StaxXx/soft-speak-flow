@@ -69,7 +69,7 @@ Parents and legal guardians:
 ### 4.4 Age Verification
 - We may request proof of age at any time
 - Falsifying your age is a violation of these Terms and grounds for immediate termination
-- If you are a parent and believe your child under 13 is using the App, contact us immediately at alilrevolution@gmail.com
+- If you are a parent and believe your child under 13 is using the App, contact us immediately at admin@cosmiq.quest
 
 ## 5. User Accounts
 
@@ -219,7 +219,7 @@ You agree to resolve disputes individually and waive any right to participate in
 The App may contain links to third-party websites or services that are not owned or controlled by us. We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party services.
 
 Third-party services include:
-- Supabase (data storage and authentication)
+- Firebase (authentication and data storage)
 - Stripe (payment processing)
 - Artificial Intelligence services (for mentor chat and personalized content generation)
 - Mobile app platforms (Apple App Store, Google Play Store)
@@ -245,7 +245,7 @@ No waiver of any term of these Terms shall be deemed a further or continuing wai
 
 If you have any questions about these Terms, please contact us:
 
-**Email:** alilrevolution@gmail.com
+**Email:** admin@cosmiq.quest
 
 ---
 

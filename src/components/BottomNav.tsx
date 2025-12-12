@@ -3,31 +3,35 @@ import { Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { getMentor } from "@/lib/firebase/mentors";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
 
-  const { data: selectedMentor } = useQuery({
-    queryKey: ["selected-mentor", profile?.selected_mentor_id],
-    enabled: !!profile?.selected_mentor_id,
+  const resolvedMentorId = getResolvedMentorId(profile);
+
+  const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
+    queryKey: ["selected-mentor", resolvedMentorId],
+    enabled: !!resolvedMentorId,
     staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
     queryFn: async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         throw new Error('No mentor selected');
       }
+
+      const mentor = await getMentor(resolvedMentorId);
+      if (!mentor) return null;
       
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("slug, name, primary_color") // Select only needed fields
-        .eq("id", profile.selected_mentor_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return {
+        slug: mentor.slug,
+        name: mentor.name,
+        primary_color: mentor.primary_color,
+      };
     },
   });
 
@@ -41,14 +45,15 @@ export const BottomNav = memo(() => {
       >
         <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
         <NavLink
-          to="/"
-          end
+          to="/mentor"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
         >
           {({ isActive }) => (
             <>
-              {selectedMentor ? (
+              {mentorLoading ? (
+                <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
+              ) : selectedMentor ? (
                 <MentorAvatar
                   mentorSlug={selectedMentor.slug || ''}
                   mentorName={selectedMentor.name}

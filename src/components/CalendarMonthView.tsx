@@ -4,32 +4,41 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-
-interface Task {
-  id: string;
-  task_text: string;
-  task_date?: string;
-  scheduled_time: string | null;
-  estimated_duration: number | null;
-  completed: boolean;
-  is_main_quest: boolean;
-  difficulty: string | null;
-  xp_reward: number;
-}
+import { useState } from "react";
+import { playSound } from "@/utils/soundEffects";
+import { CalendarTask } from "@/types/quest";
 
 interface CalendarMonthViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
-  tasks: Task[];
-  onTaskClick: (task: Task) => void;
+  tasks: CalendarTask[];
+  onTaskClick: (task: CalendarTask) => void;
+  onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick }: CalendarMonthViewProps) => {
+export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick, onDateLongPress }: CalendarMonthViewProps) => {
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfMonth(monthEnd);
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  const handleLongPressStart = (date: Date) => {
+    const timer = setTimeout(() => {
+      playSound('pop');
+      onDateLongPress?.(date);
+    }, 500);
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
   
   const getTasksForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -89,7 +98,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
           <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
             {day}
           </div>
@@ -111,6 +120,11 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
                 !isSameMonth(day, selectedDate) && "opacity-50"
               )}
               onClick={() => onDateSelect(day)}
+              onTouchStart={() => handleLongPressStart(day)}
+              onTouchEnd={handleLongPressEnd}
+              onMouseDown={() => handleLongPressStart(day)}
+              onMouseUp={handleLongPressEnd}
+              onMouseLeave={handleLongPressEnd}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className={cn(

@@ -5,8 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { updateProfile } from "@/lib/firebase/profiles";
 import { Sparkles } from "lucide-react";
 
 export const DailyQuoteSettings = () => {
@@ -19,12 +19,7 @@ export const DailyQuoteSettings = () => {
     setIsUpdating(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_quote_push_enabled: enabled })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateProfile(user.uid, { daily_quote_push_enabled: enabled });
       
       toast.success(enabled ? "Daily quotes enabled" : "Daily quotes disabled");
     } catch (error) {
@@ -40,12 +35,7 @@ export const DailyQuoteSettings = () => {
     setIsUpdating(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_quote_push_window: window })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateProfile(user.uid, { daily_quote_push_window: window });
       
       toast.success("Delivery time updated");
     } catch (error) {
@@ -61,12 +51,7 @@ export const DailyQuoteSettings = () => {
     setIsUpdating(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_quote_push_time: time })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateProfile(user.uid, { daily_quote_push_time: time });
       
       toast.success("Delivery time updated");
     } catch (error) {

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
@@ -19,7 +19,9 @@ export interface DailyTask {
   recurrence_days: number[] | null;
   is_recurring: boolean;
   reminder_enabled: boolean;
-  reminder_minutes_before: number;
+  reminder_minutes_before: number | null;
+  reminder_sent: boolean | null;
+  parent_template_id: string | null;
   category: string | null;
   is_bonus: boolean;
   created_at: string;
@@ -34,26 +36,30 @@ export const useTasksQuery = (selectedDate?: Date) => {
     : format(new Date(), 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading, error } = useQuery({
-    queryKey: ['daily-tasks', user?.id, taskDate],
+    queryKey: ['daily-tasks', user?.uid, taskDate],
     queryFn: async () => {
-      if (!user?.id) {
+      if (!user?.uid) {
         throw new Error('User not authenticated');
       }
       
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('task_date', taskDate)
-        .order('created_at', { ascending: false });
+      const data = await getDocuments<DailyTask>(
+        'daily_tasks',
+        [
+          ['user_id', '==', user.uid],
+          ['task_date', '==', taskDate],
+        ],
+        'created_at',
+        'desc'
+      );
 
-      if (error) {
-        console.error('Failed to fetch daily tasks:', error);
-        throw error;
-      }
-      return (data || []) as DailyTask[];
+      // Convert Firestore timestamps to ISO strings
+      return data.map(task => ({
+        ...task,
+        created_at: timestampToISO(task.created_at as any) || task.created_at || new Date().toISOString(),
+        completed_at: timestampToISO(task.completed_at as any) || task.completed_at,
+      })) as DailyTask[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.uid,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

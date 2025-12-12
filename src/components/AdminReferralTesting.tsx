@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { createInfluencerCode, processPaypalPayout } from "@/lib/firebase/functions";
+import { getReferralCode, updateReferralCode } from "@/lib/firebase/referralCodes";
+import { getReferralPayouts, createReferralPayout, updateReferralPayout } from "@/lib/firebase/referralPayouts";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +10,7 @@ import { toast } from "sonner";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 
 export const AdminReferralTesting = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<Array<{ step: string; status: 'success' | 'error'; message: string }>>([]);
   
@@ -38,17 +42,12 @@ export const AdminReferralTesting = () => {
       
       addResult("Creating influencer code", 'success', `Attempting to create code for: ${influencerName}`);
       
-      const { data, error } = await supabase.functions.invoke('create-influencer-code', {
-        body: { 
-          name: influencerName,
-          email: testEmail,
-          handle: testHandle,
-          paypal_email: testEmail
-        }
+      const data = await createInfluencerCode({
+        name: influencerName,
+        email: testEmail,
+        handle: testHandle,
+        paypalEmail: testEmail,
       });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
 
       addResult("Influencer code created", 'success', `Code: ${data.code}, Link: ${data.link}`);
       setTestCode(data.code);
@@ -72,28 +71,16 @@ export const AdminReferralTesting = () => {
       addResult("Testing signup flow", 'success', `Using code: ${testCode}`);
       
       // Check if code exists and is valid
-      const { data: codes, error: codeError } = await supabase
-        .from('referral_codes')
-        .select('*')
-        .eq('code', testCode)
-        .eq('is_active', true)
-        .maybeSingle();
+      const code = await getReferralCode(testCode);
+      if (!code) throw new Error("Code not found or inactive");
 
-      if (codeError) throw codeError;
-      if (!codes) throw new Error("Code not found or inactive");
-
-      addResult("Code validation", 'success', `Code found: ${codes.code}, Signups: ${codes.total_signups || 0}`);
+      addResult("Code validation", 'success', `Code found: ${code.code}, Signups: ${code.total_signups || 0}`);
 
       // In a real scenario, this would happen during user onboarding
       // For testing, we'll manually increment the signup count
-      const { error: updateError } = await supabase
-        .from('referral_codes')
-        .update({ 
-          total_signups: (codes.total_signups || 0) + 1 
-        })
-        .eq('id', codes.id);
-
-      if (updateError) throw updateError;
+      await updateReferralCode(code.id, {
+        total_signups: (code.total_signups || 0) + 1,
+      });
 
       addResult("Signup tracked", 'success', "User signup recorded successfully");
       toast.success("Signup test completed!");
@@ -116,13 +103,7 @@ export const AdminReferralTesting = () => {
       addResult("Simulating subscription", 'success', `Testing conversion for code: ${testCode}`);
       
       // Get the referral code info
-      const { data: codeData, error: codeError } = await supabase
-        .from('referral_codes')
-        .select('*')
-        .eq('code', testCode)
-        .maybeSingle();
-
-      if (codeError) throw codeError;
+      const codeData = await getReferralCode(testCode);
       if (!codeData) throw new Error("Code not found");
 
       addResult("Code fetched", 'success', `Code ID: ${codeData.id}`);
@@ -142,40 +123,29 @@ export const AdminReferralTesting = () => {
       const payoutAmount = mockWebhookData.amount * 0.5;
 
       // For testing, we need a valid user ID. Get current user or use a test ID
-      const { data: { user } } = await supabase.auth.getUser();
-      const testReferrerId = user?.id || '00000000-0000-0000-0000-000000000000';
-      const testRefereeId = user?.id || '00000000-0000-0000-0000-000000000000';
+      const testReferrerId = user?.uid || codeData.owner_user_id || '00000000-0000-0000-0000-000000000000';
+      const testRefereeId = user?.uid || '00000000-0000-0000-0000-000000000000';
 
       // Create payout record
-      const { data: payout, error: payoutError } = await supabase
-        .from('referral_payouts')
-        .insert({
-          referral_code_id: codeData.id,
-          referrer_id: testReferrerId,
-          referee_id: testRefereeId,
-          amount: payoutAmount,
-          payout_type: 'first_month' as const,
-          status: 'pending' as const
-        })
-        .select()
-        .maybeSingle();
-
-      if (payoutError) throw payoutError;
-      if (!payout) throw new Error('Failed to create payout record');
+      const payout = await createReferralPayout({
+        referral_code_id: codeData.id,
+        referrer_id: testReferrerId,
+        referee_id: testRefereeId,
+        amount: payoutAmount,
+        payout_type: 'first_month',
+        status: 'pending',
+      });
 
       addResult("Payout created", 'success', `Payout ID: ${payout.id}, Amount: $${payoutAmount.toFixed(2)}`);
 
       // Update code stats (optional tracking columns)
-      const { error: updateError } = await supabase
-        .from('referral_codes')
-        .update({
+      try {
+        await updateReferralCode(codeData.id, {
           total_conversions: (codeData.total_conversions || 0) + 1,
-          total_revenue: ((codeData.total_revenue as number) || 0) + mockWebhookData.amount
-        })
-        .eq('id', codeData.id);
-
-      if (updateError) {
-        addResult("Warning", 'error', `Stats update failed: ${updateError.message} (non-critical)`);
+          total_revenue: ((codeData.total_revenue as number) || 0) + mockWebhookData.amount,
+        });
+      } catch (error: any) {
+        addResult("Warning", 'error', `Stats update failed: ${error.message} (non-critical)`);
       }
 
       addResult("Stats updated", 'success', "Conversion and revenue tracked");
@@ -194,47 +164,28 @@ export const AdminReferralTesting = () => {
       addResult("Testing payout approval", 'success', "Fetching pending payouts");
       
       // Get pending payouts
-      const { data: payouts, error: fetchError } = await supabase
-        .from('referral_payouts')
-        .select('*')
-        .eq('status', 'pending')
-        .limit(1);
-
-      if (fetchError) throw fetchError;
-      if (!payouts || payouts.length === 0) {
+      const allPayouts = await getReferralPayouts();
+      const pendingPayouts = allPayouts.filter(p => p.status === 'pending');
+      
+      if (pendingPayouts.length === 0) {
         throw new Error("No pending payouts found. Create a subscription conversion first.");
       }
 
-      const payout = payouts[0];
+      const payout = pendingPayouts[0];
       
       // Get referral code info separately
-      if (payout.referral_code_id) {
-        const { data: codeData } = await supabase
-          .from('referral_codes')
-          .select('code, influencer_name, payout_identifier')
-          .eq('id', payout.referral_code_id)
-          .maybeSingle();
-          
-        if (codeData) {
-          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${codeData.code}`);
-          addResult("Payout check", 'success', `Identifier: ${codeData.payout_identifier || 'Not set'}`);
-        } else {
-          addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
-        }
+      if (payout.referral_code) {
+        addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}, Code: ${payout.referral_code.code}`);
+        addResult("Payout check", 'success', `Identifier: ${payout.referral_code.payout_identifier || 'Not set'}`);
       } else {
         addResult("Payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}`);
       }
 
       // Approve the payout
-      const { error: approveError } = await supabase
-        .from('referral_payouts')
-        .update({ 
-          status: 'approved',
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', payout.id);
-
-      if (approveError) throw approveError;
+      await updateReferralPayout(payout.id, {
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+      });
 
       addResult("Payout approved", 'success', "Status updated to approved");
       toast.success("Payout approval test completed!");
@@ -252,40 +203,22 @@ export const AdminReferralTesting = () => {
       addResult("Testing PayPal integration", 'success', "Note: This requires valid PayPal credentials");
       
       // Get an approved payout
-      const { data: payouts, error: fetchError } = await supabase
-        .from('referral_payouts')
-        .select('*')
-        .eq('status', 'approved')
-        .limit(1);
-
-      if (fetchError) throw fetchError;
-      if (!payouts || payouts.length === 0) {
+      const allPayouts = await getReferralPayouts();
+      const approvedPayouts = allPayouts.filter(p => p.status === 'approved');
+      
+      if (approvedPayouts.length === 0) {
         throw new Error("No approved payouts found. Approve a payout first.");
       }
 
-      const payout = payouts[0];
-      
-      // Get referral code separately if referral_code_id exists
-      let codeData = null;
-      if (payout.referral_code_id) {
-        const { data } = await supabase
-          .from('referral_codes')
-          .select('*')
-          .eq('id', payout.referral_code_id)
-          .maybeSingle();
-        codeData = data;
-      }
-        
-      addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}${codeData ? `, Code: ${codeData.code}` : ''}`);
+      const payout = approvedPayouts[0];
+      addResult("Approved payout found", 'success', `ID: ${payout.id}, Amount: $${payout.amount}${payout.referral_code ? `, Code: ${payout.referral_code.code}` : ''}`);
 
       // Call the PayPal payout function
-      const { data, error } = await supabase.functions.invoke('process-paypal-payout', {
-        body: { payout_id: payout.id }
+      const data = await processPaypalPayout({
+        payoutId: payout.id,
       });
 
-      if (error) throw error;
-
-      addResult("PayPal payout initiated", 'success', `Transaction ID: ${data.payoutBatchId || 'N/A'}`);
+      addResult("PayPal payout initiated", 'success', `Transaction ID: ${data.payout_batch_id || 'N/A'}`);
       toast.success("PayPal payout test completed!");
     } catch (error: any) {
       addResult("PayPal test failed", 'error', error.message);

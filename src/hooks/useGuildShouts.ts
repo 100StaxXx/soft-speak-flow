@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, getDocument, setDocument, updateDocument, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import { getShoutByKey, ShoutType } from "@/data/shoutMessages";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
+import { onSnapshot, query, where, collection, orderBy, limit } from "firebase/firestore";
+import { firebaseDb } from "@/lib/firebase";
 
 export interface GuildShout {
   id: string;
@@ -35,19 +37,32 @@ export const useGuildShouts = (epicId?: string) => {
     queryFn: async () => {
       if (!epicId) return [];
 
-      const { data, error } = await supabase
-        .from("guild_shouts")
-        .select(`
-          *,
-          sender:profiles!guild_shouts_sender_id_fkey(email, onboarding_data),
-          recipient:profiles!guild_shouts_recipient_id_fkey(email, onboarding_data)
-        `)
-        .eq("epic_id", epicId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const shoutsData = await getDocuments<GuildShout>(
+        "guild_shouts",
+        [["epic_id", "==", epicId]],
+        "created_at",
+        "desc",
+        50
+      );
 
-      if (error) throw error;
-      return data as GuildShout[];
+      // Fetch sender and recipient profiles
+      const shoutsWithProfiles = await Promise.all(
+        shoutsData.map(async (shout) => {
+          const [sender, recipient] = await Promise.all([
+            getDocument<{ email: string | null; onboarding_data?: unknown }>("profiles", shout.sender_id),
+            getDocument<{ email: string | null; onboarding_data?: unknown }>("profiles", shout.recipient_id),
+          ]);
+
+          return {
+            ...shout,
+            created_at: timestampToISO(shout.created_at as any) || shout.created_at || new Date().toISOString(),
+            sender: sender || undefined,
+            recipient: recipient || undefined,
+          };
+        })
+      );
+
+      return shoutsWithProfiles;
     },
     enabled: !!epicId,
   });
@@ -66,49 +81,46 @@ export const useGuildShouts = (epicId?: string) => {
       if (!user || !epicId) throw new Error("Not authenticated or no epic");
 
       // Prevent sending shouts to yourself
-      if (recipientId === user.id) {
+      if (recipientId === user.uid) {
         throw new Error("You cannot send a shout to yourself");
       }
 
-      const { data, error } = await supabase
-        .from("guild_shouts")
-        .insert({
-          epic_id: epicId,
-          sender_id: user.id,
-          recipient_id: recipientId,
-          shout_type: shoutType,
-          message_key: messageKey,
-        })
-        .select()
-        .single();
+      const shoutId = `${epicId}_${user.uid}_${recipientId}_${Date.now()}`;
+      const shoutData = {
+        id: shoutId,
+        epic_id: epicId,
+        sender_id: user.uid,
+        recipient_id: recipientId,
+        shout_type: shoutType,
+        message_key: messageKey,
+        is_read: false,
+      };
 
-      if (error) throw error;
+      await setDocument("guild_shouts", shoutId, shoutData, false);
 
       // Trigger push notification (fire and forget)
       const message = getShoutByKey(messageKey);
       
       // Fetch current user's profile to get their display name
-      const { data: userProfile } = await supabase
-        .from("profiles")
-        .select("email, onboarding_data")
-        .eq("id", user.id)
-        .single();
+      const userProfile = await getDocument<{ email: string | null; onboarding_data?: unknown }>("profiles", user.uid);
       
       const senderName = getUserDisplayName(userProfile);
       
-      supabase.functions.invoke('send-shout-notification', {
-        body: {
-          shoutId: data.id,
-          senderId: user.id,
-          recipientId,
-          epicId,
-          senderName,
-          shoutType,
-          messageText: message?.text || 'Someone sent you a shout!',
-        },
-      }).catch(err => console.error('Push notification failed:', err));
+      // TODO: Migrate to Firebase Cloud Function
+      // fetch('https://YOUR-FIREBASE-FUNCTION/send-shout-notification', {
+      //   method: 'POST',
+      //   body: JSON.stringify({
+      //     shoutId,
+      //     senderId: user.uid,
+      //     recipientId,
+      //     epicId,
+      //     senderName,
+      //     shoutType,
+      //     messageText: message?.text || 'Someone sent you a shout!',
+      //   }),
+      // }).catch(err => console.error('Push notification failed:', err));
 
-      return data;
+      return shoutData as GuildShout;
     },
     onSuccess: (_, variables) => {
       const message = getShoutByKey(variables.messageKey);
@@ -126,52 +138,68 @@ export const useGuildShouts = (epicId?: string) => {
     mutationFn: async (shoutIds: string[]) => {
       if (!user) return;
 
-      const { error } = await supabase
-        .from("guild_shouts")
-        .update({ is_read: true })
-        .in("id", shoutIds)
-        .eq("recipient_id", user.id);
-
-      if (error) throw error;
+      // Update each shout individually (Firestore doesn't support batch updates with filters)
+      await Promise.all(
+        shoutIds.map(async (shoutId) => {
+          const shout = await getDocument<{ recipient_id: string }>("guild_shouts", shoutId);
+          if (shout && shout.recipient_id === user.uid) {
+            await updateDocument("guild_shouts", shoutId, { is_read: true });
+          }
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
     },
   });
 
-  // Real-time subscription
+  // Real-time subscription - only subscribe when we have both epicId and authenticated user
   useEffect(() => {
     if (!epicId) return;
+    if (!user?.uid) return; // Wait for auth
 
-    const channel = supabase
-      .channel(`shouts-${epicId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'guild_shouts',
-          filter: `epic_id=eq.${epicId}`,
-        },
-        (payload) => {
-          queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
-          
-          // Show toast for received shouts
-          if (payload.new && (payload.new as GuildShout).recipient_id === user?.id) {
-            const message = getShoutByKey((payload.new as GuildShout).message_key);
+    let isSubscribed = true;
+
+    const shoutsQuery = query(
+      collection(firebaseDb, "guild_shouts"),
+      where("epic_id", "==", epicId),
+      orderBy("created_at", "desc"),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(shoutsQuery, (snapshot) => {
+      if (!isSubscribed) return;
+      
+      queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
+      
+      // Show toast for new received shouts
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const shout = change.doc.data() as GuildShout;
+          if (shout.recipient_id === user?.uid) {
+            const message = getShoutByKey(shout.message_key);
             toast.info(`New shout: ${message?.emoji} ${message?.text || 'Someone sent you a shout!'}`);
           }
         }
-      )
-      .subscribe();
+      });
+    }, (error: unknown) => {
+      // Handle permission errors gracefully
+      const errorCode = (error as { code?: string })?.code;
+      if (errorCode === 'permission-denied') {
+        console.warn('Guild shouts: Permission denied');
+      } else {
+        console.warn('Guild shouts subscription error:', error);
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      isSubscribed = false;
+      unsubscribe();
     };
-  }, [epicId, user?.id, queryClient]);
+  }, [epicId, user?.uid, queryClient]);
 
-  const unreadCount = shouts?.filter(s => s.recipient_id === user?.id && !s.is_read).length || 0;
-  const myShouts = shouts?.filter(s => s.recipient_id === user?.id) || [];
+  const unreadCount = shouts?.filter(s => s.recipient_id === user?.uid && !s.is_read).length || 0;
+  const myShouts = shouts?.filter(s => s.recipient_id === user?.uid) || [];
 
   return {
     shouts,

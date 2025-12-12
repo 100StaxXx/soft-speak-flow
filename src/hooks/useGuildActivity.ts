@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocuments, timestampToISO } from "@/lib/firebase/firestore";
 import { useAuth } from "./useAuth";
 import { useEffect } from "react";
+import { onSnapshot, query, where, collection, orderBy, limit } from "firebase/firestore";
+import { firebaseDb } from "@/lib/firebase";
 
 export interface GuildActivity {
   id: string;
@@ -21,15 +23,18 @@ export const useGuildActivity = (epicId?: string) => {
     queryFn: async () => {
       if (!epicId) return [];
 
-      const { data, error } = await supabase
-        .from("epic_activity_feed")
-        .select("*")
-        .eq("epic_id", epicId)
-        .order("created_at", { ascending: false })
-        .limit(20);
+      const data = await getDocuments<GuildActivity>(
+        "epic_activity_feed",
+        [["epic_id", "==", epicId]],
+        "created_at",
+        "desc",
+        20
+      );
 
-      if (error) throw error;
-      return data as GuildActivity[];
+      return data.map(activity => ({
+        ...activity,
+        created_at: timestampToISO(activity.created_at as any) || activity.created_at || new Date().toISOString(),
+      }));
     },
     enabled: !!epicId,
     staleTime: 30 * 1000,
@@ -39,24 +44,21 @@ export const useGuildActivity = (epicId?: string) => {
   useEffect(() => {
     if (!epicId) return;
 
-    const channel = supabase
-      .channel(`guild-activity-${epicId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "epic_activity_feed",
-          filter: `epic_id=eq.${epicId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["guild-activity", epicId] });
-        }
-      )
-      .subscribe();
+    const activityQuery = query(
+      collection(firebaseDb, "epic_activity_feed"),
+      where("epic_id", "==", epicId),
+      orderBy("created_at", "desc"),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(activityQuery, () => {
+      queryClient.invalidateQueries({ queryKey: ["guild-activity", epicId] });
+    }, (error) => {
+      console.warn('Guild activity subscription error:', error);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [epicId, queryClient]);
 

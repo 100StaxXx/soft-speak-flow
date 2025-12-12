@@ -1,0 +1,1225 @@
+{
+  "mentors": [
+    {
+      "id": "mentor_atlas",
+      "name": "Atlas",
+      "slug": "atlas",
+      "mentor_type": "motivational_guide",
+      "short_title": "The Motivator",
+      "archetype": "The Champion",
+      "description": "Atlas is your unwavering champion, always pushing you to see your potential and take action. With a balanced approach that combines motivation with practical wisdom, Atlas helps you build discipline while maintaining compassion for yourself. Perfect for those who need consistent encouragement and clear direction.",
+      "tone_description": "Warm, motivating, and action-oriented. Atlas speaks with conviction and care, always believing in your ability to grow. The tone is encouraging without being pushy, supportive while holding you accountable.",
+      "voice_style": "Confident and warm, with a steady rhythm that builds momentum. Speaks clearly and directly, with moments of emphasis that land like gentle pushes forward.",
+      "style": "motivational",
+      "style_description": "Balanced motivation that combines encouragement with accountability. Atlas knows when to push and when to support, always keeping your growth at the center.",
+      "identity_description": "Atlas represents the part of you that knows you're capable of more. This mentor embodies strength, resilience, and the belief that consistent action leads to transformation.",
+      "target_user": "People who need motivation and structure to build new habits and achieve their goals",
+      "target_user_type": "goal-oriented",
+      "intensity_level": "medium",
+      "gender_energy": "neutral",
+      "primary_color": "#4F46E5",
+      "signature_line": "You've got this. Let's make it happen.",
+      "welcome_message": "Hey there. I'm Atlas, and I'm here because you're ready to level up. Not tomorrow, not next week—right now. I see the potential in you, and together we're going to unlock it. Every step counts, every action matters. Let's build something real.",
+      "avatar_url": null,
+      "tags": ["motivation", "discipline", "growth", "accountability", "action"],
+      "themes": ["achievement", "progress", "consistency", "self-improvement"],
+      "theme_config": {
+        "primary": "#4F46E5",
+        "secondary": "#7C3AED",
+        "accent": "#A78BFA"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_darius",
+      "name": "Darius",
+      "slug": "darius",
+      "mentor_type": "tough_love_coach",
+      "short_title": "The Challenger",
+      "archetype": "The Warrior",
+      "description": "Darius doesn't sugarcoat. This mentor brings tough love and direct accountability, perfect for when you need someone to cut through excuses and push you past your limits. Darius believes in your strength even when you don't, and isn't afraid to call out what's holding you back.",
+      "tone_description": "Direct, intense, and unapologetically honest. Darius speaks with authority and conviction, cutting through noise to get to what matters. The tone is challenging but never cruel—tough because they care, not because they're harsh.",
+      "voice_style": "Strong and commanding, with sharp clarity. Speaks with purpose and intensity, using pauses strategically to let important points land. The voice carries weight and demands attention.",
+      "style": "tough-love",
+      "style_description": "Accountability-first coaching that doesn't let you off the hook. Darius pushes you because they see what you're capable of, even when you can't see it yourself.",
+      "identity_description": "Darius represents your inner warrior—the part that refuses to settle, that knows you're stronger than your excuses, and that won't let you quit on yourself.",
+      "target_user": "People who respond well to direct feedback and need accountability to break through plateaus",
+      "target_user_type": "high-achiever",
+      "intensity_level": "high",
+      "gender_energy": "masculine",
+      "primary_color": "#DC2626",
+      "signature_line": "No excuses. Just results.",
+      "welcome_message": "Listen up. I'm Darius, and I'm not here to coddle you. You came here because something needs to change, and I'm going to help you change it. But here's the thing—I can't do the work for you. I can push you, challenge you, and hold you accountable, but the action? That's on you. Ready to stop making excuses and start making progress?",
+      "avatar_url": null,
+      "tags": ["discipline", "tough-love", "accountability", "strength", "resilience"],
+      "themes": ["challenge", "breakthrough", "discipline", "excellence"],
+      "theme_config": {
+        "primary": "#DC2626",
+        "secondary": "#B91C1C",
+        "accent": "#EF4444"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_eli",
+      "name": "Eli",
+      "slug": "eli",
+      "mentor_type": "wise_guide",
+      "short_title": "The Sage",
+      "archetype": "The Philosopher",
+      "description": "Eli brings wisdom, reflection, and deep understanding to your journey. This mentor helps you see the bigger picture, understand patterns in your life, and make decisions from a place of clarity rather than reaction. Perfect for those seeking meaning and thoughtful guidance.",
+      "tone_description": "Calm, thoughtful, and deeply wise. Eli speaks with measured words that invite reflection. The tone is patient and understanding, like a trusted teacher who helps you discover answers within yourself.",
+      "voice_style": "Smooth and contemplative, with a gentle cadence that allows space for thought. Speaks deliberately, choosing words carefully. The voice feels like a warm conversation with someone who truly understands.",
+      "style": "reflective",
+      "style_description": "Wisdom-based guidance that helps you understand yourself and your patterns. Eli doesn't give quick fixes—they help you build lasting insight and clarity.",
+      "identity_description": "Eli represents your inner wisdom—the part that knows what's true, that sees patterns others miss, and that guides you toward deeper understanding.",
+      "target_user": "People who value reflection, wisdom, and understanding the deeper patterns in their life",
+      "target_user_type": "reflective",
+      "intensity_level": "medium",
+      "gender_energy": "neutral",
+      "primary_color": "#059669",
+      "signature_line": "Understanding is the first step to transformation.",
+      "welcome_message": "Hello. I'm Eli, and I'm here to walk with you on a journey of understanding. Not quick fixes or surface-level solutions, but real insight into who you are and what you need. Growth happens when we see ourselves clearly—the patterns, the strengths, the areas that need attention. Let's explore together.",
+      "avatar_url": null,
+      "tags": ["wisdom", "reflection", "growth", "understanding", "clarity"],
+      "themes": ["insight", "self-awareness", "meaning", "transformation"],
+      "theme_config": {
+        "primary": "#059669",
+        "secondary": "#047857",
+        "accent": "#10B981"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_nova",
+      "name": "Nova",
+      "slug": "nova",
+      "mentor_type": "innovative_visionary",
+      "short_title": "The Innovator",
+      "archetype": "The Creator",
+      "description": "Nova is all about possibility, creativity, and thinking differently. This mentor helps you break free from limiting patterns, see new perspectives, and create innovative solutions to your challenges. Perfect for entrepreneurs, creators, and anyone ready to think outside the box.",
+      "tone_description": "Energetic, creative, and forward-thinking. Nova speaks with excitement about possibilities and potential. The tone is inspiring and visionary, always pointing toward what could be rather than what is.",
+      "voice_style": "Dynamic and expressive, with varied pacing that matches the energy of ideas. Speaks with enthusiasm and clarity, making complex concepts accessible. The voice feels like a spark of inspiration.",
+      "style": "innovative",
+      "style_description": "Creative problem-solving and visionary thinking. Nova helps you see opportunities where others see obstacles, and build new approaches to old challenges.",
+      "identity_description": "Nova represents your creative potential—the part that imagines new possibilities, that isn't bound by conventional thinking, and that creates solutions from nothing.",
+      "target_user": "Creators, entrepreneurs, and visionaries who want to think differently and build something new",
+      "target_user_type": "innovator",
+      "intensity_level": "medium",
+      "gender_energy": "neutral",
+      "primary_color": "#7C3AED",
+      "signature_line": "What if we tried something different?",
+      "welcome_message": "Hey! I'm Nova, and I'm here to help you think bigger. The status quo? We're not about that. I see potential everywhere—in you, in your ideas, in the challenges you're facing. Let's turn obstacles into opportunities and build something that hasn't been built before. Ready to innovate?",
+      "avatar_url": null,
+      "tags": ["innovation", "creativity", "vision", "possibility", "entrepreneurship"],
+      "themes": ["creation", "innovation", "vision", "breakthrough"],
+      "theme_config": {
+        "primary": "#7C3AED",
+        "secondary": "#6D28D9",
+        "accent": "#A78BFA"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_sienna",
+      "name": "Sienna",
+      "slug": "sienna",
+      "mentor_type": "compassionate_healer",
+      "short_title": "The Healer",
+      "archetype": "The Nurturer",
+      "description": "Sienna brings gentle compassion, deep empathy, and healing energy to your journey. This mentor creates a safe space for vulnerability, helps you process emotions, and supports you through difficult times. Perfect for those healing from trauma, navigating emotional challenges, or needing gentle support.",
+      "tone_description": "Warm, gentle, and deeply compassionate. Sienna speaks with softness and care, creating a sense of safety and understanding. The tone is nurturing without being condescending, supportive without being enabling.",
+      "voice_style": "Soft and soothing, with a calming cadence that feels like a warm embrace. Speaks slowly and clearly, giving space for emotions. The voice feels like coming home to yourself.",
+      "style": "healing",
+      "style_description": "Compassionate support that honors your emotions and creates space for healing. Sienna helps you process, understand, and move through difficult experiences with gentleness and care.",
+      "identity_description": "Sienna represents your capacity for self-compassion—the part that knows you deserve kindness, that honors your feelings, and that creates space for healing.",
+      "target_user": "People navigating emotional challenges, healing from trauma, or needing gentle, compassionate support",
+      "target_user_type": "healing",
+      "intensity_level": "gentle",
+      "gender_energy": "feminine",
+      "primary_color": "#EC4899",
+      "signature_line": "You are safe here. You are enough.",
+      "welcome_message": "Hello, beautiful soul. I'm Sienna, and I'm so glad you're here. I know this journey isn't easy, and I want you to know that you don't have to do it alone. Here, with me, you can be exactly as you are—no masks, no pretending, just you. Your feelings are valid. Your experience matters. Let's walk this path together, with gentleness and care.",
+      "avatar_url": null,
+      "tags": ["compassion", "healing", "support", "empathy", "self-care"],
+      "themes": ["healing", "self-compassion", "emotional-wellness", "vulnerability"],
+      "theme_config": {
+        "primary": "#EC4899",
+        "secondary": "#DB2777",
+        "accent": "#F472B6"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_lumi",
+      "name": "Lumi",
+      "slug": "lumi",
+      "mentor_type": "mindful_guide",
+      "short_title": "The Light",
+      "archetype": "The Mystic",
+      "description": "Lumi brings mindfulness, presence, and spiritual wisdom to your journey. This mentor helps you find peace in the present moment, connect with your inner light, and navigate life with calm awareness. Perfect for those seeking balance, spiritual growth, or a more mindful approach to life.",
+      "tone_description": "Calm, peaceful, and deeply present. Lumi speaks with quiet wisdom that invites you into the present moment. The tone is serene and grounding, like a meditation guide who helps you find stillness within.",
+      "voice_style": "Soft and flowing, with a meditative quality that slows down time. Speaks with intention and presence, each word chosen carefully. The voice feels like a gentle light in darkness.",
+      "style": "mindful",
+      "style_description": "Presence-based guidance that helps you find peace and clarity through mindfulness. Lumi teaches you to be here now, to observe without judgment, and to connect with your inner wisdom.",
+      "identity_description": "Lumi represents your inner light—the part that knows peace, that finds stillness in chaos, and that connects you to something greater than yourself.",
+      "target_user": "People seeking mindfulness, spiritual growth, balance, or a more present approach to life",
+      "target_user_type": "spiritual",
+      "intensity_level": "gentle",
+      "gender_energy": "neutral",
+      "primary_color": "#F59E0B",
+      "signature_line": "Be here now. Everything else will follow.",
+      "welcome_message": "Welcome, friend. I'm Lumi, and I'm here to help you find your light. In this busy world, it's easy to lose touch with what matters—with who you really are beneath all the noise. Let's slow down together. Let's breathe. Let's find the peace that's already within you, waiting to be discovered. The present moment is where everything happens. Let's be here, together.",
+      "avatar_url": null,
+      "tags": ["mindfulness", "peace", "balance", "spirituality", "presence"],
+      "themes": ["mindfulness", "spiritual-growth", "balance", "inner-peace"],
+      "theme_config": {
+        "primary": "#F59E0B",
+        "secondary": "#D97706",
+        "accent": "#FBBF24"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_kai",
+      "name": "Astor",
+      "slug": "kai",
+      "mentor_type": "energetic_catalyst",
+      "short_title": "The Catalyst",
+      "archetype": "The Energizer",
+      "description": "Astor (Kai) brings explosive energy, momentum, and unstoppable drive to your journey. This mentor is all about action, movement, and breaking through barriers with pure force. Perfect for those who need a jolt of energy, want to build momentum quickly, or respond to high-intensity motivation.",
+      "tone_description": "High-energy, intense, and electrifying. Astor speaks with passion and urgency, like a coach in the final quarter. The tone is motivating and action-focused, designed to get you moving immediately.",
+      "voice_style": "Powerful and dynamic, with rapid-fire delivery that builds excitement. Speaks with conviction and energy, using emphasis to create momentum. The voice feels like a shot of adrenaline.",
+      "style": "high-energy",
+      "style_description": "Action-first coaching that builds momentum through intensity and drive. Astor helps you break through resistance, build speed, and maintain forward motion through pure energy.",
+      "identity_description": "Astor represents your inner fire—the part that's ready to move, that refuses to stay stuck, and that channels energy into unstoppable action.",
+      "target_user": "People who need high-energy motivation, want to build momentum fast, or respond to intense, action-focused coaching",
+      "target_user_type": "high-energy",
+      "intensity_level": "high",
+      "gender_energy": "masculine",
+      "primary_color": "#EF4444",
+      "signature_line": "Let's go! Time to move!",
+      "welcome_message": "Alright, let's GO! I'm Astor, and I'm here to light a fire under you. No more waiting. No more hesitating. You want change? You want results? Then we're moving NOW. I don't do slow. I don't do maybe. I do ACTION. You ready? Because I'm ready. Let's turn this energy into momentum and momentum into results. LET'S GO!",
+      "avatar_url": null,
+      "tags": ["energy", "action", "momentum", "intensity", "drive"],
+      "themes": ["momentum", "action", "breakthrough", "energy"],
+      "theme_config": {
+        "primary": "#EF4444",
+        "secondary": "#DC2626",
+        "accent": "#F87171"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_stryker",
+      "name": "Rich",
+      "slug": "stryker",
+      "mentor_type": "powerful_force",
+      "short_title": "The Force",
+      "archetype": "The Titan",
+      "description": "Rich (Stryker) embodies raw power, unshakeable strength, and relentless determination. This mentor pushes you to tap into your deepest reserves of strength and never back down. Perfect for those facing major challenges, building resilience, or needing to access their inner power.",
+      "tone_description": "Powerful, commanding, and unyielding. Rich speaks with authority and strength, like a general leading troops. The tone is intense and resolute, designed to help you access your own power.",
+      "voice_style": "Deep and resonant, with commanding presence that demands respect. Speaks with weight and authority, each word carrying power. The voice feels like a force of nature.",
+      "style": "power-based",
+      "style_description": "Strength-focused coaching that helps you access your inner power and build unshakeable resilience. Rich teaches you to stand firm, push through, and never give up.",
+      "identity_description": "Rich represents your inner strength—the part that's unbreakable, that knows you can handle anything, and that refuses to be defeated.",
+      "target_user": "People facing major challenges, building resilience, or needing to access their inner strength and power",
+      "target_user_type": "resilient",
+      "intensity_level": "high",
+      "gender_energy": "masculine",
+      "primary_color": "#1F2937",
+      "signature_line": "You are stronger than you know. Act like it.",
+      "welcome_message": "Listen. I'm Rich, and I'm here because you're stronger than you think. Life's throwing everything at you? Good. That means you're ready for this. I don't deal in weakness. I deal in strength. And you've got it—you just need to access it. Let's build something unbreakable. Let's make you unstoppable. Ready?",
+      "avatar_url": null,
+      "tags": ["strength", "resilience", "power", "determination", "fortitude"],
+      "themes": ["strength", "resilience", "power", "endurance"],
+      "theme_config": {
+        "primary": "#1F2937",
+        "secondary": "#111827",
+        "accent": "#374151"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mentor_solace",
+      "name": "Solace",
+      "slug": "solace",
+      "mentor_type": "comforting_presence",
+      "short_title": "The Comfort",
+      "archetype": "The Comforter",
+      "description": "Solace brings gentle comfort, deep understanding, and unconditional acceptance to your journey. This mentor creates a safe haven where you can be vulnerable, process difficult emotions, and find peace. Perfect for those going through hard times, needing emotional support, or seeking a place of comfort.",
+      "tone_description": "Gentle, comforting, and deeply understanding. Solace speaks with softness and care, like a trusted friend who's always there. The tone is soothing and accepting, creating a sense of safety and peace.",
+      "voice_style": "Soft and warm, with a nurturing quality that feels like a gentle hug. Speaks slowly and lovingly, giving space for feelings. The voice feels like coming home to comfort.",
+      "style": "comforting",
+      "style_description": "Emotional support that provides comfort, understanding, and a safe space for vulnerability. Solace helps you process, heal, and find peace in difficult moments.",
+      "identity_description": "Solace represents your need for comfort—the part that knows it's okay to not be okay, that deserves gentleness, and that finds peace in acceptance.",
+      "target_user": "People going through difficult times, needing emotional support, or seeking comfort and understanding",
+      "target_user_type": "seeking-comfort",
+      "intensity_level": "gentle",
+      "gender_energy": "feminine",
+      "primary_color": "#8B5CF6",
+      "signature_line": "You don't have to be strong all the time. I'm here.",
+      "welcome_message": "Hello, dear one. I'm Solace, and I'm here to hold space for you. I know things might feel heavy right now, and that's okay. You don't have to have it all together. You don't have to be strong all the time. Here, with me, you can just be. Your feelings are welcome. Your struggles are valid. Let's find comfort together, one breath at a time.",
+      "avatar_url": null,
+      "tags": ["comfort", "understanding", "empathy", "support", "peace"],
+      "themes": ["comfort", "emotional-support", "acceptance", "peace"],
+      "theme_config": {
+        "primary": "#8B5CF6",
+        "secondary": "#7C3AED",
+        "accent": "#A78BFA"
+      },
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "tone_profiles": [
+    {
+      "id": "tone_motivational",
+      "name": "Motivational",
+      "description": "Warm, encouraging, and action-oriented. Balances support with accountability, always believing in your potential while pushing you forward.",
+      "characteristics": ["encouraging", "action-focused", "balanced", "supportive"],
+      "mentor_ids": ["mentor_atlas"]
+    },
+    {
+      "id": "tone_tough_love",
+      "name": "Tough Love",
+      "description": "Direct, intense, and unapologetically honest. Cuts through excuses with authority and conviction, pushing you past limits because they care.",
+      "characteristics": ["direct", "intense", "accountable", "challenging"],
+      "mentor_ids": ["mentor_darius"]
+    },
+    {
+      "id": "tone_reflective",
+      "name": "Reflective",
+      "description": "Calm, thoughtful, and deeply wise. Invites reflection and helps you discover answers within yourself through patient guidance.",
+      "characteristics": ["thoughtful", "patient", "wise", "contemplative"],
+      "mentor_ids": ["mentor_eli"]
+    },
+    {
+      "id": "tone_innovative",
+      "name": "Innovative",
+      "description": "Energetic, creative, and forward-thinking. Excited about possibilities and potential, always pointing toward what could be.",
+      "characteristics": ["creative", "visionary", "energetic", "forward-thinking"],
+      "mentor_ids": ["mentor_nova"]
+    },
+    {
+      "id": "tone_healing",
+      "name": "Healing",
+      "description": "Warm, gentle, and deeply compassionate. Creates safety for vulnerability and supports emotional processing with care.",
+      "characteristics": ["compassionate", "gentle", "nurturing", "empathetic"],
+      "mentor_ids": ["mentor_sienna"]
+    },
+    {
+      "id": "tone_mindful",
+      "name": "Mindful",
+      "description": "Calm, peaceful, and deeply present. Invites you into the present moment with quiet wisdom and serene grounding.",
+      "characteristics": ["peaceful", "present", "serene", "grounding"],
+      "mentor_ids": ["mentor_lumi"]
+    },
+    {
+      "id": "tone_high_energy",
+      "name": "High Energy",
+      "description": "High-energy, intense, and electrifying. Builds momentum through passion and urgency, designed to get you moving immediately.",
+      "characteristics": ["intense", "dynamic", "action-focused", "energizing"],
+      "mentor_ids": ["mentor_kai"]
+    },
+    {
+      "id": "tone_powerful",
+      "name": "Powerful",
+      "description": "Powerful, commanding, and unyielding. Speaks with authority and strength, helping you access your inner power and resilience.",
+      "characteristics": ["commanding", "strong", "resolute", "authoritative"],
+      "mentor_ids": ["mentor_stryker"]
+    },
+    {
+      "id": "tone_comforting",
+      "name": "Comforting",
+      "description": "Gentle, comforting, and deeply understanding. Provides a safe haven for vulnerability and emotional processing with unconditional acceptance.",
+      "characteristics": ["comforting", "understanding", "accepting", "soothing"],
+      "mentor_ids": ["mentor_solace"]
+    }
+  ],
+  "pep_talks": [
+    {
+      "id": "pep_morning_boost",
+      "title": "Morning Momentum",
+      "description": "Start your day with energy and intention",
+      "category": "morning",
+      "quote": "This is your day. Not yesterday's, not tomorrow's—this one, right here.",
+      "duration_seconds": 180,
+      "mentor_slug": "atlas",
+      "tags": ["morning", "motivation", "energy"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_breakthrough",
+      "title": "Break Through the Wall",
+      "description": "Push past resistance and break through barriers",
+      "category": "motivation",
+      "quote": "Walls are meant to be broken. You're stronger than that wall.",
+      "duration_seconds": 240,
+      "mentor_slug": "darius",
+      "tags": ["breakthrough", "resistance", "strength"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_present_moment",
+      "title": "Be Here Now",
+      "description": "Find peace in the present moment",
+      "category": "mindfulness",
+      "quote": "Everything you need is right here, right now.",
+      "duration_seconds": 200,
+      "mentor_slug": "lumi",
+      "tags": ["mindfulness", "presence", "peace"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_self_compassion",
+      "title": "You Deserve Kindness",
+      "description": "Practice self-compassion and gentle self-care",
+      "category": "healing",
+      "quote": "You deserve kindness. Especially from yourself.",
+      "duration_seconds": 220,
+      "mentor_slug": "sienna",
+      "tags": ["self-compassion", "healing", "kindness"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_innovate",
+      "title": "Think Different",
+      "description": "Break free from limiting patterns and see new possibilities",
+      "category": "creativity",
+      "quote": "The possibilities are endless when you're willing to think differently.",
+      "duration_seconds": 210,
+      "mentor_slug": "nova",
+      "tags": ["innovation", "creativity", "possibility"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_wisdom",
+      "title": "See the Pattern",
+      "description": "Understand your patterns and make wiser choices",
+      "category": "wisdom",
+      "quote": "When you see the pattern, you can change it.",
+      "duration_seconds": 230,
+      "mentor_slug": "eli",
+      "tags": ["wisdom", "reflection", "understanding"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_energy_boost",
+      "title": "Unleash the Energy",
+      "description": "Tap into your inner fire and build unstoppable momentum",
+      "category": "energy",
+      "quote": "That energy wants to move. Don't waste it. UNLEASH IT.",
+      "duration_seconds": 190,
+      "mentor_slug": "kai",
+      "tags": ["energy", "momentum", "action"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_inner_strength",
+      "title": "Access Your Power",
+      "description": "Tap into your unshakeable inner strength",
+      "category": "strength",
+      "quote": "You are stronger than you know, and it's time to prove it to yourself.",
+      "duration_seconds": 250,
+      "mentor_slug": "stryker",
+      "tags": ["strength", "power", "resilience"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "pep_comfort",
+      "title": "You're Not Alone",
+      "description": "Find comfort and peace in difficult moments",
+      "category": "comfort",
+      "quote": "You don't have to carry it alone. I'm here.",
+      "duration_seconds": 200,
+      "mentor_slug": "solace",
+      "tags": ["comfort", "support", "peace"],
+      "transcript": [],
+      "audio_url": "",
+      "is_featured": false,
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "mission_templates": [
+    {
+      "id": "mission_connection_text_friend",
+      "type": "connection_text_friend",
+      "text": "Text someone you appreciate and let them know why",
+      "xp": 8,
+      "difficulty": "easy",
+      "category": "connection",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_connection_check_in",
+      "type": "connection_check_in",
+      "text": "Send a simple check-in message to a friend or family member",
+      "xp": 7,
+      "difficulty": "easy",
+      "category": "connection",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_connection_compliment",
+      "type": "connection_compliment",
+      "text": "Give someone a small compliment today",
+      "xp": 5,
+      "difficulty": "easy",
+      "category": "connection",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_connection_gratitude",
+      "type": "connection_gratitude",
+      "text": "Express gratitude to someone who helped you recently",
+      "xp": 8,
+      "difficulty": "easy",
+      "category": "connection",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_quick_win_avoided_task",
+      "type": "quick_win_avoided_task",
+      "text": "Do one tiny task you've been avoiding",
+      "xp": 8,
+      "difficulty": "easy",
+      "category": "quick_win",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_quick_win_organize",
+      "type": "quick_win_organize",
+      "text": "Organize one small area for two minutes",
+      "xp": 6,
+      "difficulty": "easy",
+      "category": "quick_win",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_quick_win_make_bed",
+      "type": "quick_win_make_bed",
+      "text": "Make your bed to start the day with a win",
+      "xp": 5,
+      "difficulty": "easy",
+      "category": "quick_win",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_quick_win_declutter",
+      "type": "quick_win_declutter",
+      "text": "Throw away or delete one thing you no longer need",
+      "xp": 7,
+      "difficulty": "easy",
+      "category": "quick_win",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_quick_win_five_minutes",
+      "type": "quick_win_five_minutes",
+      "text": "Take care of something that will take less than five minutes",
+      "xp": 8,
+      "difficulty": "medium",
+      "category": "quick_win",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_complete_all_quests",
+      "type": "identity_complete_all_quests",
+      "text": "Complete all your quests today",
+      "xp": 15,
+      "difficulty": "hard",
+      "category": "identity",
+      "autoComplete": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_complete_all_habits",
+      "type": "identity_complete_all_habits",
+      "text": "Complete all your habits today",
+      "xp": 12,
+      "difficulty": "medium",
+      "category": "identity",
+      "autoComplete": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_plan_tomorrow",
+      "type": "identity_plan_tomorrow",
+      "text": "Plan tomorrow before you go to bed",
+      "xp": 10,
+      "difficulty": "medium",
+      "category": "identity",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_schedule",
+      "type": "identity_schedule",
+      "text": "Schedule something you've been putting off",
+      "xp": 12,
+      "difficulty": "medium",
+      "category": "identity",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_future_self",
+      "type": "identity_future_self",
+      "text": "Take one action your future self would thank you for",
+      "xp": 12,
+      "difficulty": "medium",
+      "category": "identity",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "mission_identity_discipline_burst",
+      "type": "identity_discipline_burst",
+      "text": "Act for two minutes as the most disciplined version of yourself",
+      "xp": 10,
+      "difficulty": "medium",
+      "category": "identity",
+      "autoComplete": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "evolution_stages": [
+    {
+      "id": "stage_0",
+      "stage": 0,
+      "stage_name": "Egg",
+      "xp_required": 0,
+      "description": "The beginning of your journey. A dormant egg containing infinite potential, waiting for the first spark of action to begin the transformation.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_1",
+      "stage": 1,
+      "stage_name": "Hatchling",
+      "xp_required": 10,
+      "description": "The first crack appears. You've taken your first steps, and the journey has truly begun. Small but full of promise.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_2",
+      "stage": 2,
+      "stage_name": "Sproutling",
+      "xp_required": 100,
+      "description": "Breaking free from the shell, you're discovering your first abilities. Growth is visible, and momentum is building.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_3",
+      "stage": 3,
+      "stage_name": "Cub",
+      "xp_required": 250,
+      "description": "Playful and curious, you're exploring your world with fresh eyes. Every day brings new discoveries and small victories.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_4",
+      "stage": 4,
+      "stage_name": "Juvenile",
+      "xp_required": 450,
+      "description": "Growing stronger and more confident. You're learning what you're capable of and building the foundation for greater things.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_5",
+      "stage": 5,
+      "stage_name": "Apprentice",
+      "xp_required": 800,
+      "description": "The student phase. You're actively learning, practicing, and refining your skills. Progress is steady and meaningful.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_6",
+      "stage": 6,
+      "stage_name": "Scout",
+      "xp_required": 1300,
+      "description": "Venturing further, exploring new territories. You're becoming more independent and discovering your unique path forward.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_7",
+      "stage": 7,
+      "stage_name": "Fledgling",
+      "xp_required": 2000,
+      "description": "Testing your wings, preparing for flight. You're gaining confidence and ready to take on bigger challenges.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_8",
+      "stage": 8,
+      "stage_name": "Warrior",
+      "xp_required": 2900,
+      "description": "A true fighter. You've faced challenges and emerged stronger. Your determination is clear, and your strength is growing.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_9",
+      "stage": 9,
+      "stage_name": "Guardian",
+      "xp_required": 4000,
+      "description": "Protecting what matters. You've developed the strength to not only care for yourself but to support others on their journey.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_10",
+      "stage": 10,
+      "stage_name": "Champion",
+      "xp_required": 5400,
+      "description": "A proven winner. You've achieved significant milestones and demonstrated what's possible through consistent effort.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_11",
+      "stage": 11,
+      "stage_name": "Ascended",
+      "xp_required": 7100,
+      "description": "Rising above. You've transcended previous limitations and are operating at a new level of capability and understanding.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_12",
+      "stage": 12,
+      "stage_name": "Vanguard",
+      "xp_required": 9100,
+      "description": "Leading the way. You're at the forefront, setting new standards and inspiring others through your example.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_13",
+      "stage": 13,
+      "stage_name": "Titan",
+      "xp_required": 11400,
+      "description": "Immense power and presence. You've become a force to be reckoned with, capable of handling challenges that would overwhelm most.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_14",
+      "stage": 14,
+      "stage_name": "Mythic",
+      "xp_required": 14000,
+      "description": "Legendary status. Your achievements have become the stuff of stories, inspiring others and setting new benchmarks.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_15",
+      "stage": 15,
+      "stage_name": "Prime",
+      "xp_required": 17000,
+      "description": "Peak form. You're operating at your absolute best, with all your abilities refined and integrated into a powerful whole.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_16",
+      "stage": 16,
+      "stage_name": "Regal",
+      "xp_required": 20400,
+      "description": "Royal presence. You carry yourself with the dignity and authority of one who has earned their place through consistent excellence.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_17",
+      "stage": 17,
+      "stage_name": "Eternal",
+      "xp_required": 24200,
+      "description": "Timeless essence. You've achieved a level of mastery that transcends the moment, creating lasting impact and enduring legacy.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_18",
+      "stage": 18,
+      "stage_name": "Transcendent",
+      "xp_required": 28400,
+      "description": "Beyond ordinary limits. You've moved past conventional boundaries and are operating in a realm of pure potential and possibility.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_19",
+      "stage": 19,
+      "stage_name": "Apex",
+      "xp_required": 33000,
+      "description": "The pinnacle. You stand at the absolute peak, having mastered every challenge and achieved the highest level of excellence.",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "stage_20",
+      "stage": 20,
+      "stage_name": "Ultimate",
+      "xp_required": 38000,
+      "description": "The final evolution. You've reached the ultimate form, embodying the full potential of your journey. This is mastery in its purest expression.",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "quest_templates": [
+    {
+      "id": "quest_daily_reflection",
+      "title": "Daily Reflection",
+      "description": "Take time to reflect on your day and process your experiences",
+      "category": "mindfulness",
+      "difficulty": "easy",
+      "xp_reward": 8,
+      "estimated_minutes": 5,
+      "tags": ["reflection", "mindfulness", "daily"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_gratitude_practice",
+      "title": "Gratitude Practice",
+      "description": "Write down three things you're grateful for today",
+      "category": "wellness",
+      "difficulty": "easy",
+      "xp_reward": 8,
+      "estimated_minutes": 3,
+      "tags": ["gratitude", "wellness", "positive-thinking"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_goal_setting",
+      "title": "Goal Setting Session",
+      "description": "Set or review your goals for the week ahead",
+      "category": "productivity",
+      "difficulty": "medium",
+      "xp_reward": 16,
+      "estimated_minutes": 15,
+      "tags": ["goals", "planning", "productivity"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_skill_learning",
+      "title": "Learn Something New",
+      "description": "Spend time learning a new skill or topic that interests you",
+      "category": "growth",
+      "difficulty": "medium",
+      "xp_reward": 16,
+      "estimated_minutes": 30,
+      "tags": ["learning", "growth", "education"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_creative_project",
+      "title": "Creative Project",
+      "description": "Work on a creative project or express yourself artistically",
+      "category": "creativity",
+      "difficulty": "medium",
+      "xp_reward": 16,
+      "estimated_minutes": 45,
+      "tags": ["creativity", "art", "expression"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_physical_activity",
+      "title": "Physical Activity",
+      "description": "Engage in physical exercise or movement for at least 20 minutes",
+      "category": "health",
+      "difficulty": "medium",
+      "xp_reward": 16,
+      "estimated_minutes": 20,
+      "tags": ["exercise", "health", "fitness"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_social_connection",
+      "title": "Social Connection",
+      "description": "Reach out to a friend or loved one for meaningful connection",
+      "category": "connection",
+      "difficulty": "easy",
+      "xp_reward": 8,
+      "estimated_minutes": 10,
+      "tags": ["social", "connection", "relationships"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_organization",
+      "title": "Organize Your Space",
+      "description": "Tidy and organize one area of your living or working space",
+      "category": "productivity",
+      "difficulty": "easy",
+      "xp_reward": 8,
+      "estimated_minutes": 15,
+      "tags": ["organization", "productivity", "decluttering"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_self_care",
+      "title": "Self-Care Ritual",
+      "description": "Engage in a self-care activity that nourishes your mind, body, or spirit",
+      "category": "wellness",
+      "difficulty": "easy",
+      "xp_reward": 8,
+      "estimated_minutes": 20,
+      "tags": ["self-care", "wellness", "nourishment"],
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "quest_challenge_comfort",
+      "title": "Challenge Your Comfort Zone",
+      "description": "Do something that pushes you slightly outside your comfort zone",
+      "category": "growth",
+      "difficulty": "hard",
+      "xp_reward": 28,
+      "estimated_minutes": 30,
+      "tags": ["challenge", "growth", "courage"],
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "cosmic_assets": [
+    {
+      "id": "asset_starfield_bg",
+      "name": "Starfield Background",
+      "type": "background",
+      "category": "cosmic",
+      "url": null,
+      "description": "A beautiful starfield background for cosmic-themed screens",
+      "tags": ["background", "cosmic", "stars", "space"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_nebula_bg",
+      "name": "Nebula Background",
+      "type": "background",
+      "category": "cosmic",
+      "url": null,
+      "description": "Colorful nebula cloud background with cosmic energy",
+      "tags": ["background", "cosmic", "nebula", "colorful"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_galaxy_bg",
+      "name": "Galaxy Background",
+      "type": "background",
+      "category": "cosmic",
+      "url": null,
+      "description": "Spiral galaxy background with cosmic depth",
+      "tags": ["background", "cosmic", "galaxy", "spiral"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_planet_earth",
+      "name": "Planet Earth",
+      "type": "decoration",
+      "category": "cosmic",
+      "url": null,
+      "description": "Beautiful Earth planet asset for cosmic scenes",
+      "tags": ["decoration", "cosmic", "planet", "earth"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_moon_phase",
+      "name": "Moon Phases",
+      "type": "decoration",
+      "category": "cosmic",
+      "url": null,
+      "description": "Moon phase illustrations for cosmic themes",
+      "tags": ["decoration", "cosmic", "moon", "phases"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_constellation",
+      "name": "Constellation Patterns",
+      "type": "decoration",
+      "category": "cosmic",
+      "url": null,
+      "description": "Constellation line art patterns for cosmic design",
+      "tags": ["decoration", "cosmic", "constellation", "stars"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_meteor_shower",
+      "name": "Meteor Shower",
+      "type": "animation",
+      "category": "cosmic",
+      "url": null,
+      "description": "Animated meteor shower effect for cosmic scenes",
+      "tags": ["animation", "cosmic", "meteor", "shower"],
+      "is_premium": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_aurora",
+      "name": "Aurora Borealis",
+      "type": "background",
+      "category": "cosmic",
+      "url": null,
+      "description": "Northern lights aurora background with flowing colors",
+      "tags": ["background", "cosmic", "aurora", "lights"],
+      "is_premium": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_solar_flare",
+      "name": "Solar Flare",
+      "type": "effect",
+      "category": "cosmic",
+      "url": null,
+      "description": "Solar flare particle effect for cosmic energy",
+      "tags": ["effect", "cosmic", "solar", "flare"],
+      "is_premium": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_cosmic_dust",
+      "name": "Cosmic Dust",
+      "type": "particle",
+      "category": "cosmic",
+      "url": null,
+      "description": "Cosmic dust particle system for ambient effects",
+      "tags": ["particle", "cosmic", "dust", "ambient"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_zodiac_symbols",
+      "name": "Zodiac Symbols",
+      "type": "icon",
+      "category": "astrology",
+      "url": null,
+      "description": "Complete set of zodiac sign symbols and icons",
+      "tags": ["icon", "astrology", "zodiac", "symbols"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_planet_icons",
+      "name": "Planet Icons",
+      "type": "icon",
+      "category": "astrology",
+      "url": null,
+      "description": "Icon set of all astrological planets",
+      "tags": ["icon", "astrology", "planets", "symbols"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_cosmic_gradient",
+      "name": "Cosmic Gradient",
+      "type": "background",
+      "category": "cosmic",
+      "url": null,
+      "description": "Smooth cosmic gradient backgrounds in various color schemes",
+      "tags": ["background", "cosmic", "gradient", "colors"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_star_particles",
+      "name": "Star Particles",
+      "type": "particle",
+      "category": "cosmic",
+      "url": null,
+      "description": "Twinkling star particle system for magical effects",
+      "tags": ["particle", "cosmic", "stars", "twinkle"],
+      "is_premium": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "asset_cosmic_portal",
+      "name": "Cosmic Portal",
+      "type": "effect",
+      "category": "cosmic",
+      "url": null,
+      "description": "Mystical portal effect for transitions and special moments",
+      "tags": ["effect", "cosmic", "portal", "mystical"],
+      "is_premium": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "cosmic_flavor_data": {
+    "factions": [
+      {
+        "id": "starfall",
+        "name": "STARFALL FLEET",
+        "subtitle": "Blazing Through the Unknown",
+        "description": "Warriors of momentum who believe that action is the ultimate teacher. The Fleet charges forward, turning obstacles into fuel and doubt into determination.",
+        "motto": "We don't follow paths, we burn new ones.",
+        "philosophy": [
+          "Action over hesitation",
+          "Bold moves create breakthroughs",
+          "Fear is fuel for the fearless",
+          "Progress beats perfection"
+        ],
+        "traits": ["Courageous", "Driven", "Resilient", "Bold"],
+        "idealFor": "Those who thrive on challenge and want to build unstoppable momentum in their growth journey.",
+        "color": "#FF6600"
+      },
+      {
+        "id": "void",
+        "name": "Void Collective",
+        "subtitle": "Masters of the In Between",
+        "description": "Seekers of depth who find power in pause. The Collective understands that true transformation happens in moments of stillness, where clarity emerges from chaos.",
+        "motto": "In stillness, we find infinite power.",
+        "philosophy": [
+          "Depth over speed",
+          "Reflection reveals truth",
+          "The void holds all answers",
+          "Patience is strength"
+        ],
+        "traits": ["Introspective", "Wise", "Centered", "Mysterious"],
+        "idealFor": "Those who value mindfulness and want to cultivate inner wisdom alongside outer achievement.",
+        "color": "#7F26D9"
+      },
+      {
+        "id": "stellar",
+        "name": "Stellar Voyagers",
+        "subtitle": "Navigators of Infinite Possibility",
+        "description": "Explorers who believe that growth comes from curiosity and connection. The Voyagers seek balance, harmony, and meaningful experiences across the cosmos.",
+        "motto": "Every journey teaches, every connection transforms.",
+        "philosophy": [
+          "Curiosity opens doors",
+          "Connection creates growth",
+          "Balance is strength",
+          "Every experience matters"
+        ],
+        "traits": ["Curious", "Balanced", "Connected", "Harmonious"],
+        "idealFor": "Those who seek balance and want to grow through exploration and meaningful connections.",
+        "color": "#00BFFF"
+      }
+    ],
+    "elements": [
+      {
+        "id": "fire",
+        "name": "Fire",
+        "description": "Passion, energy, and transformation through action",
+        "color": "#FF4500",
+        "traits": ["passionate", "energetic", "transformative", "bold"]
+      },
+      {
+        "id": "water",
+        "name": "Water",
+        "description": "Emotion, flow, and adaptation through feeling",
+        "color": "#1E90FF",
+        "traits": ["emotional", "flowing", "adaptive", "intuitive"]
+      },
+      {
+        "id": "earth",
+        "name": "Earth",
+        "description": "Stability, growth, and foundation through grounding",
+        "color": "#8B4513",
+        "traits": ["stable", "grounded", "nurturing", "practical"]
+      },
+      {
+        "id": "air",
+        "name": "Air",
+        "description": "Thought, communication, and freedom through movement",
+        "color": "#87CEEB",
+        "traits": ["intellectual", "communicative", "free", "light"]
+      },
+      {
+        "id": "spirit",
+        "name": "Spirit",
+        "description": "Transcendence, connection, and unity through essence",
+        "color": "#9370DB",
+        "traits": ["transcendent", "connected", "unified", "essence"]
+      }
+    ],
+    "spirit_animals": [
+      {
+        "id": "wolf",
+        "name": "Wolf",
+        "description": "Loyalty, intuition, and strong social bonds",
+        "traits": ["loyal", "intuitive", "social", "protective"]
+      },
+      {
+        "id": "eagle",
+        "name": "Eagle",
+        "description": "Vision, freedom, and perspective from above",
+        "traits": ["visionary", "free", "perspective", "soaring"]
+      },
+      {
+        "id": "bear",
+        "name": "Bear",
+        "description": "Strength, introspection, and protective power",
+        "traits": ["strong", "introspective", "protective", "grounded"]
+      },
+      {
+        "id": "dolphin",
+        "name": "Dolphin",
+        "description": "Joy, playfulness, and intelligent communication",
+        "traits": ["joyful", "playful", "intelligent", "communicative"]
+      },
+      {
+        "id": "phoenix",
+        "name": "Phoenix",
+        "description": "Rebirth, transformation, and rising from ashes",
+        "traits": ["transformative", "resilient", "renewing", "powerful"]
+      },
+      {
+        "id": "owl",
+        "name": "Owl",
+        "description": "Wisdom, mystery, and seeing through darkness",
+        "traits": ["wise", "mysterious", "perceptive", "nocturnal"]
+      },
+      {
+        "id": "tiger",
+        "name": "Tiger",
+        "description": "Power, courage, and fierce independence",
+        "traits": ["powerful", "courageous", "independent", "fierce"]
+      },
+      {
+        "id": "butterfly",
+        "name": "Butterfly",
+        "description": "Transformation, beauty, and lightness of being",
+        "traits": ["transformative", "beautiful", "light", "graceful"]
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { updateProfile } from "@/lib/firebase/profiles";
+import { generateDailyHoroscope, calculateCosmicProfile } from "@/lib/firebase/functions";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -78,13 +80,8 @@ const Horoscope = () => {
   const generateHoroscope = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-daily-horoscope');
-
-      // Check for zodiac/onboarding error anywhere in the error object
-      // This handles the 400 response with "No zodiac sign found"
-      const errorString = JSON.stringify(error) + (error?.message || '');
-      if (error && (errorString.toLowerCase().includes('zodiac') || errorString.toLowerCase().includes('onboarding'))) {
-        console.log('User needs to complete onboarding - no zodiac sign');
+      if (!profile?.zodiac_sign) {
+        // Don't throw error, just show zodiac selector
         setHoroscope(null);
         setZodiac(null);
         setIsPersonalized(false);
@@ -93,31 +90,24 @@ const Horoscope = () => {
         return;
       }
 
-      // Handle other errors
-      if (error) {
-        throw new Error(error.message || 'Failed to load horoscope');
+      const data = await generateDailyHoroscope({
+        zodiacSign: profile.zodiac_sign,
+        date: new Date().toISOString(),
+      });
+
+      if (!data?.horoscope) {
+        throw new Error("Failed to generate horoscope");
       }
 
-      // Check for error in data body
-      if (data?.error) {
-        if (data.error.toLowerCase().includes('zodiac') || data.error.toLowerCase().includes('onboarding')) {
-          setHoroscope(null);
-          setZodiac(null);
-          setIsPersonalized(false);
-          setDate(new Date().toLocaleDateString('en-CA'));
-          setLoading(false);
-          return;
-        }
-        throw new Error(data.error);
-      }
-
-      setHoroscope(data.horoscope);
-      setZodiac(data.zodiac);
-      setIsPersonalized(data.isPersonalized);
-      setDate(data.date);
-      setCosmiqTip(data.cosmiqTip || null);
-      setEnergyForecast(data.energyForecast || null);
-      setPlacementInsights(data.placementInsights || null);
+      // Extract data from the response - horoscope may be nested or flat
+      const horoscopeData = data.horoscope as any;
+      setHoroscope(typeof horoscopeData === 'string' ? horoscopeData : horoscopeData?.text || horoscopeData?.horoscope || JSON.stringify(horoscopeData));
+      setZodiac(horoscopeData?.zodiac || (data as any)?.zodiac || profile.zodiac_sign);
+      setIsPersonalized(horoscopeData?.isPersonalized || (data as any)?.isPersonalized || false);
+      setDate(horoscopeData?.date || (data as any)?.date || new Date().toLocaleDateString('en-CA'));
+      setCosmiqTip(horoscopeData?.cosmiqTip || (data as any)?.cosmiqTip || null);
+      setEnergyForecast(horoscopeData?.energyForecast || (data as any)?.energyForecast || null);
+      setPlacementInsights(horoscopeData?.placementInsights || (data as any)?.placementInsights || null);
     } catch (err) {
       console.error('Error generating horoscope:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -134,7 +124,7 @@ const Horoscope = () => {
       
       toast({
         title: "Error",
-        description: errMsg || "Failed to load your horoscope",
+        description: errMsg || "Failed to load your horoscope. Please try again later.",
         variant: "destructive",
       });
       setHoroscope("Unable to load your cosmiq insights at this moment. Please try again later.");
@@ -192,16 +182,11 @@ const Horoscope = () => {
     
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          birthdate: birthDate?.trim() || null,
-          birth_time: normalizedBirthTime,
-          birth_location: birthLocation?.trim() || null,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateDocument("profiles", user.uid, {
+        birthdate: birthDate?.trim() || null,
+        birth_time: normalizedBirthTime,
+        birth_location: birthLocation?.trim() || null,
+      });
 
       toast({
         title: "Saved!",
@@ -209,8 +194,8 @@ const Horoscope = () => {
       });
 
       // Invalidate and refetch profile immediately
-      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.uid] });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.uid] });
       
       // Wait for profile state to update
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -270,43 +255,16 @@ const Horoscope = () => {
     
     setRevealing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-cosmic-profile');
-
-      if (error) {
-        // Handle rate limit (429) specifically
-        if (error.message?.includes('already generated today') || error.message?.includes('once per 24 hours')) {
-          toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw error;
+      const data = await calculateCosmicProfile();
+      
+      if (!data?.cosmicProfile) {
+        throw new Error('Failed to calculate profile');
       }
       
-      if (data && typeof data === 'object' && 'error' in data) {
-        const errorMsg = data.error as string;
-        // Handle rate limit from response data
-        if (errorMsg.includes('already generated today') || errorMsg.includes('once per 24 hours')) {
-          toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw new Error(errorMsg);
-      }
+      // Update profile with cosmic data
+      // The function should handle the profile update, but we can also do it here if needed
 
-      toast({
-        title: "✨ Cosmiq Profile Revealed!",
-        description: "Your celestial map has been calculated.",
-      });
-
-      setTimeout(() => {
-        window.location.href = window.location.pathname;
-      }, 1000);
+      // NOTE: Code below is unreachable until Firebase migration is complete
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -374,7 +332,46 @@ const Horoscope = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
       </div>
 
-      <div className="relative max-w-2xl mx-auto p-6 space-y-6 safe-area-top">
+      <header className="sticky top-0 z-40 w-full border-b border-purple-500/30 bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-gray-950/60 safe-area-top">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <motion.div
+            className="flex-1 text-center"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
+              <motion.div
+                animate={{
+                  rotate: [0, 360],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Moon className="w-8 h-8 text-purple-400" />
+              </motion.div>
+              Cosmiq Insight
+              <HoroscopeInfoTooltip />
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">
+              {date ? formatDate(date) : 'Loading...'}
+            </p>
+          </motion.div>
+        </div>
+      </header>
+
+      <div className="relative max-w-2xl mx-auto px-6 pt-6 pb-6 space-y-6">
         {/* Welcome Tooltip for first-time visitors */}
         {showWelcomeTooltip && (
           <motion.div
@@ -402,44 +399,6 @@ const Horoscope = () => {
             </div>
           </motion.div>
         )}
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/')}
-            className="text-gray-400 hover:text-white bg-gray-900/50 backdrop-blur-sm"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <motion.div
-            className="flex-1 text-center"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-2">
-              <motion.div
-                animate={{
-                  rotate: [0, 360],
-                  scale: [1, 1.2, 1],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-              <Moon className="w-8 h-8 text-purple-400" />
-              </motion.div>
-              Cosmiq Insight
-              <HoroscopeInfoTooltip />
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              {date ? formatDate(date) : 'Loading...'}
-            </p>
-          </motion.div>
-        </div>
 
         {/* Constellation Zodiac Display */}
         <motion.div
@@ -513,12 +472,7 @@ const Horoscope = () => {
               onSelect={async (sign) => {
                 if (!user) return;
                 try {
-                  const { error } = await supabase
-                    .from('profiles')
-                    .update({ zodiac_sign: sign })
-                    .eq('id', user.id);
-                  
-                  if (error) throw error;
+                  await updateProfile(user.uid, { zodiac_sign: sign });
                   
                   // Invalidate profile and regenerate horoscope
                   await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
