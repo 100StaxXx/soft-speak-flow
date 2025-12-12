@@ -1,0 +1,145 @@
+-- Create comprehensive user account deletion function
+CREATE OR REPLACE FUNCTION public.delete_user_account(p_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- 1. Delete companion evolution cards (must be deleted before companion_evolutions due to FK)
+  DELETE FROM public.companion_evolution_cards WHERE user_id = p_user_id;
+  
+  -- 2. Delete companion evolutions (depends on user_companion)
+  DELETE FROM public.companion_evolutions WHERE companion_id IN (
+    SELECT id FROM public.user_companion WHERE user_id = p_user_id
+  );
+  
+  -- 3. Delete XP events (depends on user_companion)
+  DELETE FROM public.xp_events WHERE user_id = p_user_id;
+  
+  -- 4. Delete companion postcards
+  DELETE FROM public.companion_postcards WHERE user_id = p_user_id;
+  
+  -- 5. Delete companion stories
+  DELETE FROM public.companion_stories WHERE user_id = p_user_id;
+  
+  -- 6. Delete user companion
+  DELETE FROM public.user_companion WHERE user_id = p_user_id;
+  
+  -- 7. Delete task reminders log (depends on daily_tasks)
+  DELETE FROM public.task_reminders_log WHERE user_id = p_user_id;
+  
+  -- 8. Delete challenge progress (depends on user_challenges)
+  DELETE FROM public.challenge_progress WHERE user_id = p_user_id;
+  
+  -- 9. Delete user challenges
+  DELETE FROM public.user_challenges WHERE user_id = p_user_id;
+  
+  -- 10. Delete habit completions (depends on habits)
+  DELETE FROM public.habit_completions WHERE user_id = p_user_id;
+  
+  -- 11. Delete epic habits (depends on habits and epics)
+  DELETE FROM public.epic_habits WHERE habit_id IN (
+    SELECT id FROM public.habits WHERE user_id = p_user_id
+  );
+  
+  -- 12. Delete habits
+  DELETE FROM public.habits WHERE user_id = p_user_id;
+  
+  -- 13. Delete epic progress log
+  DELETE FROM public.epic_progress_log WHERE user_id = p_user_id;
+  
+  -- 14. Delete epic members
+  DELETE FROM public.epic_members WHERE user_id = p_user_id;
+  
+  -- 15. Delete guild shouts (sender or recipient)
+  DELETE FROM public.guild_shouts WHERE sender_id = p_user_id OR recipient_id = p_user_id;
+  
+  -- 16. Delete guild rivalries
+  DELETE FROM public.guild_rivalries WHERE user_id = p_user_id OR rival_id = p_user_id;
+  
+  -- 17. Delete guild story reads
+  DELETE FROM public.guild_story_reads WHERE user_id = p_user_id;
+  
+  -- 18. Delete epic activity feed
+  DELETE FROM public.epic_activity_feed WHERE user_id = p_user_id;
+  
+  -- 19. Delete epics owned by user
+  DELETE FROM public.epics WHERE user_id = p_user_id;
+  
+  -- 20. Delete daily tasks
+  DELETE FROM public.daily_tasks WHERE user_id = p_user_id;
+  
+  -- 21. Delete daily missions
+  DELETE FROM public.daily_missions WHERE user_id = p_user_id;
+  
+  -- 22. Delete daily check-ins
+  DELETE FROM public.daily_check_ins WHERE user_id = p_user_id;
+  
+  -- 23. Delete check-ins
+  DELETE FROM public.check_ins WHERE user_id = p_user_id;
+  
+  -- 24. Delete activity feed
+  DELETE FROM public.activity_feed WHERE user_id = p_user_id;
+  
+  -- 25. Delete achievements
+  DELETE FROM public.achievements WHERE user_id = p_user_id;
+  
+  -- 26. Delete favorites
+  DELETE FROM public.favorites WHERE user_id = p_user_id;
+  
+  -- 27. Delete downloads
+  DELETE FROM public.downloads WHERE user_id = p_user_id;
+  
+  -- 28. Delete adaptive push settings
+  DELETE FROM public.adaptive_push_settings WHERE user_id = p_user_id;
+  
+  -- 29. Delete adaptive push queue
+  DELETE FROM public.adaptive_push_queue WHERE user_id = p_user_id;
+  
+  -- 30. Delete cosmic deep dive feedback
+  DELETE FROM public.cosmic_deep_dive_feedback WHERE user_id = p_user_id;
+  
+  -- 31. Delete user cosmic deep dives
+  DELETE FROM public.user_cosmic_deep_dives WHERE user_id = p_user_id;
+  
+  -- 32. Delete user horoscope
+  DELETE FROM public.user_horoscope WHERE user_id = p_user_id;
+  
+  -- 33. Delete AI output validation logs
+  DELETE FROM public.ai_output_validation_log WHERE user_id = p_user_id;
+  
+  -- 34. Delete user companion skins
+  DELETE FROM public.user_companion_skins WHERE user_id = p_user_id;
+  
+  -- 35. Delete user roles
+  DELETE FROM public.user_roles WHERE user_id = p_user_id;
+  
+  -- 36. Delete battle participants
+  DELETE FROM public.battle_participants WHERE user_id = p_user_id;
+  
+  -- 37. Delete battle rankings
+  DELETE FROM public.battle_rankings WHERE user_id = p_user_id;
+  
+  -- 38. Null out battle match winners (don't delete the match, just remove winner reference)
+  UPDATE public.battle_matches SET winner_user_id = NULL WHERE winner_user_id = p_user_id;
+  
+  -- 39. Delete referral payouts where user is referrer or recipient
+  DELETE FROM public.referral_payouts WHERE referrer_id = p_user_id OR recipient_user_id = p_user_id;
+  
+  -- 40. Delete referral codes owned by user
+  DELETE FROM public.referral_codes WHERE owner_type = 'user' AND owner_user_id = p_user_id;
+  
+  -- 41. Delete push subscriptions
+  DELETE FROM public.push_subscriptions WHERE user_id = p_user_id;
+  
+  -- 42. Delete user subscriptions
+  DELETE FROM public.user_subscriptions WHERE user_id = p_user_id;
+  
+  -- 43. Finally delete the profile (this should cascade to remaining FKs like referral_audit_log)
+  DELETE FROM public.profiles WHERE id = p_user_id;
+END;
+$$;
+
+-- Grant execute permission to service_role
+GRANT EXECUTE ON FUNCTION public.delete_user_account(uuid) TO service_role;
