@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
@@ -14,7 +14,11 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   const { user, loading: authLoading } = useAuth();
   const { hasAccess, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
+  const location = useLocation();
   const [progress, setProgress] = useState(0);
+
+  // Don't block onboarding with paywall - users need to complete onboarding first
+  const isOnboarding = location.pathname === "/onboarding";
 
   useEffect(() => {
     // Redirect to auth if not logged in
@@ -64,6 +68,12 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
 
   // Don't render children until auth is confirmed
   if (!user) return null;
+
+  // Skip access check during onboarding - users need to complete onboarding first
+  // The paywall should only block access to protected features AFTER onboarding is complete
+  if (isOnboarding) {
+    return <>{children}</>;
+  }
 
   // Only check access if it's loaded - don't block if still loading
   // Profile/access can load in background, pages will handle their own loading states
