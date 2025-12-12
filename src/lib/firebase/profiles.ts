@@ -120,14 +120,33 @@ export const createProfile = async (userId: string, email: string | null, data?:
     
     await Promise.race([setDocPromise, timeoutPromise]);
   } catch (error: any) {
+    console.error('[createProfile] Error creating profile:', error);
+    
+    // Check if it's a permission error
+    if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+      console.error('[createProfile] Permission denied - check Firestore security rules');
+      throw new Error('Permission denied. Please check your authentication status and try again.');
+    }
+    
     // Check if it's a duplicate/race condition error
     if (error.code === 'already-exists' || error.message?.includes('already exists')) {
       // Profile was created by another process, fetch it
+      console.log('[createProfile] Profile already exists (race condition), fetching...');
       const existing = await getProfile(userId);
-      if (existing) return existing;
+      if (existing) {
+        console.log('[createProfile] Found existing profile after race condition');
+        return existing;
+      }
     }
-    // Re-throw other errors
-    throw error;
+    
+    // Check for network errors
+    if (error.code === 'unavailable' || error.message?.includes('network') || error.message?.includes('offline')) {
+      throw new Error('Network error. Please check your connection and try again.');
+    }
+    
+    // Re-throw other errors with more context
+    const errorMessage = error.message || 'Unknown error occurred while creating profile';
+    throw new Error(`Failed to create profile: ${errorMessage}`);
   }
   
   // Return the profile directly instead of re-reading from Firestore

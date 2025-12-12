@@ -39,12 +39,26 @@ export const convertFirebaseUser = (user: FirebaseUser | null): AuthUser | null 
 
 // Sign up with email and password
 export const signUp = async (email: string, password: string, metadata?: { timezone?: string }) => {
-  const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-  
-  // Create profile document in Firestore
-  await ensureProfile(userCredential.user.uid, email, metadata);
-  
-  return userCredential;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+    
+    // Create profile document in Firestore
+    // If profile creation fails, log the error but don't fail the signup
+    // The profile can be created later by ensureProfile in the auth flow
+    try {
+      await ensureProfile(userCredential.user.uid, email, metadata);
+    } catch (profileError: any) {
+      console.error('[signUp] Error creating profile (non-fatal):', profileError);
+      // Don't throw - the profile will be created by ensureProfile in handlePostAuthNavigation
+      // This prevents the signup from failing if there's a temporary Firestore issue
+    }
+    
+    return userCredential;
+  } catch (error: any) {
+    console.error('[signUp] Error during signup:', error);
+    // Re-throw Firebase auth errors so they can be handled by the UI
+    throw error;
+  }
 };
 
 // Sign in with email and password
