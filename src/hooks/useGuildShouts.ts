@@ -153,9 +153,12 @@ export const useGuildShouts = (epicId?: string) => {
     },
   });
 
-  // Real-time subscription
+  // Real-time subscription - only subscribe when we have both epicId and authenticated user
   useEffect(() => {
     if (!epicId) return;
+    if (!user?.uid) return; // Wait for auth
+
+    let isSubscribed = true;
 
     const shoutsQuery = query(
       collection(firebaseDb, "guild_shouts"),
@@ -165,6 +168,8 @@ export const useGuildShouts = (epicId?: string) => {
     );
 
     const unsubscribe = onSnapshot(shoutsQuery, (snapshot) => {
+      if (!isSubscribed) return;
+      
       queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
       
       // Show toast for new received shouts
@@ -177,11 +182,18 @@ export const useGuildShouts = (epicId?: string) => {
           }
         }
       });
-    }, (error) => {
-      console.warn('Guild shouts subscription error:', error);
+    }, (error: unknown) => {
+      // Handle permission errors gracefully
+      const errorCode = (error as { code?: string })?.code;
+      if (errorCode === 'permission-denied') {
+        console.warn('Guild shouts: Permission denied');
+      } else {
+        console.warn('Guild shouts subscription error:', error);
+      }
     });
 
     return () => {
+      isSubscribed = false;
       unsubscribe();
     };
   }, [epicId, user?.uid, queryClient]);

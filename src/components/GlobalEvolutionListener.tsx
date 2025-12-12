@@ -4,12 +4,12 @@ import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import { getCompanionEvolution } from "@/lib/firebase/companionEvolutions";
 import { getMentor } from "@/lib/firebase/mentors";
-import { getDocument, onSnapshot } from "@/lib/firebase/firestore";
+import { onSnapshot } from "@/lib/firebase/firestore";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
 export const GlobalEvolutionListener = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
@@ -22,74 +22,95 @@ export const GlobalEvolutionListener = () => {
   const [previousStage, setPreviousStage] = useState<number | null>(null);
 
   useEffect(() => {
+    // CRITICAL: Wait for auth to fully load before subscribing to Firestore
+    // This prevents "Missing or insufficient permissions" errors on iOS
+    if (authLoading) return;
     if (!user?.uid) return;
 
     // Track previous stage to detect changes
     let previousStage: number | null = null;
+    let isSubscribed = true;
 
     // Subscribe to companion updates using Firestore real-time listener
     const unsubscribe = onSnapshot(
       { collection: "user_companion", docId: user.uid },
       async (snapshot) => {
-        const newData = snapshot;
+        // Check if still subscribed (prevent updates after unmount)
+        if (!isSubscribed) return;
         
-        if (!newData) {
-          console.warn('Evolution listener: Missing companion data');
-          return;
-        }
-
-        const newStage = typeof newData.current_stage === 'number' ? newData.current_stage : null;
-        
-        if (newStage === null) {
-          console.warn('Evolution listener: Invalid stage value');
-          return;
-        }
-
-        // Check if stage changed (evolution happened)
-        if (previousStage !== null && newStage > previousStage) {
-          // Validate companion id exists
-          const companionId = typeof newData.id === 'string' ? newData.id : user.uid;
+        try {
+          const newData = snapshot;
           
-          // Fetch the latest evolution record to ensure we have the correct image
-          const evolutionRecord = await getCompanionEvolution(companionId, newStage);
-          
-          const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
-          const imageUrl = evolutionRecord?.image_url || currentImageUrl;
-
-          // Fetch mentor slug if we have a selected mentor
-          let mentorSlug: string | undefined;
-          if (profile?.selected_mentor_id) {
-            const mentor = await getMentor(profile.selected_mentor_id);
-            mentorSlug = mentor?.slug;
+          if (!newData) {
+            // Silently ignore missing data - companion may not exist yet
+            return;
           }
 
-          setPreviousStage(previousStage);
-          setEvolutionData({
-            stage: newStage,
-            imageUrl,
-            mentorSlug,
-          });
-          setIsEvolving(true);
+          const newStage = typeof newData.current_stage === 'number' ? newData.current_stage : null;
           
-          // Notify walkthrough that evolution is starting
-          window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+          if (newStage === null) {
+            return;
+          }
 
-          // Invalidate companion query to refresh data
-          queryClient.invalidateQueries({ queryKey: ['companion', user.uid] });
+          // Check if stage changed (evolution happened)
+          if (previousStage !== null && newStage > previousStage) {
+            // Validate companion id exists
+            const companionId = typeof newData.id === 'string' ? newData.id : user.uid;
+            
+            // Fetch the latest evolution record to ensure we have the correct image
+            const evolutionRecord = await getCompanionEvolution(companionId, newStage);
+            
+            const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
+            const imageUrl = evolutionRecord?.image_url || currentImageUrl;
+
+            // Fetch mentor slug if we have a selected mentor
+            let mentorSlug: string | undefined;
+            if (profile?.selected_mentor_id) {
+              const mentor = await getMentor(profile.selected_mentor_id);
+              mentorSlug = mentor?.slug;
+            }
+
+            if (isSubscribed) {
+              setPreviousStage(previousStage);
+              setEvolutionData({
+                stage: newStage,
+                imageUrl,
+                mentorSlug,
+              });
+              setIsEvolving(true);
+              
+              // Notify walkthrough that evolution is starting
+              window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+
+              // Invalidate companion query to refresh data
+              queryClient.invalidateQueries({ queryKey: ['companion', user.uid] });
+            }
+          }
+          
+          // Update previous stage for next comparison
+          previousStage = newStage;
+        } catch (error) {
+          // Silently handle errors - don't crash the app
+          console.warn('Evolution listener data error:', error);
         }
-        
-        // Update previous stage for next comparison
-        previousStage = newStage;
       },
-      (error) => {
-        console.warn('Evolution listener subscription error:', error);
+      (error: unknown) => {
+        // Handle permission errors gracefully - common on iOS before auth is ready
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorCode = (error as { code?: string })?.code;
+        if (errorCode === 'permission-denied' || errorMessage?.includes('permission')) {
+          console.warn('Evolution listener: Permission denied, will retry when auth is ready');
+        } else {
+          console.warn('Evolution listener subscription error:', error);
+        }
       }
     );
 
     return () => {
+      isSubscribed = false;
       unsubscribe();
     };
-  }, [user, user?.uid, profile?.selected_mentor_id, queryClient]);
+  }, [authLoading, user?.uid, profile?.selected_mentor_id, queryClient]);
 
   if (!isEvolving || !evolutionData) {
     return null;
