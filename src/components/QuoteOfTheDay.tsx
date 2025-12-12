@@ -51,31 +51,42 @@ export const QuoteOfTheDay = () => {
       );
 
       const dailyPepTalk = dailyPepTalks[0];
-      if (dailyPepTalk) {
-        // Fetch quotes
-        const quotes = await getQuotes(undefined, 10);
+      
+      // Always fetch quotes, even if no daily pep talk exists
+      // This ensures users see a quote after onboarding even if they missed the daily trigger
+      const quotes = await getQuotes(undefined, 10);
+      
+      if (quotes && quotes.length > 0) {
+        let matchingQuote = quotes[0]; // Default to first quote
+        let topicCategory: string | null = null;
         
-        if (quotes && quotes.length > 0) {
-          // If we have emotional triggers, try to find a matching quote
+        // If we have a daily pep talk, try to find a matching quote
+        if (dailyPepTalk) {
           const triggers = dailyPepTalk.emotional_triggers || [];
-          const topicCategory = Array.isArray(dailyPepTalk.topic_category) 
+          topicCategory = Array.isArray(dailyPepTalk.topic_category) 
             ? dailyPepTalk.topic_category[0] 
             : dailyPepTalk.topic_category;
           
           // Try to find a matching quote by category or triggers
-          const matchingQuote = quotes.find(q => {
-            // Note: quotes might not have emotional_triggers field in Firestore
-            // This is a simplified matching - you may need to adjust based on your schema
-            return true; // For now, just return first quote
+          matchingQuote = quotes.find(q => {
+            // Match by category if available
+            if (topicCategory && q.category === topicCategory) {
+              return true;
+            }
+            // Match by emotional triggers if available
+            if (triggers.length > 0 && q.emotional_triggers?.some((t: string) => triggers.includes(t))) {
+              return true;
+            }
+            return false;
           }) || quotes[0];
-          
-          setTodaysQuote({
-            id: matchingQuote.id,
-            text: matchingQuote.quote,
-            author: matchingQuote.author || null,
-            category: topicCategory || null,
-          });
         }
+        
+        setTodaysQuote({
+          id: matchingQuote.id,
+          text: matchingQuote.text || '',
+          author: matchingQuote.author || null,
+          category: topicCategory,
+        });
       }
       
       setLoading(false);

@@ -113,23 +113,25 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         );
 
         const dailyPepTalk = dailyPepTalks[0];
-        if (!isMounted || !dailyPepTalk) return;
+        
+        // Try to fetch a quote that matches category if we have a daily pep talk
+        let quotes: any[] = [];
+        if (dailyPepTalk?.topic_category) {
+          quotes = await getDocuments(
+            "quotes",
+            [["category", "==", dailyPepTalk.topic_category]],
+            undefined,
+            undefined,
+            10
+          );
+        }
 
-        // Try to fetch a quote that matches category first, then fall back to any quote
-        let quotes = await getDocuments(
-          "quotes",
-          [["category", "==", dailyPepTalk.topic_category]],
-          undefined,
-          undefined,
-          10
-        );
-
-        // If no category match, get any quotes
+        // If no category match or no daily pep talk, get any quotes
         if (quotes.length === 0) {
           quotes = await getDocuments("quotes", undefined, undefined, undefined, 20);
         }
 
-        // Pick a random quote
+        // Pick a random quote (always show a quote even if no daily pep talk)
         if (isMounted && quotes.length > 0) {
           const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
           setTodaysQuote({
@@ -276,9 +278,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
     const missingMentor = !resolvedMentorId;
     const explicitlyIncomplete = profile.onboarding_completed === false;
-    // Only check for missing companion if onboarding is not completed
+    // Only check for missing companion if onboarding is not explicitly completed
     // This prevents redirect loops when companion fails to load after onboarding
-    const missingCompanion = !companion && !companionLoading && profile.onboarding_completed !== true;
+    // Note: We already return early if onboarding_completed === true (line 244), so at this point it's either false or undefined
+    const missingCompanion = !companion && !companionLoading;
 
     if (missingMentor || explicitlyIncomplete || missingCompanion) {
       console.log('[Index] Redirecting to onboarding:', {

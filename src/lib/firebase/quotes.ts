@@ -2,7 +2,7 @@ import { getDocuments, getDocument, timestampToISO } from "./firestore";
 
 export interface Quote {
   id: string;
-  quote: string;
+  text: string; // Changed from 'quote' to 'text' to match Firestore schema
   author?: string;
   title?: string;
   audio_url?: string;
@@ -10,6 +10,10 @@ export interface Quote {
   date?: string;
   created_at?: string;
   updated_at?: string;
+  category?: string;
+  intensity?: string;
+  emotional_triggers?: string[];
+  is_premium?: boolean;
 }
 
 export const getQuote = async (quoteId: string): Promise<Quote | null> => {

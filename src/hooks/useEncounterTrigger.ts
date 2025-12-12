@@ -97,8 +97,13 @@ export const useEncounterTrigger = () => {
       }
 
       questCountRef.current = profile.total_quests_completed || 0;
-      // If no next encounter set, initialize with random 2-4
-      nextEncounterRef.current = profile.next_encounter_quest_count ?? getRandomInterval();
+      // If no next encounter set, initialize to current count + random interval
+      const nextEncounter = profile.next_encounter_quest_count;
+      if (nextEncounter === null || nextEncounter === undefined) {
+        nextEncounterRef.current = questCountRef.current + getRandomInterval();
+      } else {
+        nextEncounterRef.current = nextEncounter;
+      }
     }
 
     if (!encountersEnabled) {
@@ -121,6 +126,8 @@ export const useEncounterTrigger = () => {
       : nextEncounterRef.current;
 
     // Update database with new quest count and potentially new encounter threshold
+    // NOTE: This is not atomic - if multiple quests complete simultaneously, counts could be lost.
+    // Consider using Firestore transactions or incrementField() for atomic updates in the future.
     try {
       await updateDocument('profiles', user.uid, {
         total_quests_completed: newTotal,
@@ -132,14 +139,14 @@ export const useEncounterTrigger = () => {
       return { shouldTrigger: false };
     }
 
-    // Update local ref if triggering
     if (shouldTrigger) {
+      // Calculate interval BEFORE updating ref
+      const previousThreshold = nextEncounterRef.current ?? (newTotal - getRandomInterval());
+      const questInterval = newTotal - previousThreshold;
+      
+      // Update ref for next time
       nextEncounterRef.current = nextEncounterValue;
-    }
-
-    if (shouldTrigger) {
-      // Calculate how many quests since last encounter
-      const questInterval = newTotal - ((nextEncounterRef.current ?? newTotal) - getRandomInterval());
+      
       return { 
         shouldTrigger: true, 
         triggerType: 'quest_milestone',
@@ -148,7 +155,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id, ensureEncountersEnabled]);
+  }, [user?.uid, ensureEncountersEnabled]);
 
   // Check for epic checkpoint trigger (25%, 50%, 75%, 100%)
   const checkEpicCheckpoint = useCallback(async (
@@ -171,6 +178,10 @@ export const useEncounterTrigger = () => {
     if (crossedMilestone) {
       // Get epic category for themed adversary
       const epic = await getDocument<{ title: string; description: string }>('epics', epicId);
+      
+      if (!epic) {
+        console.warn(`Epic ${epicId} not found, using default category`);
+      }
 
       // Infer category from title/description
       const text = `${epic?.title || ''} ${epic?.description || ''}`.toLowerCase();
@@ -193,7 +204,7 @@ export const useEncounterTrigger = () => {
     }
 
     return { shouldTrigger: false };
-  }, [user?.id, ensureEncountersEnabled]);
+  }, [user?.uid, ensureEncountersEnabled]);
 
   // Check for weekly trigger (once per 7 days)
   const checkWeeklyTrigger = useCallback(async (): Promise<TriggerResult> => {

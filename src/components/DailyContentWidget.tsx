@@ -27,56 +27,82 @@ export const DailyContentWidget = () => {
         return;
       }
 
-      const today = format(new Date(), 'yyyy-MM-dd');
+      try {
+        const today = format(new Date(), 'yyyy-MM-dd');
 
-      // Get mentor details from Firestore
-      const mentor = await getDocument<{ slug: string; name: string }>("mentors", profile.selected_mentor_id);
+        // Get mentor details from Firestore
+        const mentor = await getDocument<{ slug: string; name: string }>("mentors", profile.selected_mentor_id);
 
-      if (!mentor) {
+        if (!mentor) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch both pep talk and quote in parallel
+        const [pepTalkResult, quoteResult] = await Promise.all([
+          getDocuments<{
+            id: string;
+            title: string;
+            summary: string;
+            audio_url?: string;
+          }>("daily_pep_talks", [
+            ["for_date", "==", today],
+            ["mentor_slug", "==", mentor.slug],
+          ], undefined, undefined, 1),
+          getDocuments<{
+            id: string;
+            quote_id: string;
+          }>("daily_quotes", [
+            ["for_date", "==", today],
+            ["mentor_slug", "==", mentor.slug],
+          ], undefined, undefined, 1)
+        ]);
+
+        let pepTalk = pepTalkResult[0];
+        
+        // If no daily pep talk exists, get the most recent one for this mentor
+        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+        if (!pepTalk) {
+          try {
+            const recentPepTalks = await getDocuments<{
+              id: string;
+              title: string;
+              summary: string;
+              audio_url?: string;
+            }>("daily_pep_talks", [
+              ["mentor_slug", "==", mentor.slug],
+            ], "for_date", "desc", 1);
+            pepTalk = recentPepTalks[0];
+          } catch (error) {
+            console.error("Error fetching recent pep talk:", error);
+            // Continue without pep talk if fallback fails
+          }
+        }
+        
+        const dailyQuote = quoteResult[0];
+        const quoteData = dailyQuote?.quote_id
+          ? await getDocument<{ text: string; author?: string | null; category?: string | null }>("quotes", dailyQuote.quote_id)
+          : null;
+
+        setContent({
+          pepTalk: pepTalk ? {
+            id: pepTalk.id,
+            title: pepTalk.title,
+            summary: pepTalk.summary,
+            audio_url: pepTalk.audio_url
+          } : null,
+          quote: quoteData ? {
+            text: quoteData.text,
+            author: quoteData.author || 'Unknown',
+            category: quoteData.category || undefined
+          } : null,
+        });
+      } catch (error) {
+        console.error("Error fetching daily content:", error);
+        setContent({});
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // Fetch both pep talk and quote in parallel
-      const [pepTalkResult, quoteResult] = await Promise.all([
-        getDocuments<{
-          id: string;
-          title: string;
-          summary: string;
-          audio_url?: string;
-        }>("daily_pep_talks", [
-          ["for_date", "==", today],
-          ["mentor_slug", "==", mentor.slug],
-        ], undefined, undefined, 1),
-        getDocuments<{
-          id: string;
-          quote_id: string;
-        }>("daily_quotes", [
-          ["for_date", "==", today],
-          ["mentor_slug", "==", mentor.slug],
-        ], undefined, undefined, 1)
-      ]);
-
-      const pepTalk = pepTalkResult[0];
-      const dailyQuote = quoteResult[0];
-      const quoteData = dailyQuote?.quote_id
-        ? await getDocument<{ text: string; author?: string | null; category?: string | null }>("quotes", dailyQuote.quote_id)
-        : null;
-
-      setContent({
-        pepTalk: pepTalk ? {
-          id: pepTalk.id,
-          title: pepTalk.title,
-          summary: pepTalk.summary,
-          audio_url: pepTalk.audio_url
-        } : null,
-        quote: quoteData ? {
-          text: quoteData.text,
-          author: quoteData.author || 'Unknown',
-          category: quoteData.category || undefined
-        } : null,
-      });
-      setLoading(false);
     };
 
     fetchDailyContent();

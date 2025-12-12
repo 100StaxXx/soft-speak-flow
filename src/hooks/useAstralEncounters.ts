@@ -290,11 +290,15 @@ export const useAstralEncounters = () => {
     }
 
     // Check for recent incomplete encounter
+    // Fetch recent encounters (limit to 50 to avoid fetching all historical data)
     const pendingEncounters = await getDocuments(
       'astral_encounters',
       [
         ['user_id', '==', user.uid],
-      ]
+      ],
+      'created_at',
+      'desc',
+      50 // Limit to recent encounters for performance
     );
 
     const pendingEncounter = pendingEncounters.find(e => !e.completed_at);

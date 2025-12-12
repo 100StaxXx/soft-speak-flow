@@ -203,14 +203,20 @@ export const useCompanion = () => {
             logger.error("Failed to create stage 0 evolution (non-critical):", evolutionError);
             // Don't throw - evolution creation is not critical for companion creation
           }
+        }
 
         // Generate stage 0 card in background (don't await - don't block onboarding)
+        // This should always run, regardless of whether evolution record was just created
         const generateStageZeroCard = async () => {
           try {
             const fullCompanionData = await getDocument("user_companion", companionData.id);
+            if (!fullCompanionData) {
+              logger.warn("Companion data not found for stage 0 card generation");
+              return;
+            }
             
-            // Get evolution ID for stage 0
-            const evolutionRecords = await getDocuments(
+            // Get evolution ID for stage 0 - retry if not found initially
+            let evolutionRecords = await getDocuments(
               "companion_evolutions",
               [
                 ["companion_id", "==", companionData.id],
@@ -218,11 +224,23 @@ export const useCompanion = () => {
               ]
             );
             
+            // If evolution record doesn't exist, wait a bit and retry (it might be creating)
+            if (evolutionRecords.length === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              evolutionRecords = await getDocuments(
+                "companion_evolutions",
+                [
+                  ["companion_id", "==", companionData.id],
+                  ["stage", "==", 0],
+                ]
+              );
+            }
+            
             const evolutionId = evolutionRecords[0]?.id || `${companionData.id}_stage_0`;
             
             // Call Firebase Cloud Function to generate evolution card
             const { generateEvolutionCard } = await import("@/lib/firebase/functions");
-            await generateEvolutionCard({
+            const cardResult = await generateEvolutionCard({
               companionId: companionData.id,
               evolutionId,
               stage: 0,
@@ -236,55 +254,119 @@ export const useCompanion = () => {
               },
             });
             
+            // Update companion's display_name with the creature_name from the card
+            if (cardResult?.card?.creature_name) {
+              try {
+                await updateDocument("user_companion", companionData.id, {
+                  display_name: cardResult.card.creature_name,
+                });
+                logger.log("Updated companion display_name:", cardResult.card.creature_name);
+                
+                // Invalidate companion query to refresh the UI
+                queryClient.invalidateQueries({ queryKey: ["companion"] });
+              } catch (updateError) {
+                logger.error("Failed to update companion display_name:", updateError);
+              }
+            }
+            
+            // Update card and evolution record with image URL if companion has one
+            const imageUrl = fullCompanionData?.current_image_url || fullCompanionData?.initial_image_url;
+            if (imageUrl) {
+              // Update the evolution record with the image URL (only if it exists)
+              if (evolutionRecords.length > 0 && evolutionRecords[0]?.id) {
+                try {
+                  await updateDocument("companion_evolutions", evolutionRecords[0].id, {
+                    image_url: imageUrl,
+                  });
+                  logger.log("Updated stage 0 evolution record with image URL");
+                } catch (updateError) {
+                  logger.error("Failed to update evolution record image URL:", updateError);
+                }
+              }
+              
+              // Retry mechanism for finding and updating the card
+              let cards: any[] = [];
+              const maxRetries = 3;
+              for (let attempt = 0; attempt < maxRetries; attempt++) {
+                if (attempt > 0) {
+                  await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+                }
+                
+                cards = await getDocuments(
+                  "companion_evolution_cards",
+                  [
+                    ["companion_id", "==", companionData.id],
+                    ["evolution_stage", "==", 0],
+                  ]
+                );
+                
+                if (cards.length > 0 && cards[0].id) {
+                  try {
+                    await updateDocument("companion_evolution_cards", cards[0].id, {
+                      image_url: imageUrl,
+                    });
+                    logger.log("Updated stage 0 card with image URL");
+                    break;
+                  } catch (updateError) {
+                    logger.error(`Failed to update card image URL (attempt ${attempt + 1}):`, updateError);
+                    if (attempt === maxRetries - 1) {
+                      logger.warn("Failed to update card image URL after all retries");
+                    }
+                  }
+                } else if (attempt === maxRetries - 1) {
+                  logger.warn("Stage 0 card not found after generation, may need manual retry");
+                }
+              }
+            }
+            
             queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
           } catch (cardError) {
-            console.error("Stage 0 card generation failed (non-critical):", cardError);
+            logger.error("Stage 0 card generation failed (non-critical):", cardError);
           }
         };
 
         generateStageZeroCard(); // Fire and forget - don't block onboarding
-      }
 
-      // Generate story only for new companions
-      if (isNewCompanion) {
-        // Auto-generate the first chapter of the companion's story in background with retry
-        const generateStoryWithRetry = async (attempts = 3) => {
-          for (let attempt = 1; attempt <= attempts; attempt++) {
-            try {
-              const { generateCompanionStory } = await import("@/lib/firebase/functions");
-              await generateCompanionStory({
-                companionId: companion.id,
-                stage: 0,
-              });
-              logger.log("Stage 0 story generated successfully");
-              queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-              queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-              return;
-            } catch (storyError) {
-              const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
-              const isTransient = errorMessage.includes('network') ||
-                                 errorMessage.includes('timeout') ||
-                                 errorMessage.includes('temporarily unavailable');
+        // Generate story only for new companions
+        if (isNewCompanion) {
+          // Auto-generate the first chapter of the companion's story in background with retry
+          const generateStoryWithRetry = async (attempts = 3) => {
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              try {
+                const { generateCompanionStory } = await import("@/lib/firebase/functions");
+                await generateCompanionStory({
+                  companionId: companionData.id,
+                  stage: 0,
+                });
+                logger.log("Stage 0 story generated successfully");
+                queryClient.invalidateQueries({ queryKey: ["companion-story"] });
+                queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+                return;
+              } catch (storyError) {
+                const errorMessage = storyError instanceof Error ? storyError.message : String(storyError);
+                const isTransient = errorMessage.includes('network') ||
+                                   errorMessage.includes('timeout') ||
+                                   errorMessage.includes('temporarily unavailable');
 
-              if (attempt < attempts && isTransient) {
-                logger.log(`Story generation attempt ${attempt} failed, retrying...`);
-                await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-                continue;
+                if (attempt < attempts && isTransient) {
+                  logger.log(`Story generation attempt ${attempt} failed, retrying...`);
+                  await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+                  continue;
+                }
+
+                console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
+                break;
               }
-
-              console.error(`Failed to auto-generate stage 0 story after ${attempt} attempts:`, storyError);
-              break;
             }
-          }
-        };
+          };
 
-        // Start story generation in background (don't await)
-        generateStoryWithRetry().catch((error) => {
-          console.warn('Story generation failed (non-critical):', error?.message || error);
-        });
-      }
+          // Start story generation in background (don't await)
+          generateStoryWithRetry().catch((error) => {
+            console.warn('Story generation failed (non-critical):', error?.message || error);
+          });
+        }
 
-      return companionData;
+        return companionData;
       } catch (error) {
         // Reset flag on error
         companionCreationInProgress.current = false;

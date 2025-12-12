@@ -73,7 +73,7 @@ export const MentorSelectionModal = ({ recommendedMentor, onMentorSelected }: Me
     try {
       // Fetch quotes with null safety
       const quotesData = (await getQuotes(mentorId, 3)) || [];
-      setQuotes(quotesData.map(q => ({ id: q.id, text: q.quote, mentor_id: q.mentor_id || mentorId })));
+      setQuotes(quotesData.map(q => ({ id: q.id, text: q.text || '', mentor_id: q.mentor_id || mentorId })));
 
       // Fetch pep talks with null safety
       const pepTalksData = (await getDocuments(

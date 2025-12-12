@@ -82,13 +82,34 @@ export const generateCompanionName = onCall(
 
       const vibes = "curious, cute, eager"; // Initial stage vibes
 
-      // Build AI prompt with the same rules as the original function
+      // Helper function to check if a name is generic
+      const isGenericName = (name: string): boolean => {
+        const lowerName = name.toLowerCase();
+        const genericWords = [
+          'pup', 'puppy', 'cub', 'kitten', 'baby', 'young', 'little', 'small', 'tiny',
+          'wolf', 'fox', 'dragon', 'tiger', 'bird', 'hound', 'beast', 'creature',
+          'spirit', 'shadow', 'fire', 'storm', 'lightning', 'thunder', 'flame', 'ember',
+          'elder', 'ancient', 'old', 'big', 'large', 'mighty', 'great'
+        ];
+        
+        // Check if name contains any generic words
+        return genericWords.some(word => lowerName.includes(word)) ||
+               // Check if it's an element + species combo pattern
+               lowerName.split(/\s+/).length > 1 && (
+                 lowerName.includes(coreElement.toLowerCase()) || 
+                 lowerName.includes(spiritAnimal.toLowerCase())
+               );
+      };
+
+      // Build AI prompt with strengthened rules
       const systemPrompt = "You are a creative card game designer. Always respond with valid JSON only.";
       const userPrompt = `You are a master fantasy creature naming expert. Generate a UNIQUE, ORIGINAL creature name for this companion's FIRST evolution.
 
+CRITICAL: The name must be a PROPER FANTASY CHARACTER NAME - like "Aragorn" or "Galadriel" from Lord of the Rings, NOT a description like "Fire Wolf" or "Storm Puppy".
+
 CREATURE ATTRIBUTES:
-- Species: ${spiritAnimal}
-- Element: ${coreElement}
+- Species: ${spiritAnimal} (DO NOT use this word in the name)
+- Element: ${coreElement} (DO NOT use this word in the name)
 - Primary Color: ${favoriteColor}
 - Secondary Color: ${coreElement} undertones
 - Personality: ${personality}
@@ -96,57 +117,104 @@ CREATURE ATTRIBUTES:
 - Evolution Stage: 0/20
 - Rarity: Common
 
-NAME GENERATION RULES:
-• Create a PROPER CHARACTER NAME - like naming a protagonist in a fantasy novel
-• 1-2 words maximum
-• Must be mythic, elegant, and slightly otherworldly
-• Easy to pronounce
-• ABSOLUTELY NO generic animal words: pup, puppy, cub, wolf, fox, dragon, tiger, kitten, bird, hound, beast, etc.
-• ABSOLUTELY NO descriptive/stage words: baby, young, elder, ancient, little, big, small, tiny
-• NO element + species combos (e.g., "Fire Wolf", "Storm Tiger", "Lightning Pup")
-• NO references to Pokémon, Digimon, Marvel, Warcraft, or mythology
-• NO real-world names
-• NO numbers
-• Must feel ORIGINAL and fresh - a unique fantasy NAME, not a description
+STRICT NAME GENERATION RULES (VIOLATIONS = REJECTION):
+❌ ABSOLUTELY FORBIDDEN WORDS: pup, puppy, cub, wolf, fox, dragon, tiger, kitten, bird, hound, beast, creature, spirit, shadow
+❌ ABSOLUTELY FORBIDDEN WORDS: baby, young, elder, ancient, little, big, small, tiny, old, great, mighty
+❌ ABSOLUTELY FORBIDDEN: Element names (fire, storm, lightning, thunder, flame, water, earth, air, etc.)
+❌ ABSOLUTELY FORBIDDEN: Species names (${spiritAnimal.toLowerCase()}, wolf, fox, dragon, etc.)
+❌ NO element + species combos: "Fire Wolf", "Storm Tiger", "Lightning ${spiritAnimal}", "${coreElement} ${spiritAnimal}"
+❌ NO descriptive compound names: "Shadow Pup", "Flame Cub", "Thunder Beast"
+❌ NO references to existing IP: Pokémon, Digimon, Marvel, Warcraft, mythology
+❌ NO real-world names: John, Sarah, Max, etc.
+❌ NO numbers: Phoenix1, Zephyr2, etc.
 
-GOOD EXAMPLES: Zephyros, Voltrix, Lumara, Aelion, Nyxara, Embris, Kaelthos, Seraphis, Thalox, Veyra
-BAD EXAMPLES: Fire Pup, Storm Wolf, Lightning Cub, Shadow Fox, Flame Dragon, Thunder Beast, Fulmen Pup
+✅ REQUIRED CRITERIA:
+• 1-2 words maximum
+• Must be a PROPER NAME (like "Zephyros" not "Zephyr Wind")
+• Mythic, elegant, slightly otherworldly
+• Easy to pronounce
+• Unique fantasy name, NOT a description
+• Should sound like a character from an epic fantasy novel
+
+EXCELLENT EXAMPLES (follow this style):
+- Single words: Zephyros, Voltrix, Lumara, Aelion, Nyxara, Embris, Kaelthos, Seraphis, Thalox, Veyra, Kryos, Venari, Zeris, Thalia
+- Two words (if absolutely necessary, must still be unique): Azure Shade, Crimson Wing (NOT "Fire Wolf" or "${coreElement} ${spiritAnimal}")
+
+TERRIBLE EXAMPLES (DO NOT generate names like these):
+- Fire Pup, Storm Wolf, Lightning Cub, Shadow Fox, Flame Dragon, Thunder Beast, ${coreElement} ${spiritAnimal}
+- Little Cub, Baby Wolf, Ancient Dragon, Mighty Beast
+- ${spiritAnimal} Pup, ${spiritAnimal} Cub, Young ${spiritAnimal}
 
 Generate a card with these exact fields in JSON:
 
 {
-  "creature_name": "Generate a unique name following all rules above. This will be permanent.",
+  "creature_name": "Generate a unique PROPER FANTASY CHARACTER NAME (1-2 words) following ALL rules above. This will be permanent. The name should be ORIGINAL and NOT contain any forbidden words.",
   "traits": ["3-5 dynamic trait names that reflect the creature's abilities at stage 0"],
   "story_text": "2-4 paragraphs telling the origin story of this newly awakened creature. Use the generated name throughout.",
   "lore_seed": "One mysterious sentence hinting at the creature's destiny, mentioning its name"
 }
 
-Make it LEGENDARY. This is the birth of a companion.`;
+Remember: This is the birth of a companion. Make the name LEGENDARY and UNIQUE.`;
 
-      // Call Gemini API using helper
-      const geminiResponse = await callGemini(userPrompt, systemPrompt, {
-        temperature: 0.9,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
-      }, apiKey);
-
-      // Parse JSON from AI response
+      // Try up to 3 times to get a non-generic name
       let cardData;
-      try {
-        cardData = parseGeminiJSON(geminiResponse.text);
-      } catch (e) {
-        console.error("Failed to parse AI response:", geminiResponse.text);
-        throw new HttpsError(
-          "internal",
-          "AI response was not valid JSON"
-        );
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        attempts++;
+        
+        // Call Gemini API using helper
+        const geminiResponse = await callGemini(userPrompt, systemPrompt, {
+          temperature: 0.75, // Lowered from 0.9 for more consistent, creative names
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }, apiKey);
+
+        // Parse JSON from AI response
+        try {
+          cardData = parseGeminiJSON(geminiResponse.text);
+        } catch (e) {
+          console.error("Failed to parse AI response:", geminiResponse.text);
+          if (attempts >= maxAttempts) {
+            throw new HttpsError(
+              "internal",
+              "AI response was not valid JSON"
+            );
+          }
+          continue; // Retry
+        }
+
+        if (!cardData.creature_name) {
+          if (attempts >= maxAttempts) {
+            throw new HttpsError(
+              "internal",
+              "AI did not generate a creature name"
+            );
+          }
+          continue; // Retry
+        }
+
+        // Validate that the name is not generic
+        if (isGenericName(cardData.creature_name)) {
+          console.warn(`Generated name "${cardData.creature_name}" is too generic, retrying... (attempt ${attempts}/${maxAttempts})`);
+          if (attempts >= maxAttempts) {
+            // On final attempt, use the name anyway but log a warning
+            console.warn(`Final attempt: using potentially generic name "${cardData.creature_name}"`);
+            break;
+          }
+          continue; // Retry
+        }
+
+        // Name passed validation
+        break;
       }
 
-      if (!cardData.creature_name) {
+      if (!cardData || !cardData.creature_name) {
         throw new HttpsError(
           "internal",
-          "AI did not generate a creature name"
+          "Failed to generate a valid creature name after multiple attempts"
         );
       }
 
@@ -1860,6 +1928,98 @@ export const generateDailyQuotes = functions.https.onCall(async (request) => {
 /**
  * Generate Daily Mentor Pep Talks - AI-powered daily pep talk generation for all mentors
  */
+// Temporary HTTP endpoint for triggering via service account (testing only)
+export const triggerDailyPepTalksHttp = onRequest(
+  {
+    secrets: [geminiApiKey],
+    cors: true,
+  },
+  async (req: ExpressRequest, res: ExpressResponse) => {
+    // Simple auth check - expect a secret key in the request
+    const secretKey = req.headers['x-secret-key'] || req.query.secret;
+    const expectedSecret = process.env.TRIGGER_SECRET || 'temp-trigger-secret-123';
+    
+    if (secretKey !== expectedSecret) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      const db = admin.firestore();
+      const today = new Date().toISOString().split("T")[0];
+      const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+      const results = [];
+
+      for (const mentorSlug of mentorSlugs) {
+        try {
+          const existingSnapshot = await db
+            .collection("daily_pep_talks")
+            .where("mentor_slug", "==", mentorSlug)
+            .where("for_date", "==", today)
+            .limit(1)
+            .get();
+
+          if (!existingSnapshot.empty) {
+            results.push({ mentor: mentorSlug, status: "skipped" });
+            continue;
+          }
+
+          const mentorSnapshot = await db
+            .collection("mentors")
+            .where("slug", "==", mentorSlug)
+            .limit(1)
+            .get();
+
+          if (mentorSnapshot.empty) {
+            results.push({ mentor: mentorSlug, status: "error", error: "Mentor not found" });
+            continue;
+          }
+
+          const mentor = mentorSnapshot.docs[0].data();
+          const prompt = `Generate a daily motivational pep talk for mentor ${mentorSlug}. The mentor's personality is: ${mentor.description || "motivational and inspiring"}. Return JSON: {"script": "Full pep talk script (2-3 minutes of speaking)", "title": "Engaging title", "summary": "Brief summary"}`;
+
+          const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
+            temperature: 0.8,
+            maxOutputTokens: 2048,
+            apiKey: geminiApiKey.value(),
+          });
+
+          const pepTalk = parseGeminiJSON(response.text);
+
+          if (!pepTalk.script || !pepTalk.title) {
+            results.push({ mentor: mentorSlug, status: "error", error: "Invalid response from AI" });
+            continue;
+          }
+
+          await db.collection("daily_pep_talks").add({
+            mentor_slug: mentorSlug,
+            mentor_id: mentorSnapshot.docs[0].id,
+            title: pepTalk.title,
+            summary: pepTalk.summary || "",
+            script: pepTalk.script,
+            audio_url: null,
+            for_date: today,
+            topic_category: "motivation",
+            intensity: "balanced",
+            emotional_triggers: [],
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          results.push({ mentor: mentorSlug, status: "generated" });
+        } catch (error) {
+          console.error(`Error generating pep talk for ${mentorSlug}:`, error);
+          results.push({ mentor: mentorSlug, status: "error", error: error instanceof Error ? error.message : "Unknown error" });
+        }
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error("Error in triggerDailyPepTalksHttp:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }
+);
+
 export const generateDailyMentorPepTalks = functions.https.onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
