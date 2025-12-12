@@ -8,7 +8,8 @@ import {
   generateSampleCard, 
   generateCosmicPostcard,
   generateCompletePepTalk,
-  generateDailyMentorPepTalks
+  generateDailyMentorPepTalks,
+  generateCompanionName
 } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,24 @@ const Admin = () => {
     locationDescription: string;
     caption: string;
   } | null>(null);
+
+  // Companion Name Generator State
+  const [nameTestData, setNameTestData] = useState({
+    spiritAnimal: "wolf",
+    coreElement: "fire",
+    favoriteColor: "crimson",
+    mind: 50,
+    body: 50,
+    soul: 50,
+  });
+  const [generatingName, setGeneratingName] = useState(false);
+  const [generatedName, setGeneratedName] = useState<{
+    name: string;
+    traits: string[];
+    storyText: string;
+    loreSeed: string;
+  } | null>(null);
+  const [nameTestAttempts, setNameTestAttempts] = useState<number[]>([]);
   
   const [mentors, setMentors] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -398,6 +417,51 @@ const Admin = () => {
       toast.error(error.message || "Failed to generate companion image");
     } finally {
       setGeneratingCompanionImage(false);
+    }
+  };
+
+  const handleGenerateCompanionName = async () => {
+    setGeneratingName(true);
+    setGeneratedName(null);
+    setNameTestAttempts([]);
+    const startTime = Date.now();
+
+    try {
+      const data = await generateCompanionName({
+        spiritAnimal: nameTestData.spiritAnimal,
+        favoriteColor: nameTestData.favoriteColor,
+        coreElement: nameTestData.coreElement,
+        userAttributes: {
+          mind: nameTestData.mind,
+          body: nameTestData.body,
+          soul: nameTestData.soul,
+        },
+      });
+
+      const elapsed = Date.now() - startTime;
+      setNameTestAttempts([elapsed]);
+      setGeneratedName({
+        name: data.name,
+        traits: data.traits || [],
+        storyText: data.storyText || "",
+        loreSeed: data.loreSeed || "",
+      });
+      
+      // Check if name seems generic
+      const lowerName = data.name.toLowerCase();
+      const genericWords = ['pup', 'puppy', 'cub', 'wolf', 'fox', 'dragon', 'fire', 'storm', 'lightning'];
+      const isGeneric = genericWords.some(word => lowerName.includes(word));
+      
+      if (isGeneric) {
+        toast.warning(`Generated name "${data.name}" may be too generic!`);
+      } else {
+        toast.success(`Generated unique name: "${data.name}"!`);
+      }
+    } catch (error: any) {
+      console.error("Error generating companion name:", error);
+      toast.error(error.message || "Failed to generate companion name");
+    } finally {
+      setGeneratingName(false);
     }
   };
 
@@ -870,6 +934,180 @@ const Admin = () => {
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Companion Name Generator Tester */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">✨ Companion Name Generator Tester</h2>
+          <p className="text-muted-foreground mb-6">Test companion name generation to verify it avoids generic names</p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="nameSpiritAnimal">Spirit Animal</Label>
+                <select
+                  id="nameSpiritAnimal"
+                  value={nameTestData.spiritAnimal}
+                  onChange={(e) => setNameTestData({ ...nameTestData, spiritAnimal: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="wolf">Wolf</option>
+                  <option value="lion">Lion</option>
+                  <option value="tiger">Tiger</option>
+                  <option value="eagle">Eagle</option>
+                  <option value="bear">Bear</option>
+                  <option value="phoenix">Phoenix</option>
+                  <option value="dragon">Dragon</option>
+                  <option value="fox">Fox</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="nameElement">Core Element</Label>
+                <select
+                  id="nameElement"
+                  value={nameTestData.coreElement}
+                  onChange={(e) => setNameTestData({ ...nameTestData, coreElement: e.target.value })}
+                  className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+                >
+                  <option value="fire">Fire</option>
+                  <option value="water">Water</option>
+                  <option value="earth">Earth</option>
+                  <option value="air">Air</option>
+                  <option value="lightning">Lightning</option>
+                  <option value="ice">Ice</option>
+                  <option value="light">Light</option>
+                  <option value="shadow">Shadow</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="nameColor">Favorite Color</Label>
+                <Input
+                  id="nameColor"
+                  value={nameTestData.favoriteColor}
+                  onChange={(e) => setNameTestData({ ...nameTestData, favoriteColor: e.target.value })}
+                  className="rounded-2xl min-h-[44px] text-base"
+                  placeholder="crimson, azure, emerald..."
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="nameMind">Mind: {nameTestData.mind}</Label>
+                <input
+                  type="range"
+                  id="nameMind"
+                  min="0"
+                  max="100"
+                  value={nameTestData.mind}
+                  onChange={(e) => setNameTestData({ ...nameTestData, mind: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nameBody">Body: {nameTestData.body}</Label>
+                <input
+                  type="range"
+                  id="nameBody"
+                  min="0"
+                  max="100"
+                  value={nameTestData.body}
+                  onChange={(e) => setNameTestData({ ...nameTestData, body: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nameSoul">Soul: {nameTestData.soul}</Label>
+                <input
+                  type="range"
+                  id="nameSoul"
+                  min="0"
+                  max="100"
+                  value={nameTestData.soul}
+                  onChange={(e) => setNameTestData({ ...nameTestData, soul: parseInt(e.target.value) })}
+                  className="w-full h-10 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={handleGenerateCompanionName}
+              disabled={generatingName}
+              className="w-full rounded-2xl min-h-[48px] text-base"
+            >
+              {generatingName ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Generating Name...
+                </>
+              ) : (
+                "✨ Generate Companion Name"
+              )}
+            </Button>
+
+            {generatedName && (
+              <div className="space-y-4 p-4 md:p-6 border rounded-2xl bg-card">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-lg font-semibold">Generated Name:</Label>
+                    {nameTestAttempts.length > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        Generated in {nameTestAttempts[0]}ms
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4 bg-primary/10 rounded-2xl">
+                    <p className="text-2xl font-bold text-primary">{generatedName.name}</p>
+                  </div>
+                </div>
+
+                {generatedName.traits && generatedName.traits.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Traits:</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {generatedName.traits.map((trait, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 bg-muted rounded-full text-sm"
+                        >
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {generatedName.storyText && (
+                  <div className="space-y-2">
+                    <Label>Story:</Label>
+                    <Textarea
+                      value={generatedName.storyText}
+                      readOnly
+                      className="rounded-2xl min-h-[150px] text-sm"
+                    />
+                  </div>
+                )}
+
+                {generatedName.loreSeed && (
+                  <div className="space-y-2">
+                    <Label>Lore Seed:</Label>
+                    <p className="p-3 bg-muted/50 rounded-2xl text-sm italic">
+                      {generatedName.loreSeed}
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Note:</strong> The name should be unique and NOT contain generic words like "pup", "cub", "wolf", "fire", etc.
+                    If it does, the validation should catch it and retry automatically.
+                  </p>
                 </div>
               </div>
             )}

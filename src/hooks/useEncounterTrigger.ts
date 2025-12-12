@@ -139,14 +139,14 @@ export const useEncounterTrigger = () => {
       return { shouldTrigger: false };
     }
 
-    // Update local ref if triggering
     if (shouldTrigger) {
+      // Calculate interval BEFORE updating ref
+      const previousThreshold = nextEncounterRef.current ?? (newTotal - getRandomInterval());
+      const questInterval = newTotal - previousThreshold;
+      
+      // Update ref for next time
       nextEncounterRef.current = nextEncounterValue;
-    }
-
-    if (shouldTrigger) {
-      // Calculate how many quests since last encounter
-      const questInterval = newTotal - ((nextEncounterRef.current ?? newTotal) - getRandomInterval());
+      
       return { 
         shouldTrigger: true, 
         triggerType: 'quest_milestone',
