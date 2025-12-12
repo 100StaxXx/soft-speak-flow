@@ -1,22 +1,12 @@
-# Welcome to your Lovable project
+# Cosmiq - Your Personal AI Mentor
 
-## Project info
-
-**URL**: https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c
+A gamified self-improvement companion with AI mentor, evolving digital companion, and quest-based habit tracking.
 
 ## How can I edit this code?
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
 **Use your preferred IDE**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Clone this repo and work locally using your own IDE.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -62,15 +52,12 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and click on Share -> Publish.
+This project uses Firebase for hosting and backend services. Deploy using:
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```sh
+npm run build
+firebase deploy
+```
 
 ## iOS build troubleshooting
 
