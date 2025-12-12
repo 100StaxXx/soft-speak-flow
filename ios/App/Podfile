@@ -63,6 +63,8 @@ end
 target 'App' do
   pod 'IONFilesystemLib', :path => '../IONFilesystemLib'
   capacitor_pods
+  # Firebase (for native initialization - optional)
+  pod 'Firebase/Core'
   # Add your Pods here
 end
 

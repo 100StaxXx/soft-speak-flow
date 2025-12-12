@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getDocuments } from "@/lib/firebase/firestore";
 import { BottomNav } from "@/components/BottomNav";
@@ -13,13 +13,16 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { Mic } from "lucide-react";
 
+const ITEMS_PER_PAGE = 20;
+
 export default function PepTalks() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
 
-  // Fetch pep talks with filters
+  // Fetch pep talks with filters - limit to reasonable initial amount
   const { data: pepTalks, isLoading } = useQuery({
     queryKey: ["pep-talks", selectedCategory, selectedTrigger],
     queryFn: async () => {
@@ -36,17 +39,31 @@ export default function PepTalks() {
         filters.push(["emotional_triggers", "array-contains", selectedTrigger]);
       }
 
+      // Fetch more than we need initially to support pagination
       const data = await getDocuments(
         "pep_talks",
         filters.length > 0 ? filters : undefined,
         "created_at",
         "desc",
-        50
+        100 // Fetch up to 100, but only display what's needed
       );
 
       return data || [];
     },
   });
+
+  // Reset display count when filters change
+  useEffect(() => {
+    setDisplayCount(ITEMS_PER_PAGE);
+  }, [selectedCategory, selectedTrigger]);
+
+  // Get visible pep talks based on pagination
+  const visiblePepTalks = useMemo(() => {
+    if (!pepTalks) return [];
+    return pepTalks.slice(0, displayCount);
+  }, [pepTalks, displayCount]);
+
+  const hasMore = pepTalks ? pepTalks.length > displayCount : false;
 
   const clearFilters = () => {
     setSelectedCategory(null);
@@ -160,14 +177,14 @@ export default function PepTalks() {
               <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin mb-4" />
               <p className="text-muted-foreground">Loading pep talks...</p>
             </div>
-          ) : pepTalks && pepTalks.length > 0 ? (
+          ) : visiblePepTalks && visiblePepTalks.length > 0 ? (
             <>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-muted-foreground">
-                  {pepTalks.length} pep talk{pepTalks.length !== 1 ? 's' : ''} found
+                  Showing {visiblePepTalks.length} of {pepTalks?.length || 0} pep talk{pepTalks && pepTalks.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              {pepTalks.map((pepTalk) => (
+              {visiblePepTalks.map((pepTalk) => (
                 <PepTalkCard
                   key={pepTalk.id}
                   id={pepTalk.id}
@@ -180,6 +197,16 @@ export default function PepTalks() {
                   emotionalTriggers={pepTalk.emotional_triggers || []}
                 />
               ))}
+              {hasMore && (
+                <div className="flex justify-center mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDisplayCount(prev => prev + ITEMS_PER_PAGE)}
+                  >
+                    Load More ({pepTalks!.length - displayCount} remaining)
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             <Card className="p-12 text-center">
