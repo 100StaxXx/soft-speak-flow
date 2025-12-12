@@ -169,7 +169,16 @@ export const LibraryContent = () => {
                   </>
                 ) : (
                   featuredPepTalks?.map((pepTalk, index) => (
-                    <FeaturedPepTalkCard key={pepTalk.id} pepTalk={pepTalk} index={index} />
+                    <FeaturedPepTalkCard 
+                      key={pepTalk.id} 
+                      pepTalk={{
+                        id: pepTalk.id,
+                        title: pepTalk.title || 'Untitled',
+                        category: pepTalk.category || 'General',
+                        description: pepTalk.description,
+                      }} 
+                      index={index} 
+                    />
                   ))
                 )}
               </div>

@@ -35,10 +35,14 @@ export default function Creator() {
         name: formData.name,
         email: formData.email,
         handle: formData.handle,
-        paypalEmail: formData.paypalEmail,
+        paypalEmail: formData.paypal_email,
       });
       
-      setResult(data);
+      setResult({
+        code: data.code,
+        link: data.link,
+        promo_caption: data.promo_caption || '',
+      });
       toast.success("Your referral code is ready!");
     } catch (error) {
       console.error("Failed to create code:", error);

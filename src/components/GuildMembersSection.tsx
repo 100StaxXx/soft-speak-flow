@@ -74,9 +74,11 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
         });
 
         // Enrich members with profile and companion data
-        const enrichedMembers = membersData.map(member => ({
-          ...member,
-          profile: profileDataMap.get(member.user_id),
+        const enrichedMembers: LeaderboardMember[] = membersData.map(member => ({
+          user_id: member.user_id,
+          total_contribution: member.total_contribution ?? 0,
+          joined_at: member.joined_at || new Date().toISOString(),
+          profile: profilesMap.get(member.user_id),
           companion: companionsMap.get(member.user_id) ? {
             current_image_url: companionsMap.get(member.user_id)?.current_image_url || null,
             spirit_animal: companionsMap.get(member.user_id)?.spirit_animal || null,

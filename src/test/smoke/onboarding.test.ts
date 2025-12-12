@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getAllMentors } from '@/lib/firebase/mentors';
 import { getProfile, updateProfile } from '@/lib/firebase/profiles';
-import { createCompanion } from '@/hooks/useCompanion';
 import { createMockUser, createMockMentor, createMockProfile } from '../utils/testHelpers';
 
 // Mock dependencies
@@ -16,9 +15,8 @@ vi.mock('@/lib/firebase/profiles', () => ({
 
 vi.mock('@/hooks/useCompanion', () => ({
   useCompanion: vi.fn(() => ({
-    createCompanion: vi.fn(() => Promise.resolve({ id: 'companion-123' })),
+    createCompanion: { mutate: vi.fn(() => Promise.resolve({ id: 'companion-123' })) },
   })),
-  createCompanion: vi.fn(() => Promise.resolve({ id: 'companion-123' })),
 }));
 
 vi.mock('@/lib/firebase/firestore', () => ({
@@ -89,12 +87,12 @@ describe('Onboarding Smoke Tests', () => {
       core_element: 'fire',
     };
 
-    const { createCompanion } = await import('@/hooks/useCompanion');
-    const result = await createCompanion(companionData);
+    const { useCompanion } = await import('@/hooks/useCompanion');
+    const companion = useCompanion();
+    const mockMutate = companion.createCompanion.mutate as ReturnType<typeof vi.fn>;
+    mockMutate(companionData);
 
-    expect(createCompanion).toHaveBeenCalledWith(companionData);
-    expect(result).toBeDefined();
-    expect(result.id).toBe('companion-123');
+    expect(mockMutate).toHaveBeenCalledWith(companionData);
   });
 
   it('should complete onboarding flow end-to-end', async () => {

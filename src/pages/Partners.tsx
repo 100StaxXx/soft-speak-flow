@@ -39,7 +39,7 @@ export default function Partners() {
         name: formData.name,
         email: formData.email,
         handle: formData.handle,
-        paypalEmail: formData.paypalEmail,
+        paypalEmail: formData.paypal_email,
       });
       
       toast.success("Your referral code is ready!");

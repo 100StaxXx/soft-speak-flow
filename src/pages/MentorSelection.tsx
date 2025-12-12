@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { getMentors } from "@/lib/firebase/mentors";
+import { getMentors, Mentor } from "@/lib/firebase/mentors";
 import { updateProfile } from "@/lib/firebase/profiles";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
@@ -9,8 +9,6 @@ import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useProfile } from "@/hooks/useProfile";
-import { getMentors, Mentor } from "@/lib/firebase/mentors";
-import { updateProfile } from "@/lib/firebase/profiles";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const MentorSelection = () => {
@@ -123,7 +121,20 @@ const MentorSelection = () => {
 
         {/* Mentor Grid */}
         <MentorGrid 
-          mentors={mentors}
+          mentors={mentors.map(m => ({
+            id: m.id,
+            name: m.name,
+            slug: m.slug || m.id,
+            archetype: m.archetype || '',
+            short_title: m.short_title || '',
+            tone_description: m.tone_description || '',
+            style_description: m.style_description || '',
+            target_user: m.target_user || '',
+            signature_line: m.signature_line || '',
+            primary_color: m.primary_color || '#6366f1',
+            avatar_url: m.avatar_url,
+            themes: [],
+          }))}
           onSelectMentor={handleSelectMentor}
           currentMentorId={getResolvedMentorId(profile)}
           isSelecting={selecting}

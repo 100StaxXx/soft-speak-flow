@@ -220,9 +220,10 @@ export const CompanionDisplay = memo(() => {
     // The companion query will be invalidated and refetched with new data
     // For the evolution animation, we use the image URL from the mutation
     // and the stage from the companion data after refetch
-    const imageUrl = typeof evolveCompanion.data === 'string' 
-      ? evolveCompanion.data 
-      : (evolveCompanion.data as { current_image_url?: string } | undefined)?.current_image_url || "";
+    const mutationData = evolveCompanion.data as string | { current_image_url?: string } | undefined;
+    const imageUrl = typeof mutationData === 'string' 
+      ? mutationData 
+      : mutationData?.current_image_url || "";
     
     // Use companion's current stage + 1 since mutation triggers after XP threshold
     const newStage = companion ? companion.current_stage : 0;

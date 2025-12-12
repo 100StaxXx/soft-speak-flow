@@ -81,8 +81,13 @@ export const EvolutionCardGallery = () => {
       // Deduplicate cards by card_id (handles potential race conditions in card generation)
       const uniqueCards = new Map<string, EvolutionCard>();
       cardsWithImages.forEach(card => {
+        const normalizedCard: EvolutionCard = {
+          ...card,
+          stats: card.stats || {},
+          traits: card.traits || null,
+        };
         if (!uniqueCards.has(card.card_id)) {
-          uniqueCards.set(card.card_id, card);
+          uniqueCards.set(card.card_id, normalizedCard);
         } else {
           // Log duplicate detection for monitoring
           console.warn(`[EvolutionCardGallery] Duplicate card_id detected: ${card.card_id}. This may indicate a race condition in card generation.`);

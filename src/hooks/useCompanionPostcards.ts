@@ -63,6 +63,8 @@ export const useCompanionPostcards = () => {
     }) => {
       if (!user?.uid) throw new Error("Not authenticated");
 
+      // Import generateCosmicPostcard from functions
+      const { generateCosmicPostcard } = await import("@/lib/firebase/functions");
       const data = await generateCosmicPostcard({
         companionId,
         occasion: `milestone-${milestonePercent}`,

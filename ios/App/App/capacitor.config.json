@@ -30,7 +30,10 @@
 	},
 	"packageClassList": [
 		"SignInWithApple",
+<<<<<<< HEAD
+=======
 		"CAPBrowserPlugin",
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 		"FilesystemPlugin",
 		"PushNotificationsPlugin",
 		"ScreenOrientationPlugin",

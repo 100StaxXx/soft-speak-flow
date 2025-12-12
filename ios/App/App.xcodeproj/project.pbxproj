@@ -207,13 +207,25 @@
 				"${BUILT_PRODUCTS_DIR}/CapacitorShare/CapacitorShare.framework",
 				"${BUILT_PRODUCTS_DIR}/CapacitorSplashScreen/CapacitorSplashScreen.framework",
 				"${BUILT_PRODUCTS_DIR}/CapgoCapacitorSocialLogin/CapgoCapacitorSocialLogin.framework",
+<<<<<<< HEAD
+=======
 				"${BUILT_PRODUCTS_DIR}/CapgoNativePurchases/CapgoNativePurchases.framework",
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 				"${BUILT_PRODUCTS_DIR}/GTMAppAuth/GTMAppAuth.framework",
 				"${BUILT_PRODUCTS_DIR}/GTMSessionFetcher/GTMSessionFetcher.framework",
 				"${BUILT_PRODUCTS_DIR}/GoogleSignIn/GoogleSignIn.framework",
 				"${BUILT_PRODUCTS_DIR}/GoogleUtilities/GoogleUtilities.framework",
+<<<<<<< HEAD
+				"${BUILT_PRODUCTS_DIR}/PromisesObjC/FBLPromises.framework",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/FBAEMKit/FBAEMKit.framework/FBAEMKit",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/FBSDKCoreKit/FBSDKCoreKit.framework/FBSDKCoreKit",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.framework/FBSDKCoreKit_Basics",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/FBSDKLoginKit/FBSDKLoginKit.framework/FBSDKLoginKit",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/IONFilesystemLib/IONFilesystemLib.framework/IONFilesystemLib",
+=======
 				"${BUILT_PRODUCTS_DIR}/IONFilesystemLib/IONFilesystemLib.framework",
 				"${BUILT_PRODUCTS_DIR}/PromisesObjC/FBLPromises.framework",
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
@@ -229,13 +241,25 @@
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CapacitorShare.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CapacitorSplashScreen.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CapgoCapacitorSocialLogin.framework",
+<<<<<<< HEAD
+=======
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CapgoNativePurchases.framework",
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GTMAppAuth.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GTMSessionFetcher.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GoogleSignIn.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GoogleUtilities.framework",
+<<<<<<< HEAD
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBLPromises.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBAEMKit.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBSDKCoreKit.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBSDKCoreKit_Basics.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBSDKLoginKit.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IONFilesystemLib.framework",
+=======
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IONFilesystemLib.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBLPromises.framework",
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -394,6 +418,10 @@
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+<<<<<<< HEAD
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+=======
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -420,6 +448,10 @@
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+<<<<<<< HEAD
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+=======
+>>>>>>> a1a0e738b068eeb2bb2742775c22959286144276
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
