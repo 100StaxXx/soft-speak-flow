@@ -23,8 +23,7 @@
     "audit:db": "node scripts/invoke-database-audit.cjs",
     "verify:migration": "tsx scripts/verify-migration.ts",
     "seed:catalog": "tsx scripts/seed-cosmiq-catalog.ts",
-    "verify:catalog": "tsx scripts/verify-catalog-seed.ts",
-    "cleanup:supabase": "bash scripts/cleanup-supabase.sh"
+    "verify:catalog": "tsx scripts/verify-catalog-seed.ts"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
