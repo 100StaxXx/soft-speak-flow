@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface Mentor {
+interface MentorModalData {
   id: string;
   name: string;
   description: string;
@@ -33,7 +33,7 @@ interface PepTalk {
 }
 
 interface MentorSelectionModalProps {
-  recommendedMentor: Mentor;
+  recommendedMentor: MentorModalData;
   onMentorSelected: (mentorId: string) => void;
 }
 
@@ -42,8 +42,8 @@ interface MentorSelectionModalProps {
  * Note: This is different from the MentorSelection page component
  */
 export const MentorSelectionModal = ({ recommendedMentor, onMentorSelected }: MentorSelectionModalProps) => {
-  const [mentors, setMentors] = useState<Mentor[]>([]);
-  const [selectedMentor, setSelectedMentor] = useState<Mentor>(recommendedMentor);
+  const [mentors, setMentors] = useState<MentorModalData[]>([]);
+  const [selectedMentor, setSelectedMentor] = useState<MentorModalData>(recommendedMentor);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +61,17 @@ export const MentorSelectionModal = ({ recommendedMentor, onMentorSelected }: Me
   const fetchMentors = async () => {
     try {
       const data = await getMentors(false); // Get all mentors, not just active
-      setMentors(data);
+      // Map to MentorModalData format
+      const mappedMentors: MentorModalData[] = data.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.tone_description || '',
+        identity_description: m.style_description || null,
+        tone_description: m.tone_description || '',
+        style: m.archetype || null,
+        tags: [],
+      }));
+      setMentors(mappedMentors);
     } catch (error) {
       console.error("Error fetching mentors:", error);
     } finally {

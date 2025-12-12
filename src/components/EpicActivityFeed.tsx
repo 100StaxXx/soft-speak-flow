@@ -53,10 +53,13 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
         }
         
         const enrichedActivities = data.map(activity => ({
-          ...activity,
+          id: activity.id || `${activity.epic_id}_${activity.user_id}_${Date.now()}`,
+          user_id: activity.user_id,
+          activity_type: activity.activity_type,
           activity_data: typeof activity.activity_data === 'object' && activity.activity_data !== null 
             ? activity.activity_data as Record<string, unknown>
             : {},
+          created_at: activity.created_at || new Date().toISOString(),
           profiles: profileMap.get(activity.user_id)
         }));
         

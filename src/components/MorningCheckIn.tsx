@@ -16,6 +16,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
 import { getDocuments, setDocument } from "@/lib/firebase/firestore";
+import { getCheckIn } from "@/lib/firebase/dailyCheckIns";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();

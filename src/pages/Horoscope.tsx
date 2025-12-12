@@ -99,13 +99,15 @@ const Horoscope = () => {
         throw new Error("Failed to generate horoscope");
       }
 
-      setHoroscope(data.horoscope);
-      setZodiac(data.zodiac || profile.zodiac_sign);
-      setIsPersonalized(data.isPersonalized || false);
-      setDate(data.date || new Date().toLocaleDateString('en-CA'));
-      setCosmiqTip(data.cosmiqTip || null);
-      setEnergyForecast(data.energyForecast || null);
-      setPlacementInsights(data.placementInsights || null);
+      // Extract data from the response - horoscope may be nested or flat
+      const horoscopeData = data.horoscope as any;
+      setHoroscope(typeof horoscopeData === 'string' ? horoscopeData : horoscopeData?.text || horoscopeData?.horoscope || JSON.stringify(horoscopeData));
+      setZodiac(horoscopeData?.zodiac || (data as any)?.zodiac || profile.zodiac_sign);
+      setIsPersonalized(horoscopeData?.isPersonalized || (data as any)?.isPersonalized || false);
+      setDate(horoscopeData?.date || (data as any)?.date || new Date().toLocaleDateString('en-CA'));
+      setCosmiqTip(horoscopeData?.cosmiqTip || (data as any)?.cosmiqTip || null);
+      setEnergyForecast(horoscopeData?.energyForecast || (data as any)?.energyForecast || null);
+      setPlacementInsights(horoscopeData?.placementInsights || (data as any)?.placementInsights || null);
     } catch (err) {
       console.error('Error generating horoscope:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
