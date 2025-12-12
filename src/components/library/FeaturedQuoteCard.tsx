@@ -1,11 +1,6 @@
 import { motion } from "framer-motion";
 import { Quote, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
-<<<<<<< HEAD
-=======
-import { getDocuments, setDocument, deleteDocument } from "@/lib/firebase/firestore";
-import { useAuth } from "@/hooks/useAuth";
->>>>>>> origin/main
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { addFavorite, removeFavorite, isFavorite } from "@/lib/firebase/favorites";
@@ -50,15 +45,6 @@ export const FeaturedQuoteCard = ({ quote, index }: FeaturedQuoteCardProps) => {
         setIsFavorited(false);
       } else {
         await addFavorite(user.id, quote.id);
-        await deleteDocument("favorites", favoriteId);
-        setIsFavorited(false);
-      } else {
-        await setDocument("favorites", favoriteId, {
-          user_id: user.uid,
-          content_type: "quote",
-          content_id: quote.id,
-        }, false);
->>>>>>> origin/main
         setIsFavorited(true);
       }
     } catch (error) {

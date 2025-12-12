@@ -34,6 +34,10 @@ const appleWebhookAudience = defineSecret("APPLE_WEBHOOK_AUDIENCE");
 // Define secret for Gemini API
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
+// Define secrets for OpenAI and ElevenLabs API
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+const elevenlabsApiKey = defineSecret("ELEVENLABS_API_KEY");
+
 /**
  * Generate a companion name using AI
  * Uses the same rules as the original Supabase edge function
@@ -1297,7 +1301,12 @@ export const generateCompanionImage = functions.https.onCall(async (request) => 
       throw new functions.https.HttpsError("invalid-argument", "Missing companionId or stage");
     }
 
-    const prompt = `Generate an image description for a ${species} companion at evolution stage ${stage} with ${element} element and ${color} color. Return JSON: {"imagePrompt": "Detailed image generation prompt", "description": "Image description"}`;
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = species?.toLowerCase() === "cerberus" 
+      ? "Cerberus with 3 heads" 
+      : species;
+    
+    const prompt = `Generate an image description for a ${speciesDescription} companion at evolution stage ${stage} with ${element} element and ${color} color. Return JSON: {"imagePrompt": "Detailed image generation prompt", "description": "Image description"}`;
 
     const response = await callGemini(prompt, "You are an image prompt generator. Always respond with valid JSON only.", {
       temperature: 0.9,
@@ -1605,7 +1614,17 @@ export const generateNeglectedCompanionImage = functions.https.onCall(async (req
       throw new functions.https.HttpsError("invalid-argument", "Missing companionId");
     }
 
-    const prompt = `Generate an image description for a neglected companion. Days since last interaction: ${daysSinceLastInteraction || 0}. Return JSON: {"imagePrompt": "Image prompt", "description": "Description"}`;
+    // Get companion data to check if it's Cerberus
+    const db = admin.firestore();
+    const companionDoc = await db.collection("user_companion").doc(companionId).get();
+    const companion = companionDoc.exists ? companionDoc.data()! : null;
+    
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = companion?.spirit_animal?.toLowerCase() === "cerberus"
+      ? "neglected Cerberus with 3 heads"
+      : "neglected companion";
+
+    const prompt = `Generate an image description for a ${speciesDescription}. Days since last interaction: ${daysSinceLastInteraction || 0}. Return JSON: {"imagePrompt": "Image prompt", "description": "Description"}`;
 
     const response = await callGemini(prompt, "You are an image prompt generator. Always respond with valid JSON only.", {
       temperature: 0.9,
@@ -1749,7 +1768,12 @@ export const generateCompanionEvolution = functions.https.onCall(async (request)
     }
     const companion = companionDoc.data()!;
 
-    const prompt = `Generate evolution details for companion. Current stage: ${currentStage}, Target stage: ${targetStage || currentStage + 1}, Species: ${companion.spirit_animal}, Element: ${companion.core_element}. Return JSON: {"evolutionDescription": "Description", "newAbilities": ["ability1"], "imagePrompt": "Image prompt"}`;
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = companion.spirit_animal?.toLowerCase() === "cerberus"
+      ? "Cerberus with 3 heads"
+      : companion.spirit_animal;
+
+    const prompt = `Generate evolution details for companion. Current stage: ${currentStage}, Target stage: ${targetStage || currentStage + 1}, Species: ${speciesDescription}, Element: ${companion.core_element}. Return JSON: {"evolutionDescription": "Description", "newAbilities": ["ability1"], "imagePrompt": "Image prompt"}`;
 
     const response = await callGemini(prompt, "You are an evolution designer. Always respond with valid JSON only.", {
       temperature: 0.9,
@@ -1901,21 +1925,25 @@ export const generateDailyMentorPepTalks = functions.https.onCall(async (request
  * Generate Mentor Audio - Text-to-speech using ElevenLabs
  * Note: This uses ElevenLabs API, not Gemini
  */
-export const generateMentorAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { mentorSlug, script } = request.data;
-    if (!mentorSlug || !script) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing mentorSlug or script");
+export const generateMentorAudio = onCall(
+  {
+    secrets: [elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{ mentorSlug: string; script: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-    if (!ELEVENLABS_API_KEY) {
-      throw new functions.https.HttpsError("internal", "ELEVENLABS_API_KEY not configured");
-    }
+    try {
+      const { mentorSlug, script } = request.data;
+      if (!mentorSlug || !script) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug or script");
+      }
+
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      if (!ELEVENLABS_API_KEY) {
+        throw new HttpsError("internal", "ELEVENLABS_API_KEY not configured");
+      }
 
     const mentorVoices: Record<string, any> = {
       atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
@@ -1959,7 +1987,7 @@ export const generateMentorAudio = functions.https.onCall(async (request) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs API error:", errorText);
-      throw new functions.https.HttpsError("internal", `ElevenLabs API error: ${response.status}`);
+      throw new HttpsError("internal", `ElevenLabs API error: ${response.status}`);
     }
 
     const audioBuffer = await response.arrayBuffer();
@@ -1981,42 +2009,51 @@ export const generateMentorAudio = functions.https.onCall(async (request) => {
     return { audioUrl };
   } catch (error) {
     console.error("Error in generateMentorAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
 /**
  * Generate Full Mentor Audio - Orchestrates script generation and audio generation
  */
-export const generateFullMentorAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
-    if (!mentorSlug) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing mentorSlug");
+export const generateFullMentorAudio = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{
+    mentorSlug: string;
+    topicCategory?: string;
+    intensity?: string;
+    emotionalTriggers?: string;
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    // Step 1: Generate script
-    const scriptPrompt = `Generate a pep talk script for mentor ${mentorSlug}. Topic: ${topicCategory || "general"}, Intensity: ${intensity || "balanced"}, Triggers: ${emotionalTriggers || "none"}. Return JSON: {"script": "Full script text"}`;
+    try {
+      const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
+      if (!mentorSlug) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug");
+      }
 
-    const scriptResponse = await callGemini(scriptPrompt, "You are a motivational speaker. Always respond with valid JSON only.", {
-      temperature: 0.8,
-      maxOutputTokens: 2048,
-    });
+      // Step 1: Generate script
+      const scriptPrompt = `Generate a pep talk script for mentor ${mentorSlug}. Topic: ${topicCategory || "general"}, Intensity: ${intensity || "balanced"}, Triggers: ${emotionalTriggers || "none"}. Return JSON: {"script": "Full script text"}`;
 
-    const scriptData = parseGeminiJSON(scriptResponse.text);
-    const script = scriptData.script;
+      const scriptResponse = await callGemini(scriptPrompt, "You are a motivational speaker. Always respond with valid JSON only.", {
+        temperature: 0.8,
+        maxOutputTokens: 2048,
+      }, geminiApiKey.value());
 
-    // Step 2: Generate audio (call the generateMentorAudio function internally)
-    // For now, we'll call ElevenLabs directly here
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-    if (!ELEVENLABS_API_KEY) {
-      throw new functions.https.HttpsError("internal", "ELEVENLABS_API_KEY not configured");
-    }
+      const scriptData = parseGeminiJSON(scriptResponse.text);
+      const script = scriptData.script;
+
+      // Step 2: Generate audio (call the generateMentorAudio function internally)
+      // For now, we'll call ElevenLabs directly here
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      if (!ELEVENLABS_API_KEY) {
+        throw new HttpsError("internal", "ELEVENLABS_API_KEY not configured");
+      }
 
     const mentorVoices: Record<string, string> = {
       atlas: "JBFqnCBsd6RMkjVDRZzb",
@@ -2054,7 +2091,7 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
     );
 
     if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", "Failed to generate audio");
+      throw new HttpsError("internal", "Failed to generate audio");
     }
 
     const audioBuffer = await audioResponse.arrayBuffer();
@@ -2075,8 +2112,8 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
     return { script, audioUrl };
   } catch (error) {
     console.error("Error in generateFullMentorAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
@@ -2084,24 +2121,28 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
  * Test function to verify API keys are configured correctly
  * This is a simple diagnostic function
  */
-export const testApiKeys = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
+export const testApiKeys = onCall(
+  {
+    secrets: [geminiApiKey, openaiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
 
-  const results: Record<string, boolean | string> = {};
+    const results: Record<string, boolean | string> = {};
 
-  // Check Gemini API Key
-  const geminiKey = process.env.GEMINI_API_KEY;
-  results.GEMINI_API_KEY = geminiKey ? `${geminiKey.substring(0, 10)}...` : "NOT SET";
+    // Check Gemini API Key
+    const geminiKey = geminiApiKey.value();
+    results.GEMINI_API_KEY = geminiKey ? `${geminiKey.substring(0, 10)}...` : "NOT SET";
 
-  // Check OpenAI API Key
-  const openaiKey = process.env.OPENAI_API_KEY;
-  results.OPENAI_API_KEY = openaiKey ? `${openaiKey.substring(0, 10)}...` : "NOT SET";
+    // Check OpenAI API Key
+    const openaiKey = openaiApiKey.value();
+    results.OPENAI_API_KEY = openaiKey ? `${openaiKey.substring(0, 10)}...` : "NOT SET";
 
-  // Check ElevenLabs API Key
-  const elevenlabsKey = process.env.ELEVENLABS_API_KEY;
-  results.ELEVENLABS_API_KEY = elevenlabsKey ? `${elevenlabsKey.substring(0, 10)}...` : "NOT SET";
+    // Check ElevenLabs API Key
+    const elevenlabsKey = elevenlabsApiKey.value();
+    results.ELEVENLABS_API_KEY = elevenlabsKey ? `${elevenlabsKey.substring(0, 10)}...` : "NOT SET";
 
   return {
     success: true,
@@ -2115,10 +2156,14 @@ export const testApiKeys = functions.https.onCall(async (request) => {
  * Generate Evolution Voice - AI-powered evolution voice line generation using OpenAI GPT-5-mini
  * Note: Uses OpenAI for text generation, then ElevenLabs for TTS
  */
-export const generateEvolutionVoice = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
+export const generateEvolutionVoice = onCall(
+  {
+    secrets: [openaiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{ mentorSlug: string; newStage: number }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
 
   try {
     const { mentorSlug, newStage } = request.data;
@@ -2148,9 +2193,9 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
 
     const mentor = mentorsSnapshot.docs[0].data();
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = openaiApiKey.value();
     if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
+      throw new HttpsError("internal", "OPENAI_API_KEY not configured");
     }
 
     // Generate voice line using OpenAI GPT-5-mini
@@ -2177,14 +2222,14 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
     });
 
     if (!openaiResponse.ok) {
-      throw new functions.https.HttpsError("internal", "Failed to generate voice line");
+      throw new HttpsError("internal", "Failed to generate voice line");
     }
 
     const openaiData = await openaiResponse.json();
     const voiceLine = openaiData.choices[0].message.content.trim().replace(/^["']|["']$/g, "");
 
     // Convert to speech using ElevenLabs
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+    const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
     if (!ELEVENLABS_API_KEY) {
       return { voiceLine, audioContent: null };
     }
@@ -2245,26 +2290,30 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
 /**
  * Transcribe Audio - Uses OpenAI Whisper API to transcribe audio files
  */
-export const transcribeAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { audioUrl } = request.data;
-    if (!audioUrl) {
-      throw new functions.https.HttpsError("invalid-argument", "Audio URL is required");
+export const transcribeAudio = onCall(
+  {
+    secrets: [openaiApiKey],
+  },
+  async (request: CallableRequest<{ audioUrl: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
-    }
+    try {
+      const { audioUrl } = request.data;
+      if (!audioUrl) {
+        throw new HttpsError("invalid-argument", "Audio URL is required");
+      }
+
+      const OPENAI_API_KEY = openaiApiKey.value();
+      if (!OPENAI_API_KEY) {
+        throw new HttpsError("internal", "OPENAI_API_KEY not configured");
+      }
 
     // Fetch the audio file
     const audioResponse = await fetch(audioUrl);
     if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
+      throw new HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
     }
 
     const audioBuffer = await audioResponse.arrayBuffer();
@@ -2291,7 +2340,7 @@ export const transcribeAudio = functions.https.onCall(async (request) => {
     if (!transcriptionResponse.ok) {
       const errorText = await transcriptionResponse.text();
       console.error("OpenAI API error:", errorText);
-      throw new functions.https.HttpsError("internal", `OpenAI API error: ${transcriptionResponse.status}`);
+      throw new HttpsError("internal", `OpenAI API error: ${transcriptionResponse.status}`);
     }
 
     const transcriptionData = await transcriptionResponse.json();
@@ -2313,127 +2362,131 @@ export const transcribeAudio = functions.https.onCall(async (request) => {
     };
   } catch (error) {
     console.error("Error in transcribeAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed to transcribe audio: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed to transcribe audio: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
 /**
  * Sync Daily Pep Talk Transcript - Syncs transcript for daily pep talks
  */
-export const syncDailyPepTalkTranscript = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { id, mentorSlug, forDate } = request.data;
-
-    const db = admin.firestore();
-
-    // Fetch the daily pep talk
-    let pepTalkDoc: admin.firestore.DocumentSnapshot | null = null;
-    if (id) {
-      pepTalkDoc = await db.collection("daily_pep_talks").doc(id).get();
-    } else if (mentorSlug && forDate) {
-      const snapshot = await db
-        .collection("daily_pep_talks")
-        .where("mentor_slug", "==", mentorSlug)
-        .where("for_date", "==", forDate)
-        .limit(1)
-        .get();
-      pepTalkDoc = snapshot.docs[0] || null;
-    } else {
-      throw new functions.https.HttpsError("invalid-argument", "Provide either id or {mentorSlug, forDate}");
+export const syncDailyPepTalkTranscript = onCall(
+  {
+    secrets: [openaiApiKey],
+  },
+  async (request: CallableRequest<{ id?: string; mentorSlug?: string; forDate?: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    if (!pepTalkDoc || !pepTalkDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Pep talk not found");
-    }
+    try {
+      const { id, mentorSlug, forDate } = request.data;
 
-    const pepTalk = pepTalkDoc.data()!;
-    if (!pepTalk.audio_url) {
-      throw new functions.https.HttpsError("invalid-argument", "Pep talk has no audio_url");
-    }
+      const db = admin.firestore();
 
-    // Transcribe audio using OpenAI Whisper
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
-    }
+      // Fetch the daily pep talk
+      let pepTalkDoc: admin.firestore.DocumentSnapshot | null = null;
+      if (id) {
+        pepTalkDoc = await db.collection("daily_pep_talks").doc(id).get();
+      } else if (mentorSlug && forDate) {
+        const snapshot = await db
+          .collection("daily_pep_talks")
+          .where("mentor_slug", "==", mentorSlug)
+          .where("for_date", "==", forDate)
+          .limit(1)
+          .get();
+        pepTalkDoc = snapshot.docs[0] || null;
+      } else {
+        throw new HttpsError("invalid-argument", "Provide either id or {mentorSlug, forDate}");
+      }
 
-    const audioResponse = await fetch(pepTalk.audio_url);
-    if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
-    }
+      if (!pepTalkDoc || !pepTalkDoc.exists) {
+        throw new HttpsError("not-found", "Pep talk not found");
+      }
 
-    const audioBuffer = await audioResponse.arrayBuffer();
-    const audioBlob = Buffer.from(audioBuffer);
+      const pepTalk = pepTalkDoc.data()!;
+      if (!pepTalk.audio_url) {
+        throw new HttpsError("invalid-argument", "Pep talk has no audio_url");
+      }
 
-    const FormData = require("form-data");
-    const formData = new FormData();
-    formData.append("file", audioBlob, { filename: "audio.mp3", contentType: "audio/mpeg" });
-    formData.append("model", "whisper-1");
-    formData.append("response_format", "verbose_json");
-    formData.append("timestamp_granularities[]", "word");
+      // Transcribe audio using OpenAI Whisper
+      const OPENAI_API_KEY = openaiApiKey.value();
+      if (!OPENAI_API_KEY) {
+        throw new HttpsError("internal", "OPENAI_API_KEY not configured");
+      }
 
-    const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        ...formData.getHeaders(),
-      },
-      body: formData,
-    });
+      const audioResponse = await fetch(pepTalk.audio_url);
+      if (!audioResponse.ok) {
+        throw new HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
+      }
 
-    if (!transcriptionResponse.ok) {
-      const errorText = await transcriptionResponse.text();
-      throw new functions.https.HttpsError("internal", `Transcription failed: ${errorText}`);
-    }
+      const audioBuffer = await audioResponse.arrayBuffer();
+      const audioBlob = Buffer.from(audioBuffer);
 
-    const transcriptionData = await transcriptionResponse.json();
-    const words = transcriptionData.words || [];
-    const transcript = words.map((wordData: any) => ({
-      word: wordData.word,
-      start: wordData.start,
-      end: wordData.end,
-    }));
+      const FormData = require("form-data");
+      const formData = new FormData();
+      formData.append("file", audioBlob, { filename: "audio.mp3", contentType: "audio/mpeg" });
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "verbose_json");
+      formData.append("timestamp_granularities[]", "word");
 
-    const transcription = {
-      text: transcriptionData.text,
-      transcript,
-    };
+      const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          ...formData.getHeaders(),
+        },
+        body: formData,
+      });
 
-    const transcribedText = transcription.text;
-    const wordTimestamps = transcription.transcript || [];
+      if (!transcriptionResponse.ok) {
+        const errorText = await transcriptionResponse.text();
+        throw new HttpsError("internal", `Transcription failed: ${errorText}`);
+      }
 
-    if (!transcribedText) {
-      throw new functions.https.HttpsError("internal", "No transcription text returned");
-    }
+      const transcriptionData = await transcriptionResponse.json();
+      const words = transcriptionData.words || [];
+      const transcript = words.map((wordData: any) => ({
+        word: wordData.word,
+        start: wordData.start,
+        end: wordData.end,
+      }));
+
+      const transcription = {
+        text: transcriptionData.text,
+        transcript,
+      };
+
+      const transcribedText = transcription.text;
+      const wordTimestamps = transcription.transcript || [];
+
+      if (!transcribedText) {
+        throw new HttpsError("internal", "No transcription text returned");
+      }
 
     // If the new text differs significantly, update the row
     const currentText = pepTalk.script || "";
     const differs = currentText.trim() !== transcribedText.trim();
 
-    if (differs) {
-      await db.collection("daily_pep_talks").doc(pepTalkDoc.id).update({
+      if (differs) {
+        await db.collection("daily_pep_talks").doc(pepTalkDoc.id).update({
+          script: transcribedText,
+          transcript: wordTimestamps,
+        });
+      }
+
+      return {
+        id: pepTalkDoc.id,
         script: transcribedText,
         transcript: wordTimestamps,
-      });
+        changed: differs,
+      };
+    } catch (error) {
+      console.error("Error in syncDailyPepTalkTranscript:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed to sync transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-
-    return {
-      id: pepTalkDoc.id,
-      script: transcribedText,
-      transcript: wordTimestamps,
-      changed: differs,
-    };
-  } catch (error) {
-    console.error("Error in syncDailyPepTalkTranscript:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed to sync transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
-});
+  });
 
 /**
  * Seed Real Quotes - Seeds real quotes into the database
@@ -3247,12 +3300,23 @@ export const scheduledDispatchDailyPushes = onSchedule(
           const pepTalk = pepTalkDoc.data()!;
 
           // Get user's push subscriptions (web and iOS)
+          // Check both user_id and userId fields for compatibility
           const subscriptionsSnapshot = await db
             .collection("push_subscriptions")
             .where("user_id", "==", push.user_id)
             .get();
+          
+          // Also check userId field if no results (for compatibility with frontend naming)
+          let subscriptions = subscriptionsSnapshot.docs;
+          if (subscriptions.length === 0) {
+            const userIdSnapshot = await db
+              .collection("push_subscriptions")
+              .where("userId", "==", push.user_id)
+              .get();
+            subscriptions = userIdSnapshot.docs;
+          }
 
-          if (subscriptionsSnapshot.empty) {
+          if (subscriptions.length === 0) {
             console.log(`No push subscriptions for user ${push.user_id}`);
             // Mark as delivered anyway (user has no devices registered)
             await pushDoc.ref.update({
@@ -3263,10 +3327,10 @@ export const scheduledDispatchDailyPushes = onSchedule(
           }
 
           // Separate web and iOS subscriptions
-          const webSubscriptions = subscriptionsSnapshot.docs.filter(
+          const webSubscriptions = subscriptions.filter(
             (doc) => doc.data().platform === "web" || !doc.data().platform
           );
-          const iosSubscriptions = subscriptionsSnapshot.docs.filter(
+          const iosSubscriptions = subscriptions.filter(
             (doc) => doc.data().platform === "ios"
           );
 
@@ -3323,20 +3387,28 @@ export const scheduledDispatchDailyPushes = onSchedule(
 
           // Send to iOS subscriptions
           if (iosSubscriptions.length > 0) {
-            const apnsKeyId = process.env.APNS_KEY_ID;
-            const apnsTeamId = process.env.APNS_TEAM_ID;
-            const apnsBundleId = process.env.APNS_BUNDLE_ID;
-            const apnsKey = process.env.APNS_AUTH_KEY;
+            const apnsKeyIdValue = apnsKeyId.value();
+            const apnsTeamIdValue = apnsTeamId.value();
+            const apnsBundleIdValue = apnsBundleId.value();
+            const apnsKeyValue = apnsAuthKey.value();
+            const apnsEnvironmentValue = apnsEnvironment.value() || "production";
 
-            if (apnsKeyId && apnsTeamId && apnsBundleId && apnsKey) {
+            if (apnsKeyIdValue && apnsTeamIdValue && apnsBundleIdValue && apnsKeyValue) {
               const iosSendPromises = iosSubscriptions.map(async (subDoc) => {
                 const sub = subDoc.data();
                 try {
-                  const jwt = await generateAPNsJWT(apnsKeyId, apnsTeamId, apnsKey);
-                  const apnsHost = process.env.APNS_ENVIRONMENT === "production" 
+                  const jwt = await generateAPNsJWT(apnsKeyIdValue, apnsTeamIdValue, apnsKeyValue);
+                  const apnsHost = apnsEnvironmentValue === "production" 
                     ? "api.push.apple.com" 
                     : "api.sandbox.push.apple.com";
-                  const apnsUrl = `https://${apnsHost}/3/device/${sub.device_token || sub.endpoint}`;
+                  // iOS tokens are stored in endpoint field for push_subscriptions
+                  const deviceToken = sub.endpoint || sub.device_token;
+                  if (!deviceToken) {
+                    console.log(`iOS subscription ${subDoc.id} missing device token`);
+                    return { success: false, error: "Missing device token" };
+                  }
+                  
+                  const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`;
 
                   const payload = {
                     aps: {
@@ -3357,7 +3429,7 @@ export const scheduledDispatchDailyPushes = onSchedule(
                     method: "POST",
                     headers: {
                       authorization: `bearer ${jwt}`,
-                      "apns-topic": apnsBundleId,
+                      "apns-topic": apnsBundleIdValue,
                       "apns-push-type": "alert",
                       "apns-priority": "10",
                       "content-type": "application/json",
@@ -3395,11 +3467,11 @@ export const scheduledDispatchDailyPushes = onSchedule(
               delivered_at: admin.firestore.FieldValue.serverTimestamp(),
             });
             dispatched++;
-            console.log(`✓ Dispatched push ${pushDoc.id} to ${successCount}/${subscriptionsSnapshot.size} devices`);
+            console.log(`✓ Dispatched push ${pushDoc.id} to ${successCount}/${subscriptions.length} devices`);
           } else {
             errors.push({
               pushId: pushDoc.id,
-              error: `Failed to send to all ${subscriptionsSnapshot.size} devices`,
+              error: `Failed to send to all ${subscriptions.length} devices`,
             });
           }
         } catch (error) {
@@ -4271,3 +4343,963 @@ export const appleWebhook = onRequest(
     res.status(200).send("OK");
   }
 });
+
+/**
+ * Scheduled function: Deliver scheduled notifications (runs every 5 minutes)
+ * Processes pending notifications from push_notification_queue
+ */
+export const scheduledDeliverScheduledNotifications = onSchedule(
+  {
+    schedule: "*/5 * * * *", // Every 5 minutes
+    timeZone: "UTC",
+    secrets: [vapidPublicKey, vapidPrivateKey, vapidSubject, apnsKeyId, apnsTeamId, apnsBundleId, apnsAuthKey, apnsEnvironment],
+  },
+  async () => {
+    console.log("Starting scheduled notification delivery...");
+
+    try {
+      const db = admin.firestore();
+      const now = admin.firestore.Timestamp.now();
+
+      // Get pending notifications that are due
+      // Note: orderBy requires a composite index. If index doesn't exist, remove orderBy or create index.
+      const pendingNotificationsSnapshot = await db
+        .collection("push_notification_queue")
+        .where("delivered", "==", false)
+        .where("scheduled_for", "<=", now)
+        .limit(50)
+        .get();
+      
+      // Sort in memory if orderBy causes index issues
+      const sortedDocs = pendingNotificationsSnapshot.docs.sort((a, b) => {
+        const aScheduled = a.data().scheduled_for;
+        const bScheduled = b.data().scheduled_for;
+        const aTime = aScheduled?.toMillis?.() || 
+                     (aScheduled instanceof admin.firestore.Timestamp ? aScheduled.toMillis() : 0) ||
+                     0;
+        const bTime = bScheduled?.toMillis?.() || 
+                     (bScheduled instanceof admin.firestore.Timestamp ? bScheduled.toMillis() : 0) ||
+                     0;
+        return aTime - bTime;
+      });
+
+      if (pendingNotificationsSnapshot.empty) {
+        console.log("No pending notifications to deliver");
+        return;
+      }
+
+      console.log(`Found ${pendingNotificationsSnapshot.size} notifications to deliver`);
+
+      let delivered = 0;
+      let failed = 0;
+
+      // Load VAPID keys for Web Push
+      const vapidPublicKeyValue = vapidPublicKey.value();
+      const vapidPrivateKeyValue = vapidPrivateKey.value();
+      const vapidSubjectValue = vapidSubject.value() || "mailto:admin@cosmiq.quest";
+
+      const webpush = require("web-push");
+      if (vapidPublicKeyValue && vapidPrivateKeyValue) {
+        webpush.setVapidDetails(vapidSubjectValue, vapidPublicKeyValue, vapidPrivateKeyValue);
+      }
+
+      for (const notificationDoc of sortedDocs) {
+        try {
+          const notification = notificationDoc.data();
+          if (!notification.user_id) {
+            console.error(`Notification ${notificationDoc.id} missing user_id`);
+            continue;
+          }
+          console.log(`Processing notification ${notificationDoc.id} for user ${notification.user_id}`);
+
+          // Get user's push subscriptions (check both user_id and userId fields for compatibility)
+          const subscriptionsSnapshot = await db
+            .collection("push_subscriptions")
+            .where("user_id", "==", notification.user_id)
+            .get();
+          
+          // Also check userId field if no results (for compatibility with frontend naming)
+          let subscriptions = subscriptionsSnapshot.docs;
+          if (subscriptions.length === 0) {
+            const userIdSnapshot = await db
+              .collection("push_subscriptions")
+              .where("userId", "==", notification.user_id)
+              .get();
+            subscriptions = userIdSnapshot.docs;
+          }
+
+          if (subscriptions.length === 0) {
+            console.log(`No subscription for user ${notification.user_id}, marking as delivered`);
+            await notificationDoc.ref.update({
+              delivered: true,
+              delivered_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            delivered++;
+            continue;
+          }
+
+          let success = false;
+
+          // Send to all subscriptions
+          for (const subDoc of subscriptions) {
+            const sub = subDoc.data();
+
+            if (sub.platform === "ios") {
+              // iOS tokens are stored in endpoint field for push_subscriptions
+              const deviceToken = sub.endpoint || sub.device_token;
+              if (!deviceToken) {
+                console.log(`iOS subscription ${subDoc.id} missing device token`);
+                continue;
+              }
+              
+              // Send via APNs
+              try {
+                const apnsKeyIdValue = apnsKeyId.value();
+                const apnsTeamIdValue = apnsTeamId.value();
+                const apnsBundleIdValue = apnsBundleId.value();
+                const apnsKeyValue = apnsAuthKey.value();
+                const apnsEnvironmentValue = apnsEnvironment.value() || "production";
+
+                if (!apnsKeyIdValue || !apnsTeamIdValue || !apnsBundleIdValue || !apnsKeyValue) {
+                  console.error("APNs not configured, skipping iOS notification");
+                  continue;
+                }
+
+                const jwt = await generateAPNsJWT(apnsKeyIdValue, apnsTeamIdValue, apnsKeyValue);
+                const apnsHost = apnsEnvironmentValue === "production" 
+                  ? "api.push.apple.com" 
+                  : "api.sandbox.push.apple.com";
+                const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`;
+
+                const apnsPayload = {
+                  aps: {
+                    alert: {
+                      title: notification.title,
+                      body: notification.body,
+                    },
+                    sound: "default",
+                    badge: 1,
+                  },
+                  ...(notification.data || {}),
+                };
+
+                const apnsResponse = await fetch(apnsUrl, {
+                  method: "POST",
+                  headers: {
+                    authorization: `bearer ${jwt}`,
+                    "apns-topic": apnsBundleIdValue,
+                    "apns-push-type": "alert",
+                    "apns-priority": "10",
+                    "content-type": "application/json",
+                  },
+                  body: JSON.stringify(apnsPayload),
+                });
+
+                if (!apnsResponse.ok) {
+                  const errorText = await apnsResponse.text();
+                  if (apnsResponse.status === 410 || apnsResponse.status === 404) {
+                    // Token invalid, delete subscription
+                    await subDoc.ref.delete();
+                    console.log(`Deleted invalid iOS subscription ${subDoc.id}`);
+                  } else {
+                    console.error(`APNs error for ${subDoc.id}: ${apnsResponse.status} ${errorText}`);
+                  }
+                } else {
+                  success = true;
+                }
+              } catch (apnsError) {
+                console.error(`APNs error for ${subDoc.id}:`, apnsError);
+              }
+            } else if (sub.platform === "web" && sub.endpoint && sub.p256dh && sub.auth) {
+              // Send via Web Push
+              if (vapidPublicKeyValue && vapidPrivateKeyValue) {
+                try {
+                  await webpush.sendNotification(
+                    {
+                      endpoint: sub.endpoint,
+                      keys: {
+                        p256dh: sub.p256dh,
+                        auth: sub.auth,
+                      },
+                    },
+                    JSON.stringify({
+                      title: notification.title,
+                      body: notification.body,
+                      icon: "/icon-192.png",
+                      badge: "/icon-192.png",
+                      data: notification.data || {},
+                    })
+                  );
+                  success = true;
+                } catch (webPushError: any) {
+                  if (webPushError.statusCode === 410) {
+                    // Subscription expired, delete it
+                    await subDoc.ref.delete();
+                    console.log(`Deleted expired subscription ${subDoc.id}`);
+                  }
+                  console.error(`Web push error for ${subDoc.id}:`, webPushError);
+                }
+              }
+            }
+          }
+
+          // Mark as delivered
+          await notificationDoc.ref.update({
+            delivered: true,
+            delivered_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          if (success) {
+            delivered++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          console.error(`Error processing notification ${notificationDoc.id}:`, error);
+          failed++;
+        }
+      }
+
+      console.log(`Delivery complete: ${delivered} delivered, ${failed} failed`);
+    } catch (error) {
+      console.error("Error in scheduled notification delivery:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Scheduled function: Process daily decay (runs daily at 2 AM UTC)
+ * Handles companion stat decay, streak freezes, and recovery
+ */
+export const scheduledProcessDailyDecay = onSchedule(
+  {
+    schedule: "0 2 * * *", // Daily at 2 AM UTC
+    timeZone: "UTC",
+  },
+  async () => {
+    console.log("[Daily Decay] Starting daily decay processing...");
+
+    try {
+      const db = admin.firestore();
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const todayStr = today.toISOString().split("T")[0];
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+      // Get all companions
+      const companionsSnapshot = await db.collection("user_companion").get();
+
+      console.log(`[Daily Decay] Found ${companionsSnapshot.size} companions to process`);
+
+      let processedCount = 0;
+      let decayedCount = 0;
+      let recoveredCount = 0;
+      let neglectedImageTriggered = 0;
+
+      for (const companionDoc of companionsSnapshot.docs) {
+        try {
+          const companion = companionDoc.data();
+
+          // Check if user had any activity yesterday
+          const hadActivity = await checkUserActivityForDecay(db, companion.user_id, yesterdayStr);
+
+          if (hadActivity) {
+            // User was active - reset decay
+            if ((companion.inactive_days ?? 0) > 0) {
+              console.log(`[Recovery] User ${companion.user_id} was active, resetting decay`);
+
+              // Recovery bonus: +10 to each stat
+              const newBody = Math.min(100, (companion.body ?? 100) + 10);
+              const newMind = Math.min(100, (companion.mind ?? 0) + 10);
+              const newSoul = Math.min(100, (companion.soul ?? 0) + 10);
+
+              await companionDoc.ref.update({
+                inactive_days: 0,
+                last_activity_date: yesterdayStr,
+                current_mood: "happy",
+                body: newBody,
+                mind: newMind,
+                soul: newSoul,
+              });
+
+              recoveredCount++;
+            }
+          } else {
+            // User was inactive - apply decay
+            const newInactiveDays = (companion.inactive_days ?? 0) + 1;
+
+            console.log(`[Decay] User ${companion.user_id} inactive for ${newInactiveDays} days`);
+
+            // Apply stat decay: -5 per stat per day (minimum 0)
+            const newBody = Math.max(0, (companion.body ?? 100) - 5);
+            const newMind = Math.max(0, (companion.mind ?? 0) - 5);
+            const newSoul = Math.max(0, (companion.soul ?? 0) - 5);
+
+            // Determine mood based on inactive days
+            let newMood = "neutral";
+            if (newInactiveDays === 1) newMood = "neutral";
+            else if (newInactiveDays === 2) newMood = "worried";
+            else if (newInactiveDays >= 3 && newInactiveDays < 5) newMood = "sad";
+            else if (newInactiveDays >= 5) newMood = "sick";
+
+            await companionDoc.ref.update({
+              inactive_days: newInactiveDays,
+              current_mood: newMood,
+              body: newBody,
+              mind: newMind,
+              soul: newSoul,
+            });
+
+            decayedCount++;
+
+            // Trigger neglected image generation at 3 days if not already generated
+            if (newInactiveDays === 3 && !companion.neglected_image_url && companion.current_image_url) {
+              console.log(`[Neglected Image] Triggering generation for user ${companion.user_id}`);
+              // The generateNeglectedCompanionImage function can be called here
+              neglectedImageTriggered++;
+            }
+
+            // Handle streak freeze logic
+            await handleStreakFreezeForDecay(db, companion.user_id);
+          }
+
+          processedCount++;
+        } catch (userError) {
+          console.error(`Error processing companion ${companionDoc.id}:`, userError);
+        }
+      }
+
+      // Reset expired streak freezes
+      await resetExpiredStreakFreezesForDecay(db, todayStr);
+
+      console.log(
+        `[Daily Decay] Complete: ${processedCount} processed, ${decayedCount} decayed, ${recoveredCount} recovered, ${neglectedImageTriggered} neglected images triggered`
+      );
+    } catch (error) {
+      console.error("[Daily Decay] Error:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Helper function to check user activity for decay processing
+ */
+async function checkUserActivityForDecay(db: admin.firestore.Firestore, userId: string, date: string): Promise<boolean> {
+  // Check for task completions
+  // Note: task_date might be stored as Date, Timestamp, or string - handle all cases
+  const tasksSnapshot = await db
+    .collection("daily_tasks")
+    .where("user_id", "==", userId)
+    .where("completed", "==", true)
+    .limit(100) // Get more to filter by date in memory
+    .get();
+
+  // Filter by date in memory (handles Date, Timestamp, or string)
+  const matchingTasks = tasksSnapshot.docs.filter(doc => {
+    const taskDate = doc.data().task_date;
+    if (!taskDate) return false;
+    // Handle Timestamp
+    if (taskDate.toDate) {
+      return taskDate.toDate().toISOString().split("T")[0] === date;
+    }
+    // Handle Date
+    if (taskDate instanceof Date) {
+      return taskDate.toISOString().split("T")[0] === date;
+    }
+    // Handle string
+    return taskDate === date || taskDate.split("T")[0] === date;
+  });
+
+  if (matchingTasks.length > 0) return true;
+
+  // Check for habit completions
+  const habitsSnapshot = await db
+    .collection("habit_completions")
+    .where("user_id", "==", userId)
+    .limit(100) // Get more to filter by date
+    .get();
+
+  const matchingHabits = habitsSnapshot.docs.filter(doc => {
+    const habitDate = doc.data().date;
+    if (!habitDate) return false;
+    if (habitDate.toDate) return habitDate.toDate().toISOString().split("T")[0] === date;
+    if (habitDate instanceof Date) return habitDate.toISOString().split("T")[0] === date;
+    return habitDate === date || habitDate.split("T")[0] === date;
+  });
+
+  if (matchingHabits.length > 0) return true;
+
+  // Check for check-ins
+  const checkInsSnapshot = await db
+    .collection("daily_check_ins")
+    .where("user_id", "==", userId)
+    .limit(100) // Get more to filter by date
+    .get();
+
+  const matchingCheckIns = checkInsSnapshot.docs.filter(doc => {
+    const checkInDate = doc.data().check_in_date;
+    if (!checkInDate) return false;
+    if (checkInDate.toDate) return checkInDate.toDate().toISOString().split("T")[0] === date;
+    if (checkInDate instanceof Date) return checkInDate.toISOString().split("T")[0] === date;
+    return checkInDate === date || checkInDate.split("T")[0] === date;
+  });
+
+  if (matchingCheckIns.length > 0) return true;
+
+  return false;
+}
+
+/**
+ * Helper function to handle streak freeze logic
+ */
+async function handleStreakFreezeForDecay(db: admin.firestore.Firestore, userId: string): Promise<void> {
+  const profileDoc = await db.collection("profiles").doc(userId).get();
+  if (!profileDoc.exists) return;
+
+  const profile = profileDoc.data()!;
+
+  // If user has no streak, nothing to protect
+  if ((profile.current_habit_streak ?? 0) <= 0) return;
+
+  // Check if streak_at_risk was set more than 24 hours ago
+  if (profile.streak_at_risk && profile.streak_at_risk_since) {
+    const riskSince = (profile.streak_at_risk_since as admin.firestore.Timestamp).toDate();
+    const hoursSinceRisk = (Date.now() - riskSince.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceRisk >= 24) {
+      // Auto-consume freeze if available, else reset
+      if ((profile.streak_freezes_available ?? 0) > 0) {
+        await profileDoc.ref.update({
+          streak_at_risk: false,
+          streak_at_risk_since: null,
+          streak_freezes_available: Math.max(0, (profile.streak_freezes_available ?? 1) - 1),
+          last_streak_freeze_used: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        await profileDoc.ref.update({
+          streak_at_risk: false,
+          streak_at_risk_since: null,
+          current_habit_streak: 0,
+        });
+      }
+      return;
+    }
+    // Streak already at risk, user hasn't decided yet
+    return;
+  }
+
+  // First miss: set streak_at_risk
+  await profileDoc.ref.update({
+    streak_at_risk: true,
+    streak_at_risk_since: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+/**
+ * Helper function to reset expired streak freezes
+ */
+async function resetExpiredStreakFreezesForDecay(db: admin.firestore.Firestore, today: string): Promise<void> {
+  const now = admin.firestore.Timestamp.now();
+  const profilesSnapshot = await db
+    .collection("profiles")
+    .where("streak_freezes_reset_at", "<", now)
+    .get();
+
+  for (const profileDoc of profilesSnapshot.docs) {
+    const nextReset = new Date();
+    nextReset.setDate(nextReset.getDate() + 7);
+
+    await profileDoc.ref.update({
+      streak_freezes_available: 1,
+      streak_freezes_reset_at: admin.firestore.Timestamp.fromDate(nextReset),
+    });
+  }
+}
+
+/**
+ * Scheduled function: Deliver adaptive pushes (runs every 10 minutes)
+ * Processes pending adaptive pushes from adaptive_push_queue
+ */
+export const scheduledDeliverAdaptivePushes = onSchedule(
+  {
+    schedule: "*/10 * * * *", // Every 10 minutes
+    timeZone: "UTC",
+    secrets: [vapidPublicKey, vapidPrivateKey, vapidSubject],
+  },
+  async () => {
+    console.log("Starting adaptive push delivery...");
+
+    try {
+      const db = admin.firestore();
+      const now = admin.firestore.Timestamp.now();
+      const oneDayAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      // Get due pushes
+      // Note: orderBy requires composite index. Sort in memory if needed.
+      const duePushesSnapshot = await db
+        .collection("adaptive_push_queue")
+        .where("delivered", "==", false)
+        .where("scheduled_for", "<=", now)
+        .limit(50)
+        .get();
+      
+      // Sort in memory by scheduled_for (ascending - earliest first)
+      const sortedPushes = duePushesSnapshot.docs.sort((a, b) => {
+        const aTime = a.data().scheduled_for?.toMillis?.() || 
+                     (a.data().scheduled_for instanceof admin.firestore.Timestamp ? a.data().scheduled_for.toMillis() : 0) ||
+                     0;
+        const bTime = b.data().scheduled_for?.toMillis?.() || 
+                     (b.data().scheduled_for instanceof admin.firestore.Timestamp ? b.data().scheduled_for.toMillis() : 0) ||
+                     0;
+        return aTime - bTime;
+      });
+
+      if (sortedPushes.length === 0) {
+        console.log("No due adaptive pushes");
+        return;
+      }
+
+      let deliveredCount = 0;
+
+      // Load VAPID keys
+      const vapidPublicKeyValue = vapidPublicKey.value();
+      const vapidPrivateKeyValue = vapidPrivateKey.value();
+      const vapidSubjectValue = vapidSubject.value() || "mailto:admin@cosmiq.quest";
+
+      const webpush = require("web-push");
+      if (vapidPublicKeyValue && vapidPrivateKeyValue) {
+        webpush.setVapidDetails(vapidSubjectValue, vapidPublicKeyValue, vapidPrivateKeyValue);
+      }
+
+      for (const pushDoc of sortedPushes) {
+        try {
+          const push = pushDoc.data();
+          if (!push.user_id) {
+            console.error(`Adaptive push ${pushDoc.id} missing user_id`);
+            continue;
+          }
+
+          // Check rate limits: max 1 per day, max 5 per week
+          const dailyCountSnapshot = await db
+            .collection("adaptive_push_queue")
+            .where("user_id", "==", push.user_id)
+            .where("delivered", "==", true)
+            .where("created_at", ">=", oneDayAgo)
+            .get();
+
+          if (dailyCountSnapshot.size >= 1) {
+            console.log(`User ${push.user_id} hit daily limit, skipping`);
+            continue;
+          }
+
+          const weeklyCountSnapshot = await db
+            .collection("adaptive_push_queue")
+            .where("user_id", "==", push.user_id)
+            .where("delivered", "==", true)
+            .where("created_at", ">=", sevenDaysAgo)
+            .get();
+
+          if (weeklyCountSnapshot.size >= 5) {
+            console.log(`User ${push.user_id} hit weekly limit, skipping`);
+            continue;
+          }
+
+          // Send push notification (get subscriptions and send)
+          const subscriptionsSnapshot = await db
+            .collection("push_subscriptions")
+            .where("user_id", "==", push.user_id)
+            .get();
+          
+          // Also check userId field if no results (for compatibility with frontend naming)
+          let subscriptions = subscriptionsSnapshot.docs;
+          if (subscriptions.length === 0) {
+            const userIdSnapshot = await db
+              .collection("push_subscriptions")
+              .where("userId", "==", push.user_id)
+              .get();
+            subscriptions = userIdSnapshot.docs;
+          }
+
+          let pushSent = false;
+          if (subscriptions.length > 0 && vapidPublicKeyValue && vapidPrivateKeyValue) {
+            for (const subDoc of subscriptions) {
+              const sub = subDoc.data();
+              if (sub.platform === "web" && sub.endpoint && sub.p256dh && sub.auth) {
+                try {
+                  await webpush.sendNotification(
+                    {
+                      endpoint: sub.endpoint,
+                      keys: { p256dh: sub.p256dh, auth: sub.auth },
+                    },
+                    JSON.stringify({
+                      title: push.title || "Adaptive Push",
+                      body: push.message || "",
+                      icon: "/icon-192.png",
+                      data: { type: "adaptive_push", ...push.data },
+                    })
+                  );
+                  pushSent = true;
+                } catch (error: any) {
+                  if (error.statusCode === 410) {
+                    await subDoc.ref.delete();
+                  }
+                  console.error(`Web push error:`, error);
+                }
+              }
+            }
+          }
+
+          // Mark as delivered (always mark, even if no subscriptions, to prevent retries)
+          await pushDoc.ref.update({
+            delivered: true,
+            delivered_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          if (pushSent) {
+            console.log(`Delivered adaptive push to user ${push.user_id}: ${push.message}`);
+            deliveredCount++;
+          } else if (subscriptions.length === 0) {
+            // No subscriptions but marked as delivered
+            console.log(`Adaptive push ${pushDoc.id} marked as delivered (no subscriptions for user ${push.user_id})`);
+            deliveredCount++;
+          }
+        } catch (error) {
+          console.error(`Error processing adaptive push ${pushDoc.id}:`, error);
+        }
+      }
+
+      console.log(`Adaptive push delivery complete: ${deliveredCount} delivered`);
+    } catch (error) {
+      console.error("Error in adaptive push delivery:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * Trigger adaptive event - Callable function to trigger adaptive push based on event
+ */
+export const triggerAdaptiveEvent = onCall(
+  {
+    secrets: [geminiApiKey],
+  },
+  async (request: CallableRequest<{
+    eventType: "low_motivation" | "overthinking" | "heartbreak_spike" | "return_after_break";
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    const { eventType } = request.data;
+
+    if (!eventType) {
+      throw new HttpsError("invalid-argument", "Missing eventType");
+    }
+
+    try {
+      const userId = request.auth.uid;
+      const db = admin.firestore();
+
+      // Check rate limits
+      const oneDayAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const dailyCountSnapshot = await db
+        .collection("adaptive_push_queue")
+        .where("user_id", "==", userId)
+        .where("delivered", "==", true)
+        .where("created_at", ">=", oneDayAgo)
+        .get();
+
+      if (dailyCountSnapshot.size >= 1) {
+        throw new HttpsError("resource-exhausted", "Daily limit reached");
+      }
+
+      const weeklyCountSnapshot = await db
+        .collection("adaptive_push_queue")
+        .where("user_id", "==", userId)
+        .where("delivered", "==", true)
+        .where("created_at", ">=", sevenDaysAgo)
+        .get();
+      
+      let weeklyCount = weeklyCountSnapshot.size;
+      if (weeklyCount === 0) {
+        const userIdCountSnapshot = await db
+          .collection("adaptive_push_queue")
+          .where("userId", "==", userId)
+          .where("delivered", "==", true)
+          .where("created_at", ">=", sevenDaysAgo)
+          .get();
+        weeklyCount = userIdCountSnapshot.size;
+      }
+
+      if (weeklyCount >= 5) {
+        throw new HttpsError("resource-exhausted", "Weekly limit reached");
+      }
+
+      // Get user settings (check both user_id and userId fields for compatibility)
+      let settingsDoc = await db
+        .collection("adaptive_push_settings")
+        .where("user_id", "==", userId)
+        .where("enabled", "==", true)
+        .limit(1)
+        .get();
+
+      if (settingsDoc.empty) {
+        // Try userId field as fallback
+        settingsDoc = await db
+          .collection("adaptive_push_settings")
+          .where("userId", "==", userId)
+          .where("enabled", "==", true)
+          .limit(1)
+          .get();
+      }
+
+      if (settingsDoc.empty) {
+        throw new HttpsError("failed-precondition", "Adaptive pushes not enabled");
+      }
+
+      // Map event to category
+      const eventCategoryMap: Record<string, string> = {
+        low_motivation: "confidence",
+        overthinking: "calm",
+        heartbreak_spike: "love",
+        return_after_break: "discipline",
+      };
+
+      const chosenCategory = eventCategoryMap[eventType] || "discipline";
+
+      // Generate adaptive push message using AI
+      const apiKey = geminiApiKey.value();
+      const prompt = `Generate a brief, supportive push notification message for a user experiencing: ${eventType}. Category: ${chosenCategory}. Keep it under 100 characters.`;
+
+      const geminiResponse = await callGemini(prompt, "You are a supportive mentor.", {
+        maxOutputTokens: 100,
+      }, apiKey);
+
+      // Schedule the push for immediate delivery (or very soon)
+      const scheduledFor = admin.firestore.Timestamp.now();
+      await db.collection("adaptive_push_queue").add({
+        user_id: userId,
+        message: geminiResponse.text.trim(),
+        event_type: eventType,
+        category: chosenCategory,
+        scheduled_for: scheduledFor,
+        delivered: false,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { success: true, message: "Adaptive push scheduled" };
+    } catch (error) {
+      console.error("Error in triggerAdaptiveEvent:", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError("internal", "Failed to trigger adaptive event");
+    }
+  }
+);
+
+/**
+ * Scheduled function: Check task reminders (runs every minute)
+ * Sends reminders for tasks that are about to start
+ */
+export const scheduledCheckTaskReminders = onSchedule(
+  {
+    schedule: "* * * * *", // Every minute
+    timeZone: "UTC",
+    secrets: [apnsKeyId, apnsTeamId, apnsBundleId, apnsAuthKey, apnsEnvironment],
+  },
+  async () => {
+    console.log("Checking for tasks needing reminders...");
+
+    try {
+      const db = admin.firestore();
+      const now = new Date();
+      const today = now.toISOString().split("T")[0];
+
+      // Get tasks with reminders enabled that haven't been sent
+      // Note: Multiple where clauses may need composite index
+      // Filter by task_date in memory if index doesn't exist
+      const tasksSnapshot = await db
+        .collection("daily_tasks")
+        .where("reminder_enabled", "==", true)
+        .where("reminder_sent", "==", false)
+        .where("completed", "==", false)
+        .limit(500) // Get more, filter by date in memory
+        .get();
+      
+      // Filter by today's date in memory (handles Date, Timestamp, or string)
+      const todayTasks = tasksSnapshot.docs.filter(doc => {
+        const taskDate = doc.data().task_date;
+        if (!taskDate) return false;
+        if (taskDate.toDate) return taskDate.toDate().toISOString().split("T")[0] === today;
+        if (taskDate instanceof Date) return taskDate.toISOString().split("T")[0] === today;
+        return taskDate === today || taskDate.split("T")[0] === today;
+      });
+
+      console.log(`Found ${todayTasks.length} tasks to check for today`);
+
+      const tasksToRemind: Array<{ id: string; data: any }> = [];
+
+      // Filter tasks where reminder time is within 30 seconds of now
+      for (const taskDoc of todayTasks) {
+        const task = taskDoc.data();
+        if (!task.scheduled_time || !task.reminder_minutes_before) continue;
+        
+        // Handle task_date as Date, Timestamp, or string
+        let taskDateStr = today;
+        if (task.task_date) {
+          if (task.task_date.toDate) {
+            taskDateStr = task.task_date.toDate().toISOString().split("T")[0];
+          } else if (task.task_date instanceof Date) {
+            taskDateStr = task.task_date.toISOString().split("T")[0];
+          } else {
+            taskDateStr = task.task_date.split("T")[0];
+          }
+        }
+
+        const scheduledDateTime = new Date(`${taskDateStr}T${task.scheduled_time}`);
+        const reminderTime = new Date(
+          scheduledDateTime.getTime() - (task.reminder_minutes_before as number) * 60 * 1000
+        );
+
+        const timeDiff = reminderTime.getTime() - now.getTime();
+        if (timeDiff >= -30000 && timeDiff <= 30000) {
+          tasksToRemind.push({ id: taskDoc.id, data: task });
+        }
+      }
+
+      console.log(`Sending reminders for ${tasksToRemind.length} tasks`);
+
+      for (const { id, data: task } of tasksToRemind) {
+        try {
+          if (!task.user_id) {
+            console.error(`Task ${id} missing user_id`);
+            continue;
+          }
+
+          // Get user's iOS push subscriptions (iOS tokens are in push_subscriptions with platform=ios)
+          // Check both user_id and userId fields for compatibility
+          const iosSubscriptionsSnapshot = await db
+            .collection("push_subscriptions")
+            .where("user_id", "==", task.user_id)
+            .where("platform", "==", "ios")
+            .get();
+          
+          let iosSubscriptions = iosSubscriptionsSnapshot.docs;
+          if (iosSubscriptions.length === 0) {
+            const userIdSnapshot = await db
+              .collection("push_subscriptions")
+              .where("userId", "==", task.user_id)
+              .where("platform", "==", "ios")
+              .get();
+            iosSubscriptions = userIdSnapshot.docs;
+          }
+
+          if (iosSubscriptions.length === 0) {
+            console.log(`No iOS subscriptions for user ${task.user_id}`);
+            // Mark reminder as sent anyway (user has no devices registered)
+            await db.collection("daily_tasks").doc(id).update({
+              reminder_sent: true,
+            });
+            continue;
+          }
+
+          // Send APNs notifications
+          let reminderSent = false;
+          const apnsKeyIdValue = apnsKeyId.value();
+          const apnsTeamIdValue = apnsTeamId.value();
+          const apnsBundleIdValue = apnsBundleId.value();
+          const apnsKeyValue = apnsAuthKey.value();
+          const apnsEnvironmentValue = apnsEnvironment.value() || "production";
+
+          if (!apnsKeyIdValue || !apnsTeamIdValue || !apnsBundleIdValue || !apnsKeyValue) {
+            console.error("APNs not configured, skipping task reminders");
+            continue;
+          }
+
+          for (const subDoc of iosSubscriptions) {
+            const sub = subDoc.data();
+            // iOS tokens are stored in endpoint field
+            const deviceToken = sub.endpoint || sub.device_token;
+            if (!deviceToken) {
+              console.log(`iOS subscription ${subDoc.id} missing device token`);
+              continue;
+            }
+
+            try {
+              const jwt = await generateAPNsJWT(apnsKeyIdValue, apnsTeamIdValue, apnsKeyValue);
+              const apnsHost = apnsEnvironmentValue === "production" 
+                ? "api.push.apple.com" 
+                : "api.sandbox.push.apple.com";
+              const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`;
+
+              const apnsPayload = {
+                aps: {
+                  alert: {
+                    title: `Task Reminder: ${task.title || "Task"}`,
+                    body: task.scheduled_time 
+                      ? `Your task is scheduled for ${task.scheduled_time}`
+                      : "Don't forget your task!",
+                  },
+                  sound: "default",
+                  badge: 1,
+                },
+                type: "task_reminder",
+                task_id: id,
+                task_date: task.task_date,
+              };
+
+              const apnsResponse = await fetch(apnsUrl, {
+                method: "POST",
+                headers: {
+                  authorization: `bearer ${jwt}`,
+                  "apns-topic": apnsBundleIdValue,
+                  "apns-push-type": "alert",
+                  "apns-priority": "10",
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify(apnsPayload),
+              });
+
+              if (!apnsResponse.ok) {
+                const errorText = await apnsResponse.text();
+                if (apnsResponse.status === 410 || apnsResponse.status === 404) {
+                  // Token invalid, delete subscription
+                  await subDoc.ref.delete();
+                  console.log(`Deleted invalid iOS subscription ${subDoc.id}`);
+                } else {
+                  console.error(`APNs error for task reminder ${subDoc.id}: ${apnsResponse.status} ${errorText}`);
+                }
+              } else {
+                reminderSent = true;
+              }
+            } catch (error) {
+              console.error(`Error sending APNs for subscription ${subDoc.id}:`, error);
+            }
+          }
+
+          // Mark reminder as sent if at least one notification was sent
+          if (reminderSent || iosSubscriptions.length === 0) {
+            await db.collection("daily_tasks").doc(id).update({
+              reminder_sent: true,
+            });
+            console.log(`Sent reminder for task ${id} to user ${task.user_id}`);
+          }
+        } catch (error) {
+          console.error(`Error sending reminder for task ${id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error("Error in check-task-reminders:", error);
+      throw error;
+    }
+  }
+);

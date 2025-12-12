@@ -7,6 +7,16 @@ import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EvolutionCardFlip } from "./EvolutionCardFlip";
 
+interface EvolutionCardStats {
+  strength?: number;
+  agility?: number;
+  vitality?: number;
+  intellect?: number;
+  spirit?: number;
+  affinity?: number;
+  [key: string]: number | undefined;
+}
+
 interface EvolutionCard {
   id: string;
   card_id: string;
@@ -14,7 +24,7 @@ interface EvolutionCard {
   creature_name: string;
   species: string;
   element: string;
-  stats: any;
+  stats: EvolutionCardStats | Record<string, unknown>;
   traits: string[] | null;
   story_text: string;
   rarity: string;
@@ -68,15 +78,18 @@ export const EvolutionCardGallery = () => {
         };
       });
       
-      // Deduplicate cards by card_id
-      const uniqueCards = new Map<string, any>();
+      // Deduplicate cards by card_id (handles potential race conditions in card generation)
+      const uniqueCards = new Map<string, EvolutionCard>();
       cardsWithImages.forEach(card => {
         if (!uniqueCards.has(card.card_id)) {
           uniqueCards.set(card.card_id, card);
+        } else {
+          // Log duplicate detection for monitoring
+          console.warn(`[EvolutionCardGallery] Duplicate card_id detected: ${card.card_id}. This may indicate a race condition in card generation.`);
         }
       });
       
-      const mappedCards = Array.from(uniqueCards.values()) as EvolutionCard[];
+      const mappedCards = Array.from(uniqueCards.values());
       return mappedCards;
     },
     enabled: !!user,

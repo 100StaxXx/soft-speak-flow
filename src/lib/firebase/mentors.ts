@@ -44,3 +44,8 @@ export const getMentors = async (activeOnly = true): Promise<Mentor[]> => {
     updated_at: timestampToISO(mentor.updated_at as any) || mentor.updated_at || undefined,
   }));
 };
+
+// Get all mentors (including inactive ones) - for backward compatibility
+export const getAllMentors = async (): Promise<Mentor[]> => {
+  return getMentors(false);
+};

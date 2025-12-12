@@ -123,6 +123,7 @@ export const StoryOnboarding = () => {
   const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorsLoading, setMentorsLoading] = useState(true);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
@@ -134,29 +135,77 @@ export const StoryOnboarding = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage]);
 
+  // Load mentors when mentor-grid stage is shown (in case they weren't loaded yet)
+  useEffect(() => {
+    if (stage === "mentor-grid" && mentors.length === 0) {
+      const loadMentorsForGrid = async () => {
+        // Only load if we're not already loading
+        if (mentorsLoading) return;
+        
+        try {
+          setMentorsLoading(true);
+          console.log("[StoryOnboarding] Loading mentors for grid...");
+          const mentorsData = await getAllMentors();
+          console.log("[StoryOnboarding] Raw mentors data:", mentorsData);
+          if (mentorsData && mentorsData.length > 0) {
+            const mappedMentors: Mentor[] = mentorsData.map(m => ({
+              id: m.id,
+              name: m.name,
+              description: (m as any).description || (m as any).signature_line || m.tone_description || "",
+              tone_description: m.tone_description || "",
+              avatar_url: m.avatar_url ?? undefined,
+              tags: (m as any).tags || [],
+              mentor_type: (m as any).mentor_type || m.archetype || "",
+              target_user_type: (m as any).target_user_type ?? undefined,
+              slug: m.slug || "",
+              short_title: m.short_title || "",
+              primary_color: m.primary_color || "#7B68EE",
+              target_user: m.target_user || "",
+              themes: (m as any).themes ?? undefined,
+              intensity_level: m.intensity_level ?? undefined,
+            }));
+            setMentors(mappedMentors);
+            console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for grid:`, mappedMentors.map(m => m.name));
+          } else {
+            console.warn("[StoryOnboarding] ⚠️ No mentors returned from getAllMentors()");
+          }
+        } catch (error) {
+          console.error("[StoryOnboarding] ❌ Error loading mentors for grid:", error);
+          // Show error toast to user
+          toast.error("Failed to load mentors. Please check your connection and try again.");
+        } finally {
+          setMentorsLoading(false);
+        }
+      };
+      loadMentorsForGrid();
+    }
+  }, [stage, mentors.length, mentorsLoading]);
+
   // Load mentors on mount from Firestore
   useEffect(() => {
     const loadMentors = async () => {
       try {
+        setMentorsLoading(true);
         console.log("[StoryOnboarding] Loading mentors from Firestore...");
         const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data from mount:", mentorsData);
         
         if (mentorsData && mentorsData.length > 0) {
           console.log(`[StoryOnboarding] ✅ Loaded ${mentorsData.length} mentors from Firestore:`, mentorsData.map(m => m.name));
           const mappedMentors: Mentor[] = mentorsData.map(m => ({
             id: m.id,
             name: m.name,
-            description: m.description || "",
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
             tone_description: m.tone_description || "",
             avatar_url: m.avatar_url ?? undefined,
-            tags: m.tags || [],
-            mentor_type: m.mentor_type || "",
-            target_user_type: m.target_user_type ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
             slug: m.slug || "",
             short_title: m.short_title || "",
             primary_color: m.primary_color || "#7B68EE",
             target_user: m.target_user || "",
-            themes: m.themes ?? undefined,
+            themes: (m as any).themes ?? undefined,
             intensity_level: m.intensity_level ?? undefined,
           }));
           setMentors(mappedMentors);
@@ -165,6 +214,8 @@ export const StoryOnboarding = () => {
         }
       } catch (error) {
         console.error("[StoryOnboarding] ❌ Exception loading mentors from Firestore:", error);
+      } finally {
+        setMentorsLoading(false);
       }
     };
     loadMentors();
@@ -244,6 +295,48 @@ export const StoryOnboarding = () => {
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
 
+    // Ensure mentors are loaded before attempting to match
+    let mentorsToUse = mentors;
+    if (mentorsLoading || mentors.length === 0) {
+      console.log("[StoryOnboarding] Mentors not loaded yet, fetching now...");
+      try {
+        const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data for matching:", mentorsData);
+        if (mentorsData && mentorsData.length > 0) {
+          const mappedMentors: Mentor[] = mentorsData.map(m => ({
+            id: m.id,
+            name: m.name,
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
+            tone_description: m.tone_description || "",
+            avatar_url: m.avatar_url ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
+            slug: m.slug || "",
+            short_title: m.short_title || "",
+            primary_color: m.primary_color || "#7B68EE",
+            target_user: m.target_user || "",
+            themes: (m as any).themes ?? undefined,
+            intensity_level: m.intensity_level ?? undefined,
+          }));
+          setMentors(mappedMentors);
+          setMentorsLoading(false);
+          mentorsToUse = mappedMentors;
+          console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for matching`);
+        }
+      } catch (error) {
+        console.error("[StoryOnboarding] Error loading mentors:", error);
+      }
+    }
+
+    // If still no mentors after fetch attempt, show error and go to grid
+    if (mentorsToUse.length === 0) {
+      console.error("[StoryOnboarding] No mentors available for matching");
+      toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+      setStage("mentor-grid");
+      return;
+    }
+
     // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
     const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
 
@@ -271,7 +364,7 @@ export const StoryOnboarding = () => {
       exactMatches: number;
       intensityMatch: boolean;
     }
-    const mentorScores: MentorScore[] = mentors.map(mentor => {
+    const mentorScores: MentorScore[] = mentorsToUse.map(mentor => {
       const mentorCanonicalTags = (() => {
         const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
         if (normalized.length > 0) {
@@ -356,9 +449,9 @@ export const StoryOnboarding = () => {
     // Fallback: if no match or score is 0, default to a reasonable mentor
     if (!bestMatch || topScore === 0) {
       // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
-      bestMatch = mentors.find(m => m.slug === "atlas")
-        || mentors.find(m => m.slug === "eli")
-        || mentors[0];
+      bestMatch = mentorsToUse.find(m => m.slug === "atlas")
+        || mentorsToUse.find(m => m.slug === "eli")
+        || mentorsToUse[0];
     }
 
     if (bestMatch) {
@@ -645,10 +738,17 @@ export const StoryOnboarding = () => {
               <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
-            {mentors.length === 0 ? (
+            {mentorsLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center space-y-4">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-muted-foreground">Loading mentors...</p>
+                </div>
+              </div>
+            ) : mentors.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <p className="text-muted-foreground">No mentors available</p>
                   <p className="text-sm text-muted-foreground">If mentors don't appear, check the browser console for errors.</p>
                 </div>
               </div>

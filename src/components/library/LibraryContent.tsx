@@ -46,12 +46,18 @@ export const LibraryContent = () => {
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["featured-quotes"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("quotes")
-        .select("id, text, author")
-        .order("created_at", { ascending: false })
-        .limit(4);
-      return data || [];
+      const quotes = await getDocuments<{ id: string; text?: string; author?: string; created_at?: any }>(
+        "quotes",
+        undefined,
+        "created_at",
+        "desc",
+        4
+      );
+      return quotes.map(q => ({
+        id: q.id,
+        text: q.text || "",
+        author: q.author || ""
+      }));
     },
   });
 

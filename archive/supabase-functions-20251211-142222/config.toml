@@ -1,0 +1,109 @@
+project_id = "tffrgsaawvletgiztfry"
+
+[functions.delete-user-account]
+verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
+
+[functions.generate-cosmic-postcard]
+verify_jwt = true
+
+[functions.generate-cosmic-postcard-test]
+verify_jwt = true
+
+[functions.generate-sample-card]
+verify_jwt = true
+
+[functions.process-referral]
+verify_jwt = false
+
+[functions.record-subscription]
+verify_jwt = false
+
+[functions.generate-guild-story]
+verify_jwt = true
+
+[functions.generate-tutorial-tts]
+verify_jwt = false
+
+[functions.generate-daily-mentor-pep-talks]
+verify_jwt = false
+
+[functions.schedule-daily-mentor-pushes]
+verify_jwt = false
+
+[functions.dispatch-daily-pushes]
+verify_jwt = false
+
+[functions.generate-mentor-content]
+verify_jwt = false
+
+[functions.generate-mentor-audio]
+verify_jwt = false
+
+[functions.generate-mentor-script]
+verify_jwt = false
+
+[functions.generate-full-mentor-audio]
+verify_jwt = false
+
+[functions.generate-complete-pep-talk]
+verify_jwt = false
+
+[functions.generate-weekly-challenges]
+verify_jwt = false
+
+[functions.generate-mood-push]
+verify_jwt = false
+
+[functions.generate-reflection-reply]
+verify_jwt = false
+
+[functions.generate-evolution-voice]
+verify_jwt = false
+
+[functions.generate-inspire-quote]
+verify_jwt = false
+
+[functions.generate-companion-evolution]
+verify_jwt = false
+
+[functions.generate-zodiac-images]
+verify_jwt = false
+
+[functions.check-task-reminders]
+verify_jwt = false
+
+[functions.verify-apple-receipt]
+verify_jwt = true
+
+[functions.check-apple-subscription]
+verify_jwt = true
+
+[functions.apple-webhook]
+verify_jwt = false
+
+[functions.generate-daily-horoscope]
+verify_jwt = true
+
+[functions.calculate-cosmic-profile]
+verify_jwt = true
+
+[functions.process-daily-decay]
+verify_jwt = false
+
+[functions.generate-neglected-companion-image]
+verify_jwt = false
+
+[functions.generate-smart-notifications]
+verify_jwt = false
+
+[functions.deliver-scheduled-notifications]
+verify_jwt = false
+
+[functions.resolve-streak-freeze]
+verify_jwt = true
+
+[functions.generate-cosmic-deep-dive]
+verify_jwt = true

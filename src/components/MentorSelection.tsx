@@ -32,12 +32,16 @@ interface PepTalk {
   mentor_id: string;
 }
 
-interface MentorSelectionProps {
+interface MentorSelectionModalProps {
   recommendedMentor: Mentor;
   onMentorSelected: (mentorId: string) => void;
 }
 
-export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorSelectionProps) => {
+/**
+ * MentorSelectionModal - A modal/dialog component for selecting mentors
+ * Note: This is different from the MentorSelection page component
+ */
+export const MentorSelectionModal = ({ recommendedMentor, onMentorSelected }: MentorSelectionModalProps) => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [selectedMentor, setSelectedMentor] = useState<Mentor>(recommendedMentor);
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -67,18 +71,18 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
 
   const fetchMentorContent = async (mentorId: string) => {
     try {
-      // Fetch quotes
-      const quotesData = await getQuotes(mentorId, 3);
+      // Fetch quotes with null safety
+      const quotesData = (await getQuotes(mentorId, 3)) || [];
       setQuotes(quotesData.map(q => ({ id: q.id, text: q.quote, mentor_id: q.mentor_id || mentorId })));
 
-      // Fetch pep talks
-      const pepTalksData = await getDocuments(
+      // Fetch pep talks with null safety
+      const pepTalksData = (await getDocuments(
         "pep_talks",
         [["mentor_id", "==", mentorId]],
         undefined,
         undefined,
         3
-      );
+      )) || [];
       setPepTalks(pepTalksData.map(pt => ({
         id: pt.id,
         title: pt.title,
@@ -88,6 +92,9 @@ export const MentorSelection = ({ recommendedMentor, onMentorSelected }: MentorS
       })));
     } catch (error) {
       console.error("Error fetching mentor content:", error);
+      // Set empty arrays on error to prevent UI issues
+      setQuotes([]);
+      setPepTalks([]);
     }
   };
 

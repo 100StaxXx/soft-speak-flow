@@ -3,9 +3,8 @@
  * Replaces Supabase push_subscriptions table
  */
 
-import { collection, doc, query, where, getDocs, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, setDoc, deleteDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { firebaseDb } from "../firebase";
-import { serverTimestamp } from "./firestore";
 
 export interface PushSubscription {
   id?: string;

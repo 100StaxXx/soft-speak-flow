@@ -56,18 +56,18 @@ export const HabitCard = memo(({
     }
 
     try {
-      // Explicit user_id check for defense-in-depth (RLS also enforces this)
-      const { error } = await supabase
-        .from('habits')
-        .update({ is_active: false })
-        .eq('id', id)
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error('Failed to archive habit:', error);
-        toast.error("Failed to archive habit. Please try again.");
+      // Verify the habit belongs to the user before archiving
+      const habit = await getDocument("habits", id);
+      if (!habit) {
+        toast.error("Habit not found");
         return;
       }
+      if (habit.user_id !== user.id) {
+        toast.error("You don't have permission to archive this habit");
+        return;
+      }
+      
+      await updateDocument('habits', id, { is_active: false });
       
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       toast.success("Habit archived. Ready for a new one.");
