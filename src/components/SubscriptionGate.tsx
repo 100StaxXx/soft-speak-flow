@@ -97,25 +97,15 @@ export const SubscriptionGate = () => {
             </div>
           </div>
           <DialogTitle className="text-center text-2xl">
-            {isInTrial && trialDaysRemaining > 0 
-              ? `Just a friendly reminder ✨`
-              : "Welcome to your free trial! ✨"}
+            What you get with Premium ✨
           </DialogTitle>
-          <DialogDescription className="text-center text-base pt-2">
-            {isInTrial && trialDaysRemaining > 0 ? (
-              <>
-                You have <span className="font-bold text-lg text-primary">{trialDaysRemaining}</span> day{trialDaysRemaining !== 1 ? 's' : ''} left in your free trial. No pressure — just wanted to let you know!
-              </>
-            ) : (
-              <>
-                You have <span className="font-semibold text-foreground">7 days</span> to explore all features — no credit card required.
-              </>
-            )}
+          <DialogDescription className="sr-only">
+            Premium features and benefits
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Features */}
+          {/* Features - Main Focus */}
           <div className="space-y-3">
           {[
             { icon: Sparkles, text: "All 21 evolution stages" },
@@ -131,39 +121,12 @@ export const SubscriptionGate = () => {
             ))}
           </div>
 
-          {/* Trial Info */}
-          <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/20">
-            {isInTrial && trialDaysRemaining > 0 ? (
-              <>
-                <p className="text-sm text-foreground mb-1">
-                  {trialDaysRemaining === 1 
-                    ? "Today's your last day — enjoy it!" 
-                    : `Take your time exploring. When you're ready, subscriptions start at $9.99/month.`}
-                </p>
-                {trialDaysRemaining > 1 && (
-                  <p className="text-xs text-muted-foreground">
-                    Cancel anytime, no questions asked
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-foreground mb-1">
-                  After your trial, subscriptions start at $9.99/month
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Cancel anytime in iOS Settings
-                </p>
-              </>
-            )}
-          </div>
-
           {/* CTA */}
           <Button
             onClick={() => setShowPaywall(false)}
             className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            {isInTrial && trialDaysRemaining > 0 ? "Got it, thanks!" : "Start Exploring"}
+            Continue Exploring
           </Button>
 
           <Button
@@ -177,11 +140,12 @@ export const SubscriptionGate = () => {
             Learn more about premium
           </Button>
 
-          {!isInTrial && (
-            <p className="text-xs text-center text-muted-foreground">
-              No credit card required. We'll check in with you daily.
-            </p>
-          )}
+          {/* Minimal trial/subscription info at bottom */}
+          <p className="text-xs text-center text-muted-foreground pt-2">
+            {isInTrial && trialDaysRemaining > 0 
+              ? `${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} left in your trial`
+              : "7-day free trial • No credit card required"}
+          </p>
         </div>
       </DialogContent>
     </Dialog>
