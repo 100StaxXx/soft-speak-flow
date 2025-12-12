@@ -693,7 +693,7 @@ export const useCompanion = () => {
                   logger.log(`Generated evolution card for stage ${stage}`);
                 } catch (cardGenError) {
                   const errorMessage = cardGenError instanceof Error ? cardGenError.message : String(cardGenError);
-                  logger.error(`Failed to generate evolution card for stage ${stage}:`, errorMessage);
+                  logger.error(`Failed to generate evolution card for stage ${stage}: ${errorMessage}`);
                   // Log to error tracking service if available
                   console.error('[Firebase Function Error] generateEvolutionCard failed:', {
                     companionId: companion.id,

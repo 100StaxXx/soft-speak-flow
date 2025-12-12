@@ -3,9 +3,9 @@ import { PushNotifications, PushNotificationSchema, ActionPerformed, Token } fro
 import { logger } from '@/utils/logger';
 import {
   savePushSubscription as savePushSubscriptionToFirestore,
-  saveNativePushToken,
+  saveNativePushToken as saveNativePushTokenToFirestore,
   deletePushSubscription as deletePushSubscriptionFromFirestore,
-  deleteNativePushToken,
+  deleteNativePushToken as deleteNativePushTokenFromFirestore,
   hasActivePushSubscription as hasActivePushSubscriptionInFirestore,
 } from '@/lib/firebase/pushSubscriptions';
 
@@ -79,7 +79,7 @@ function setupNativePushListeners(): void {
   PushNotifications.addListener('registration', async (token: Token) => {
     logger.log('Native push token received:', token.value);
     if (currentNativePushUserId) {
-      await saveNativePushToken(currentNativePushUserId, token.value);
+      await saveNativePushTokenLocal(currentNativePushUserId, token.value);
     } else {
       logger.warn('No user ID available for saving native push token');
     }
@@ -105,7 +105,7 @@ function setupNativePushListeners(): void {
 export async function unsubscribeFromPush(userId: string): Promise<void> {
   try {
     if (Capacitor.isNativePlatform()) {
-      await deleteNativePushToken(userId);
+      await deleteNativePushTokenLocal(userId);
       if (currentNativePushUserId === userId) {
         currentNativePushUserId = null;
       }
@@ -144,20 +144,20 @@ async function savePushSubscription(userId: string, subscription: PushSubscripti
   }
 }
 
-async function saveNativePushToken(userId: string, token: string): Promise<void> {
+async function saveNativePushTokenLocal(userId: string, token: string): Promise<void> {
   const platform = Capacitor.getPlatform() as 'ios' | 'android';
   try {
-    await saveNativePushToken(userId, token, platform);
+    await saveNativePushTokenToFirestore(userId, token, platform);
   } catch (error) {
     logger.error('Error saving native push token:', error);
     throw error;
   }
 }
 
-async function deleteNativePushToken(userId: string): Promise<void> {
+async function deleteNativePushTokenLocal(userId: string): Promise<void> {
   const platform = Capacitor.getPlatform() as 'ios' | 'android';
   try {
-    await deleteNativePushToken(userId, platform);
+    await deleteNativePushTokenFromFirestore(userId, platform);
   } catch (error) {
     logger.error('Error deleting native push token:', error);
     throw error;

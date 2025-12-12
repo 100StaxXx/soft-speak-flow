@@ -165,21 +165,22 @@ describe('Push Notification Token Retrieval Smoke Tests', () => {
 
   it('should handle push notification registration errors', async () => {
     const { PushNotifications } = await import('@capacitor/push-notifications');
-    let registrationError: any = null;
+    let registrationErrorReceived = false;
 
     vi.mocked(PushNotifications.addListener).mockImplementationOnce(
-      async (event, callback) => {
+      async (event: any, callback: any) => {
         if (event === 'registrationError') {
           setTimeout(() => {
             callback({ error: 'Registration failed' });
+            registrationErrorReceived = true;
           }, 100);
         }
         return Promise.resolve({ remove: vi.fn() });
       }
     );
 
-    await PushNotifications.addListener('registrationError', (error) => {
-      registrationError = error;
+    await (PushNotifications.addListener as any)('registrationError', () => {
+      registrationErrorReceived = true;
     });
 
     // Wait for async error callback

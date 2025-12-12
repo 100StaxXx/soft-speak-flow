@@ -364,19 +364,22 @@ export default function Tasks() {
     estimated_duration: number | null;
     notes: string | null;
   }) => {
-    if (!user?.id) return;
+    if (!user?.uid) return;
     setIsUpdating(true);
     
     try {
-      await updateDailyTask(taskId, updates)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+      await updateDailyTask(taskId, {
+        task_text: updates.task_text,
+        difficulty: updates.difficulty as "easy" | "medium" | "hard",
+        scheduled_time: updates.scheduled_time,
+        estimated_duration: updates.estimated_duration,
+        more_information: updates.notes,
+      });
       
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast({ title: "Quest updated!" });
-    } catch {
+    } catch (err) {
       toast({ title: "Failed to update quest", variant: "destructive" });
     } finally {
       setIsUpdating(false);
@@ -579,13 +582,12 @@ export default function Tasks() {
                   onDateSelect={setSelectedDate}
                   tasks={allCalendarTasks}
                   onTaskDrop={async (taskId, newDate, newTime) => {
-                    await updateDailyTask(taskId, {
-                      task_date: format(newDate, 'yyyy-MM-dd'),
-                      scheduled_time: newTime || null,
-                      reminder_sent: false
-                    });
+                    try {
+                      await updateDailyTask(taskId, {
+                        task_date: format(newDate, 'yyyy-MM-dd'),
+                        scheduled_time: newTime || null,
+                      });
 
-                    if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
                       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
                       toast({
@@ -594,6 +596,8 @@ export default function Tasks() {
                           ? `Scheduled for ${format(newDate, 'MMM d')} at ${newTime}`
                           : `Moved to ${format(newDate, 'MMM d')}`
                       });
+                    } catch (err) {
+                      toast({ title: "Failed to reschedule quest", variant: "destructive" });
                     }
                   }}
                   onTimeSlotLongPress={(date, time) => {
@@ -663,13 +667,12 @@ export default function Tasks() {
                   onDateSelect={setSelectedDate}
                   tasks={allCalendarTasks}
                   onTaskDrop={async (taskId, newDate, newTime) => {
-                    await updateDailyTask(taskId, {
-                      task_date: format(newDate, 'yyyy-MM-dd'),
-                      scheduled_time: newTime || null,
-                      reminder_sent: false
-                    });
+                    try {
+                      await updateDailyTask(taskId, {
+                        task_date: format(newDate, 'yyyy-MM-dd'),
+                        scheduled_time: newTime || null,
+                      });
 
-                    if (!error) {
                       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
                       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
                       toast({
@@ -685,6 +688,8 @@ export default function Tasks() {
                           setShowCelebration({ show: true, type: "perfect_week" });
                         }
                       }, 500);
+                    } catch (err) {
+                      toast({ title: "Failed to reschedule quest", variant: "destructive" });
                     }
                   }}
                   onTimeSlotLongPress={(date, time) => {
