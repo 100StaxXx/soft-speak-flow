@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 import { syncDailyPepTalkTranscript } from "@/lib/firebase/functions";
-import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
+import { getDailyPepTalk, getDailyPepTalks } from "@/lib/firebase/dailyPepTalks";
 import { getMentor } from "@/lib/firebase/mentors";
 import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
