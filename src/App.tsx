@@ -175,9 +175,20 @@ const AppContent = memo(() => {
     }
   }, [session]);
   
-  // Hide splash screen once auth is loaded (not profile - profile can load in background)
+  // Hide splash screen once auth is loaded OR if on auth route
   // This prevents iOS watchdog timeout (0xbadf00d) from blocking network calls
   useEffect(() => {
+    // Hide immediately if on auth route (no need to wait for auth check)
+    const isAuthRoute = location.pathname === '/auth' || location.pathname.startsWith('/auth/');
+    if (isAuthRoute && !splashHidden) {
+      const timer = setTimeout(() => {
+        console.log('[App] Hiding splash screen - on auth route');
+        hideSplashScreen();
+        setSplashHidden(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+
     // Safety net: Force hide splash after 10 seconds max to prevent watchdog timeout
     const maxTimeout = setTimeout(() => {
       if (!splashHidden) {
@@ -188,7 +199,7 @@ const AppContent = memo(() => {
     }, 10000);
 
     // Normal hide: Hide after auth loads (not profile - profile is non-blocking)
-    if (!authLoading && !splashHidden) {
+    if (!authLoading && !splashHidden && !isAuthRoute) {
       // Small delay to ensure smooth transition
       const timer = setTimeout(() => {
         hideSplashScreen();
@@ -202,7 +213,7 @@ const AppContent = memo(() => {
     }
 
     return () => clearTimeout(maxTimeout);
-  }, [authLoading, splashHidden]);
+  }, [authLoading, splashHidden, location.pathname]);
   
   const resolvedMentorId = getResolvedMentorId(profile);
 
@@ -264,21 +275,35 @@ const App = () => {
   useEffect(() => {
     // Lock orientation to portrait on native apps
     lockToPortrait();
+    
+    // Debug: Log Firebase status on app start
+    import('@/utils/firebaseDebug').then(({ logFirebaseStatus }) => {
+      logFirebaseStatus();
+    }).catch(() => {
+      // Ignore if debug utility fails
+    });
   }, []);
 
-  // Firebase auth state listener
+  // Firebase auth state listener (for debugging)
   useEffect(() => {
     try {
       if (!firebaseAuth) {
-        console.error('Firebase auth not initialized - check your .env file');
+        console.error('❌ [App] Firebase auth not initialized - check your .env file');
         return;
       }
-      const unsub = onAuthStateChanged(firebaseAuth, (user) => {
-        console.log("🔥 Firebase auth state:", user ? user.email : "logged out");
-      });
+      console.log('✅ [App] Firebase auth initialized, setting up listener...');
+      const unsub = onAuthStateChanged(
+        firebaseAuth, 
+        (user) => {
+          console.log("🔥 [App] Firebase auth state:", user ? `Logged in: ${user.email}` : "Logged out");
+        },
+        (error) => {
+          console.error("❌ [App] Firebase auth listener error:", error);
+        }
+      );
       return () => unsub();
     } catch (error) {
-      console.error("Firebase auth listener error:", error);
+      console.error("❌ [App] Firebase auth listener setup error:", error);
     }
   }, []);
 
