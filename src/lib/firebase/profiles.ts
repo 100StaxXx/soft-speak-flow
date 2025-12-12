@@ -1,4 +1,4 @@
-import { getDocument, setDocument, updateDocument, getDocuments, timestampToISO } from "./firestore";
+import { getDocument, setDocument, updateDocument, getDocuments, getDocumentsByIds, timestampToISO } from "./firestore";
 
 export interface Profile {
   id: string;
@@ -164,5 +164,35 @@ export const updateProfile = async (
   updates: Partial<Profile>
 ): Promise<void> => {
   await updateDocument("profiles", userId, updates);
+};
+
+// Batch fetch multiple profiles (much faster than individual fetches)
+// This fixes the N+1 query problem in GuildMembersSection
+export const getProfilesByIds = async (userIds: string[]): Promise<Map<string, Profile>> => {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  try {
+    const profilesMap = await getDocumentsByIds<Profile>("profiles", userIds);
+    
+    // Convert timestamps to ISO strings for all profiles
+    const processedMap = new Map<string, Profile>();
+    profilesMap.forEach((profile, userId) => {
+      processedMap.set(userId, {
+        ...profile,
+        created_at: timestampToISO(profile.created_at as any) || profile.created_at || new Date().toISOString(),
+        updated_at: timestampToISO(profile.updated_at as any) || profile.updated_at || new Date().toISOString(),
+        trial_ends_at: timestampToISO(profile.trial_ends_at as any) || profile.trial_ends_at || null,
+        subscription_expires_at: timestampToISO(profile.subscription_expires_at as any) || profile.subscription_expires_at || null,
+        cosmic_profile_generated_at: timestampToISO(profile.cosmic_profile_generated_at as any) || profile.cosmic_profile_generated_at || null,
+      } as Profile);
+    });
+    
+    return processedMap;
+  } catch (error) {
+    console.error("[getProfilesByIds] Error fetching profiles:", error);
+    return new Map();
+  }
 };
 
