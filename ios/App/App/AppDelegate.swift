@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AVFoundation
+import FirebaseCore
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,6 +9,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Initialize Firebase (only needed if using native Firebase features)
+        // If you're only using Firebase Auth via web SDK, this is optional
+        FirebaseApp.configure()
+        
         configureAudioSession()
         return true
     }
