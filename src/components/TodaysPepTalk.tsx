@@ -125,7 +125,14 @@ export const TodaysPepTalk = memo(() => {
           return;
         }
 
-        const data = await getDailyPepTalk(today, mentor.slug);
+        let data = await getDailyPepTalk(today, mentor.slug);
+        
+        // If no daily pep talk exists, get the most recent one for this mentor
+        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+        if (!data) {
+          const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
+          data = recentPepTalks[0] || null;
+        }
 
         if (data) {
           // Validate and sanitize transcript data

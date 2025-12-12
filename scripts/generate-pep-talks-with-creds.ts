@@ -40,12 +40,9 @@ const db = getFirestore(app);
 
 // Call Gemini API - using fetch to match the actual function implementation
 async function callGemini(prompt: string, systemInstruction: string): Promise<any> {
-  // Try multiple sources for the API key
-  const envConfig = dotenv.config();
+  // Try multiple sources for the API key (dotenv already loaded at top)
   const apiKey = process.env.GEMINI_API_KEY 
-    || process.env.VITE_GEMINI_API_KEY
-    || envConfig.parsed?.GEMINI_API_KEY
-    || envConfig.parsed?.VITE_GEMINI_API_KEY;
+    || process.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey) {
     console.error('⚠️  GEMINI_API_KEY not found. Please set it as an environment variable:');
@@ -117,9 +114,11 @@ function parseGeminiJSON(text: string): any {
   };
 }
 
-async function generateDailyPepTalks(onlyFailed: boolean = false) {
+async function generateDailyPepTalks(onlyFailed: boolean = false, failedMentorSlugs?: string[]) {
   const today = new Date().toISOString().split("T")[0];
-  const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+  const allMentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+  // If retrying, only process the failed mentors
+  const mentorSlugs = onlyFailed && failedMentorSlugs ? failedMentorSlugs : allMentorSlugs;
   const results: any[] = [];
 
   console.log(`🚀 Generating daily pep talks for ${today}${onlyFailed ? ' (retrying failed ones)' : ''}...\n`);
@@ -128,20 +127,18 @@ async function generateDailyPepTalks(onlyFailed: boolean = false) {
     try {
       console.log(`Processing ${mentorSlug}...`);
 
-      // Check if already generated (skip check if retrying failed ones)
-      if (!onlyFailed) {
-        const existingSnapshot = await db
-          .collection("daily_pep_talks")
-          .where("mentor_slug", "==", mentorSlug)
-          .where("for_date", "==", today)
-          .limit(1)
-          .get();
+      // Check if already generated (always check to avoid duplicates)
+      const existingSnapshot = await db
+        .collection("daily_pep_talks")
+        .where("mentor_slug", "==", mentorSlug)
+        .where("for_date", "==", today)
+        .limit(1)
+        .get();
 
-        if (!existingSnapshot.empty) {
-          console.log(`  ⏭️  Skipped (already exists)`);
-          results.push({ mentor: mentorSlug, status: "skipped" });
-          continue;
-        }
+      if (!existingSnapshot.empty) {
+        console.log(`  ⏭️  Skipped (already exists)`);
+        results.push({ mentor: mentorSlug, status: "skipped" });
+        continue;
       }
 
       // Get mentor document
@@ -204,6 +201,11 @@ async function generateDailyPepTalks(onlyFailed: boolean = false) {
         }
       }
 
+      // Ensure response was set (TypeScript safety)
+      if (!response) {
+        throw new Error("Failed to get response from Gemini API after all retries");
+      }
+
       const pepTalk = parseGeminiJSON(response.text);
 
       if (!pepTalk.script || !pepTalk.title) {
@@ -251,10 +253,8 @@ async function main() {
       console.log(`\n🔄 Retrying ${failedMentors.length} failed mentor(s): ${failedMentors.join(', ')}\n`);
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
       
-      // Update to only process failed ones
-      const originalFunction = generateDailyPepTalks;
-      // We'll manually filter in the loop instead
-      const retryResults = await generateDailyPepTalks(true);
+      // Retry only the failed mentors
+      const retryResults = await generateDailyPepTalks(true, failedMentors);
       
       // Update results with retry outcomes
       results = results.map(r => {

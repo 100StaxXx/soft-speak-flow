@@ -5,6 +5,7 @@ import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getMentor } from "@/lib/firebase/mentors";
 import { getQuotes } from "@/lib/firebase/quotes";
+import { getDocument, getDocuments } from "@/lib/firebase/firestore";
 
 interface QuoteData {
   id: string;
@@ -61,25 +62,39 @@ export const HeroQuoteBanner = memo(() => {
 
       const dailyPepTalk = dailyPepTalks.length > 0 ? dailyPepTalks[0] : null;
 
-      if (dailyPepTalk) {
-        // Fetch quotes that match the pep talk's themes
-        const filters: Array<[string, any, any]> = [];
+      // Always fetch quotes, even if no daily pep talk exists
+      // This ensures users see a quote after onboarding even if they missed the daily trigger
+      const filters: Array<[string, any, any]> = [];
+      
+      if (dailyPepTalk?.topic_category) {
+        filters.push(["category", "==", dailyPepTalk.topic_category]);
+      }
+      
+      let quotes = await getDocuments("quotes", filters.length > 0 ? filters : undefined, undefined, undefined, 10);
+      
+      // If no category match or no daily pep talk, get any quotes
+      if (quotes.length === 0) {
+        quotes = await getDocuments("quotes", undefined, undefined, undefined, 10);
+      }
+      
+      if (quotes && quotes.length > 0) {
+        let matchingQuote = quotes[0]; // Default to first quote
         
-        if (dailyPepTalk.topic_category) {
-          filters.push(["category", "==", dailyPepTalk.topic_category]);
-        }
-        
-        const quotes = await getDocuments("quotes", filters.length > 0 ? filters : undefined, undefined, undefined, 10);
-        
-        if (quotes && quotes.length > 0) {
-          // If we have emotional triggers, try to find a matching quote
+        // If we have a daily pep talk, try to find a matching quote by emotional triggers
+        if (dailyPepTalk) {
           const triggers = dailyPepTalk.emotional_triggers || [];
-          const matchingQuote = quotes.find((q: any) => 
+          matchingQuote = quotes.find((q: any) => 
             q.emotional_triggers?.some((t: string) => triggers.includes(t))
           ) || quotes[0];
-          
-          setTodaysQuote(matchingQuote);
         }
+        
+        // Map to QuoteData structure
+        setTodaysQuote({
+          id: matchingQuote.id,
+          text: matchingQuote.text || '',
+          author: matchingQuote.author || null,
+          category: matchingQuote.category || null,
+        });
       }
       
       setLoading(false);

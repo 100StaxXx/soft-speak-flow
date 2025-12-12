@@ -57,7 +57,22 @@ export const DailyContentWidget = () => {
         ], undefined, undefined, 1)
       ]);
 
-      const pepTalk = pepTalkResult[0];
+      let pepTalk = pepTalkResult[0];
+      
+      // If no daily pep talk exists, get the most recent one for this mentor
+      // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+      if (!pepTalk) {
+        const recentPepTalks = await getDocuments<{
+          id: string;
+          title: string;
+          summary: string;
+          audio_url?: string;
+        }>("daily_pep_talks", [
+          ["mentor_slug", "==", mentor.slug],
+        ], "for_date", "desc", 1);
+        pepTalk = recentPepTalks[0];
+      }
+      
       const dailyQuote = quoteResult[0];
       const quoteData = dailyQuote?.quote_id
         ? await getDocument<{ text: string; author?: string | null; category?: string | null }>("quotes", dailyQuote.quote_id)

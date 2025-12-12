@@ -26,7 +26,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
+import * as https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -239,8 +239,18 @@ async function fetchQuoteBatch(page: number, pageSize: number = 150): Promise<Qu
       throw new Error(`API returned ${response.statusCode}`);
     }
 
-    const data = JSON.parse(response.data);
-    const results: QuoteAPIResponse[] = data.results || [];
+    let data;
+    try {
+      data = JSON.parse(response.data);
+    } catch (parseError) {
+      throw new Error(`Failed to parse API response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid API response format');
+    }
+
+    const results: QuoteAPIResponse[] = Array.isArray(data.results) ? data.results : [];
     
     // Rate limiting - be nice to the API
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -325,8 +335,13 @@ async function seedQuotesWithAutoFetch(
           break;
         }
 
-        // Filter out API-level duplicates
-        const newQuotes = apiQuotes.filter(q => !seenApiIds.has(q._id));
+        // Filter out API-level duplicates and invalid quotes
+        const newQuotes = apiQuotes.filter(q => 
+          !seenApiIds.has(q._id) && 
+          q.content && 
+          q.content.trim().length > 0 &&
+          q.author
+        );
         newQuotes.forEach(q => seenApiIds.add(q._id));
         
         // Map to Firestore schema
@@ -359,7 +374,6 @@ async function seedQuotesWithAutoFetch(
     }
 
     // Process quotes from queue in Firestore batches
-    const batch = db.batch();
     const batchQuotes: FirestoreQuote[] = [];
     let batchInserted = 0;
 
@@ -379,40 +393,45 @@ async function seedQuotesWithAutoFetch(
       skipped += batchQuotes.length - quotesToInsert.length;
     }
 
-    // Add quotes to batch
-    for (const quote of quotesToInsert) {
-      try {
-        if (!dryRun) {
-          const quoteRef = db.collection('quotes').doc();
-          batch.set(quoteRef, quote);
-          batchInserted++;
-        } else {
-          // Validate quote structure
-          if (!quote.text || !quote.author) {
-            throw new Error('Quote missing required fields: text or author');
-          }
-          batchInserted++;
-        }
-      } catch (error) {
-        console.error(`   ❌ Error processing quote:`, error);
-        errors++;
-      }
-    }
+    // Only create batch if we have quotes to insert
+    if (quotesToInsert.length > 0) {
+      const batch = db.batch();
 
-    // Commit batch
-    if (!dryRun && batchInserted > 0) {
-      try {
-        await batch.commit();
-        inserted += batchInserted;
-        console.log(`   ✅ Inserted ${batchInserted} quotes (${inserted}/${targetCount} total inserted, ${quoteQueue.length} in queue)`);
-      } catch (error) {
-        console.error(`   ❌ Error committing batch:`, error);
-        errors += batchInserted;
+      // Add quotes to batch
+      for (const quote of quotesToInsert) {
+        try {
+          if (!dryRun) {
+            const quoteRef = db.collection('quotes').doc();
+            batch.set(quoteRef, quote);
+            batchInserted++;
+          } else {
+            // Validate quote structure
+            if (!quote.text || !quote.author) {
+              throw new Error('Quote missing required fields: text or author');
+            }
+            batchInserted++;
+          }
+        } catch (error) {
+          console.error(`   ❌ Error processing quote:`, error);
+          errors++;
+        }
       }
-    } else if (dryRun) {
-      inserted += batchInserted;
-      console.log(`   ✅ Validated ${batchInserted} quotes (${inserted}/${targetCount} total validated, ${quoteQueue.length} in queue)`);
-    } else if (batchQuotes.length > 0 && batchInserted === 0) {
+
+      // Commit batch
+      if (!dryRun && batchInserted > 0) {
+        try {
+          await batch.commit();
+          inserted += batchInserted;
+          console.log(`   ✅ Inserted ${batchInserted} quotes (${inserted}/${targetCount} total inserted, ${quoteQueue.length} in queue)`);
+        } catch (error) {
+          console.error(`   ❌ Error committing batch:`, error);
+          errors += batchInserted;
+        }
+      } else if (dryRun) {
+        inserted += batchInserted;
+        console.log(`   ✅ Validated ${batchInserted} quotes (${inserted}/${targetCount} total validated, ${quoteQueue.length} in queue)`);
+      }
+    } else if (batchQuotes.length > 0) {
       // All quotes in this batch were duplicates
       console.log(`   ⏭️  Skipped ${batchQuotes.length} quotes (all duplicates)`);
     }

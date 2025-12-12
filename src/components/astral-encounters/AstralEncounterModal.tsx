@@ -81,34 +81,40 @@ export const AstralEncounterModal = ({
   const handleMiniGameComplete = useCallback((result: MiniGameResult) => {
     if (!adversary || !encounter) return;
 
-    const newResults = [...phaseResults, result];
-    setPhaseResults(newResults);
+    setPhaseResults(prevResults => {
+      const newResults = [...prevResults, result];
+      
+      // Check if all phases are complete
+      if (currentPhaseIndex < adversary.phases - 1) {
+        // Not done yet, just update state and move to next phase
+        setCurrentPhaseIndex(prev => prev + 1);
+        setPhase('instructions');
+        return newResults;
+      } else {
+        // All phases complete, calculate final result
+        const totalAccuracy = Math.round(
+          newResults.reduce((sum, r) => sum + r.accuracy, 0) / newResults.length
+        );
+        const resultType = getResultFromAccuracy(totalAccuracy);
+        const xpEarned = calculateXPReward(adversary.tier as AdversaryTier, totalAccuracy);
 
-    if (currentPhaseIndex < adversary.phases - 1) {
-      setCurrentPhaseIndex(prev => prev + 1);
-      setPhase('instructions');
-    } else {
-      const totalAccuracy = Math.round(
-        newResults.reduce((sum, r) => sum + r.accuracy, 0) / newResults.length
-      );
-      const resultType = getResultFromAccuracy(totalAccuracy);
-      const xpEarned = calculateXPReward(adversary.tier as AdversaryTier, totalAccuracy);
+        setFinalResult({
+          result: resultType,
+          accuracy: totalAccuracy,
+          xpEarned,
+        });
 
-      setFinalResult({
-        result: resultType,
-        accuracy: totalAccuracy,
-        xpEarned,
-      });
+        onComplete({
+          encounterId: encounter.id,
+          accuracy: totalAccuracy,
+          phasesCompleted: adversary.phases,
+        });
 
-      onComplete({
-        encounterId: encounter.id,
-        accuracy: totalAccuracy,
-        phasesCompleted: adversary.phases,
-      });
-
-      setPhase('result');
-    }
-  }, [adversary, encounter, currentPhaseIndex, phaseResults, onComplete]);
+        setPhase('result');
+        return newResults;
+      }
+    });
+  }, [adversary, encounter, currentPhaseIndex, onComplete]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -131,7 +137,7 @@ export const AstralEncounterModal = ({
         ? 'medium' 
         : 'easy';
 
-    const intervalScale = (questInterval - 3) * 0.15;
+    const intervalScale = ((questInterval ?? 3) - 3) * 0.15;
 
     const props = {
       companionStats,

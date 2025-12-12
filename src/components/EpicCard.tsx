@@ -149,9 +149,16 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     // Update ref for next comparison
     previousProgressRef.current = currentProgress;
     
-    // Dispatch event for Astral Encounter trigger on epic milestone crossings
-    if (encounterCheckRef.current !== currentProgress && currentProgress > 0) {
-      const prevCheck = encounterCheckRef.current < 0 ? 0 : encounterCheckRef.current;
+    // Dispatch event for Astral Encounter trigger on epic milestone crossings only
+    const milestones = [25, 50, 75, 100];
+    const prevCheck = encounterCheckRef.current < 0 ? 0 : encounterCheckRef.current;
+    
+    // Find if we crossed a milestone
+    const crossedMilestone = milestones.find(
+      m => prevCheck < m && currentProgress >= m
+    );
+    
+    if (crossedMilestone) {
       encounterCheckRef.current = currentProgress;
       window.dispatchEvent(
         new CustomEvent('epic-progress-checkpoint', {
@@ -162,6 +169,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           },
         })
       );
+    } else if (currentProgress !== encounterCheckRef.current) {
+      // Update ref even if no milestone crossed (for accurate next comparison)
+      encounterCheckRef.current = currentProgress;
     }
   }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 

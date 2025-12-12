@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
 import { Bell, Play, Sparkles } from "lucide-react";
 import { getMentor } from "@/lib/firebase/mentors";
-import { getDailyPepTalk } from "@/lib/firebase/dailyPepTalks";
+import { getDailyPepTalk, getDailyPepTalks } from "@/lib/firebase/dailyPepTalks";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
@@ -34,7 +34,14 @@ export const TodaysPush = () => {
       if (!mentor || !mentor.slug) return;
 
       // Check if there's a daily pep talk for today
-      const dailyPepTalk = await getDailyPepTalk(today, mentor.slug);
+      let dailyPepTalk = await getDailyPepTalk(today, mentor.slug);
+      
+      // If no daily pep talk exists, get the most recent one for this mentor
+      // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+      if (!dailyPepTalk) {
+        const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
+        dailyPepTalk = recentPepTalks[0] || null;
+      }
 
       if (dailyPepTalk) {
         setTodaysPepTalk({ 
