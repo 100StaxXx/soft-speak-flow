@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Secrets and credentials
+.secrets/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!components.json
+!firebase.json
+!.firebaserc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
