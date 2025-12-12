@@ -45,5 +45,7 @@ export const getMentors = async (activeOnly = true): Promise<Mentor[]> => {
   }));
 };
 
-// Alias for backward compatibility
-export const getAllMentors = getMentors;
+// Get all mentors (including inactive ones) - for backward compatibility
+export const getAllMentors = async (): Promise<Mentor[]> => {
+  return getMentors(false);
+};

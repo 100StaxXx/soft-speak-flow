@@ -137,34 +137,42 @@ export const StoryOnboarding = () => {
 
   // Load mentors when mentor-grid stage is shown (in case they weren't loaded yet)
   useEffect(() => {
-    if (stage === "mentor-grid" && mentors.length === 0 && !mentorsLoading) {
+    if (stage === "mentor-grid" && mentors.length === 0) {
       const loadMentorsForGrid = async () => {
+        // Only load if we're not already loading
+        if (mentorsLoading) return;
+        
         try {
           setMentorsLoading(true);
           console.log("[StoryOnboarding] Loading mentors for grid...");
           const mentorsData = await getAllMentors();
+          console.log("[StoryOnboarding] Raw mentors data:", mentorsData);
           if (mentorsData && mentorsData.length > 0) {
             const mappedMentors: Mentor[] = mentorsData.map(m => ({
               id: m.id,
               name: m.name,
-              description: m.description || "",
+              description: (m as any).description || (m as any).signature_line || m.tone_description || "",
               tone_description: m.tone_description || "",
               avatar_url: m.avatar_url ?? undefined,
-              tags: m.tags || [],
-              mentor_type: m.mentor_type || "",
-              target_user_type: m.target_user_type ?? undefined,
+              tags: (m as any).tags || [],
+              mentor_type: (m as any).mentor_type || m.archetype || "",
+              target_user_type: (m as any).target_user_type ?? undefined,
               slug: m.slug || "",
               short_title: m.short_title || "",
               primary_color: m.primary_color || "#7B68EE",
               target_user: m.target_user || "",
-              themes: m.themes ?? undefined,
+              themes: (m as any).themes ?? undefined,
               intensity_level: m.intensity_level ?? undefined,
             }));
             setMentors(mappedMentors);
-            console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for grid`);
+            console.log(`[StoryOnboarding] ✅ Loaded ${mappedMentors.length} mentors for grid:`, mappedMentors.map(m => m.name));
+          } else {
+            console.warn("[StoryOnboarding] ⚠️ No mentors returned from getAllMentors()");
           }
         } catch (error) {
-          console.error("[StoryOnboarding] Error loading mentors for grid:", error);
+          console.error("[StoryOnboarding] ❌ Error loading mentors for grid:", error);
+          // Show error toast to user
+          toast.error("Failed to load mentors. Please check your connection and try again.");
         } finally {
           setMentorsLoading(false);
         }
@@ -180,23 +188,24 @@ export const StoryOnboarding = () => {
         setMentorsLoading(true);
         console.log("[StoryOnboarding] Loading mentors from Firestore...");
         const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data from mount:", mentorsData);
         
         if (mentorsData && mentorsData.length > 0) {
           console.log(`[StoryOnboarding] ✅ Loaded ${mentorsData.length} mentors from Firestore:`, mentorsData.map(m => m.name));
           const mappedMentors: Mentor[] = mentorsData.map(m => ({
             id: m.id,
             name: m.name,
-            description: m.description || "",
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
             tone_description: m.tone_description || "",
             avatar_url: m.avatar_url ?? undefined,
-            tags: m.tags || [],
-            mentor_type: m.mentor_type || "",
-            target_user_type: m.target_user_type ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
             slug: m.slug || "",
             short_title: m.short_title || "",
             primary_color: m.primary_color || "#7B68EE",
             target_user: m.target_user || "",
-            themes: m.themes ?? undefined,
+            themes: (m as any).themes ?? undefined,
             intensity_level: m.intensity_level ?? undefined,
           }));
           setMentors(mappedMentors);
@@ -292,21 +301,22 @@ export const StoryOnboarding = () => {
       console.log("[StoryOnboarding] Mentors not loaded yet, fetching now...");
       try {
         const mentorsData = await getAllMentors();
+        console.log("[StoryOnboarding] Raw mentors data for matching:", mentorsData);
         if (mentorsData && mentorsData.length > 0) {
           const mappedMentors: Mentor[] = mentorsData.map(m => ({
             id: m.id,
             name: m.name,
-            description: m.description || "",
+            description: (m as any).description || (m as any).signature_line || m.tone_description || "",
             tone_description: m.tone_description || "",
             avatar_url: m.avatar_url ?? undefined,
-            tags: m.tags || [],
-            mentor_type: m.mentor_type || "",
-            target_user_type: m.target_user_type ?? undefined,
+            tags: (m as any).tags || [],
+            mentor_type: (m as any).mentor_type || m.archetype || "",
+            target_user_type: (m as any).target_user_type ?? undefined,
             slug: m.slug || "",
             short_title: m.short_title || "",
             primary_color: m.primary_color || "#7B68EE",
             target_user: m.target_user || "",
-            themes: m.themes ?? undefined,
+            themes: (m as any).themes ?? undefined,
             intensity_level: m.intensity_level ?? undefined,
           }));
           setMentors(mappedMentors);
@@ -728,10 +738,17 @@ export const StoryOnboarding = () => {
               <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
-            {mentors.length === 0 ? (
+            {mentorsLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center space-y-4">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-muted-foreground">Loading mentors...</p>
+                </div>
+              </div>
+            ) : mentors.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <p className="text-muted-foreground">No mentors available</p>
                   <p className="text-sm text-muted-foreground">If mentors don't appear, check the browser console for errors.</p>
                 </div>
               </div>
