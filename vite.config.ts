@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
@@ -12,7 +11,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(), 
-    mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
@@ -59,12 +57,6 @@ export default defineConfig(({ mode }) => ({
               }
             }
           },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            // Do not cache authenticated API responses to avoid persisting
-            // user data offline. Always fetch fresh content instead.
-            handler: 'NetworkOnly',
-          }
         ]
       }
     })
@@ -84,11 +76,6 @@ export default defineConfig(({ mode }) => ({
           // Core React libraries
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
             return 'react-vendor';
-          }
-          
-          // Supabase
-          if (id.includes('node_modules/@supabase')) {
-            return 'supabase-vendor';
           }
           
           // React Query
@@ -150,7 +137,7 @@ export default defineConfig(({ mode }) => ({
     reportCompressedSize: false, // Faster builds
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+    include: ['react', 'react-dom', 'react-router-dom'],
     exclude: ['@radix-ui/react-icons'], // Exclude if not directly used
   },
   esbuild: {

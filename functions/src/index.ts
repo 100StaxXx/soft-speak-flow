@@ -34,6 +34,10 @@ const appleWebhookAudience = defineSecret("APPLE_WEBHOOK_AUDIENCE");
 // Define secret for Gemini API
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
+// Define secrets for OpenAI and ElevenLabs API
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+const elevenlabsApiKey = defineSecret("ELEVENLABS_API_KEY");
+
 /**
  * Generate a companion name using AI
  * Uses the same rules as the original Supabase edge function
@@ -1901,21 +1905,25 @@ export const generateDailyMentorPepTalks = functions.https.onCall(async (request
  * Generate Mentor Audio - Text-to-speech using ElevenLabs
  * Note: This uses ElevenLabs API, not Gemini
  */
-export const generateMentorAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { mentorSlug, script } = request.data;
-    if (!mentorSlug || !script) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing mentorSlug or script");
+export const generateMentorAudio = onCall(
+  {
+    secrets: [elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{ mentorSlug: string; script: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-    if (!ELEVENLABS_API_KEY) {
-      throw new functions.https.HttpsError("internal", "ELEVENLABS_API_KEY not configured");
-    }
+    try {
+      const { mentorSlug, script } = request.data;
+      if (!mentorSlug || !script) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug or script");
+      }
+
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      if (!ELEVENLABS_API_KEY) {
+        throw new HttpsError("internal", "ELEVENLABS_API_KEY not configured");
+      }
 
     const mentorVoices: Record<string, any> = {
       atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
@@ -1959,7 +1967,7 @@ export const generateMentorAudio = functions.https.onCall(async (request) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs API error:", errorText);
-      throw new functions.https.HttpsError("internal", `ElevenLabs API error: ${response.status}`);
+      throw new HttpsError("internal", `ElevenLabs API error: ${response.status}`);
     }
 
     const audioBuffer = await response.arrayBuffer();
@@ -1981,42 +1989,51 @@ export const generateMentorAudio = functions.https.onCall(async (request) => {
     return { audioUrl };
   } catch (error) {
     console.error("Error in generateMentorAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
 /**
  * Generate Full Mentor Audio - Orchestrates script generation and audio generation
  */
-export const generateFullMentorAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
-    if (!mentorSlug) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing mentorSlug");
+export const generateFullMentorAudio = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{
+    mentorSlug: string;
+    topicCategory?: string;
+    intensity?: string;
+    emotionalTriggers?: string;
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    // Step 1: Generate script
-    const scriptPrompt = `Generate a pep talk script for mentor ${mentorSlug}. Topic: ${topicCategory || "general"}, Intensity: ${intensity || "balanced"}, Triggers: ${emotionalTriggers || "none"}. Return JSON: {"script": "Full script text"}`;
+    try {
+      const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
+      if (!mentorSlug) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug");
+      }
 
-    const scriptResponse = await callGemini(scriptPrompt, "You are a motivational speaker. Always respond with valid JSON only.", {
-      temperature: 0.8,
-      maxOutputTokens: 2048,
-    });
+      // Step 1: Generate script
+      const scriptPrompt = `Generate a pep talk script for mentor ${mentorSlug}. Topic: ${topicCategory || "general"}, Intensity: ${intensity || "balanced"}, Triggers: ${emotionalTriggers || "none"}. Return JSON: {"script": "Full script text"}`;
 
-    const scriptData = parseGeminiJSON(scriptResponse.text);
-    const script = scriptData.script;
+      const scriptResponse = await callGemini(scriptPrompt, "You are a motivational speaker. Always respond with valid JSON only.", {
+        temperature: 0.8,
+        maxOutputTokens: 2048,
+      }, geminiApiKey.value());
 
-    // Step 2: Generate audio (call the generateMentorAudio function internally)
-    // For now, we'll call ElevenLabs directly here
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-    if (!ELEVENLABS_API_KEY) {
-      throw new functions.https.HttpsError("internal", "ELEVENLABS_API_KEY not configured");
-    }
+      const scriptData = parseGeminiJSON(scriptResponse.text);
+      const script = scriptData.script;
+
+      // Step 2: Generate audio (call the generateMentorAudio function internally)
+      // For now, we'll call ElevenLabs directly here
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      if (!ELEVENLABS_API_KEY) {
+        throw new HttpsError("internal", "ELEVENLABS_API_KEY not configured");
+      }
 
     const mentorVoices: Record<string, string> = {
       atlas: "JBFqnCBsd6RMkjVDRZzb",
@@ -2054,7 +2071,7 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
     );
 
     if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", "Failed to generate audio");
+      throw new HttpsError("internal", "Failed to generate audio");
     }
 
     const audioBuffer = await audioResponse.arrayBuffer();
@@ -2075,8 +2092,8 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
     return { script, audioUrl };
   } catch (error) {
     console.error("Error in generateFullMentorAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
@@ -2084,24 +2101,28 @@ export const generateFullMentorAudio = functions.https.onCall(async (request) =>
  * Test function to verify API keys are configured correctly
  * This is a simple diagnostic function
  */
-export const testApiKeys = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
+export const testApiKeys = onCall(
+  {
+    secrets: [geminiApiKey, openaiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
 
-  const results: Record<string, boolean | string> = {};
+    const results: Record<string, boolean | string> = {};
 
-  // Check Gemini API Key
-  const geminiKey = process.env.GEMINI_API_KEY;
-  results.GEMINI_API_KEY = geminiKey ? `${geminiKey.substring(0, 10)}...` : "NOT SET";
+    // Check Gemini API Key
+    const geminiKey = geminiApiKey.value();
+    results.GEMINI_API_KEY = geminiKey ? `${geminiKey.substring(0, 10)}...` : "NOT SET";
 
-  // Check OpenAI API Key
-  const openaiKey = process.env.OPENAI_API_KEY;
-  results.OPENAI_API_KEY = openaiKey ? `${openaiKey.substring(0, 10)}...` : "NOT SET";
+    // Check OpenAI API Key
+    const openaiKey = openaiApiKey.value();
+    results.OPENAI_API_KEY = openaiKey ? `${openaiKey.substring(0, 10)}...` : "NOT SET";
 
-  // Check ElevenLabs API Key
-  const elevenlabsKey = process.env.ELEVENLABS_API_KEY;
-  results.ELEVENLABS_API_KEY = elevenlabsKey ? `${elevenlabsKey.substring(0, 10)}...` : "NOT SET";
+    // Check ElevenLabs API Key
+    const elevenlabsKey = elevenlabsApiKey.value();
+    results.ELEVENLABS_API_KEY = elevenlabsKey ? `${elevenlabsKey.substring(0, 10)}...` : "NOT SET";
 
   return {
     success: true,
@@ -2115,10 +2136,14 @@ export const testApiKeys = functions.https.onCall(async (request) => {
  * Generate Evolution Voice - AI-powered evolution voice line generation using OpenAI GPT-5-mini
  * Note: Uses OpenAI for text generation, then ElevenLabs for TTS
  */
-export const generateEvolutionVoice = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
+export const generateEvolutionVoice = onCall(
+  {
+    secrets: [openaiApiKey, elevenlabsApiKey],
+  },
+  async (request: CallableRequest<{ mentorSlug: string; newStage: number }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
 
   try {
     const { mentorSlug, newStage } = request.data;
@@ -2148,9 +2173,9 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
 
     const mentor = mentorsSnapshot.docs[0].data();
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = openaiApiKey.value();
     if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
+      throw new HttpsError("internal", "OPENAI_API_KEY not configured");
     }
 
     // Generate voice line using OpenAI GPT-5-mini
@@ -2177,14 +2202,14 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
     });
 
     if (!openaiResponse.ok) {
-      throw new functions.https.HttpsError("internal", "Failed to generate voice line");
+      throw new HttpsError("internal", "Failed to generate voice line");
     }
 
     const openaiData = await openaiResponse.json();
     const voiceLine = openaiData.choices[0].message.content.trim().replace(/^["']|["']$/g, "");
 
     // Convert to speech using ElevenLabs
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+    const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
     if (!ELEVENLABS_API_KEY) {
       return { voiceLine, audioContent: null };
     }
@@ -2245,26 +2270,30 @@ export const generateEvolutionVoice = functions.https.onCall(async (request) => 
 /**
  * Transcribe Audio - Uses OpenAI Whisper API to transcribe audio files
  */
-export const transcribeAudio = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { audioUrl } = request.data;
-    if (!audioUrl) {
-      throw new functions.https.HttpsError("invalid-argument", "Audio URL is required");
+export const transcribeAudio = onCall(
+  {
+    secrets: [openaiApiKey],
+  },
+  async (request: CallableRequest<{ audioUrl: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
-    }
+    try {
+      const { audioUrl } = request.data;
+      if (!audioUrl) {
+        throw new HttpsError("invalid-argument", "Audio URL is required");
+      }
+
+      const OPENAI_API_KEY = openaiApiKey.value();
+      if (!OPENAI_API_KEY) {
+        throw new HttpsError("internal", "OPENAI_API_KEY not configured");
+      }
 
     // Fetch the audio file
     const audioResponse = await fetch(audioUrl);
     if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
+      throw new HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
     }
 
     const audioBuffer = await audioResponse.arrayBuffer();
@@ -2291,7 +2320,7 @@ export const transcribeAudio = functions.https.onCall(async (request) => {
     if (!transcriptionResponse.ok) {
       const errorText = await transcriptionResponse.text();
       console.error("OpenAI API error:", errorText);
-      throw new functions.https.HttpsError("internal", `OpenAI API error: ${transcriptionResponse.status}`);
+      throw new HttpsError("internal", `OpenAI API error: ${transcriptionResponse.status}`);
     }
 
     const transcriptionData = await transcriptionResponse.json();
@@ -2313,127 +2342,131 @@ export const transcribeAudio = functions.https.onCall(async (request) => {
     };
   } catch (error) {
     console.error("Error in transcribeAudio:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed to transcribe audio: ${error instanceof Error ? error.message : "Unknown error"}`);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `Failed to transcribe audio: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 
 /**
  * Sync Daily Pep Talk Transcript - Syncs transcript for daily pep talks
  */
-export const syncDailyPepTalkTranscript = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { id, mentorSlug, forDate } = request.data;
-
-    const db = admin.firestore();
-
-    // Fetch the daily pep talk
-    let pepTalkDoc: admin.firestore.DocumentSnapshot | null = null;
-    if (id) {
-      pepTalkDoc = await db.collection("daily_pep_talks").doc(id).get();
-    } else if (mentorSlug && forDate) {
-      const snapshot = await db
-        .collection("daily_pep_talks")
-        .where("mentor_slug", "==", mentorSlug)
-        .where("for_date", "==", forDate)
-        .limit(1)
-        .get();
-      pepTalkDoc = snapshot.docs[0] || null;
-    } else {
-      throw new functions.https.HttpsError("invalid-argument", "Provide either id or {mentorSlug, forDate}");
+export const syncDailyPepTalkTranscript = onCall(
+  {
+    secrets: [openaiApiKey],
+  },
+  async (request: CallableRequest<{ id?: string; mentorSlug?: string; forDate?: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    if (!pepTalkDoc || !pepTalkDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Pep talk not found");
-    }
+    try {
+      const { id, mentorSlug, forDate } = request.data;
 
-    const pepTalk = pepTalkDoc.data()!;
-    if (!pepTalk.audio_url) {
-      throw new functions.https.HttpsError("invalid-argument", "Pep talk has no audio_url");
-    }
+      const db = admin.firestore();
 
-    // Transcribe audio using OpenAI Whisper
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      throw new functions.https.HttpsError("internal", "OPENAI_API_KEY not configured");
-    }
+      // Fetch the daily pep talk
+      let pepTalkDoc: admin.firestore.DocumentSnapshot | null = null;
+      if (id) {
+        pepTalkDoc = await db.collection("daily_pep_talks").doc(id).get();
+      } else if (mentorSlug && forDate) {
+        const snapshot = await db
+          .collection("daily_pep_talks")
+          .where("mentor_slug", "==", mentorSlug)
+          .where("for_date", "==", forDate)
+          .limit(1)
+          .get();
+        pepTalkDoc = snapshot.docs[0] || null;
+      } else {
+        throw new HttpsError("invalid-argument", "Provide either id or {mentorSlug, forDate}");
+      }
 
-    const audioResponse = await fetch(pepTalk.audio_url);
-    if (!audioResponse.ok) {
-      throw new functions.https.HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
-    }
+      if (!pepTalkDoc || !pepTalkDoc.exists) {
+        throw new HttpsError("not-found", "Pep talk not found");
+      }
 
-    const audioBuffer = await audioResponse.arrayBuffer();
-    const audioBlob = Buffer.from(audioBuffer);
+      const pepTalk = pepTalkDoc.data()!;
+      if (!pepTalk.audio_url) {
+        throw new HttpsError("invalid-argument", "Pep talk has no audio_url");
+      }
 
-    const FormData = require("form-data");
-    const formData = new FormData();
-    formData.append("file", audioBlob, { filename: "audio.mp3", contentType: "audio/mpeg" });
-    formData.append("model", "whisper-1");
-    formData.append("response_format", "verbose_json");
-    formData.append("timestamp_granularities[]", "word");
+      // Transcribe audio using OpenAI Whisper
+      const OPENAI_API_KEY = openaiApiKey.value();
+      if (!OPENAI_API_KEY) {
+        throw new HttpsError("internal", "OPENAI_API_KEY not configured");
+      }
 
-    const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        ...formData.getHeaders(),
-      },
-      body: formData,
-    });
+      const audioResponse = await fetch(pepTalk.audio_url);
+      if (!audioResponse.ok) {
+        throw new HttpsError("internal", `Failed to fetch audio: ${audioResponse.statusText}`);
+      }
 
-    if (!transcriptionResponse.ok) {
-      const errorText = await transcriptionResponse.text();
-      throw new functions.https.HttpsError("internal", `Transcription failed: ${errorText}`);
-    }
+      const audioBuffer = await audioResponse.arrayBuffer();
+      const audioBlob = Buffer.from(audioBuffer);
 
-    const transcriptionData = await transcriptionResponse.json();
-    const words = transcriptionData.words || [];
-    const transcript = words.map((wordData: any) => ({
-      word: wordData.word,
-      start: wordData.start,
-      end: wordData.end,
-    }));
+      const FormData = require("form-data");
+      const formData = new FormData();
+      formData.append("file", audioBlob, { filename: "audio.mp3", contentType: "audio/mpeg" });
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "verbose_json");
+      formData.append("timestamp_granularities[]", "word");
 
-    const transcription = {
-      text: transcriptionData.text,
-      transcript,
-    };
+      const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          ...formData.getHeaders(),
+        },
+        body: formData,
+      });
 
-    const transcribedText = transcription.text;
-    const wordTimestamps = transcription.transcript || [];
+      if (!transcriptionResponse.ok) {
+        const errorText = await transcriptionResponse.text();
+        throw new HttpsError("internal", `Transcription failed: ${errorText}`);
+      }
 
-    if (!transcribedText) {
-      throw new functions.https.HttpsError("internal", "No transcription text returned");
-    }
+      const transcriptionData = await transcriptionResponse.json();
+      const words = transcriptionData.words || [];
+      const transcript = words.map((wordData: any) => ({
+        word: wordData.word,
+        start: wordData.start,
+        end: wordData.end,
+      }));
+
+      const transcription = {
+        text: transcriptionData.text,
+        transcript,
+      };
+
+      const transcribedText = transcription.text;
+      const wordTimestamps = transcription.transcript || [];
+
+      if (!transcribedText) {
+        throw new HttpsError("internal", "No transcription text returned");
+      }
 
     // If the new text differs significantly, update the row
     const currentText = pepTalk.script || "";
     const differs = currentText.trim() !== transcribedText.trim();
 
-    if (differs) {
-      await db.collection("daily_pep_talks").doc(pepTalkDoc.id).update({
+      if (differs) {
+        await db.collection("daily_pep_talks").doc(pepTalkDoc.id).update({
+          script: transcribedText,
+          transcript: wordTimestamps,
+        });
+      }
+
+      return {
+        id: pepTalkDoc.id,
         script: transcribedText,
         transcript: wordTimestamps,
-      });
+        changed: differs,
+      };
+    } catch (error) {
+      console.error("Error in syncDailyPepTalkTranscript:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed to sync transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-
-    return {
-      id: pepTalkDoc.id,
-      script: transcribedText,
-      transcript: wordTimestamps,
-      changed: differs,
-    };
-  } catch (error) {
-    console.error("Error in syncDailyPepTalkTranscript:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed to sync transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
-});
+  });
 
 /**
  * Seed Real Quotes - Seeds real quotes into the database
@@ -4964,7 +4997,7 @@ export const triggerAdaptiveEvent = onCall(
         .where("created_at", ">=", oneDayAgo)
         .get();
 
-      if (dailyCount >= 1) {
+      if (dailyCountSnapshot.size >= 1) {
         throw new HttpsError("resource-exhausted", "Daily limit reached");
       }
 
