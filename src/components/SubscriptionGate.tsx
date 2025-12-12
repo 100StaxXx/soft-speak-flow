@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useEvolution } from "@/contexts/EvolutionContext";
@@ -14,8 +14,9 @@ const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 
 export const SubscriptionGate = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { companion } = useCompanion();
-  const { hasAccess, isInTrial, trialDaysRemaining } = useAccessStatus();
+  const { hasAccess, isInTrial, trialDaysRemaining, loading: accessLoading } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
   const todayString = getTodayDateString();
@@ -25,7 +26,22 @@ export const SubscriptionGate = () => {
   const [shouldShowAfterEvolution, setShouldShowAfterEvolution] = useState(false);
   const hasShownToday = lastShownDate === todayString;
 
+  // Don't show paywall during onboarding - it should only be accessible from profile tab
+  const isOnboarding = location.pathname === "/onboarding";
+
   useEffect(() => {
+    // Don't show if still loading access status
+    if (accessLoading) {
+      return;
+    }
+
+    // Don't show if on onboarding route
+    if (isOnboarding) {
+      setShowPaywall(false);
+      setShouldShowAfterEvolution(false);
+      return;
+    }
+
     // Don't show if already subscribed (not just in trial)
     if (hasAccess && !isInTrial) {
       setShowPaywall(false);
@@ -35,23 +51,29 @@ export const SubscriptionGate = () => {
 
     // Don't trigger while evolution is in progress - wait for it to complete
     if (isEvolvingLoading) {
-      // Queue paywall to show after evolution completes if companion is at stage 1+
-      if (companion && companion.current_stage >= 1 && !hasShownToday) {
+      // Queue paywall to show after evolution completes if user is in trial
+      if (isInTrial && !hasShownToday) {
         setShouldShowAfterEvolution(true);
       }
       return;
     }
 
-    // Show modal if companion is at stage 1+ and we haven't shown it yet
-    if (companion && companion.current_stage >= 1 && !hasShownToday) {
+    // Show modal once per day if user is in trial and we haven't shown it today
+    if (isInTrial && !hasShownToday) {
       setShowPaywall(true);
       setLastShownDate(todayString);
       safeLocalStorage.setItem(SUBSCRIPTION_MODAL_LAST_SHOWN_KEY, todayString);
     }
-  }, [companion, hasAccess, isInTrial, hasShownToday, isEvolvingLoading, todayString]);
+  }, [accessLoading, hasAccess, isInTrial, hasShownToday, isEvolvingLoading, todayString, isOnboarding]);
 
   // Listen for evolution completion
   useEffect(() => {
+    // Don't show if on onboarding route
+    if (isOnboarding) {
+      setShouldShowAfterEvolution(false);
+      return;
+    }
+
     if (shouldShowAfterEvolution && !isEvolvingLoading) {
       // Small delay to let evolution modal fully dismiss
       const timer = setTimeout(() => {
@@ -63,7 +85,7 @@ export const SubscriptionGate = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [shouldShowAfterEvolution, isEvolvingLoading, todayString]);
+  }, [shouldShowAfterEvolution, isEvolvingLoading, todayString, isOnboarding]);
 
   return (
     <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
@@ -75,23 +97,15 @@ export const SubscriptionGate = () => {
             </div>
           </div>
           <DialogTitle className="text-center text-2xl">
-            Your Companion Has Evolved! 🎉
+            What you get with Premium ✨
           </DialogTitle>
-          <DialogDescription className="text-center text-base pt-2">
-            {isInTrial && trialDaysRemaining > 0 ? (
-              <>
-                You're enjoying your <span className="font-semibold text-foreground">free trial</span> — {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} remaining!
-              </>
-            ) : (
-              <>
-                Enjoy <span className="font-semibold text-foreground">7 days of full access</span> — no credit card required.
-              </>
-            )}
+          <DialogDescription className="sr-only">
+            Premium features and benefits
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Features */}
+          {/* Features - Main Focus */}
           <div className="space-y-3">
           {[
             { icon: Sparkles, text: "All 21 evolution stages" },
@@ -107,35 +121,12 @@ export const SubscriptionGate = () => {
             ))}
           </div>
 
-          {/* Trial Info */}
-          <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/20">
-            {isInTrial && trialDaysRemaining > 0 ? (
-              <>
-                <p className="text-sm font-semibold text-foreground mb-1">
-                  Your free trial is active
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Subscribe anytime: $9.99/month or $59.99/year • Cancel anytime
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-foreground mb-1">
-                  After your free trial
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Just $9.99/month or $59.99/year • Cancel anytime in iOS Settings
-                </p>
-              </>
-            )}
-          </div>
-
           {/* CTA */}
           <Button
             onClick={() => setShowPaywall(false)}
             className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            {isInTrial && trialDaysRemaining > 0 ? "Continue to App" : "Start My Free Trial"}
+            Continue Exploring
           </Button>
 
           <Button
@@ -146,14 +137,15 @@ export const SubscriptionGate = () => {
             }}
             className="w-full text-sm text-muted-foreground hover:text-foreground"
           >
-            View pricing details
+            Learn more about premium
           </Button>
 
-          {!isInTrial && (
-            <p className="text-xs text-center text-muted-foreground">
-              No credit card required. We'll remind you before the trial ends.
-            </p>
-          )}
+          {/* Minimal trial/subscription info at bottom */}
+          <p className="text-xs text-center text-muted-foreground pt-2">
+            {isInTrial && trialDaysRemaining > 0 
+              ? `${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} left in your trial`
+              : "7-day free trial • No credit card required"}
+          </p>
         </div>
       </DialogContent>
     </Dialog>

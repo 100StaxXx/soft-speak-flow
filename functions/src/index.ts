@@ -1301,7 +1301,12 @@ export const generateCompanionImage = functions.https.onCall(async (request) => 
       throw new functions.https.HttpsError("invalid-argument", "Missing companionId or stage");
     }
 
-    const prompt = `Generate an image description for a ${species} companion at evolution stage ${stage} with ${element} element and ${color} color. Return JSON: {"imagePrompt": "Detailed image generation prompt", "description": "Image description"}`;
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = species?.toLowerCase() === "cerberus" 
+      ? "Cerberus with 3 heads" 
+      : species;
+    
+    const prompt = `Generate an image description for a ${speciesDescription} companion at evolution stage ${stage} with ${element} element and ${color} color. Return JSON: {"imagePrompt": "Detailed image generation prompt", "description": "Image description"}`;
 
     const response = await callGemini(prompt, "You are an image prompt generator. Always respond with valid JSON only.", {
       temperature: 0.9,
@@ -1609,7 +1614,17 @@ export const generateNeglectedCompanionImage = functions.https.onCall(async (req
       throw new functions.https.HttpsError("invalid-argument", "Missing companionId");
     }
 
-    const prompt = `Generate an image description for a neglected companion. Days since last interaction: ${daysSinceLastInteraction || 0}. Return JSON: {"imagePrompt": "Image prompt", "description": "Description"}`;
+    // Get companion data to check if it's Cerberus
+    const db = admin.firestore();
+    const companionDoc = await db.collection("user_companion").doc(companionId).get();
+    const companion = companionDoc.exists ? companionDoc.data()! : null;
+    
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = companion?.spirit_animal?.toLowerCase() === "cerberus"
+      ? "neglected Cerberus with 3 heads"
+      : "neglected companion";
+
+    const prompt = `Generate an image description for a ${speciesDescription}. Days since last interaction: ${daysSinceLastInteraction || 0}. Return JSON: {"imagePrompt": "Image prompt", "description": "Description"}`;
 
     const response = await callGemini(prompt, "You are an image prompt generator. Always respond with valid JSON only.", {
       temperature: 0.9,
@@ -1753,7 +1768,12 @@ export const generateCompanionEvolution = functions.https.onCall(async (request)
     }
     const companion = companionDoc.data()!;
 
-    const prompt = `Generate evolution details for companion. Current stage: ${currentStage}, Target stage: ${targetStage || currentStage + 1}, Species: ${companion.spirit_animal}, Element: ${companion.core_element}. Return JSON: {"evolutionDescription": "Description", "newAbilities": ["ability1"], "imagePrompt": "Image prompt"}`;
+    // Cerberus always has 3 heads regardless of stage
+    const speciesDescription = companion.spirit_animal?.toLowerCase() === "cerberus"
+      ? "Cerberus with 3 heads"
+      : companion.spirit_animal;
+
+    const prompt = `Generate evolution details for companion. Current stage: ${currentStage}, Target stage: ${targetStage || currentStage + 1}, Species: ${speciesDescription}, Element: ${companion.core_element}. Return JSON: {"evolutionDescription": "Description", "newAbilities": ["ability1"], "imagePrompt": "Image prompt"}`;
 
     const response = await callGemini(prompt, "You are an evolution designer. Always respond with valid JSON only.", {
       temperature: 0.9,
