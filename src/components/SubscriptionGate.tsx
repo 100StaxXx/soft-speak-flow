@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useCompanion } from "@/hooks/useCompanion";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,7 +14,7 @@ const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 export const SubscriptionGate = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { companion } = useCompanion();
+  // Removed useCompanion - not needed for gate logic and slows initial load
   const { hasAccess, isInTrial, trialDaysRemaining, loading: accessLoading } = useAccessStatus();
   const { isEvolvingLoading } = useEvolution();
   const [showPaywall, setShowPaywall] = useState(false);
