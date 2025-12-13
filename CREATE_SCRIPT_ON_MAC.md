@@ -149,3 +149,4 @@ npx cap sync ios
 # 4. Open Xcode
 open ios/App/App.xcworkspace
 ```
+

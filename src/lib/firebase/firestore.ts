@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   getDocsFromCache,
-  getAll,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -83,7 +82,8 @@ export const getDocumentsByIds = async <T = DocumentData>(
     chunks.map(async (chunk) => {
       const docRefs = chunk.map((id) => doc(firebaseDb, collectionName, id));
       try {
-        const snapshots = await getAll(...docRefs);
+        // Use Promise.all with getDoc instead of getAll (getAll was removed in Firebase v10+)
+        const snapshots = await Promise.all(docRefs.map(ref => getDoc(ref)));
         snapshots.forEach((docSnap) => {
           if (docSnap.exists()) {
             results.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as T);
