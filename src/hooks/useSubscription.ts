@@ -1,14 +1,60 @@
 import { useAuth } from "./useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { logger } from "@/utils/logger";
 import { checkAppleSubscription } from "@/lib/firebase/functions";
+import { safeLocalStorage } from "@/utils/storage";
 
 export interface Subscription {
   status: "active" | "cancelled" | "past_due" | "trialing" | "incomplete";
   plan: "monthly" | "yearly";
   trial_ends_at?: string | null;
   current_period_end?: string | null;
+}
+
+// Cache key and expiry (1 hour)
+const SUBSCRIPTION_CACHE_KEY = "subscription_cache";
+const SUBSCRIPTION_CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour in ms
+
+interface CachedSubscription {
+  data: any;
+  timestamp: number;
+  userId: string;
+}
+
+// Get cached subscription (returns null if expired or invalid)
+function getCachedSubscription(userId: string): any | null {
+  try {
+    const cached = safeLocalStorage.getItem(SUBSCRIPTION_CACHE_KEY);
+    if (!cached) return null;
+    
+    const parsed: CachedSubscription = JSON.parse(cached);
+    const isExpired = Date.now() - parsed.timestamp > SUBSCRIPTION_CACHE_EXPIRY;
+    const isWrongUser = parsed.userId !== userId;
+    
+    if (isExpired || isWrongUser) {
+      safeLocalStorage.removeItem(SUBSCRIPTION_CACHE_KEY);
+      return null;
+    }
+    
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+// Save subscription to cache
+function setCachedSubscription(userId: string, data: any): void {
+  try {
+    const cache: CachedSubscription = {
+      data,
+      timestamp: Date.now(),
+      userId
+    };
+    safeLocalStorage.setItem(SUBSCRIPTION_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 // Valid status values for type safety
@@ -31,11 +77,28 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user) return null;
 
-      return await checkAppleSubscription();
+      // Check cache first for fast initial load
+      const cached = getCachedSubscription(user.uid);
+      if (cached) {
+        // Return cached immediately, but also fetch fresh in background
+        checkAppleSubscription().then((fresh) => {
+          if (fresh) setCachedSubscription(user.uid, fresh);
+        }).catch(() => {});
+        return cached;
+      }
+
+      // No cache, fetch from server
+      const result = await checkAppleSubscription();
+      if (result && user.uid) {
+        setCachedSubscription(user.uid, result);
+      }
+      return result;
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance
-    refetchInterval: false, // Disable automatic refetching for better performance
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: false,
+    // Return cached data immediately while revalidating
+    placeholderData: user ? getCachedSubscription(user.uid) : undefined,
   });
 
   const subscription = useMemo(() => {
