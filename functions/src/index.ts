@@ -1981,8 +1981,7 @@ export const triggerDailyPepTalksHttp = onRequest(
           const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
             temperature: 0.8,
             maxOutputTokens: 2048,
-            apiKey: geminiApiKey.value(),
-          });
+          }, geminiApiKey.value());
 
           const pepTalk = parseGeminiJSON(response.text);
 
