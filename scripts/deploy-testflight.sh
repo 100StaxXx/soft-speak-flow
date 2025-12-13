@@ -113,3 +113,5 @@ open ios/App/App.xcworkspace
 echo ""
 echo -e "${GREEN}🎉 Setup complete! Continue in Xcode.${NC}"
 
+
+
