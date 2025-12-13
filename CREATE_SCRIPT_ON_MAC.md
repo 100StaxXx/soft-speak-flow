@@ -150,3 +150,5 @@ npx cap sync ios
 open ios/App/App.xcworkspace
 ```
 
+
+
