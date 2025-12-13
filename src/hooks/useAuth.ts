@@ -19,18 +19,30 @@ export const useAuth = () => {
   useEffect(() => {
     let isInitialCheck = true;
     let timeoutId: NodeJS.Timeout | null = null;
+    const startTime = Date.now();
     
-    console.log('[useAuth] Setting up auth state listener...');
+    // Check for persisted user immediately (no network wait)
+    const persistedUser = firebaseAuth?.currentUser;
+    if (persistedUser) {
+      console.log('[useAuth] Found persisted user immediately:', persistedUser.email);
+      const authUser = convertFirebaseUser(persistedUser);
+      if (authUser) {
+        setUser(authUser);
+        setSession({ user: authUser });
+        setLoading(false);
+        isInitialCheck = false;
+        // Still set up listener for future auth changes, but don't block on it
+      }
+    }
     
-    // Safety timeout: If auth state doesn't resolve within 10 seconds, stop loading
-    // This prevents infinite loading if Firebase fails to initialize
+    // Safety timeout: Reduced to 5 seconds for faster failure recovery
     timeoutId = setTimeout(() => {
       if (isInitialCheck) {
-        console.warn('[useAuth] ⚠️ Auth state check timeout after 10s - proceeding without user');
+        console.warn(`[useAuth] ⚠️ Auth state check timeout after 5s - proceeding without user`);
         setLoading(false);
         isInitialCheck = false;
       }
-    }, 10000);
+    }, 5000);
     
     // Check if Firebase auth is initialized
     if (!firebaseAuth) {

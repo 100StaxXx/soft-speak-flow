@@ -58,7 +58,7 @@ export const getDocument = async <T = DocumentData>(
   return { id: docSnap.id, ...docSnap.data() } as T;
 };
 
-// Batch get multiple documents by IDs (much faster than individual fetches)
+// Batch get multiple documents by IDs (using Promise.all for web SDK)
 export const getDocumentsByIds = async <T = DocumentData>(
   collectionName: string,
   docIds: string[]
@@ -67,34 +67,22 @@ export const getDocumentsByIds = async <T = DocumentData>(
     return new Map();
   }
 
-  // Firestore getAll can fetch up to 10 documents at once
-  // Split into chunks of 10 to handle larger batches
-  const chunkSize = 10;
-  const chunks: string[][] = [];
-  for (let i = 0; i < docIds.length; i += chunkSize) {
-    chunks.push(docIds.slice(i, i + chunkSize));
-  }
-
   const results = new Map<string, T>();
 
-  // Fetch all chunks in parallel
-  await Promise.all(
-    chunks.map(async (chunk) => {
-      const docRefs = chunk.map((id) => doc(firebaseDb, collectionName, id));
-      try {
-        // Use Promise.all with getDoc instead of getAll (getAll was removed in Firebase v10+)
-        const snapshots = await Promise.all(docRefs.map(ref => getDoc(ref)));
-        snapshots.forEach((docSnap) => {
-          if (docSnap.exists()) {
-            results.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as T);
-          }
-        });
-      } catch (error) {
-        console.error(`[getDocumentsByIds] Error fetching chunk:`, error);
-        // Continue with other chunks even if one fails
+  // Fetch all documents in parallel using Promise.all
+  const docRefs = docIds.map((id) => doc(firebaseDb, collectionName, id));
+  
+  try {
+    const snapshots = await Promise.all(docRefs.map((ref) => getDoc(ref)));
+    
+    snapshots.forEach((docSnap) => {
+      if (docSnap.exists()) {
+        results.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as T);
       }
-    })
-  );
+    });
+  } catch (error) {
+    console.error(`[getDocumentsByIds] Error fetching documents:`, error);
+  }
 
   return results;
 };

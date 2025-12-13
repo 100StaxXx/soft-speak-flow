@@ -44,13 +44,13 @@ export interface Profile {
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   try {
-    // Add timeout to prevent hanging on iOS
+    // Add timeout to prevent hanging on iOS - reduced to 5s for faster failure
     const dataPromise = getDocument<Profile>("profiles", userId);
     const timeoutPromise = new Promise<null>((resolve) => 
       setTimeout(() => {
-        console.warn("[getProfile] Timeout fetching profile, returning null");
+        console.warn("[getProfile] Timeout fetching profile after 5s, returning null");
         resolve(null);
-      }, 8000)
+      }, 5000)
     );
     
     const data = await Promise.race([dataPromise, timeoutPromise]);
