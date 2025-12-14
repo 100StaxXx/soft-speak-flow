@@ -212,9 +212,31 @@ cd ios/App
 # Check if CocoaPods is installed
 if ! command -v pod &> /dev/null; then
   echo -e "${YELLOW}⚠️  CocoaPods not found. Installing...${NC}"
-  sudo gem install cocoapods || {
-    echo -e "${RED}❌ Failed to install CocoaPods. Install manually: sudo gem install cocoapods${NC}"
-    exit 1
+  
+  # Try user-level install first (no sudo required)
+  gem install --user-install cocoapods 2>/dev/null && {
+    # Add to PATH if user install succeeded
+    export PATH="$HOME/.gem/ruby/$(ruby -e 'puts RUBY_VERSION')/bin:$PATH"
+    if command -v pod &> /dev/null; then
+      echo -e "${GREEN}✅ CocoaPods installed (user-level)${NC}"
+    else
+      echo -e "${YELLOW}⚠️  CocoaPods installed but not in PATH. Trying sudo install...${NC}"
+      sudo gem install cocoapods || {
+        echo -e "${RED}❌ Failed to install CocoaPods. Install manually:${NC}"
+        echo -e "${YELLOW}   gem install --user-install cocoapods${NC}"
+        echo -e "${YELLOW}   export PATH=\"\$HOME/.gem/ruby/\$(ruby -e 'puts RUBY_VERSION')/bin:\$PATH\"${NC}"
+        exit 1
+      }
+    fi
+  } || {
+    # If user install failed, try sudo
+    echo -e "${YELLOW}⚠️  User-level install failed. Trying sudo...${NC}"
+    sudo gem install cocoapods || {
+      echo -e "${RED}❌ Failed to install CocoaPods. Install manually:${NC}"
+      echo -e "${YELLOW}   gem install --user-install cocoapods${NC}"
+      echo -e "${YELLOW}   export PATH=\"\$HOME/.gem/ruby/\$(ruby -e 'puts RUBY_VERSION')/bin:\$PATH\"${NC}"
+      exit 1
+    }
   }
 fi
 
