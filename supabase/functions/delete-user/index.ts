@@ -13,7 +13,7 @@ async function cleanupReferralArtifacts(supabase: any, userId: string) {
   const { error: referralPayoutsError } = await supabase
     .from("referral_payouts")
     .delete()
-    .or(`referrer_id.eq.${userId},recipient_user_id.eq.${userId}`);
+    .or(`referrer_id.eq.${userId},referee_id.eq.${userId}`);
   if (referralPayoutsError) {
     throw referralPayoutsError;
   }
