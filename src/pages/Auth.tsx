@@ -741,7 +741,8 @@ const Auth = () => {
               </form>
             )}
 
-            {!isForgotPassword && (
+            {/* OAuth buttons hidden for now */}
+            {false && !isForgotPassword && (
               <div className="space-y-4 pt-4">
                 <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.4em] text-steel">
                   <span className="h-px flex-1 bg-obsidian/40" />
