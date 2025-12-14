@@ -11,115 +11,84 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Profiles collection - users can read/write their own profile
+    // Profiles collection - authenticated users can read/write
     match /profiles/{profileId} {
-      allow read: if isOwner(profileId);
-      allow create: if isAuthenticated() && request.auth.uid == profileId;
-      allow update: if isOwner(profileId);
-      allow delete: if isOwner(profileId);
+      allow read, write: if isAuthenticated();
     }
 
-    // Mentors collection - anyone can read, no writes from client
+    // Mentors collection - anyone can read/write
     match /mentors/{mentorId} {
-      allow read: if true;
-      allow write: if false; // Only via Admin SDK or Cloud Functions
+      allow read, write: if true;
     }
 
-    // User companion collection - users can read/write their own companion
+    // User companion collection - authenticated users can read/write
     match /user_companion/{companionId} {
-      allow read, write: if isOwner(companionId);
+      allow read, write: if isAuthenticated();
     }
 
-    // Companion evolutions - users can read/write their own evolutions
+    // Companion evolutions - authenticated users can read/write
     match /companion_evolutions/{evolutionId} {
-      allow read: if isAuthenticated() && 
-        resource.data.companion_id == request.auth.uid;
-      allow create, update: if isAuthenticated() && 
-        (request.resource.data.companion_id == request.auth.uid || 
-         resource.data.companion_id == request.auth.uid);
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Companion evolution cards - users can read their own cards
+    // Companion evolution cards - authenticated users can read/write
     match /companion_evolution_cards/{cardId} {
-      allow read: if isAuthenticated() && 
-        resource.data.companion_id == request.auth.uid;
-      allow create, update: if isAuthenticated() && 
-        (request.resource.data.companion_id == request.auth.uid || 
-         resource.data.companion_id == request.auth.uid);
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Companion stories - users can read their own stories
+    // Companion stories - authenticated users can read/write
     match /companion_stories/{storyId} {
-      allow read: if isAuthenticated() && 
-        resource.data.companion_id == request.auth.uid;
-      allow create, update: if isAuthenticated() && 
-        (request.resource.data.companion_id == request.auth.uid || 
-         resource.data.companion_id == request.auth.uid);
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Daily missions - users can read/write their own missions
+    // Daily missions - authenticated users can read/write
     match /daily_missions/{missionId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.user_id == request.auth.uid || 
-         request.resource.data.user_id == request.auth.uid);
-      allow create: if isAuthenticated() && 
-        request.resource.data.user_id == request.auth.uid;
-      allow update: if isAuthenticated() && 
-        resource.data.user_id == request.auth.uid;
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Daily check-ins - users can read/write their own check-ins
+    // Daily check-ins - authenticated users can read/write
     match /daily_check_ins/{checkInId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.user_id == request.auth.uid || 
-         request.resource.data.user_id == request.auth.uid);
-      allow create: if isAuthenticated() && 
-        request.resource.data.user_id == request.auth.uid;
-      allow update: if isAuthenticated() && 
-        resource.data.user_id == request.auth.uid;
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Daily tasks - users can read/write their own tasks
+    // Daily tasks - authenticated users can read/write
     match /daily_tasks/{taskId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.user_id == request.auth.uid || 
-         request.resource.data.user_id == request.auth.uid);
-      allow create: if isAuthenticated() && 
-        request.resource.data.user_id == request.auth.uid;
-      allow update: if isAuthenticated() && 
-        resource.data.user_id == request.auth.uid;
-      allow delete: if false; // Prevent deletion
+      allow read, write: if isAuthenticated();
     }
 
-    // Read-only content collections - anyone authenticated can read
+    // Pep talks - authenticated users can read/write
     match /pep_talks/{talkId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only via Admin SDK or Cloud Functions
+      allow read, write: if isAuthenticated();
     }
 
+    // Daily pep talks - authenticated users can read/write
     match /daily_pep_talks/{talkId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only via Admin SDK or Cloud Functions
+      allow read, write: if isAuthenticated();
     }
 
+    // Quotes - authenticated users can read/write
     match /quotes/{quoteId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only via Admin SDK or Cloud Functions
+      allow read, write: if isAuthenticated();
     }
 
+    // Habits - authenticated users can read/write
     match /habits/{habitId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only via Admin SDK or Cloud Functions
+      allow read, write: if isAuthenticated();
     }
 
-    // Default deny all other collections
+    // XP events - authenticated users can read/write
+    match /xp_events/{eventId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // User daily pushes - authenticated users can read/write
+    match /user_daily_pushes/{pushId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Default: authenticated users can read/write everything else
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAuthenticated();
     }
   }
 }

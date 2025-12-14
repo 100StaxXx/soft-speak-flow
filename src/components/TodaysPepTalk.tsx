@@ -46,7 +46,7 @@ export const TodaysPepTalk = memo(() => {
   const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ message: string; isIndexError: boolean; indexUrl?: string } | null>(null);
+  const [error, setError] = useState<{ message: string; isIndexError: boolean; isPermissionError: boolean; indexUrl?: string } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -136,19 +136,29 @@ export const TodaysPepTalk = memo(() => {
           const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
           data = recentPepTalks[0] || null;
         } catch (fallbackError: any) {
-          // Check if this is also an index error
+          // Check if this is an index or permission error
           const errorMessage = fallbackError?.message || String(fallbackError);
           if (errorMessage.includes("index") || errorMessage.includes("The query requires an index")) {
             const indexUrlMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s)]+/);
             setError({
               message: "Firebase index is missing. Please create the required index to load pep talks.",
               isIndexError: true,
+              isPermissionError: false,
               indexUrl: indexUrlMatch ? indexUrlMatch[0] : undefined,
             });
             setLoading(false);
             return;
           }
-          throw fallbackError; // Re-throw if not an index error
+          if (errorMessage.includes("permission") || errorMessage.includes("Missing or insufficient permissions")) {
+            setError({
+              message: "Permission denied. You don't have access to load pep talks. Please check your Firebase security rules.",
+              isIndexError: false,
+              isPermissionError: true,
+            });
+            setLoading(false);
+            return;
+          }
+          throw fallbackError; // Re-throw if not a handled error
         }
       }
 
@@ -176,9 +186,10 @@ export const TodaysPepTalk = memo(() => {
     } catch (error: any) {
       console.error("Unexpected error fetching pep talk:", error);
       
-      // Check if this is a Firebase index error
+      // Check if this is a Firebase index or permission error
       const errorMessage = error?.message || String(error);
       const isIndexError = errorMessage.includes("index") || errorMessage.includes("The query requires an index");
+      const isPermissionError = errorMessage.includes("permission") || errorMessage.includes("Missing or insufficient permissions");
       
       if (isIndexError) {
         // Try to extract the Firebase index creation URL from the error
@@ -186,12 +197,20 @@ export const TodaysPepTalk = memo(() => {
         setError({
           message: "Firebase index is missing. Please create the required index to load pep talks.",
           isIndexError: true,
+          isPermissionError: false,
           indexUrl: indexUrlMatch ? indexUrlMatch[0] : undefined,
+        });
+      } else if (isPermissionError) {
+        setError({
+          message: "Permission denied. You don't have access to load pep talks. Please check your Firebase security rules.",
+          isIndexError: false,
+          isPermissionError: true,
         });
       } else {
         setError({
           message: "Failed to load today's pep talk. Please try again later.",
           isIndexError: false,
+          isPermissionError: false,
         });
       }
     } finally {
@@ -503,6 +522,17 @@ export const TodaysPepTalk = memo(() => {
                     Check your browser console for the Firebase index creation link, or manually create an index for the <code className="bg-muted px-1 rounded">daily_pep_talks</code> collection on fields: <code className="bg-muted px-1 rounded">mentor_slug</code> and <code className="bg-muted px-1 rounded">for_date</code>.
                   </p>
                 )}
+              </div>
+            )}
+            
+            {error.isPermissionError && (
+              <div className="space-y-2 pt-2 border-t border-destructive/20">
+                <p className="text-xs text-muted-foreground font-medium">
+                  This usually happens when Firebase security rules are too restrictive. The <code className="bg-muted px-1 rounded">daily_pep_talks</code> collection needs read access for authenticated users.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Check your Firestore security rules and ensure users can read from the <code className="bg-muted px-1 rounded">daily_pep_talks</code> collection.
+                </p>
               </div>
             )}
             
