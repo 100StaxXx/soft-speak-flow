@@ -471,26 +471,21 @@ export async function generateDailyQuotes() {
 }
 
 /**
- * Generate Single Mentor Pep Talk - Generates a complete pep talk with audio and transcript for a single mentor
+ * Generate Single Mentor Pep Talk - AI-powered pep talk generation for one mentor
+ * Use this instead of generateDailyMentorPepTalks to avoid timeout issues
  */
-export async function generateSingleMentorPepTalk(data: {
-  mentorSlug: string;
-  topicCategory?: string;
-  intensity?: string;
-  emotionalTriggers?: string[];
-}) {
+export async function generateSingleMentorPepTalk(data: { mentorSlug: string }) {
   return callFirebaseFunction<typeof data, {
-    title: string;
-    summary: string;
-    script: string;
-    audio_url: string;
-    transcript: Array<{ word: string; start: number; end: number }>;
-    mentor_slug: string;
+    mentor: string;
+    status: string;
+    title?: string;
+    message?: string;
   }>("generateSingleMentorPepTalk", data);
 }
 
 /**
  * Generate Daily Mentor Pep Talks - AI-powered daily pep talk generation for all mentors
+ * DEPRECATED: Use generateSingleMentorPepTalk for each mentor instead to avoid timeouts
  */
 export async function generateDailyMentorPepTalks() {
   return callFirebaseFunction<{}, {
