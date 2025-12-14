@@ -471,6 +471,25 @@ export async function generateDailyQuotes() {
 }
 
 /**
+ * Generate Single Mentor Pep Talk - Generates a complete pep talk with audio and transcript for a single mentor
+ */
+export async function generateSingleMentorPepTalk(data: {
+  mentorSlug: string;
+  topicCategory?: string;
+  intensity?: string;
+  emotionalTriggers?: string[];
+}) {
+  return callFirebaseFunction<typeof data, {
+    title: string;
+    summary: string;
+    script: string;
+    audio_url: string;
+    transcript: Array<{ word: string; start: number; end: number }>;
+    mentor_slug: string;
+  }>("generateSingleMentorPepTalk", data);
+}
+
+/**
  * Generate Daily Mentor Pep Talks - AI-powered daily pep talk generation for all mentors
  */
 export async function generateDailyMentorPepTalks() {
