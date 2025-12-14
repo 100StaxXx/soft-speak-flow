@@ -73,6 +73,9 @@ const Auth = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { session: authSession, loading: authLoading } = useAuth();
+  
+  // Ref to track if signup is in progress - used for onAuthStateChanged detection
+  const signupInProgressRef = useRef(false);
 
   // Hide splash screen immediately when Auth page loads (don't wait for auth check)
   useEffect(() => {
@@ -315,6 +318,16 @@ const Auth = () => {
       if (user && !hasRedirected.current) {
         const timestamp = Date.now();
         console.log(`[Auth onAuthStateChanged] User signed in at ${timestamp}, redirecting...`);
+        
+        // If signup is in progress on native, redirect to onboarding immediately
+        if (signupInProgressRef.current && Capacitor.isNativePlatform()) {
+          console.log('[Auth onAuthStateChanged] Signup detected - immediate redirect to onboarding');
+          signupInProgressRef.current = false;
+          hasRedirected.current = true;
+          window.location.href = '/onboarding';
+          return;
+        }
+        
         const authUser = convertFirebaseUser(user);
         if (authUser) {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -338,6 +351,16 @@ const Auth = () => {
   // Extra safety net: if the auth context already has a session, redirect immediately
   useEffect(() => {
     if (!authSession?.user || hasRedirected.current) return;
+    
+    // If signup is in progress on native, redirect to onboarding immediately
+    if (signupInProgressRef.current && Capacitor.isNativePlatform()) {
+      console.log('[Auth] Signup detected via authSession - redirecting to onboarding');
+      signupInProgressRef.current = false;
+      hasRedirected.current = true;
+      window.location.href = '/onboarding';
+      return;
+    }
+    
     handlePostAuthNavigation({ uid: authSession.user.uid || authSession.user.id, email: authSession.user.email || '' }, 'authContext');
   }, [authSession, handlePostAuthNavigation]);
 
@@ -375,25 +398,56 @@ const Auth = () => {
           console.error('[Auth] Post-login navigation error:', err);
         });
       } else {
-        // SIGNUP FLOW
-        const userCredential = await signUp(sanitizedEmail, password, {
+        // SIGNUP FLOW - Don't await signUp to prevent blocking on iOS
+        // The onAuthStateChanged listener will detect when user is created and redirect
+        signupInProgressRef.current = true;
+        
+        // Start signup WITHOUT awaiting - let onAuthStateChanged handle navigation
+        signUp(sanitizedEmail, password, {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        }).then((userCredential) => {
+          console.log('[Auth signUp] Signup completed successfully');
+          // For web: handle navigation if not already redirected
+          if (!Capacitor.isNativePlatform() && !hasRedirected.current) {
+            const authUser = convertFirebaseUser(userCredential.user);
+            handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
+              console.error('[Auth] Post-signup navigation error:', err);
+            });
+          }
+        }).catch((error: any) => {
+          console.error('[Auth signUp] Error:', error);
+          signupInProgressRef.current = false;
+          setLoading(false);
+          
+          let errorMessage = 'Failed to create account. Please try again.';
+          if (error?.code === 'auth/email-already-in-use') {
+            errorMessage = 'This email is already registered. Please sign in instead.';
+          } else if (error?.message) {
+            errorMessage = error.message;
+          }
+          
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
         });
         
-        // For native iOS: IMMEDIATELY redirect to onboarding
-        // Don't wait for anything else - new users ALWAYS go to onboarding
+        // For native: set a fallback timeout to force redirect if onAuthStateChanged doesn't fire
         if (Capacitor.isNativePlatform()) {
-          console.log('[Auth signUp] Native platform - IMMEDIATE redirect to onboarding');
-          // Use direct location change - most reliable on iOS
-          window.location.href = '/onboarding';
-          return; // Stop execution here
+          setTimeout(() => {
+            if (signupInProgressRef.current && !hasRedirected.current) {
+              console.log('[Auth signUp] Fallback timeout - forcing redirect to onboarding');
+              signupInProgressRef.current = false;
+              hasRedirected.current = true;
+              window.location.href = '/onboarding';
+            }
+          }, 8000);
         }
         
-        // Web: use the normal flow
-        const authUser = convertFirebaseUser(userCredential.user);
-        handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
-          console.error('[Auth] Post-signup navigation error:', err);
-        });
+        // Exit early - don't wait for the promise
+        // Navigation will be handled by onAuthStateChanged or the fallback timeout
+        return;
       }
     } catch (error: any) {
       console.error('[Auth] Auth error:', error);
