@@ -44,6 +44,8 @@ export function useAccessStatus(): AccessStatus {
       };
     }
 
+    const now = new Date();
+    
     // Parse trial end date with fallback to created_at + 7 days
     let trialEndsAt: Date | null = null;
     
@@ -51,10 +53,13 @@ export function useAccessStatus(): AccessStatus {
       trialEndsAt = new Date(profile.trial_ends_at);
     } else if (profile.created_at) {
       // Fallback: use profile creation date + 7 days
-      trialEndsAt = new Date(new Date(profile.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
+      const createdAt = new Date(profile.created_at);
+      trialEndsAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+    } else {
+      // For brand new accounts without dates, assume trial starts now and ends in 7 days
+      // This should rarely happen as createProfile now sets these fields, but handle gracefully
+      trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
-    
-    const now = new Date();
     
     // Calculate trial status
     const trialExpired = trialEndsAt ? now > trialEndsAt : false;
@@ -64,7 +69,10 @@ export function useAccessStatus(): AccessStatus {
     let trialDaysRemaining = 0;
     if (trialEndsAt && !trialExpired) {
       const msRemaining = trialEndsAt.getTime() - now.getTime();
-      trialDaysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
+      trialDaysRemaining = Math.max(1, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    } else if (isInTrial && !trialExpired) {
+      // Fallback: if in trial but calculation failed, default to 7 days for new accounts
+      trialDaysRemaining = 7;
     }
 
     // Determine access source and overall access

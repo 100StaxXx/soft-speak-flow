@@ -75,6 +75,8 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
 
 export const createProfile = async (userId: string, email: string | null, data?: Partial<Profile>): Promise<Profile> => {
   const userTimezone = data?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const now = new Date();
+  const trialEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
   
   const newProfile: Partial<Profile> = {
     id: userId,
@@ -93,7 +95,8 @@ export const createProfile = async (userId: string, email: string | null, data?:
     longest_habit_streak: null,
     onboarding_completed: false,
     onboarding_data: {},
-    trial_ends_at: null,
+    created_at: data?.created_at || now.toISOString(),
+    trial_ends_at: data?.trial_ends_at || trialEndDate.toISOString(),
     subscription_status: null,
     subscription_expires_at: null,
     zodiac_sign: null,
