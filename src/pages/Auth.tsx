@@ -375,34 +375,25 @@ const Auth = () => {
           console.error('[Auth] Post-login navigation error:', err);
         });
       } else {
-        try {
-          const userCredential = await signUp(sanitizedEmail, password, {
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          });
-          const authUser = convertFirebaseUser(userCredential.user);
-          
-          // For native iOS: immediately redirect to onboarding after signup
-          // Don't wait for profile creation - it can happen in background
-          // New users ALWAYS go to onboarding, so we know the destination
-          if (Capacitor.isNativePlatform()) {
-            console.log('[Auth signUp] Native platform - immediate redirect to onboarding');
-            // Small delay to ensure Firebase auth state is persisted
-            setTimeout(() => {
-              window.location.href = '/onboarding';
-            }, 500);
-          } else {
-            // Web: use the normal flow
-            handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
-              console.error('[Auth] Post-signup navigation error:', err);
-            });
-          }
-        } catch (error: any) {
-          // Firebase error handling
-          if (error.code === 'auth/email-already-in-use') {
-            throw new Error('This email is already registered. Please sign in instead.');
-          }
-          throw error;
+        // SIGNUP FLOW
+        const userCredential = await signUp(sanitizedEmail, password, {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        });
+        
+        // For native iOS: IMMEDIATELY redirect to onboarding
+        // Don't wait for anything else - new users ALWAYS go to onboarding
+        if (Capacitor.isNativePlatform()) {
+          console.log('[Auth signUp] Native platform - IMMEDIATE redirect to onboarding');
+          // Use direct location change - most reliable on iOS
+          window.location.href = '/onboarding';
+          return; // Stop execution here
         }
+        
+        // Web: use the normal flow
+        const authUser = convertFirebaseUser(userCredential.user);
+        handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
+          console.error('[Auth] Post-signup navigation error:', err);
+        });
       }
     } catch (error: any) {
       console.error('[Auth] Auth error:', error);
