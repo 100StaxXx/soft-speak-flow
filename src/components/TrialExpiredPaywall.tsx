@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 type PlanType = "monthly" | "yearly";
 
 export const TrialExpiredPaywall = () => {
+  // Temporarily disabled - remove this line to re-enable
+  return null;
+
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const { 
     handlePurchase, 
