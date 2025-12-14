@@ -50,7 +50,7 @@ export const TodaysPepTalk = memo(() => {
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [hasAwardedXP, setHasAwardedXP] = useState(false);
-  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
+  // Removed walkthrough check - was causing play button to be permanently disabled
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -74,22 +74,7 @@ export const TodaysPepTalk = memo(() => {
     return unsubscribe;
   }, [isPlaying]);
 
-  // Track walkthrough state
-  useEffect(() => {
-    const checkWalkthrough = () => {
-      setIsWalkthroughActive(Boolean(safeLocalStorage.getItem('appWalkthroughActive')));
-    };
-
-    checkWalkthrough();
-    
-    // Listen for walkthrough state changes
-    const handleTutorialChange = () => checkWalkthrough();
-    window.addEventListener('tutorial-step-change', handleTutorialChange);
-    
-    return () => {
-      window.removeEventListener('tutorial-step-change', handleTutorialChange);
-    };
-  }, []);
+  // Removed walkthrough tracking - was causing play button to be permanently disabled
 
   // Duck ambient music when playing pep talk
   useEffect(() => {
@@ -543,7 +528,7 @@ export const TodaysPepTalk = memo(() => {
               <Button
                 size="icon"
                 onClick={togglePlayPause}
-                disabled={isWalkthroughActive}
+                disabled={false}
                 className={cn(
                   "h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                   isPlaying
@@ -566,7 +551,7 @@ export const TodaysPepTalk = memo(() => {
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(-10)}
-                disabled={isWalkthroughActive}
+                disabled={false}
                 className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
                 aria-label="Skip back 10 seconds"
               >
@@ -581,7 +566,7 @@ export const TodaysPepTalk = memo(() => {
                 variant="ghost"
                 size="icon"
                 onClick={() => skipTime(10)}
-                disabled={isWalkthroughActive}
+                disabled={false}
                 className="h-10 w-10 rounded-full hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
                 aria-label="Skip forward 10 seconds"
               >
@@ -596,7 +581,7 @@ export const TodaysPepTalk = memo(() => {
                 max={duration || 100}
                 step={0.1}
                 onValueChange={handleSeek}
-                disabled={isWalkthroughActive}
+                disabled={false}
                 className="w-full"
               />
             </div>
