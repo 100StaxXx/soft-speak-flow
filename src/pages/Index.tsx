@@ -163,12 +163,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsReady(false);
+      return;
+    }
     
     // Wait for both profile and companion to finish loading
-    if (!profileLoading && !companionLoading) {
-      setIsReady(true);
-    }
+    const ready = !profileLoading && !companionLoading;
+    setIsReady(ready);
   }, [user, profileLoading, companionLoading]);
 
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
