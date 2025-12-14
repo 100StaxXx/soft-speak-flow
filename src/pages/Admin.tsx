@@ -9,6 +9,7 @@ import {
   generateCosmicPostcard,
   generateCompletePepTalk,
   generateDailyMentorPepTalks,
+  batchGeneratePepTalks,
   generateCompanionName
 } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const Admin = () => {
   const [uploading, setUploading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [generatingDailyPepTalks, setGeneratingDailyPepTalks] = useState(false);
+  const [generatingBatchPepTalks, setGeneratingBatchPepTalks] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Companion Image Tester State
@@ -617,6 +619,36 @@ const Admin = () => {
     }
   };
 
+  const handleBatchGeneratePepTalks = async () => {
+    setGeneratingBatchPepTalks(true);
+    try {
+      toast.info("Starting batch generation of 45 pep talks with audio... This will take several minutes.");
+      const result = await batchGeneratePepTalks();
+      
+      if (result?.summary) {
+        const { generated, skipped, errors } = result.summary;
+        if (errors > 0) {
+          toast.warning(
+            `Generated ${generated}, skipped ${skipped}, ${errors} errors. Check console for details.`,
+            { duration: 10000 }
+          );
+        } else {
+          toast.success(
+            `Successfully generated ${generated} pep talks with audio! ${skipped} were already generated.`,
+            { duration: 8000 }
+          );
+        }
+      } else {
+        toast.success("Batch pep talks generation completed!");
+      }
+    } catch (error) {
+      console.error("Error batch generating pep talks:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to batch generate pep talks");
+    } finally {
+      setGeneratingBatchPepTalks(false);
+    }
+  };
+
   // Temporary: Auto-trigger daily pep talks generation on admin page load (testing)
   useEffect(() => {
     if (
@@ -744,6 +776,40 @@ const Admin = () => {
                   <>
                     <Plus className="mr-2 h-4 w-4" />
                     Generate Today's Pep Talks
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Batch Generate Starter Pep Talks */}
+            <div className="p-4 border rounded-2xl bg-card border-amber-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    🎵 Batch Generate Starter Pep Talks
+                    <span className="text-xs bg-amber-500/20 text-amber-600 px-2 py-0.5 rounded-full">45 Total</span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate 5 pep talks per mentor (9 mentors × 5 topics) with full audio and word-by-word captions.
+                    This takes ~10-15 minutes and uses ElevenLabs + OpenAI Whisper.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleBatchGeneratePepTalks}
+                disabled={generatingBatchPepTalks || generatingDailyPepTalks}
+                variant="outline"
+                className="mt-4 border-amber-500/50 hover:bg-amber-500/10"
+              >
+                {generatingBatchPepTalks ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating 45 Pep Talks...
+                  </>
+                ) : (
+                  <>
+                    <Music className="mr-2 h-4 w-4" />
+                    Generate Starter Content (45 Pep Talks)
                   </>
                 )}
               </Button>

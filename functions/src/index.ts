@@ -2019,66 +2019,287 @@ export const triggerDailyPepTalksHttp = onRequest(
   }
 );
 
-export const generateDailyMentorPepTalks = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+/**
+ * Helper function to generate audio with ElevenLabs and upload to Firebase Storage
+ */
+async function generateAndUploadAudio(
+  mentorSlug: string,
+  script: string,
+  ELEVENLABS_API_KEY: string
+): Promise<string> {
+  const mentorVoices: Record<string, any> = {
+    atlas: { voiceId: "JBFqnCBsd6RMkjVDRZzb", stability: 0.75, similarity_boost: 0.85, style_exaggeration: 0.5 },
+    darius: { voiceId: "rWyjfFeMZ6PxkHqD3wGC", stability: 0.8, similarity_boost: 0.9, style_exaggeration: 0.7 },
+    eli: { voiceId: "iP95p4xoKVk53GoZ742B", stability: 0.7, similarity_boost: 0.8, style_exaggeration: 0.4 },
+    nova: { voiceId: "onwK4e9ZLuTAKqWW03F9", stability: 0.65, similarity_boost: 0.75, style_exaggeration: 0.6 },
+    sienna: { voiceId: "XB0fDUnXU5powFXDhCwa", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.3 },
+    lumi: { voiceId: "EXAVITQu4vr4xnSDxMaL", stability: 0.75, similarity_boost: 0.8, style_exaggeration: 0.2 },
+    kai: { voiceId: "N2lVS1w4EtoT3dr4eOWO", stability: 0.7, similarity_boost: 0.85, style_exaggeration: 0.8 },
+    stryker: { voiceId: "pNInz6obpgDQGcFmaJgB", stability: 0.85, similarity_boost: 0.9, style_exaggeration: 0.7 },
+    solace: { voiceId: "pFZP5JQG7iQjIQuC4Bku", stability: 0.8, similarity_boost: 0.85, style_exaggeration: 0.2 },
+  };
+
+  const voiceConfig = mentorVoices[mentorSlug] || mentorVoices.atlas;
+
+  const response = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceConfig.voiceId}`,
+    {
+      method: "POST",
+      headers: {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: script,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: voiceConfig.stability,
+          similarity_boost: voiceConfig.similarity_boost,
+          style: voiceConfig.style_exaggeration,
+          use_speaker_boost: true,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("ElevenLabs API error:", errorText);
+    throw new Error(`ElevenLabs API error: ${response.status}`);
   }
 
-  try {
-    const db = admin.firestore();
-    const today = new Date().toISOString().split("T")[0];
+  const audioBuffer = await response.arrayBuffer();
+  const audioBytes = new Uint8Array(audioBuffer);
 
-    const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
-    const results = [];
+  // Upload to Firebase Storage
+  const bucket = admin.storage().bucket();
+  const fileName = `pep_talk_${mentorSlug}_${Date.now()}.mp3`;
+  const file = bucket.file(`pep-talks/${fileName}`);
 
-    for (const mentorSlug of mentorSlugs) {
-      try {
-        // Check if already generated
-        const existingSnapshot = await db
-          .collection("daily_pep_talks")
-          .where("mentor_slug", "==", mentorSlug)
-          .where("for_date", "==", today)
-          .limit(1)
-          .get();
+  await file.save(Buffer.from(audioBytes), {
+    metadata: { contentType: "audio/mpeg" },
+  });
 
-        if (!existingSnapshot.empty) {
-          results.push({ mentor: mentorSlug, status: "skipped" });
-          continue;
-        }
+  await file.makePublic();
+  return `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+}
 
-        // Generate pep talk using generateCompletePepTalk
-        // This is a simplified version - you may want to call the actual function
-        const prompt = `Generate a daily pep talk for mentor ${mentorSlug}. Return JSON: {"script": "Pep talk script", "title": "Title", "summary": "Summary"}`;
+/**
+ * Helper function to transcribe audio with OpenAI Whisper and get word-level timestamps
+ */
+async function transcribeAudioWithTimestamps(
+  audioUrl: string,
+  OPENAI_API_KEY: string
+): Promise<Array<{ word: string; start: number; end: number }>> {
+  // Fetch the audio file
+  const audioResponse = await fetch(audioUrl);
+  if (!audioResponse.ok) {
+    throw new Error(`Failed to fetch audio: ${audioResponse.statusText}`);
+  }
 
-        const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
-          temperature: 0.8,
-          maxOutputTokens: 1024,
-        });
+  const audioBuffer = await audioResponse.arrayBuffer();
+  const audioBlob = Buffer.from(audioBuffer);
 
-        const pepTalk = parseGeminiJSON(response.text);
+  // Prepare form data for OpenAI Whisper API
+  const FormData = require("form-data");
+  const formData = new FormData();
+  formData.append("file", audioBlob, { filename: "audio.mp3", contentType: "audio/mpeg" });
+  formData.append("model", "whisper-1");
+  formData.append("response_format", "verbose_json");
+  formData.append("timestamp_granularities[]", "word");
 
-        // Save to Firestore
-        await db.collection("daily_pep_talks").add({
-          mentor_slug: mentorSlug,
-          ...pepTalk,
-          for_date: today,
-          created_at: admin.firestore.FieldValue.serverTimestamp(),
-        });
+  // Call OpenAI Whisper API
+  const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      ...formData.getHeaders(),
+    },
+    body: formData,
+  });
 
-        results.push({ mentor: mentorSlug, status: "generated" });
-      } catch (error) {
-        console.error(`Error generating pep talk for ${mentorSlug}:`, error);
-        results.push({ mentor: mentorSlug, status: "error", error: error instanceof Error ? error.message : "Unknown error" });
-      }
+  if (!transcriptionResponse.ok) {
+    const errorText = await transcriptionResponse.text();
+    console.error("OpenAI Whisper API error:", errorText);
+    throw new Error(`OpenAI Whisper API error: ${transcriptionResponse.status}`);
+  }
+
+  const transcriptionData = await transcriptionResponse.json();
+  const words = transcriptionData.words || [];
+
+  return words.map((wordData: any) => ({
+    word: wordData.word,
+    start: wordData.start,
+    end: wordData.end,
+  }));
+}
+
+/**
+ * Helper function to generate a complete pep talk with audio and transcript
+ */
+async function generateCompletePepTalkWithAudio(
+  mentorSlug: string,
+  mentorDescription: string,
+  topicCategory: string,
+  intensity: string,
+  emotionalTriggers: string[],
+  GEMINI_API_KEY: string,
+  ELEVENLABS_API_KEY: string,
+  OPENAI_API_KEY: string
+): Promise<{
+  title: string;
+  summary: string;
+  script: string;
+  audio_url: string;
+  transcript: Array<{ word: string; start: number; end: number }>;
+}> {
+  // Step 1: Generate script with Gemini
+  console.log(`[${mentorSlug}] Step 1: Generating script...`);
+  const scriptPrompt = `Generate a motivational pep talk for mentor "${mentorSlug}".
+Mentor personality: ${mentorDescription}
+Topic: ${topicCategory}
+Intensity: ${intensity}
+Emotional triggers: ${emotionalTriggers.length > 0 ? emotionalTriggers.join(", ") : "general motivation"}
+
+Generate a 2-3 minute spoken pep talk script (approximately 300-450 words). Make it engaging, personal, and encouraging.
+
+Return JSON:
+{
+  "title": "Engaging title for this pep talk",
+  "summary": "Brief 1-2 sentence summary",
+  "script": "Full pep talk script written for speaking aloud, with natural pauses and emotional emphasis"
+}`;
+
+  const scriptResponse = await callGemini(
+    scriptPrompt,
+    "You are a motivational speaker creating spoken content. Always respond with valid JSON only.",
+    { temperature: 0.85, maxOutputTokens: 2048 },
+    GEMINI_API_KEY
+  );
+
+  const pepTalkData = parseGeminiJSON(scriptResponse.text);
+  if (!pepTalkData.script || !pepTalkData.title) {
+    throw new Error("Invalid AI response - missing script or title");
+  }
+
+  // Step 2: Generate audio with ElevenLabs
+  console.log(`[${mentorSlug}] Step 2: Generating audio...`);
+  const audioUrl = await generateAndUploadAudio(mentorSlug, pepTalkData.script, ELEVENLABS_API_KEY);
+
+  // Step 3: Transcribe audio with OpenAI Whisper for word timestamps
+  console.log(`[${mentorSlug}] Step 3: Generating transcript...`);
+  const transcript = await transcribeAudioWithTimestamps(audioUrl, OPENAI_API_KEY);
+
+  return {
+    title: pepTalkData.title,
+    summary: pepTalkData.summary || "",
+    script: pepTalkData.script,
+    audio_url: audioUrl,
+    transcript,
+  };
+}
+
+export const generateDailyMentorPepTalks = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
+    timeoutSeconds: 540, // 9 minutes for full audio generation
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    return { results };
-  } catch (error) {
-    console.error("Error in generateDailyMentorPepTalks:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    try {
+      const db = admin.firestore();
+      const today = new Date().toISOString().split("T")[0];
+      const GEMINI_API_KEY = geminiApiKey.value();
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      const OPENAI_API_KEY = openaiApiKey.value();
+
+      if (!GEMINI_API_KEY || !ELEVENLABS_API_KEY || !OPENAI_API_KEY) {
+        throw new HttpsError("internal", "Missing required API keys");
+      }
+
+      const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+      const results = [];
+
+      for (const mentorSlug of mentorSlugs) {
+        try {
+          // Check if already generated for today
+          const existingSnapshot = await db
+            .collection("daily_pep_talks")
+            .where("mentor_slug", "==", mentorSlug)
+            .where("for_date", "==", today)
+            .limit(1)
+            .get();
+
+          if (!existingSnapshot.empty) {
+            results.push({ mentor: mentorSlug, status: "skipped" });
+            continue;
+          }
+
+          // Get mentor document for personality description
+          const mentorSnapshot = await db
+            .collection("mentors")
+            .where("slug", "==", mentorSlug)
+            .limit(1)
+            .get();
+
+          const mentorDescription = mentorSnapshot.empty
+            ? "motivational and inspiring"
+            : mentorSnapshot.docs[0].data().description || "motivational and inspiring";
+
+          // Generate complete pep talk with audio and transcript
+          const pepTalk = await generateCompletePepTalkWithAudio(
+            mentorSlug,
+            mentorDescription,
+            "motivation",
+            "balanced",
+            [],
+            GEMINI_API_KEY,
+            ELEVENLABS_API_KEY,
+            OPENAI_API_KEY
+          );
+
+          // Save to Firestore
+          await db.collection("daily_pep_talks").add({
+            mentor_slug: mentorSlug,
+            mentor_id: mentorSnapshot.empty ? null : mentorSnapshot.docs[0].id,
+            title: pepTalk.title,
+            summary: pepTalk.summary,
+            script: pepTalk.script,
+            audio_url: pepTalk.audio_url,
+            transcript: pepTalk.transcript,
+            for_date: today,
+            topic_category: "motivation",
+            intensity: "balanced",
+            emotional_triggers: [],
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          results.push({ mentor: mentorSlug, status: "generated" });
+          console.log(`✓ Generated pep talk for ${mentorSlug}`);
+
+          // Small delay to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        } catch (error) {
+          console.error(`Error generating pep talk for ${mentorSlug}:`, error);
+          results.push({
+            mentor: mentorSlug,
+            status: "error",
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      return { results };
+    } catch (error) {
+      console.error("Error in generateDailyMentorPepTalks:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
-});
+);
 
 /**
  * Generate Mentor Audio - Text-to-speech using ElevenLabs
@@ -3154,19 +3375,28 @@ export const scheduledGenerateDailyQuotes = onSchedule(
 
 /**
  * Scheduled function: Generate Daily Mentor Pep Talks (runs daily at 00:01 UTC)
- * This automatically generates daily pep talks for all mentors
+ * This automatically generates daily pep talks with audio and transcripts for all mentors
  */
 export const scheduledGenerateDailyMentorPepTalks = onSchedule(
   {
     schedule: "1 0 * * *", // Every day at 00:01 UTC
     timeZone: "UTC",
+    secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
+    timeoutSeconds: 540, // 9 minutes
   },
-  async (event) => {
-    console.log("Starting scheduled daily mentor pep talks generation...");
+  async () => {
+    console.log("Starting scheduled daily mentor pep talks generation with audio...");
     
     try {
       const db = admin.firestore();
       const today = new Date().toISOString().split("T")[0];
+      const GEMINI_API_KEY = geminiApiKey.value();
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      const OPENAI_API_KEY = openaiApiKey.value();
+
+      if (!GEMINI_API_KEY || !ELEVENLABS_API_KEY || !OPENAI_API_KEY) {
+        throw new Error("Missing required API keys");
+      }
 
       const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
       const results = [];
@@ -3193,36 +3423,31 @@ export const scheduledGenerateDailyMentorPepTalks = onSchedule(
             .limit(1)
             .get();
 
-          if (mentorSnapshot.empty) {
-            results.push({ mentor: mentorSlug, status: "error", error: "Mentor not found" });
-            continue;
-          }
+          const mentorDescription = mentorSnapshot.empty
+            ? "motivational and inspiring"
+            : mentorSnapshot.docs[0].data().description || "motivational and inspiring";
 
-          const mentor = mentorSnapshot.docs[0].data();
+          // Generate complete pep talk with audio and transcript
+          const pepTalk = await generateCompletePepTalkWithAudio(
+            mentorSlug,
+            mentorDescription,
+            "motivation",
+            "balanced",
+            [],
+            GEMINI_API_KEY,
+            ELEVENLABS_API_KEY,
+            OPENAI_API_KEY
+          );
 
-          // Generate pep talk using Gemini
-          const prompt = `Generate a daily motivational pep talk for mentor ${mentorSlug}. The mentor's personality is: ${mentor.description || "motivational and inspiring"}. Return JSON: {"script": "Full pep talk script (2-3 minutes of speaking)", "title": "Engaging title", "summary": "Brief summary"}`;
-
-          const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
-            temperature: 0.8,
-            maxOutputTokens: 2048,
-          });
-
-          const pepTalk = parseGeminiJSON(response.text);
-
-          if (!pepTalk.script || !pepTalk.title) {
-            results.push({ mentor: mentorSlug, status: "error", error: "Invalid response from AI" });
-            continue;
-          }
-
-          // Save to Firestore (audio can be generated on-demand)
+          // Save to Firestore
           await db.collection("daily_pep_talks").add({
             mentor_slug: mentorSlug,
-            mentor_id: mentorSnapshot.docs[0].id,
+            mentor_id: mentorSnapshot.empty ? null : mentorSnapshot.docs[0].id,
             title: pepTalk.title,
-            summary: pepTalk.summary || "",
+            summary: pepTalk.summary,
             script: pepTalk.script,
-            audio_url: null, // Will be generated on-demand or by separate process
+            audio_url: pepTalk.audio_url,
+            transcript: pepTalk.transcript,
             for_date: today,
             topic_category: "motivation",
             intensity: "balanced",
@@ -3231,6 +3456,10 @@ export const scheduledGenerateDailyMentorPepTalks = onSchedule(
           });
 
           results.push({ mentor: mentorSlug, status: "generated" });
+          console.log(`✓ Generated pep talk with audio for ${mentorSlug}`);
+
+          // Delay to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         } catch (error) {
           console.error(`Error generating pep talk for ${mentorSlug}:`, error);
           results.push({ mentor: mentorSlug, status: "error", error: error instanceof Error ? error.message : "Unknown error" });
@@ -3241,6 +3470,149 @@ export const scheduledGenerateDailyMentorPepTalks = onSchedule(
     } catch (error) {
       console.error("Error in scheduled daily pep talks generation:", error);
       throw error;
+    }
+  }
+);
+
+/**
+ * Batch Generate Starter Pep Talks - Generates 5 pep talks per mentor with audio and transcripts
+ * Creates pep talks for the past 5 days to build initial content library
+ */
+export const batchGeneratePepTalks = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
+    timeoutSeconds: 540, // 9 minutes max
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    try {
+      const db = admin.firestore();
+      const GEMINI_API_KEY = geminiApiKey.value();
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      const OPENAI_API_KEY = openaiApiKey.value();
+
+      if (!GEMINI_API_KEY || !ELEVENLABS_API_KEY || !OPENAI_API_KEY) {
+        throw new HttpsError("internal", "Missing required API keys");
+      }
+
+      const mentorSlugs = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+      const topics = [
+        { category: "morning_motivation", triggers: ["energy", "focus"], intensity: "high" },
+        { category: "overcoming_obstacles", triggers: ["resilience", "strength"], intensity: "medium" },
+        { category: "building_habits", triggers: ["discipline", "consistency"], intensity: "medium" },
+        { category: "self_compassion", triggers: ["kindness", "acceptance"], intensity: "gentle" },
+        { category: "evening_reflection", triggers: ["gratitude", "peace"], intensity: "calm" },
+      ];
+
+      const results: Array<{ mentor: string; date: string; topic: string; status: string; error?: string }> = [];
+      let totalGenerated = 0;
+      const maxTotal = 45; // 9 mentors × 5 topics
+
+      // Generate dates for past 5 days
+      const dates: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        dates.push(date.toISOString().split("T")[0]);
+      }
+
+      console.log(`Starting batch generation: ${mentorSlugs.length} mentors × ${topics.length} topics = ${maxTotal} pep talks`);
+
+      for (const mentorSlug of mentorSlugs) {
+        // Get mentor document
+        const mentorSnapshot = await db
+          .collection("mentors")
+          .where("slug", "==", mentorSlug)
+          .limit(1)
+          .get();
+
+        const mentorDescription = mentorSnapshot.empty
+          ? "motivational and inspiring"
+          : mentorSnapshot.docs[0].data().description || "motivational and inspiring";
+
+        for (let i = 0; i < topics.length; i++) {
+          const topic = topics[i];
+          const forDate = dates[i];
+
+          try {
+            // Check if already exists for this mentor + date
+            const existingSnapshot = await db
+              .collection("daily_pep_talks")
+              .where("mentor_slug", "==", mentorSlug)
+              .where("for_date", "==", forDate)
+              .limit(1)
+              .get();
+
+            if (!existingSnapshot.empty) {
+              results.push({ mentor: mentorSlug, date: forDate, topic: topic.category, status: "skipped" });
+              continue;
+            }
+
+            console.log(`[${++totalGenerated}/${maxTotal}] Generating ${topic.category} for ${mentorSlug} (${forDate})...`);
+
+            // Generate complete pep talk with audio and transcript
+            const pepTalk = await generateCompletePepTalkWithAudio(
+              mentorSlug,
+              mentorDescription,
+              topic.category,
+              topic.intensity,
+              topic.triggers,
+              GEMINI_API_KEY,
+              ELEVENLABS_API_KEY,
+              OPENAI_API_KEY
+            );
+
+            // Save to Firestore
+            await db.collection("daily_pep_talks").add({
+              mentor_slug: mentorSlug,
+              mentor_id: mentorSnapshot.empty ? null : mentorSnapshot.docs[0].id,
+              title: pepTalk.title,
+              summary: pepTalk.summary,
+              script: pepTalk.script,
+              audio_url: pepTalk.audio_url,
+              transcript: pepTalk.transcript,
+              for_date: forDate,
+              topic_category: topic.category,
+              intensity: topic.intensity,
+              emotional_triggers: topic.triggers,
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            results.push({ mentor: mentorSlug, date: forDate, topic: topic.category, status: "generated" });
+            console.log(`✓ Generated pep talk for ${mentorSlug} - ${topic.category}`);
+
+            // Delay between generations to avoid rate limiting
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+          } catch (error) {
+            console.error(`Error generating ${topic.category} for ${mentorSlug}:`, error);
+            results.push({
+              mentor: mentorSlug,
+              date: forDate,
+              topic: topic.category,
+              status: "error",
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        }
+      }
+
+      const generated = results.filter((r) => r.status === "generated").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+      const errors = results.filter((r) => r.status === "error").length;
+
+      console.log(`Batch generation complete: ${generated} generated, ${skipped} skipped, ${errors} errors`);
+
+      return {
+        results,
+        summary: { generated, skipped, errors, total: results.length },
+      };
+    } catch (error) {
+      console.error("Error in batchGeneratePepTalks:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
 );

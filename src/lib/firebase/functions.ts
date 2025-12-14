@@ -291,6 +291,16 @@ export async function generateCompletePepTalk(data: {
 }
 
 /**
+ * Batch Generate Pep Talks - Generates 5 pep talks per mentor with audio and transcripts
+ */
+export async function batchGeneratePepTalks() {
+  return callFirebaseFunction<{}, {
+    results: Array<{ mentor: string; date: string; topic: string; status: string; error?: string }>;
+    summary: { generated: number; skipped: number; errors: number; total: number };
+  }>("batchGeneratePepTalks", {});
+}
+
+/**
  * Generate Check-In Response - AI-powered check-in response generation
  */
 export async function generateCheckInResponse(data: {
