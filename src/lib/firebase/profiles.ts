@@ -154,11 +154,11 @@ export const createProfile = async (userId: string, email: string | null, data?:
   
   // Return the profile directly instead of re-reading from Firestore
   // This avoids an extra network round trip and speeds up account creation
-  const now = new Date().toISOString();
+  const nowISO = now.toISOString();
   return {
     ...newProfile,
-    created_at: now,
-    updated_at: now,
+    created_at: nowISO,
+    updated_at: nowISO,
   } as Profile;
 };
 

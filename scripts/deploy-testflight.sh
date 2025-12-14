@@ -143,16 +143,27 @@ if ! git diff-index --quiet HEAD --; then
 fi
 echo ""
 
-# Step 2: Pull latest code
-echo -e "${YELLOW}📥 Step 2: Pulling latest code...${NC}"
+# Step 2: Pull latest code from main branch
+echo -e "${YELLOW}📥 Step 2: Pulling latest code from main branch...${NC}"
 CURRENT_BRANCH=$(git branch --show-current)
 echo -e "${YELLOW}Current branch: ${CURRENT_BRANCH}${NC}"
-git pull origin "$CURRENT_BRANCH" || {
-  echo -e "${RED}❌ Failed to pull code. Check your git status.${NC}"
+
+# Switch to main branch if not already on it
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo -e "${YELLOW}Switching to main branch...${NC}"
+  git checkout main || {
+    echo -e "${RED}❌ Failed to switch to main branch${NC}"
+    exit 1
+  }
+fi
+
+# Pull latest from main
+git pull origin main || {
+  echo -e "${RED}❌ Failed to pull code from main. Check your git status.${NC}"
   echo -e "${YELLOW}💡 Tip: Run 'git stash' first if you have uncommitted changes${NC}"
   exit 1
 }
-echo -e "${GREEN}✅ Code pulled successfully${NC}"
+echo -e "${GREEN}✅ Code pulled successfully from main${NC}"
 echo ""
 
 # Step 3: Install npm dependencies
