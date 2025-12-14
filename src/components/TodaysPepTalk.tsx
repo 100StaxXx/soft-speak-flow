@@ -172,6 +172,9 @@ export const TodaysPepTalk = memo(() => {
           mentor_name: mentor.name,
           transcript,
         } as DailyPepTalk);
+      } else {
+        // No pep talk found - set pepTalk to null explicitly
+        setPepTalk(null);
       }
     } catch (error: any) {
       console.error("Unexpected error fetching pep talk:", error);
@@ -513,6 +516,36 @@ export const TodaysPepTalk = memo(() => {
               onClick={() => fetchDailyPepTalk()}
             >
               Try Again
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Show a helpful message if no pep talk is available
+  if (!pepTalk && !loading && !error) {
+    return (
+      <Card className="relative overflow-hidden rounded-3xl border-2 border-primary/30">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5" />
+        <div className="relative p-6 md:p-8 space-y-4 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary animate-pulse-slow" />
+            <h2 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+              {personality?.name ? `${personality.name}'s Daily Message` : "Today's Pep Talk"}
+            </h2>
+          </div>
+          <div className="space-y-3 p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-primary/20">
+            <p className="text-sm text-muted-foreground">
+              Your daily pep talk will be available soon. Check back later or browse our library for more content.
+            </p>
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="w-full rounded-full border-2 hover:bg-primary/10 hover:scale-105 transition-all shadow-soft"
+              onClick={() => navigate("/pep-talks")}
+            >
+              Browse Pep Talks Library
             </Button>
           </div>
         </div>
