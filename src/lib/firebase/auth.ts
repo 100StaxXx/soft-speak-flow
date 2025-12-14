@@ -42,17 +42,14 @@ export const signUp = async (email: string, password: string, metadata?: { timez
   try {
     const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
     
-    // Create profile document in Firestore
-    // If profile creation fails, log the error but don't fail the signup
-    // The profile can be created later by ensureProfile in the auth flow
-    try {
-      await ensureProfile(userCredential.user.uid, email, metadata);
-    } catch (profileError: any) {
-      console.error('[signUp] Error creating profile (non-fatal):', profileError);
-      // Don't throw - the profile will be created by ensureProfile in handlePostAuthNavigation
-      // This prevents the signup from failing if there's a temporary Firestore issue
-    }
+    // CRITICAL: Do NOT await profile creation - it can hang on iOS
+    // Fire and forget - let profile creation happen in background
+    // If it fails, ensureProfile will be called again later
+    ensureProfile(userCredential.user.uid, email, metadata).catch((profileError: any) => {
+      console.error('[signUp] Background profile creation error (non-fatal):', profileError);
+    });
     
+    // Return immediately after Firebase auth succeeds
     return userCredential;
   } catch (error: any) {
     console.error('[signUp] Error during signup:', error);
