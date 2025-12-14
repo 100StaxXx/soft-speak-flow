@@ -398,23 +398,31 @@ const Auth = () => {
           console.error('[Auth] Post-login navigation error:', err);
         });
       } else {
-        // SIGNUP FLOW - Don't await signUp to prevent blocking on iOS
-        // The onAuthStateChanged listener will detect when user is created and redirect
+        // SIGNUP FLOW - Await signUp and redirect IMMEDIATELY after success
+        // Don't rely on onAuthStateChanged which doesn't fire reliably on iOS
         signupInProgressRef.current = true;
+        console.log('[Auth signUp] Starting signup for:', sanitizedEmail);
         
-        // Start signup WITHOUT awaiting - let onAuthStateChanged handle navigation
-        signUp(sanitizedEmail, password, {
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-        }).then((userCredential) => {
-          console.log('[Auth signUp] Signup completed successfully');
-          // For web: handle navigation if not already redirected
-          if (!Capacitor.isNativePlatform() && !hasRedirected.current) {
-            const authUser = convertFirebaseUser(userCredential.user);
-            handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
-              console.error('[Auth] Post-signup navigation error:', err);
-            });
+        try {
+          const userCredential = await signUp(sanitizedEmail, password, {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          });
+          
+          console.log('[Auth signUp] SUCCESS - User created:', userCredential.user.uid);
+          
+          // IMMEDIATE redirect - don't wait for callbacks or profile creation
+          hasRedirected.current = true;
+          signupInProgressRef.current = false;
+          
+          if (Capacitor.isNativePlatform()) {
+            console.log('[Auth signUp] Native platform - using window.location.href');
+            window.location.href = '/onboarding';
+          } else {
+            console.log('[Auth signUp] Web platform - using navigate');
+            navigate('/onboarding');
           }
-        }).catch((error: any) => {
+          return;
+        } catch (error: any) {
           console.error('[Auth signUp] Error:', error);
           signupInProgressRef.current = false;
           setLoading(false);
@@ -431,23 +439,8 @@ const Auth = () => {
             description: errorMessage,
             variant: "destructive",
           });
-        });
-        
-        // For native: set a fallback timeout to force redirect if onAuthStateChanged doesn't fire
-        if (Capacitor.isNativePlatform()) {
-          setTimeout(() => {
-            if (signupInProgressRef.current && !hasRedirected.current) {
-              console.log('[Auth signUp] Fallback timeout - forcing redirect to onboarding');
-              signupInProgressRef.current = false;
-              hasRedirected.current = true;
-              window.location.href = '/onboarding';
-            }
-          }, 8000);
+          return;
         }
-        
-        // Exit early - don't wait for the promise
-        // Navigation will be handled by onAuthStateChanged or the fallback timeout
-        return;
       }
     } catch (error: any) {
       console.error('[Auth] Auth error:', error);
