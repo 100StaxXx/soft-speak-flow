@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { safeNavigate } from "@/utils/nativeNavigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,7 @@ const ResetPassword = () => {
         title: "Invalid Link",
         description: "This password reset link is invalid or has expired",
       });
-      navigate("/auth");
+      safeNavigate(navigate, "/auth");
       return;
     }
 
@@ -44,12 +45,12 @@ const ResetPassword = () => {
         if (session) {
           setValidToken(true);
         } else {
-          toast({
+        toast({
             variant: "destructive",
             title: "Session Error",
             description: "Unable to establish password reset session. Please try again.",
           });
-          navigate("/auth");
+          safeNavigate(navigate, "/auth");
         }
       }
     });
@@ -105,7 +106,7 @@ const ResetPassword = () => {
           title: "Password Updated",
           description: "Your password has been successfully reset",
         });
-        navigate("/auth");
+        safeNavigate(navigate, "/auth");
       }
     } catch (error) {
       toast({
