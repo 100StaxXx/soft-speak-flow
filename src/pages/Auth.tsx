@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
+import { safeNavigate } from "@/utils/nativeNavigation";
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import type { Session } from "@supabase/supabase-js";
@@ -62,10 +63,10 @@ const Auth = () => {
       await ensureProfile(session.user.id, session.user.email);
       const path = await getAuthRedirectPath(session.user.id);
       console.log(`[Auth ${source}] Navigating to ${path}`);
-      navigate(path);
+      safeNavigate(navigate, path);
     } catch (error) {
       console.error(`[Auth ${source}] Navigation error:`, error);
-      navigate('/onboarding');
+      safeNavigate(navigate, '/onboarding');
     }
   }, [navigate]);
   

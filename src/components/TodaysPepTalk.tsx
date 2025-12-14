@@ -43,6 +43,7 @@ export const TodaysPepTalk = memo(() => {
   const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -114,6 +115,7 @@ export const TodaysPepTalk = memo(() => {
       }
 
       try {
+        setError(false);
         const today = new Date().toLocaleDateString("en-CA");
 
         const { data: mentor, error: mentorError } = await supabase
@@ -124,6 +126,7 @@ export const TodaysPepTalk = memo(() => {
 
         if (mentorError) {
           console.error("Error fetching mentor:", mentorError);
+          setError(true);
           setLoading(false);
           return;
         }
@@ -142,6 +145,7 @@ export const TodaysPepTalk = memo(() => {
 
         if (pepTalkError) {
           console.error("Error fetching pep talk:", pepTalkError);
+          setError(true);
           setLoading(false);
           return;
         }
@@ -167,8 +171,9 @@ export const TodaysPepTalk = memo(() => {
             transcript,
           } as DailyPepTalk);
         }
-      } catch (error) {
-        console.error("Unexpected error fetching pep talk:", error);
+      } catch (err) {
+        console.error("Unexpected error fetching pep talk:", err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -444,7 +449,33 @@ export const TodaysPepTalk = memo(() => {
     );
   }
 
-  if (!pepTalk) return null;
+  // Show fallback card when error or no pep talk available
+  if (error || !pepTalk) {
+    return (
+      <Card className="relative overflow-hidden rounded-3xl border-2 p-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5" />
+        <div className="relative space-y-4 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold text-muted-foreground">
+              {personality?.name ? `${personality.name}'s Daily Message` : "Today's Pep Talk"}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {error ? "Unable to load today's pep talk" : "No pep talk available today"}
+          </p>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="rounded-full"
+            onClick={() => navigate("/pep-talks")}
+          >
+            Browse Pep Talks
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="relative overflow-hidden group animate-fade-in rounded-3xl border-2">

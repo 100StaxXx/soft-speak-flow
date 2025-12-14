@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { safeNavigate } from "@/utils/nativeNavigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -518,7 +519,7 @@ export const StoryOnboarding = () => {
 
   const handleJourneyComplete = () => {
     toast.success("Welcome to Cosmiq! Your journey begins.");
-    navigate("/tasks");
+    safeNavigate(navigate, "/tasks");
   };
 
   return (
