@@ -146,42 +146,24 @@ const Auth = () => {
       
       console.log(`[Auth ${source}] Navigating to ${path}`);
       
-      // Use setTimeout to ensure navigation happens after current execution context
-      // This helps prevent crashes on iOS
-      setTimeout(() => {
-        if (!isMounted.current) {
-          console.log(`[Auth ${source}] Component unmounted, skipping navigation`);
-          return;
-        }
-        try {
-          navigate(path);
-        } catch (navError) {
-          console.error(`[Auth ${source}] Navigation error:`, navError);
-          // Fallback navigation only if component is still mounted
-          if (isMounted.current && typeof window !== 'undefined') {
-            window.location.href = path;
-          }
-        }
-      }, 0);
+      // For native iOS, use direct location change - more reliable than React Router
+      // React Router navigate() can fail silently on iOS when component unmounts
+      if (Capacitor.isNativePlatform()) {
+        console.log(`[Auth ${source}] Using window.location.href for native platform`);
+        window.location.href = path;
+      } else {
+        // Use React Router for web/PWA
+        navigate(path);
+      }
     } catch (error) {
       console.error(`[Auth ${source}] Navigation error:`, error);
       // If profile creation fails, still navigate to onboarding
       // The profile will be created by useProfile hook
-      setTimeout(() => {
-        if (!isMounted.current) {
-          console.log(`[Auth ${source}] Component unmounted, skipping fallback navigation`);
-          return;
-        }
-        try {
-          navigate('/onboarding');
-        } catch (navError) {
-          console.error(`[Auth ${source}] Fallback navigation error:`, navError);
-          // Fallback navigation only if component is still mounted
-          if (isMounted.current && typeof window !== 'undefined') {
-            window.location.href = '/onboarding';
-          }
-        }
-      }, 0);
+      if (Capacitor.isNativePlatform()) {
+        window.location.href = '/onboarding';
+      } else {
+        navigate('/onboarding');
+      }
     }
   }, [navigate]);
   
