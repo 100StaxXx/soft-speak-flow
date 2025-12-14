@@ -1393,32 +1393,61 @@ export const generateCompanionImage = functions.https.onCall(async (request) => 
 /**
  * Generate Complete Pep Talk - AI-powered complete pep talk generation
  */
-export const generateCompletePepTalk = functions.https.onCall(async (request) => {
-  if (!request.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
-  }
-
-  try {
-    const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
-    if (!mentorSlug) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing mentorSlug");
+export const generateCompletePepTalk = onCall(
+  {
+    secrets: [geminiApiKey],
+  },
+  async (request: CallableRequest<{
+    mentorSlug: string;
+    topicCategory?: string | string[];
+    intensity?: string;
+    emotionalTriggers?: string[];
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
     }
 
-    const prompt = `Generate a complete pep talk for mentor ${mentorSlug}. Topic: ${topicCategory || "general"}, Intensity: ${intensity || "balanced"}, Triggers: ${emotionalTriggers || "none"}. Return JSON: {"script": "Full pep talk script", "title": "Title", "duration": 60}`;
+    try {
+      const { mentorSlug, topicCategory, intensity, emotionalTriggers } = request.data;
+      if (!mentorSlug) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug");
+      }
 
-    const response = await callGemini(prompt, "You are a motivational speaker. Always respond with valid JSON only.", {
-      temperature: 0.8,
-      maxOutputTokens: 2048,
-    });
+      const apiKey = geminiApiKey.value();
+      if (!apiKey) {
+        throw new HttpsError("internal", "GEMINI_API_KEY not configured");
+      }
 
-    const pepTalk = parseGeminiJSON(response.text);
-    return { pepTalk };
-  } catch (error) {
-    console.error("Error in generateCompletePepTalk:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Handle topicCategory as string or array
+      const topicCategoryStr = Array.isArray(topicCategory) 
+        ? topicCategory.join(", ") 
+        : topicCategory || "general";
+      
+      const triggersStr = Array.isArray(emotionalTriggers) 
+        ? emotionalTriggers.join(", ") 
+        : emotionalTriggers || "none";
+
+      const prompt = `Generate a complete pep talk for mentor ${mentorSlug}. Topic: ${topicCategoryStr}, Intensity: ${intensity || "balanced"}, Triggers: ${triggersStr}. Return JSON: {"script": "Full pep talk script", "title": "Title", "quote": "Inspirational quote", "description": "Brief description", "category": "${topicCategoryStr}", "duration": 60}`;
+
+      const response = await callGemini(
+        prompt, 
+        "You are a motivational speaker. Always respond with valid JSON only.", 
+        {
+          temperature: 0.8,
+          maxOutputTokens: 2048,
+        },
+        apiKey
+      );
+
+      const pepTalk = parseGeminiJSON(response.text);
+      return { pepTalk };
+    } catch (error) {
+      console.error("Error in generateCompletePepTalk:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
-});
+);
 
 /**
  * Generate Check-In Response - AI-powered check-in response generation
