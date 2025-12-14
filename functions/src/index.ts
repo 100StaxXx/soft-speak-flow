@@ -2049,6 +2049,18 @@ export const triggerDailyPepTalksHttp = onRequest(
 );
 
 /**
+ * Helper function to get Firebase Storage bucket with explicit bucket name
+ */
+function getStorageBucket() {
+  const projectId = admin.app().options.projectId;
+  if (!projectId) {
+    throw new Error("Firebase project ID not configured");
+  }
+  const bucketName = admin.app().options.storageBucket || `${projectId}.appspot.com`;
+  return admin.storage().bucket(bucketName);
+}
+
+/**
  * Helper function to generate audio with ElevenLabs and upload to Firebase Storage
  */
 async function generateAndUploadAudio(
@@ -2101,16 +2113,21 @@ async function generateAndUploadAudio(
   const audioBytes = new Uint8Array(audioBuffer);
 
   // Upload to Firebase Storage
-  const bucket = admin.storage().bucket();
+  const bucket = getStorageBucket();
   const fileName = `pep_talk_${mentorSlug}_${Date.now()}.mp3`;
   const file = bucket.file(`pep-talks/${fileName}`);
 
-  await file.save(Buffer.from(audioBytes), {
-    metadata: { contentType: "audio/mpeg" },
-  });
+  try {
+    await file.save(Buffer.from(audioBytes), {
+      metadata: { contentType: "audio/mpeg" },
+    });
 
-  await file.makePublic();
-  return `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+    await file.makePublic();
+    return `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+  } catch (error) {
+    console.error(`Failed to upload audio to Firebase Storage bucket ${bucket.name}:`, error);
+    throw new Error(`Storage upload failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 }
 
 /**
@@ -2227,6 +2244,79 @@ Return JSON:
     transcript,
   };
 }
+
+/**
+ * Generate Single Mentor Pep Talk - Generates a complete pep talk with audio and transcript for a single mentor
+ */
+export const generateSingleMentorPepTalk = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
+    timeoutSeconds: 540, // 9 minutes for full audio generation
+  },
+  async (request: CallableRequest<{
+    mentorSlug: string;
+    topicCategory?: string;
+    intensity?: string;
+    emotionalTriggers?: string[];
+  }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    try {
+      const { mentorSlug, topicCategory = "motivation", intensity = "balanced", emotionalTriggers = [] } = request.data;
+      
+      if (!mentorSlug) {
+        throw new HttpsError("invalid-argument", "Missing mentorSlug");
+      }
+
+      const db = admin.firestore();
+      const GEMINI_API_KEY = geminiApiKey.value();
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      const OPENAI_API_KEY = openaiApiKey.value();
+
+      if (!GEMINI_API_KEY || !ELEVENLABS_API_KEY || !OPENAI_API_KEY) {
+        throw new HttpsError("internal", "Missing required API keys");
+      }
+
+      // Get mentor document for personality description
+      const mentorSnapshot = await db
+        .collection("mentors")
+        .where("slug", "==", mentorSlug)
+        .limit(1)
+        .get();
+
+      const mentorDescription = mentorSnapshot.empty
+        ? "motivational and inspiring"
+        : mentorSnapshot.docs[0].data().description || "motivational and inspiring";
+
+      // Generate complete pep talk with audio and transcript
+      const pepTalk = await generateCompletePepTalkWithAudio(
+        mentorSlug,
+        mentorDescription,
+        topicCategory,
+        intensity,
+        emotionalTriggers,
+        GEMINI_API_KEY,
+        ELEVENLABS_API_KEY,
+        OPENAI_API_KEY
+      );
+
+      return {
+        title: pepTalk.title,
+        summary: pepTalk.summary,
+        script: pepTalk.script,
+        audio_url: pepTalk.audio_url,
+        transcript: pepTalk.transcript,
+        mentor_slug: mentorSlug,
+      };
+    } catch (error) {
+      console.error("Error in generateSingleMentorPepTalk:", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", `Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+);
 
 export const generateDailyMentorPepTalks = onCall(
   {
@@ -2403,19 +2493,24 @@ export const generateMentorAudio = onCall(
     const audioBytes = new Uint8Array(audioBuffer);
 
     // Upload to Firebase Storage
-    const bucket = admin.storage().bucket();
+    const bucket = getStorageBucket();
     const fileName = `${mentorSlug}_${Date.now()}.mp3`;
     const file = bucket.file(`mentor-audio/${fileName}`);
 
-    await file.save(Buffer.from(audioBytes), {
-      metadata: { contentType: "audio/mpeg" },
-    });
+    try {
+      await file.save(Buffer.from(audioBytes), {
+        metadata: { contentType: "audio/mpeg" },
+      });
 
-    // Get public URL
-    await file.makePublic();
-    const audioUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+      // Get public URL
+      await file.makePublic();
+      const audioUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
 
-    return { audioUrl };
+      return { audioUrl };
+    } catch (error) {
+      console.error(`Failed to upload audio to Firebase Storage bucket ${bucket.name}:`, error);
+      throw new HttpsError("internal", `Storage upload failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   } catch (error) {
     console.error("Error in generateMentorAudio:", error);
     if (error instanceof HttpsError) throw error;
@@ -2507,18 +2602,23 @@ export const generateFullMentorAudio = onCall(
     const audioBytes = new Uint8Array(audioBuffer);
 
     // Upload to Firebase Storage
-    const bucket = admin.storage().bucket();
+    const bucket = getStorageBucket();
     const fileName = `${mentorSlug}_${Date.now()}.mp3`;
     const file = bucket.file(`mentor-audio/${fileName}`);
 
-    await file.save(Buffer.from(audioBytes), {
-      metadata: { contentType: "audio/mpeg" },
-    });
+    try {
+      await file.save(Buffer.from(audioBytes), {
+        metadata: { contentType: "audio/mpeg" },
+      });
 
-    await file.makePublic();
-    const audioUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+      await file.makePublic();
+      const audioUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
 
-    return { script, audioUrl };
+      return { script, audioUrl };
+    } catch (error) {
+      console.error(`Failed to upload audio to Firebase Storage bucket ${bucket.name}:`, error);
+      throw new HttpsError("internal", `Storage upload failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   } catch (error) {
     console.error("Error in generateFullMentorAudio:", error);
     if (error instanceof HttpsError) throw error;

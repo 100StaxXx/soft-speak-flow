@@ -2,12 +2,13 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getDocuments, getDocument, setDocument, deleteDocument, updateDocument } from "@/lib/firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  generateMentorAudio, 
-  generateCompanionImage, 
-  generateSampleCard, 
+import {
+  generateMentorAudio,
+  generateCompanionImage,
+  generateSampleCard,
   generateCosmicPostcard,
   generateCompletePepTalk,
+  generateSingleMentorPepTalk,
   generateDailyMentorPepTalks,
   batchGeneratePepTalks,
   generateCompanionName
@@ -61,6 +62,7 @@ const Admin = () => {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [generatingDailyPepTalks, setGeneratingDailyPepTalks] = useState(false);
   const [generatingBatchPepTalks, setGeneratingBatchPepTalks] = useState(false);
+  const [generatingSinglePepTalk, setGeneratingSinglePepTalk] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Companion Image Tester State
@@ -649,6 +651,51 @@ const Admin = () => {
     }
   };
 
+  const handleGenerateSingleMentorPepTalk = async () => {
+    if (!formData.mentor_id) {
+      toast.error("Please select a mentor first");
+      return;
+    }
+
+    const mentor = mentors.find(m => m.id === formData.mentor_id);
+    if (!mentor) {
+      toast.error("Invalid mentor selected");
+      return;
+    }
+
+    setGeneratingSinglePepTalk(true);
+    try {
+      toast.info(`Generating complete pep talk with audio and transcript for ${mentor.name}...`);
+      const result = await generateSingleMentorPepTalk({
+        mentorSlug: mentor.slug,
+        topicCategory: formData.category || "motivation",
+        intensity: "balanced",
+        emotionalTriggers: formData.emotional_triggers || [],
+      });
+
+      // Update form with generated data
+      setFormData(prev => ({
+        ...prev,
+        title: result.title,
+        description: result.summary,
+        audio_url: result.audio_url,
+        // Note: script and transcript are available in result but not stored in formData
+        // They can be saved to Firestore if needed when saving the pep talk
+      }));
+
+      toast.success(`Complete pep talk generated for ${mentor.name}! Script, audio, and transcript ready.`);
+      setIsEditing(true);
+      
+      // Store script and transcript for later use (e.g., when saving)
+      // You can access them via result.script and result.transcript if needed
+    } catch (error) {
+      console.error("Error generating single mentor pep talk:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate pep talk");
+    } finally {
+      setGeneratingSinglePepTalk(false);
+    }
+  };
+
   // Temporary: Auto-trigger daily pep talks generation on admin page load (testing)
   useEffect(() => {
     if (
@@ -781,6 +828,44 @@ const Admin = () => {
               </Button>
             </div>
 
+            {/* Generate Single Mentor Pep Talk */}
+            <div className="p-4 border rounded-2xl bg-card border-blue-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    🎤 Generate Single Mentor Pep Talk
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate a complete pep talk (script + audio + transcript) for the selected mentor.
+                    This takes ~2-3 minutes and uses Gemini + ElevenLabs + OpenAI Whisper.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleGenerateSingleMentorPepTalk}
+                disabled={generatingSinglePepTalk || generatingDailyPepTalks || generatingBatchPepTalks || !formData.mentor_id}
+                variant="outline"
+                className="mt-4 border-blue-500/50 hover:bg-blue-500/10"
+              >
+                {generatingSinglePepTalk ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating Pep Talk...
+                  </>
+                ) : (
+                  <>
+                    <Music className="mr-2 h-4 w-4" />
+                    Generate Complete Pep Talk (with Audio & Transcript)
+                  </>
+                )}
+              </Button>
+              {!formData.mentor_id && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  ⚠️ Please select a mentor in the form below first
+                </p>
+              )}
+            </div>
+
             {/* Batch Generate Starter Pep Talks */}
             <div className="p-4 border rounded-2xl bg-card border-amber-500/30">
               <div className="flex items-center justify-between mb-2">
@@ -797,7 +882,7 @@ const Admin = () => {
               </div>
               <Button
                 onClick={handleBatchGeneratePepTalks}
-                disabled={generatingBatchPepTalks || generatingDailyPepTalks}
+                disabled={generatingBatchPepTalks || generatingDailyPepTalks || generatingSinglePepTalk}
                 variant="outline"
                 className="mt-4 border-amber-500/50 hover:bg-amber-500/10"
               >
@@ -1577,6 +1662,63 @@ const Admin = () => {
           </div>
         </Card>
 
+        {/* Mentor Pep Talk Generator */}
+        <Card className="p-6 mb-8 rounded-3xl shadow-soft">
+          <h2 className="font-heading text-2xl font-semibold mb-4">🎤 Mentor Pep Talk Generator</h2>
+          <p className="text-muted-foreground mb-6">Generate a complete pep talk with AI (script, title, quote, description, and audio) for any mentor</p>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="aiGeneratorMentor">Select Mentor</Label>
+              <select
+                id="aiGeneratorMentor"
+                value={formData.mentor_id}
+                onChange={(e) => setFormData({ ...formData, mentor_id: e.target.value })}
+                className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
+              >
+                <option value="">Select a mentor...</option>
+                {mentors.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.slug})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="aiGeneratorCategory">Topic Category (Optional)</Label>
+              <Input
+                id="aiGeneratorCategory"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g., motivation, discipline, heartbreak"
+                className="rounded-2xl"
+              />
+            </div>
+
+            <Button
+              onClick={handleFullAIGenerate}
+              disabled={aiGenerating || !formData.mentor_id}
+              className="w-full rounded-2xl min-h-[48px] text-base"
+            >
+              {aiGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Generating Pep Talk with AI...
+                </>
+              ) : (
+                <>
+                  <Music className="mr-2 h-5 w-5" />
+                  🤖 Generate Complete Pep Talk with AI
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              This will generate script, title, quote, description, and audio. The form will open automatically for review.
+            </p>
+          </div>
+        </Card>
+
         {/* Quick Actions */}
         <div className="mb-8">
           <Button
@@ -1749,7 +1891,7 @@ const Admin = () => {
 
               <div>
                 <Label htmlFor="audio">Audio File (MP3)</Label>
-                <div className="mt-2">
+                <div className="mt-2 space-y-3">
                   <Input
                     id="audio"
                     type="file"
@@ -1766,6 +1908,34 @@ const Admin = () => {
                     <p className="text-sm text-muted-foreground mt-2">
                       Current audio uploaded
                     </p>
+                  )}
+                  
+                  {/* AI Generate Pep Talk Button */}
+                  {formData.mentor_id && (
+                    <div className="pt-2 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleFullAIGenerate}
+                        disabled={aiGenerating || !formData.mentor_id}
+                        className="w-full rounded-2xl border-2 border-primary/50 hover:bg-primary/10"
+                      >
+                        {aiGenerating ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating Pep Talk with AI...
+                          </>
+                        ) : (
+                          <>
+                            <Music className="mr-2 h-4 w-4" />
+                            🤖 Generate Complete Pep Talk with AI
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Generates script, title, quote, description, and audio for the selected mentor
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
