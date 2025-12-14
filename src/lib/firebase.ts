@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { initializeAuth, browserLocalPersistence, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 // Firebase configuration - all values must come from environment variables
@@ -30,9 +30,15 @@ if (missingFields.length > 0) {
 // Initialize Firebase with config from environment variables
 // Using inline exports for Vite/Rollup static analysis compatibility
 export const firebaseApp: FirebaseApp = initializeApp(firebaseConfig);
-export const firebaseAuth: Auth = getAuth(firebaseApp);
+
+// Use initializeAuth with browserLocalPersistence for iOS compatibility
+// getAuth() defaults to indexedDBLocalPersistence which can fail in iOS WKWebView
+export const firebaseAuth: Auth = initializeAuth(firebaseApp, {
+  persistence: browserLocalPersistence
+});
+
 export const firebaseDb: Firestore = getFirestore(firebaseApp);
 
-console.log('✅ Firebase initialized successfully');
+console.log('✅ Firebase initialized with browserLocalPersistence');
 
 
