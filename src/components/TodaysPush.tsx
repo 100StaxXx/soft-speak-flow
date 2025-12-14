@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
-import { Bell, Play, Sparkles } from "lucide-react";
+import { Bell, Play, Sparkles, AlertCircle } from "lucide-react";
 import { getMentor } from "@/lib/firebase/mentors";
 import { getDailyPepTalk, getDailyPepTalks } from "@/lib/firebase/dailyPepTalks";
 import { useNavigate } from "react-router-dom";
@@ -22,30 +22,38 @@ export const TodaysPush = () => {
   const { profile } = useProfile();
   const navigate = useNavigate();
   const [todaysPepTalk, setTodaysPepTalk] = useState<DailyPepTalk | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTodaysPepTalk = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!profile?.selected_mentor_id) {
+        setIsLoading(false);
+        return;
+      }
 
       try {
+        setIsLoading(true);
+        setError(null);
         const today = format(new Date(), 'yyyy-MM-dd');
 
         // Get mentor details
         const mentor = await getMentor(profile.selected_mentor_id);
-        if (!mentor || !mentor.slug) return;
+        if (!mentor || !mentor.slug) {
+          setIsLoading(false);
+          return;
+        }
 
         // Check if there's a daily pep talk for today
         let dailyPepTalk = await getDailyPepTalk(today, mentor.slug);
         
         // If no daily pep talk exists, get the most recent one for this mentor
-        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
         if (!dailyPepTalk) {
           try {
             const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
             dailyPepTalk = recentPepTalks[0] || null;
-          } catch (error) {
-            console.error("Error fetching recent pep talk:", error);
-            // Continue without pep talk if fallback fails
+          } catch (err) {
+            console.error("Error fetching recent pep talk:", err);
           }
         }
 
@@ -58,16 +66,72 @@ export const TodaysPush = () => {
               : dailyPepTalk.topic_category || undefined,
           });
         }
-      } catch (error) {
-        console.error("Error fetching today's pep talk:", error);
-        // Component will render nothing if fetch fails
+      } catch (err) {
+        console.error("Error fetching today's pep talk:", err);
+        setError("Unable to load pep talk");
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchTodaysPepTalk();
   }, [profile?.selected_mentor_id]);
 
-  if (!todaysPepTalk) return null;
+  // Show loading skeleton
+  if (isLoading) {
+    return (
+      <Card className="relative overflow-hidden animate-pulse">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-muted" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-24 bg-muted rounded" />
+              <div className="h-4 w-32 bg-muted rounded" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-6 w-3/4 bg-muted rounded" />
+            <div className="h-4 w-full bg-muted rounded" />
+          </div>
+          <div className="h-10 w-full bg-muted rounded" />
+        </div>
+      </Card>
+    );
+  }
+
+  // Show placeholder when no pep talk available
+  if (!todaysPepTalk || error) {
+    return (
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-muted/50 via-muted/30 to-background opacity-60" />
+        <div className="relative p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-muted/50 rounded-full border border-border/20">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Today's Push</span>
+              </div>
+              <h3 className="font-semibold text-sm text-muted-foreground">No pep talk available</h3>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Check back later for your daily motivation from your mentor.
+          </p>
+          <Button 
+            onClick={() => navigate('/library')}
+            variant="outline"
+            className="w-full"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Browse Library
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="relative overflow-hidden group animate-fade-in">
