@@ -4,28 +4,16 @@
       "collectionGroup": "daily_pep_talks",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "for_date",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "mentor_slug",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "for_date", "order": "ASCENDING" },
+        { "fieldPath": "mentor_slug", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "daily_pep_talks",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "mentor_slug",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "for_date",
-          "order": "DESCENDING"
-        }
+        { "fieldPath": "mentor_slug", "order": "ASCENDING" },
+        { "fieldPath": "for_date", "order": "DESCENDING" }
       ]
     }
   ],
