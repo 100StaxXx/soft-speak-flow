@@ -36,8 +36,9 @@ git stash push -m "Before TestFlight deployment"
 
 ### 2. Pull & Setup
 ```bash
-# Pull latest code (use your current branch name)
-git pull origin codex/list-database-read/write-operations
+# Switch to main branch and pull latest code
+git checkout main
+git pull origin main
 
 # Install dependencies
 npm install
