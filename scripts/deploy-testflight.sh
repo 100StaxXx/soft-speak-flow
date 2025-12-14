@@ -32,23 +32,57 @@ setup_node() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     
     # Try to activate LTS version (this adds node/npm to PATH)
-    if nvm use --lts >/dev/null 2>&1; then
-      echo -e "${GREEN}✅ Node.js/npm loaded via nvm (LTS): $(node --version) / $(npm --version)${NC}"
-      return 0
+    echo -e "${YELLOW}📦 Attempting to activate Node.js LTS...${NC}"
+    if nvm use --lts 2>&1; then
+      # nvm use should modify PATH, but ensure it's exported
+      # Find the active node version's bin directory and add to PATH
+      ACTIVE_VERSION=$(nvm current 2>/dev/null)
+      if [ -n "$ACTIVE_VERSION" ] && [ "$ACTIVE_VERSION" != "none" ]; then
+        NODE_BIN="$NVM_DIR/versions/node/$ACTIVE_VERSION/bin"
+        if [ -d "$NODE_BIN" ] && [[ ":$PATH:" != *":$NODE_BIN:"* ]]; then
+          export PATH="$NODE_BIN:$PATH"
+        fi
+      fi
+      # Verify npm is now available
+      if command -v npm &> /dev/null; then
+        echo -e "${GREEN}✅ Node.js/npm loaded via nvm (LTS): $(node --version) / $(npm --version)${NC}"
+        return 0
+      fi
     fi
     
     # If LTS not available, try default
-    if nvm use default >/dev/null 2>&1; then
-      echo -e "${GREEN}✅ Node.js/npm loaded via nvm (default): $(node --version) / $(npm --version)${NC}"
-      return 0
+    echo -e "${YELLOW}📦 Attempting to activate default Node.js version...${NC}"
+    if nvm use default 2>&1; then
+      # Find the active node version's bin directory and add to PATH
+      ACTIVE_VERSION=$(nvm current 2>/dev/null)
+      if [ -n "$ACTIVE_VERSION" ] && [ "$ACTIVE_VERSION" != "none" ]; then
+        NODE_BIN="$NVM_DIR/versions/node/$ACTIVE_VERSION/bin"
+        if [ -d "$NODE_BIN" ] && [[ ":$PATH:" != *":$NODE_BIN:"* ]]; then
+          export PATH="$NODE_BIN:$PATH"
+        fi
+      fi
+      if command -v npm &> /dev/null; then
+        echo -e "${GREEN}✅ Node.js/npm loaded via nvm (default): $(node --version) / $(npm --version)${NC}"
+        return 0
+      fi
     fi
     
     # If no version is active, install LTS
     echo -e "${YELLOW}⚠️  No active Node.js version. Installing LTS...${NC}"
-    if nvm install --lts >/dev/null 2>&1 && nvm use --lts >/dev/null 2>&1; then
-      if command -v npm &> /dev/null; then
-        echo -e "${GREEN}✅ Node.js/npm installed via nvm: $(node --version) / $(npm --version)${NC}"
-        return 0
+    if nvm install --lts 2>&1; then
+      if nvm use --lts 2>&1; then
+        # Ensure PATH includes the new node version
+        ACTIVE_VERSION=$(nvm current 2>/dev/null)
+        if [ -n "$ACTIVE_VERSION" ] && [ "$ACTIVE_VERSION" != "none" ]; then
+          NODE_BIN="$NVM_DIR/versions/node/$ACTIVE_VERSION/bin"
+          if [ -d "$NODE_BIN" ] && [[ ":$PATH:" != *":$NODE_BIN:"* ]]; then
+            export PATH="$NODE_BIN:$PATH"
+          fi
+        fi
+        if command -v npm &> /dev/null; then
+          echo -e "${GREEN}✅ Node.js/npm installed via nvm: $(node --version) / $(npm --version)${NC}"
+          return 0
+        fi
       fi
     fi
   fi
