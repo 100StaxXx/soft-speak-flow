@@ -46,6 +46,7 @@ export const TodaysPepTalk = memo(() => {
   const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<{ message: string; isIndexError: boolean; indexUrl?: string } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -109,61 +110,98 @@ export const TodaysPepTalk = memo(() => {
     };
   }, [isPlaying]);
 
-  useEffect(() => {
-    const fetchDailyPepTalk = async () => {
-      if (!profile?.selected_mentor_id) {
+  const fetchDailyPepTalk = useCallback(async () => {
+    if (!profile?.selected_mentor_id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError(null); // Clear any previous errors
+      setLoading(true);
+      const today = new Date().toLocaleDateString("en-CA");
+
+      const mentor = await getMentor(profile.selected_mentor_id);
+      if (!mentor || !mentor.slug) {
         setLoading(false);
         return;
       }
 
-      try {
-        const today = new Date().toLocaleDateString("en-CA");
-
-        const mentor = await getMentor(profile.selected_mentor_id);
-        if (!mentor || !mentor.slug) {
-          setLoading(false);
-          return;
-        }
-
-        let data = await getDailyPepTalk(today, mentor.slug);
-        
-        // If no daily pep talk exists, get the most recent one for this mentor
-        // This ensures users see a pep talk after onboarding even if they missed the daily trigger
-        if (!data) {
+      let data = await getDailyPepTalk(today, mentor.slug);
+      
+      // If no daily pep talk exists, get the most recent one for this mentor
+      // This ensures users see a pep talk after onboarding even if they missed the daily trigger
+      if (!data) {
+        try {
           const recentPepTalks = await getDailyPepTalks(mentor.slug, 1);
           data = recentPepTalks[0] || null;
-        }
-
-        if (data) {
-          // Validate and sanitize transcript data
-          let transcript: CaptionWord[] = [];
-          if (Array.isArray(data.transcript)) {
-            // Validate each word object has required fields
-            transcript = (data.transcript as unknown as CaptionWord[]).filter(
-              (word): word is CaptionWord => 
-                word && 
-                typeof word === 'object' &&
-                typeof word.word === 'string' &&
-                typeof word.start === 'number' &&
-                typeof word.end === 'number'
-            );
+        } catch (fallbackError: any) {
+          // Check if this is also an index error
+          const errorMessage = fallbackError?.message || String(fallbackError);
+          if (errorMessage.includes("index") || errorMessage.includes("The query requires an index")) {
+            const indexUrlMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s)]+/);
+            setError({
+              message: "Firebase index is missing. Please create the required index to load pep talks.",
+              isIndexError: true,
+              indexUrl: indexUrlMatch ? indexUrlMatch[0] : undefined,
+            });
+            setLoading(false);
+            return;
           }
-          
-          setPepTalk({ 
-            ...data, 
-            mentor_name: mentor.name,
-            transcript,
-          } as DailyPepTalk);
+          throw fallbackError; // Re-throw if not an index error
         }
-      } catch (error) {
-        console.error("Unexpected error fetching pep talk:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchDailyPepTalk();
+      if (data) {
+        // Validate and sanitize transcript data
+        let transcript: CaptionWord[] = [];
+        if (Array.isArray(data.transcript)) {
+          // Validate each word object has required fields
+          transcript = (data.transcript as unknown as CaptionWord[]).filter(
+            (word): word is CaptionWord => 
+              word && 
+              typeof word === 'object' &&
+              typeof word.word === 'string' &&
+              typeof word.start === 'number' &&
+              typeof word.end === 'number'
+          );
+        }
+        
+        setPepTalk({ 
+          ...data, 
+          mentor_name: mentor.name,
+          transcript,
+        } as DailyPepTalk);
+      }
+    } catch (error: any) {
+      console.error("Unexpected error fetching pep talk:", error);
+      
+      // Check if this is a Firebase index error
+      const errorMessage = error?.message || String(error);
+      const isIndexError = errorMessage.includes("index") || errorMessage.includes("The query requires an index");
+      
+      if (isIndexError) {
+        // Try to extract the Firebase index creation URL from the error
+        const indexUrlMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s)]+/);
+        setError({
+          message: "Firebase index is missing. Please create the required index to load pep talks.",
+          isIndexError: true,
+          indexUrl: indexUrlMatch ? indexUrlMatch[0] : undefined,
+        });
+      } else {
+        setError({
+          message: "Failed to load today's pep talk. Please try again later.",
+          isIndexError: false,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [profile?.selected_mentor_id]);
+
+  useEffect(() => {
+    fetchDailyPepTalk();
+  }, [fetchDailyPepTalk]);
 
   useEffect(() => {
     const runSync = async () => {
@@ -423,6 +461,60 @@ export const TodaysPepTalk = memo(() => {
         <div className="space-y-4">
           <div className="h-4 bg-muted rounded w-1/3" />
           <div className="h-20 bg-muted rounded" />
+        </div>
+      </Card>
+    );
+  }
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <Card className="relative overflow-hidden rounded-3xl border-2 border-destructive/50">
+        <div className="absolute inset-0 bg-gradient-to-br from-destructive/10 via-accent/5 to-destructive/5" />
+        <div className="relative p-6 md:p-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-destructive" />
+            <h2 className="text-xl font-bold text-foreground">
+              Unable to Load Pep Talk
+            </h2>
+          </div>
+          
+          <div className="space-y-3 p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-destructive/20">
+            <p className="text-sm text-foreground">
+              {error.message}
+            </p>
+            
+            {error.isIndexError && (
+              <div className="space-y-2 pt-2 border-t border-destructive/20">
+                <p className="text-xs text-muted-foreground font-medium">
+                  This usually happens after a database migration. You need to create a composite index in Firebase.
+                </p>
+                {error.indexUrl ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open(error.indexUrl, '_blank')}
+                  >
+                    Create Index in Firebase Console
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Check your browser console for the Firebase index creation link, or manually create an index for the <code className="bg-muted px-1 rounded">daily_pep_talks</code> collection on fields: <code className="bg-muted px-1 rounded">mentor_slug</code> and <code className="bg-muted px-1 rounded">for_date</code>.
+                  </p>
+                )}
+              </div>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-4"
+              onClick={() => fetchDailyPepTalk()}
+            >
+              Try Again
+            </Button>
+          </div>
         </div>
       </Card>
     );

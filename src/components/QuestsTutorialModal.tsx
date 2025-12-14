@@ -19,59 +19,59 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
       // Only allow closing via the button, not by clicking outside or ESC
       if (!isOpen) return;
     }}>
-      <DialogContent className="max-w-md" hideCloseButton>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl">
+      <DialogContent className="max-w-md rounded-2xl" hideCloseButton>
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
             <Swords className="h-6 w-6 text-primary" />
             Welcome to Quests!
           </DialogTitle>
-          <DialogDescription className="space-y-4 pt-4 text-base">
-            <p className="text-foreground">
+          <div className="space-y-4 pt-2">
+            <p className="text-base text-foreground leading-relaxed">
               Quests are your daily tasks that help you level up and grow your companion. 
               They're the things you need to do each day—like laundry, meal prep, exercise, 
               or studying.
             </p>
             
-            <div className="bg-accent/20 rounded-lg p-4 space-y-3">
+            <div className="bg-accent/20 rounded-lg p-4 space-y-3 border border-accent/30">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   Add quests throughout your day
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   First 3 quests earn full XP, then rewards gradually decrease
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   Main Quest = 1.5x XP boost
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   Create Epics for long-term goals
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   Browse Star Paths for curated habit journeys
                 </p>
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground italic">
+            <p className="text-sm text-muted-foreground italic leading-relaxed">
               Your first quest is already waiting for you below. Check it off to get started!
             </p>
-          </DialogDescription>
+          </div>
         </DialogHeader>
-        <div className="flex justify-end">
-          <Button onClick={onClose} size="lg">
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={onClose} size="lg" className="rounded-full">
             Got it, let's go!
           </Button>
         </div>
