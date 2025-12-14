@@ -4182,6 +4182,7 @@ export type Database = {
         Args: { current_stage: number }
         Returns: number
       }
+      get_user_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4202,6 +4203,13 @@ export type Database = {
           is_active: boolean
           owner_type: string
           owner_user_id: string
+        }[]
+      }
+      validate_referral_code_secure: {
+        Args: { p_code: string }
+        Returns: {
+          code_id: string
+          is_valid: boolean
         }[]
       }
     }

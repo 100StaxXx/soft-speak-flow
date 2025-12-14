@@ -13,6 +13,9 @@ const SUBSCRIPTION_MODAL_LAST_SHOWN_KEY = "subscription_modal_last_shown";
 const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 
 export const SubscriptionGate = () => {
+  // Temporarily disabled - remove this line to re-enable
+  return null;
+  
   const navigate = useNavigate();
   const { companion } = useCompanion();
   const { hasAccess, isInTrial, trialDaysRemaining } = useAccessStatus();
