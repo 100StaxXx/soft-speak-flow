@@ -29,6 +29,17 @@ const App = lazy(() => import("./App.tsx"));
 const AppWrapper = () => {
   useEffect(() => {
     initializeCapacitor();
+    
+    // Hide splash screen immediately when app loads (don't wait for auth)
+    // This prevents Capacitor timeout warnings
+    import('@/utils/capacitor').then(({ hideSplashScreen }) => {
+      // Small delay to ensure smooth transition, but much faster than waiting for auth
+      setTimeout(() => {
+        hideSplashScreen().catch(() => {
+          // Ignore errors - splash screen might not be available on web
+        });
+      }, 500);
+    });
   }, []);
 
   return <App />;

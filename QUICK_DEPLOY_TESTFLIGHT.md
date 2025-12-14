@@ -46,14 +46,14 @@ npm run validate:env
 
 ### 2. iOS Setup
 ```bash
-# Install pods
+# Build and sync (must happen before pod install)
+npm run build
+npx cap sync ios
+
+# Install pods (after config is generated)
 cd ios/App
 pod install
 cd ../..
-
-# Build and sync
-npm run build
-npx cap sync ios
 ```
 
 ### 4. Open Xcode
@@ -90,11 +90,10 @@ If you see this error:
 ✖ Error parsing config: Unexpected token '<', ..."thApple", <<<<<<< HE"... is not valid JSON
 ```
 
-**Fix:** The file `ios/App/App/capacitor.config.json` has merge conflict markers. Resolve it by:
-1. Opening `ios/App/App/capacitor.config.json`
-2. Removing lines with `<<<<<<<`, `=======`, and `>>>>>>>`
-3. Keeping the correct content (usually include `CAPBrowserPlugin` in `packageClassList`)
-4. Save and run `npx cap sync ios`
+**Fix:** The deployment script now handles this automatically by running `cap sync ios` before `pod install`. If you still see this error:
+1. Delete the file: `rm ios/App/App/capacitor.config.json`
+2. Regenerate it: `npm run build && npx cap sync ios`
+3. Then run: `cd ios/App && pod install`
 
 ### Patch-Package Warning
 
@@ -113,6 +112,63 @@ npm install
 # 1. Manually edit the file in node_modules/@capgo/capacitor-social-login
 # 2. Run: npx patch-package @capgo/capacitor-social-login
 ```
+
+### Missing Pods Configuration Files
+
+If you see this error in Xcode:
+```
+Unable to open base configuration reference file '/Volumes/workspace/repository/ios/App/Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig'
+```
+
+**Cause:** CocoaPods dependencies haven't been installed yet, or the Pods directory is missing.
+
+**Fix:**
+
+First, check if CocoaPods is already installed:
+```bash
+pod --version
+```
+
+If CocoaPods is NOT installed, try one of these methods:
+
+**Option 1: User-level gem install (No sudo required)**
+```bash
+# Install to user directory (no sudo needed)
+gem install --user-install cocoapods
+
+# Add to PATH (add this to your ~/.zshrc or ~/.bash_profile)
+export PATH="$HOME/.gem/ruby/$(ruby -e 'puts RUBY_VERSION')/bin:$PATH"
+
+# Reload shell or run:
+source ~/.zshrc  # or source ~/.bash_profile
+```
+
+**Option 2: Using Homebrew (if available)**
+```bash
+brew install cocoapods
+```
+
+**Option 3: If you have sudo access**
+```bash
+sudo gem install cocoapods
+```
+
+**After CocoaPods is installed:**
+```bash
+# Navigate to iOS App directory (if not already there)
+cd ios/App
+
+# Install pods (this creates the Pods/ directory and .xcconfig files)
+pod install
+
+# Go back to project root
+cd ../..
+
+# Close Xcode if it's open, then reopen the workspace
+open ios/App/App.xcworkspace
+```
+
+**Important:** Always open `App.xcworkspace` (NOT `App.xcodeproj`) after running `pod install`.
 
 ### Node.js/npm Not Found
 

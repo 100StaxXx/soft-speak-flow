@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubscriptionGate Modal Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .shadow-glow {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+        }
+        .gradient-primary {
+            background: linear-gradient(to bottom right, #8b5cf6, #ec4899);
+        }
+        .gradient-button {
+            background: linear-gradient(to right, #8b5cf6, #ec4899);
+        }
+    </style>
+</head>
+<body>
+    <!-- Modal Overlay -->
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+        <!-- Modal Content -->
+        <div class="bg-[#1a1a1a] border border-[#2d2d2d] rounded-lg shadow-xl max-w-md w-full p-6 space-y-6">
+            <!-- Header -->
+            <div class="text-center space-y-4">
+                <div class="flex justify-center mb-4">
+                    <div class="w-16 h-16 rounded-full gradient-primary flex items-center justify-center shadow-glow">
+                        <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold text-white">
+                    What you get with Premium ✨
+                </h2>
+            </div>
+
+            <!-- Features List -->
+            <div class="space-y-3">
+                <div class="flex items-center gap-3 text-sm">
+                    <svg class="h-5 w-5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <span class="text-gray-200">All 21 evolution stages</span>
+                </div>
+                
+                <div class="flex items-center gap-3 text-sm">
+                    <svg class="h-5 w-5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                    <span class="text-gray-200">Personalized Daily Cosmiq Insight</span>
+                </div>
+                
+                <div class="flex items-center gap-3 text-sm">
+                    <svg class="h-5 w-5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span class="text-gray-200">Unlimited AI Mentor Chat</span>
+                </div>
+                
+                <div class="flex items-center gap-3 text-sm">
+                    <svg class="h-5 w-5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <span class="text-gray-200">Pet Mode, Guild Stories & all features</span>
+                </div>
+                
+                <div class="flex items-center gap-3 text-sm">
+                    <svg class="h-5 w-5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span class="text-gray-200">Unlimited Quests, Epics & Challenges</span>
+                </div>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="space-y-3 pt-4">
+                <button class="w-full py-6 text-base font-semibold text-white rounded-lg gradient-button hover:opacity-90 transition-opacity">
+                    Continue Exploring
+                </button>
+                
+                <button class="w-full text-sm text-gray-400 hover:text-gray-200 transition-colors py-2">
+                    Learn more about premium
+                </button>
+            </div>
+
+            <!-- Footer -->
+            <p class="text-xs text-center text-gray-500 pt-2">
+                7-day free trial • No credit card required
+            </p>
+        </div>
+    </div>
+</body>
+</html>

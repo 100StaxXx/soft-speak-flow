@@ -175,45 +175,20 @@ const AppContent = memo(() => {
     }
   }, [session]);
   
-  // Hide splash screen once auth is loaded OR if on auth route
-  // This prevents iOS watchdog timeout (0xbadf00d) from blocking network calls
+  // Hide splash screen early - it's already hidden in main.tsx, but this is a safety net
+  // The splash screen should be hidden as soon as the app loads, not waiting for auth
   useEffect(() => {
-    // Hide immediately if on auth route (no need to wait for auth check)
-    const isAuthRoute = location.pathname === '/auth' || location.pathname.startsWith('/auth/');
-    if (isAuthRoute && !splashHidden) {
+    // Safety net: Ensure splash is hidden after a short delay (in case main.tsx didn't catch it)
+    if (!splashHidden) {
       const timer = setTimeout(() => {
-        console.log('[App] Hiding splash screen - on auth route');
-        hideSplashScreen();
+        hideSplashScreen().catch(() => {
+          // Ignore errors - splash screen might not be available on web
+        });
         setSplashHidden(true);
-      }, 300);
+      }, 1000); // 1 second max wait
       return () => clearTimeout(timer);
     }
-
-    // Safety net: Force hide splash after 10 seconds max to prevent watchdog timeout
-    const maxTimeout = setTimeout(() => {
-      if (!splashHidden) {
-        console.warn('[App] Force hiding splash screen after 10s timeout');
-        hideSplashScreen();
-        setSplashHidden(true);
-      }
-    }, 10000);
-
-    // Normal hide: Hide after auth loads (not profile - profile is non-blocking)
-    if (!authLoading && !splashHidden && !isAuthRoute) {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        hideSplashScreen();
-        setSplashHidden(true);
-        clearTimeout(maxTimeout);
-      }, 500);
-      return () => {
-        clearTimeout(timer);
-        clearTimeout(maxTimeout);
-      };
-    }
-
-    return () => clearTimeout(maxTimeout);
-  }, [authLoading, splashHidden, location.pathname]);
+  }, [splashHidden]);
   
   const resolvedMentorId = getResolvedMentorId(profile);
 

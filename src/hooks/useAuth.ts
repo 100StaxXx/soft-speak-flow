@@ -19,10 +19,18 @@ export const useAuth = () => {
   useEffect(() => {
     let isInitialCheck = true;
     let timeoutId: NodeJS.Timeout | null = null;
+    let listenerSetup = false;
     const startTime = Date.now();
     
+    // Check if Firebase auth is initialized
+    if (!firebaseAuth) {
+      console.error('[useAuth] ❌ Firebase auth not initialized - check Firebase config');
+      setLoading(false);
+      return;
+    }
+    
     // Check for persisted user immediately (no network wait)
-    const persistedUser = firebaseAuth?.currentUser;
+    const persistedUser = firebaseAuth.currentUser;
     if (persistedUser) {
       console.log('[useAuth] Found persisted user immediately:', persistedUser.email);
       const authUser = convertFirebaseUser(persistedUser);
@@ -35,36 +43,22 @@ export const useAuth = () => {
       }
     }
     
-    // Safety timeout: Reduced to 5 seconds for faster failure recovery
-    timeoutId = setTimeout(() => {
-      if (isInitialCheck) {
-        console.warn(`[useAuth] ⚠️ Auth state check timeout after 5s - proceeding without user`);
-        setLoading(false);
-        isInitialCheck = false;
-      }
-    }, 5000);
-    
-    // Check if Firebase auth is initialized
-    if (!firebaseAuth) {
-      console.error('[useAuth] ❌ Firebase auth not initialized - check Firebase config');
-      setLoading(false);
-      if (timeoutId) clearTimeout(timeoutId);
-      return;
-    }
-    
-    console.log('[useAuth] ✅ Firebase auth available, waiting for auth state...');
-    
-    // Set up Firebase auth state listener
-    console.log('[useAuth] Registering onAuthStateChanged listener...');
+    // Set up Firebase auth state listener - this should fire immediately
+    console.log('[useAuth] ✅ Firebase auth available, registering onAuthStateChanged listener...');
+    listenerSetup = true;
     const unsubscribe = onAuthStateChanged(
       firebaseAuth,
       async (firebaseUser: FirebaseUser | null) => {
-        console.log('[useAuth] 🔥 Auth state changed:', firebaseUser ? `User: ${firebaseUser.email}` : 'No user');
-        
         // Clear timeout since we got a response
         if (timeoutId) {
           clearTimeout(timeoutId);
           timeoutId = null;
+        }
+        
+        // Only log on initial check to reduce console noise
+        if (isInitialCheck) {
+          const elapsed = Date.now() - startTime;
+          console.log(`[useAuth] 🔥 Auth state resolved after ${elapsed}ms:`, firebaseUser ? `User: ${firebaseUser.email}` : 'No user');
         }
         
         const authUser = convertFirebaseUser(firebaseUser);
@@ -101,6 +95,16 @@ export const useAuth = () => {
         isInitialCheck = false;
       }
     );
+    
+    // Safety timeout: Only warn if listener was set up but didn't fire within 5 seconds
+    // This is a fallback for edge cases where onAuthStateChanged doesn't fire
+    timeoutId = setTimeout(() => {
+      if (isInitialCheck && listenerSetup) {
+        console.warn(`[useAuth] ⚠️ Auth state check timeout after 5s - proceeding without user (listener may not have fired)`);
+        setLoading(false);
+        isInitialCheck = false;
+      }
+    }, 5000);
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);

@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
-import { TrialExpiredPaywall } from "@/components/TrialExpiredPaywall";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -89,12 +88,7 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
     return <>{children}</>;
   }
 
-  // Only check access if it's loaded - don't block if still loading
+  // Render children - SubscriptionGate component will handle showing paywall when needed
   // Profile/access can load in background, pages will handle their own loading states
-  if (!accessLoading && !hasAccess) {
-    return <TrialExpiredPaywall />;
-  }
-
-  // Render children - profile/access will load in background
   return <>{children}</>;
 };

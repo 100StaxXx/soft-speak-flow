@@ -100,11 +100,17 @@ export function SubscriptionManagement() {
     return productId === IAP_PRODUCTS.YEARLY ? "$59.99" : "$9.99";
   };
 
-  const canPurchasePlan = (productId: string) => {
-    if (!isAvailable || purchasing || productsLoading) return false;
-    if (productError) return false;
-    if (!hasLoadedProducts) return false;
-    return Boolean(productMap[productId]);
+  const handleSubscribe = async () => {
+    if (!selectedPlanOption) {
+      toast({
+        title: "No plan selected",
+        description: "Please select a subscription plan",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    await handlePurchase(selectedPlanOption.productId);
   };
 
   if (isLoading) {
@@ -209,11 +215,12 @@ export function SubscriptionManagement() {
           </div>
 
           <Button
-            onClick={() => selectedPlanOption && handlePurchase(selectedPlanOption.productId)}
+            onClick={handleSubscribe}
             disabled={
               !isAvailable ||
               !selectedPlanOption ||
-              !canPurchasePlan(selectedPlanOption.productId)
+              purchasing ||
+              productsLoading
             }
             className="w-full"
           >
