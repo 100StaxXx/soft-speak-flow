@@ -1,4 +1,5 @@
 import { getCorsHeaders } from "./cors.ts";
+import { logError } from "./errorHandler.ts";
 
 // Use any for flexible client type compatibility across different Supabase client instances
 type SupabaseClient = any;
@@ -155,13 +156,17 @@ export async function upsertSubscription(
   const now = new Date().toISOString();
   const amountCents = getPriceCents(payload.plan);
 
-  const { data: existingPayment } = await supabase
+  const { data: existingPayment, error: paymentError } = await supabase
     .from("payment_history")
     .select("id")
     .eq("stripe_payment_intent_id", payload.transactionId)
     .maybeSingle();
 
-  const { data: subscription } = await supabase
+  if (paymentError && paymentError.code === "42P01") {
+    logError(paymentError, "payment_history query in upsertSubscription");
+  }
+
+  const { data: subscription, error: subscriptionError } = await supabase
     .from("subscriptions")
     .upsert({
       user_id: payload.userId,
@@ -192,8 +197,12 @@ export async function upsertSubscription(
     })
     .eq("id", payload.userId);
 
+  if (profileError && profileError.code === "42P01") {
+    logError(profileError, "profiles update in upsertSubscription");
+  }
+
   if (!existingPayment) {
-    await supabase.from("payment_history").insert({
+    const { error: insertError } = await supabase.from("payment_history").insert({
       user_id: payload.userId,
       subscription_id: subscription?.id,
       stripe_payment_intent_id: payload.transactionId,
@@ -208,6 +217,10 @@ export async function upsertSubscription(
         environment: payload.environment ?? "unknown",
       },
     });
+
+    if (insertError && insertError.code === "42P01") {
+      logError(insertError, "payment_history insert in upsertSubscription");
+    }
   }
 
   return subscription;
@@ -220,7 +233,10 @@ export async function fetchSubscriptionForUser(supabase: SupabaseClient, userId:
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    logError(error, "subscriptions query in fetchSubscriptionForUser");
+    throw error;
+  }
   return data;
 }
 

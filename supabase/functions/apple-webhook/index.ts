@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.8.0";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { resolvePlanFromProduct, upsertSubscription } from "../_shared/appleSubscriptions.ts";
+import { logError } from "../_shared/errorHandler.ts";
 
 const defaultAppleBundleId = "com.darrylgraham.revolution";
 const appleWebhookAudiences = [
@@ -103,8 +104,11 @@ serve(async (req) => {
       .maybeSingle();
 
     if (subscriptionError) {
-      console.error("Error fetching subscription:", subscriptionError);
-      // Still return 200 to prevent Apple from retrying
+      logError(subscriptionError, "subscriptions query");
+      // Still return 200 to prevent Apple from retrying, but log critical errors
+      if (subscriptionError.code === "42P01") {
+        console.error("Critical: subscriptions table not found");
+      }
       return new Response("OK", { 
         status: 200, 
         headers: getCorsHeaders(req),
@@ -221,9 +225,12 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error processing Apple notification:", error);
-    
+    logError(error, "apple-webhook edge function");
     // Still return 200 to prevent Apple from retrying
+    // But log critical database errors
+    if (typeof error === "object" && error !== null && (error as { code?: string }).code === "42P01") {
+      console.error("Critical: Database table not found in Apple webhook");
+    }
     return new Response("OK", {
       status: 200,
       headers: getCorsHeaders(req),
@@ -465,11 +472,16 @@ async function createReferralPayout(
   plan: string
 ) {
   // Check if user was referred by someone using referral code
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("referred_by_code")
     .eq("id", userId)
     .single();
+
+  if (profileError && profileError.code === "42P01") {
+    logError(profileError, "profiles query in createReferralPayout");
+    return;
+  }
 
   if (!profile?.referred_by_code) {
     console.log(`User ${userId} was not referred, no payout created`);
@@ -479,11 +491,16 @@ async function createReferralPayout(
   const referralCode = profile.referred_by_code;
 
   // Find the referral_code record
-  const { data: codeData } = await supabase
+  const { data: codeData, error: codeError } = await supabase
     .from("referral_codes")
     .select("id, owner_type")
     .eq("code", referralCode)
     .single();
+
+  if (codeError && codeError.code === "42P01") {
+    logError(codeError, "referral_codes query in createReferralPayout");
+    return;
+  }
 
   if (!codeData) {
     console.error(`Referral code ${referralCode} not found`);
@@ -522,7 +539,12 @@ async function createReferralPayout(
     });
 
   if (error) {
-    console.error(`Failed to create payout for code ${referralCode}:`, error);
+    logError(error, "referral_payouts insert in createReferralPayout");
+    if (error.code === "42P01") {
+      console.error("Critical: referral_payouts table not found");
+    } else {
+      console.error(`Failed to create payout for code ${referralCode}:`, error);
+    }
   } else {
     console.log(`Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`);
   }

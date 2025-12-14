@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createErrorResponse, logError } from "../_shared/errorHandler.ts";
 
 /**
  * Process Referral Code from alilpush
@@ -54,6 +55,13 @@ serve(async (req) => {
       .eq("code", referral_code.toUpperCase())
       .single();
 
+    if (codeError) {
+      logError(codeError, "referral_codes query");
+      if (codeError.code === "42P01") {
+        return createErrorResponse(codeError, req, corsHeaders);
+      }
+    }
+
     if (codeError || !codeData) {
       console.error(`Invalid referral code: ${referral_code}`);
       return new Response(
@@ -101,6 +109,10 @@ serve(async (req) => {
       .eq("id", codeData.id);
 
     if (updateError) {
+      logError(updateError, "referral_codes update");
+      if (updateError.code === "42P01") {
+        return createErrorResponse(updateError, req, corsHeaders);
+      }
       console.error(`Failed to increment signups for code ${referral_code}:`, updateError);
       return new Response(
         JSON.stringify({ 
@@ -130,17 +142,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error processing referral:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: errorMessage 
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    logError(error, "process-referral edge function");
+    return createErrorResponse(error, req, corsHeaders);
   }
 });

@@ -1,4 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logError } from "./errorHandler.ts";
 
 export interface RateLimitConfig {
   maxCalls: number;
@@ -37,8 +38,12 @@ export async function checkRateLimit(
       .gte('created_at', windowStart.toISOString());
 
     if (error) {
-      console.error('Rate limit check error:', error);
+      logError(error, "ai_output_validation_log query in checkRateLimit");
       // Fail open - allow request if we can't check
+      // But log critical table errors
+      if (error.code === "42P01") {
+        console.error("Critical: ai_output_validation_log table not found");
+      }
       return {
         allowed: true,
         remaining: config.maxCalls,

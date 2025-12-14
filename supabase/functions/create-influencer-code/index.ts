@@ -68,12 +68,16 @@ serve(async (req) => {
     }
 
     // Check if influencer already has a code
-    const { data: existingCode } = await supabaseClient
+    const { data: existingCode, error: checkError } = await supabaseClient
       .from("referral_codes")
       .select("code")
       .eq("influencer_email", email)
       .eq("owner_type", "influencer")
       .maybeSingle();
+
+    if (checkError && checkError.code === "42P01") {
+      return createErrorResponse(checkError, req, corsHeaders);
+    }
 
     if (existingCode) {
       // Return existing code instead of creating duplicate
@@ -156,14 +160,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error creating influencer code:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    logError(error, "create-influencer-code edge function");
+    return createErrorResponse(error, req, corsHeaders);
   }
 });

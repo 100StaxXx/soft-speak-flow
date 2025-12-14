@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logError } from "./errorHandler.ts";
 
 interface PromptTemplate {
   template_key: string;
@@ -43,6 +44,13 @@ export class PromptBuilder {
       .eq('is_active', true)
       .single();
 
+    if (error) {
+      logError(error, "prompt_templates query in loadTemplate");
+      if (error.code === "42P01") {
+        throw new Error("Database configuration error. Template system unavailable.");
+      }
+    }
+
     if (error || !data) {
       throw new Error(`Template ${templateKey} not found`);
     }
@@ -51,11 +59,16 @@ export class PromptBuilder {
   }
 
   async loadUserPreferences(userId: string): Promise<void> {
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('user_ai_preferences')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
+
+    if (error && error.code === "42P01") {
+      logError(error, "user_ai_preferences query in loadUserPreferences");
+      // Use defaults if table doesn't exist
+    }
 
     // Use defaults if no preferences exist
     this.userPrefs = data || {

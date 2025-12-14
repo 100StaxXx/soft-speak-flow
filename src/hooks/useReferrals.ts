@@ -97,6 +97,10 @@ export const useReferrals = () => {
 
       if (codeError) {
         console.error("Error fetching referral code:", codeError);
+        // Handle database table errors
+        if (codeError.code === "42P01") {
+          throw new Error("Database configuration error. Please contact support.");
+        }
         throw new Error("Unable to validate referral code. Please try again.");
       }
       
@@ -123,6 +127,10 @@ export const useReferrals = () => {
 
         if (applyError) {
           console.error("Failed to apply referral code atomically:", applyError);
+          // Handle database table errors
+          if (applyError.code === "42P01") {
+            throw new Error("Database configuration error. Please contact support.");
+          }
           throw new Error("Failed to apply referral code. Please try again.");
         }
 

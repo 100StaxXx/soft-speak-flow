@@ -176,6 +176,10 @@ export const useCompanion = () => {
 
         if (result.error) {
           console.error("Database error creating companion:", result.error);
+          // Handle database table errors
+          if (result.error.code === "42P01") {
+            throw new Error("Database configuration error. Please contact support.");
+          }
           throw new Error(`Failed to save companion to database: ${result.error.message}`);
         }
         
