@@ -40,7 +40,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const Profile = () => {
@@ -507,6 +506,15 @@ const Profile = () => {
                   >
                     How account deletion works
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full border-destructive/60 text-destructive hover:bg-destructive/10"
+                    disabled={isDeletingAccount}
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {isDeletingAccount ? "Deleting..." : "Delete account"}
+                  </Button>
                   <AlertDialog
                     open={showDeleteDialog}
                     onOpenChange={(open) => {
@@ -517,16 +525,6 @@ const Profile = () => {
                       }
                     }}
                   >
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full border-destructive/60 text-destructive hover:bg-destructive/10"
-                        disabled={isDeletingAccount}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {isDeletingAccount ? "Deleting..." : "Delete account"}
-                      </Button>
-                    </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete your account?</AlertDialogTitle>
