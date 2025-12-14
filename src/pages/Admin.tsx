@@ -9,6 +9,7 @@ import {
   generateCosmicPostcard,
   generateCompletePepTalk,
   generateDailyMentorPepTalks,
+  generateSingleMentorPepTalk,
   batchGeneratePepTalks,
   generateCompanionName
 } from "@/lib/firebase/functions";
@@ -61,6 +62,8 @@ const Admin = () => {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [generatingDailyPepTalks, setGeneratingDailyPepTalks] = useState(false);
   const [generatingBatchPepTalks, setGeneratingBatchPepTalks] = useState(false);
+  const [mentorPepTalkStatus, setMentorPepTalkStatus] = useState<Record<string, 'idle' | 'generating' | 'generated' | 'skipped' | 'error'>>({});
+  const [currentGeneratingMentor, setCurrentGeneratingMentor] = useState<string | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Companion Image Tester State
@@ -582,42 +585,62 @@ const Admin = () => {
     }
   };
 
-  const handleGenerateDailyPepTalks = async () => {
-    setGeneratingDailyPepTalks(true);
+  const MENTOR_SLUGS = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+
+  const handleGenerateSingleMentorPepTalk = async (mentorSlug: string) => {
+    setMentorPepTalkStatus(prev => ({ ...prev, [mentorSlug]: 'generating' }));
+    setCurrentGeneratingMentor(mentorSlug);
+    
     try {
-      toast.info("Generating daily pep talks for all mentors...");
-      const result = await generateDailyMentorPepTalks();
+      const result = await generateSingleMentorPepTalk({ mentorSlug });
       
-      if (result?.results) {
-        const successCount = result.results.filter((r: any) => r.status === "generated").length;
-        const skippedCount = result.results.filter((r: any) => r.status === "skipped").length;
-        const errorCount = result.results.filter((r: any) => r.status === "error").length;
-        
-        if (errorCount > 0) {
-          const errors = result.results
-            .filter((r: any) => r.status === "error")
-            .map((r: any) => `${r.mentor}: ${r.error || "Unknown error"}`)
-            .join(", ");
-          toast.warning(
-            `Generated ${successCount}, skipped ${skippedCount}, ${errorCount} errors. Errors: ${errors}`,
-            { duration: 8000 }
-          );
-        } else {
-          toast.success(
-            `Successfully generated ${successCount} daily pep talks. ${skippedCount} were already generated.`,
-            { duration: 5000 }
-          );
-        }
-      } else {
-        toast.success("Daily pep talks generation completed!");
+      if (result.status === 'skipped') {
+        setMentorPepTalkStatus(prev => ({ ...prev, [mentorSlug]: 'skipped' }));
+        toast.info(`${mentorSlug}: Already generated for today`);
+      } else if (result.status === 'generated') {
+        setMentorPepTalkStatus(prev => ({ ...prev, [mentorSlug]: 'generated' }));
+        toast.success(`${mentorSlug}: Pep talk generated!`);
       }
     } catch (error) {
-      console.error("Error generating daily pep talks:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to generate daily pep talks");
+      console.error(`Error generating pep talk for ${mentorSlug}:`, error);
+      setMentorPepTalkStatus(prev => ({ ...prev, [mentorSlug]: 'error' }));
+      toast.error(`${mentorSlug}: ${error instanceof Error ? error.message : 'Failed'}`);
     } finally {
-      setGeneratingDailyPepTalks(false);
+      setCurrentGeneratingMentor(null);
     }
   };
+
+  const handleGenerateAllMentorPepTalks = async () => {
+    setGeneratingDailyPepTalks(true);
+    
+    // Reset all statuses
+    setMentorPepTalkStatus({});
+    
+    toast.info("Generating pep talks for all mentors one at a time...");
+    
+    for (const mentorSlug of MENTOR_SLUGS) {
+      try {
+        await handleGenerateSingleMentorPepTalk(mentorSlug);
+        // Small delay between mentors
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        // Continue to next mentor even if one fails
+        console.error(`Failed for ${mentorSlug}, continuing...`, error);
+      }
+    }
+    
+    setGeneratingDailyPepTalks(false);
+    
+    // Summary
+    const generated = Object.values(mentorPepTalkStatus).filter(s => s === 'generated').length;
+    const skipped = Object.values(mentorPepTalkStatus).filter(s => s === 'skipped').length;
+    const errors = Object.values(mentorPepTalkStatus).filter(s => s === 'error').length;
+    
+    toast.success(`Complete! Generated: ${generated}, Skipped: ${skipped}, Errors: ${errors}`);
+  };
+
+  // Keep legacy function for backward compatibility
+  const handleGenerateDailyPepTalks = handleGenerateAllMentorPepTalks;
 
   const handleBatchGeneratePepTalks = async () => {
     setGeneratingBatchPepTalks(true);
@@ -649,22 +672,7 @@ const Admin = () => {
     }
   };
 
-  // Temporary: Auto-trigger daily pep talks generation on admin page load (testing)
-  useEffect(() => {
-    if (
-      isAdmin &&
-      !generatingDailyPepTalks &&
-      !hasAutoTriggered.current
-    ) {
-      hasAutoTriggered.current = true;
-      console.log('🔧 Auto-triggering daily pep talks generation (testing mode)');
-      // Small delay to ensure page is fully loaded
-      setTimeout(() => {
-        handleGenerateDailyPepTalks();
-      }, 1000);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, generatingDailyPepTalks]);
+  // Auto-trigger removed - use manual buttons instead
 
   if (authLoading) {
     return (
@@ -753,32 +761,62 @@ const Admin = () => {
           
           <div className="space-y-4">
             <div className="p-4 border rounded-2xl bg-card">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-semibold text-lg">Generate Daily Pep Talks</h3>
                   <p className="text-sm text-muted-foreground">
-                    Generate today's pep talks for all mentors. This normally runs automatically at 00:01 UTC daily.
+                    Generate today's pep talks one mentor at a time to avoid timeouts.
                   </p>
                 </div>
+                <Button
+                  onClick={handleGenerateAllMentorPepTalks}
+                  disabled={generatingDailyPepTalks || currentGeneratingMentor !== null}
+                  variant="default"
+                  size="sm"
+                >
+                  {generatingDailyPepTalks ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating All...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Generate All
+                    </>
+                  )}
+                </Button>
               </div>
-              <Button
-                onClick={handleGenerateDailyPepTalks}
-                disabled={generatingDailyPepTalks}
-                variant="default"
-                className="mt-4"
-              >
-                {generatingDailyPepTalks ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Generate Today's Pep Talks
-                  </>
-                )}
-              </Button>
+              
+              {/* Per-Mentor Generation Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {MENTOR_SLUGS.map((slug) => {
+                  const status = mentorPepTalkStatus[slug] || 'idle';
+                  const isGenerating = currentGeneratingMentor === slug;
+                  
+                  return (
+                    <Button
+                      key={slug}
+                      variant={status === 'generated' ? 'default' : status === 'skipped' ? 'secondary' : status === 'error' ? 'destructive' : 'outline'}
+                      size="sm"
+                      onClick={() => handleGenerateSingleMentorPepTalk(slug)}
+                      disabled={isGenerating || generatingDailyPepTalks}
+                      className="capitalize text-xs"
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : status === 'generated' ? (
+                        <span className="mr-1">✓</span>
+                      ) : status === 'skipped' ? (
+                        <span className="mr-1">—</span>
+                      ) : status === 'error' ? (
+                        <span className="mr-1">✗</span>
+                      ) : null}
+                      {slug}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Batch Generate Starter Pep Talks */}

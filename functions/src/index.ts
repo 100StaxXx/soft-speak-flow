@@ -2228,6 +2228,107 @@ Return JSON:
   };
 }
 
+/**
+ * Generate Single Mentor Pep Talk - Generates a pep talk for one mentor only
+ * This avoids timeout issues by processing one mentor at a time
+ */
+export const generateSingleMentorPepTalk = onCall(
+  {
+    secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
+    timeoutSeconds: 120, // 2 minutes is plenty for one mentor
+  },
+  async (request: CallableRequest<{ mentorSlug: string }>) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    const { mentorSlug } = request.data;
+    if (!mentorSlug) {
+      throw new HttpsError("invalid-argument", "Missing mentorSlug");
+    }
+
+    const validMentors = ["atlas", "darius", "eli", "nova", "sienna", "lumi", "kai", "stryker", "solace"];
+    if (!validMentors.includes(mentorSlug)) {
+      throw new HttpsError("invalid-argument", `Invalid mentor: ${mentorSlug}`);
+    }
+
+    try {
+      const db = admin.firestore();
+      const today = new Date().toISOString().split("T")[0];
+      const GEMINI_API_KEY = geminiApiKey.value();
+      const ELEVENLABS_API_KEY = elevenlabsApiKey.value();
+      const OPENAI_API_KEY = openaiApiKey.value();
+
+      if (!GEMINI_API_KEY || !ELEVENLABS_API_KEY || !OPENAI_API_KEY) {
+        throw new HttpsError("internal", "Missing required API keys");
+      }
+
+      // Check if already generated for today
+      const existingSnapshot = await db
+        .collection("daily_pep_talks")
+        .where("mentor_slug", "==", mentorSlug)
+        .where("for_date", "==", today)
+        .limit(1)
+        .get();
+
+      if (!existingSnapshot.empty) {
+        return { mentor: mentorSlug, status: "skipped", message: "Already generated for today" };
+      }
+
+      // Get mentor document for personality description
+      const mentorSnapshot = await db
+        .collection("mentors")
+        .where("slug", "==", mentorSlug)
+        .limit(1)
+        .get();
+
+      const mentorDescription = mentorSnapshot.empty
+        ? "motivational and inspiring"
+        : mentorSnapshot.docs[0].data().description || "motivational and inspiring";
+
+      console.log(`Generating pep talk for ${mentorSlug}...`);
+
+      // Generate complete pep talk with audio and transcript
+      const pepTalk = await generateCompletePepTalkWithAudio(
+        mentorSlug,
+        mentorDescription,
+        "motivation",
+        "balanced",
+        [],
+        GEMINI_API_KEY,
+        ELEVENLABS_API_KEY,
+        OPENAI_API_KEY
+      );
+
+      // Save to Firestore
+      await db.collection("daily_pep_talks").add({
+        mentor_slug: mentorSlug,
+        mentor_id: mentorSnapshot.empty ? null : mentorSnapshot.docs[0].id,
+        title: pepTalk.title,
+        summary: pepTalk.summary,
+        script: pepTalk.script,
+        audio_url: pepTalk.audio_url,
+        transcript: pepTalk.transcript,
+        for_date: today,
+        topic_category: "motivation",
+        intensity: "balanced",
+        emotional_triggers: [],
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✓ Generated pep talk for ${mentorSlug}`);
+      return { mentor: mentorSlug, status: "generated", title: pepTalk.title };
+    } catch (error) {
+      console.error(`Error generating pep talk for ${mentorSlug}:`, error);
+      throw new HttpsError("internal", `Failed for ${mentorSlug}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+);
+
+/**
+ * Generate Daily Mentor Pep Talks - Generates pep talks for all mentors sequentially
+ * DEPRECATED: Use generateSingleMentorPepTalk for each mentor instead to avoid timeouts
+ */
 export const generateDailyMentorPepTalks = onCall(
   {
     secrets: [geminiApiKey, elevenlabsApiKey, openaiApiKey],
