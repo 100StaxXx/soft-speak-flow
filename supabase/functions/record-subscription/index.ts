@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { createErrorResponse, logError } from "../_shared/errorHandler.ts";
 
 /**
  * Record Subscription from alilpush
@@ -57,13 +56,6 @@ serve(async (req) => {
       .eq("code", referral_code.toUpperCase())
       .single();
 
-    if (codeError) {
-      logError(codeError, "referral_codes query");
-      if (codeError.code === "42P01") {
-        return createErrorResponse(codeError, req, {});
-      }
-    }
-
     if (codeError || !codeData) {
       console.error(`Referral code not found: ${referral_code}`);
       return errorResponse(req, "Referral code not found", 400);
@@ -108,10 +100,6 @@ serve(async (req) => {
       .single();
 
     if (payoutError) {
-      logError(payoutError, "referral_payouts insert");
-      if (payoutError.code === "42P01") {
-        return createErrorResponse(payoutError, req, {});
-      }
       console.error(`Failed to create payout:`, payoutError);
       return errorResponse(req, "Failed to create payout record", 500);
     }
@@ -137,12 +125,8 @@ serve(async (req) => {
       .eq("id", codeData.id);
 
     if (updateError) {
-      logError(updateError, "referral_codes update");
+      console.error(`Failed to update referral code metrics:`, updateError);
       // Don't fail the whole request, payout was created successfully
-      // But log if it's a table error
-      if (updateError.code === "42P01") {
-        console.error("Critical: referral_codes table not found");
-      }
     }
 
     console.log(`Created ${payoutType} payout of $${payoutAmount.toFixed(2)} for code ${referral_code} from ${source_app || 'unknown'}`);
@@ -157,7 +141,8 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    logError(error, "record-subscription edge function");
-    return createErrorResponse(error, req, {});
+    console.error("Error recording subscription:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return errorResponse(req, errorMessage, 500);
   }
 });

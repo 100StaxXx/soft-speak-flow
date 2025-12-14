@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { createErrorResponse, logError } from "../_shared/errorHandler.ts";
 
 /**
  * Process PayPal Payout
@@ -50,16 +49,12 @@ serve(async (req) => {
     }
 
     // Check if user is admin
-    const { data: userRole, error: roleError } = await supabaseClient
+    const { data: userRole } = await supabaseClient
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "admin")
       .single();
-
-    if (roleError && roleError.code === "42P01") {
-      return createErrorResponse(roleError, req, corsHeaders);
-    }
 
     if (!userRole) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
@@ -91,13 +86,6 @@ serve(async (req) => {
       `)
       .eq("id", payout_id)
       .single();
-
-    if (payoutError) {
-      logError(payoutError, "referral_payouts query");
-      if (payoutError.code === "42P01") {
-        return createErrorResponse(payoutError, req, corsHeaders);
-      }
-    }
 
     if (payoutError || !payout) {
       return new Response(JSON.stringify({ error: "Payout not found" }), {
@@ -198,7 +186,7 @@ serve(async (req) => {
     const payoutItemId = payoutResult.items?.[0]?.payout_item_id;
 
     // Update payout status
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from("referral_payouts")
       .update({
         status: "paid",
@@ -207,14 +195,6 @@ serve(async (req) => {
         paypal_payer_id: payoutItemId,
       })
       .eq("id", payout_id);
-
-    if (updateError) {
-      logError(updateError, "referral_payouts update");
-      // Log but don't fail - PayPal payout already succeeded
-      if (updateError.code === "42P01") {
-        console.error("Critical: referral_payouts table not found after PayPal payout");
-      }
-    }
 
     console.log(`Successfully processed payout ${payout_id} to ${paypalEmail}`);
 
@@ -231,7 +211,14 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    logError(error, "process-paypal-payout edge function");
-    return createErrorResponse(error, req, corsHeaders);
+    console.error("Error processing payout:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });

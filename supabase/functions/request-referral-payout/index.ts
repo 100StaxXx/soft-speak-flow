@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { createErrorResponse, logError } from "../_shared/errorHandler.ts";
 
 /**
  * Request Referral Payout
@@ -54,13 +53,6 @@ serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    if (profileError) {
-      logError(profileError, "profiles query");
-      if (profileError.code === "42P01") {
-        return createErrorResponse(profileError, req, corsHeaders);
-      }
-    }
-
     if (profileError || !profile) {
       return new Response(JSON.stringify({ error: "Profile not found" }), {
         status: 404,
@@ -88,10 +80,6 @@ serve(async (req) => {
       .eq("status", "pending");
 
     if (payoutsError) {
-      logError(payoutsError, "referral_payouts query");
-      if (payoutsError.code === "42P01") {
-        return createErrorResponse(payoutsError, req, corsHeaders);
-      }
       console.error("Error fetching payouts:", payoutsError);
       return new Response(JSON.stringify({ error: "Failed to fetch payouts" }), {
         status: 500,
@@ -138,10 +126,6 @@ serve(async (req) => {
       .eq("status", "pending");
 
     if (updateError) {
-      logError(updateError, "referral_payouts update");
-      if (updateError.code === "42P01") {
-        return createErrorResponse(updateError, req, corsHeaders);
-      }
       console.error("Error updating payouts:", updateError);
       return new Response(JSON.stringify({ error: "Failed to submit payout request" }), {
         status: 500,
@@ -164,7 +148,14 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    logError(error, "request-referral-payout edge function");
-    return createErrorResponse(error, req, corsHeaders);
+    console.error("Error processing payout request:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });

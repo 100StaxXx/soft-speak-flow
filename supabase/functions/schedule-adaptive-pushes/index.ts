@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createErrorResponse, logError } from "../_shared/errorHandler.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,28 +37,16 @@ serve(async (req) => {
       .eq('user_id', userId)
       .single();
 
-    if (settingsError) {
-      logError(settingsError, "adaptive_push_settings query");
-      if (settingsError.code === "42P01") {
-        return createErrorResponse(settingsError, req, corsHeaders);
-      }
-    }
-
     if (settingsError || !settings) {
       throw new Error('Settings not found');
     }
 
     // Get user profile for selected mentor
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('selected_mentor_id')
       .eq('id', userId)
       .single();
-
-    if (profileError && profileError.code === "42P01") {
-      logError(profileError, "profiles query");
-      return createErrorResponse(profileError, req, corsHeaders);
-    }
 
     // Determine mentor
     let mentorId = settings.mentor_id;
@@ -184,8 +171,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    logError(error, "schedule-adaptive-pushes edge function");
-    return createErrorResponse(error, req, corsHeaders);
+    console.error('Error in schedule-adaptive-pushes:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
