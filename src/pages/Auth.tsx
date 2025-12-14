@@ -151,6 +151,15 @@ const Auth = () => {
       if (Capacitor.isNativePlatform()) {
         console.log(`[Auth ${source}] Using window.location.href for native platform`);
         window.location.href = path;
+        
+        // Fallback: if still on auth page after 2 seconds, force reload
+        // The reload will trigger onAuthStateChanged which will redirect properly
+        setTimeout(() => {
+          if (window.location.pathname.includes('/auth')) {
+            console.log(`[Auth ${source}] Still on auth page, forcing reload`);
+            window.location.reload();
+          }
+        }, 2000);
       } else {
         // Use React Router for web/PWA
         navigate(path);
