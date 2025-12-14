@@ -378,14 +378,22 @@ const Auth = () => {
       if (isLogin) {
         const userCredential = await signIn(sanitizedEmail, password);
         const authUser = convertFirebaseUser(userCredential.user);
-        await handlePostAuthNavigation(authUser, 'passwordSignIn');
+        // Don't await navigation - let it happen async to prevent iOS freeze
+        // The onAuthStateChanged listener will also handle navigation as a backup
+        handlePostAuthNavigation(authUser, 'passwordSignIn').catch((err) => {
+          console.error('[Auth] Post-login navigation error:', err);
+        });
       } else {
         try {
           const userCredential = await signUp(sanitizedEmail, password, {
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           });
           const authUser = convertFirebaseUser(userCredential.user);
-          await handlePostAuthNavigation(authUser, 'signUpImmediate');
+          // Don't await navigation - let it happen async to prevent iOS freeze
+          // Critical: This prevents the loading spinner from freezing if Firestore is slow
+          handlePostAuthNavigation(authUser, 'signUpImmediate').catch((err) => {
+            console.error('[Auth] Post-signup navigation error:', err);
+          });
         } catch (error: any) {
           // Firebase error handling
           if (error.code === 'auth/email-already-in-use') {
@@ -395,8 +403,8 @@ const Auth = () => {
         }
       }
     } catch (error: any) {
-      console.error('[Auth] Signup error:', error);
-      let errorMessage = 'Failed to create account. Please try again.';
+      console.error('[Auth] Auth error:', error);
+      let errorMessage = isLogin ? 'Failed to sign in. Please try again.' : 'Failed to create account. Please try again.';
       
       if (error?.message) {
         errorMessage = error.message;
@@ -420,8 +428,12 @@ const Auth = () => {
           case 'auth/network-request-failed':
             errorMessage = 'Network error. Please check your connection and try again.';
             break;
+          case 'auth/wrong-password':
+          case 'auth/user-not-found':
+            errorMessage = 'Invalid email or password.';
+            break;
           default:
-            errorMessage = error.message || 'Failed to create account. Please try again.';
+            errorMessage = error.message || (isLogin ? 'Failed to sign in.' : 'Failed to create account.');
         }
       }
       
