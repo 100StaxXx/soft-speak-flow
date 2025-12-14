@@ -56,15 +56,18 @@ const Auth = () => {
   const { session: authSession } = useAuth();
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
-    if (!session) return;
+    // Synchronous guard - check and set IMMEDIATELY before any async work
+    if (!session || hasRedirected.current) return;
+    hasRedirected.current = true;
 
     try {
-      hasRedirected.current = true;
       await ensureProfile(session.user.id, session.user.email);
       const path = await getAuthRedirectPath(session.user.id);
       console.log(`[Auth ${source}] Navigating to ${path}`);
       safeNavigate(navigate, path);
     } catch (error) {
+      // Reset on error so user can retry
+      hasRedirected.current = false;
       console.error(`[Auth ${source}] Navigation error:`, error);
       safeNavigate(navigate, '/onboarding');
     }
@@ -241,11 +244,7 @@ const Auth = () => {
     };
   }, [handlePostAuthNavigation]);
 
-  // Extra safety net: if the auth context already has a session, redirect immediately
-  useEffect(() => {
-    if (!authSession || hasRedirected.current) return;
-    handlePostAuthNavigation(authSession, 'authContext');
-  }, [authSession, handlePostAuthNavigation]);
+  // Removed redundant authContext effect - onAuthStateChange already handles this
 
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
