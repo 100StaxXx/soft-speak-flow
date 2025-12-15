@@ -15,7 +15,7 @@ const ChatSchema = z.object({
   mentorTone: z.string().min(1).max(200)
 });
 
-const DAILY_MESSAGE_LIMIT = 10;
+const DAILY_MESSAGE_LIMIT = 20;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "Daily limit reached",
-          message: `You've reached today's mentor chat limit of ${DAILY_MESSAGE_LIMIT} messages. Please come back tomorrow.`,
+          message: `You've reached today's mentor chat limit (${DAILY_MESSAGE_LIMIT} messages). Come back tomorrow for more guidance!`,
           limit: DAILY_MESSAGE_LIMIT
         }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -113,7 +113,7 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   chaos: 'tap_sequence',            // Order from chaos - memorize sequences
   stagnation: 'astral_serpent',     // Movement/growth - get moving
   laziness: 'astral_serpent',       // Action required - keep the serpent alive
-  anxiety: 'orb_match',             // Matching/organizing - find calm in order
+  anxiety: 'astral_frequency',      // Finding calm through meditative focus
   overthinking: 'astral_frequency', // Quieting mental noise - find clarity
   doubt: 'starfall_dodge',          // Facing fears - courage under fire
   fear: 'starfall_dodge',           // Overcoming fear - dodge the darkness

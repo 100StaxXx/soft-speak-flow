@@ -151,7 +151,7 @@ serve(async (req) => {
         userMood: checkIn.mood,
         userIntention: checkIn.intention,
         dailyContext,
-        maxSentences: 3,
+        maxSentences: 5,
         personalityModifiers: '',
         responseLength: 'concise'
       }
@@ -169,7 +169,8 @@ serve(async (req) => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 200,
+        max_tokens: 350,
+        temperature: 0.75,
       }),
     })
 

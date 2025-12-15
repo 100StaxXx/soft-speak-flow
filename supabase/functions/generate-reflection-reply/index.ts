@@ -80,7 +80,7 @@ serve(async (req) => {
       variables: {
         userMood: mood,
         userNote: note || 'No additional note provided',
-        maxSentences: 3,
+        maxSentences: 5,
         personalityModifiers: '',
         responseLength: 'brief'
       }
@@ -99,6 +99,8 @@ serve(async (req) => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
+        max_tokens: 350,
+        temperature: 0.75,
       }),
     });
 
