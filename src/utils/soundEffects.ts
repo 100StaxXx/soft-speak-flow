@@ -291,6 +291,86 @@ class SoundManager {
       this.createOscillator(440, 3, 'sine');
     }, 1500);
   }
+
+  // Arcade sounds
+  playArcadeEntrance() {
+    if (!this.audioContext || this.shouldMute()) return;
+
+    // Retro power-up sweep with layered oscillators
+    const startFreq = 150;
+    const endFreq = 800;
+    const duration = 0.6;
+    
+    // Main sweep
+    const osc1 = this.audioContext.createOscillator();
+    const gain1 = this.audioContext.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(startFreq, this.audioContext.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(endFreq, this.audioContext.currentTime + duration);
+    gain1.gain.setValueAtTime(this.masterVolume * 0.25, this.audioContext.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+    osc1.connect(gain1);
+    gain1.connect(this.audioContext.destination);
+    osc1.start();
+    osc1.stop(this.audioContext.currentTime + duration);
+
+    // Harmonic layer
+    const osc2 = this.audioContext.createOscillator();
+    const gain2 = this.audioContext.createGain();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(startFreq * 2, this.audioContext.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(endFreq * 1.5, this.audioContext.currentTime + duration);
+    gain2.gain.setValueAtTime(this.masterVolume * 0.1, this.audioContext.currentTime);
+    gain2.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+    osc2.connect(gain2);
+    gain2.connect(this.audioContext.destination);
+    osc2.start();
+    osc2.stop(this.audioContext.currentTime + duration);
+
+    // Sparkle at the end
+    setTimeout(() => {
+      this.createOscillator(1200, 0.15, 'sine');
+      this.createOscillator(1500, 0.1, 'sine');
+    }, 400);
+  }
+
+  playArcadeSelect() {
+    if (!this.audioContext || this.shouldMute()) return;
+
+    // Quick 8-bit bloop
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(600, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, this.audioContext.currentTime + 0.08);
+    gain.gain.setValueAtTime(this.masterVolume * 0.2, this.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(this.audioContext.destination);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.1);
+  }
+
+  playArcadeHighScore() {
+    if (!this.audioContext || this.shouldMute()) return;
+
+    // Victory fanfare arpeggio C5 → E5 → G5 → C6
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        this.createOscillator(freq, 0.2, 'triangle');
+        // Add sparkle harmonic
+        this.createOscillator(freq * 2, 0.1, 'sine');
+      }, i * 100);
+    });
+
+    // Final chord burst
+    setTimeout(() => {
+      [1046.50, 1318.51, 1567.98].forEach(freq => {
+        this.createOscillator(freq, 0.4, 'triangle');
+      });
+    }, 450);
+  }
 }
 
 export const soundManager = new SoundManager();
@@ -309,6 +389,9 @@ export const playNotification = () => soundManager.playNotification();
 export const playStreakMilestone = () => soundManager.playStreakMilestone();
 export const playAmbientNature = () => soundManager.playAmbientNature();
 export const playCalming = () => soundManager.playCalming();
+export const playArcadeEntrance = () => soundManager.playArcadeEntrance();
+export const playArcadeSelect = () => soundManager.playArcadeSelect();
+export const playArcadeHighScore = () => soundManager.playArcadeHighScore();
 
 // Generic sound aliases for UI
 export const playSound = (type: 'complete' | 'error' | 'pop' | 'success') => {

@@ -1,7 +1,8 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { MiniGameType } from '@/types/astralEncounters';
 import { cn } from '@/lib/utils';
+import { playArcadeSelect } from '@/utils/soundEffects';
 
 interface ArcadeGameCardProps {
   gameType: MiniGameType;
@@ -32,9 +33,14 @@ export const ArcadeGameCard = memo(({
   highScore,
   onSelect,
 }: ArcadeGameCardProps) => {
+  const handleClick = useCallback(() => {
+    playArcadeSelect();
+    onSelect(gameType);
+  }, [gameType, onSelect]);
+
   return (
     <button
-      onClick={() => onSelect(gameType)}
+      onClick={handleClick}
       className={cn(
         'relative group p-4 rounded-xl border border-white/10',
         'bg-gradient-to-br from-white/5 to-white/[0.02]',
