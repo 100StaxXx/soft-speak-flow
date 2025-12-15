@@ -100,7 +100,7 @@ export const GlobalSearch = ({
         .from('daily_tasks')
         .select('*')
         .eq('user_id', user.id)
-        .ilike('task_text', `%${currentQuery}%`)
+        .or(`task_text.ilike.%${currentQuery}%,notes.ilike.%${currentQuery}%,category.ilike.%${currentQuery}%`)
         .order('task_date', { ascending: false })
         .limit(10);
 
