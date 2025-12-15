@@ -9,8 +9,10 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EmptyState } from "@/components/EmptyState";
 import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
+import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 export function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
@@ -18,6 +20,7 @@ export function EpicsTab() {
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
 
   const handleSelectTemplate = (template: EpicTemplate) => {
     setSelectedTemplate(template);
@@ -144,6 +147,9 @@ export function EpicsTab() {
         open={joinEpicDialogOpen}
         onOpenChange={setJoinEpicDialogOpen}
       />
+      
+      {/* First-time Tutorial Modal */}
+      <EpicsTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </div>
   );
 }
