@@ -371,6 +371,60 @@ class SoundManager {
       });
     }, 450);
   }
+
+  // Pokemon-style encounter trigger sound - classic ascending arpeggio
+  playEncounterTrigger() {
+    if (!this.audioContext || this.shouldMute()) return;
+
+    // Classic Pokemon "wild encounter!" arpeggio: E4 → G4 → B4 → E5
+    const notes = [329.63, 392.00, 493.88, 659.25];
+    
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        const osc = this.audioContext!.createOscillator();
+        const gain = this.audioContext!.createGain();
+        
+        // Square wave for authentic 8-bit feel
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, this.audioContext!.currentTime);
+        
+        gain.gain.setValueAtTime(this.masterVolume * 0.25, this.audioContext!.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext!.currentTime + 0.15);
+        
+        osc.connect(gain);
+        gain.connect(this.audioContext!.destination);
+        osc.start();
+        osc.stop(this.audioContext!.currentTime + 0.15);
+      }, i * 100);
+    });
+  }
+
+  // Background music player for encounters/arcade
+  private encounterMusicAudio: HTMLAudioElement | null = null;
+
+  playEncounterMusic(): HTMLAudioElement | null {
+    if (this.shouldMute()) return null;
+    
+    // Stop any existing music first
+    this.stopEncounterMusic();
+    
+    this.encounterMusicAudio = new Audio('/sounds/encounter-music.mp3');
+    this.encounterMusicAudio.volume = this.masterVolume * 0.4;
+    this.encounterMusicAudio.loop = true;
+    this.encounterMusicAudio.play().catch(() => {
+      // Ignore autoplay errors
+    });
+    
+    return this.encounterMusicAudio;
+  }
+
+  stopEncounterMusic() {
+    if (this.encounterMusicAudio) {
+      this.encounterMusicAudio.pause();
+      this.encounterMusicAudio.currentTime = 0;
+      this.encounterMusicAudio = null;
+    }
+  }
 }
 
 export const soundManager = new SoundManager();
@@ -392,6 +446,9 @@ export const playCalming = () => soundManager.playCalming();
 export const playArcadeEntrance = () => soundManager.playArcadeEntrance();
 export const playArcadeSelect = () => soundManager.playArcadeSelect();
 export const playArcadeHighScore = () => soundManager.playArcadeHighScore();
+export const playEncounterTrigger = () => soundManager.playEncounterTrigger();
+export const playEncounterMusic = () => soundManager.playEncounterMusic();
+export const stopEncounterMusic = () => soundManager.stopEncounterMusic();
 
 // Generic sound aliases for UI
 export const playSound = (type: 'complete' | 'error' | 'pop' | 'success') => {

@@ -9,7 +9,7 @@ import { useCompanion } from '@/hooks/useCompanion';
 import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
 import { useAchievements } from '@/hooks/useAchievements';
 import { MiniGameType, MiniGameResult } from '@/types/astralEncounters';
-import { playArcadeEntrance, playArcadeHighScore } from '@/utils/soundEffects';
+import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcadeHighScore } from '@/utils/soundEffects';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -100,10 +100,21 @@ export default function AstralArcade() {
   const [sessionPlays, setSessionPlays] = useState(0);
   const [sessionBestAccuracy, setSessionBestAccuracy] = useState(0);
 
-  // Award discovery badge and play entrance sound on first visit
+  // Award discovery badge and play entrance sound + background music
   useEffect(() => {
     checkArcadeDiscovery();
-    playArcadeEntrance();
+    playEncounterTrigger();
+    
+    // Start background music after trigger sound
+    const musicTimeout = setTimeout(() => {
+      playEncounterMusic();
+    }, 500);
+    
+    // Cleanup: stop music when leaving arcade
+    return () => {
+      clearTimeout(musicTimeout);
+      stopEncounterMusic();
+    };
   }, [checkArcadeDiscovery]);
 
   // Memoize star positions for consistent rendering
