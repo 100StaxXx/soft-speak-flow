@@ -2,7 +2,6 @@ import { format, addDays, startOfWeek, isSameDay, addWeeks, subWeeks } from "dat
 import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
-import { Card } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
 import { QuestDropZone } from "./QuestDropZone";
@@ -95,31 +94,26 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
       </div>
 
       <ScrollArea className="h-[600px]">
-        <div className="grid grid-cols-8 gap-2">
-          {/* Time column */}
-          <div className="space-y-1">
-            <div className="h-20 border-b border-border" />
-            {hours.map(hour => (
-              <div key={hour} className="h-20 flex items-start pt-1 text-xs text-muted-foreground">
-                {format(new Date().setHours(hour, 0), 'h a')}
-              </div>
-            ))}
-          </div>
+        <div className="border border-border">
+          {/* Header row */}
+          <div className="grid grid-cols-8 border-b border-border bg-muted/30">
+            {/* Time column header */}
+            <div className="h-16 border-r border-border" />
+            {/* Day headers */}
+            {weekDays.map((day, i) => {
+              const isToday = isSameDay(day, new Date());
+              const isSelected = isSameDay(day, selectedDate);
+              const unscheduledTasks = getUnscheduledTasksForDate(day);
+              const isLast = i === weekDays.length - 1;
 
-          {/* Day columns */}
-          {weekDays.map(day => {
-            const isToday = isSameDay(day, new Date());
-            const isSelected = isSameDay(day, selectedDate);
-            const unscheduledTasks = getUnscheduledTasksForDate(day);
-
-            return (
-              <div key={day.toString()} className="space-y-1">
-                {/* Day header */}
-                <Card
+              return (
+                <div
+                  key={day.toString()}
                   className={cn(
-                    "h-20 p-2 cursor-pointer transition-all",
-                    isSelected && "ring-2 ring-primary",
-                    isToday && "bg-primary/10"
+                    "h-16 p-2 cursor-pointer transition-colors",
+                    !isLast && "border-r border-border",
+                    isSelected && "bg-primary/10",
+                    isToday && "bg-primary/5"
                   )}
                   onClick={() => onDateSelect(day)}
                 >
@@ -129,7 +123,7 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                     </div>
                     <div className={cn(
                       "text-lg font-bold",
-                      isToday && "text-primary"
+                      isToday && "bg-primary text-primary-foreground w-7 h-7 flex items-center justify-center mx-auto"
                     )}>
                       {format(day, 'd')}
                     </div>
@@ -139,17 +133,42 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                       </div>
                     )}
                   </div>
-                </Card>
+                </div>
+              );
+            })}
+          </div>
 
-                {/* Hour slots */}
-                {hours.map(hour => {
+          {/* Hour rows */}
+          {hours.map((hour, hourIndex) => {
+            const isLastHour = hourIndex === hours.length - 1;
+            
+            return (
+              <div 
+                key={hour} 
+                className={cn(
+                  "grid grid-cols-8",
+                  !isLastHour && "border-b border-border"
+                )}
+              >
+                {/* Time label */}
+                <div className="h-16 flex items-start pt-1 px-2 text-xs text-muted-foreground border-r border-border">
+                  {format(new Date().setHours(hour, 0), 'h a')}
+                </div>
+                
+                {/* Day cells for this hour */}
+                {weekDays.map((day, dayIndex) => {
                   const hourTasks = getTasksForDateTime(day, hour);
                   const hasConflict = checkTimeConflict(day, hour);
+                  const isLast = dayIndex === weekDays.length - 1;
 
                   return (
                     <QuestDropZone
-                      key={hour}
+                      key={`${day}-${hour}`}
                       hasConflict={hasConflict}
+                      className={cn(
+                        "h-16 rounded-none border-0",
+                        !isLast && "border-r border-border"
+                      )}
                       onDrop={(e) => {
                         e.preventDefault();
                         const taskId = e.dataTransfer.getData('taskId');
