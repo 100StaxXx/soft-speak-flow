@@ -176,3 +176,6 @@ verify_jwt = true
 
 [functions.generate-adaptive-push]
 verify_jwt = false
+
+[functions.dispatch-mentor-nudge-pushes]
+verify_jwt = false

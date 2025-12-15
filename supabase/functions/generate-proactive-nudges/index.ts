@@ -7,12 +7,15 @@ const corsHeaders = {
 }
 
 // Concern level messages based on inactive days
+// Only 3, 7, and 14+ days trigger push notifications
 const getConcernLevel = (inactiveDays: number) => {
-  if (inactiveDays === 1) return { level: 'gentle', tone: 'curious and casual' };
-  if (inactiveDays === 2) return { level: 'concerned', tone: 'noticeably worried but supportive' };
-  if (inactiveDays >= 3 && inactiveDays < 5) return { level: 'urgent', tone: 'genuinely concerned and caring' };
-  if (inactiveDays >= 5 && inactiveDays < 7) return { level: 'emotional', tone: 'deeply worried and emotional' };
-  if (inactiveDays >= 7) return { level: 'final', tone: 'sad but hopeful, like a friend who misses you deeply' };
+  if (inactiveDays === 1) return { level: 'gentle', tone: 'curious and casual', sendPush: false };
+  if (inactiveDays === 2) return { level: 'concerned', tone: 'noticeably worried but supportive', sendPush: false };
+  if (inactiveDays === 3) return { level: 'urgent', tone: 'genuinely concerned and caring', sendPush: true };
+  if (inactiveDays >= 4 && inactiveDays < 7) return { level: 'waiting', tone: 'patient but hopeful', sendPush: false };
+  if (inactiveDays === 7) return { level: 'emotional', tone: 'deeply worried and emotional', sendPush: true };
+  if (inactiveDays >= 8 && inactiveDays < 14) return { level: 'hopeful', tone: 'still hopeful, missing you', sendPush: false };
+  if (inactiveDays >= 14) return { level: 'final', tone: 'sad but hopeful, like a friend who misses you deeply', sendPush: true };
   return null;
 };
 
@@ -45,6 +48,7 @@ serve(async (req) => {
 
     let nudgesGenerated = 0
     let concernNudgesGenerated = 0
+    let pushEligibleNudges = 0
 
     for (const profile of profiles) {
       try {
@@ -92,13 +96,19 @@ serve(async (req) => {
                     contextPrompt = `The user has been away for 2 days. Their ${companionName} companion is worried and their energy is starting to fade. Generate a ${concernInfo.tone} message (1-2 sentences) expressing concern about both the user and their companion.`;
                     break;
                   case 'urgent':
-                    contextPrompt = `The user has been inactive for ${companion.inactive_days} days! Their ${companionName} companion is sad and losing energy daily. Generate an ${concernInfo.tone} message (1-2 sentences) that conveys urgency without being guilt-trippy. Mention the companion misses them.`;
+                    contextPrompt = `The user has been inactive for 3 days! Their ${companionName} companion is sad and losing energy daily. Generate an ${concernInfo.tone} message (1-2 sentences) that conveys urgency without being guilt-trippy. Mention the companion misses them.`;
+                    break;
+                  case 'waiting':
+                    contextPrompt = `The user has been away for ${companion.inactive_days} days. Their ${companionName} companion is waiting patiently. Generate a ${concernInfo.tone} message (1 sentence) - gentle and understanding.`;
                     break;
                   case 'emotional':
-                    contextPrompt = `The user has been gone for ${companion.inactive_days} days. Their ${companionName} companion is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
+                    contextPrompt = `The user has been gone for a week (${companion.inactive_days} days). Their ${companionName} companion is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
+                    break;
+                  case 'hopeful':
+                    contextPrompt = `The user has been away for ${companion.inactive_days} days. Their ${companionName} companion is still waiting faithfully. Generate a ${concernInfo.tone} brief message (1 sentence) - patient, no pressure.`;
                     break;
                   case 'final':
-                    contextPrompt = `The user has been away for over a week (${companion.inactive_days} days). Their ${companionName} companion is waiting faithfully but struggling. Generate a ${concernInfo.tone} final plea message (2 sentences max). Don't be dramatic, just genuine - like a friend who really misses them and wants them to know the door is always open.`;
+                    contextPrompt = `The user has been away for over two weeks (${companion.inactive_days} days). Their ${companionName} companion is waiting faithfully but struggling. Generate a ${concernInfo.tone} final message (2 sentences max). Don't be dramatic, just genuine - like a friend who really misses them and wants them to know the door is always open.`;
                     break;
                 }
 
@@ -134,10 +144,15 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
                         inactive_days: companion.inactive_days,
                         concern_level: concernInfo.level,
                         companion_animal: companion.spirit_animal,
+                        send_push: concernInfo.sendPush, // Flag for push notification
                       },
                     })
                     concernNudgesGenerated++
                     nudgesGenerated++
+                    if (concernInfo.sendPush) {
+                      pushEligibleNudges++
+                      console.log(`Push-eligible nudge created for user ${profile.id} (${companion.inactive_days} days inactive)`)
+                    }
                   }
                 }
               }
@@ -145,7 +160,7 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
           }
         }
 
-        // ========== EXISTING NUDGE LOGIC ==========
+        // ========== EXISTING NUDGE LOGIC (no push notifications for these) ==========
 
         // Check morning check-in (only nudge after 10am if not completed)
         if (currentHour >= 10 && currentHour < 12) {
@@ -192,6 +207,7 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
                     user_id: profile.id,
                     nudge_type: 'check_in',
                     message: message,
+                    context: { send_push: false },
                   })
                   nudgesGenerated++
                 }
@@ -252,6 +268,7 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
                       user_id: profile.id,
                       nudge_type: 'habit_reminder',
                       message: message,
+                      context: { send_push: false },
                     })
                     nudgesGenerated++
                   }
@@ -309,6 +326,7 @@ The user has been quiet today. Generate a brief, unexpected check-in message (1 
                     user_id: profile.id,
                     nudge_type: 'encouragement',
                     message: message,
+                    context: { send_push: false },
                   })
                   nudgesGenerated++
                 }
@@ -321,9 +339,14 @@ The user has been quiet today. Generate a brief, unexpected check-in message (1 
       }
     }
 
-    console.log(`Generated ${nudgesGenerated} nudges (${concernNudgesGenerated} concern nudges)`)
+    console.log(`Generated ${nudgesGenerated} nudges (${concernNudgesGenerated} concern, ${pushEligibleNudges} push-eligible)`)
 
-    return new Response(JSON.stringify({ success: true, nudgesGenerated, concernNudgesGenerated }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      nudgesGenerated, 
+      concernNudgesGenerated,
+      pushEligibleNudges 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
