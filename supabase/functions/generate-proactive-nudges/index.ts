@@ -128,6 +128,7 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
                     model: 'google/gemini-2.5-flash',
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: 150,
+                    temperature: 0.75,
                   }),
                 })
 
@@ -195,6 +196,7 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
                   model: 'google/gemini-2.5-flash',
                   messages: [{ role: 'user', content: prompt }],
                   max_tokens: 100,
+                  temperature: 0.75,
                 }),
               })
 
@@ -252,11 +254,12 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
                     'Authorization': `Bearer ${lovableApiKey}`,
                     'Content-Type': 'application/json',
                   },
-                  body: JSON.stringify({
-                    model: 'google/gemini-2.5-flash',
-                    messages: [{ role: 'user', content: prompt }],
-                    max_tokens: 100,
-                  }),
+                body: JSON.stringify({
+                  model: 'google/gemini-2.5-flash',
+                  messages: [{ role: 'user', content: prompt }],
+                  max_tokens: 100,
+                  temperature: 0.75,
+                }),
                 })
 
                 if (response.ok) {
@@ -279,7 +282,7 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
         }
 
         // Surprise encouragement - random check at various times (10% chance per run)
-        if (Math.random() < 0.1) {
+        if (Math.random() < 0.18) {
           const { data: recentActivity } = await supabase
             .from('activity_feed')
             .select('created_at')
@@ -314,6 +317,7 @@ The user has been quiet today. Generate a brief, unexpected check-in message (1 
                   model: 'google/gemini-2.5-flash',
                   messages: [{ role: 'user', content: prompt }],
                   max_tokens: 100,
+                  temperature: 0.75,
                 }),
               })
 

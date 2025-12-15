@@ -129,7 +129,7 @@ serve(async (req) => {
         milestoneContext,
         userReply: userReply || '',
         previousComment: activity.mentor_comment || '',
-        maxSentences: 2,
+        maxSentences: 4,
         personalityModifiers: '',
         responseLength: 'brief'
       }
@@ -147,7 +147,8 @@ serve(async (req) => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 150,
+        max_tokens: 250,
+        temperature: 0.75,
       }),
     })
 

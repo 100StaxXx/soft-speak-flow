@@ -85,7 +85,7 @@ serve(async (req) => {
         checkInCount: weeklyData.checkInCount,
         moodCount: weeklyData.moodCount,
         activitiesSummary,
-        maxSentences: 3,
+        maxSentences: 6,
         personalityModifiers: '',
         responseLength: 'brief'
       }
@@ -103,7 +103,8 @@ serve(async (req) => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 200,
+        max_tokens: 400,
+        temperature: 0.75,
       }),
     })
 
