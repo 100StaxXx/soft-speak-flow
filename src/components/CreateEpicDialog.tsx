@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { EPIC_XP_REWARDS } from "@/config/xpRewards";
 import {
   Dialog,
   DialogContent,
@@ -167,7 +168,7 @@ export const CreateEpicDialog = ({
     onOpenChange(isOpen);
   };
 
-  const calculateXPReward = useCallback(() => targetDays * 10, [targetDays]);
+  const calculateXPReward = useCallback(() => targetDays * EPIC_XP_REWARDS.XP_PER_DAY, [targetDays]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

@@ -7,7 +7,8 @@ import {
   TriggerType,
   THEME_MINIGAME_MAP,
   THEME_STAT_MAP,
-  TIER_CONFIG 
+  TIER_CONFIG,
+  RESULT_MULTIPLIERS
 } from '@/types/astralEncounters';
 
 // Adversary name prefixes by theme
@@ -208,17 +209,15 @@ export const generateAdversary = (
   };
 };
 
-// Calculate XP reward based on tier and result
+// Calculate XP reward based on tier and result using centralized multipliers
 export const calculateXPReward = (
   tier: AdversaryTier,
   accuracy: number
 ): number => {
   const baseXP = TIER_CONFIG[tier].xpBase;
-  
-  if (accuracy >= 90) return Math.round(baseXP * 1.5);
-  if (accuracy >= 70) return baseXP;
-  if (accuracy >= 50) return Math.round(baseXP * 0.5);
-  return 0;
+  const result = getResultFromAccuracy(accuracy);
+  const multiplier = RESULT_MULTIPLIERS[result];
+  return Math.round(baseXP * multiplier);
 };
 
 // Get result from accuracy

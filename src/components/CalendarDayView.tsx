@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
 import { CalendarTask } from "@/types/quest";
+import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -168,11 +169,11 @@ export const CalendarDayView = ({
       const hour = parseInt(t.scheduled_time!.split(':')[0]);
       return hour < 9;
     });
-    powerUpXP += morningTasks.length * 10;
+    powerUpXP += morningTasks.length * CALENDAR_BONUS_XP.MORNING_WARRIOR;
 
     // Deep Work Blocks (90+ min)
     const deepWorkTasks = scheduledTasks.filter(t => t.estimated_duration! >= 90);
-    powerUpXP += deepWorkTasks.length * 20;
+    powerUpXP += deepWorkTasks.length * CALENDAR_BONUS_XP.DEEP_WORK;
 
     return powerUpXP;
   };
