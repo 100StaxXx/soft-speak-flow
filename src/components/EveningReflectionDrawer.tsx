@@ -30,6 +30,16 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const [wins, setWins] = useState("");
   const [gratitude, setGratitude] = useState("");
 
+  // Reset form when drawer closes
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      setMood("");
+      setWins("");
+      setGratitude("");
+    }
+    onOpenChange(isOpen);
+  };
+
   const handleSubmit = () => {
     if (!mood) return;
     
@@ -48,7 +58,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const isValid = mood.length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent className="max-h-[90vh]">
         <div className="mx-auto w-full max-w-lg px-4 pb-8">
           <DrawerHeader className="text-center">

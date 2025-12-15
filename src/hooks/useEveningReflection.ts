@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,13 +22,11 @@ export const useEveningReflection = () => {
   const { awardCustomXP } = useXPRewards();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  // Use current date (recalculates on each render for accuracy)
+  const today = format(new Date(), "yyyy-MM-dd");
 
   // Check if it's evening (after 6 PM)
-  const isEvening = useMemo(() => {
-    const hour = new Date().getHours();
-    return hour >= 18;
-  }, []);
+  const isEvening = new Date().getHours() >= 18;
 
   // Check if reflection exists for today
   const { data: todaysReflection, isLoading } = useQuery({
