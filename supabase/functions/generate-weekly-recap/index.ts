@@ -25,21 +25,30 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Calculate week boundaries (previous Mon-Sun)
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysToLastSunday = dayOfWeek === 0 ? 0 : dayOfWeek;
-    const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - daysToLastSunday);
-    
-    const weekEnd = new Date(lastSunday);
-    weekEnd.setDate(lastSunday.getDate() - 1); // Saturday
-    
-    const weekStart = new Date(weekEnd);
-    weekStart.setDate(weekEnd.getDate() - 6); // Previous Monday
+    // Helper for timezone-safe date formatting
+    const formatLocalDate = (date: Date) => {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
 
-    const weekStartStr = weekStart.toISOString().split("T")[0];
-    const weekEndStr = weekEnd.toISOString().split("T")[0];
+    // Calculate week boundaries (previous Mon-Sun, matching frontend)
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, etc.
+    
+    // Get Monday of current week
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() - daysToMonday);
+    
+    // Get Monday of previous week
+    const weekStart = new Date(currentMonday);
+    weekStart.setDate(currentMonday.getDate() - 7);
+    
+    // Get Sunday of previous week (Mon + 6 days)
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const weekStartStr = formatLocalDate(weekStart);
+    const weekEndStr = formatLocalDate(weekEnd);
 
     console.log(`Generating recap for ${userId}: ${weekStartStr} to ${weekEndStr}`);
 

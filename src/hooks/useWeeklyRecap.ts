@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useXPRewards } from "@/hooks/useXPRewards";
-import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
+import { format } from "date-fns";
 
 export interface WeeklyRecap {
   id: string;
@@ -35,19 +35,31 @@ export const useWeeklyRecap = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecap, setSelectedRecap] = useState<WeeklyRecap | null>(null);
 
-  // Get current week boundaries (Sunday-based week for recap delivery)
-  const currentWeekStart = useMemo(() => {
+  // Get previous week boundaries (Mon-Sun), recalculates for accuracy
+  const getWeekBoundaries = () => {
     const today = new Date();
-    // Start of previous week (Mon-Sun recap delivered on Sunday)
-    const lastSunday = startOfWeek(today, { weekStartsOn: 1 }); // Monday start
-    return format(subDays(lastSunday, 7), "yyyy-MM-dd");
-  }, []);
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, etc.
+    
+    // Get Monday of current week
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() - daysToMonday);
+    
+    // Get Monday of previous week
+    const weekStart = new Date(currentMonday);
+    weekStart.setDate(currentMonday.getDate() - 7);
+    
+    // Get Sunday of previous week (Mon + 6 days)
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    return {
+      start: format(weekStart, "yyyy-MM-dd"),
+      end: format(weekEnd, "yyyy-MM-dd"),
+    };
+  };
 
-  const currentWeekEnd = useMemo(() => {
-    const today = new Date();
-    const lastSunday = startOfWeek(today, { weekStartsOn: 1 });
-    return format(subDays(lastSunday, 1), "yyyy-MM-dd");
-  }, []);
+  const { start: currentWeekStart, end: currentWeekEnd } = getWeekBoundaries();
 
   // Recalculates on each render for accuracy
   const isSunday = new Date().getDay() === 0;
