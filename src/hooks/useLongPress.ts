@@ -97,6 +97,5 @@ export const useLongPress = ({
     onMouseDown: start,
     onMouseUp: end,
     onMouseLeave: clear,
-    isLongPress: isLongPressRef,
   };
 };
