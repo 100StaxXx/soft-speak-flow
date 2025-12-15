@@ -244,7 +244,7 @@ const Profile = () => {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 space-y-6 relative z-10">
-          <div className="max-w-md">
+          <div className="max-w-md space-y-3">
             <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/library")} data-tour="library">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -252,6 +252,15 @@ const Profile = () => {
                   <CardTitle className="text-lg">Library</CardTitle>
                 </div>
                 <CardDescription>View your saved favorites and downloads</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="cursor-pointer hover:border-amber-500/50 transition-all hover:shadow-glow" onClick={() => navigate("/recaps")}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-amber-400" />
+                  <CardTitle className="text-lg">Weekly Recaps</CardTitle>
+                </div>
+                <CardDescription>Review your past weekly reflections</CardDescription>
               </CardHeader>
             </Card>
           </div>
