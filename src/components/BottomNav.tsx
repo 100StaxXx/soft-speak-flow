@@ -116,11 +116,11 @@ export const BottomNav = memo(() => {
           )}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
-          {...longPressHandlers}
           onTouchStart={(e) => {
             setIsLongPressing(true);
             longPressHandlers.onTouchStart(e);
           }}
+          onTouchMove={longPressHandlers.onTouchMove}
           onTouchEnd={(e) => {
             setIsLongPressing(false);
             longPressHandlers.onTouchEnd(e);
