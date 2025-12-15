@@ -131,6 +131,12 @@ export const OrbMatchGame = ({
   const gridRef = useRef<HTMLDivElement>(null);
   const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingRef = useRef(false);
+  const orbsRef = useRef<Orb[]>(orbs);
+  
+  // Keep orbsRef in sync with orbs state
+  useEffect(() => {
+    orbsRef.current = orbs;
+  }, [orbs]);
 
   // Static stars - only calculated once
   const stars = useStaticStars(15);
@@ -172,6 +178,7 @@ export const OrbMatchGame = ({
       }
     }
     setOrbs(newOrbs);
+    orbsRef.current = newOrbs;
   }, [availableColors]);
 
   // Start a new round
@@ -324,6 +331,7 @@ export const OrbMatchGame = ({
           matchedIds.has(orb.id) ? { ...orb, matched: true } : orb
         );
         setOrbs([...orbsToProcess]);
+        orbsRef.current = [...orbsToProcess];
         triggerHaptic('success');
         
         // Show combo popup
@@ -338,6 +346,7 @@ export const OrbMatchGame = ({
         // Drop and fill
         orbsToProcess = dropAndFill(orbsToProcess);
         setOrbs([...orbsToProcess]);
+        orbsRef.current = [...orbsToProcess];
         
         // Wait and check for more combos
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -385,7 +394,7 @@ export const OrbMatchGame = ({
   // Swap orbs
   const swapOrbs = useCallback((orb1: Orb, orb2: Orb) => {
     setOrbs(currentOrbs => {
-      return currentOrbs.map(orb => {
+      const newOrbs = currentOrbs.map(orb => {
         if (orb.id === orb1.id) {
           return { ...orb, row: orb2.row, col: orb2.col };
         }
@@ -394,6 +403,9 @@ export const OrbMatchGame = ({
         }
         return orb;
       });
+      // Sync ref immediately for accurate match detection
+      orbsRef.current = newOrbs;
+      return newOrbs;
     });
   }, []);
 
@@ -452,8 +464,11 @@ export const OrbMatchGame = ({
         moveTimerRef.current = null;
       }
       
-      // Process matches
-      await processMatches(orbs);
+      // Use ref to get latest orbs state (avoids stale closure)
+      const currentOrbs = orbsRef.current;
+      
+      // Process matches with latest orbs
+      await processMatches(currentOrbs);
       
       // Check if round complete or start new move timer
       setRoundsCompleted(r => {
@@ -472,7 +487,7 @@ export const OrbMatchGame = ({
     
     setSelectedOrb(null);
     setDragPath([]);
-  }, [dragPath, orbs, processMatches, config.rounds, config.moveTime]);
+  }, [dragPath, processMatches, config.rounds, config.moveTime]);
 
   // Mouse/touch event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
