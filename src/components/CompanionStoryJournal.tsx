@@ -41,12 +41,7 @@ export const CompanionStoryJournal = () => {
       if (!companion) return null;
       
       try {
-        // Special handling for Stage 0 (Egg state)
-        if (debouncedStage === 0) {
-          // Return current image or a placeholder
-          return companion.current_image_url || '/placeholder-egg.svg';
-        }
-        
+        // Query companion_evolutions for the specific stage (including stage 0)
         const { data, error } = await supabase
           .from("companion_evolutions")
           .select("image_url")
@@ -56,13 +51,23 @@ export const CompanionStoryJournal = () => {
         
         if (error && error.code !== 'PGRST116') {
           console.error('Failed to fetch evolution image:', error);
-          return companion.current_image_url || '/placeholder-companion.svg';
         }
         
-        return data?.image_url || companion.current_image_url || '/placeholder-companion.svg';
+        // If we found an image for this stage, use it
+        if (data?.image_url) {
+          return data.image_url;
+        }
+        
+        // Fallback for stage 0 (egg) if no evolution record exists
+        if (debouncedStage === 0) {
+          return '/placeholder-egg.svg';
+        }
+        
+        // Fallback for other stages
+        return companion.current_image_url || '/placeholder-companion.svg';
       } catch (error) {
         console.error('Error in evolution image query:', error);
-        return companion.current_image_url || '/placeholder-companion.svg';
+        return debouncedStage === 0 ? '/placeholder-egg.svg' : (companion.current_image_url || '/placeholder-companion.svg');
       }
     },
     enabled: !!companion,
