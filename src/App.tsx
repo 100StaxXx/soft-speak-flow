@@ -55,7 +55,7 @@ const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
-const BattleArena = lazy(() => import("./pages/BattleArena"));
+const AstralArcade = lazy(() => import("./pages/AstralArcade"));
 const Horoscope = lazy(() => import("./pages/Horoscope"));
 const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
@@ -213,7 +213,7 @@ const AppContent = memo(() => {
             <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
             <Route path="/join/:code" element={<JoinEpic />} />
             <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-            <Route path="/battle-arena" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
+            <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} />
             <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
             <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
             

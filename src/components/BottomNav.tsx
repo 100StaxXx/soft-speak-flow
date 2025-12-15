@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Search, Sparkles, User, Swords } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,12 +9,25 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
+import { useLongPress } from "@/hooks/useLongPress";
+import { cn } from "@/lib/utils";
 
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
+  const navigate = useNavigate();
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   const resolvedMentorId = getResolvedMentorId(profile);
+
+  // Long press on Quests tab navigates to hidden arcade
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      setIsLongPressing(false);
+      navigate('/arcade');
+    },
+    threshold: 800,
+  });
 
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
@@ -96,9 +110,33 @@ export const BottomNav = memo(() => {
 
         <NavLink
           to="/tasks"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className={cn(
+            "flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95",
+            isLongPressing && "scale-95 opacity-70"
+          )}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
+          {...longPressHandlers}
+          onTouchStart={(e) => {
+            setIsLongPressing(true);
+            longPressHandlers.onTouchStart(e);
+          }}
+          onTouchEnd={(e) => {
+            setIsLongPressing(false);
+            longPressHandlers.onTouchEnd(e);
+          }}
+          onMouseDown={(e) => {
+            setIsLongPressing(true);
+            longPressHandlers.onMouseDown(e);
+          }}
+          onMouseUp={(e) => {
+            setIsLongPressing(false);
+            longPressHandlers.onMouseUp(e);
+          }}
+          onMouseLeave={() => {
+            setIsLongPressing(false);
+            longPressHandlers.onMouseLeave();
+          }}
         >
           {({ isActive }) => (
             <>
