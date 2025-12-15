@@ -49,7 +49,8 @@ export const useWeeklyRecap = () => {
     return format(subDays(lastSunday, 1), "yyyy-MM-dd");
   }, []);
 
-  const isSunday = useMemo(() => new Date().getDay() === 0, []);
+  // Recalculates on each render for accuracy
+  const isSunday = new Date().getDay() === 0;
 
   // Fetch current week's recap
   const { data: currentRecap, isLoading } = useQuery({
@@ -141,7 +142,7 @@ export const useWeeklyRecap = () => {
     if (isSunday && !currentRecap && !isLoading && user?.id && !generateMutation.isPending) {
       generateMutation.mutate();
     }
-  }, [isSunday, currentRecap, isLoading, user?.id]);
+  }, [isSunday, currentRecap, isLoading, user?.id, generateMutation.isPending]);
 
   const openRecap = (recap: WeeklyRecap) => {
     setSelectedRecap(recap);
