@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
@@ -29,11 +29,59 @@ interface TrailParticle {
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
-const GRID_SIZE = 15;
-const CELL_SIZE = 20;
+// EASIER: Smaller grid, larger cells
+const GRID_SIZE = 12;
+const CELL_SIZE = 24;
 const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
 const MIN_SWIPE_DISTANCE = 30;
+
+// D-Pad button component
+const DPadButton = memo(({ 
+  direction, 
+  onPress,
+  disabled 
+}: { 
+  direction: Direction; 
+  onPress: (dir: Direction) => void;
+  disabled: boolean;
+}) => {
+  const icons: Record<Direction, typeof ArrowUp> = {
+    up: ArrowUp,
+    down: ArrowDown,
+    left: ArrowLeft,
+    right: ArrowRight,
+  };
+  const Icon = icons[direction];
+  
+  const positions: Record<Direction, string> = {
+    up: 'top-0 left-1/2 -translate-x-1/2',
+    down: 'bottom-0 left-1/2 -translate-x-1/2',
+    left: 'left-0 top-1/2 -translate-y-1/2',
+    right: 'right-0 top-1/2 -translate-y-1/2',
+  };
+  
+  return (
+    <button
+      className={`absolute ${positions[direction]} w-14 h-14 rounded-xl 
+        bg-primary/20 border border-primary/40 backdrop-blur-sm
+        active:bg-primary/40 active:scale-95 transition-all
+        flex items-center justify-center touch-manipulation
+        ${disabled ? 'opacity-50' : ''}`}
+      onTouchStart={(e) => {
+        e.preventDefault();
+        if (!disabled) onPress(direction);
+      }}
+      onClick={() => {
+        if (!disabled) onPress(direction);
+      }}
+      disabled={disabled}
+    >
+      <Icon className="w-7 h-7 text-primary" />
+    </button>
+  );
+});
+DPadButton.displayName = 'DPadButton';
 
 // Swipe indicator component
 const SwipeIndicator = memo(({ direction, visible }: { direction: Direction | null; visible: boolean }) => {
@@ -74,7 +122,7 @@ const SwipeHint = memo(({ show }: { show: boolean }) => (
         className="absolute bottom-2 left-0 right-0 text-center z-20"
       >
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/20 border border-primary/30">
-          <span className="text-xs text-primary">👆 Swipe or tap to change direction</span>
+          <span className="text-xs text-primary">👆 Swipe or use D-Pad below</span>
         </div>
       </motion.div>
     )}
@@ -82,33 +130,60 @@ const SwipeHint = memo(({ show }: { show: boolean }) => (
 ));
 SwipeHint.displayName = 'SwipeHint';
 
+// Direction indicator arrow for serpent head
+const DirectionArrow = memo(({ direction }: { direction: Direction }) => {
+  const rotations: Record<Direction, number> = {
+    up: -90,
+    down: 90,
+    left: 180,
+    right: 0,
+  };
+  
+  return (
+    <motion.div
+      className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-primary/80 flex items-center justify-center z-10"
+      style={{ rotate: rotations[direction] }}
+      animate={{ scale: [1, 1.2, 1] }}
+      transition={{ duration: 0.5, repeat: Infinity }}
+    >
+      <ArrowRight className="w-3 h-3 text-primary-foreground" />
+    </motion.div>
+  );
+});
+DirectionArrow.displayName = 'DirectionArrow';
+
 // Memoized cell component for performance
 const Cell = memo(({ 
   isHead, 
   isBody, 
   isStardust,
   bodyIndex,
-  totalLength
+  totalLength,
+  direction
 }: { 
   isHead: boolean; 
   isBody: boolean; 
   isStardust: boolean;
   bodyIndex: number;
   totalLength: number;
+  direction?: Direction;
 }) => {
   if (isHead) {
     return (
-      <motion.div
-        className="absolute rounded-full"
-        style={{
-          width: CELL_SIZE - 2,
-          height: CELL_SIZE - 2,
-          background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
-          boxShadow: '0 0 15px hsl(var(--primary)), 0 0 25px hsl(var(--primary) / 0.5), inset 0 0 8px hsl(var(--primary-foreground) / 0.3)',
-        }}
-        animate={{ scale: [1, 1.1, 1] }}
-        transition={{ duration: 0.3, repeat: Infinity }}
-      />
+      <div className="relative">
+        <motion.div
+          className="rounded-full"
+          style={{
+            width: CELL_SIZE - 2,
+            height: CELL_SIZE - 2,
+            background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
+            boxShadow: '0 0 15px hsl(var(--primary)), 0 0 25px hsl(var(--primary) / 0.5), inset 0 0 8px hsl(var(--primary-foreground) / 0.3)',
+          }}
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ duration: 0.3, repeat: Infinity }}
+        />
+        {direction && <DirectionArrow direction={direction} />}
+      </div>
     );
   }
 
@@ -116,7 +191,7 @@ const Cell = memo(({
     const opacity = 1 - (bodyIndex / totalLength) * 0.5;
     return (
       <div
-        className="absolute rounded-full"
+        className="rounded-full"
         style={{
           width: CELL_SIZE - 4,
           height: CELL_SIZE - 4,
@@ -131,15 +206,13 @@ const Cell = memo(({
   if (isStardust) {
     return (
       <motion.div
-        className="absolute"
         style={{
-          width: CELL_SIZE - 4,
-          height: CELL_SIZE - 4,
-          margin: 1,
+          width: CELL_SIZE - 2,
+          height: CELL_SIZE - 2,
         }}
         animate={{ 
           rotate: 360,
-          scale: [0.8, 1.2, 0.8],
+          scale: [0.9, 1.3, 0.9],
         }}
         transition={{ 
           rotate: { duration: 3, repeat: Infinity, ease: "linear" },
@@ -150,10 +223,10 @@ const Cell = memo(({
           className="w-full h-full rounded-full"
           style={{ 
             background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-            boxShadow: '0 0 10px #fbbf24, 0 0 20px #fbbf24, 0 0 30px #fbbf24' 
+            boxShadow: '0 0 15px #fbbf24, 0 0 25px #fbbf24, 0 0 35px #fbbf24' 
           }}
         />
-        <span className="absolute inset-0 flex items-center justify-center text-xs">✨</span>
+        <span className="absolute inset-0 flex items-center justify-center text-sm">✨</span>
       </motion.div>
     );
   }
@@ -189,9 +262,9 @@ export const AstralSerpentGame = ({
   questIntervalScale = 0
 }: AstralSerpentGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
-  const [snake, setSnake] = useState<Position[]>([{ x: 7, y: 7 }]);
+  const [snake, setSnake] = useState<Position[]>([{ x: 6, y: 6 }]);
   const [direction, setDirection] = useState<Direction>('right');
-  const [stardust, setStardust] = useState<Position>({ x: 10, y: 7 });
+  const [stardust, setStardust] = useState<Position>({ x: 9, y: 6 });
   const [score, setScore] = useState(0);
   const [shake, setShake] = useState(false);
   const [showCollect, setShowCollect] = useState(false);
@@ -207,14 +280,14 @@ export const AstralSerpentGame = ({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Calculate game speed based on difficulty and companion stats
-  const bodyBonus = Math.min(companionStats.body / 100, 1);
-  const baseSpeed = difficulty === 'easy' ? 200 : difficulty === 'medium' ? 150 : 100;
-  const adjustedSpeed = baseSpeed * (1 - questIntervalScale * 0.2) * (1 - bodyBonus * 0.15);
-  const gameSpeed = Math.max(80, adjustedSpeed);
+  // EASIER: Much slower base speeds (280/220/170ms)
+  const baseSpeed = difficulty === 'easy' ? 280 : difficulty === 'medium' ? 220 : 170;
+  // Slight difficulty scaling, no body stat penalty
+  const adjustedSpeed = baseSpeed * (1 - questIntervalScale * 0.1);
+  const gameSpeed = Math.max(120, adjustedSpeed);
 
-  // Target score based on difficulty
-  const targetScore = difficulty === 'easy' ? 5 : difficulty === 'medium' ? 7 : 10;
+  // EASIER: Lower target scores (3/4/6)
+  const targetScore = difficulty === 'easy' ? 3 : difficulty === 'medium' ? 4 : 6;
 
   // Add trail particle when snake moves
   const addTrailParticle = useCallback((position: Position, snakeLength: number) => {
@@ -290,34 +363,25 @@ export const AstralSerpentGame = ({
           newHead = { x: head.x + 1, y: head.y };
       }
 
-      // Check wall collision
-      if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
-        setGameState('complete');
-        triggerHaptic('error');
-        setShake(true);
-        setTimeout(() => setShake(false), 300);
-        
-        const accuracy = Math.round((score / targetScore) * 100);
-        onComplete({
-          success: score >= Math.ceil(targetScore / 2),
-          accuracy: Math.min(100, accuracy),
-          result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail'
-        });
-        return prevSnake;
-      }
+      // EASIER: Wrap-around walls instead of death
+      if (newHead.x < 0) newHead.x = GRID_SIZE - 1;
+      if (newHead.x >= GRID_SIZE) newHead.x = 0;
+      if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
+      if (newHead.y >= GRID_SIZE) newHead.y = 0;
 
-      // Check self collision
+      // Self collision still causes game over
       if (prevSnake.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
         setGameState('complete');
         triggerHaptic('error');
         setShake(true);
         setTimeout(() => setShake(false), 300);
         
+        // EASIER: Lower thresholds (40% partial, 60% good, 85% perfect)
         const accuracy = Math.round((score / targetScore) * 100);
         onComplete({
-          success: score >= Math.ceil(targetScore / 2),
+          success: score >= Math.ceil(targetScore * 0.4),
           accuracy: Math.min(100, accuracy),
-          result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail'
+          result: accuracy >= 85 ? 'perfect' : accuracy >= 60 ? 'good' : accuracy >= 40 ? 'partial' : 'fail'
         });
         return prevSnake;
       }
@@ -457,30 +521,12 @@ export const AstralSerpentGame = ({
         // Vertical swipe
         changeDirection(deltaY > 0 ? 'down' : 'up');
       }
-    } else {
-      // It's a tap - use position relative to snake head
-      const rect = gameAreaRef.current.getBoundingClientRect();
-      const tapX = touch.clientX - rect.left;
-      const tapY = touch.clientY - rect.top;
-      
-      const head = snake[0];
-      const headPixelX = head.x * CELL_SIZE + CELL_SIZE / 2;
-      const headPixelY = head.y * CELL_SIZE + CELL_SIZE / 2;
-      
-      const tapDeltaX = tapX - headPixelX;
-      const tapDeltaY = tapY - headPixelY;
-      
-      if (Math.abs(tapDeltaX) > Math.abs(tapDeltaY)) {
-        changeDirection(tapDeltaX > 0 ? 'right' : 'left');
-      } else {
-        changeDirection(tapDeltaY > 0 ? 'down' : 'up');
-      }
     }
     
     touchStartRef.current = null;
-  }, [gameState, snake, changeDirection]);
+  }, [gameState, changeDirection]);
 
-  // Mouse click handler (for desktop tap)
+  // Mouse click handler (for desktop)
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (gameState !== 'playing' || !gameAreaRef.current) return;
     
@@ -515,6 +561,8 @@ export const AstralSerpentGame = ({
     };
   }, []);
 
+  const gridPixelSize = GRID_SIZE * CELL_SIZE;
+
   return (
     <GameStyleWrapper>
       <div className={`flex flex-col items-center relative ${shake ? 'animate-shake' : ''}`}>
@@ -533,7 +581,7 @@ export const AstralSerpentGame = ({
         {/* Game HUD */}
         <GameHUD
           title="Astral Serpent"
-          subtitle="Consume the stardust!"
+          subtitle={`Collect ${targetScore} stardust!`}
           score={score}
           maxScore={targetScore}
           combo={snake.length - 1}
@@ -544,18 +592,18 @@ export const AstralSerpentGame = ({
         />
 
         {/* Score progress */}
-        <div className="flex gap-1.5 mb-4">
+        <div className="flex gap-2 mb-4">
           {Array.from({ length: targetScore }).map((_, i) => (
             <motion.div
               key={i}
-              className={`w-3 h-3 rounded-full border-2 transition-all ${
+              className={`w-4 h-4 rounded-full border-2 transition-all ${
                 i < score
                   ? 'border-yellow-400'
                   : 'border-muted-foreground/30 bg-muted/20'
               }`}
               style={i < score ? {
                 background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                boxShadow: '0 0 8px #fbbf24',
+                boxShadow: '0 0 10px #fbbf24',
               } : {}}
               animate={i < score ? { scale: [1, 1.2, 1] } : {}}
               transition={{ duration: 0.3 }}
@@ -563,13 +611,13 @@ export const AstralSerpentGame = ({
           ))}
         </div>
 
-        {/* Game Grid - Swipe and tap to control */}
+        {/* Game Grid */}
         <motion.div
           ref={gameAreaRef}
           className="relative rounded-xl overflow-hidden cursor-pointer select-none touch-none"
           style={{
-            width: GRID_SIZE * CELL_SIZE,
-            height: GRID_SIZE * CELL_SIZE,
+            width: gridPixelSize,
+            height: gridPixelSize,
             background: 'linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted) / 0.5) 100%)',
             border: '2px solid hsl(var(--border) / 0.5)',
             boxShadow: '0 0 30px hsl(var(--primary) / 0.1), inset 0 0 50px hsl(var(--background) / 0.5)',
@@ -650,6 +698,7 @@ export const AstralSerpentGame = ({
                 isStardust={false}
                 bodyIndex={index}
                 totalLength={snake.length}
+                direction={index === 0 ? direction : undefined}
               />
             </div>
           ))}
@@ -670,14 +719,23 @@ export const AstralSerpentGame = ({
           </AnimatePresence>
         </motion.div>
 
-        {/* Control hint */}
-        <p className="mt-4 text-xs text-muted-foreground text-center">
-          👆 Swipe to change direction • Tap relative to serpent head
-        </p>
+        {/* D-Pad Controls */}
+        <div 
+          className="relative mt-4"
+          style={{ width: 160, height: 160 }}
+        >
+          <DPadButton direction="up" onPress={changeDirection} disabled={gameState !== 'playing'} />
+          <DPadButton direction="down" onPress={changeDirection} disabled={gameState !== 'playing'} />
+          <DPadButton direction="left" onPress={changeDirection} disabled={gameState !== 'playing'} />
+          <DPadButton direction="right" onPress={changeDirection} disabled={gameState !== 'playing'} />
+          
+          {/* Center indicator */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-muted/30 border border-border/30" />
+        </div>
 
-        {/* Stat bonus */}
-        <p className="mt-1 text-xs text-muted-foreground">
-          Body stat bonus: {Math.round(bodyBonus * 15)}% faster serpent
+        {/* Control hint */}
+        <p className="mt-3 text-xs text-muted-foreground text-center">
+          Use D-Pad or swipe on grid • Walls wrap around!
         </p>
 
         {/* CSS animations */}
