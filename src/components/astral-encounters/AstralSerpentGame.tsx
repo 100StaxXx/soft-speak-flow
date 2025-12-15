@@ -206,6 +206,7 @@ const Cell = memo(({
   if (isStardust) {
     return (
       <motion.div
+        className="relative"
         style={{
           width: CELL_SIZE - 2,
           height: CELL_SIZE - 2,
