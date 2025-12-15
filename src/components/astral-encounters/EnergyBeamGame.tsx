@@ -41,7 +41,7 @@ const AttemptDots = memo(({
 ));
 AttemptDots.displayName = 'AttemptDots';
 
-// Premium charge bar component with Apple-quality visuals
+// Premium charge bar component with cosmic visuals
 const ChargeBar = memo(({ 
   chargeLevel, 
   sweetSpotStart, 
@@ -59,73 +59,76 @@ const ChargeBar = memo(({
   isCharging: boolean;
   pulseRing: boolean;
 }) => (
-  <div className="relative w-full max-w-xs h-16 mb-6">
+  <div className="relative w-full max-w-xs h-20 mb-6">
     {/* Background track with premium glass effect */}
     <div 
       className="absolute inset-0 rounded-2xl overflow-hidden"
       style={{
-        background: 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2)',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(10,10,30,0.4) 50%, rgba(0,0,0,0.3) 100%)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.5), 0 6px 20px rgba(0,0,0,0.3), 0 0 40px rgba(168,85,247,0.08)',
       }}
     >
-      {/* Sweet spot zone with gradient */}
+      {/* Sweet spot zone with cosmic gradient */}
       <div 
-        className="absolute top-0 bottom-0 overflow-hidden"
+        className="absolute top-1 bottom-1 overflow-hidden rounded-xl"
         style={{ 
           left: `${sweetSpotStart}%`, 
           width: `${adjustedSweetSpotSize}%`,
-          borderRadius: 4,
         }}
       >
-        {/* Outer zone gradient */}
+        {/* Outer zone gradient with glow */}
         <div 
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(90deg, hsl(var(--primary)/0.3), hsl(var(--primary)/0.5), hsl(var(--primary)/0.3))',
+            background: 'linear-gradient(90deg, hsl(var(--primary)/0.35), hsl(var(--primary)/0.6), hsl(var(--primary)/0.35))',
+            boxShadow: 'inset 0 0 15px hsl(var(--primary)/0.3)',
           }}
         />
         
-        {/* Perfect zone (inner) with glow */}
+        {/* Perfect zone (inner) with pulsing glow */}
         <div 
           className="absolute top-0 bottom-0"
           style={{
             left: '28%',
             width: '44%',
-            background: 'linear-gradient(90deg, rgba(250,204,21,0.4), rgba(250,204,21,0.6), rgba(250,204,21,0.4))',
-            animation: 'breathe 1.5s ease-in-out infinite',
+            background: 'linear-gradient(90deg, rgba(250,204,21,0.45), rgba(250,204,21,0.7), rgba(250,204,21,0.45))',
+            animation: 'cosmic-breathe 1.5s ease-in-out infinite',
+            boxShadow: 'inset 0 0 10px rgba(250,204,21,0.4)',
           }}
         />
         
-        {/* Edge markers */}
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-primary to-transparent" />
-        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-primary to-transparent" />
+        {/* Edge markers with glow */}
+        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--primary)), transparent)', boxShadow: '0 0 8px hsl(var(--primary))' }} />
+        <div className="absolute right-0 top-0 bottom-0 w-0.5" style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--primary)), transparent)', boxShadow: '0 0 8px hsl(var(--primary))' }} />
       </div>
       
-      {/* Charge fill with premium gradient */}
+      {/* Charge fill with premium animated gradient */}
       <div 
-        className="absolute top-0 bottom-0 left-0 rounded-r transition-all duration-75"
+        className="absolute top-1 bottom-1 left-1 rounded-xl transition-all duration-75"
         style={{ 
-          width: `${chargeLevel}%`,
+          width: `calc(${chargeLevel}% - 4px)`,
           background: isPerfectZone 
             ? 'linear-gradient(90deg, #fbbf24, #fcd34d, #fbbf24)'
             : isInSweetSpot 
               ? 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))'
-              : 'linear-gradient(90deg, #6366f1, #8b5cf6, #6366f1)',
+              : 'linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7)',
+          backgroundSize: isCharging ? '200% 100%' : '100% 100%',
+          animation: isCharging ? 'shimmer 1s linear infinite' : 'none',
           boxShadow: isInSweetSpot 
-            ? '0 0 30px hsl(var(--primary)), inset 0 2px 4px rgba(255,255,255,0.3)' 
-            : '0 0 15px rgba(99,102,241,0.5)',
+            ? '0 0 35px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.4), inset 0 2px 4px rgba(255,255,255,0.35)' 
+            : '0 0 20px rgba(99,102,241,0.6), inset 0 2px 4px rgba(255,255,255,0.2)',
         }}
       />
 
-      {/* Charge indicator line */}
+      {/* Charge indicator line with glow */}
       <div
-        className="absolute top-1 bottom-1 w-1 rounded-full gpu-accelerated"
+        className="absolute top-1.5 bottom-1.5 w-1.5 rounded-full gpu-accelerated"
         style={{ 
           left: `${chargeLevel}%`,
-          background: 'linear-gradient(180deg, white, rgba(255,255,255,0.8))',
-          boxShadow: '0 0 12px white, 0 0 24px white',
-          transform: isCharging ? 'scaleY(1.1)' : 'scaleY(1)',
+          background: 'linear-gradient(180deg, white, rgba(255,255,255,0.85))',
+          boxShadow: '0 0 15px white, 0 0 30px white, 0 0 45px rgba(255,255,255,0.5)',
+          transform: isCharging ? 'scaleY(1.15)' : 'scaleY(1)',
           transition: 'transform 0.1s',
         }}
       />
@@ -135,21 +138,21 @@ const ChargeBar = memo(({
         {pulseRing && (
           <motion.div
             className="absolute inset-0 rounded-2xl"
-            style={{ border: '3px solid #fbbf24' }}
+            style={{ border: '3px solid #fbbf24', boxShadow: '0 0 30px #fbbf24' }}
             initial={{ opacity: 1, scale: 1 }}
             animate={{ opacity: 0, scale: 1.15 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.5 }}
           />
         )}
       </AnimatePresence>
     </div>
 
-    {/* Zone labels */}
-    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[10px] text-white/40 font-medium px-1">
-      <span>0%</span>
-      <span className="text-primary/80">Sweet Spot</span>
-      <span>100%</span>
+    {/* Zone labels with better visibility */}
+    <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[10px] font-medium px-1">
+      <span className="text-white/50">0%</span>
+      <span className="text-primary/90" style={{ textShadow: '0 0 10px hsl(var(--primary)/0.5)' }}>Sweet Spot</span>
+      <span className="text-white/50">100%</span>
     </div>
   </div>
 ));
@@ -350,43 +353,49 @@ export const EnergyBeamGame = ({
         )}
       </AnimatePresence>
 
-      {/* Premium charge button */}
+      {/* Premium charge button with cosmic styling */}
       {gameState === 'playing' && !showResult && (
         <motion.button
-          className="relative w-32 h-32 rounded-full flex items-center justify-center overflow-hidden gpu-accelerated touch-target"
+          className="relative w-36 h-36 rounded-full flex items-center justify-center overflow-hidden gpu-accelerated touch-target"
           style={{
             background: isCharging 
-              ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))'
-              : 'linear-gradient(135deg, hsl(var(--primary)/0.9), hsl(var(--accent)/0.9))',
-            border: '3px solid rgba(255,255,255,0.2)',
+              ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))'
+              : 'linear-gradient(135deg, hsl(var(--primary)/0.92), hsl(var(--accent)/0.92))',
+            backgroundSize: isCharging ? '200% 200%' : '100% 100%',
+            animation: isCharging ? 'shimmer 1.5s linear infinite' : 'none',
+            border: '3px solid rgba(255,255,255,0.25)',
             boxShadow: isCharging 
-              ? '0 0 40px hsl(var(--primary)), 0 0 80px hsl(var(--primary)/0.5), inset 0 2px 0 rgba(255,255,255,0.2)'
-              : '0 8px 32px rgba(0,0,0,0.3), 0 0 20px hsl(var(--primary)/0.3), inset 0 2px 0 rgba(255,255,255,0.15)',
+              ? '0 0 50px hsl(var(--primary)), 0 0 100px hsl(var(--primary)/0.5), 0 0 150px hsl(var(--primary)/0.25), inset 0 2px 0 rgba(255,255,255,0.25)'
+              : '0 10px 40px rgba(0,0,0,0.35), 0 0 30px hsl(var(--primary)/0.35), inset 0 2px 0 rgba(255,255,255,0.2)',
           }}
           onMouseDown={startCharging}
           onMouseUp={releaseBeam}
           onMouseLeave={releaseBeam}
           onTouchStart={startCharging}
           onTouchEnd={releaseBeam}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
         >
-          {/* Inner rings - CSS driven */}
-          <div className={`absolute inset-3 rounded-full border border-white/20 ${isCharging ? 'animate-ring-1' : ''}`} />
-          <div className={`absolute inset-6 rounded-full border border-white/15 ${isCharging ? 'animate-ring-2' : ''}`} />
+          {/* Inner rings with cosmic effect */}
+          <div className={`absolute inset-4 rounded-full border border-white/25 ${isCharging ? 'animate-ring-1' : ''}`} />
+          <div className={`absolute inset-7 rounded-full border border-white/20 ${isCharging ? 'animate-ring-2' : ''}`} />
           
-          {/* Center icon with glow */}
+          {/* Center icon with enhanced glow */}
           <Zap 
-            className="w-12 h-12 text-white relative z-10"
+            className="w-14 h-14 text-white relative z-10"
             style={{ 
-              filter: isCharging ? 'drop-shadow(0 0 15px white)' : 'drop-shadow(0 0 8px rgba(255,255,255,0.5))',
+              filter: isCharging ? 'drop-shadow(0 0 20px white) drop-shadow(0 0 40px hsl(var(--primary)))' : 'drop-shadow(0 0 10px rgba(255,255,255,0.6))',
             }}
           />
           
           {/* Charge level visual inside button */}
           <div 
-            className="absolute bottom-0 left-0 right-0 bg-white/25 transition-all duration-75"
-            style={{ height: `${chargeLevel}%` }}
+            className="absolute bottom-0 left-0 right-0 transition-all duration-75"
+            style={{ 
+              height: `${chargeLevel}%`,
+              background: 'linear-gradient(to top, rgba(255,255,255,0.35), rgba(255,255,255,0.15))',
+              borderRadius: '0 0 50% 50%',
+            }}
           />
         </motion.button>
       )}

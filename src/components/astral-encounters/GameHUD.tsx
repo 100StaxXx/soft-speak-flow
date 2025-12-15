@@ -90,21 +90,29 @@ export const GameHUD = memo(({
   const isTimeLow = timeLeft !== undefined && timeLeft <= 3;
 
   return (
-    <div className="w-full px-3 py-3 mb-2">
-      {/* Title row with glass effect */}
+    <div className="w-full px-3 py-3 mb-3">
+      {/* Title row with premium glass effect */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-white tracking-tight">{title}</h3>
+          <h3 className="text-lg font-bold text-white tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+            {title}
+          </h3>
           {subtitle && (
-            <p className="text-xs text-white/50 font-medium">{subtitle}</p>
+            <p className="text-xs text-white/60 font-medium tracking-wide">{subtitle}</p>
           )}
         </div>
         
         {onPauseToggle && (
           <motion.button
             onClick={onPauseToggle}
-            className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-            whileTap={{ scale: 0.9 }}
+            className="p-2.5 rounded-full transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
           >
             {isPaused ? (
               <Play className="w-4 h-4 text-white" />
@@ -179,9 +187,16 @@ export const GameHUD = memo(({
         )}
       </div>
 
-      {/* Premium timer progress bar */}
+      {/* Premium timer progress bar with animated glow */}
       {totalTime !== undefined && timeLeft !== undefined && (
-        <div className="h-2 rounded-full overflow-hidden progress-bar-premium">
+        <div 
+          className="h-2.5 rounded-full overflow-hidden"
+          style={{
+            background: 'linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06))',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+          }}
+        >
           <motion.div
             className="h-full rounded-full"
             style={{
@@ -190,8 +205,8 @@ export const GameHUD = memo(({
                 : 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))',
               backgroundSize: '200% 100%',
               boxShadow: isTimeLow 
-                ? '0 0 15px rgba(239, 68, 68, 0.5)' 
-                : '0 0 15px hsl(var(--primary) / 0.4)',
+                ? '0 0 20px rgba(239, 68, 68, 0.6), inset 0 1px 0 rgba(255,255,255,0.3)' 
+                : '0 0 20px hsl(var(--primary) / 0.5), inset 0 1px 0 rgba(255,255,255,0.3)',
             }}
             animate={{ 
               width: `${timeProgress}%`,
@@ -199,7 +214,7 @@ export const GameHUD = memo(({
             }}
             transition={{
               width: { duration: 0.3 },
-              backgroundPosition: { duration: 3, repeat: Infinity, ease: 'linear' },
+              backgroundPosition: { duration: 2.5, repeat: Infinity, ease: 'linear' },
             }}
           />
         </div>
@@ -228,18 +243,14 @@ export const GameHUD = memo(({
         </div>
       )}
 
-      {/* Inline styles for stat-pill */}
+      {/* Inline styles for stat-pill with enhanced glass effect */}
       <style>{`
         .stat-pill {
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-        }
-        .progress-bar-premium {
-          background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05));
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -280,16 +291,16 @@ export const CountdownOverlay = memo(({ count, onComplete }: CountdownOverlayPro
           exit={{ opacity: 0 }}
           className="absolute inset-0 z-50 flex items-center justify-center"
           style={{
-            background: 'radial-gradient(circle at center, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%)',
-            backdropFilter: 'blur(8px)',
+            background: 'radial-gradient(circle at center, rgba(0,0,0,0.92) 0%, rgba(5,5,15,0.97) 100%)',
+            backdropFilter: 'blur(12px) saturate(120%)',
           }}
         >
           <motion.div
             key={current}
-            initial={{ scale: 2.5, opacity: 0, rotate: -10 }}
+            initial={{ scale: 2.5, opacity: 0, rotate: -15 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            exit={{ scale: 0.5, opacity: 0, rotate: 10 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            exit={{ scale: 0.5, opacity: 0, rotate: 15 }}
+            transition={{ type: "spring", stiffness: 350, damping: 22 }}
             className="relative"
           >
             {/* Multiple expanding rings */}
@@ -307,18 +318,21 @@ export const CountdownOverlay = memo(({ count, onComplete }: CountdownOverlayPro
               />
             ))}
             
-            {/* Main number circle */}
+            {/* Main number circle with cosmic glow */}
             <div 
               className="w-36 h-36 rounded-full flex items-center justify-center relative"
               style={{
                 background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
-                boxShadow: '0 0 60px hsl(var(--primary) / 0.5), 0 0 100px hsl(var(--primary) / 0.3), inset 0 2px 0 rgba(255,255,255,0.2)',
+                boxShadow: '0 0 60px hsl(var(--primary) / 0.6), 0 0 120px hsl(var(--primary) / 0.3), inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -2px 0 rgba(0,0,0,0.15)',
               }}
             >
-              {/* Inner glow */}
-              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
+              {/* Inner highlight */}
+              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/25 to-transparent" />
               
-              <span className="text-7xl font-black text-white relative z-10" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+              <span 
+                className="text-7xl font-black text-white relative z-10"
+                style={{ textShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 40px rgba(255,255,255,0.2)' }}
+              >
                 {current}
               </span>
             </div>
@@ -393,39 +407,41 @@ export const PauseOverlay = memo(({ onResume }: PauseOverlayProps) => {
       exit={{ opacity: 0 }}
       className="absolute inset-0 z-50 flex flex-col items-center justify-center"
       style={{
-        background: 'radial-gradient(circle at center, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.97) 100%)',
-        backdropFilter: 'blur(12px)',
+        background: 'radial-gradient(circle at center, rgba(0,0,0,0.94) 0%, rgba(5,5,15,0.98) 100%)',
+        backdropFilter: 'blur(16px) saturate(120%)',
       }}
     >
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ scale: 0.8, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         className="text-center"
       >
-        {/* Pause icon with glow */}
+        {/* Pause icon with cosmic glow */}
         <div 
-          className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center"
+          className="w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 0 60px hsl(var(--primary) / 0.1), inset 0 1px 0 rgba(255,255,255,0.1)',
           }}
         >
-          <Pause className="w-10 h-10 text-white/80" />
+          <Pause className="w-12 h-12 text-white/85" />
         </div>
         
-        <h3 className="text-2xl font-bold text-white mb-1.5 tracking-tight">Paused</h3>
-        <p className="text-white/50 mb-8 text-sm">Take your time</p>
+        <h3 className="text-2xl font-bold text-white mb-1.5 tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+          Paused
+        </h3>
+        <p className="text-white/50 mb-8 text-sm font-medium">Take your time</p>
         
         <motion.button
           onClick={onResume}
           className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2.5 mx-auto text-white"
           style={{
             background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
-            boxShadow: '0 8px 30px hsl(var(--primary) / 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            boxShadow: '0 8px 30px hsl(var(--primary) / 0.5), 0 0 60px hsl(var(--primary) / 0.2), inset 0 1px 0 rgba(255,255,255,0.25)',
           }}
-          whileHover={{ scale: 1.03, y: -1 }}
+          whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.97 }}
         >
           <Play className="w-5 h-5" />
