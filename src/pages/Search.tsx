@@ -11,15 +11,18 @@ import { SearchHero } from "@/components/search/SearchHero";
 import { SuggestedSearches } from "@/components/library/SuggestedSearches";
 import { FeaturedQuoteCard } from "@/components/library/FeaturedQuoteCard";
 import { FeaturedPepTalkCard } from "@/components/library/FeaturedPepTalkCard";
+import { SearchTutorialModal } from "@/components/SearchTutorialModal";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 const Search = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const trimmedQuery = searchQuery.trim();
   const isSearchActive = trimmedQuery.length >= 2;
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('search');
 
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
     queryKey: ["featured-quotes"],
@@ -149,6 +152,8 @@ const Search = () => {
           </AnimatePresence>
         </div>
         <BottomNav />
+        
+        <SearchTutorialModal open={showTutorial} onClose={dismissTutorial} />
       </div>
     </PageTransition>
   );

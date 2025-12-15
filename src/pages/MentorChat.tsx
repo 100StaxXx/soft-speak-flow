@@ -10,9 +10,11 @@ import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { MentorTutorialModal } from "@/components/MentorTutorialModal";
 import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 
 export default function MentorChat() {
@@ -21,6 +23,7 @@ export default function MentorChat() {
   const navigate = useNavigate();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const haptics = useHapticFeedback();
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
     queryKey: ['mentor', profile?.selected_mentor_id],
@@ -149,6 +152,8 @@ export default function MentorChat() {
           ]}
           tip="Your mentor's tone and style match your preferences from onboarding."
         />
+        
+        <MentorTutorialModal open={showTutorial} onClose={dismissTutorial} />
       </div>
   );
 }

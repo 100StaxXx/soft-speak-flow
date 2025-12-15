@@ -19,7 +19,9 @@ import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
 import { useState, memo } from "react";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: { 
@@ -73,6 +75,7 @@ const Companion = () => {
   const { data: unreadStoryCount = 0 } = useUnreadGuildStories();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
 
   // Show error state if query failed
   if (error) {
@@ -238,6 +241,8 @@ const Companion = () => {
         ]}
         tip="Your companion's element and personality are based on your zodiac sign and choices during onboarding."
       />
+      
+      <CompanionTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </PageTransition>
   );
 };
