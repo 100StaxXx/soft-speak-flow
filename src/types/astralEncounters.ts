@@ -22,7 +22,8 @@ export type MiniGameType =
   | 'eclipse_timing'
   | 'starfall_dodge'
   | 'rune_resonance'
-  | 'astral_serpent';
+  | 'astral_serpent'
+  | 'orb_match';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -112,13 +113,13 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   chaos: 'tap_sequence',
   stagnation: 'astral_serpent',
   laziness: 'astral_serpent',
-  anxiety: 'astral_frequency',
-  overthinking: 'astral_frequency',
+  anxiety: 'orb_match',
+  overthinking: 'orb_match',
   doubt: 'starfall_dodge',
   fear: 'starfall_dodge',
-  confusion: 'rune_resonance',
+  confusion: 'orb_match',
   vulnerability: 'eclipse_timing',
-  imbalance: 'rune_resonance',
+  imbalance: 'orb_match',
 };
 
 // Theme to stat mapping

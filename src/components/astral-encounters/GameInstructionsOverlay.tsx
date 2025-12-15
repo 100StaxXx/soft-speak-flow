@@ -8,7 +8,8 @@ import {
   Sparkles,
   Music,
   Brain,
-  Heart
+  Heart,
+  Grid3X3
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -110,6 +111,19 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     ],
     statBonus: 'body',
     statIcon: Heart,
+  },
+  orb_match: {
+    icon: Grid3X3,
+    title: "Cosmic Orb Match",
+    goal: "Drag orbs to create matches of 3 or more!",
+    howToPlay: [
+      "Touch and drag any orb across the grid",
+      "Orbs swap positions as you pass through",
+      "Match 3+ of the same color to score",
+      "Chain combos for bonus points!"
+    ],
+    statBonus: 'soul',
+    statIcon: Sparkles,
   },
 };
 

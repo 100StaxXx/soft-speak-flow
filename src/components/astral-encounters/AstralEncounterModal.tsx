@@ -10,6 +10,7 @@ import { EclipseTimingGame } from './EclipseTimingGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { RuneResonanceGame } from './RuneResonanceGame';
 import { AstralSerpentGame } from './AstralSerpentGame';
+import { OrbMatchGame } from './OrbMatchGame';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { BattleSceneHeader } from './BattleSceneHeader';
@@ -156,6 +157,8 @@ export const AstralEncounterModal = ({
         return <RuneResonanceGame {...props} />;
       case 'astral_serpent':
         return <AstralSerpentGame {...props} />;
+      case 'orb_match':
+        return <OrbMatchGame {...props} />;
       default:
         return <EnergyBeamGame {...props} />;
     }
