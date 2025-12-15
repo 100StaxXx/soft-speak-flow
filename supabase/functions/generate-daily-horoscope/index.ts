@@ -81,7 +81,7 @@ serve(async (req) => {
     // Check if horoscope already exists for today
     const { data: existingHoroscope, error: fetchError } = await supabaseClient
       .from('user_daily_horoscopes')
-      .select('horoscope_text, zodiac, is_personalized, for_date, cosmiq_tip, energy_forecast, placement_insights')
+      .select('horoscope_text, zodiac, is_personalized, for_date, cosmic_tip, energy_forecast, placement_insights')
       .eq('user_id', user.id)
       .eq('for_date', today)
       .maybeSingle();
@@ -91,9 +91,9 @@ serve(async (req) => {
     }
 
     if (existingHoroscope) {
-      console.log('[Horoscope] Found existing horoscope for', today, 'has cosmiq_tip:', !!existingHoroscope.cosmiq_tip);
+      console.log('[Horoscope] Found existing horoscope for', today, 'has cosmic_tip:', !!existingHoroscope.cosmic_tip);
       
-      if (existingHoroscope.cosmiq_tip) {
+      if (existingHoroscope.cosmic_tip) {
         console.log('[Horoscope] Returning cached horoscope');
         return new Response(
           JSON.stringify({ 
@@ -101,7 +101,7 @@ serve(async (req) => {
             zodiac: existingHoroscope.zodiac,
             isPersonalized: existingHoroscope.is_personalized,
             date: existingHoroscope.for_date,
-            cosmiqTip: existingHoroscope.cosmiq_tip,
+            cosmiqTip: existingHoroscope.cosmic_tip,
             energyForecast: existingHoroscope.energy_forecast || null,
             placementInsights: existingHoroscope.placement_insights || null
           }),
@@ -111,8 +111,8 @@ serve(async (req) => {
           }
         );
       } else {
-        // If cosmiq_tip is missing, delete old record so we can regenerate
-        console.log('[Horoscope] Deleting incomplete horoscope to regenerate with cosmiq tip');
+        // If cosmic_tip is missing, delete old record so we can regenerate
+        console.log('[Horoscope] Deleting incomplete horoscope to regenerate with cosmic tip');
         await supabaseClient
           .from('user_daily_horoscopes')
           .delete()
@@ -325,7 +325,7 @@ Respond with JSON:
       }
     }
 
-    // Store the horoscope and cosmiq tip for today
+    // Store the horoscope and cosmic tip for today
     const { error: insertError } = await supabaseClient
       .from('user_daily_horoscopes')
       .insert({
@@ -334,7 +334,7 @@ Respond with JSON:
         zodiac: profile.zodiac_sign,
         horoscope_text: horoscope,
         is_personalized: hasAdvancedDetails,
-        cosmiq_tip: cosmiqTip,
+        cosmic_tip: cosmiqTip,
         energy_forecast: energyForecast,
         placement_insights: placementInsights
       });
