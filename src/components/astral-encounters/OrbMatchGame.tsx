@@ -21,31 +21,68 @@ interface Orb {
   matched?: boolean;
 }
 
-const ORB_COLORS: Record<OrbColor, { bg: string; glow: string; emoji: string }> = {
-  fire: { bg: 'from-red-500 to-orange-600', glow: 'rgba(239, 68, 68, 0.6)', emoji: '🔥' },
-  water: { bg: 'from-blue-500 to-cyan-500', glow: 'rgba(59, 130, 246, 0.6)', emoji: '💧' },
-  earth: { bg: 'from-green-500 to-emerald-600', glow: 'rgba(34, 197, 94, 0.6)', emoji: '🌿' },
-  light: { bg: 'from-yellow-400 to-amber-500', glow: 'rgba(250, 204, 21, 0.6)', emoji: '✨' },
-  dark: { bg: 'from-purple-600 to-violet-700', glow: 'rgba(147, 51, 234, 0.6)', emoji: '🌙' },
-  cosmic: { bg: 'from-pink-500 to-rose-600', glow: 'rgba(236, 72, 153, 0.6)', emoji: '💫' },
+// Premium orb color configurations with refined gradients
+const ORB_COLORS: Record<OrbColor, { gradient: string; glow: string; inner: string; emoji: string }> = {
+  fire: { 
+    gradient: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #ff4757 100%)', 
+    glow: 'rgba(255, 107, 107, 0.6)', 
+    inner: 'rgba(255, 200, 150, 0.4)',
+    emoji: '🔥' 
+  },
+  water: { 
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00cec9 50%, #0984e3 100%)', 
+    glow: 'rgba(79, 172, 254, 0.6)', 
+    inner: 'rgba(200, 240, 255, 0.4)',
+    emoji: '💧' 
+  },
+  earth: { 
+    gradient: 'linear-gradient(135deg, #00b894 0%, #55a630 50%, #2d6a4f 100%)', 
+    glow: 'rgba(0, 184, 148, 0.6)', 
+    inner: 'rgba(200, 255, 220, 0.4)',
+    emoji: '🌿' 
+  },
+  light: { 
+    gradient: 'linear-gradient(135deg, #ffd93d 0%, #ff9f1c 50%, #f9a825 100%)', 
+    glow: 'rgba(255, 217, 61, 0.6)', 
+    inner: 'rgba(255, 255, 220, 0.5)',
+    emoji: '✨' 
+  },
+  dark: { 
+    gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 50%, #6366f1 100%)', 
+    glow: 'rgba(168, 85, 247, 0.6)', 
+    inner: 'rgba(220, 200, 255, 0.4)',
+    emoji: '🌙' 
+  },
+  cosmic: { 
+    gradient: 'linear-gradient(135deg, #f472b6 0%, #ec4899 50%, #e11d48 100%)', 
+    glow: 'rgba(244, 114, 182, 0.6)', 
+    inner: 'rgba(255, 200, 230, 0.4)',
+    emoji: '💫' 
+  },
 };
 
 const GRID_ROWS = 5;
 const GRID_COLS = 6;
 
-// Memoized static star background
+// Premium star background with refined animation
 const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    {/* Nebula gradients */}
+    <div className="absolute inset-0">
+      <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-0 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-pink-500/3 rounded-full blur-3xl" />
+    </div>
     {stars.map(star => (
       <div
         key={star.id}
-        className="absolute rounded-full bg-white"
+        className="absolute rounded-full bg-white gpu-accelerated"
         style={{
           width: star.size,
           height: star.size,
           left: `${star.x}%`,
           top: `${star.y}%`,
-          opacity: star.opacity,
+          opacity: star.opacity * 0.7,
           animation: `twinkle ${star.animationDuration}s ease-in-out infinite`,
           animationDelay: `${star.animationDelay}s`,
         }}
@@ -55,7 +92,7 @@ const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStar
 ));
 StarBackground.displayName = 'StarBackground';
 
-// Memoized orb component
+// Premium orb component with refined visuals
 const OrbComponent = memo(({ 
   orb, 
   cellSize, 
@@ -70,45 +107,62 @@ const OrbComponent = memo(({
   isInPath: boolean;
 }) => {
   const colorConfig = ORB_COLORS[orb.color];
+  const orbSize = cellSize - 8;
   
   return (
     <motion.div
-      className={`absolute rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing ${
-        isSelected ? 'z-30 scale-110' : isInPath ? 'z-20 scale-105' : 'z-10'
+      className={`absolute rounded-full flex items-center justify-center gpu-accelerated ${
+        isSelected ? 'z-30' : isInPath ? 'z-20' : 'z-10'
       }`}
       style={{
-        width: cellSize - 6,
-        height: cellSize - 6,
-        left: orb.col * cellSize + 3,
-        top: orb.row * cellSize + 3,
+        width: orbSize,
+        height: orbSize,
+        left: orb.col * cellSize + (cellSize - orbSize) / 2,
+        top: orb.row * cellSize + (cellSize - orbSize) / 2,
+        background: colorConfig.gradient,
         boxShadow: isSelected || isInPath 
-          ? `0 0 20px ${colorConfig.glow}, 0 0 40px ${colorConfig.glow}` 
-          : `0 0 10px ${colorConfig.glow}`,
-        transition: isDragging ? 'none' : 'all 0.15s ease-out',
+          ? `0 0 20px ${colorConfig.glow}, 0 0 40px ${colorConfig.glow}, inset 0 2px 4px rgba(255,255,255,0.3)` 
+          : `0 4px 12px rgba(0,0,0,0.3), 0 0 15px ${colorConfig.glow}, inset 0 2px 4px rgba(255,255,255,0.2)`,
+        transition: isDragging ? 'none' : 'all 0.12s cubic-bezier(0.4, 0, 0.2, 1)',
+        border: '2px solid rgba(255,255,255,0.25)',
       }}
       animate={{
-        scale: orb.matched ? 0 : isSelected ? 1.15 : isInPath ? 1.08 : 1,
+        scale: orb.matched ? 0 : isSelected ? 1.18 : isInPath ? 1.1 : 1,
         opacity: orb.matched ? 0 : 1,
       }}
-      transition={{ duration: 0.15 }}
+      transition={{ duration: 0.12, ease: 'easeOut' }}
     >
-      <div className={`w-full h-full rounded-full bg-gradient-to-br ${colorConfig.bg} flex items-center justify-center border-2 border-white/30`}>
-        <span className="text-lg select-none">{colorConfig.emoji}</span>
-      </div>
+      {/* Inner highlight */}
+      <div 
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          width: '60%',
+          height: '60%',
+          top: '10%',
+          left: '20%',
+          background: `radial-gradient(circle at 30% 30%, ${colorConfig.inner}, transparent 70%)`,
+        }}
+      />
+      
+      {/* Emoji */}
+      <span className="text-base select-none relative z-10 drop-shadow-sm">{colorConfig.emoji}</span>
+      
+      {/* Selection ring */}
       {(isSelected || isInPath) && (
-        <div 
-          className="absolute inset-0 rounded-full animate-pulse"
+        <motion.div 
+          className="absolute inset-[-4px] rounded-full pointer-events-none"
           style={{ 
-            boxShadow: `0 0 15px ${colorConfig.glow}`,
-            background: `radial-gradient(circle, ${colorConfig.glow} 0%, transparent 70%)`,
+            border: `2px solid ${colorConfig.glow}`,
+            boxShadow: `0 0 12px ${colorConfig.glow}`,
           }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 0.6, repeat: Infinity }}
         />
       )}
     </motion.div>
   );
 });
 OrbComponent.displayName = 'OrbComponent';
-
 export const OrbMatchGame = ({
   companionStats,
   onComplete,
@@ -627,13 +681,13 @@ export const OrbMatchGame = ({
         </div>
       )}
 
-      {/* Game area */}
+      {/* Game area with premium styling */}
       <div
         ref={gridRef}
-        className="relative w-full max-w-xs bg-gradient-to-b from-slate-900 via-slate-900/95 to-primary/20 rounded-xl border border-border/50 overflow-hidden cursor-pointer touch-none shadow-2xl"
+        className="relative w-full max-w-xs rounded-2xl overflow-hidden cursor-pointer touch-none game-container"
         style={{ 
           aspectRatio: `${GRID_COLS}/${GRID_ROWS}`,
-          maxWidth: 280,
+          maxWidth: 300,
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -646,20 +700,28 @@ export const OrbMatchGame = ({
         {/* Starfield background */}
         <StarBackground stars={stars} />
 
-        {/* Grid lines */}
+        {/* Subtle grid lines */}
         <div className="absolute inset-0 pointer-events-none">
           {Array.from({ length: GRID_ROWS + 1 }).map((_, i) => (
             <div
               key={`h-${i}`}
-              className="absolute left-0 right-0 h-px bg-white/5"
-              style={{ top: `${(i / GRID_ROWS) * 100}%` }}
+              className="absolute left-0 right-0"
+              style={{ 
+                top: `${(i / GRID_ROWS) * 100}%`,
+                height: 1,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)',
+              }}
             />
           ))}
           {Array.from({ length: GRID_COLS + 1 }).map((_, i) => (
             <div
               key={`v-${i}`}
-              className="absolute top-0 bottom-0 w-px bg-white/5"
-              style={{ left: `${(i / GRID_COLS) * 100}%` }}
+              className="absolute top-0 bottom-0"
+              style={{ 
+                left: `${(i / GRID_COLS) * 100}%`,
+                width: 1,
+                background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)',
+              }}
             />
           ))}
         </div>
@@ -680,39 +742,60 @@ export const OrbMatchGame = ({
         <AnimatePresence>
           {showComboPopup && (
             <motion.div
-              className="absolute z-50 pointer-events-none font-bold text-xl text-yellow-400"
-              style={{ left: `${showComboPopup.x}%`, top: `${showComboPopup.y}%`, transform: 'translate(-50%, -50%)' }}
+              className="absolute z-50 pointer-events-none px-4 py-2 rounded-full combo-badge"
+              style={{ 
+                left: `${showComboPopup.x}%`, 
+                top: `${showComboPopup.y}%`, 
+                transform: 'translate(-50%, -50%)' 
+              }}
               initial={{ opacity: 1, scale: 1 }}
-              animate={{ opacity: 0, y: -30, scale: 1.5 }}
+              animate={{ opacity: 0, y: -40, scale: 1.3 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.7 }}
             >
-              🔥 {showComboPopup.combo}x COMBO!
+              <span className="font-black text-lg text-yellow-400">
+                🔥 {showComboPopup.combo}x COMBO!
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-3 mt-4 text-xs">
+      {/* Legend with refined styling */}
+      <div className="flex flex-wrap justify-center gap-4 mt-4 text-xs">
         {availableColors.slice(0, 4).map(color => (
-          <div key={color} className="flex items-center gap-1">
-            <span>{ORB_COLORS[color].emoji}</span>
-            <span className="capitalize text-muted-foreground">{color}</span>
+          <div key={color} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+            <span className="text-sm">{ORB_COLORS[color].emoji}</span>
+            <span className="capitalize text-white/60 font-medium">{color}</span>
           </div>
         ))}
       </div>
 
       {/* Instructions */}
-      <p className="text-xs text-muted-foreground mt-2 text-center">
-        Drag an orb across the grid • Orbs swap as you pass • Match 3+ to score!
+      <p className="text-xs text-white/40 mt-3 text-center font-medium">
+        Drag orbs to swap • Match 3+ to clear • Chain combos for bonus!
       </p>
 
-      {/* CSS animations */}
+      {/* CSS */}
       <style>{`
         @keyframes twinkle {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.8; }
+          0%, 100% { opacity: 0.2; transform: scale(0.8); }
+          50% { opacity: 0.9; transform: scale(1.1); }
+        }
+        .gpu-accelerated {
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          will-change: transform, opacity;
+        }
+        .game-container {
+          background: linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(15,15,35,0.95) 50%, rgba(25,15,45,0.9) 100%);
+          border: 1px solid rgba(255,255,255,0.08);
+          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .combo-badge {
+          background: linear-gradient(135deg, rgba(250,204,21,0.2) 0%, rgba(251,191,36,0.1) 100%);
+          border: 1px solid rgba(250,204,21,0.4);
+          box-shadow: 0 0 20px rgba(250,204,21,0.3);
         }
       `}</style>
     </div>
