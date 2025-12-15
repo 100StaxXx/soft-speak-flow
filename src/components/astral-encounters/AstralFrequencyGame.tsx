@@ -415,12 +415,6 @@ export const AstralFrequencyGame = ({
       {/* Frequency slider */}
       <div className="w-full max-w-xs">
         <div className="relative">
-          {/* Target indicator on slider */}
-          <div
-            className="absolute -top-2 w-1 h-6 bg-purple-500 rounded-full z-10 pointer-events-none target-indicator"
-            style={{ left: `${targetFrequency}%` }}
-          />
-          
           <input
             type="range"
             min="0"
@@ -475,13 +469,6 @@ export const AstralFrequencyGame = ({
         @keyframes scale-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.05); }
-        }
-        .target-indicator {
-          animation: target-pulse 1s ease-in-out infinite;
-        }
-        @keyframes target-pulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
         }
         .frequency-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
