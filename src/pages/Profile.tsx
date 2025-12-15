@@ -75,23 +75,6 @@ const Profile = () => {
     }
   }, [location.state?.showDeleteDialog, location.pathname, navigate]);
 
-  const { data: adaptivePushSettings, refetch: refetchSettings } = useQuery({
-    queryKey: ["adaptive-push-settings", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { data, error } = await supabase
-        .from("adaptive_push_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const { data: mentors } = useQuery({
     queryKey: ["mentors", "active"],
@@ -129,23 +112,6 @@ const Profile = () => {
     },
   });
 
-  const handleToggleAdaptivePush = async () => {
-    if (!user) return;
-    try {
-      const newState = !adaptivePushSettings?.enabled;
-      if (adaptivePushSettings) {
-        const { error } = await supabase
-          .from("adaptive_push_settings")
-          .update({ enabled: newState })
-          .eq("user_id", user.id);
-        if (error) throw error;
-      }
-      refetchSettings();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to toggle adaptive push";
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-    }
-  };
 
   const handleChangeMentor = async (mentorId: string) => {
     if (!user || isChangingMentor) return;
@@ -240,20 +206,6 @@ const Profile = () => {
     }
   };
 
-  const handleCreateAdaptivePushSettings = async () => {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("adaptive_push_settings").insert({
-        user_id: user.id,
-        enabled: true,
-        mentor_id: profile?.selected_mentor_id,
-      });
-      if (!error) refetchSettings();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to update settings";
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-    }
-  };
 
 
   if (!user) {
@@ -570,25 +522,6 @@ const Profile = () => {
             <TabsContent value="notifications" className="space-y-6">
               <PushNotificationSettings />
               <DailyQuoteSettings />
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />Adaptive Pushes™</CardTitle>
-                  <CardDescription>Smart reminders in the voice you need, exactly when you need them</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {adaptivePushSettings ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <Label>Enable Adaptive Pushes</Label>
-                        <p className="text-sm text-muted-foreground">Get personalized nudges throughout your day</p>
-                      </div>
-                      <Switch checked={adaptivePushSettings.enabled ?? false} onCheckedChange={handleToggleAdaptivePush} />
-                    </div>
-                  ) : (
-                    <Button onClick={handleCreateAdaptivePushSettings} className="w-full">Enable Adaptive Pushes</Button>
-                  )}
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-6">
