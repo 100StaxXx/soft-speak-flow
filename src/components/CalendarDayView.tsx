@@ -1,5 +1,5 @@
 import { format, addDays, subDays, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
@@ -7,7 +7,6 @@ import { QuestDragCard } from "./QuestDragCard";
 import { useEffect, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
-import { toast } from "sonner";
 import { CalendarTask } from "@/types/quest";
 
 interface CalendarDayViewProps {
@@ -92,7 +91,12 @@ export const CalendarDayView = ({
 
   const getUnscheduledTasks = () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return tasks.filter(task => task.task_date === dateStr && !task.scheduled_time);
+    return tasks.filter(task => task.task_date === dateStr && !task.scheduled_time && !task.completed);
+  };
+
+  const getCompletedTasks = () => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return tasks.filter(task => task.task_date === dateStr && task.completed);
   };
 
   const calculateTaskHeight = (duration: number | null) => {
@@ -423,10 +427,37 @@ export const CalendarDayView = ({
         </div>
       </ScrollArea>
 
+      {/* Completed Today Section */}
+      {getCompletedTasks().length > 0 && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
+            <CheckCircle2 className="h-4 w-4" />
+            Completed Today ({getCompletedTasks().length})
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {getCompletedTasks().slice(0, 5).map((task) => (
+              <div
+                key={task.id}
+                className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary line-through opacity-70"
+              >
+                {task.task_text}
+              </div>
+            ))}
+            {getCompletedTasks().length > 5 && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                +{getCompletedTasks().length - 5} more
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Long Press Hint */}
-      <div className="text-center text-xs text-muted-foreground">
-        💡 Drag unscheduled quests or long press on a time to add a new quest
-      </div>
+      {dayTasks.length > 0 && (
+        <div className="text-center text-xs text-muted-foreground">
+          💡 Drag unscheduled quests or long press on a time to add a new quest
+        </div>
+      )}
     </div>
   );
 };
