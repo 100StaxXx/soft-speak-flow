@@ -50,6 +50,7 @@ interface OrbComponentProps {
   disabled: boolean;
 }
 
+// Premium Orb component with refined visuals
 const OrbComponent = memo(({ 
   orb, 
   isHighlighted, 
@@ -60,29 +61,44 @@ const OrbComponent = memo(({
   onClick, 
   disabled 
 }: OrbComponentProps) => {
-  const buttonClasses = useMemo(() => {
-    if (orb.tapped) return 'bg-gradient-to-br from-green-500 to-green-600 border-green-400 text-white';
-    if (isHighlighted) return 'bg-gradient-to-br from-primary to-accent border-primary text-primary-foreground scale-125 z-20';
-    if (isPast) return 'bg-primary/40 border-primary/50 text-primary-foreground';
-    if (isNext) return 'bg-primary/30 border-primary/80 text-primary-foreground';
-    return 'bg-muted/40 border-border text-muted-foreground hover:bg-muted/60 hover:border-primary/50';
+  const getOrbStyle = useMemo(() => {
+    if (orb.tapped) return {
+      bg: 'linear-gradient(135deg, #22c55e, #16a34a)',
+      border: 'rgba(34,197,94,0.6)',
+      shadow: '0 0 25px rgba(34,197,94,0.5), inset 0 2px 4px rgba(255,255,255,0.2)',
+    };
+    if (isHighlighted) return {
+      bg: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
+      border: 'rgba(255,255,255,0.4)',
+      shadow: '0 0 35px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.4), inset 0 2px 4px rgba(255,255,255,0.3)',
+    };
+    if (isPast) return {
+      bg: 'linear-gradient(135deg, hsl(var(--primary)/0.5), hsl(var(--accent)/0.5))',
+      border: 'rgba(255,255,255,0.2)',
+      shadow: '0 4px 15px rgba(0,0,0,0.3)',
+    };
+    if (isNext) return {
+      bg: 'linear-gradient(135deg, hsl(var(--primary)/0.4), hsl(var(--accent)/0.4))',
+      border: 'hsl(var(--primary)/0.6)',
+      shadow: '0 0 20px hsl(var(--primary)/0.4), inset 0 2px 4px rgba(255,255,255,0.15)',
+    };
+    return {
+      bg: 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+      border: 'rgba(255,255,255,0.1)',
+      shadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)',
+    };
   }, [orb.tapped, isHighlighted, isPast, isNext]);
-
-  const boxShadow = useMemo(() => {
-    if (isHighlighted) return '0 0 30px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.5)';
-    if (orb.tapped) return '0 0 20px hsl(142, 76%, 46%)';
-    if (isNext) return '0 0 15px hsl(var(--primary)/0.5)';
-    return 'none';
-  }, [isHighlighted, orb.tapped, isNext]);
 
   return (
     <motion.button
-      className={`absolute w-14 h-14 rounded-full border-2 flex items-center justify-center font-bold transition-colors will-animate gpu-accelerated ${buttonClasses}`}
+      className="absolute w-14 h-14 rounded-full flex items-center justify-center font-bold gpu-accelerated touch-target"
       style={{
         left: `${orb.x}%`,
         top: `${orb.y}%`,
         transform: 'translate(-50%, -50%)',
-        boxShadow,
+        background: getOrbStyle.bg,
+        border: `2px solid ${getOrbStyle.border}`,
+        boxShadow: getOrbStyle.shadow,
       }}
       initial={{ scale: 0, opacity: 0 }}
       animate={{ 
@@ -92,31 +108,38 @@ const OrbComponent = memo(({
       exit={{ scale: 0, opacity: 0 }}
       onClick={onClick}
       disabled={disabled}
-      whileTap={{ scale: 0.9 }}
+      whileTap={{ scale: 0.92 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
     >
-      {/* Number display */}
-      <span className={`text-lg ${isHighlighted ? 'font-black' : ''}`}>
+      {/* Number with glow */}
+      <span 
+        className={`text-lg ${isHighlighted || orb.tapped ? 'text-white' : 'text-white/70'}`}
+        style={{ 
+          textShadow: isHighlighted ? '0 0 10px white' : 'none',
+          fontWeight: isHighlighted ? 800 : 600,
+        }}
+      >
         {showNumber ? orb.order : '?'}
       </span>
 
-      {/* Pulse ring for current orb - CSS only */}
+      {/* Pulse ring for next orb */}
       {isNext && (
-        <div className="absolute inset-0 rounded-full border-2 border-primary pulse-ring" />
+        <motion.div 
+          className="absolute inset-[-3px] rounded-full"
+          style={{ border: '2px solid hsl(var(--primary))' }}
+          animate={{ scale: [1, 1.3, 1], opacity: [0.8, 0, 0.8] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+        />
       )}
 
-      {/* Highlight ring animation */}
+      {/* Expanding rings for highlighted orb */}
       {isHighlighted && (
         <>
           <motion.div
-            className="absolute inset-0 rounded-full border-4 border-white"
-            initial={{ scale: 1, opacity: 1 }}
-            animate={{ scale: 1.8, opacity: 0 }}
-            transition={{ duration: 0.6, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute inset-0 rounded-full bg-white/20"
-            animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
-            transition={{ duration: 0.6 }}
+            className="absolute inset-0 rounded-full border-2 border-white"
+            initial={{ scale: 1, opacity: 0.8 }}
+            animate={{ scale: 2, opacity: 0 }}
+            transition={{ duration: 0.8, repeat: Infinity }}
           />
         </>
       )}
@@ -126,19 +149,16 @@ const OrbComponent = memo(({
         <motion.div
           className="absolute inset-0 rounded-full flex items-center justify-center"
           initial={{ scale: 0.5, opacity: 1 }}
-          animate={{ scale: 2, opacity: 0 }}
-          transition={{ duration: 0.4 }}
+          animate={{ scale: 2.5, opacity: 0 }}
+          transition={{ duration: 0.5 }}
         >
-          <span className="text-2xl">
-            {tapResult.success ? '✨' : '❌'}
-          </span>
+          <span className="text-2xl">{tapResult.success ? '✨' : '❌'}</span>
         </motion.div>
       )}
     </motion.button>
   );
 });
 OrbComponent.displayName = 'OrbComponent';
-
 // Memoized connection lines - only renders when sequence is being shown
 const ConnectionLines = memo(({ orbs, highlightIndex }: { orbs: Orb[]; highlightIndex: number }) => {
   if (highlightIndex <= 0) return null;
@@ -356,18 +376,28 @@ export const TapSequenceGame = ({
         )}
       </AnimatePresence>
 
-      {/* Game area */}
-      <div className="relative w-full aspect-square max-w-xs bg-gradient-to-br from-muted/20 to-background rounded-2xl border border-border/50 overflow-hidden shadow-inner">
-        {/* Cosmic background effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+      {/* Premium game area */}
+      <div 
+        className="relative w-full aspect-square max-w-xs rounded-2xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(15,15,35,0.95) 50%, rgba(25,15,45,0.9) 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+        }}
+      >
+        {/* Nebula background effect */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/8 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-cyan-500/6 rounded-full blur-3xl" />
+        </div>
         
-        {/* Animated star particles - memoized with CSS */}
+        {/* Star particles */}
         <StarBackground stars={stars} />
 
-        {/* Connection lines between orbs during sequence show */}
+        {/* Connection lines */}
         {gameState === 'showing' && <ConnectionLines orbs={orbs} highlightIndex={highlightIndex} />}
         
-        {/* Orbs - using memoized component */}
+        {/* Orbs */}
         <AnimatePresence>
           {orbs.map((orb) => {
             const isHighlighted = gameState === 'showing' && highlightIndex === orb.order;
@@ -398,21 +428,21 @@ export const TapSequenceGame = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-background/80 flex items-center justify-center z-30"
+              className="absolute inset-0 flex items-center justify-center z-30"
+              style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="text-center"
               >
-                <span className="text-4xl">🎉</span>
-                <p className="text-lg font-bold text-foreground mt-2">Round Complete!</p>
+                <span className="text-5xl">🎉</span>
+                <p className="text-lg font-bold text-white mt-3">Round Complete!</p>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-
       {/* Instructions */}
       <motion.p 
         className="mt-4 text-sm text-muted-foreground text-center"
@@ -435,29 +465,24 @@ export const TapSequenceGame = ({
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-          20%, 40%, 60%, 80% { transform: translateX(4px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+          20%, 40%, 60%, 80% { transform: translateX(3px); }
         }
-        .animate-shake {
-          animation: shake 0.3s ease-in-out;
-        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
         @keyframes twinkle {
-          0%, 100% { opacity: 0.2; transform: scale(0.5); }
-          50% { opacity: 0.8; transform: scale(1); }
-        }
-        .pulse-ring {
-          animation: pulse-expand 1s ease-out infinite;
-        }
-        @keyframes pulse-expand {
-          0% { transform: scale(1); opacity: 0.5; }
-          100% { transform: scale(1.5); opacity: 0; }
-        }
-        .will-animate {
-          will-change: transform, opacity;
+          0%, 100% { opacity: 0.15; transform: scale(0.6); }
+          50% { opacity: 0.7; transform: scale(1); }
         }
         .gpu-accelerated {
           transform: translateZ(0);
           backface-visibility: hidden;
+          will-change: transform, opacity;
+        }
+        .touch-target {
+          min-height: 44px;
+          min-width: 44px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </div>
