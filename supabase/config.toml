@@ -1,7 +1,4 @@
-project_id = "opbfpbbqvuksuvmtmssd"
-
-[functions.delete-user-account]
-verify_jwt = true
+project_id = "tffrgsaawvletgiztfry"
 
 [functions.delete-user]
 verify_jwt = true
@@ -40,6 +37,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.dispatch-daily-pushes]
+verify_jwt = false
+
+[functions.dispatch-daily-pushes-native]
 verify_jwt = false
 
 [functions.generate-mentor-content]
@@ -113,3 +113,66 @@ verify_jwt = true
 
 [functions.generate-cosmic-deep-dive]
 verify_jwt = true
+
+[functions.generate-proactive-nudges]
+verify_jwt = false
+
+[functions.generate-daily-missions]
+verify_jwt = false
+
+[functions.generate-daily-quotes]
+verify_jwt = false
+
+[functions.dispatch-daily-quote-pushes]
+verify_jwt = false
+
+[functions.schedule-daily-quote-pushes]
+verify_jwt = false
+
+[functions.generate-activity-comment]
+verify_jwt = false
+
+[functions.generate-check-in-response]
+verify_jwt = false
+
+[functions.generate-companion-image]
+verify_jwt = false
+
+[functions.generate-companion-story]
+verify_jwt = false
+
+[functions.generate-evolution-card]
+verify_jwt = false
+
+[functions.generate-weekly-insights]
+verify_jwt = false
+
+[functions.mentor-chat]
+verify_jwt = true
+
+[functions.send-apns-notification]
+verify_jwt = false
+
+[functions.create-influencer-code]
+verify_jwt = false
+
+[functions.request-referral-payout]
+verify_jwt = true
+
+[functions.process-paypal-payout]
+verify_jwt = false
+
+[functions.reset-companion]
+verify_jwt = true
+
+[functions.schedule-adaptive-pushes]
+verify_jwt = false
+
+[functions.deliver-adaptive-pushes]
+verify_jwt = false
+
+[functions.trigger-adaptive-event]
+verify_jwt = true
+
+[functions.generate-adaptive-push]
+verify_jwt = false
