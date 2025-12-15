@@ -45,7 +45,6 @@ export interface AddTaskParams {
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
   category?: string;
-  notes?: string | null;
 }
 
 export const useTaskMutations = (taskDate: string) => {
@@ -96,7 +95,6 @@ export const useTaskMutations = (taskDate: string) => {
             is_recurring: !!params.recurrencePattern,
             reminder_enabled: params.reminderEnabled ?? false,
             reminder_minutes_before: params.reminderMinutesBefore ?? 15,
-            notes: params.notes || null,
             category: detectedCategory,
             is_bonus: false
           });
@@ -273,7 +271,6 @@ export const useTaskMutations = (taskDate: string) => {
         difficulty: string;
         scheduled_time: string | null;
         estimated_duration: number | null;
-        notes: string | null;
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -285,7 +282,6 @@ export const useTaskMutations = (taskDate: string) => {
           difficulty: updates.difficulty,
           scheduled_time: updates.scheduled_time,
           estimated_duration: updates.estimated_duration,
-          notes: updates.notes,
         })
         .eq('id', taskId)
         .eq('user_id', user.id);
