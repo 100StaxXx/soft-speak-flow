@@ -12,13 +12,14 @@ class SoundManager {
   private activeIntervals: Set<NodeJS.Timeout> = new Set();
   private globalMuteUnsubscribe: (() => void) | null = null;
 
+  private encounterMusicVolume = 0.4;
+
   constructor() {
     if (typeof window !== 'undefined') {
-      // Use shared audio context for iOS compatibility
       this.audioContext = getSharedAudioContext();
       this.loadSoundPreferences();
+      this.loadEncounterMusicVolume();
       
-      // Subscribe to global mute changes
       this.isGloballyMuted = globalAudio.getMuted();
       this.globalMuteUnsubscribe = globalAudio.subscribe((muted) => {
         this.isGloballyMuted = muted;
@@ -27,7 +28,13 @@ class SoundManager {
         }
       });
       
-      // Cleanup all intervals on page unload
+      window.addEventListener('encounter-music-volume-change', ((e: CustomEvent) => {
+        this.encounterMusicVolume = e.detail;
+        if (this.encounterMusicAudio) {
+          this.encounterMusicAudio.volume = this.encounterMusicVolume;
+        }
+      }) as EventListener);
+      
       window.addEventListener('beforeunload', () => {
         this.stopAllAmbientSounds();
         if (this.globalMuteUnsubscribe) {
@@ -36,7 +43,17 @@ class SoundManager {
       });
     }
   }
-  
+
+  private loadEncounterMusicVolume() {
+    const savedVolume = safeLocalStorage.getItem('encounter_music_volume');
+    if (savedVolume) {
+      const parsed = parseFloat(savedVolume);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        this.encounterMusicVolume = parsed;
+      }
+    }
+  }
+
   // Check if audio should be muted (either locally or globally)
   private shouldMute(): boolean {
     return this.isMuted || this.isGloballyMuted;
@@ -405,15 +422,12 @@ class SoundManager {
   playEncounterMusic(): HTMLAudioElement | null {
     if (this.shouldMute()) return null;
     
-    // Stop any existing music first
     this.stopEncounterMusic();
     
     this.encounterMusicAudio = new Audio('/sounds/encounter-music.mp3');
-    this.encounterMusicAudio.volume = this.masterVolume * 0.4;
+    this.encounterMusicAudio.volume = this.encounterMusicVolume;
     this.encounterMusicAudio.loop = true;
-    this.encounterMusicAudio.play().catch(() => {
-      // Ignore autoplay errors
-    });
+    this.encounterMusicAudio.play().catch(() => {});
     
     return this.encounterMusicAudio;
   }

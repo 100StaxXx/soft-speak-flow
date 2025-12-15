@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useLongPress } from "@/hooks/useLongPress";
 import { cn } from "@/lib/utils";
+import { haptics } from "@/utils/haptics";
 
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
@@ -61,6 +62,7 @@ export const BottomNav = memo(() => {
           to="/mentor"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
@@ -90,6 +92,7 @@ export const BottomNav = memo(() => {
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="companion-tab"
+          onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
@@ -152,6 +155,7 @@ export const BottomNav = memo(() => {
           to="/search"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
@@ -167,6 +171,7 @@ export const BottomNav = memo(() => {
           to="/profile"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>

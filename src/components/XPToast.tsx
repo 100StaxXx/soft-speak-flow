@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import confetti from "canvas-confetti";
+import { haptics } from "@/utils/haptics";
 
 interface XPToastProps {
   xp: number;
@@ -13,6 +14,9 @@ interface XPToastProps {
 export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
   useEffect(() => {
     if (show) {
+      // Haptic feedback for XP gain
+      haptics.success();
+      
       // Enhanced confetti burst
       const isBigXP = xp >= 50;
       
