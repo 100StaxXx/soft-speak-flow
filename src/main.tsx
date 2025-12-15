@@ -1,8 +1,25 @@
 import { createRoot } from "react-dom/client";
 import { Suspense, lazy, useEffect } from "react";
+import * as Sentry from "@sentry/react";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
+
+// Initialize Sentry error tracking (only in production with valid DSN)
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (sentryDsn && import.meta.env.PROD) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: import.meta.env.MODE,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+    ],
+    tracesSampleRate: 0.1, // 10% of transactions
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0, // 100% of errors get replay
+  });
+}
 
 // Global error tracking for unhandled errors
 window.addEventListener('error', (event) => {
