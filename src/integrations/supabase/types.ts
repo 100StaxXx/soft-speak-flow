@@ -1754,6 +1754,39 @@ export type Database = {
         }
         Relationships: []
       }
+      evening_reflections: {
+        Row: {
+          created_at: string
+          gratitude: string | null
+          id: string
+          mentor_response: string | null
+          mood: string
+          reflection_date: string
+          user_id: string
+          wins: string | null
+        }
+        Insert: {
+          created_at?: string
+          gratitude?: string | null
+          id?: string
+          mentor_response?: string | null
+          mood: string
+          reflection_date?: string
+          user_id: string
+          wins?: string | null
+        }
+        Update: {
+          created_at?: string
+          gratitude?: string | null
+          id?: string
+          mentor_response?: string | null
+          mood?: string
+          reflection_date?: string
+          user_id?: string
+          wins?: string | null
+        }
+        Relationships: []
+      }
       evolution_thresholds: {
         Row: {
           stage: number
@@ -4018,6 +4051,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      weekly_recaps: {
+        Row: {
+          created_at: string
+          gratitude_themes: string[] | null
+          id: string
+          mentor_insight: string | null
+          mood_data: Json | null
+          stats: Json | null
+          user_id: string
+          viewed_at: string | null
+          week_end_date: string
+          week_start_date: string
+          win_highlights: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          gratitude_themes?: string[] | null
+          id?: string
+          mentor_insight?: string | null
+          mood_data?: Json | null
+          stats?: Json | null
+          user_id: string
+          viewed_at?: string | null
+          week_end_date: string
+          week_start_date: string
+          win_highlights?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          gratitude_themes?: string[] | null
+          id?: string
+          mentor_insight?: string | null
+          mood_data?: Json | null
+          stats?: Json | null
+          user_id?: string
+          viewed_at?: string | null
+          week_end_date?: string
+          week_start_date?: string
+          win_highlights?: string[] | null
+        }
+        Relationships: []
       }
       written_content: {
         Row: {

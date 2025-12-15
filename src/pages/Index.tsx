@@ -12,6 +12,8 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
+import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
+import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
@@ -300,6 +302,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             
             <ErrorBoundary>
               <MorningCheckIn />
+            </ErrorBoundary>
+
+            <ErrorBoundary>
+              <EveningReflectionBanner />
+            </ErrorBoundary>
+
+            <ErrorBoundary>
+              <WeeklyRecapCard />
             </ErrorBoundary>
           
             <ErrorBoundary>

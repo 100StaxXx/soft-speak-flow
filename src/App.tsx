@@ -25,6 +25,7 @@ import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
+import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -61,6 +62,7 @@ const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 
 const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
+const Recaps = lazy(() => import("./pages/Recaps"));
 
 
 // Create query client outside component for better performance and stability
@@ -115,6 +117,7 @@ const EvolutionAwareContent = memo(() => {
       <GlobalEvolutionListener />
       <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
       <SubscriptionGate />
+      <WeeklyRecapModal />
     </>
   );
 });
@@ -224,6 +227,7 @@ const AppContent = memo(() => {
             <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
             <Route path="/partners" element={<Partners />} />
             <Route path="/account-deletion" element={<AccountDeletionHelp />} />
+            <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="*" element={<NotFound />} />

@@ -47,6 +47,10 @@ export const SYSTEM_XP_REWARDS = {
   PEP_TALK_LISTEN: 8,
   /** Morning check-in completion (quick tap, low effort) */
   CHECK_IN: 3,
+  /** Evening reflection completion */
+  EVENING_REFLECTION: 3,
+  /** Viewing weekly recap */
+  WEEKLY_RECAP_VIEWED: 5,
   /** Reaching a streak milestone */
   STREAK_MILESTONE: 15,
   /** Returning after inactivity to re-engage with the companion */

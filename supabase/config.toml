@@ -170,3 +170,9 @@ verify_jwt = true
 
 [functions.dispatch-mentor-nudge-pushes]
 verify_jwt = false
+
+[functions.generate-evening-response]
+verify_jwt = false
+
+[functions.generate-weekly-recap]
+verify_jwt = false
