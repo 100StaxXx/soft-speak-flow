@@ -198,12 +198,12 @@ export const OrbMatchGame = ({
   // Soul stat bonus - extends move time
   const soulBonus = companionStats.soul / 100;
 
-  // Difficulty config
+  // Difficulty config - 30 second total game time, threshold-based passing
   const config = useMemo(() => {
     const settings = {
-      easy: { colors: 5 as const, moveTime: 6, rounds: 2, targetScore: 150 },
-      medium: { colors: 5 as const, moveTime: 5, rounds: 2, targetScore: 200 },
-      hard: { colors: 6 as const, moveTime: 4, rounds: 3, targetScore: 280 },
+      easy: { colors: 5 as const, moveTime: 6, targetScore: 150, totalTime: 30 },
+      medium: { colors: 5 as const, moveTime: 5, targetScore: 200, totalTime: 30 },
+      hard: { colors: 6 as const, moveTime: 4, targetScore: 280, totalTime: 30 },
     };
     const s = settings[difficulty];
     return {
@@ -247,9 +247,9 @@ export const OrbMatchGame = ({
   // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
-    setTimeLeft(config.rounds * 8); // Total game time
+    setTimeLeft(config.totalTime); // Fixed 30 second total game time
     startRound();
-  }, [config.rounds, startRound]);
+  }, [config.totalTime, startRound]);
 
   // Find matches in the grid
   const findMatches = useCallback((currentOrbs: Orb[]): Set<string> => {
@@ -422,10 +422,13 @@ export const OrbMatchGame = ({
         setMaxCombo(m => Math.max(m, newCombo));
         return newCombo;
       });
+      
+      // Reset move timer on successful match
+      setMoveTimeLeft(config.moveTime);
     }
 
     return currentCombo;
-  }, [findMatches, dropAndFill]);
+  }, [findMatches, dropAndFill, config.moveTime]);
 
   // Get cell from touch/mouse position
   const getCellFromPosition = useCallback((clientX: number, clientY: number): { row: number; col: number } | null => {
@@ -512,7 +515,7 @@ export const OrbMatchGame = ({
     isDraggingRef.current = false;
     
     if (dragPath.length > 1) {
-      // Stop move timer
+      // Stop move timer temporarily
       if (moveTimerRef.current) {
         clearInterval(moveTimerRef.current);
         moveTimerRef.current = null;
@@ -521,27 +524,13 @@ export const OrbMatchGame = ({
       // Use ref to get latest orbs state (avoids stale closure)
       const currentOrbs = orbsRef.current;
       
-      // Process matches with latest orbs
+      // Process matches with latest orbs (timer resets inside if match found)
       await processMatches(currentOrbs);
-      
-      // Check if round complete or start new move timer
-      setRoundsCompleted(r => {
-        const newRounds = r + 1;
-        if (newRounds >= config.rounds) {
-          setTimeout(() => setGameState('complete'), 500);
-        } else {
-          // Start new round after delay
-          setTimeout(() => {
-            setMoveTimeLeft(config.moveTime);
-          }, 500);
-        }
-        return newRounds;
-      });
     }
     
     setSelectedOrb(null);
     setDragPath([]);
-  }, [dragPath, processMatches, config.rounds, config.moveTime]);
+  }, [dragPath, processMatches]);
 
   // Mouse/touch event handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -612,17 +601,23 @@ export const OrbMatchGame = ({
     return () => clearInterval(timer);
   }, [gameState]);
 
-  // Complete game
+  // Complete game - threshold-based pass/fail
   useEffect(() => {
     if (gameState === 'complete') {
-      const scoreRatio = Math.min(1, score / config.targetScore);
-      const comboBonus = Math.min(maxCombo * 3, 20);
-      const accuracy = Math.round(Math.min(100, scoreRatio * 80 + comboBonus));
-      const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+      const passed = score >= config.targetScore;
+      const comboBonus = Math.min(maxCombo * 2, 15);
+      
+      // If passed, accuracy is 70-100 based on how much over threshold
+      // If failed, accuracy is 0-50 based on how close to threshold
+      const accuracy = passed 
+        ? Math.round(Math.min(100, 70 + ((score - config.targetScore) / config.targetScore) * 30 + comboBonus))
+        : Math.round(Math.min(50, (score / config.targetScore) * 50));
+      
+      const result = passed && accuracy >= 90 ? 'perfect' : passed && accuracy >= 70 ? 'good' : passed ? 'partial' : 'fail';
       
       setTimeout(() => {
         onComplete({
-          success: accuracy >= 50,
+          success: passed,
           accuracy,
           result,
         });
@@ -651,13 +646,13 @@ export const OrbMatchGame = ({
       {/* Game HUD */}
       <GameHUD
         title="Orb Match"
-        subtitle="Drag orbs to match 3+"
+        subtitle={`Target: ${config.targetScore} pts`}
         timeLeft={timeLeft}
-        totalTime={config.rounds * 8}
+        totalTime={config.totalTime}
         combo={combo}
         showCombo={true}
-        primaryStat={{ value: score, label: 'Score', color: '#a855f7' }}
-        secondaryStat={{ value: roundsCompleted, label: `Round ${roundsCompleted + 1}/${config.rounds}`, color: '#22d3ee' }}
+        primaryStat={{ value: score, label: `${score}/${config.targetScore}`, color: score >= config.targetScore ? '#22c55e' : '#a855f7' }}
+        secondaryStat={{ value: Math.round((score / config.targetScore) * 100), label: `${Math.min(100, Math.round((score / config.targetScore) * 100))}%`, color: '#22d3ee' }}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
