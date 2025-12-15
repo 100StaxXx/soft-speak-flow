@@ -9,6 +9,7 @@ interface QuestDropZoneProps {
   onDrop: (e: React.DragEvent) => void;
   children?: React.ReactNode;
   time?: string;
+  className?: string;
   onTouchStart?: () => void;
   onTouchEnd?: () => void;
   onMouseDown?: () => void;
@@ -23,6 +24,7 @@ export const QuestDropZone = ({
   onDrop,
   children,
   time,
+  className,
   onTouchStart,
   onTouchEnd,
   onMouseDown,
@@ -52,11 +54,12 @@ export const QuestDropZone = ({
         onMouseLeaveHandler?.();
       }}
       className={cn(
-        "min-h-[80px] border rounded-lg p-2 transition-all duration-300 relative overflow-hidden",
-        isDragOver && !hasConflict && "border-primary bg-primary/10 shadow-glow scale-105",
-        isDragOver && hasConflict && "border-destructive bg-destructive/10 shadow-destructive/50",
-        !isDragOver && hasConflict && "border-destructive/50 bg-destructive/5",
-        !isDragOver && !hasConflict && "border-border hover:border-primary/30"
+        "min-h-[80px] p-2 transition-all duration-300 relative overflow-hidden",
+        isDragOver && !hasConflict && "bg-primary/10",
+        isDragOver && hasConflict && "bg-destructive/10",
+        !isDragOver && hasConflict && "bg-destructive/5",
+        !isDragOver && !hasConflict && "hover:bg-muted/30",
+        className
       )}
     >
       {/* Background animation on drag over */}
