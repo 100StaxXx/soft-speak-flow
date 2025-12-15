@@ -7,7 +7,7 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useProfile } from "@/hooks/useProfile";
-import { getHabitXP } from "@/config/xpRewards";
+import { getHabitXP, HABIT_XP_REWARDS } from "@/config/xpRewards";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { format } from "date-fns";
@@ -175,7 +175,7 @@ export function useHabits() {
           const habit = habits.find(h => h.id === habitId);
           if (!habit) throw new Error('Habit not found');
           
-          const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : 10;
+          const xpAmount = habit.difficulty ? getHabitXP(habit.difficulty as 'easy' | 'medium' | 'hard') : HABIT_XP_REWARDS.EASY;
           await awardCustomXP(xpAmount, 'habit_complete', 'Habit Complete!');
           await maybeAwardAllHabitsComplete();
           

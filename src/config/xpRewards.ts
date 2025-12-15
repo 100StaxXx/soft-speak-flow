@@ -89,6 +89,28 @@ export const ENCOUNTER_RESULT_MULTIPLIERS = {
 } as const;
 
 /**
+ * Epic XP Rewards
+ * 
+ * Formula: targetDays * XP_PER_DAY
+ */
+export const EPIC_XP_REWARDS = {
+  /** XP earned per day of epic duration */
+  XP_PER_DAY: 10,
+} as const;
+
+/**
+ * Calendar Power-Up XP Bonuses
+ * 
+ * Bonus XP for strategic scheduling behaviors.
+ */
+export const CALENDAR_BONUS_XP = {
+  /** Per morning task (before 9am) */
+  MORNING_WARRIOR: 10,
+  /** Per deep work block (90+ min) */
+  DEEP_WORK: 20,
+} as const;
+
+/**
  * Type-safe difficulty type
  */
 export type Difficulty = 'easy' | 'medium' | 'hard';

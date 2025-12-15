@@ -45,6 +45,14 @@
  * - Partial (50-69%): 0.5x XP
  * - Fail (<50%): 0x XP
  *
+ * EPICS:
+ * - XP Reward: targetDays × 10 XP per day
+ * - Example: 30-day Epic = 300 XP on completion
+ *
+ * CALENDAR POWER-UPS:
+ * - Morning Warrior (before 9am): +10 XP per task
+ * - Deep Work Block (90+ min): +20 XP per task
+ *
  * STREAK MULTIPLIER:
  * - 0-6 day streak: 1.0x XP
  * - 7-29 day streak: 1.5x XP
