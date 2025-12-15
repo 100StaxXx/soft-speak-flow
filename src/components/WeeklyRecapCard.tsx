@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
 
 export const WeeklyRecapCard = () => {
-  const { currentRecap, openRecap, isSunday } = useWeeklyRecap();
+  const { currentRecap, openRecap } = useWeeklyRecap();
 
   // Only show if recap exists for current week
   if (!currentRecap) return null;
