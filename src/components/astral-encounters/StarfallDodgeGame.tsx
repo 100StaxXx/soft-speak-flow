@@ -117,7 +117,7 @@ export const StarfallDodgeGame = ({
   const [hits, setHits] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(12);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [totalCrystals, setTotalCrystals] = useState(0);
   const [shake, setShake] = useState(false);
   const [playerGlow, setPlayerGlow] = useState(false);
@@ -150,12 +150,12 @@ export const StarfallDodgeGame = ({
   const statBonus = Math.round((companionStats.mind + companionStats.body) / 2);
   const playerSize = 32 + Math.floor(statBonus / 35);
 
-  // Memoized difficulty settings
+  // Memoized difficulty settings - extended time for proper gameplay
   const config = useMemo(() => {
     const settings = {
-      easy: { spawnRate: 550, debrisRatio: 0.45, baseSpeed: 2, time: 12 },
-      medium: { spawnRate: 400, debrisRatio: 0.55, baseSpeed: 3, time: 12 },
-      hard: { spawnRate: 280, debrisRatio: 0.65, baseSpeed: 4, time: 12 },
+      easy: { spawnRate: 550, debrisRatio: 0.45, baseSpeed: 2, time: 30 },
+      medium: { spawnRate: 400, debrisRatio: 0.55, baseSpeed: 3, time: 35 },
+      hard: { spawnRate: 280, debrisRatio: 0.65, baseSpeed: 4, time: 40 },
     };
     const s = settings[difficulty];
     return {
@@ -164,6 +164,11 @@ export const StarfallDodgeGame = ({
       baseSpeed: s.baseSpeed + questIntervalScale * 0.4,
     };
   }, [difficulty, questIntervalScale]);
+
+  // Initialize time based on difficulty
+  useEffect(() => {
+    setTimeLeft(config.time);
+  }, [config.time]);
 
   // Handle player movement
   const handleMove = useCallback((clientX: number) => {
@@ -327,7 +332,7 @@ export const StarfallDodgeGame = ({
         title="Starfall Dodge"
         subtitle="Collect crystals, dodge debris!"
         timeLeft={timeLeft}
-        totalTime={12}
+        totalTime={config.time}
         combo={combo}
         showCombo={true}
         primaryStat={{ value: crystalsCollected, label: 'Crystals', color: '#22d3ee' }}
@@ -336,10 +341,10 @@ export const StarfallDodgeGame = ({
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
 
-      {/* Game area */}
+      {/* Game area - taller for better gameplay */}
       <div
         ref={gameAreaRef}
-        className="relative w-full max-w-xs h-80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-primary/20 rounded-xl border border-border/50 overflow-hidden cursor-none touch-none shadow-2xl"
+        className="relative w-full max-w-xs h-96 bg-gradient-to-b from-slate-900 via-slate-900/95 to-primary/20 rounded-xl border border-border/50 overflow-hidden cursor-none touch-none shadow-2xl"
         onMouseMove={handleMouseMove}
         onTouchMove={handleTouchMove}
       >

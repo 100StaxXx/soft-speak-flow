@@ -29,9 +29,9 @@ interface TrailParticle {
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
-// EASIER: Smaller grid, larger cells
-const GRID_SIZE = 12;
-const CELL_SIZE = 24;
+// Larger cells for better mobile UX
+const GRID_SIZE = 10;
+const CELL_SIZE = 32;
 const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
 const MIN_SWIPE_DISTANCE = 30;
@@ -63,7 +63,7 @@ const DPadButton = memo(({
   
   return (
     <button
-      className={`absolute ${positions[direction]} w-14 h-14 rounded-xl 
+      className={`absolute ${positions[direction]} w-16 h-16 rounded-xl 
         bg-primary/20 border border-primary/40 backdrop-blur-sm
         active:bg-primary/40 active:scale-95 transition-all
         flex items-center justify-center touch-manipulation
@@ -77,7 +77,7 @@ const DPadButton = memo(({
       }}
       disabled={disabled}
     >
-      <Icon className="w-7 h-7 text-primary" />
+      <Icon className="w-8 h-8 text-primary" />
     </button>
   );
 });
@@ -723,7 +723,7 @@ export const AstralSerpentGame = ({
         {/* D-Pad Controls */}
         <div 
           className="relative mt-4"
-          style={{ width: 160, height: 160 }}
+          style={{ width: 192, height: 192 }}
         >
           <DPadButton direction="up" onPress={changeDirection} disabled={gameState !== 'playing'} />
           <DPadButton direction="down" onPress={changeDirection} disabled={gameState !== 'playing'} />
@@ -731,7 +731,7 @@ export const AstralSerpentGame = ({
           <DPadButton direction="right" onPress={changeDirection} disabled={gameState !== 'playing'} />
           
           {/* Center indicator */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-muted/30 border border-border/30" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-lg bg-muted/30 border border-border/30" />
         </div>
 
         {/* Control hint */}
