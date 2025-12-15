@@ -3227,6 +3227,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_audit_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event_type: string
+          function_name: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event_type: string
+          function_name: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          function_name?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       shout_push_log: {
         Row: {
           epic_id: string
@@ -4142,6 +4172,7 @@ export type Database = {
       }
     }
     Functions: {
+      cleanup_old_audit_logs: { Args: never; Returns: undefined }
       count_user_epics: { Args: { p_user_id: string }; Returns: number }
       create_companion_if_not_exists: {
         Args: {

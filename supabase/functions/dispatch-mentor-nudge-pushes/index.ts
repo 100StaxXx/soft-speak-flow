@@ -29,7 +29,7 @@ serve(async (req) => {
       .from('mentor_nudges')
       .select('id, user_id, message, nudge_type, context')
       .is('push_sent_at', null)
-      .eq('dismissed', false)
+      .is('dismissed_at', null)
       .order('created_at', { ascending: true })
       .limit(50)
 
