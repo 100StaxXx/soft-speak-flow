@@ -107,19 +107,19 @@ export interface EncounterPhase {
   accuracy: number;
 }
 
-// Theme to mini-game mapping
+// Theme to mini-game mapping (rebalanced for variety)
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
-  distraction: 'tap_sequence',
-  chaos: 'tap_sequence',
-  stagnation: 'astral_serpent',
-  laziness: 'astral_serpent',
-  anxiety: 'orb_match',
-  overthinking: 'orb_match',
-  doubt: 'starfall_dodge',
-  fear: 'starfall_dodge',
-  confusion: 'orb_match',
-  vulnerability: 'eclipse_timing',
-  imbalance: 'orb_match',
+  distraction: 'tap_sequence',      // Focus challenge - pattern recognition
+  chaos: 'tap_sequence',            // Order from chaos - memorize sequences
+  stagnation: 'astral_serpent',     // Movement/growth - get moving
+  laziness: 'astral_serpent',       // Action required - keep the serpent alive
+  anxiety: 'orb_match',             // Matching/organizing - find calm in order
+  overthinking: 'astral_frequency', // Quieting mental noise - find clarity
+  doubt: 'starfall_dodge',          // Facing fears - courage under fire
+  fear: 'starfall_dodge',           // Overcoming fear - dodge the darkness
+  confusion: 'rune_resonance',      // Finding patterns - recognize the rhythm
+  vulnerability: 'eclipse_timing',  // Precise timing - trust your instincts
+  imbalance: 'energy_beam',         // Controlled release - find balance
 };
 
 // Theme to stat mapping

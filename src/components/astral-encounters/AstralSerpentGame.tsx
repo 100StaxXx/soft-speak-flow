@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
@@ -30,8 +31,56 @@ type Direction = 'up' | 'down' | 'left' | 'right';
 
 const GRID_SIZE = 15;
 const CELL_SIZE = 20;
-const TRAIL_LIFETIME = 600; // ms
+const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
+const MIN_SWIPE_DISTANCE = 30;
+
+// Swipe indicator component
+const SwipeIndicator = memo(({ direction, visible }: { direction: Direction | null; visible: boolean }) => {
+  if (!visible || !direction) return null;
+  
+  const icons: Record<Direction, typeof ArrowUp> = {
+    up: ArrowUp,
+    down: ArrowDown,
+    left: ArrowLeft,
+    right: ArrowRight,
+  };
+  const Icon = icons[direction];
+  
+  return (
+    <motion.div
+      className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
+      initial={{ opacity: 0, scale: 1.5 }}
+      animate={{ opacity: 0.8, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.5 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="p-4 rounded-full bg-primary/30 backdrop-blur-sm">
+        <Icon className="w-12 h-12 text-primary" />
+      </div>
+    </motion.div>
+  );
+});
+SwipeIndicator.displayName = 'SwipeIndicator';
+
+// Swipe hint for first-time players
+const SwipeHint = memo(({ show }: { show: boolean }) => (
+  <AnimatePresence>
+    {show && (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className="absolute bottom-2 left-0 right-0 text-center z-20"
+      >
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/20 border border-primary/30">
+          <span className="text-xs text-primary">👆 Swipe or tap to change direction</span>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+));
+SwipeHint.displayName = 'SwipeHint';
 
 // Memoized cell component for performance
 const Cell = memo(({ 
@@ -114,7 +163,7 @@ const Cell = memo(({
 Cell.displayName = 'Cell';
 
 // Trail particle component
-const TrailParticle = memo(({ particle }: { particle: TrailParticle }) => (
+const TrailParticleComponent = memo(({ particle }: { particle: TrailParticle }) => (
   <motion.div
     className="absolute rounded-full pointer-events-none"
     style={{
@@ -131,7 +180,7 @@ const TrailParticle = memo(({ particle }: { particle: TrailParticle }) => (
     transition={{ duration: TRAIL_LIFETIME / 1000, ease: 'easeOut' }}
   />
 ));
-TrailParticle.displayName = 'TrailParticle';
+TrailParticleComponent.displayName = 'TrailParticleComponent';
 
 export const AstralSerpentGame = ({
   companionStats,
@@ -147,12 +196,16 @@ export const AstralSerpentGame = ({
   const [shake, setShake] = useState(false);
   const [showCollect, setShowCollect] = useState(false);
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
+  const [swipeIndicator, setSwipeIndicator] = useState<Direction | null>(null);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
   
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const trailCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const directionRef = useRef<Direction>('right');
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const particleIdRef = useRef(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate game speed based on difficulty and companion stats
   const bodyBonus = Math.min(companionStats.body / 100, 1);
@@ -169,14 +222,13 @@ export const AstralSerpentGame = ({
       id: `trail-${particleIdRef.current++}`,
       x: position.x,
       y: position.y,
-      opacity: Math.min(0.8, 0.4 + snakeLength * 0.05), // More intense trail for longer snake
+      opacity: Math.min(0.8, 0.4 + snakeLength * 0.05),
       scale: Math.min(1.2, 0.6 + snakeLength * 0.05),
       createdAt: Date.now(),
     };
     
     setTrailParticles(prev => {
       const updated = [...prev, newParticle];
-      // Limit max particles
       if (updated.length > MAX_TRAIL_PARTICLES) {
         return updated.slice(-MAX_TRAIL_PARTICLES);
       }
@@ -218,7 +270,6 @@ export const AstralSerpentGame = ({
       const head = prevSnake[0];
       const currentDirection = directionRef.current;
       
-      // Add trail particle at previous head position
       addTrailParticle(head, prevSnake.length);
       
       let newHead: Position;
@@ -292,10 +343,10 @@ export const AstralSerpentGame = ({
         setShowCollect(true);
         triggerHaptic('medium');
         setTimeout(() => setShowCollect(false), 300);
-        return newSnake; // Don't remove tail - snake grows
+        return newSnake;
       }
 
-      newSnake.pop(); // Remove tail
+      newSnake.pop();
       return newSnake;
     });
   }, [gameState, stardust, score, targetScore, spawnStardust, onComplete, addTrailParticle]);
@@ -325,8 +376,22 @@ export const AstralSerpentGame = ({
       directionRef.current = newDirection;
       setDirection(newDirection);
       triggerHaptic('light');
+      
+      // Show swipe indicator briefly
+      setSwipeIndicator(newDirection);
+      if (swipeTimeoutRef.current) {
+        clearTimeout(swipeTimeoutRef.current);
+      }
+      swipeTimeoutRef.current = setTimeout(() => {
+        setSwipeIndicator(null);
+      }, 200);
+      
+      // Hide hint after first input
+      if (showSwipeHint) {
+        setShowSwipeHint(false);
+      }
     }
-  }, []);
+  }, [showSwipeHint]);
 
   // Keyboard controls
   useEffect(() => {
@@ -365,48 +430,89 @@ export const AstralSerpentGame = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState, changeDirection]);
 
-  // Quadrant tap controls - tap relative to snake head position
-  const handleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  // Touch start handler - record starting position
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (gameState !== 'playing') return;
+    
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, [gameState]);
+
+  // Touch end handler - detect swipe or tap
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (gameState !== 'playing' || !gameAreaRef.current || !touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    // Check if it's a swipe (minimum distance threshold)
+    if (distance >= MIN_SWIPE_DISTANCE) {
+      // Determine swipe direction
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal swipe
+        changeDirection(deltaX > 0 ? 'right' : 'left');
+      } else {
+        // Vertical swipe
+        changeDirection(deltaY > 0 ? 'down' : 'up');
+      }
+    } else {
+      // It's a tap - use position relative to snake head
+      const rect = gameAreaRef.current.getBoundingClientRect();
+      const tapX = touch.clientX - rect.left;
+      const tapY = touch.clientY - rect.top;
+      
+      const head = snake[0];
+      const headPixelX = head.x * CELL_SIZE + CELL_SIZE / 2;
+      const headPixelY = head.y * CELL_SIZE + CELL_SIZE / 2;
+      
+      const tapDeltaX = tapX - headPixelX;
+      const tapDeltaY = tapY - headPixelY;
+      
+      if (Math.abs(tapDeltaX) > Math.abs(tapDeltaY)) {
+        changeDirection(tapDeltaX > 0 ? 'right' : 'left');
+      } else {
+        changeDirection(tapDeltaY > 0 ? 'down' : 'up');
+      }
+    }
+    
+    touchStartRef.current = null;
+  }, [gameState, snake, changeDirection]);
+
+  // Mouse click handler (for desktop tap)
+  const handleClick = useCallback((e: React.MouseEvent) => {
     if (gameState !== 'playing' || !gameAreaRef.current) return;
     
     const rect = gameAreaRef.current.getBoundingClientRect();
-    let clientX: number, clientY: number;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
     
-    if ('touches' in e) {
-      // Touch event
-      clientX = e.touches[0]?.clientX ?? (e as React.TouchEvent).changedTouches[0]?.clientX ?? 0;
-      clientY = e.touches[0]?.clientY ?? (e as React.TouchEvent).changedTouches[0]?.clientY ?? 0;
-    } else {
-      // Mouse event
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-    
-    // Get tap position relative to game area
-    const tapX = clientX - rect.left;
-    const tapY = clientY - rect.top;
-    
-    // Get snake head position in pixels
     const head = snake[0];
     const headPixelX = head.x * CELL_SIZE + CELL_SIZE / 2;
     const headPixelY = head.y * CELL_SIZE + CELL_SIZE / 2;
     
-    // Calculate direction based on tap position relative to head
-    const deltaX = tapX - headPixelX;
-    const deltaY = tapY - headPixelY;
+    const deltaX = clickX - headPixelX;
+    const deltaY = clickY - headPixelY;
     
-    // Determine which axis has greater difference
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Horizontal movement
       changeDirection(deltaX > 0 ? 'right' : 'left');
     } else {
-      // Vertical movement
       changeDirection(deltaY > 0 ? 'down' : 'up');
     }
   }, [gameState, snake, changeDirection]);
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
+  }, []);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (swipeTimeoutRef.current) {
+        clearTimeout(swipeTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -457,10 +563,10 @@ export const AstralSerpentGame = ({
           ))}
         </div>
 
-        {/* Game Grid - Tap anywhere to control */}
+        {/* Game Grid - Swipe and tap to control */}
         <motion.div
           ref={gameAreaRef}
-          className="relative rounded-xl overflow-hidden cursor-pointer select-none"
+          className="relative rounded-xl overflow-hidden cursor-pointer select-none touch-none"
           style={{
             width: GRID_SIZE * CELL_SIZE,
             height: GRID_SIZE * CELL_SIZE,
@@ -468,10 +574,19 @@ export const AstralSerpentGame = ({
             border: '2px solid hsl(var(--border) / 0.5)',
             boxShadow: '0 0 30px hsl(var(--primary) / 0.1), inset 0 0 50px hsl(var(--background) / 0.5)',
           }}
-          onClick={handleTap}
-          onTouchStart={handleTap}
+          onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           whileTap={{ scale: 0.99 }}
         >
+          {/* Swipe indicator */}
+          <AnimatePresence>
+            <SwipeIndicator direction={swipeIndicator} visible={swipeIndicator !== null} />
+          </AnimatePresence>
+
+          {/* Swipe hint */}
+          <SwipeHint show={showSwipeHint && gameState === 'playing'} />
+
           {/* Nebula background effect */}
           <div 
             className="absolute inset-0 opacity-30"
@@ -498,33 +613,35 @@ export const AstralSerpentGame = ({
           {/* Trail particles */}
           <AnimatePresence>
             {trailParticles.map(particle => (
-              <TrailParticle key={particle.id} particle={particle} />
+              <TrailParticleComponent key={particle.id} particle={particle} />
             ))}
           </AnimatePresence>
 
-          {/* Stardust */}
+          {/* Render stardust */}
           <div
-            className="absolute"
             style={{
+              position: 'absolute',
               left: stardust.x * CELL_SIZE,
               top: stardust.y * CELL_SIZE,
-              width: CELL_SIZE,
-              height: CELL_SIZE,
             }}
           >
-            <Cell isHead={false} isBody={false} isStardust={true} bodyIndex={0} totalLength={0} />
+            <Cell 
+              isHead={false} 
+              isBody={false} 
+              isStardust={true}
+              bodyIndex={0}
+              totalLength={1}
+            />
           </div>
 
-          {/* Snake */}
+          {/* Render snake */}
           {snake.map((segment, index) => (
             <div
-              key={index}
-              className="absolute transition-all duration-75"
+              key={`${segment.x}-${segment.y}-${index}`}
               style={{
+                position: 'absolute',
                 left: segment.x * CELL_SIZE,
                 top: segment.y * CELL_SIZE,
-                width: CELL_SIZE,
-                height: CELL_SIZE,
               }}
             >
               <Cell
@@ -537,86 +654,40 @@ export const AstralSerpentGame = ({
             </div>
           ))}
 
-          {/* Collect effect */}
+          {/* Collection effect */}
           <AnimatePresence>
             {showCollect && (
               <motion.div
-                className="absolute inset-0 pointer-events-none"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.5 }}
+                transition={{ duration: 0.3 }}
               >
-                <div 
-                  className="absolute inset-0"
-                  style={{
-                    background: 'radial-gradient(circle, hsl(45 100% 60% / 0.3) 0%, transparent 70%)',
-                  }}
-                />
+                <span className="text-4xl">✨</span>
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Tap indicator overlay */}
-          {gameState === 'playing' && (
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <motion.div
-                className="text-muted-foreground/20 text-4xl"
-                animate={{ opacity: [0.1, 0.3, 0.1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                👆
-              </motion.div>
-            </div>
-          )}
         </motion.div>
 
-        {/* Direction indicator */}
-        <div className="mt-4 flex items-center gap-2">
-          <div 
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-            style={{
-              background: 'linear-gradient(135deg, hsl(var(--primary) / 0.2), hsl(var(--accent) / 0.2))',
-              border: '1px solid hsl(var(--primary) / 0.3)',
-              boxShadow: '0 0 15px hsl(var(--primary) / 0.2)',
-            }}
-          >
-            {direction === 'up' && '↑'}
-            {direction === 'down' && '↓'}
-            {direction === 'left' && '←'}
-            {direction === 'right' && '→'}
-          </div>
-          <span className="text-sm text-muted-foreground">Tap to steer</span>
-        </div>
-
-        {/* Instructions */}
-        <p className="mt-3 text-sm text-muted-foreground text-center max-w-[280px]">
-          {gameState === 'playing' 
-            ? 'Tap where you want to go!'
-            : 'Get ready...'}
+        {/* Control hint */}
+        <p className="mt-4 text-xs text-muted-foreground text-center">
+          👆 Swipe to change direction • Tap relative to serpent head
         </p>
 
-        {/* Stat bonus indicator */}
-        <div 
-          className="mt-3 px-3 py-1.5 rounded-full text-xs"
-          style={{
-            background: 'linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--accent) / 0.1))',
-            border: '1px solid hsl(var(--border) / 0.3)',
-          }}
-        >
-          <span className="text-muted-foreground">Body bonus: </span>
-          <span className="text-primary font-medium">+{Math.round(bodyBonus * 15)}% speed</span>
-        </div>
+        {/* Stat bonus */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          Body stat bonus: {Math.round(bodyBonus * 15)}% faster serpent
+        </p>
 
         {/* CSS animations */}
         <style>{`
           @keyframes shake {
             0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-            20%, 40%, 60%, 80% { transform: translateX(4px); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+            20%, 40%, 60%, 80% { transform: translateX(3px); }
           }
-          .animate-shake {
-            animation: shake 0.3s ease-in-out;
-          }
+          .animate-shake { animation: shake 0.3s ease-in-out; }
         `}</style>
       </div>
     </GameStyleWrapper>
