@@ -165,17 +165,5 @@ verify_jwt = false
 [functions.reset-companion]
 verify_jwt = true
 
-[functions.schedule-adaptive-pushes]
-verify_jwt = false
-
-[functions.deliver-adaptive-pushes]
-verify_jwt = false
-
-[functions.trigger-adaptive-event]
-verify_jwt = true
-
-[functions.generate-adaptive-push]
-verify_jwt = false
-
 [functions.dispatch-mentor-nudge-pushes]
 verify_jwt = false
