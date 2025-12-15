@@ -1,5 +1,5 @@
 import { format, addDays, subDays, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
@@ -16,7 +16,6 @@ interface CalendarDayViewProps {
   tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
-  onAutoSchedule?: (tasks: CalendarTask[]) => void;
 }
 
 export const CalendarDayView = ({
@@ -24,8 +23,7 @@ export const CalendarDayView = ({
   onDateSelect,
   tasks,
   onTaskDrop,
-  onTimeSlotLongPress,
-  onAutoSchedule
+  onTimeSlotLongPress
 }: CalendarDayViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -298,30 +296,9 @@ export const CalendarDayView = ({
       {/* Unscheduled Tasks */}
       {unscheduledTasks.length > 0 && (
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              Unscheduled ({unscheduledTasks.length})
-            </div>
-            <div className="flex items-center gap-2">
-              {onAutoSchedule && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    playSound("pop");
-                    onAutoSchedule(unscheduledTasks);
-                    toast.success("Auto-scheduling quests...", {
-                      description: "Finding optimal time slots for your quests",
-                    });
-                  }}
-                  className="h-7 gap-1 text-xs border-primary/30 bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  Auto-Schedule
-                </Button>
-              )}
-            </div>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            Unscheduled ({unscheduledTasks.length})
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {visibleUnscheduledTasks.map((task) => (
