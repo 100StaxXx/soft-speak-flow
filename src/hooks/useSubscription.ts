@@ -24,9 +24,9 @@ function isValidPlan(plan: unknown): plan is Subscription["plan"] {
 }
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const { data: subscriptionData, isLoading, error, refetch } = useQuery({
+  const { data: subscriptionData, isLoading: queryLoading, error, refetch } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -45,6 +45,9 @@ export function useSubscription() {
     staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance
     refetchInterval: false, // Disable automatic refetching for better performance
   });
+
+  // Only consider loading if auth is done AND user exists AND query is actually loading
+  const isLoading = authLoading || (!!user && queryLoading);
 
   const subscription = useMemo(() => {
     // Return null if no data or user is not subscribed
