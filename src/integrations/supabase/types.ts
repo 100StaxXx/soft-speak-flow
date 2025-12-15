@@ -2242,6 +2242,7 @@ export type Database = {
           id: string
           message: string
           nudge_type: string
+          push_sent_at: string | null
           read_at: string | null
           user_id: string
           voice_url: string | null
@@ -2254,6 +2255,7 @@ export type Database = {
           id?: string
           message: string
           nudge_type: string
+          push_sent_at?: string | null
           read_at?: string | null
           user_id: string
           voice_url?: string | null
@@ -2266,6 +2268,7 @@ export type Database = {
           id?: string
           message?: string
           nudge_type?: string
+          push_sent_at?: string | null
           read_at?: string | null
           user_id?: string
           voice_url?: string | null
