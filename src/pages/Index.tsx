@@ -171,9 +171,16 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     }
     
     // Wait for both profile and companion to finish loading
-    const ready = !profileLoading && !companionLoading;
+    const loadingComplete = !profileLoading && !companionLoading;
+    
+    // If user completed onboarding, require mentor to be resolved before ready
+    const hasCompletedOnboarding = profile?.onboarding_completed === true;
+    const hasMentor = !!resolvedMentorId;
+    
+    // Ready = loading done AND (not completed onboarding OR has mentor)
+    const ready = loadingComplete && (!hasCompletedOnboarding || hasMentor);
     setIsReady(ready);
-  }, [user, profileLoading, companionLoading]);
+  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId]);
 
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
   useEffect(() => {
