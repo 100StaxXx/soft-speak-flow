@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { AdversaryReveal } from './AdversaryReveal';
+import { BattleVSScreen } from './BattleVSScreen';
 import { EnergyBeamGame } from './EnergyBeamGame';
 import { TapSequenceGame } from './TapSequenceGame';
 import { AstralFrequencyGame } from './AstralFrequencyGame';
@@ -15,6 +15,7 @@ import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { BattleSceneHeader } from './BattleSceneHeader';
 import { useCompanion } from '@/hooks/useCompanion';
+import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 
@@ -47,6 +48,14 @@ export const AstralEncounterModal = ({
   } | null>(null);
   
   const { companion } = useCompanion();
+
+  // Fetch/generate adversary image
+  const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
+    theme: adversary?.theme || '',
+    tier: adversary?.tier || '',
+    name: adversary?.name || '',
+    enabled: !!adversary && open,
+  });
 
   const companionStats = {
     mind: companion?.mind || 50,
@@ -168,7 +177,7 @@ export const AstralEncounterModal = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-background border-border">
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
         <div className="relative min-h-[500px]">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
           
@@ -181,9 +190,12 @@ export const AstralEncounterModal = ({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <AdversaryReveal 
-                    adversary={adversary} 
-                    onBeginBattle={handleBeginBattle} 
+                  <BattleVSScreen 
+                    adversary={adversary}
+                    adversaryImageUrl={adversaryImageUrl || undefined}
+                    companionImageUrl={companion?.current_image_url || undefined}
+                    companionName={companion?.spirit_animal || "Companion"}
+                    onReady={handleBeginBattle} 
                   />
                 </motion.div>
               )}
@@ -213,6 +225,7 @@ export const AstralEncounterModal = ({
                     companionImageUrl={companion?.current_image_url || undefined}
                     companionName={companion?.spirit_animal || "Companion"}
                     adversary={adversary}
+                    adversaryImageUrl={adversaryImageUrl || undefined}
                   />
 
                   {adversary.phases > 1 && (

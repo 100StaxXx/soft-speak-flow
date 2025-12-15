@@ -6,6 +6,7 @@ interface BattleSceneHeaderProps {
   companionImageUrl?: string;
   companionName?: string;
   adversary: Adversary;
+  adversaryImageUrl?: string;
 }
 
 const TIER_COLORS: Record<AdversaryTier, string> = {
@@ -27,7 +28,8 @@ const TIER_BG: Record<AdversaryTier, string> = {
 export const BattleSceneHeader = ({ 
   companionImageUrl, 
   companionName = "Companion",
-  adversary 
+  adversary,
+  adversaryImageUrl,
 }: BattleSceneHeaderProps) => {
   const tierColor = TIER_COLORS[adversary.tier as AdversaryTier] || TIER_COLORS.common;
   const tierBg = TIER_BG[adversary.tier as AdversaryTier] || TIER_BG.common;
@@ -58,8 +60,8 @@ export const BattleSceneHeader = ({
               transition={{ duration: 2, repeat: Infinity }}
             />
             
-            {/* Portrait container */}
-            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-primary/20 to-accent/20">
+            {/* Portrait container - larger size */}
+            <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-primary/20 to-accent/20 shadow-lg shadow-primary/20">
               {companionImageUrl ? (
                 <img
                   src={companionImageUrl}
@@ -68,7 +70,7 @@ export const BattleSceneHeader = ({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                  <span className="text-2xl">🌟</span>
+                  <span className="text-3xl">🌟</span>
                 </div>
               )}
             </div>
@@ -151,17 +153,25 @@ export const BattleSceneHeader = ({
               transition={{ duration: 2, repeat: Infinity }}
             />
             
-            {/* Portrait container */}
+            {/* Portrait container - larger with AI image support */}
             <div 
-              className={`relative w-20 h-20 rounded-full overflow-hidden border-2 bg-gradient-to-br ${tierBg}`}
-              style={{ borderColor: `${tierColor}60` }}
+              className={`relative w-24 h-24 rounded-2xl overflow-hidden border-2 bg-gradient-to-br ${tierBg} shadow-lg`}
+              style={{ borderColor: `${tierColor}60`, boxShadow: `0 8px 24px ${tierColor}30` }}
             >
-              <div className="w-full h-full flex items-center justify-center">
-                <Skull 
-                  className="w-10 h-10" 
-                  style={{ color: tierColor, filter: `drop-shadow(0 0 8px ${tierColor})` }}
+              {adversaryImageUrl ? (
+                <img
+                  src={adversaryImageUrl}
+                  alt={adversary.name}
+                  className="w-full h-full object-cover"
                 />
-              </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Skull 
+                    className="w-12 h-12" 
+                    style={{ color: tierColor, filter: `drop-shadow(0 0 8px ${tierColor})` }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Tier badge */}

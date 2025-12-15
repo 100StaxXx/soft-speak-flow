@@ -10,6 +10,7 @@ export { RuneResonanceGame } from './RuneResonanceGame';
 export { OrbMatchGame } from './OrbMatchGame';
 export { GameInstructionsOverlay } from './GameInstructionsOverlay';
 export { BattleSceneHeader } from './BattleSceneHeader';
+export { BattleVSScreen } from './BattleVSScreen';
 export { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
 export { MiniGameTester } from './MiniGameTester';
 export { CosmicCodex } from './CosmicCodex';
