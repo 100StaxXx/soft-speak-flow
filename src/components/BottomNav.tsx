@@ -119,6 +119,7 @@ export const BottomNav = memo(() => {
           )}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
+          onClick={() => haptics.light()}
           onTouchStart={(e) => {
             setIsLongPressing(true);
             longPressHandlers.onTouchStart(e);
