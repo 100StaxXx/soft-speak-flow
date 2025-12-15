@@ -70,11 +70,11 @@ export function EpicsTab() {
             <EpicSectionTooltip />
           </div>
           <EmptyState
-            icon={Trophy}
+            icon={Star}
             title="No Active Epics"
-            description="Create your first epic quest and link your habits to track legendary progress!"
-            actionLabel="Create Epic"
-            onAction={() => setCreateEpicDialogOpen(true)}
+            description="Browse Star Paths to find the perfect epic quest and start your legendary journey!"
+            actionLabel="Star Paths"
+            onAction={() => setTemplatesDialogOpen(true)}
           />
         </div>
       ) : (
