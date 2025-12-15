@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getShoutByKey } from "../_shared/shoutMessages.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
-};
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 interface ShoutNotificationPayload {
   shoutId: string;
@@ -28,15 +24,17 @@ if (!internalSecret) {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -55,7 +53,7 @@ serve(async (req) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -64,7 +62,7 @@ serve(async (req) => {
     if (payload.senderId !== user.id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -81,7 +79,7 @@ serve(async (req) => {
     if (shout.sender_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
-        headers: corsHeaders,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -204,6 +202,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in send-shout-notification:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { 
