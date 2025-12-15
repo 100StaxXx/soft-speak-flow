@@ -193,6 +193,7 @@ export const AstralEncounterModal = ({
                   <BattleVSScreen 
                     adversary={adversary}
                     adversaryImageUrl={adversaryImageUrl || undefined}
+                    isLoadingImage={isLoadingImage}
                     companionImageUrl={companion?.current_image_url || undefined}
                     companionName={companion?.spirit_animal || "Companion"}
                     onReady={handleBeginBattle} 
