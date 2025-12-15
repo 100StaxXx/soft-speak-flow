@@ -1,5 +1,8 @@
 project_id = "tffrgsaawvletgiztfry"
 
+[functions.generate-adversary-image]
+verify_jwt = false
+
 [functions.delete-user]
 verify_jwt = true
 

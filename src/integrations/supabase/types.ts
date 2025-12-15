@@ -245,6 +245,30 @@ export type Database = {
           },
         ]
       }
+      adversary_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          theme: string
+          tier: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          theme: string
+          tier: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          theme?: string
+          tier?: string
+        }
+        Relationships: []
+      }
       ai_output_validation_log: {
         Row: {
           created_at: string | null
