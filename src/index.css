@@ -407,6 +407,26 @@ All colors MUST be HSL.
     animation: sparkle 2s ease-in-out infinite;
   }
 
+  /* Sparkle particle for quest completion */
+  @keyframes sparkle-particle {
+    0% {
+      opacity: 1;
+      transform: scale(0) translateY(0);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.2) translateY(-10px);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(0.5) translateY(-25px);
+    }
+  }
+
+  .animate-sparkle-particle {
+    animation: sparkle-particle 0.8s ease-out forwards;
+  }
+
   .animate-pulse-slow {
     animation: pulse-slow 3s ease-in-out infinite;
   }

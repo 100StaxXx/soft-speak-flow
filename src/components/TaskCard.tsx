@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
-
+import { haptics } from "@/utils/haptics";
 interface TaskCardProps {
   task: {
     id: string;
@@ -101,17 +101,22 @@ export const TaskCard = ({
       className="relative"
       data-tutorial-quest={isTutorialQuest ? "true" : undefined}
     >
-      {/* Floating XP Animation */}
+      {/* Floating XP Animation with Sparkles */}
       {showXP && (
         <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div 
-            className="text-lg font-bold"
+            className="text-lg font-bold relative"
             style={{ 
               animation: 'fadeInUp 2s ease-out',
               color: isMainQuest ? 'hsl(45, 100%, 60%)' : 'hsl(var(--primary))'
             }}
           >
             +{task.xp_reward} XP
+            {/* Sparkle particles */}
+            <span className="absolute -left-3 -top-1 w-2 h-2 bg-primary rounded-full animate-sparkle-particle" style={{ animationDelay: '0ms' }} />
+            <span className="absolute -right-3 top-0 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-particle" style={{ animationDelay: '100ms' }} />
+            <span className="absolute left-1/2 -top-3 w-1 h-1 bg-primary rounded-full animate-sparkle-particle" style={{ animationDelay: '200ms' }} />
+            <span className="absolute -left-1 bottom-0 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-particle" style={{ animationDelay: '150ms' }} />
           </div>
         </div>
       )}
@@ -180,7 +185,10 @@ export const TaskCard = ({
             </div>
           )}
           <button
-            onClick={onToggle}
+            onClick={() => {
+              haptics.success();
+              onToggle();
+            }}
             className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10"
             aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
           >

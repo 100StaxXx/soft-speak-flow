@@ -4,8 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX, Music, Bell, Sparkles } from "lucide-react";
+import { Volume2, VolumeX, Music, Sparkles, Swords } from "lucide-react";
 import { soundManager } from "@/utils/soundEffects";
 import { globalAudio } from "@/utils/globalAudio";
 
@@ -14,6 +13,7 @@ export const SoundSettings = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.15);
   const [bgMusicMuted, setBgMusicMuted] = useState(false);
+  const [encounterMusicVolume, setEncounterMusicVolume] = useState(0.4);
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   useEffect(() => {
@@ -21,6 +21,7 @@ export const SoundSettings = () => {
     const savedMuted = safeLocalStorage.getItem('sound_muted');
     const savedBgVolume = safeLocalStorage.getItem('bg_music_volume');
     const savedBgMuted = safeLocalStorage.getItem('bg_music_muted');
+    const savedEncounterVolume = safeLocalStorage.getItem('encounter_music_volume');
     
     if (savedVolume) {
       const parsed = parseFloat(savedVolume);
@@ -36,6 +37,12 @@ export const SoundSettings = () => {
       }
     }
     if (savedBgMuted) setBgMusicMuted(savedBgMuted === 'true');
+    if (savedEncounterVolume) {
+      const parsed = parseFloat(savedEncounterVolume);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        setEncounterMusicVolume(parsed);
+      }
+    }
     
     // Subscribe to global mute changes
     const unsubscribe = globalAudio.subscribe((muted) => {
@@ -70,8 +77,11 @@ export const SoundSettings = () => {
     window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMuted }));
   };
 
-  const testSound = (soundFn: () => void) => {
-    soundFn();
+  const handleEncounterMusicVolumeChange = (values: number[]) => {
+    const newVolume = values[0];
+    setEncounterMusicVolume(newVolume);
+    safeLocalStorage.setItem('encounter_music_volume', newVolume.toString());
+    window.dispatchEvent(new CustomEvent('encounter-music-volume-change', { detail: newVolume }));
   };
 
   const handleGlobalMuteToggle = () => {
@@ -186,6 +196,39 @@ export const SoundSettings = () => {
               checked={bgMusicMuted}
               onCheckedChange={handleBgMusicMuteToggle}
               disabled={isGloballyMuted}
+            />
+          </div>
+        </div>
+
+        {/* Encounter/Arcade Music Section */}
+        <div className={`pt-6 mt-6 border-t space-y-4 transition-opacity ${isGloballyMuted ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Swords className="w-4 h-4 text-primary" />
+              Battle & Arcade Music
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Music during encounters and arcade games
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4" />
+                Volume
+              </Label>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(encounterMusicVolume * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[encounterMusicVolume]}
+              onValueChange={handleEncounterMusicVolumeChange}
+              max={1}
+              step={0.05}
+              disabled={isGloballyMuted}
+              className="w-full"
             />
           </div>
         </div>
