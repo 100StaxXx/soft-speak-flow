@@ -311,7 +311,6 @@ export default function Tasks() {
         recurrenceDays: dataToAdd.recurrenceDays,
         reminderEnabled: dataToAdd.reminderEnabled,
         reminderMinutesBefore: dataToAdd.reminderMinutesBefore,
-        notes: dataToAdd.moreInformation,
       });
 
       // Clear form
@@ -360,7 +359,6 @@ export default function Tasks() {
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;
-    notes: string | null;
   }) => {
     if (!user?.id) return;
     setIsUpdating(true);

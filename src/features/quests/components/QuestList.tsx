@@ -21,7 +21,6 @@ interface Task {
   scheduled_time?: string | null;
   estimated_duration?: number | null;
   recurrence_pattern?: string | null;
-  notes?: string | null;
 }
 
 interface QuestListProps {
