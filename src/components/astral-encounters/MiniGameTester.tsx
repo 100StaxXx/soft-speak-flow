@@ -8,6 +8,7 @@ import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { RuneResonanceGame } from './RuneResonanceGame';
+import { AstralSerpentGame } from './AstralSerpentGame';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
 import { Zap, Target, Radio, Moon, Sparkles, Music, X, Trophy, Brain, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +20,7 @@ const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: '
   { type: 'eclipse_timing', label: 'Eclipse Timing', icon: <Moon className="w-4 h-4" />, stat: 'body' },
   { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" />, stat: 'mind' },
   { type: 'rune_resonance', label: 'Rune Resonance', icon: <Music className="w-4 h-4" />, stat: 'soul' },
+  { type: 'astral_serpent', label: 'Astral Serpent', icon: <Zap className="w-4 h-4" />, stat: 'body' },
 ];
 
 interface MiniGameTesterProps {
@@ -64,6 +66,8 @@ export const MiniGameTester = ({ companionStats: initialStats }: MiniGameTesterP
         return <StarfallDodgeGame {...props} />;
       case 'rune_resonance':
         return <RuneResonanceGame {...props} />;
+      case 'astral_serpent':
+        return <AstralSerpentGame {...props} />;
       default:
         return null;
     }

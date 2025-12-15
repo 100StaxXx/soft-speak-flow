@@ -21,7 +21,8 @@ export type MiniGameType =
   | 'astral_frequency'
   | 'eclipse_timing'
   | 'starfall_dodge'
-  | 'rune_resonance';
+  | 'rune_resonance'
+  | 'astral_serpent';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -109,8 +110,8 @@ export interface EncounterPhase {
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   distraction: 'tap_sequence',
   chaos: 'tap_sequence',
-  stagnation: 'energy_beam',
-  laziness: 'energy_beam',
+  stagnation: 'astral_serpent',
+  laziness: 'astral_serpent',
   anxiety: 'astral_frequency',
   overthinking: 'astral_frequency',
   doubt: 'starfall_dodge',
