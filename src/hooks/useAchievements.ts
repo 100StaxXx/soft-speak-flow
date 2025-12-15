@@ -468,6 +468,21 @@ export const useAchievements = () => {
     });
   };
 
+  // New: Arcade discovery achievement
+  const checkArcadeDiscovery = useCallback(async () => {
+    await awardAchievement({
+      type: "arcade_explorer",
+      title: "Arcade Explorer",
+      description: "Discovered the hidden Astral Arcade",
+      icon: "gamepad-2",
+      tier: "silver",
+      metadata: {
+        pepTalkMessage: "You found the secret arcade. Nice work, explorer.",
+        pepTalkCategory: "discovery"
+      }
+    });
+  }, [awardAchievement]);
+
   return {
     awardAchievement,
     checkStreakAchievements,
@@ -481,5 +496,6 @@ export const useAchievements = () => {
     checkStoryChapterAchievement,
     checkFullStorylineAchievement,
     checkComebackAchievement,
+    checkArcadeDiscovery,
   };
 };

@@ -392,6 +392,16 @@ export const BADGE_CATALOG: BadgeDefinition[] = [
     category: 'special',
     unlockHint: 'Listen to 50 pep talks',
   },
+  {
+    id: 'arcade_explorer',
+    achievementType: 'arcade_explorer',
+    title: 'Arcade Explorer',
+    description: 'Discovered the hidden Astral Arcade',
+    icon: '🕹️',
+    tier: 'silver',
+    category: 'special',
+    unlockHint: '???',
+  },
 ];
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {

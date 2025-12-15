@@ -7,6 +7,7 @@ export { AstralFrequencyGame } from './AstralFrequencyGame';
 export { EclipseTimingGame } from './EclipseTimingGame';
 export { StarfallDodgeGame } from './StarfallDodgeGame';
 export { RuneResonanceGame } from './RuneResonanceGame';
+export { AstralSerpentGame } from './AstralSerpentGame';
 export { OrbMatchGame } from './OrbMatchGame';
 export { GameInstructionsOverlay } from './GameInstructionsOverlay';
 export { BattleSceneHeader } from './BattleSceneHeader';
