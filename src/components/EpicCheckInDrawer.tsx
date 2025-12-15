@@ -272,39 +272,37 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
                       onClick={() => {
-                        console.log('[EpicCheckIn] Row clicked', { habitId: habit.id, isCompleted, submitting });
                         if (!submitting) {
                           handleToggleHabit(habit.id, !isCompleted);
                         }
                       }}
-                      style={{ touchAction: 'manipulation' }}
+                      style={{ 
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        userSelect: 'none'
+                      }}
                       className={cn(
-                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer",
+                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer min-h-[56px]",
                         "bg-secondary/30 border border-border/50",
                         isCompleted && "bg-primary/10 border-primary/30"
                       )}
                     >
                       <Checkbox
-                        id={habit.id}
                         checked={isCompleted}
                         disabled={submitting}
-                        onCheckedChange={(checked) => handleToggleHabit(habit.id, checked as boolean)}
-                        onClick={(e) => e.stopPropagation()}
                         className={cn(
-                          "h-6 w-6 rounded-full border-2",
+                          "h-6 w-6 rounded-full border-2 pointer-events-none",
                           isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
                         )}
-                        style={{ touchAction: 'manipulation' }}
                       />
-                      <label
-                        htmlFor={habit.id}
+                      <span
                         className={cn(
-                          "flex-1 text-sm font-medium cursor-pointer transition-all",
+                          "flex-1 text-sm font-medium transition-all",
                           isCompleted && "line-through text-muted-foreground"
                         )}
                       >
                         {habit.title}
-                      </label>
+                      </span>
                       {isCompleted && (
                         <motion.div
                           initial={{ scale: 0 }}

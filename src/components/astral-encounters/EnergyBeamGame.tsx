@@ -41,7 +41,7 @@ const AttemptDots = memo(({
 ));
 AttemptDots.displayName = 'AttemptDots';
 
-// Memoized charge bar component
+// Premium charge bar component with cosmic visuals
 const ChargeBar = memo(({ 
   chargeLevel, 
   sweetSpotStart, 
@@ -60,52 +60,76 @@ const ChargeBar = memo(({
   pulseRing: boolean;
 }) => (
   <div className="relative w-full max-w-xs h-20 mb-6">
-    {/* Background track */}
-    <div className="absolute inset-0 bg-muted/30 rounded-2xl overflow-hidden border border-border/50 backdrop-blur-sm">
-      {/* Sweet spot indicator with gradient */}
+    {/* Background track with premium glass effect */}
+    <div 
+      className="absolute inset-0 rounded-2xl overflow-hidden"
+      style={{
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(10,10,30,0.4) 50%, rgba(0,0,0,0.3) 100%)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.5), 0 6px 20px rgba(0,0,0,0.3), 0 0 40px rgba(168,85,247,0.08)',
+      }}
+    >
+      {/* Sweet spot zone with cosmic gradient */}
       <div 
-        className="absolute top-0 bottom-0 overflow-hidden"
+        className="absolute top-1 bottom-1 overflow-hidden rounded-xl"
         style={{ 
           left: `${sweetSpotStart}%`, 
-          width: `${adjustedSweetSpotSize}%` 
+          width: `${adjustedSweetSpotSize}%`,
         }}
       >
-        {/* Outer zone */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30" />
-        
-        {/* Perfect zone (inner) */}
+        {/* Outer zone gradient with glow */}
         <div 
-          className="absolute top-0 bottom-0 bg-gradient-to-r from-yellow-400/40 via-yellow-400/60 to-yellow-400/40 perfect-zone-pulse"
+          className="absolute inset-0"
           style={{
-            left: '30%',
-            width: '40%',
+            background: 'linear-gradient(90deg, hsl(var(--primary)/0.35), hsl(var(--primary)/0.6), hsl(var(--primary)/0.35))',
+            boxShadow: 'inset 0 0 15px hsl(var(--primary)/0.3)',
           }}
         />
         
-        {/* Edge borders */}
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-        <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-primary" />
+        {/* Perfect zone (inner) with pulsing glow */}
+        <div 
+          className="absolute top-0 bottom-0"
+          style={{
+            left: '28%',
+            width: '44%',
+            background: 'linear-gradient(90deg, rgba(250,204,21,0.45), rgba(250,204,21,0.7), rgba(250,204,21,0.45))',
+            animation: 'cosmic-breathe 1.5s ease-in-out infinite',
+            boxShadow: 'inset 0 0 10px rgba(250,204,21,0.4)',
+          }}
+        />
+        
+        {/* Edge markers with glow */}
+        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--primary)), transparent)', boxShadow: '0 0 8px hsl(var(--primary))' }} />
+        <div className="absolute right-0 top-0 bottom-0 w-0.5" style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--primary)), transparent)', boxShadow: '0 0 8px hsl(var(--primary))' }} />
       </div>
       
-      {/* Charge level fill */}
+      {/* Charge fill with premium animated gradient */}
       <div 
-        className={`absolute top-0 bottom-0 left-0 transition-all duration-75 ${
-          isPerfectZone ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-          isInSweetSpot ? 'bg-gradient-to-r from-primary to-primary/80' : 
-          'bg-gradient-to-r from-accent to-accent/80'
-        }`}
+        className="absolute top-1 bottom-1 left-1 rounded-xl transition-all duration-75"
         style={{ 
-          width: `${chargeLevel}%`,
-          boxShadow: isInSweetSpot ? '0 0 30px hsl(var(--primary))' : 'none',
+          width: `calc(${chargeLevel}% - 4px)`,
+          background: isPerfectZone 
+            ? 'linear-gradient(90deg, #fbbf24, #fcd34d, #fbbf24)'
+            : isInSweetSpot 
+              ? 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))'
+              : 'linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7)',
+          backgroundSize: isCharging ? '200% 100%' : '100% 100%',
+          animation: isCharging ? 'shimmer 1s linear infinite' : 'none',
+          boxShadow: isInSweetSpot 
+            ? '0 0 35px hsl(var(--primary)), 0 0 60px hsl(var(--primary)/0.4), inset 0 2px 4px rgba(255,255,255,0.35)' 
+            : '0 0 20px rgba(99,102,241,0.6), inset 0 2px 4px rgba(255,255,255,0.2)',
         }}
       />
 
-      {/* Charge indicator line */}
+      {/* Charge indicator line with glow */}
       <div
-        className={`absolute top-2 bottom-2 w-1 bg-white rounded-full shadow-lg gpu-accelerated ${isCharging ? 'charge-pulse' : ''}`}
+        className="absolute top-1.5 bottom-1.5 w-1.5 rounded-full gpu-accelerated"
         style={{ 
           left: `${chargeLevel}%`,
-          boxShadow: '0 0 10px white, 0 0 20px white',
+          background: 'linear-gradient(180deg, white, rgba(255,255,255,0.85))',
+          boxShadow: '0 0 15px white, 0 0 30px white, 0 0 45px rgba(255,255,255,0.5)',
+          transform: isCharging ? 'scaleY(1.15)' : 'scaleY(1)',
+          transition: 'transform 0.1s',
         }}
       />
 
@@ -113,9 +137,10 @@ const ChargeBar = memo(({
       <AnimatePresence>
         {pulseRing && (
           <motion.div
-            className="absolute inset-0 border-4 border-yellow-400 rounded-2xl"
+            className="absolute inset-0 rounded-2xl"
+            style={{ border: '3px solid #fbbf24', boxShadow: '0 0 30px #fbbf24' }}
             initial={{ opacity: 1, scale: 1 }}
-            animate={{ opacity: 0, scale: 1.2 }}
+            animate={{ opacity: 0, scale: 1.15 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
           />
@@ -123,16 +148,15 @@ const ChargeBar = memo(({
       </AnimatePresence>
     </div>
 
-    {/* Zone labels */}
-    <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-xs text-muted-foreground px-1">
-      <span>0%</span>
-      <span className="text-primary font-medium">Sweet Spot</span>
-      <span>100%</span>
+    {/* Zone labels with better visibility */}
+    <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-[10px] font-medium px-1">
+      <span className="text-white/50">0%</span>
+      <span className="text-primary/90" style={{ textShadow: '0 0 10px hsl(var(--primary)/0.5)' }}>Sweet Spot</span>
+      <span className="text-white/50">100%</span>
     </div>
   </div>
 ));
 ChargeBar.displayName = 'ChargeBar';
-
 export const EnergyBeamGame = ({ 
   companionStats, 
   onComplete,
@@ -329,41 +353,52 @@ export const EnergyBeamGame = ({
         )}
       </AnimatePresence>
 
-      {/* Charge button */}
+      {/* Premium charge button with cosmic styling */}
       {gameState === 'playing' && !showResult && (
         <motion.button
-          className={`relative w-36 h-36 rounded-full flex items-center justify-center border-4 border-primary/50 overflow-hidden mt-4 gpu-accelerated ${isCharging ? 'charging-glow' : 'idle-glow'}`}
+          className="relative w-36 h-36 rounded-full flex items-center justify-center overflow-hidden gpu-accelerated touch-target"
           style={{
             background: isCharging 
-              ? 'radial-gradient(circle, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)'
-              : 'radial-gradient(circle, hsl(var(--primary)/0.8) 0%, hsl(var(--accent)/0.8) 100%)',
+              ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))'
+              : 'linear-gradient(135deg, hsl(var(--primary)/0.92), hsl(var(--accent)/0.92))',
+            backgroundSize: isCharging ? '200% 200%' : '100% 100%',
+            animation: isCharging ? 'shimmer 1.5s linear infinite' : 'none',
+            border: '3px solid rgba(255,255,255,0.25)',
+            boxShadow: isCharging 
+              ? '0 0 50px hsl(var(--primary)), 0 0 100px hsl(var(--primary)/0.5), 0 0 150px hsl(var(--primary)/0.25), inset 0 2px 0 rgba(255,255,255,0.25)'
+              : '0 10px 40px rgba(0,0,0,0.35), 0 0 30px hsl(var(--primary)/0.35), inset 0 2px 0 rgba(255,255,255,0.2)',
           }}
           onMouseDown={startCharging}
           onMouseUp={releaseBeam}
           onMouseLeave={releaseBeam}
           onTouchStart={startCharging}
           onTouchEnd={releaseBeam}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
         >
-          {/* Inner rings animation - CSS only */}
-          <div className={`absolute inset-4 rounded-full border-2 border-white/30 ${isCharging ? 'ring-pulse-1' : ''}`} />
-          <div className={`absolute inset-8 rounded-full border-2 border-white/20 ${isCharging ? 'ring-pulse-2' : ''}`} />
+          {/* Inner rings with cosmic effect */}
+          <div className={`absolute inset-4 rounded-full border border-white/25 ${isCharging ? 'animate-ring-1' : ''}`} />
+          <div className={`absolute inset-7 rounded-full border border-white/20 ${isCharging ? 'animate-ring-2' : ''}`} />
           
-          {/* Center icon */}
+          {/* Center icon with enhanced glow */}
           <Zap 
-            className={`w-14 h-14 text-primary-foreground relative z-10 ${isCharging ? 'animate-pulse' : ''}`}
-            style={{ filter: 'drop-shadow(0 0 10px white)' }}
+            className="w-14 h-14 text-white relative z-10"
+            style={{ 
+              filter: isCharging ? 'drop-shadow(0 0 20px white) drop-shadow(0 0 40px hsl(var(--primary)))' : 'drop-shadow(0 0 10px rgba(255,255,255,0.6))',
+            }}
           />
           
-          {/* Charge level indicator inside button */}
+          {/* Charge level visual inside button */}
           <div 
-            className="absolute bottom-0 left-0 right-0 bg-white/30 transition-all duration-100"
-            style={{ height: `${chargeLevel}%` }}
+            className="absolute bottom-0 left-0 right-0 transition-all duration-75"
+            style={{ 
+              height: `${chargeLevel}%`,
+              background: 'linear-gradient(to top, rgba(255,255,255,0.35), rgba(255,255,255,0.15))',
+              borderRadius: '0 0 50% 50%',
+            }}
           />
         </motion.button>
       )}
-
       {/* Instructions */}
       <motion.p 
         className="mt-4 text-sm text-muted-foreground text-center"
@@ -385,59 +420,43 @@ export const EnergyBeamGame = ({
 
       {/* CSS animations */}
       <style>{`
+        @keyframes breathe {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.7; }
+        }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-          20%, 40%, 60%, 80% { transform: translateX(4px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+          20%, 40%, 60%, 80% { transform: translateX(3px); }
         }
-        .animate-shake {
-          animation: shake 0.3s ease-in-out;
-        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
         .gpu-accelerated {
           transform: translateZ(0);
           backface-visibility: hidden;
+          will-change: transform, opacity;
+        }
+        .touch-target {
+          min-height: 44px;
+          min-width: 44px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .animate-ring-1 {
+          animation: ring-pulse 0.4s ease-in-out infinite;
+        }
+        .animate-ring-2 {
+          animation: ring-pulse 0.4s ease-in-out infinite 0.2s;
+        }
+        @keyframes ring-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.2; }
+          50% { transform: scale(1.15); opacity: 0.5; }
         }
         .scale-pulse {
           animation: scale-pulse 0.5s ease-in-out infinite;
         }
         @keyframes scale-pulse {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.2); }
-        }
-        .perfect-zone-pulse {
-          animation: opacity-pulse 0.8s ease-in-out infinite;
-        }
-        @keyframes opacity-pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-        .charge-pulse {
-          animation: charge-scale 0.2s ease-in-out infinite;
-        }
-        @keyframes charge-scale {
-          0%, 100% { transform: scaleY(1); }
-          50% { transform: scaleY(1.1); }
-        }
-        .charging-glow {
-          box-shadow: 0 0 30px hsl(var(--primary)), 0 0 60px hsl(var(--primary));
-          animation: glow-pulse 0.3s ease-in-out infinite;
-        }
-        .idle-glow {
-          box-shadow: 0 0 15px hsl(var(--primary) / 0.5);
-        }
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 30px hsl(var(--primary)); }
-          50% { box-shadow: 0 0 60px hsl(var(--primary)); }
-        }
-        .ring-pulse-1 {
-          animation: ring-pulse 0.5s ease-in-out infinite;
-        }
-        .ring-pulse-2 {
-          animation: ring-pulse 0.5s ease-in-out infinite 0.25s;
-        }
-        @keyframes ring-pulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.3); opacity: 0.6; }
+          50% { transform: scale(1.15); }
         }
       `}</style>
     </div>

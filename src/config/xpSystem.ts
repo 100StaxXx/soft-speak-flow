@@ -26,6 +26,33 @@
  * - Streak Milestone: 15 XP
  * - Welcome Back Bonus: 25 XP
  *
+ * ASTRAL ENCOUNTERS (Boss Battles):
+ * Trigger Frequency:
+ * - Quest Milestone: Every 2-4 quests (Common/Uncommon)
+ * - Epic Checkpoint: 25/50/75/100% progress (Rare/Epic)
+ * - Weekly: Once per 7 days (Legendary)
+ * 
+ * Base XP by Tier:
+ * - Common: 35 XP base (52 XP perfect)
+ * - Uncommon: 45 XP base (67 XP perfect)
+ * - Rare: 55 XP base (82 XP perfect)
+ * - Epic: 75 XP base (112 XP perfect)
+ * - Legendary: 100 XP base (150 XP perfect)
+ * 
+ * Performance Multipliers:
+ * - Perfect (90%+): 1.5x XP
+ * - Good (70-89%): 1.0x XP
+ * - Partial (50-69%): 0.5x XP
+ * - Fail (<50%): 0x XP
+ *
+ * EPICS:
+ * - XP Reward: targetDays × 10 XP per day
+ * - Example: 30-day Epic = 300 XP on completion
+ *
+ * CALENDAR POWER-UPS:
+ * - Morning Warrior (before 9am): +10 XP per task
+ * - Deep Work Block (90+ min): +20 XP per task
+ *
  * STREAK MULTIPLIER:
  * - 0-6 day streak: 1.0x XP
  * - 7-29 day streak: 1.5x XP

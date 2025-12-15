@@ -1,5 +1,5 @@
 import { format, addDays, subDays, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
@@ -7,8 +7,8 @@ import { QuestDragCard } from "./QuestDragCard";
 import { useEffect, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
-import { toast } from "sonner";
 import { CalendarTask } from "@/types/quest";
+import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -16,7 +16,6 @@ interface CalendarDayViewProps {
   tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
-  onAutoSchedule?: (tasks: CalendarTask[]) => void;
 }
 
 export const CalendarDayView = ({
@@ -24,8 +23,7 @@ export const CalendarDayView = ({
   onDateSelect,
   tasks,
   onTaskDrop,
-  onTimeSlotLongPress,
-  onAutoSchedule
+  onTimeSlotLongPress
 }: CalendarDayViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -94,7 +92,12 @@ export const CalendarDayView = ({
 
   const getUnscheduledTasks = () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return tasks.filter(task => task.task_date === dateStr && !task.scheduled_time);
+    return tasks.filter(task => task.task_date === dateStr && !task.scheduled_time && !task.completed);
+  };
+
+  const getCompletedTasks = () => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return tasks.filter(task => task.task_date === dateStr && task.completed);
   };
 
   const calculateTaskHeight = (duration: number | null) => {
@@ -166,11 +169,11 @@ export const CalendarDayView = ({
       const hour = parseInt(t.scheduled_time!.split(':')[0]);
       return hour < 9;
     });
-    powerUpXP += morningTasks.length * 10;
+    powerUpXP += morningTasks.length * CALENDAR_BONUS_XP.MORNING_WARRIOR;
 
     // Deep Work Blocks (90+ min)
     const deepWorkTasks = scheduledTasks.filter(t => t.estimated_duration! >= 90);
-    powerUpXP += deepWorkTasks.length * 20;
+    powerUpXP += deepWorkTasks.length * CALENDAR_BONUS_XP.DEEP_WORK;
 
     return powerUpXP;
   };
@@ -298,30 +301,9 @@ export const CalendarDayView = ({
       {/* Unscheduled Tasks */}
       {unscheduledTasks.length > 0 && (
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              Unscheduled ({unscheduledTasks.length})
-            </div>
-            <div className="flex items-center gap-2">
-              {onAutoSchedule && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    playSound("pop");
-                    onAutoSchedule(unscheduledTasks);
-                    toast.success("Auto-scheduling quests...", {
-                      description: "Finding optimal time slots for your quests",
-                    });
-                  }}
-                  className="h-7 gap-1 text-xs border-primary/30 bg-gradient-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  Auto-Schedule
-                </Button>
-              )}
-            </div>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            Unscheduled ({unscheduledTasks.length})
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {visibleUnscheduledTasks.map((task) => (
@@ -446,10 +428,37 @@ export const CalendarDayView = ({
         </div>
       </ScrollArea>
 
+      {/* Completed Today Section */}
+      {getCompletedTasks().length > 0 && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
+            <CheckCircle2 className="h-4 w-4" />
+            Completed Today ({getCompletedTasks().length})
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {getCompletedTasks().slice(0, 5).map((task) => (
+              <div
+                key={task.id}
+                className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary line-through opacity-70"
+              >
+                {task.task_text}
+              </div>
+            ))}
+            {getCompletedTasks().length > 5 && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                +{getCompletedTasks().length - 5} more
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Long Press Hint */}
-      <div className="text-center text-xs text-muted-foreground">
-        💡 Drag unscheduled quests or long press on a time to add a new quest
-      </div>
+      {dayTasks.length > 0 && (
+        <div className="text-center text-xs text-muted-foreground">
+          💡 Drag unscheduled quests or long press on a time to add a new quest
+        </div>
+      )}
     </div>
   );
 };

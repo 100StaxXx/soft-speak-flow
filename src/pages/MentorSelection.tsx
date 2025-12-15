@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
@@ -9,6 +10,7 @@ import { Loader2 } from "lucide-react";
 const MentorSelection = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [mentors, setMentors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,10 @@ const MentorSelection = () => {
         .eq("id", user.id);
 
       if (error) throw error;
+
+      // Invalidate and refetch profile cache so mentor shows immediately
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
 
       toast({
         title: "Mentor Selected!",

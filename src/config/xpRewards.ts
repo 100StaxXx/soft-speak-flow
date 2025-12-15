@@ -54,6 +54,63 @@ export const SYSTEM_XP_REWARDS = {
 } as const;
 
 /**
+ * Astral Encounter XP Rewards (Boss Battles)
+ * 
+ * Rebalanced for flatter curve: Common boosted, Legendary reduced.
+ * Triggers: Quest milestone (every 2-4 quests), Epic checkpoint, Weekly
+ */
+export const ENCOUNTER_XP_REWARDS = {
+  /** Common tier (quest milestones) */
+  COMMON: 35,
+  /** Uncommon tier (quest milestones) */
+  UNCOMMON: 45,
+  /** Rare tier (epic checkpoints) */
+  RARE: 55,
+  /** Epic tier (epic checkpoints) */
+  EPIC: 75,
+  /** Legendary tier (weekly encounters) */
+  LEGENDARY: 100,
+} as const;
+
+/**
+ * Astral Encounter Result Multipliers
+ * 
+ * Applied to base XP based on performance accuracy.
+ */
+export const ENCOUNTER_RESULT_MULTIPLIERS = {
+  /** 90%+ accuracy */
+  PERFECT: 1.5,
+  /** 70-89% accuracy */
+  GOOD: 1.0,
+  /** 50-69% accuracy */
+  PARTIAL: 0.5,
+  /** <50% accuracy */
+  FAIL: 0,
+} as const;
+
+/**
+ * Epic XP Rewards
+ * 
+ * Formula: targetDays * XP_PER_DAY
+ */
+export const EPIC_XP_REWARDS = {
+  /** XP earned per day of epic duration */
+  XP_PER_DAY: 10,
+} as const;
+
+/**
+ * Calendar Power-Up XP Bonuses
+ * 
+ * Bonus XP for strategic scheduling behaviors.
+ */
+export const CALENDAR_BONUS_XP = {
+  /** Per morning task (before 9am) */
+  MORNING_WARRIOR: 10,
+  /** Per deep work block (90+ min) */
+  DEEP_WORK: 20,
+} as const;
+
+/**
  * Type-safe difficulty type
  */
 export type Difficulty = 'easy' | 'medium' | 'hard';

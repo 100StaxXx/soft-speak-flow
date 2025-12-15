@@ -12,7 +12,7 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
-import { MentorNudges } from "@/components/MentorNudges";
+
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { Moon, Sparkles } from "lucide-react";
@@ -281,9 +281,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         {/* Scrollable Content */}
         <div className="relative z-10 min-h-screen pb-24 sm:pb-24">
           <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-48 sm:pt-32 md:pt-24 space-y-4 sm:space-y-6 md:space-y-8">
-            <ErrorBoundary>
-              <MentorNudges />
-            </ErrorBoundary>
 
             {/* Quote of the Day */}
             {todaysQuote && (

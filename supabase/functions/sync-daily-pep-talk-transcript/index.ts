@@ -1,15 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -127,6 +125,7 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("sync-daily-pep-talk-transcript error:", e);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

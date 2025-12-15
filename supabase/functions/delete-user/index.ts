@@ -1,12 +1,7 @@
 // Edge function for account deletion - v2.0
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function cleanupReferralArtifacts(supabase: any, userId: string) {
@@ -30,8 +25,10 @@ async function cleanupReferralArtifacts(supabase: any, userId: string) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {

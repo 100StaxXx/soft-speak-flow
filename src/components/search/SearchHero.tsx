@@ -56,19 +56,6 @@ export const SearchHero = ({ searchQuery, onSearchChange }: SearchHeroProps) => 
       ))}
 
       <div className="relative z-10 text-center space-y-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="space-y-3"
-        >
-          <h1 className="text-3xl md:text-5xl font-bold text-pure-white leading-tight bg-gradient-to-r from-pure-white via-[hsl(var(--celestial-blue))] to-[hsl(var(--nebula-pink))] bg-clip-text text-transparent">
-            Find the words that shift your universe
-          </h1>
-          <p className="text-base md:text-lg text-white/70 max-w-2xl mx-auto">
-            Search across curated quotes, immersive pep talks, and guided challenges. Start typing to see results come alive in real time.
-          </p>
-        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}

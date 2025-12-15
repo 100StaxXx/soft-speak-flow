@@ -22,7 +22,8 @@ export type MiniGameType =
   | 'eclipse_timing'
   | 'starfall_dodge'
   | 'rune_resonance'
-  | 'astral_serpent';
+  | 'astral_serpent'
+  | 'orb_match';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -112,13 +113,13 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   chaos: 'tap_sequence',
   stagnation: 'astral_serpent',
   laziness: 'astral_serpent',
-  anxiety: 'astral_frequency',
-  overthinking: 'astral_frequency',
+  anxiety: 'orb_match',
+  overthinking: 'orb_match',
   doubt: 'starfall_dodge',
   fear: 'starfall_dodge',
-  confusion: 'rune_resonance',
+  confusion: 'orb_match',
   vulnerability: 'eclipse_timing',
-  imbalance: 'rune_resonance',
+  imbalance: 'orb_match',
 };
 
 // Theme to stat mapping
@@ -136,13 +137,13 @@ export const THEME_STAT_MAP: Record<AdversaryTheme, 'mind' | 'body' | 'soul'> = 
   imbalance: 'mind',
 };
 
-// Tier configurations
+// Tier configurations (XP rebalanced: flatter curve, Common boosted, Legendary reduced)
 export const TIER_CONFIG: Record<AdversaryTier, { phases: number; statBoost: number; xpBase: number }> = {
-  common: { phases: 1, statBoost: 1, xpBase: 25 },
-  uncommon: { phases: 1, statBoost: 2, xpBase: 40 },
-  rare: { phases: 2, statBoost: 3, xpBase: 60 },
-  epic: { phases: 2, statBoost: 4, xpBase: 100 },
-  legendary: { phases: 3, statBoost: 5, xpBase: 150 },
+  common: { phases: 1, statBoost: 1, xpBase: 35 },     // Was 25 → 35 (+40%)
+  uncommon: { phases: 1, statBoost: 2, xpBase: 45 },   // Was 40 → 45
+  rare: { phases: 2, statBoost: 3, xpBase: 55 },       // Was 60 → 55
+  epic: { phases: 2, statBoost: 4, xpBase: 75 },       // Was 100 → 75
+  legendary: { phases: 3, statBoost: 5, xpBase: 100 }, // Was 150 → 100 (-33%)
 };
 
 // Result XP multipliers

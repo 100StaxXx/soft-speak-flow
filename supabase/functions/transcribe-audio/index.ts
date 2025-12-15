@@ -1,16 +1,14 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const { audioUrl } = await req.json();
@@ -86,6 +84,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in transcribe-audio function:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error occurred',

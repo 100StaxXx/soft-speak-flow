@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +18,6 @@ interface Task {
   difficulty?: string | null;
   scheduled_time?: string | null;
   estimated_duration?: number | null;
-  notes?: string | null;
 }
 
 interface EditQuestDialogProps {
@@ -31,7 +29,6 @@ interface EditQuestDialogProps {
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;
-    notes: string | null;
   }) => Promise<void>;
   isSaving: boolean;
 }
@@ -47,7 +44,6 @@ export function EditQuestDialog({
   const [difficulty, setDifficulty] = useState<QuestDifficulty>("medium");
   const [scheduledTime, setScheduledTime] = useState<string>("");
   const [estimatedDuration, setEstimatedDuration] = useState<string>("");
-  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (task) {
@@ -55,7 +51,6 @@ export function EditQuestDialog({
       setDifficulty((task.difficulty as QuestDifficulty) || "medium");
       setScheduledTime(task.scheduled_time || "");
       setEstimatedDuration(task.estimated_duration?.toString() || "");
-      setNotes(task.notes || "");
     }
   }, [task]);
 
@@ -67,7 +62,6 @@ export function EditQuestDialog({
       difficulty,
       scheduled_time: scheduledTime || null,
       estimated_duration: estimatedDuration ? parseInt(estimatedDuration) : null,
-      notes: notes.trim() || null,
     });
     
     onOpenChange(false);
@@ -120,16 +114,6 @@ export function EditQuestDialog({
                 min="1"
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Notes</label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional details..."
-              rows={3}
-            />
           </div>
         </div>
 
