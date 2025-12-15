@@ -175,12 +175,12 @@ SIMPLE RULE:
 ⸻
 
 YOUR TASK:
-Write a 15-40 second spoken message that:
+Write a 45-90 second spoken message that:
 - Is built primarily around the PRIMARY CATEGORY theme
 - Opens with the PRIMARY EMOTIONAL TRIGGER(s)
 - Uses the intensity level to shape delivery (tone, pace, energy)
 - Sounds like ${mentor.name} speaking directly to someone
-- Contains 3-6 sentences
+- Contains 8-12 sentences
 - Feels PERSONAL, SPECIFIC, and MOTIVATING
 - Uses NO emojis or special formatting
 - Sounds conversational and human when spoken aloud
