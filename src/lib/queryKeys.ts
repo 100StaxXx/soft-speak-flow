@@ -128,12 +128,7 @@ export const queryKeys = {
   },
 
   // ============================================
-  // NOTIFICATIONS
-  // ============================================
-  notifications: {
-    adaptiveSettings: (userId: string) => ['adaptive-push-settings', userId] as const,
-    pending: (userId: string) => ['pending-notifications', userId] as const,
-  },
+  // STREAKS
 
   // ============================================
   // STREAKS
