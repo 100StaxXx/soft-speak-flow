@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 const zodiacPrompts = [
   { sign: "aries", prompt: "A white ram with curved horns in a dynamic leaping pose, white line art illustration on dark purple starry background, simple elegant silhouette style" },
@@ -17,14 +18,10 @@ const zodiacPrompts = [
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -81,22 +78,17 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ imageUrl, sign: zodiacSign }),
       {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error) {
     console.error('Error generating zodiac image:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
       JSON.stringify({ error: String(error) }),
       {
         status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
