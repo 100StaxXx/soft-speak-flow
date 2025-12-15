@@ -6,7 +6,7 @@
  * - Structured logging: Context objects for better debugging
  * - Log levels: debug, info, warn, error
  * - Performance tracking: Built-in timing utilities
- * - Error reporting: Hooks for external error tracking (Sentry, etc.)
+ * - Error reporting: Integrated with Sentry for production error tracking
  * 
  * Usage:
  *   import { logger } from '@/utils/logger';
@@ -26,6 +26,8 @@
  *   await fetchData();
  *   timer.end(); // Logs: "fetchData completed in 123ms"
  */
+
+import * as Sentry from "@sentry/react";
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -73,12 +75,17 @@ function formatLogEntry(entry: LogEntry): string {
 }
 
 /**
- * Send error to external tracking service (placeholder)
- * Replace with Sentry, LogRocket, etc. integration
+ * Send error to Sentry for production error tracking
  */
 function reportToErrorTracking(entry: LogEntry): void {
-  // TODO: Integrate with error tracking service
-  // Example: Sentry.captureMessage(entry.message, { extra: entry.context });
+  // Only report if Sentry is initialized (has valid DSN in production)
+  if (Sentry.isInitialized()) {
+    Sentry.captureMessage(entry.message, {
+      level: 'error',
+      extra: entry.context,
+      tags: entry.scope ? { scope: entry.scope } : undefined,
+    });
+  }
 }
 
 /**
