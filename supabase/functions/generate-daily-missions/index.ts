@@ -333,7 +333,7 @@ serve(async (req) => {
         mission_date: today,
         mission_text: streakBonus.mission.text,
         mission_type: `bonus_${streakBonus.key}`,
-        category: streakBonus.mission.category,
+        category: `bonus_${streakBonus.key}`, // Unique category to avoid conflict with base missions
         xp_reward: streakBonus.mission.xp,
         difficulty: streakBonus.mission.difficulty,
         auto_complete: false,
@@ -353,10 +353,14 @@ serve(async (req) => {
         .eq('mission_date', today);
     }
 
-    // Insert missions
+    // Insert missions - use upsert to handle race conditions
+    // Unique constraint is on (user_id, mission_date, category)
     const { error: insertError } = await supabase
       .from('daily_missions')
-      .insert(missionsToInsert);
+      .upsert(missionsToInsert, { 
+        onConflict: 'user_id,mission_date,category',
+        ignoreDuplicates: true 
+      });
 
     if (insertError) {
       console.error('Error inserting missions:', insertError);
