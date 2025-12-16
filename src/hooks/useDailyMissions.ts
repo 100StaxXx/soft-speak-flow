@@ -16,6 +16,8 @@ export const useDailyMissions = () => {
   const today = new Date().toLocaleDateString('en-CA');
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
+  const [missionTheme, setMissionTheme] = useState<{ name: string; emoji: string } | null>(null);
+
   const { data: missions, isLoading, error } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
@@ -53,6 +55,12 @@ export const useDailyMissions = () => {
           setGenerationErrorMessage(message);
           throw new Error(message);
         }
+        
+        // Capture theme from edge function response
+        if (generated?.theme) {
+          setMissionTheme(generated.theme);
+        }
+        
         return newMissions;
       }
 
@@ -194,5 +202,6 @@ export const useDailyMissions = () => {
     regenerateMissions: regenerateMissions.mutateAsync,
     isRegenerating: regenerateMissions.isPending,
     generationErrorMessage,
+    missionTheme,
   };
 };

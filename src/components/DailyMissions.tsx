@@ -26,13 +26,14 @@ const DailyMissionsContent = () => {
     regenerateMissions,
     isRegenerating,
     generationErrorMessage,
+    missionTheme,
   } = useDailyMissions();
   
   // Enable auto-completion detection
   useMissionAutoComplete();
   
-  // Get today's theme
-  const todaysTheme = getTodaysTheme();
+  // Use theme from backend if available, fallback to client-side calculation for cached missions
+  const todaysTheme = missionTheme || getTodaysTheme();
 
   if (isLoading) {
     return <MissionCardSkeleton />;
