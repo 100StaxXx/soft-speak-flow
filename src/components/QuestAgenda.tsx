@@ -1,13 +1,16 @@
 import { useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { Target, Star, Zap, Plus } from "lucide-react";
+import { Target, Zap, Plus } from "lucide-react";
 import { TaskCard } from "@/components/TaskCard";
-import { EmptyState } from "@/components/EmptyState";
-import { Progress } from "@/components/ui/progress";
+import { InteractiveEmptyState } from "@/components/InteractiveEmptyState";
+import { GamifiedProgress } from "@/components/GamifiedProgress";
+import { StreakIndicator } from "@/components/StreakIndicator";
+import { DailyXPTracker } from "@/components/DailyXPTracker";
 import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getEffectiveQuestXP, getQuestXPMultiplier } from "@/config/xpRewards";
+import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import type { DailyTask } from "@/hooks/useTasksQuery";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
@@ -20,8 +23,28 @@ interface QuestAgendaProps {
   onEdit: (task: DailyTask) => void;
   onSetMainQuest: (taskId: string) => void;
   onAddQuest?: () => void;
+  onQuickAdd?: (preset: { text: string; difficulty: "easy" | "medium" | "hard" }) => void;
   tutorialQuestId?: string;
 }
+
+// Thematic section headers
+const sectionThemes = {
+  morning: { title: "Rise & Conquer", emoji: "🌅", color: "text-amber-500" },
+  afternoon: { title: "Power Hour", emoji: "⚡", color: "text-primary" },
+  evening: { title: "Final Push", emoji: "🌙", color: "text-indigo-400" },
+  unscheduled: { title: "Flex Quests", emoji: "📝", color: "text-muted-foreground" },
+  completed: { title: "Victory Lane", emoji: "✅", color: "text-green-500" },
+};
+
+// Progress-based motivational messages
+const getProgressMessage = (percent: number) => {
+  if (percent === 0) return "Let's get started! 🚀";
+  if (percent < 25) return "Building momentum...";
+  if (percent < 50) return "Making progress! 💪";
+  if (percent < 75) return "Halfway there! Keep pushing!";
+  if (percent < 100) return "Almost done! Finish strong! 🔥";
+  return "Legendary performance! 🏆";
+};
 
 export function QuestAgenda({
   tasks,
@@ -31,10 +54,13 @@ export function QuestAgenda({
   onEdit,
   onSetMainQuest,
   onAddQuest,
+  onQuickAdd,
   tutorialQuestId,
 }: QuestAgendaProps) {
+  const { currentStreak, multiplier } = useStreakMultiplier();
   const completedCount = tasks.filter(t => t.completed).length;
   const totalCount = tasks.length;
+  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const totalXP = useMemo(() => {
     return tasks.reduce((sum, task) => {
@@ -105,20 +131,24 @@ export function QuestAgenda({
       showPromoteButton={!isMainQuest && !mainQuest}
       isMainQuest={isMainQuest}
       isTutorialQuest={task.id === tutorialQuestId}
+      streakMultiplier={multiplier}
     />
   );
 
-  const renderSection = (title: string, emoji: string, questList: DailyTask[], color?: string) => {
+  const renderSection = (key: keyof typeof sectionThemes, questList: DailyTask[]) => {
     if (questList.length === 0) return null;
+    const theme = sectionThemes[key];
     
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-base">{emoji}</span>
-          <h4 className={cn("text-sm font-medium", color || "text-muted-foreground")}>
-            {title}
+          <span className="text-base">{theme.emoji}</span>
+          <h4 className={cn("text-sm font-semibold", theme.color)}>
+            {theme.title}
           </h4>
-          <span className="text-xs text-muted-foreground">({questList.length})</span>
+          <span className="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+            {questList.length}
+          </span>
         </div>
         <div className="space-y-2 pl-6">
           {questList.map(task => renderTaskCard(task))}
@@ -129,54 +159,61 @@ export function QuestAgenda({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header with Streak and XP */}
       <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold inline-flex items-center">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold">
               {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
             </h3>
             <QuestSectionTooltip />
+            <StreakIndicator streak={currentStreak} multiplier={multiplier} />
           </div>
-          <p className="text-sm text-muted-foreground">
-            {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-sm text-muted-foreground">
+              {tasks.length} Quest{tasks.length !== 1 ? 's' : ''}
+            </p>
+            <span className="text-muted-foreground/50">•</span>
+            <DailyXPTracker totalXP={totalXP} />
+          </div>
         </div>
         {onAddQuest && (
           <Button
             size="icon"
             onClick={onAddQuest}
-            className="h-7 w-7 rounded-full shadow-md shadow-primary/25"
+            className="h-8 w-8 rounded-full shadow-lg shadow-primary/25 animate-pulse-subtle"
           >
             <Plus className="h-4 w-4" />
           </Button>
         )}
       </div>
 
-      {/* Progress Bar */}
+      {/* Progress Bar with Motivational Message */}
       {totalCount > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Progress: {completedCount}/{totalCount}
-            </span>
-            <span className="text-primary font-semibold">
-              +{totalXP} XP
-            </span>
-          </div>
-          <Progress value={(completedCount / totalCount) * 100} className="h-2" />
+        <div className="space-y-1">
+          <GamifiedProgress 
+            value={progressPercent} 
+            completedCount={completedCount}
+            totalCount={totalCount}
+          />
+          <p className={cn(
+            "text-xs text-center transition-colors",
+            progressPercent >= 100 ? "text-stardust-gold font-medium" : "text-muted-foreground"
+          )}>
+            {getProgressMessage(progressPercent)}
+          </p>
         </div>
       )}
 
       {/* Quest List */}
       <div className="space-y-4">
         {tasks.length === 0 ? (
-          <EmptyState 
+          <InteractiveEmptyState 
             icon={Target}
             title="No quests yet"
             description="Add your first quest to start earning XP!"
-            actionLabel="Add Quest"
-            onAction={onAddQuest}
+            onAddQuest={onAddQuest}
+            onQuickAdd={onQuickAdd}
           />
         ) : (
           <>
@@ -186,7 +223,7 @@ export function QuestAgenda({
                 <div className="flex items-center gap-2">
                   <span className="text-xl">⚔️</span>
                   <h4 className="font-semibold text-foreground">Main Quest</h4>
-                  <span className="ml-auto text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                  <span className="ml-auto text-xs font-bold text-stardust-gold bg-stardust-gold/10 px-2 py-1 rounded-full border border-stardust-gold/30">
                     {MAIN_QUEST_MULTIPLIER}x XP
                   </span>
                 </div>
@@ -194,12 +231,12 @@ export function QuestAgenda({
               </div>
             )}
 
-            {/* Time-based sections */}
-            {renderSection("Morning", "🌅", groupedQuests.morning)}
-            {renderSection("Afternoon", "☀️", groupedQuests.afternoon)}
-            {renderSection("Evening", "🌙", groupedQuests.evening)}
-            {renderSection("Unscheduled", "📝", groupedQuests.unscheduled)}
-            {renderSection("Completed", "✅", groupedQuests.completed, "text-green-500")}
+            {/* Time-based sections with thematic headers */}
+            {renderSection("morning", groupedQuests.morning)}
+            {renderSection("afternoon", groupedQuests.afternoon)}
+            {renderSection("evening", groupedQuests.evening)}
+            {renderSection("unscheduled", groupedQuests.unscheduled)}
+            {renderSection("completed", groupedQuests.completed)}
           </>
         )}
       </div>
