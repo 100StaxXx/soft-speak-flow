@@ -225,10 +225,23 @@ export const TodaysPepTalk = memo(() => {
           .eq("slug", mentorSlug)
           .maybeSingle();
 
+        // Validate transcript data (same validation as fetchDailyPepTalk)
+        let transcript: CaptionWord[] = [];
+        if (Array.isArray(data.pepTalk.transcript)) {
+          transcript = (data.pepTalk.transcript as unknown as CaptionWord[]).filter(
+            (word): word is CaptionWord => 
+              word && 
+              typeof word === 'object' &&
+              typeof word.word === 'string' &&
+              typeof word.start === 'number' &&
+              typeof word.end === 'number'
+          );
+        }
+
         setPepTalk({
           ...data.pepTalk,
           mentor_name: mentor?.name,
-          transcript: Array.isArray(data.pepTalk.transcript) ? data.pepTalk.transcript : []
+          transcript
         });
         setError(false);
         setIsFallback(false);
@@ -595,7 +608,7 @@ export const TodaysPepTalk = memo(() => {
           {/* Fallback indicator */}
           {isFallback && (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1 mx-auto w-fit">
-              <span>From {pepTalk.for_date}</span>
+              <span>From {new Date(pepTalk.for_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -690,10 +703,10 @@ export const TodaysPepTalk = memo(() => {
             <div className="space-y-2 px-2">
               <Slider
                 value={[currentTime]}
-                max={duration || 100}
+                max={duration > 0 ? duration : 1}
                 step={0.1}
                 onValueChange={handleSeek}
-                disabled={false}
+                disabled={duration === 0}
                 className="w-full"
               />
             </div>
