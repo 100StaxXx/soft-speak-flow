@@ -10,6 +10,7 @@ import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
 import { useAchievements } from '@/hooks/useAchievements';
 import { MiniGameType, MiniGameResult } from '@/types/astralEncounters';
 import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcadeHighScore } from '@/utils/soundEffects';
+import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -103,6 +104,9 @@ export default function AstralArcade() {
   // Award discovery badge and play entrance sound + background music
   useEffect(() => {
     checkArcadeDiscovery();
+    
+    // Pause ambient music before playing encounter/arcade sounds
+    pauseAmbientForEvent();
     playEncounterTrigger();
     
     // Start background music after trigger sound
@@ -110,10 +114,11 @@ export default function AstralArcade() {
       playEncounterMusic();
     }, 500);
     
-    // Cleanup: stop music when leaving arcade
+    // Cleanup: stop music and resume ambient when leaving arcade
     return () => {
       clearTimeout(musicTimeout);
       stopEncounterMusic();
+      resumeAmbientAfterEvent();
     };
   }, [checkArcadeDiscovery]);
 

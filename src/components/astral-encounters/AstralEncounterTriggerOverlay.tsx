@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Swords, Zap } from "lucide-react";
 import { AdversaryTier } from "@/types/astralEncounters";
 import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic } from "@/utils/soundEffects";
+import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
 
 interface AstralEncounterTriggerOverlayProps {
   isVisible: boolean;
@@ -30,6 +31,9 @@ export const AstralEncounterTriggerOverlay = ({
   useEffect(() => {
     if (isVisible && !hasSoundPlayed.current) {
       hasSoundPlayed.current = true;
+      
+      // Pause ambient music before playing encounter sounds
+      pauseAmbientForEvent();
       playEncounterTrigger();
       
       // Start background music after trigger sound completes (~0.5s)
@@ -37,7 +41,11 @@ export const AstralEncounterTriggerOverlay = ({
         playEncounterMusic();
       }, 500);
       
-      return () => clearTimeout(musicTimeout);
+      return () => {
+        clearTimeout(musicTimeout);
+        stopEncounterMusic();
+        resumeAmbientAfterEvent();
+      };
     }
     
     if (!isVisible) {
