@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar as CalendarIcon, Target, Zap, Flame, Mountain, Swords, LayoutGrid, CalendarDays, Trophy, Star, Sliders, ArrowDown } from "lucide-react";
-import { CalendarMonthView } from "@/components/CalendarMonthView";
-import { CalendarWeekView } from "@/components/CalendarWeekView";
-import { CalendarDayView } from "@/components/CalendarDayView";
+import { Target, Swords, Trophy, Star, Plus, ArrowDown } from "lucide-react";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
@@ -11,11 +8,8 @@ import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 import { Button } from "@/components/ui/button";
 import { safeLocalStorage } from "@/utils/storage";
-import { Input } from "@/components/ui/input";
-import { TaskCard } from "@/components/TaskCard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { QUEST_XP_REWARDS, getEffectiveQuestXP, getQuestXPMultiplier } from "@/config/xpRewards";
 import {
   Drawer,
   DrawerClose,
@@ -25,10 +19,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Progress } from "@/components/ui/progress";
 import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
-import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,15 +28,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
-import { cn } from "@/lib/utils";
-import { format, addDays, startOfWeek, isSameDay } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EpicsTab } from "@/features/epics/components/EpicsTab";
-import { EmptyState } from "@/components/EmptyState";
+
+// New components
+import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
+import { MiniCalendar } from "@/components/MiniCalendar";
+import { DatePillsScroller } from "@/components/DatePillsScroller";
+import { QuestAgenda } from "@/components/QuestAgenda";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -82,7 +77,9 @@ export default function Tasks() {
   
   // Calendar state
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [calendarView, setCalendarView] = useState<"list" | "month" | "week">("list");
+  const [calendarCollapsed, setCalendarCollapsed] = useState(true);
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   
   // Tasks state
   const { 
@@ -97,7 +94,17 @@ export default function Tasks() {
   } = useDailyTasks(selectedDate);
   
   // Calendar tasks for multi-day views
-  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, calendarView);
+  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
+  
+  // Create tasks per day map for calendar/pills indicators
+  const tasksPerDay = useMemo(() => {
+    const map: Record<string, number> = {};
+    allCalendarTasks.forEach((task: any) => {
+      const dateKey = task.task_date;
+      map[dateKey] = (map[dateKey] || 0) + 1;
+    });
+    return map;
+  }, [allCalendarTasks]);
   
   // Celebration states
   const [showCelebration, setShowCelebration] = useState<{
@@ -105,17 +112,7 @@ export default function Tasks() {
     type: "perfect_week" | "power_hour" | "deep_work" | "conflict_free";
   }>({ show: false, type: "perfect_week" });
 
-  // Quest form state
-  const [newTaskText, setNewTaskText] = useState("");
-  const [taskDifficulty, setTaskDifficulty] = useState<"easy" | "medium" | "hard">("medium");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
-  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
-  const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
-  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
-  const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
-  const [moreInformation, setMoreInformation] = useState<string | null>(null);
+  // Main quest prompt state
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<PendingTaskData | null>(null);
   const drawerActionHandledRef = useRef(false);
@@ -123,15 +120,6 @@ export default function Tasks() {
   // Edit quest state
   const [editingTask, setEditingTask] = useState<typeof tasks[0] | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  
-  // Calculate total XP for the day
-  const totalXP = useMemo(() => {
-    return tasks.reduce((sum, task) => {
-      if (!task.completed) return sum;
-      const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward;
-      return sum + reward;
-    }, 0);
-  }, [tasks]);
 
   const tutorialQuestId = useMemo(() => {
     const normalizedTutorial = tasks.find((task) =>
@@ -268,23 +256,21 @@ export default function Tasks() {
     }
   };
 
-  const handleAddTask = () => {
-    if (!newTaskText.trim()) return;
-    
+  const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     const hasMainQuest = tasks.some(task => task.is_main_quest);
     
     const taskData: PendingTaskData = {
-      text: newTaskText,
-      difficulty: taskDifficulty,
+      text: data.text,
+      difficulty: data.difficulty,
       date: taskDate,
-      scheduledTime,
-      estimatedDuration,
-      recurrencePattern,
-      recurrenceDays,
-      reminderEnabled,
-      reminderMinutesBefore,
-      moreInformation,
+      scheduledTime: data.scheduledTime,
+      estimatedDuration: data.estimatedDuration,
+      recurrencePattern: data.recurrencePattern,
+      recurrenceDays: data.recurrenceDays,
+      reminderEnabled: data.reminderEnabled,
+      reminderMinutesBefore: data.reminderMinutesBefore,
+      moreInformation: data.moreInformation,
     };
     
     if (!hasMainQuest) {
@@ -292,7 +278,7 @@ export default function Tasks() {
       drawerActionHandledRef.current = false;
       setShowMainQuestPrompt(true);
     } else {
-      actuallyAddTask(false, taskData);
+      await actuallyAddTask(false, taskData);
     }
   };
   
@@ -312,18 +298,6 @@ export default function Tasks() {
         reminderEnabled: dataToAdd.reminderEnabled,
         reminderMinutesBefore: dataToAdd.reminderMinutesBefore,
       });
-
-      // Clear form
-      setNewTaskText("");
-      setTaskDifficulty("medium");
-      setScheduledTime(null);
-      setEstimatedDuration(null);
-      setRecurrencePattern(null);
-      setRecurrenceDays([]);
-      setReminderEnabled(false);
-      setReminderMinutesBefore(15);
-      setMoreInformation(null);
-      setShowAdvanced(false);
     } catch (error) {
       // Error handled by mutation
     }
@@ -382,20 +356,9 @@ export default function Tasks() {
     }
   };
 
-  // Check task conflicts
-  const checkTaskConflicts = (task: any, allTasks: any[]) => {
-    for (const other of allTasks) {
-      if (task.id === other.id || !task.scheduled_time || !other.scheduled_time) continue;
-      if (task.task_date !== other.task_date) continue;
-      
-      const t1Start = new Date(`2000-01-01T${task.scheduled_time}:00`);
-      const t1End = new Date(t1Start.getTime() + ((task.estimated_duration || 0) * 60000));
-      const t2Start = new Date(`2000-01-01T${other.scheduled_time}:00`);
-      const t2End = new Date(t2Start.getTime() + ((other.estimated_duration || 0) * 60000));
-      
-      if (t1Start < t2End && t2Start < t1End) return true;
-    }
-    return false;
+  const openAddSheet = (time?: string) => {
+    setPrefilledTime(time ?? null);
+    setShowAddSheet(true);
   };
 
   // Error state
@@ -452,9 +415,6 @@ export default function Tasks() {
     );
   }
 
-  const mainQuest = tasks.find(t => t.is_main_quest);
-  const sideQuests = tasks.filter(t => !t.is_main_quest);
-
   return (
     <div className="min-h-screen pb-20 relative">
       <StarfieldBackground />
@@ -481,17 +441,29 @@ export default function Tasks() {
       <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <BrandTagline />
-          <div className="flex items-center gap-3">
-            <Target className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">Quests & Epics</h1>
-              <p className="text-muted-foreground">Build your daily momentum</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Target className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">Quests & Epics</h1>
+                <p className="text-muted-foreground">Build your daily momentum</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                onClick={() => openAddSheet()}
+                className="h-10 w-10 rounded-full shadow-lg shadow-primary/25"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+              <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-6 relative z-10">
+      <div className="max-w-2xl mx-auto p-6 space-y-4 relative z-10">
         <Tabs defaultValue="quests" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
@@ -523,345 +495,39 @@ export default function Tasks() {
                 </Button>
               </Card>
             )}
-            {/* Calendar Card */}
-            <Card data-tour="week-calendar" className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 space-y-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-lg">Calendar</h2>
-                <div className="flex gap-2">
-                  <Button
-                    variant={calendarView === "list" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCalendarView("list")}
-                    className="gap-2"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    <span className="hidden sm:inline">List</span>
-                  </Button>
-                  <Button
-                    variant={calendarView === "week" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCalendarView("week")}
-                    className="gap-2"
-                  >
-                    <CalendarDays className="h-4 w-4" />
-                    <span className="hidden sm:inline">Week</span>
-                  </Button>
-                  <Button
-                    variant={calendarView === "month" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCalendarView("month")}
-                    className="gap-2"
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">Month</span>
-                  </Button>
-                  <PageInfoButton onClick={() => setShowPageInfo(true)} />
-                </div>
-              </div>
 
-              {calendarView === "list" && (
-                <CalendarDayView
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  tasks={allCalendarTasks}
-                  onTaskDrop={async (taskId, newDate, newTime) => {
-                    const { error } = await supabase
-                      .from('daily_tasks')
-                      .update({
-                        task_date: format(newDate, 'yyyy-MM-dd'),
-                        scheduled_time: newTime,
-                        reminder_sent: false
-                      })
-                      .eq('id', taskId);
+            {/* Mini Calendar (Collapsed by default) */}
+            <MiniCalendar
+              selectedDate={selectedDate}
+              onDateSelect={(date) => {
+                setSelectedDate(date);
+                setCalendarCollapsed(true);
+              }}
+              tasksPerDay={tasksPerDay}
+              collapsed={calendarCollapsed}
+              onToggleCollapse={() => setCalendarCollapsed(!calendarCollapsed)}
+            />
 
-                    if (!error) {
-                      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-                      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-                      toast({
-                        title: "Quest scheduled",
-                        description: newTime
-                          ? `Scheduled for ${format(newDate, 'MMM d')} at ${newTime}`
-                          : `Moved to ${format(newDate, 'MMM d')}`
-                      });
-                    }
-                  }}
-                  onTimeSlotLongPress={(date, time) => {
-                    setScheduledTime(time);
-                    setSelectedDate(date);
-                    setTimeout(() => {
-                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
-                      input?.focus();
-                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 100);
-                  }}
-                />
-              )}
+            {/* Date Pills Scroller */}
+            <DatePillsScroller
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+              tasksPerDay={tasksPerDay}
+            />
 
-              {calendarView === "month" && (
-                <CalendarMonthView
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  tasks={allCalendarTasks}
-                  onTaskClick={() => setCalendarView("list")}
-                  onDateLongPress={(date) => {
-                    setSelectedDate(date);
-                    setCalendarView("list");
-                    setTimeout(() => {
-                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
-                      input?.focus();
-                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 100);
-                  }}
-                />
-              )}
-
-              {calendarView === "week" && (
-                <CalendarWeekView
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  tasks={allCalendarTasks}
-                  onTaskDrop={async (taskId, newDate, newTime) => {
-                    const { error } = await supabase
-                      .from('daily_tasks')
-                      .update({
-                        task_date: format(newDate, 'yyyy-MM-dd'),
-                        scheduled_time: newTime,
-                        reminder_sent: false
-                      })
-                      .eq('id', taskId);
-
-                    if (!error) {
-                      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-                      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-                      toast({
-                        title: "Quest rescheduled",
-                        description: newTime
-                          ? `Moved to ${format(newDate, 'MMM d')} at ${newTime}`
-                          : `Moved to ${format(newDate, 'MMM d')}`
-                      });
-
-                      setTimeout(() => {
-                        const scheduledTasks = allCalendarTasks.filter((t: any) => t.scheduled_time && t.estimated_duration);
-                        if (scheduledTasks.length >= 5 && scheduledTasks.every((t: any) => !checkTaskConflicts(t, scheduledTasks))) {
-                          setShowCelebration({ show: true, type: "perfect_week" });
-                        }
-                      }, 500);
-                    }
-                  }}
-                  onTimeSlotLongPress={(date, time) => {
-                    setScheduledTime(time);
-                    setSelectedDate(date);
-                    setTimeout(() => {
-                      const input = document.querySelector('[data-tour="add-task-input"]') as HTMLInputElement;
-                      input?.focus();
-                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 100);
-                  }}
-                />
-              )}
-            </Card>
-
-            {/* Quest List */}
-            <Card className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div>
-                    <h3 data-tour="today-quests-header" className="font-semibold inline-flex items-center">
-                      {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
-                    </h3>
-                    <QuestSectionTooltip />
-                    <p className="text-sm text-muted-foreground">
-                      {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
-                    </p>
-                  </div>
-                </div>
-                <div className="text-sm font-medium text-primary">
-                  {completedCount}/{totalCount}
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              {totalCount > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Progress: {completedCount}/{totalCount} Complete
-                    </span>
-                    <span className="text-primary font-semibold">
-                      +{totalXP} XP Today
-                    </span>
-                  </div>
-                  <Progress value={(completedCount / totalCount) * 100} className="h-2" />
-                </div>
-              )}
-
-              {/* Quest List Content */}
-              <div className="space-y-6">
-                {tasks.length === 0 ? (
-                  <EmptyState 
-                    icon={Target}
-                    title="No quests yet"
-                    description="Add quests throughout your day - first 3 earn full XP!"
-                  />
-                ) : (
-                  <>
-                    {mainQuest && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="text-xl">⚔️</div>
-                          <h3 className="font-semibold text-foreground">Main Quest</h3>
-                          <div className="ml-auto">
-                            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                              {MAIN_QUEST_MULTIPLIER}x XP
-                            </span>
-                          </div>
-                        </div>
-                        <TaskCard
-                          task={{ ...mainQuest, xp_reward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER }}
-                          onToggle={() => toggleTask({ taskId: mainQuest.id, completed: !mainQuest.completed, xpReward: mainQuest.xp_reward * MAIN_QUEST_MULTIPLIER })}
-                          onDelete={() => deleteTask(mainQuest.id)}
-                          onEdit={() => setEditingTask(mainQuest)}
-                          isMainQuest={true}
-                          isTutorialQuest={mainQuest.id === tutorialQuestId}
-                        />
-                      </div>
-                    )}
-
-                    {sideQuests.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="text-lg">📜</div>
-                          <h3 className="font-semibold text-muted-foreground">Side Quests</h3>
-                        </div>
-                        <div className="space-y-3">
-                          {sideQuests.map((task) => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              onToggle={() => toggleTask({ taskId: task.id, completed: !task.completed, xpReward: task.xp_reward })}
-                              onDelete={() => deleteTask(task.id)}
-                              onEdit={() => setEditingTask(task)}
-                              onSetMainQuest={() => setMainQuest(task.id)}
-                              showPromoteButton={!mainQuest}
-                              isTutorialQuest={task.id === tutorialQuestId}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* XP Preview */}
-              {tasks.length > 0 && (
-                <div className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border",
-                  tasks.length >= 3 ? "bg-amber-500/5 border-amber-500/20" : "bg-primary/5 border-primary/20"
-                )}>
-                  <div className="flex items-center gap-2">
-                    <Zap className={cn("h-4 w-4", tasks.length >= 3 ? "text-amber-500" : "text-primary")} />
-                    <span className="text-sm font-medium">Next Quest ({tasks.length + 1})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-xs font-semibold px-2 py-1 rounded-full",
-                      tasks.length >= 3 ? "text-amber-600 bg-amber-500/10" : "text-primary bg-primary/10"
-                    )}>
-                      {Math.round(getQuestXPMultiplier(tasks.length + 1) * 100)}% XP
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {getEffectiveQuestXP(taskDifficulty, tasks.length + 1)} XP
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Add Quest Form */}
-              <Card className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Add New Quest</p>
-                  <button
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5"
-                  >
-                    <Sliders className="w-3 h-3" />
-                    {showAdvanced ? "Hide" : "Advanced"}
-                  </button>
-                </div>
-                  
-                <div className="space-y-3">
-                  <Input
-                    data-tour="add-task-input"
-                    placeholder="Add a quest..."
-                    value={newTaskText}
-                    onChange={(e) => setNewTaskText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleAddTask()}
-                    disabled={isAdding}
-                  />
-                  
-                  <div className="flex gap-2" data-tour="task-difficulty">
-                    <Button
-                      variant={taskDifficulty === 'easy' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setTaskDifficulty('easy')}
-                      className="flex-1 gap-1 px-2"
-                    >
-                      <Zap className="h-4 w-4" />
-                      <span className="hidden sm:inline">Easy</span>
-                      <span className="text-xs font-semibold text-muted-foreground">+{QUEST_XP_REWARDS.EASY} XP</span>
-                    </Button>
-                    <Button
-                      variant={taskDifficulty === 'medium' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setTaskDifficulty('medium')}
-                      className="flex-1 gap-1 px-2"
-                    >
-                      <Flame className="h-4 w-4" />
-                      <span className="hidden sm:inline">Medium</span>
-                      <span className="text-xs font-semibold text-muted-foreground">+{QUEST_XP_REWARDS.MEDIUM} XP</span>
-                    </Button>
-                    <Button
-                      variant={taskDifficulty === 'hard' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setTaskDifficulty('hard')}
-                      className="flex-1 gap-1 px-2"
-                    >
-                      <Mountain className="h-4 w-4" />
-                      <span className="hidden sm:inline">Hard</span>
-                      <span className="text-xs font-semibold text-muted-foreground">+{QUEST_XP_REWARDS.HARD} XP</span>
-                    </Button>
-                  </div>
-
-                  {showAdvanced && (
-                    <AdvancedQuestOptions
-                      scheduledTime={scheduledTime}
-                      estimatedDuration={estimatedDuration}
-                      recurrencePattern={recurrencePattern}
-                      recurrenceDays={recurrenceDays}
-                      reminderEnabled={reminderEnabled}
-                      reminderMinutesBefore={reminderMinutesBefore}
-                      onScheduledTimeChange={setScheduledTime}
-                      onEstimatedDurationChange={setEstimatedDuration}
-                      onRecurrencePatternChange={setRecurrencePattern}
-                      onRecurrenceDaysChange={setRecurrenceDays}
-                      onReminderEnabledChange={setReminderEnabled}
-                      onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                      moreInformation={moreInformation}
-                      onMoreInformationChange={setMoreInformation}
-                    />
-                  )}
-
-                  <Button 
-                    data-tour="add-task-button"
-                    onClick={handleAddTask}
-                    disabled={isAdding || !newTaskText.trim()}
-                    className="w-full"
-                  >
-                    {isAdding ? "Adding..." : "Add Quest"}
-                  </Button>
-                </div>
-              </Card>
+            {/* Quest Agenda */}
+            <Card className="p-4">
+              <QuestAgenda
+                tasks={tasks}
+                selectedDate={selectedDate}
+                onToggle={(taskId, completed, xpReward) => 
+                  toggleTask({ taskId, completed, xpReward })
+                }
+                onDelete={deleteTask}
+                onEdit={(task) => setEditingTask(task)}
+                onSetMainQuest={setMainQuest}
+                tutorialQuestId={tutorialQuestId}
+              />
             </Card>
           </TabsContent>
 
@@ -870,6 +536,16 @@ export default function Tasks() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Quest Sheet */}
+      <AddQuestSheet
+        open={showAddSheet}
+        onOpenChange={setShowAddSheet}
+        selectedDate={selectedDate}
+        prefilledTime={prefilledTime}
+        onAdd={handleAddQuest}
+        isAdding={isAdding}
+      />
 
       {/* Main Quest Prompt Drawer */}
       <Drawer 
@@ -923,7 +599,7 @@ export default function Tasks() {
           "Use advanced options to schedule quests with time blocking",
           "Create Epics to link quests to long-term goals"
         ]}
-        tip="Tap the calendar icon to see your weekly view and plan ahead!"
+        tip="Tap + to add quests, or expand the calendar to see your month!"
       />
 
       <StreakFreezePromptModal
