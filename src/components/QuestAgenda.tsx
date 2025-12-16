@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { Target, Star, Zap } from "lucide-react";
+import { Target, Star, Zap, Plus } from "lucide-react";
 import { TaskCard } from "@/components/TaskCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Progress } from "@/components/ui/progress";
 import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getEffectiveQuestXP, getQuestXPMultiplier } from "@/config/xpRewards";
 import type { DailyTask } from "@/hooks/useTasksQuery";
@@ -18,6 +19,7 @@ interface QuestAgendaProps {
   onDelete: (taskId: string) => void;
   onEdit: (task: DailyTask) => void;
   onSetMainQuest: (taskId: string) => void;
+  onAddQuest?: () => void;
   tutorialQuestId?: string;
 }
 
@@ -28,6 +30,7 @@ export function QuestAgenda({
   onDelete,
   onEdit,
   onSetMainQuest,
+  onAddQuest,
   tutorialQuestId,
 }: QuestAgendaProps) {
   const completedCount = tasks.filter(t => t.completed).length;
@@ -128,12 +131,23 @@ export function QuestAgenda({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <div>
-            <h3 className="font-semibold inline-flex items-center">
-              {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
-            </h3>
-            <QuestSectionTooltip />
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold inline-flex items-center">
+                {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
+              </h3>
+              {onAddQuest && (
+                <Button
+                  size="icon"
+                  onClick={onAddQuest}
+                  className="h-7 w-7 rounded-full shadow-md shadow-primary/25"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+              <QuestSectionTooltip />
+            </div>
             <p className="text-sm text-muted-foreground">
               {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
             </p>

@@ -16,6 +16,8 @@ interface CalendarDayViewProps {
   tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
+  fullDayMode?: boolean;
+  hideHeader?: boolean;
 }
 
 export const CalendarDayView = ({
@@ -23,7 +25,9 @@ export const CalendarDayView = ({
   onDateSelect,
   tasks,
   onTaskDrop,
-  onTimeSlotLongPress
+  onTimeSlotLongPress,
+  fullDayMode = false,
+  hideHeader = false
 }: CalendarDayViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -35,8 +39,12 @@ export const CalendarDayView = ({
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const dayTasks = tasks.filter(t => t.task_date === dateStr);
 
-  // Auto-expand time range based on scheduled tasks
+  // Auto-expand time range based on scheduled tasks (or full day if fullDayMode)
   const calculateTimeRange = () => {
+    if (fullDayMode) {
+      return { start: 0, end: 23 }; // Full 24-hour view: 12:00 AM - 11:30 PM
+    }
+    
     const scheduledTasks = dayTasks.filter(t => t.scheduled_time);
 
     if (scheduledTasks.length === 0) {
@@ -68,9 +76,7 @@ export const CalendarDayView = ({
 
   for (let hour = startHour; hour <= endHour; hour++) {
     timeSlots.push({ hour, minute: 0 });
-    if (hour < endHour) {
-      timeSlots.push({ hour, minute: 30 });
-    }
+    timeSlots.push({ hour, minute: 30 });
   }
 
   const formatTimeSlot = (hour: number, minute: number) => {
@@ -194,8 +200,9 @@ export const CalendarDayView = ({
   }, [shouldShowPreviewToggle, showAllUnscheduled]);
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", fullDayMode && "h-full flex flex-col")}>
       {/* Compact Header */}
+      {!hideHeader && (
       <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Button
@@ -260,6 +267,7 @@ export const CalendarDayView = ({
           </Button>
         </div>
       </div>
+      )}
 
       {/* Collapsible Stats Panel */}
       {showStats && (totalCount > 0 || conflicts > 0 || powerUpXP > 0) && (
@@ -353,7 +361,7 @@ export const CalendarDayView = ({
       )}
 
       {/* Timeline */}
-      <ScrollArea className="max-h-[520px] min-h-[320px] rounded-lg border border-border">
+      <ScrollArea className={cn("rounded-lg border border-border", fullDayMode ? "h-full" : "max-h-[520px] min-h-[320px]")}>
         <div className="relative">
           {timeSlots.map(({ hour, minute }, index) => {
             const slotTasks = getTasksForTimeSlot(hour, minute);

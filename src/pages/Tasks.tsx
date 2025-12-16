@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Target, Swords, Trophy, Star, Plus, ArrowDown } from "lucide-react";
+import { Target, Swords, Trophy, Star, Plus, ArrowDown, Clock } from "lucide-react";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
@@ -40,6 +40,8 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { QuestAgenda } from "@/components/QuestAgenda";
+import { HourlyViewModal } from "@/components/HourlyViewModal";
+import { CalendarTask } from "@/types/quest";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -80,6 +82,7 @@ export default function Tasks() {
   const [calendarCollapsed, setCalendarCollapsed] = useState(true);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
+  const [showHourlyModal, setShowHourlyModal] = useState(false);
   
   // Tasks state
   const { 
@@ -450,13 +453,6 @@ export default function Tasks() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                onClick={() => openAddSheet()}
-                className="h-10 w-10 rounded-full shadow-lg shadow-primary/25"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>
@@ -526,9 +522,24 @@ export default function Tasks() {
                 onDelete={deleteTask}
                 onEdit={(task) => setEditingTask(task)}
                 onSetMainQuest={setMainQuest}
+                onAddQuest={() => openAddSheet()}
                 tutorialQuestId={tutorialQuestId}
               />
             </Card>
+
+            {/* Hourly View Trigger */}
+            <button
+              onClick={() => setShowHourlyModal(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground hover:text-foreground"
+            >
+              <Clock className="h-4 w-4" />
+              <span>View Full Schedule</span>
+              {tasks.filter(t => t.scheduled_time).length > 0 && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  {tasks.filter(t => t.scheduled_time).length} scheduled
+                </span>
+              )}
+            </button>
           </TabsContent>
 
           <TabsContent value="epics" className="space-y-4 mt-6">
@@ -545,6 +556,34 @@ export default function Tasks() {
         prefilledTime={prefilledTime}
         onAdd={handleAddQuest}
         isAdding={isAdding}
+      />
+
+      {/* Hourly View Modal */}
+      <HourlyViewModal
+        open={showHourlyModal}
+        onOpenChange={setShowHourlyModal}
+        selectedDate={selectedDate}
+        onDateSelect={setSelectedDate}
+        tasks={allCalendarTasks as CalendarTask[]}
+        onTaskDrop={async (taskId, newDate, newTime) => {
+          if (!user?.id) return;
+          const updates: { scheduled_time?: string | null; task_date?: string } = {};
+          if (newTime) updates.scheduled_time = newTime;
+          updates.task_date = format(newDate, 'yyyy-MM-dd');
+          
+          await supabase
+            .from('daily_tasks')
+            .update(updates)
+            .eq('id', taskId)
+            .eq('user_id', user.id);
+          
+          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+        }}
+        onTimeSlotLongPress={(date, time) => {
+          setShowHourlyModal(false);
+          setTimeout(() => openAddSheet(time), 150);
+        }}
       />
 
       {/* Main Quest Prompt Drawer */}
