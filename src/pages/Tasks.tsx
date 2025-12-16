@@ -40,7 +40,6 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { QuestAgenda } from "@/components/QuestAgenda";
-import { HourlyTimelineDrawer } from "@/components/HourlyTimelineDrawer";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -362,35 +361,6 @@ export default function Tasks() {
     setShowAddSheet(true);
   };
 
-  const handleTaskDrop = async (taskId: string, newDate: Date, newTime?: string) => {
-    if (!user?.id) return;
-    try {
-      const updates: Record<string, string | null> = {
-        task_date: format(newDate, 'yyyy-MM-dd'),
-      };
-      if (newTime) {
-        updates.scheduled_time = newTime;
-      }
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update(updates)
-        .eq('id', taskId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast({ title: "Quest rescheduled!" });
-    } catch {
-      toast({ title: "Failed to reschedule quest", variant: "destructive" });
-    }
-  };
-
-  const handleTimeSlotLongPress = (date: Date, time: string) => {
-    setSelectedDate(date);
-    openAddSheet(time);
-  };
-
   // Error state
   if (companionError) {
     return (
@@ -559,14 +529,6 @@ export default function Tasks() {
                 tutorialQuestId={tutorialQuestId}
               />
             </Card>
-
-            {/* Hourly Timeline Drawer */}
-            <HourlyTimelineDrawer
-              selectedDate={selectedDate}
-              tasks={tasks}
-              onTaskDrop={handleTaskDrop}
-              onTimeSlotLongPress={handleTimeSlotLongPress}
-            />
           </TabsContent>
 
           <TabsContent value="epics" className="space-y-4 mt-6">
