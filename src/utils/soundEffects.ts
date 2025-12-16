@@ -419,15 +419,27 @@ class SoundManager {
   // Background music player for encounters/arcade
   private encounterMusicAudio: HTMLAudioElement | null = null;
 
-  playEncounterMusic(): HTMLAudioElement | null {
-    if (this.shouldMute()) return null;
+  async playEncounterMusic(): Promise<HTMLAudioElement | null> {
+    if (this.shouldMute()) {
+      console.log('[Encounter Music] Skipped - audio is muted');
+      return null;
+    }
+    
+    // Ensure audio context is ready (critical for iOS)
+    await this.ensureAudioContext();
     
     this.stopEncounterMusic();
     
     this.encounterMusicAudio = new Audio('/sounds/encounter-music.mp3');
     this.encounterMusicAudio.volume = this.encounterMusicVolume;
     this.encounterMusicAudio.loop = true;
-    this.encounterMusicAudio.play().catch(() => {});
+    
+    try {
+      await this.encounterMusicAudio.play();
+      console.log('[Encounter Music] Playing successfully');
+    } catch (error) {
+      console.error('[Encounter Music] Failed to play:', error);
+    }
     
     return this.encounterMusicAudio;
   }
