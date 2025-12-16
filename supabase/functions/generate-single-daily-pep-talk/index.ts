@@ -143,24 +143,33 @@ serve(async (req) => {
       throw new Error(`Mentor not found: ${mentorSlug}`);
     }
 
-    // Generate pep talk using existing function
+    // Generate pep talk using existing function via direct fetch (edge-to-edge call)
     console.log(`Calling generate-full-mentor-audio for ${mentorSlug}...`);
-    const { data: generatedData, error: generateError } = await supabase.functions.invoke(
-      'generate-full-mentor-audio',
+    
+    const audioResponse = await fetch(
+      `${supabaseUrl}/functions/v1/generate-full-mentor-audio`,
       {
-        body: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
           mentorSlug: mentorSlug,
           topic_category: theme.topic_category,
           intensity: theme.intensity,
           emotionalTriggers: theme.triggers
-        }
+        }),
       }
     );
 
-    if (generateError || !generatedData) {
-      console.error('Error generating audio:', generateError);
-      throw new Error(generateError?.message || 'Audio generation failed');
+    if (!audioResponse.ok) {
+      const errorText = await audioResponse.text();
+      console.error('Error generating audio:', audioResponse.status, errorText);
+      throw new Error(`Audio generation failed: ${audioResponse.status}`);
     }
+
+    const generatedData = await audioResponse.json();
 
     const { script, audioUrl } = generatedData;
     
