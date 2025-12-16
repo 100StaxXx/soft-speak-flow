@@ -28,12 +28,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
+import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { format, isSameDay } from "date-fns";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EpicsTab } from "@/features/epics/components/EpicsTab";
+import { ComboCounter } from "@/components/ComboCounter";
+import { QuestClearCelebration } from "@/components/QuestClearCelebration";
+import { useComboTracker } from "@/hooks/useComboTracker";
 
 // New components
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
@@ -68,6 +72,12 @@ export default function Tasks() {
   
   // Streak freeze prompt state
   const { needsStreakDecision, currentStreak, freezesAvailable, useFreeze, resetStreak, isResolving } = useStreakAtRisk();
+  const { currentStreak: streakCount } = useStreakMultiplier();
+  
+  // Combo and celebration state
+  const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
+  const [showQuestClear, setShowQuestClear] = useState(false);
+  const prevCompletedRef = useRef(0);
   
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -424,6 +434,17 @@ export default function Tasks() {
       
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />
       
+      {/* Combo Counter */}
+      <ComboCounter count={comboCount} show={showCombo} bonusXP={bonusXP} />
+      
+      {/* Quest Clear Celebration */}
+      <QuestClearCelebration
+        show={showQuestClear}
+        totalXP={tasks.reduce((sum, t) => t.completed ? sum + t.xp_reward : sum, 0)}
+        currentStreak={streakCount}
+        onDismiss={() => setShowQuestClear(false)}
+      />
+      
       {/* Loading Overlay */}
       {isAdding && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -516,9 +537,10 @@ export default function Tasks() {
               <QuestAgenda
                 tasks={tasks}
                 selectedDate={selectedDate}
-                onToggle={(taskId, completed, xpReward) => 
-                  toggleTask({ taskId, completed, xpReward })
-                }
+                onToggle={(taskId, completed, xpReward) => {
+                  if (completed) recordCompletion();
+                  toggleTask({ taskId, completed, xpReward });
+                }}
                 onDelete={deleteTask}
                 onEdit={(task) => setEditingTask(task)}
                 onSetMainQuest={setMainQuest}
@@ -527,10 +549,10 @@ export default function Tasks() {
               />
             </Card>
 
-            {/* Hourly View Trigger */}
+            {/* Hourly View Trigger - Enhanced */}
             <button
               onClick={() => setShowHourlyModal(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground hover:text-foreground"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-all text-sm text-muted-foreground hover:text-foreground animate-cosmic-glow"
             >
               <Clock className="h-4 w-4" />
               <span>View Full Schedule</span>

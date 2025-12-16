@@ -846,5 +846,299 @@ All colors MUST be HSL.
     animation: shimmerBackground 2s ease-in-out infinite;
   }
 
+  /* ========== GAMIFICATION ANIMATIONS ========== */
+  
+  /* Milestone sparkle */
+  @keyframes milestone-sparkle {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(0) scale(0);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px) scale(1.2);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-20px) scale(0);
+    }
+  }
+  
+  .animate-milestone-sparkle {
+    animation: milestone-sparkle 1.5s ease-out forwards;
+  }
+  
+  /* Progress shimmer slide */
+  @keyframes shimmer-slide {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  .animate-shimmer-slide {
+    animation: shimmer-slide 2s ease-in-out infinite;
+  }
+  
+  /* Pulse glow for 100% progress */
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+  
+  /* Combo pop animation */
+  @keyframes combo-pop {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.5) translateY(20px);
+    }
+    30% {
+      opacity: 1;
+      transform: translateX(-50%) scale(1.1) translateY(0);
+    }
+    50% {
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+    80% {
+      opacity: 1;
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.9) translateY(-10px);
+    }
+  }
+  
+  .animate-combo-pop {
+    animation: combo-pop 2.5s ease-out forwards;
+  }
+  
+  /* Combo particles */
+  @keyframes combo-particle {
+    0% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-30px) scale(0);
+    }
+  }
+  
+  .animate-combo-particle {
+    animation: combo-particle 0.8s ease-out forwards;
+  }
+  
+  /* Flame flicker */
+  @keyframes flame-flicker {
+    0%, 100% {
+      transform: scale(1) rotate(0deg);
+      filter: brightness(1);
+    }
+    25% {
+      transform: scale(1.05) rotate(-2deg);
+      filter: brightness(1.1);
+    }
+    50% {
+      transform: scale(0.98) rotate(1deg);
+      filter: brightness(0.95);
+    }
+    75% {
+      transform: scale(1.02) rotate(-1deg);
+      filter: brightness(1.05);
+    }
+  }
+  
+  .animate-flame-flicker {
+    animation: flame-flicker 0.5s ease-in-out infinite;
+  }
+  
+  /* XP pulse */
+  @keyframes xp-pulse {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+    }
+    50% {
+      transform: scale(1.02);
+      box-shadow: 0 0 0 4px hsl(var(--primary) / 0);
+    }
+  }
+  
+  .animate-xp-pulse {
+    animation: xp-pulse 0.5s ease-out;
+  }
+  
+  /* XP float animation */
+  @keyframes xp-float {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px) scale(0.8);
+    }
+    20% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1.1);
+    }
+    40% {
+      transform: translateX(-50%) translateY(-5px) scale(1);
+    }
+    80% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-15px) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-25px) scale(0.9);
+    }
+  }
+  
+  .animate-xp-float {
+    animation: xp-float 2s ease-out forwards;
+  }
+  
+  /* Sparkle burst */
+  @keyframes sparkle-burst {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(0) translateY(-20px);
+    }
+  }
+  
+  .animate-sparkle-burst {
+    animation: sparkle-burst 0.8s ease-out forwards;
+  }
+  
+  /* Ripple expand for checkbox */
+  @keyframes ripple-expand {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(3);
+      opacity: 0;
+    }
+  }
+  
+  .animate-ripple-expand {
+    animation: ripple-expand 0.6s ease-out forwards;
+  }
+  
+  /* Task complete animation */
+  @keyframes task-complete {
+    0% {
+      transform: scale(1);
+    }
+    15% {
+      transform: scale(1.02);
+    }
+    30% {
+      transform: scale(0.98);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  .animate-task-complete {
+    animation: task-complete 0.4s ease-out;
+  }
+  
+  /* Floating particles for empty state */
+  @keyframes float-particle {
+    0%, 100% {
+      opacity: 0.3;
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: translateY(-20px) scale(1.2);
+    }
+  }
+  
+  .animate-float-particle {
+    animation: float-particle 3s ease-in-out infinite;
+  }
+  
+  /* Slow float for icons */
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  
+  .animate-float-slow {
+    animation: float-slow 3s ease-in-out infinite;
+  }
+  
+  /* Pulse subtle for buttons */
+  @keyframes pulse-subtle {
+    0%, 100% {
+      box-shadow: 0 4px 12px hsl(var(--primary) / 0.25);
+    }
+    50% {
+      box-shadow: 0 4px 20px hsl(var(--primary) / 0.4);
+    }
+  }
+  
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+  
+  /* Gradient shift for quest clear */
+  @keyframes gradient-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+  
+  /* Schedule button cosmic glow */
+  @keyframes cosmic-button-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3);
+      border-color: hsl(var(--border) / 0.6);
+    }
+    50% {
+      box-shadow: 0 0 15px hsl(var(--primary) / 0.2);
+      border-color: hsl(var(--primary) / 0.4);
+    }
+  }
+  
+  .animate-cosmic-glow {
+    animation: cosmic-button-glow 3s ease-in-out infinite;
+  }
+
 }
 

@@ -1,9 +1,11 @@
-import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown, Pencil } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown, Pencil, Shield, Sword, Crown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { haptics } from "@/utils/haptics";
+import { playHabitComplete } from "@/utils/soundEffects";
+
 interface TaskCardProps {
   task: {
     id: string;
@@ -24,6 +26,7 @@ interface TaskCardProps {
   showPromoteButton?: boolean;
   isMainQuest?: boolean;
   isTutorialQuest?: boolean;
+  streakMultiplier?: number;
 }
 
 export const TaskCard = ({
@@ -35,21 +38,39 @@ export const TaskCard = ({
   showPromoteButton,
   isMainQuest,
   isTutorialQuest,
+  streakMultiplier = 1,
 }: TaskCardProps) => {
   const [showXP, setShowXP] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [showCheckAnimation, setShowCheckAnimation] = useState(false);
   const isInitialMount = useRef(true);
 
-  const difficultyColors = {
-    easy: "text-green-500",
-    medium: "text-yellow-500",
-    hard: "text-red-500",
-  };
-
-  const difficultyIcons = {
-    easy: "◆",
-    medium: "◆◆",
-    hard: "◆◆◆",
+  // Enhanced difficulty config with icons and glow colors
+  const difficultyConfig = {
+    easy: { 
+      icon: Shield, 
+      label: "E", 
+      color: "text-green-500", 
+      bgColor: "bg-green-500/10",
+      borderColor: "border-green-500/30",
+      glowColor: "shadow-green-500/20"
+    },
+    medium: { 
+      icon: Sword, 
+      label: "M", 
+      color: "text-yellow-500", 
+      bgColor: "bg-yellow-500/10",
+      borderColor: "border-yellow-500/30",
+      glowColor: "shadow-yellow-500/20"
+    },
+    hard: { 
+      icon: Crown, 
+      label: "H", 
+      color: "text-red-500", 
+      bgColor: "bg-red-500/10",
+      borderColor: "border-red-500/30",
+      glowColor: "shadow-red-500/20"
+    },
   };
 
   const formatTime = (time: string) => {
@@ -86,38 +107,66 @@ export const TaskCard = ({
     if (task.completed && !justCompleted) {
       setJustCompleted(true);
       setShowXP(true);
+      setShowCheckAnimation(true);
+      
+      // Play completion sound
+      playHabitComplete();
+      
       const timer = setTimeout(() => {
         setShowXP(false);
         setJustCompleted(false);
+        setShowCheckAnimation(false);
       }, 2000);
       return () => clearTimeout(timer);
     } else if (!task.completed && justCompleted) {
       setJustCompleted(false);
+      setShowCheckAnimation(false);
     }
   }, [task.completed, justCompleted]);
 
+  const displayXP = streakMultiplier > 1 
+    ? Math.round(task.xp_reward * streakMultiplier) 
+    : task.xp_reward;
+
   return (
     <div 
-      className="relative"
+      className={cn(
+        "relative",
+        showCheckAnimation && "animate-task-complete"
+      )}
       data-tutorial-quest={isTutorialQuest ? "true" : undefined}
     >
-      {/* Floating XP Animation with Sparkles */}
+      {/* Enhanced Floating XP Animation */}
       {showXP && (
-        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div 
-            className="text-lg font-bold relative"
+            className={cn(
+              "text-xl font-black relative flex items-center gap-1",
+              "animate-xp-float"
+            )}
             style={{ 
-              animation: 'fadeInUp 2s ease-out',
               color: isMainQuest ? 'hsl(45, 100%, 60%)' : 'hsl(var(--primary))'
             }}
           >
-            +{task.xp_reward} XP
-            {/* Sparkle particles */}
-            <span className="absolute -left-3 -top-1 w-2 h-2 bg-primary rounded-full animate-sparkle-particle" style={{ animationDelay: '0ms' }} />
-            <span className="absolute -right-3 top-0 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-particle" style={{ animationDelay: '100ms' }} />
-            <span className="absolute left-1/2 -top-3 w-1 h-1 bg-primary rounded-full animate-sparkle-particle" style={{ animationDelay: '200ms' }} />
-            <span className="absolute -left-1 bottom-0 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-particle" style={{ animationDelay: '150ms' }} />
+            <span>+{displayXP}</span>
+            <span className="text-sm">XP</span>
+            {streakMultiplier > 1 && (
+              <span className="text-xs ml-1 opacity-80">({streakMultiplier}x)</span>
+            )}
+            {/* Enhanced sparkle particles */}
+            <span className="absolute -left-4 -top-2 w-2 h-2 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '0ms' }} />
+            <span className="absolute -right-4 top-0 w-2 h-2 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '100ms' }} />
+            <span className="absolute left-1/2 -top-4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-burst" style={{ animationDelay: '200ms' }} />
+            <span className="absolute -left-2 bottom-0 w-1.5 h-1.5 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '150ms' }} />
+            <span className="absolute right-0 -bottom-2 w-1 h-1 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '250ms' }} />
           </div>
+        </div>
+      )}
+      
+      {/* Completion ring ripple */}
+      {showCheckAnimation && (
+        <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none z-20">
+          <div className="w-8 h-8 rounded-full border-2 border-green-500 animate-ripple-expand" />
         </div>
       )}
       
@@ -229,16 +278,31 @@ export const TaskCard = ({
             )}
 
             <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {task.difficulty && (
-                <span className={cn("text-xs", difficultyColors[task.difficulty as keyof typeof difficultyColors])}>
-                  {difficultyIcons[task.difficulty as keyof typeof difficultyIcons]}
-                </span>
+              {/* Enhanced difficulty badge */}
+              {task.difficulty && difficultyConfig[task.difficulty as keyof typeof difficultyConfig] && (
+                <div className={cn(
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold border",
+                  difficultyConfig[task.difficulty as keyof typeof difficultyConfig].bgColor,
+                  difficultyConfig[task.difficulty as keyof typeof difficultyConfig].borderColor,
+                  difficultyConfig[task.difficulty as keyof typeof difficultyConfig].color,
+                  "shadow-sm",
+                  difficultyConfig[task.difficulty as keyof typeof difficultyConfig].glowColor
+                )}>
+                  {(() => {
+                    const DiffIcon = difficultyConfig[task.difficulty as keyof typeof difficultyConfig].icon;
+                    return <DiffIcon className="h-3 w-3" />;
+                  })()}
+                  <span>{difficultyConfig[task.difficulty as keyof typeof difficultyConfig].label}</span>
+                </div>
               )}
               <span className={cn(
                 "text-xs font-semibold",
                 isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-muted-foreground"
               )}>
-                +{task.xp_reward} XP
+                +{displayXP} XP
+                {streakMultiplier > 1 && !isMainQuest && (
+                  <span className="text-primary/70 ml-0.5">({streakMultiplier}x)</span>
+                )}
               </span>
               
               {task.scheduled_time && (
