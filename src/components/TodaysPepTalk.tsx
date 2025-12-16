@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
 import { logger } from "@/utils/logger";
+import { toast } from "sonner";
 
 interface CaptionWord {
   word: string;
@@ -50,6 +51,9 @@ export const TodaysPepTalk = memo(() => {
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [hasAwardedXP, setHasAwardedXP] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
+  const [mentorSlug, setMentorSlug] = useState<string | null>(null);
   // Removed walkthrough check - was causing play button to be permanently disabled
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
@@ -101,6 +105,7 @@ export const TodaysPepTalk = memo(() => {
 
       try {
         setError(false);
+        setIsFallback(false);
         const today = new Date().toLocaleDateString("en-CA");
 
         const { data: mentor, error: mentorError } = await supabase
@@ -121,7 +126,11 @@ export const TodaysPepTalk = memo(() => {
           return;
         }
 
-        const { data, error: pepTalkError } = await supabase
+        // Save mentor slug for potential generation
+        setMentorSlug(mentor.slug);
+
+        // First try today's pep talk
+        let { data, error: pepTalkError } = await supabase
           .from("daily_pep_talks")
           .select("*")
           .eq("for_date", today)
@@ -133,6 +142,26 @@ export const TodaysPepTalk = memo(() => {
           setError(true);
           setLoading(false);
           return;
+        }
+
+        // If no pep talk for today, fall back to most recent
+        if (!data) {
+          console.log("No pep talk for today, fetching most recent...");
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("daily_pep_talks")
+            .select("*")
+            .eq("mentor_slug", mentor.slug)
+            .order("for_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (fallbackError) {
+            console.error("Error fetching fallback pep talk:", fallbackError);
+          } else if (fallbackData) {
+            data = fallbackData;
+            setIsFallback(true);
+            console.log("Using fallback pep talk from:", fallbackData.for_date);
+          }
         }
 
         if (data) {
@@ -166,6 +195,55 @@ export const TodaysPepTalk = memo(() => {
 
     fetchDailyPepTalk();
   }, [profile?.selected_mentor_id]);
+
+  // Handle user-triggered pep talk generation
+  const handleGeneratePepTalk = async () => {
+    if (!mentorSlug) {
+      toast.error("No mentor selected");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      toast.info("Generating your pep talk... This may take a moment.");
+      
+      const { data, error } = await supabase.functions.invoke(
+        'generate-single-daily-pep-talk',
+        { body: { mentorSlug } }
+      );
+
+      if (error) {
+        console.error("Generation error:", error);
+        throw new Error(error.message || "Failed to generate pep talk");
+      }
+
+      if (data?.pepTalk) {
+        // Fetch mentor name for display
+        const { data: mentor } = await supabase
+          .from("mentors")
+          .select("name")
+          .eq("slug", mentorSlug)
+          .maybeSingle();
+
+        setPepTalk({
+          ...data.pepTalk,
+          mentor_name: mentor?.name,
+          transcript: Array.isArray(data.pepTalk.transcript) ? data.pepTalk.transcript : []
+        });
+        setError(false);
+        setIsFallback(false);
+        toast.success("Your pep talk is ready!");
+      } else {
+        throw new Error("No pep talk data returned");
+      }
+    } catch (err) {
+      console.error("Error generating pep talk:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate pep talk";
+      toast.error(errorMessage);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const runSync = async () => {
@@ -449,14 +527,33 @@ export const TodaysPepTalk = memo(() => {
           <p className="text-sm text-muted-foreground">
             {error ? "Unable to load today's pep talk" : "No pep talk available today"}
           </p>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="rounded-full"
-            onClick={() => navigate("/pep-talks")}
-          >
-            Browse Pep Talks
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button 
+              onClick={handleGeneratePepTalk}
+              disabled={isGenerating || !mentorSlug}
+              className="rounded-full"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Generate Today's Pep Talk
+                </>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="default"
+              className="rounded-full"
+              onClick={() => navigate("/pep-talks")}
+            >
+              Browse Library
+            </Button>
+          </div>
         </div>
       </Card>
     );
@@ -495,6 +592,21 @@ export const TodaysPepTalk = memo(() => {
 
         {/* Bubble card content */}
         <div className="space-y-6 p-6 rounded-2xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-2 border-primary/30 shadow-glow">
+          {/* Fallback indicator */}
+          {isFallback && (
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1 mx-auto w-fit">
+              <span>From {pepTalk.for_date}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto py-0 px-2 text-xs text-primary hover:text-primary/80"
+                onClick={handleGeneratePepTalk}
+                disabled={isGenerating}
+              >
+                {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate today's"}
+              </Button>
+            </div>
+          )}
           <div className="space-y-3 text-center">
             <h3 className="text-xl md:text-2xl font-bold text-foreground">
               {pepTalk.title}
