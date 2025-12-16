@@ -57,6 +57,9 @@ verify_jwt = false
 [functions.generate-full-mentor-audio]
 verify_jwt = false
 
+[functions.generate-single-daily-pep-talk]
+verify_jwt = true
+
 [functions.generate-complete-pep-talk]
 verify_jwt = false
 
