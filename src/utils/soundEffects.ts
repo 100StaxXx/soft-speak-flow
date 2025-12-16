@@ -1,6 +1,6 @@
 import { safeLocalStorage } from './storage';
 import { globalAudio } from './globalAudio';
-import { getSharedAudioContext, isIOS, resumeAudioContext } from './iosAudio';
+import { getSharedAudioContext, isIOS, resumeAudioContext, createIOSOptimizedAudio, iosAudioManager } from './iosAudio';
 
 // Sound effects management system
 class SoundManager {
@@ -25,12 +25,22 @@ class SoundManager {
         this.isGloballyMuted = muted;
         if (muted) {
           this.stopAllAmbientSounds();
+          // Also mute encounter music when globally muted
+          if (this.encounterMusicAudio) {
+            this.encounterMusicAudio.muted = true;
+          }
+        } else {
+          // Unmute encounter music if playing
+          if (this.encounterMusicAudio) {
+            this.encounterMusicAudio.muted = false;
+          }
         }
       });
       
       window.addEventListener('encounter-music-volume-change', ((e: CustomEvent) => {
         this.encounterMusicVolume = e.detail;
-        if (this.encounterMusicAudio) {
+        // Only apply volume if not muted
+        if (this.encounterMusicAudio && !this.shouldMute()) {
           this.encounterMusicAudio.volume = this.encounterMusicVolume;
         }
       }) as EventListener);
@@ -430,9 +440,15 @@ class SoundManager {
     
     this.stopEncounterMusic();
     
-    this.encounterMusicAudio = new Audio('/sounds/encounter-music.mp3');
+    // Use iOS-optimized audio creation
+    this.encounterMusicAudio = createIOSOptimizedAudio('/sounds/encounter-music.mp3');
     this.encounterMusicAudio.volume = this.encounterMusicVolume;
     this.encounterMusicAudio.loop = true;
+    
+    // Register with iOS audio manager for coordinated control
+    if (isIOS) {
+      iosAudioManager.registerAudio(this.encounterMusicAudio);
+    }
     
     try {
       await this.encounterMusicAudio.play();
@@ -446,6 +462,10 @@ class SoundManager {
 
   stopEncounterMusic() {
     if (this.encounterMusicAudio) {
+      // Unregister from iOS audio manager before cleanup
+      if (isIOS) {
+        iosAudioManager.unregisterAudio(this.encounterMusicAudio);
+      }
       this.encounterMusicAudio.pause();
       this.encounterMusicAudio.currentTime = 0;
       this.encounterMusicAudio = null;
