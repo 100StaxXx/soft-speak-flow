@@ -478,10 +478,10 @@ async function createReferralPayout(
 
   const referralCode = profile.referred_by_code;
 
-  // Find the referral_code record
+  // Find the referral_code record with owner info
   const { data: codeData } = await supabase
     .from("referral_codes")
-    .select("id, owner_type")
+    .select("id, owner_type, owner_user_id")
     .eq("code", referralCode)
     .single();
 
@@ -491,7 +491,8 @@ async function createReferralPayout(
   }
 
   // Calculate payout amount based on plan
-  const payoutAmount = plan === "yearly" ? 20.00 : 5.00; // 20% of $99.99 or 50% of $9.99
+  // Yearly: 20% of $59.99 = $12.00, Monthly: 50% of $9.99 = $5.00
+  const payoutAmount = plan === "yearly" ? 12.00 : 5.00;
   const payoutType = plan === "yearly" ? "first_year" : "first_month";
 
   // Check if payout already exists to avoid duplicates
@@ -508,11 +509,12 @@ async function createReferralPayout(
     return;
   }
 
-  // Create pending payout
+  // Create pending payout (include referrer_id if owner has a user account)
   const { error } = await supabase
     .from("referral_payouts")
     .insert({
       referral_code_id: codeData.id,
+      referrer_id: codeData.owner_user_id || null,
       referee_id: userId,
       amount: payoutAmount,
       status: "pending",
