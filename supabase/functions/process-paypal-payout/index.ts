@@ -122,8 +122,14 @@ serve(async (req) => {
       });
     }
 
+    // Use sandbox URL for testing, production URL for live
+    const isProduction = Deno.env.get("PAYPAL_ENVIRONMENT") !== "sandbox";
+    const paypalBaseUrl = isProduction 
+      ? "https://api-m.paypal.com" 
+      : "https://api-m.sandbox.paypal.com";
+
     const basicAuth = btoa(`${clientId}:${clientSecret}`);
-    const tokenResponse = await fetch("https://api-m.paypal.com/v1/oauth2/token", {
+    const tokenResponse = await fetch(`${paypalBaseUrl}/v1/oauth2/token`, {
       method: "POST",
       headers: {
         "Authorization": `Basic ${basicAuth}`,
@@ -163,7 +169,7 @@ serve(async (req) => {
       ],
     };
 
-    const payoutResponse = await fetch("https://api-m.paypal.com/v1/payments/payouts", {
+    const payoutResponse = await fetch(`${paypalBaseUrl}/v1/payments/payouts`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${access_token}`,
