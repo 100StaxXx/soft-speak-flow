@@ -16,6 +16,25 @@ interface GeneratedMission {
   difficulty?: string;
 }
 
+// Theme days configuration - matches frontend
+const THEME_DAYS: Record<number, { name: string; emoji: string; categories: string[] }> = {
+  0: { name: "Reset Sunday", emoji: "🌅", categories: ['identity', 'wellness', 'growth'] },
+  1: { name: "Momentum Monday", emoji: "🚀", categories: ['quick_win', 'growth', 'identity'] },
+  2: { name: "Connection Tuesday", emoji: "💜", categories: ['connection', 'gratitude', 'wellness'] },
+  3: { name: "Wellness Wednesday", emoji: "🧘", categories: ['wellness', 'gratitude', 'quick_win'] },
+  4: { name: "Gratitude Thursday", emoji: "✨", categories: ['gratitude', 'connection', 'identity'] },
+  5: { name: "Future Friday", emoji: "🔮", categories: ['identity', 'growth', 'quick_win'] },
+  6: { name: "Soul Saturday", emoji: "🌟", categories: ['wellness', 'gratitude', 'connection'] },
+};
+
+// Bonus mission templates based on streak milestones
+const BONUS_MISSIONS: Record<string, { text: string; xp: number; category: string; difficulty: string }> = {
+  streak_3: { text: "Keep your momentum going - share your progress with someone", xp: 10, category: 'connection', difficulty: 'easy' },
+  streak_7: { text: "Streak Master: Reflect on what's helped you stay consistent", xp: 12, category: 'growth', difficulty: 'medium' },
+  streak_14: { text: "Two weeks strong! Do something kind for yourself today", xp: 12, category: 'wellness', difficulty: 'easy' },
+  streak_30: { text: "30-day legend! Write a note to your future self", xp: 15, category: 'identity', difficulty: 'medium' },
+};
+
 const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
 
 1. **Connection Mission** (Good Human Day)
@@ -25,6 +44,7 @@ const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
    - "Send a simple check-in message to a friend or family member."
    - "Give someone a small compliment today."
    - "Express gratitude to someone who helped you recently."
+   - "Really listen to someone today without thinking about your response."
    XP: 5-10
    Difficulty: easy
 
@@ -36,6 +56,7 @@ const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
    - "Take care of something that will take less than five minutes."
    - "Make your bed to start the day with a win."
    - "Throw away or delete one thing you no longer need."
+   - "Reply to one message you've been putting off."
    XP: 5-10
    Difficulty: easy or medium
 
@@ -49,6 +70,40 @@ const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
    - "Take one action your future self would thank you for."
    - "Act for two minutes as the most disciplined version of yourself."
    XP: 10-15
+   Difficulty: medium or hard
+
+4. **Wellness Mission** (Self-Care & Body)
+   Purpose: physical and mental well-being check-ins.
+   Approved patterns:
+   - "Take 3 deep breaths and notice how you feel."
+   - "Drink a full glass of water mindfully."
+   - "Stretch your body for 60 seconds."
+   - "Take a short walk, even just around your space."
+   - "Check and correct your posture right now."
+   - "Take a 5-minute break from all screens."
+   XP: 5-10
+   Difficulty: easy
+
+5. **Gratitude Mission** (Appreciation & Reflection)
+   Purpose: cultivate appreciation and positive mindset.
+   Approved patterns:
+   - "Write down one thing you're grateful for today."
+   - "Notice one beautiful thing around you right now."
+   - "Thank your body for something it does well."
+   - "Appreciate one simple pleasure in your day."
+   - "Thank your past self for one decision they made."
+   XP: 5-10
+   Difficulty: easy
+
+6. **Growth Mission** (Learning & Challenge)
+   Purpose: expand knowledge and comfort zone.
+   Approved patterns:
+   - "Learn one new word or fact today."
+   - "Try something small outside your comfort zone."
+   - "Ask one question you've been curious about."
+   - "Read one article or chapter about something new."
+   - "Practice a skill you want to improve for 5 minutes."
+   XP: 10-15
    Difficulty: medium or hard`;
 
 // Category-specific XP and difficulty validation
@@ -56,7 +111,19 @@ const CATEGORY_RULES: Record<string, { xpRange: [number, number]; difficulties: 
   connection: { xpRange: [5, 10], difficulties: ['easy'] },
   quick_win: { xpRange: [5, 10], difficulties: ['easy', 'medium'] },
   identity: { xpRange: [10, 15], difficulties: ['medium', 'hard'] },
+  wellness: { xpRange: [5, 10], difficulties: ['easy'] },
+  gratitude: { xpRange: [5, 10], difficulties: ['easy'] },
+  growth: { xpRange: [10, 15], difficulties: ['medium', 'hard'] },
 };
+
+// Get the applicable bonus mission based on streak
+function getStreakBonus(streak: number): { key: string; mission: typeof BONUS_MISSIONS[string] } | null {
+  if (streak >= 30) return { key: 'streak_30', mission: BONUS_MISSIONS.streak_30 };
+  if (streak >= 14) return { key: 'streak_14', mission: BONUS_MISSIONS.streak_14 };
+  if (streak >= 7) return { key: 'streak_7', mission: BONUS_MISSIONS.streak_7 };
+  if (streak >= 3) return { key: 'streak_3', mission: BONUS_MISSIONS.streak_3 };
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -87,6 +154,8 @@ serve(async (req) => {
     }
 
     const today = new Date().toLocaleDateString('en-CA');
+    const dayOfWeek = new Date().getDay();
+    const themeDay = THEME_DAYS[dayOfWeek];
 
     // Check if missions already exist for today
     const { data: existing } = await supabase
@@ -97,7 +166,7 @@ serve(async (req) => {
 
     if (existing && existing.length > 0 && !forceRegenerate) {
       return new Response(
-        JSON.stringify({ missions: existing, generated: false }),
+        JSON.stringify({ missions: existing, generated: false, theme: themeDay }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -116,7 +185,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    console.log(`Generating AI missions for user ${userId} (streak: ${streak})`);
+    console.log(`Generating AI missions for user ${userId} (streak: ${streak}, theme: ${themeDay.name})`);
 
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(
@@ -124,9 +193,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const userContext = streak > 0 
-      ? `Make them personal and encouraging, acknowledging their ${streak} day streak.`
-      : 'Make them encouraging to help build momentum.';
+    let userContext = `Today is ${themeDay.name} ${themeDay.emoji}. Generate one mission from each of these categories: ${themeDay.categories.join(', ')}.`;
+    if (streak > 0) {
+      userContext += ` The user has a ${streak} day streak - acknowledge their consistency!`;
+    } else {
+      userContext += ' Make them encouraging to help build momentum.';
+    }
 
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'daily_missions',
@@ -135,7 +207,8 @@ serve(async (req) => {
         missionCount: 3,
         userStreak: streak,
         userContext,
-        categoryGuidelines: CATEGORY_GUIDELINES
+        categoryGuidelines: CATEGORY_GUIDELINES,
+        requiredCategories: themeDay.categories
       }
     });
 
@@ -210,7 +283,7 @@ serve(async (req) => {
       .insert({
         user_id: userId,
         template_key: 'daily_missions',
-        input_data: { streak, userContext },
+        input_data: { streak, userContext, themeDay: themeDay.name },
         output_data: { missions },
         validation_passed: allErrors.length === 0,
         validation_errors: allErrors.length > 0 ? allErrors : null,
@@ -220,15 +293,13 @@ serve(async (req) => {
 
     if (allErrors.length > 0) {
       console.warn('Validation warnings (proceeding anyway):', allErrors);
-      // Don't fail on validation - just log warnings and continue
     }
 
     console.log('Parsed missions:', missions);
 
-    // Determine auto_complete based on category (Identity missions that are full-day get auto_complete)
+    // Determine auto_complete based on category
     const getAutoComplete = (category: string, missionText: string): boolean => {
       const lowerText = missionText.toLowerCase();
-      // These patterns should auto-complete when detected
       if (lowerText.includes('complete all your quests') || 
           lowerText.includes('complete all your habits') ||
           lowerText.includes('complete all habits')) {
@@ -237,7 +308,7 @@ serve(async (req) => {
       return false;
     };
 
-    // Map to database format
+    // Map to database format - base missions
     const missionsToInsert = missions.map((m) => ({
       user_id: userId,
       mission_date: today,
@@ -253,21 +324,46 @@ serve(async (req) => {
       is_bonus: false,
     }));
 
-    // Insert missions with conflict handling to prevent race condition duplicates
-    // Uses unique index on (user_id, mission_date, category)
+    // Add streak bonus mission if applicable
+    const streakBonus = getStreakBonus(streak);
+    if (streakBonus) {
+      console.log(`Adding streak bonus mission: ${streakBonus.key}`);
+      missionsToInsert.push({
+        user_id: userId,
+        mission_date: today,
+        mission_text: streakBonus.mission.text,
+        mission_type: `bonus_${streakBonus.key}`,
+        category: streakBonus.mission.category,
+        xp_reward: streakBonus.mission.xp,
+        difficulty: streakBonus.mission.difficulty,
+        auto_complete: false,
+        completed: false,
+        progress_target: 1,
+        progress_current: 0,
+        is_bonus: true,
+      });
+    }
+
+    // Delete existing missions if force regenerating
+    if (forceRegenerate && existing && existing.length > 0) {
+      await supabase
+        .from('daily_missions')
+        .delete()
+        .eq('user_id', userId)
+        .eq('mission_date', today);
+    }
+
+    // Insert missions
     const { error: insertError } = await supabase
       .from('daily_missions')
-      .upsert(missionsToInsert, { 
-        onConflict: 'user_id,mission_date,category',
-        ignoreDuplicates: true 
-      });
+      .insert(missionsToInsert);
 
     if (insertError) {
       console.error('Error inserting missions:', insertError);
       throw insertError;
     }
 
-    // Fetch the actual missions (in case some were skipped due to conflict)
+    // Fetch the actual missions
     const { data: created, error: fetchError } = await supabase
       .from('daily_missions')
       .select('*')
@@ -279,10 +375,10 @@ serve(async (req) => {
       throw fetchError;
     }
 
-    console.log(`Generated ${created?.length || 0} missions for user ${userId}`);
+    console.log(`Generated ${created?.length || 0} missions for user ${userId} (${themeDay.name})`);
 
     return new Response(
-      JSON.stringify({ missions: created, generated: true }),
+      JSON.stringify({ missions: created, generated: true, theme: themeDay }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
