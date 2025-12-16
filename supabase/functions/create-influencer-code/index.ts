@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 /**
  * Create Influencer Referral Code
  * 
  * Public endpoint (no auth required) for influencers to generate referral codes.
  * Creates a code and stores payout information for future reward payments.
+ * Sends a confirmation email with the code and dashboard link.
  * 
  * Request body:
  * {
@@ -29,6 +31,126 @@ function generateCodeFromHandle(handle: string): string {
   const base = clean.substring(0, 8);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `COSMIQ-${base}${random}`;
+}
+
+async function sendConfirmationEmail(
+  name: string,
+  email: string,
+  code: string,
+  dashboardUrl: string,
+  referralLink: string
+): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) {
+    console.warn("RESEND_API_KEY not configured, skipping confirmation email");
+    return;
+  }
+
+  const resend = new Resend(resendApiKey);
+
+  try {
+    await resend.emails.send({
+      from: "Cosmiq Partners <partners@cosmiq.quest>",
+      to: [email],
+      subject: "🚀 Your Cosmiq Referral Code is Ready!",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a0f;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0f; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; overflow: hidden;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="padding: 40px 40px 20px; text-align: center;">
+                      <h1 style="margin: 0; font-size: 32px; color: #ffffff;">✨ Welcome to Cosmiq Partners!</h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 20px 40px;">
+                      <p style="color: #e0e0e0; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+                        Hey ${name}! 👋
+                      </p>
+                      <p style="color: #e0e0e0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
+                        Your referral code is all set up and ready to share with your audience!
+                      </p>
+                      
+                      <!-- Code Box -->
+                      <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 30px;">
+                        <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 1px;">Your Referral Code</p>
+                        <p style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px;">${code}</p>
+                      </div>
+                      
+                      <!-- Referral Link -->
+                      <div style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+                        <p style="color: #a78bfa; font-size: 14px; margin: 0 0 8px;">Share this link:</p>
+                        <a href="${referralLink}" style="color: #c4b5fd; font-size: 14px; word-break: break-all;">${referralLink}</a>
+                      </div>
+                      
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin-bottom: 30px;">
+                        <a href="${dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                          View Your Dashboard →
+                        </a>
+                      </div>
+                      
+                      <!-- Earnings Info -->
+                      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px;">
+                        <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 16px;">💰 Your Earning Potential</h3>
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <span style="color: #a78bfa;">Monthly subscriber:</span>
+                              <span style="color: #22c55e; float: right; font-weight: 600;">$5</span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <span style="color: #a78bfa;">Annual subscriber:</span>
+                              <span style="color: #22c55e; float: right; font-weight: 600;">$12</span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                              <span style="color: #e0e0e0; font-size: 13px;">Minimum payout threshold: $50</span>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 30px 40px; background: rgba(0,0,0,0.2); text-align: center;">
+                      <p style="color: #888; font-size: 13px; margin: 0;">
+                        Questions? Reply to this email or visit <a href="https://cosmiq.quest" style="color: #a78bfa;">cosmiq.quest</a>
+                      </p>
+                      <p style="color: #666; font-size: 12px; margin: 16px 0 0;">
+                        © 2024 Cosmiq. Transform your habits into an epic journey.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    });
+    console.log(`Confirmation email sent to ${email}`);
+  } catch (error) {
+    console.error("Failed to send confirmation email:", error);
+    // Don't throw - email failure shouldn't block code creation
+  }
 }
 
 serve(async (req) => {
@@ -67,6 +189,8 @@ serve(async (req) => {
       );
     }
 
+    const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.quest";
+
     // Check if influencer already has a code
     const { data: existingCode } = await supabaseClient
       .from("referral_codes")
@@ -77,13 +201,17 @@ serve(async (req) => {
 
     if (existingCode) {
       // Return existing code instead of creating duplicate
-      const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.app";
       const appLink = `${appUrl}/?ref=${existingCode.code}`;
+      const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}`;
+      
+      // Send reminder email with existing code
+      await sendConfirmationEmail(name, email, existingCode.code, dashboardUrl, appLink);
+      
       return new Response(
         JSON.stringify({
           code: existingCode.code,
           link: appLink,
-          message: "You already have a referral code. Here it is!",
+          message: "You already have a referral code. We've sent you a reminder email!",
         }),
         {
           status: 200,
@@ -138,9 +266,11 @@ serve(async (req) => {
       );
     }
 
-    // Use environment variable or fallback to default
-    const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.app";
     const appLink = `${appUrl}/?ref=${code}`;
+    const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}`;
+
+    // Send confirmation email
+    await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
 
     console.log(`Created influencer code for ${name} (@${handle}): ${code}`);
 
