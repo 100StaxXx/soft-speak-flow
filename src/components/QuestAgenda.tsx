@@ -131,31 +131,26 @@ export function QuestAgenda({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold inline-flex items-center">
-                {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
-              </h3>
-              {onAddQuest && (
-                <Button
-                  size="icon"
-                  onClick={onAddQuest}
-                  className="h-7 w-7 rounded-full shadow-md shadow-primary/25"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-              <QuestSectionTooltip />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
-            </p>
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold inline-flex items-center">
+              {isSameDay(selectedDate, new Date()) ? "Today's Quests" : format(selectedDate, 'MMM d')}
+            </h3>
+            <QuestSectionTooltip />
           </div>
+          <p className="text-sm text-muted-foreground">
+            {tasks.length} Quest{tasks.length !== 1 ? 's' : ''} • First 3 earn full XP
+          </p>
         </div>
-        <div className="text-sm font-medium text-primary">
-          {completedCount}/{totalCount}
-        </div>
+        {onAddQuest && (
+          <Button
+            size="icon"
+            onClick={onAddQuest}
+            className="h-7 w-7 rounded-full shadow-md shadow-primary/25"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Progress Bar */}
@@ -179,7 +174,9 @@ export function QuestAgenda({
           <EmptyState 
             icon={Target}
             title="No quests yet"
-            description="Tap + to add your first quest!"
+            description="Add your first quest to start earning XP!"
+            actionLabel="Add Quest"
+            onAction={onAddQuest}
           />
         ) : (
           <>
