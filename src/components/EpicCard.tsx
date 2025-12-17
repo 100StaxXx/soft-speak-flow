@@ -11,21 +11,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { GuildMembersSection } from "./GuildMembersSection";
 import { GuildShoutsFeed } from "./GuildShoutsFeed";
 import { GuildActivityFeed } from "./GuildActivityFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
+import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
+import { generateAdversary } from "@/utils/adversaryGenerator";
+import type { StorySeed, BossBattleContext, NarrativeCheckpoint } from "@/types/narrativeTypes";
+import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -59,6 +63,9 @@ interface Epic {
   is_public?: boolean;
   invite_code?: string;
   theme_color?: string;
+  story_seed?: unknown; // JSON from DB, cast to StorySeed when needed
+  book_title?: string | null;
+  total_chapters?: number | null;
   epic_habits?: Array<{
     habit_id: string;
     habits: {
@@ -78,6 +85,11 @@ interface EpicCardProps {
 export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+  const [showBossBattle, setShowBossBattle] = useState(false);
+  const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
+  const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
+  const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
+  
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
@@ -97,6 +109,125 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const theme = (epic.theme_color || 'heroic') as EpicTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
+
+  // Generate narrative checkpoints from story_seed if available
+  const narrativeCheckpoints = useMemo((): NarrativeCheckpoint[] | undefined => {
+    const storySeed = epic.story_seed as StorySeed | null;
+    if (!storySeed?.chapter_blueprints) return undefined;
+    
+    const totalChapters = storySeed.chapter_blueprints.length;
+    
+    return storySeed.chapter_blueprints.map((blueprint, index) => {
+      const progressPercent = Math.round(((index + 1) / totalChapters) * 100);
+      const isReached = epic.progress_percentage >= progressPercent;
+      
+      return {
+        chapter: blueprint.chapter,
+        progressPercent,
+        locationName: blueprint.title,
+        locationRevealed: isReached,
+        isReached,
+        isCurrent: isReached && epic.progress_percentage < (((index + 2) / totalChapters) * 100),
+        isFinale: index === totalChapters - 1,
+        clueText: blueprint.mystery_seed || null,
+      };
+    });
+  }, [epic.story_seed, epic.progress_percentage]);
+
+  // Build boss battle context from story_seed
+  const buildBossBattleContext = useCallback((): BossBattleContext | null => {
+    const storySeed = epic.story_seed as StorySeed | null;
+    if (!storySeed?.finale_architecture) return null;
+    
+    const finale = storySeed.finale_architecture;
+    const prophecy = storySeed.the_prophecy;
+    
+    return {
+      bossName: finale.boss_name,
+      bossTheme: finale.boss_theme,
+      bossLore: finale.boss_lore,
+      weaknessHints: [finale.boss_weakness_hint],
+      prophecyLines: prophecy?.line_meanings?.slice(0, 3) || [],
+      epicTitle: epic.title,
+      bookTitle: storySeed.book_title || epic.title,
+    };
+  }, [epic.story_seed, epic.title]);
+
+  // Trigger boss battle when progress reaches 100%
+  const triggerBossBattle = useCallback(async () => {
+    if (!companion?.id) return;
+    
+    const storySeed = epic.story_seed as StorySeed | null;
+    const context = buildBossBattleContext();
+    
+    // Generate boss adversary
+    const bossOverride = storySeed?.finale_architecture ? {
+      name: storySeed.finale_architecture.boss_name,
+      theme: storySeed.finale_architecture.boss_theme,
+      lore: storySeed.finale_architecture.boss_lore,
+    } : undefined;
+    
+    const adversary = generateAdversary('epic_checkpoint', 100, undefined, bossOverride);
+    
+    // Create encounter record
+    const { data: encounterData, error } = await supabase
+      .from('astral_encounters')
+      .insert({
+        user_id: epic.user_id,
+        companion_id: companion.id,
+        adversary_name: adversary.name,
+        adversary_theme: adversary.theme,
+        adversary_tier: adversary.tier,
+        adversary_lore: adversary.lore,
+        mini_game_type: adversary.miniGameType,
+        trigger_type: 'epic_checkpoint',
+        trigger_source_id: epic.id,
+        total_phases: adversary.phases,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Failed to create boss encounter:', error);
+      toast.error('Failed to start boss battle');
+      return;
+    }
+    
+    setBossEncounter(encounterData as AstralEncounter);
+    setBossAdversary(adversary);
+    setBossBattleContext(context);
+    setShowBossBattle(true);
+  }, [companion?.id, epic, buildBossBattleContext]);
+
+  const handleBossBattleComplete = useCallback(async ({ encounterId, accuracy, phasesCompleted }: { 
+    encounterId: string; 
+    accuracy: number; 
+    phasesCompleted: number;
+  }) => {
+    // Update encounter record with results
+    await supabase
+      .from('astral_encounters')
+      .update({
+        accuracy_score: accuracy,
+        phases_completed: phasesCompleted,
+        result: accuracy >= 50 ? 'victory' : 'defeat',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', encounterId);
+    
+    if (accuracy >= 50) {
+      toast.success('Boss Defeated!', {
+        description: 'You have conquered the final challenge!',
+      });
+    }
+  }, []);
+
+  const handleBossBattleCancel = useCallback(() => {
+    setShowBossBattle(false);
+    setBossEncounter(null);
+    setBossAdversary(null);
+    setBossBattleContext(null);
+  }, []);
 
   // Check for milestone crossings and trigger postcard generation
   useEffect(() => {
@@ -248,6 +379,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           companionImageUrl={health?.imageUrl || companion?.current_image_url}
           companionMood={health?.moodState}
           showCompanion={true}
+          narrativeCheckpoints={narrativeCheckpoints}
         />
 
         {/* Stats Grid */}
@@ -321,7 +453,16 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
 
         {/* Action Buttons */}
         {isActive && epic.progress_percentage >= 100 && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
+            {epic.story_seed && (
+              <Button
+                onClick={triggerBossBattle}
+                className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+              >
+                <Swords className="w-4 h-4 mr-2" />
+                Face Final Boss
+              </Button>
+            )}
             <Button
               onClick={onComplete}
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
@@ -332,6 +473,18 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         )}
       </Card>
+
+      {/* Boss Battle Modal */}
+      <AstralEncounterModal
+        open={showBossBattle}
+        onOpenChange={setShowBossBattle}
+        encounter={bossEncounter}
+        adversary={bossAdversary}
+        onComplete={handleBossBattleComplete}
+        isBossBattle={true}
+        bossBattleContext={bossBattleContext || undefined}
+        onBossBattleCancel={handleBossBattleCancel}
+      />
 
       <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
         <AlertDialogContent>

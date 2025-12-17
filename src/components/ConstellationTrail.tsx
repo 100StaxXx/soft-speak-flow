@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { HelpCircle } from "lucide-react";
+import type { NarrativeCheckpoint } from "@/types/narrativeTypes";
 
 interface ConstellationTrailProps {
   progress: number; // 0-100
@@ -9,6 +11,7 @@ interface ConstellationTrailProps {
   companionImageUrl?: string;
   companionMood?: string;
   showCompanion?: boolean;
+  narrativeCheckpoints?: NarrativeCheckpoint[];
 }
 
 // Generate star positions along a curved path
@@ -55,11 +58,40 @@ export const ConstellationTrail = ({
   className,
   companionImageUrl,
   companionMood,
-  showCompanion = true
+  showCompanion = true,
+  narrativeCheckpoints
 }: ConstellationTrailProps) => {
   // Create milestone checkpoints (start, 25%, 50%, 75%, 100%)
   const milestones = useMemo(() => [0, 25, 50, 75, 100], []);
   const starPositions = useMemo(() => generateStarPositions(5), []);
+  
+  // Get checkpoint label for a milestone index
+  const getCheckpointLabel = (index: number, milestone: number): { label: string; isRevealed: boolean; isFinale: boolean } => {
+    if (!narrativeCheckpoints || narrativeCheckpoints.length === 0) {
+      // Default labels when no narrative checkpoints
+      return { 
+        label: milestone === 0 ? "Start" : milestone === 100 ? "Legend" : `${milestone}%`,
+        isRevealed: true,
+        isFinale: milestone === 100
+      };
+    }
+    
+    // Map milestone index to narrative checkpoint
+    const checkpoint = narrativeCheckpoints.find(cp => cp.progressPercent === milestone);
+    if (checkpoint) {
+      return {
+        label: checkpoint.locationRevealed ? checkpoint.locationName || `Ch.${checkpoint.chapter}` : "?",
+        isRevealed: checkpoint.locationRevealed,
+        isFinale: checkpoint.isFinale
+      };
+    }
+    
+    return { 
+      label: milestone === 0 ? "Start" : `${milestone}%`,
+      isRevealed: true,
+      isFinale: false
+    };
+  };
   
   // Background stars for ambiance - use seeded pseudo-random for consistency
   const bgStars = useMemo(() => {
@@ -213,12 +245,26 @@ export const ConstellationTrail = ({
             />
 
             {/* Milestone label */}
-            <div className={cn(
-              "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap",
-              isCompleted ? "text-primary" : "text-muted-foreground/50"
-            )}>
-              {milestone === 0 ? "Start" : milestone === 100 ? "Legend" : `${milestone}%`}
-            </div>
+            {(() => {
+              const { label, isRevealed, isFinale } = getCheckpointLabel(i, milestone);
+              return (
+                <div className={cn(
+                  "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap flex items-center gap-0.5",
+                  isCompleted ? "text-primary" : "text-muted-foreground/50",
+                  isFinale && isCompleted && "text-yellow-400"
+                )}>
+                  {!isRevealed && !isCompleted ? (
+                    <HelpCircle className="w-3 h-3 animate-pulse" />
+                  ) : (
+                    <span className={cn(
+                      isRevealed && isCompleted && "font-semibold"
+                    )}>
+                      {label}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </motion.div>
         );
       })}
