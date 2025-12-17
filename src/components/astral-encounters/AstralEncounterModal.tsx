@@ -13,11 +13,15 @@ import { AstralSerpentGame } from './AstralSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
+import { PracticeRoundWrapper } from './PracticeRoundWrapper';
 import { BattleSceneHeader } from './BattleSceneHeader';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
+
+// Track which games user has practiced (persists in session)
+const practicedGames = new Set<MiniGameType>();
 
 interface AstralEncounterModalProps {
   open: boolean;
@@ -28,7 +32,7 @@ interface AstralEncounterModalProps {
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
 }
 
-type Phase = 'reveal' | 'instructions' | 'battle' | 'result';
+type Phase = 'reveal' | 'instructions' | 'practice' | 'battle' | 'result';
 
 export const AstralEncounterModal = ({
   open,
@@ -86,8 +90,26 @@ export const AstralEncounterModal = ({
   }, []);
 
   const handleInstructionsReady = useCallback(() => {
+    const currentGameType = getCurrentGameType();
+    // Show practice if user hasn't practiced this game type yet in this session
+    if (!practicedGames.has(currentGameType)) {
+      setPhase('practice');
+    } else {
+      setPhase('battle');
+    }
+  }, [getCurrentGameType]);
+
+  const handlePracticeComplete = useCallback(() => {
+    const currentGameType = getCurrentGameType();
+    practicedGames.add(currentGameType); // Mark as practiced
     setPhase('battle');
-  }, []);
+  }, [getCurrentGameType]);
+
+  const handleSkipPractice = useCallback(() => {
+    const currentGameType = getCurrentGameType();
+    practicedGames.add(currentGameType); // Mark as practiced even when skipped
+    setPhase('battle');
+  }, [getCurrentGameType]);
 
   const handleMiniGameComplete = useCallback((result: MiniGameResult) => {
     if (!adversary || !encounter) return;
@@ -211,6 +233,22 @@ export const AstralEncounterModal = ({
                   <GameInstructionsOverlay 
                     gameType={getCurrentGameType()}
                     onReady={handleInstructionsReady}
+                  />
+                </motion.div>
+              )}
+
+              {phase === 'practice' && (
+                <motion.div
+                  key={`practice-${currentPhaseIndex}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
+                  <PracticeRoundWrapper
+                    gameType={getCurrentGameType()}
+                    companionStats={companionStats}
+                    onPracticeComplete={handlePracticeComplete}
+                    onSkipPractice={handleSkipPractice}
                   />
                 </motion.div>
               )}
