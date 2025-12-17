@@ -22,14 +22,21 @@ interface Orb {
   tapped: boolean;
 }
 
-// Progressive difficulty by level
+// Progressive difficulty by level - no limit on orbs
 const getLevelConfig = (level: number) => {
   if (level <= 2) return { orbs: 4, showTimePerOrb: 600 };
   if (level <= 4) return { orbs: 5, showTimePerOrb: 500 };
   if (level <= 6) return { orbs: 6, showTimePerOrb: 450 };
   if (level <= 8) return { orbs: 7, showTimePerOrb: 400 };
-  return { orbs: 8, showTimePerOrb: 350 };
+  // Beyond level 8: +1 orb every 2 levels, minimum 300ms show time
+  const extraOrbs = Math.floor((level - 8) / 2);
+  const orbs = 8 + extraOrbs;
+  const showTimePerOrb = Math.max(300, 350 - (extraOrbs * 10));
+  return { orbs, showTimePerOrb };
 };
+
+// XP cap to prevent breaking the game economy
+const MAX_XP_FROM_GAME = 150;
 
 // Memoized star background component
 const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
@@ -301,17 +308,18 @@ export const TapSequenceGame = ({
     return () => clearTimeout(timer);
   }, [gameState, highlightIndex, orbs, showTimePerOrb]);
 
-  // Complete game
+  // Complete game with XP cap
   const finishGame = useCallback((won: boolean) => {
     setGameState('complete');
     
     const accuracy = totalTaps > 0 ? Math.round((totalCorrectTaps / totalTaps) * 100) : 0;
     const levelBonus = Math.min(level * 5, 50);
+    // Cap accuracy to prevent XP exploit from endless levels
     const finalAccuracy = Math.min(100, accuracy + levelBonus);
     
     onComplete({
       success: won && finalAccuracy >= 50,
-      accuracy: finalAccuracy,
+      accuracy: Math.min(finalAccuracy, 100), // Cap at 100
       result: finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 70 ? 'good' : finalAccuracy >= 50 ? 'partial' : 'fail'
     });
   }, [level, totalCorrectTaps, totalTaps, onComplete]);
