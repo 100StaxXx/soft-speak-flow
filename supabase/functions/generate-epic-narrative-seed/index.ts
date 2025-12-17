@@ -249,6 +249,21 @@ Return ONLY valid JSON (no markdown):
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Narrative Seed] AI error:', response.status, errorText);
+      
+      // Handle rate limiting and payment errors
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'AI credits exhausted. Please add funds.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       throw new Error(`AI generation failed: ${response.status}`);
     }
 

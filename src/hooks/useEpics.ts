@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 // Type for habits created during epic creation
 interface CreatedHabit {
@@ -70,6 +71,7 @@ export const useEpics = () => {
       target_days: number;
       is_public?: boolean;
       theme_color?: string;
+      story_type_slug?: StoryTypeSlug;
       habits: Array<{
         title: string;
         difficulty: string;
@@ -132,6 +134,7 @@ export const useEpics = () => {
             xp_reward: Math.floor(epicData.target_days * 10),
             invite_code: inviteCode,
             theme_color: epicData.theme_color || 'heroic',
+            story_type_slug: epicData.story_type_slug || null,
           })
           .select()
           .single();
@@ -171,6 +174,23 @@ export const useEpics = () => {
             .delete()
             .in("id", createdHabits.map(h => h.id));
           throw new Error(`Failed to link habits: ${linkError.message}`);
+        }
+
+        // Trigger narrative seed generation in background if story type selected
+        if (epicData.story_type_slug) {
+          supabase.functions.invoke('generate-epic-narrative-seed', {
+            body: {
+              userId: user.id,
+              epicId: epic.id,
+              epicTitle: epicData.title,
+              epicDescription: epicData.description,
+              targetDays: epicData.target_days,
+              storyTypeSlug: epicData.story_type_slug,
+            },
+          }).catch(err => {
+            console.error('Narrative seed generation failed:', err);
+            // Non-blocking - epic still created successfully
+          });
         }
 
         return epic;

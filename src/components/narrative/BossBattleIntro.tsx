@@ -184,9 +184,9 @@ export const BossBattleIntro = ({ context, onBeginBattle, onCancel }: BossBattle
               <motion.div
                 animate={{ 
                   boxShadow: [
-                    "0 0 20px rgba(239, 68, 68, 0.3)",
-                    "0 0 40px rgba(239, 68, 68, 0.6)",
-                    "0 0 20px rgba(239, 68, 68, 0.3)",
+                    "0 0 20px hsl(var(--destructive) / 0.3)",
+                    "0 0 40px hsl(var(--destructive) / 0.6)",
+                    "0 0 20px hsl(var(--destructive) / 0.3)",
                   ]
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
