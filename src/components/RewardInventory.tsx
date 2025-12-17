@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Image, Frame, Wand2, Gem, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
-import type { UserEpicReward, RewardType } from "@/types/epicRewards";
+import type { UserEpicReward, RewardType, RewardRarity } from "@/types/epicRewards";
 import { RARITY_CONFIG } from "@/types/epicRewards";
 
 interface RewardInventoryProps {
@@ -220,7 +220,7 @@ const RewardCard = ({ userReward, isEquipped, onToggleEquip, isEquipping }: Rewa
 };
 
 interface LockedRewardCardProps {
-  reward: { id: string; name: string; rarity: string; reward_type: string };
+  reward: { id: string; name: string; rarity: RewardRarity; reward_type: RewardType };
 }
 
 const LockedRewardCard = ({ reward }: LockedRewardCardProps) => {

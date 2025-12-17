@@ -9,9 +9,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Gift, Star, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RewardRevealData } from "@/types/epicRewards";
+import type { RewardRevealData, RewardRarity } from "@/types/epicRewards";
 import { RARITY_CONFIG } from "@/types/epicRewards";
 import confetti from "canvas-confetti";
+
+// Safe rarity config access with fallback
+const getRarityConfig = (rarity: string) => {
+  return RARITY_CONFIG[rarity as RewardRarity] || RARITY_CONFIG.common;
+};
 
 interface EpicRewardRevealProps {
   open: boolean;
@@ -224,22 +229,22 @@ export const EpicRewardReveal = ({
                       <div className={cn(
                         "w-32 h-32 rounded-2xl flex items-center justify-center",
                         "bg-gradient-to-br shadow-2xl",
-                        RARITY_CONFIG[rewardData.loot.rarity].bgClass,
-                        RARITY_CONFIG[rewardData.loot.rarity].glowClass
+                        getRarityConfig(rewardData.loot.rarity).bgClass,
+                        getRarityConfig(rewardData.loot.rarity).glowClass
                       )}>
                         {rewardData.loot.reward_type === 'artifact' && rewardData.loot.css_effect?.icon ? (
                           <span className="text-5xl">{rewardData.loot.css_effect.icon}</span>
                         ) : (
-                          <Star className="w-14 h-14" style={{ color: RARITY_CONFIG[rewardData.loot.rarity].color }} />
+                          <Star className="w-14 h-14" style={{ color: getRarityConfig(rewardData.loot.rarity).color }} />
                         )}
                       </div>
                       <motion.div
                         className="absolute -inset-3 rounded-3xl"
                         animate={{ 
                           boxShadow: [
-                            `0 0 20px ${RARITY_CONFIG[rewardData.loot.rarity].color}`,
-                            `0 0 40px ${RARITY_CONFIG[rewardData.loot.rarity].color}`,
-                            `0 0 20px ${RARITY_CONFIG[rewardData.loot.rarity].color}`,
+                            `0 0 20px ${getRarityConfig(rewardData.loot.rarity).color}`,
+                            `0 0 40px ${getRarityConfig(rewardData.loot.rarity).color}`,
+                            `0 0 20px ${getRarityConfig(rewardData.loot.rarity).color}`,
                           ]
                         }}
                         transition={{ duration: 1.5, repeat: Infinity }}
@@ -253,9 +258,9 @@ export const EpicRewardReveal = ({
                     >
                       <p 
                         className="text-sm font-medium uppercase tracking-wider"
-                        style={{ color: RARITY_CONFIG[rewardData.loot.rarity].color }}
+                        style={{ color: getRarityConfig(rewardData.loot.rarity).color }}
                       >
-                        {RARITY_CONFIG[rewardData.loot.rarity].label} {rewardData.loot.reward_type}
+                        {getRarityConfig(rewardData.loot.rarity).label} {rewardData.loot.reward_type}
                       </p>
                       <h3 className="text-2xl font-bold text-foreground mt-1">{rewardData.loot.name}</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-xs">{rewardData.loot.description}</p>
@@ -309,11 +314,11 @@ export const EpicRewardReveal = ({
                       ) : (
                         <div 
                           className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ background: RARITY_CONFIG[rewardData.loot.rarity].color + '30' }}
+                          style={{ background: getRarityConfig(rewardData.loot.rarity).color + '30' }}
                         >
                           <Sparkles 
                             className="w-5 h-5" 
-                            style={{ color: RARITY_CONFIG[rewardData.loot.rarity].color }} 
+                            style={{ color: getRarityConfig(rewardData.loot.rarity).color }} 
                           />
                         </div>
                       )}
@@ -321,9 +326,9 @@ export const EpicRewardReveal = ({
                         <p className="font-medium">{rewardData.loot.name}</p>
                         <p 
                           className="text-xs"
-                          style={{ color: RARITY_CONFIG[rewardData.loot.rarity].color }}
+                          style={{ color: getRarityConfig(rewardData.loot.rarity).color }}
                         >
-                          {RARITY_CONFIG[rewardData.loot.rarity].label} {rewardData.loot.reward_type}
+                          {getRarityConfig(rewardData.loot.rarity).label} {rewardData.loot.reward_type}
                         </p>
                       </div>
                     </div>
