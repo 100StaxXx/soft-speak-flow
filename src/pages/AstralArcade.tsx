@@ -37,7 +37,11 @@ import {
   RuneResonanceGame,
   AstralSerpentGame,
   OrbMatchGame,
+  PracticeRoundWrapper,
 } from '@/components/astral-encounters';
+
+// Track which games user has practiced in this arcade session
+const arcadePracticedGames = new Set<MiniGameType>();
 
 const GAMES = [
   { type: 'energy_beam' as MiniGameType, label: 'Energy Beam', icon: Zap, stat: 'mind' as const },
@@ -97,9 +101,35 @@ export default function AstralArcade() {
   const { checkArcadeDiscovery } = useAchievements();
 
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
+  const [gamePhase, setGamePhase] = useState<'practice' | 'playing'>('practice');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [sessionPlays, setSessionPlays] = useState(0);
   const [sessionBestAccuracy, setSessionBestAccuracy] = useState(0);
+
+  // Handle selecting a game - check if practice needed
+  const handleSelectGame = useCallback((gameType: MiniGameType) => {
+    setActiveGame(gameType);
+    // Show practice if user hasn't practiced this game in arcade session
+    if (!arcadePracticedGames.has(gameType)) {
+      setGamePhase('practice');
+    } else {
+      setGamePhase('playing');
+    }
+  }, []);
+
+  const handlePracticeComplete = useCallback(() => {
+    if (activeGame) {
+      arcadePracticedGames.add(activeGame);
+    }
+    setGamePhase('playing');
+  }, [activeGame]);
+
+  const handleSkipPractice = useCallback(() => {
+    if (activeGame) {
+      arcadePracticedGames.add(activeGame);
+    }
+    setGamePhase('playing');
+  }, [activeGame]);
 
   // Award discovery badge and play entrance sound + background music
   useEffect(() => {
@@ -226,7 +256,17 @@ export default function AstralArcade() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Exit Game
               </Button>
-              {renderGame()}
+              
+              {gamePhase === 'practice' ? (
+                <PracticeRoundWrapper
+                  gameType={activeGame}
+                  companionStats={companionStats}
+                  onPracticeComplete={handlePracticeComplete}
+                  onSkipPractice={handleSkipPractice}
+                />
+              ) : (
+                renderGame()
+              )}
             </div>
           </div>
         )}
@@ -333,7 +373,7 @@ export default function AstralArcade() {
                   icon={game.icon}
                   stat={game.stat}
                   highScore={getHighScore(game.type)?.accuracy}
-                  onSelect={setActiveGame}
+                  onSelect={handleSelectGame}
                 />
               </motion.div>
             ))}
