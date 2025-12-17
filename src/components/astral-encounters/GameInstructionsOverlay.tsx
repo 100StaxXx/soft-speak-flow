@@ -45,12 +45,13 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   tap_sequence: {
     icon: Circle,
-    title: "Tap Sequence",
-    goal: "Memorize and tap the orbs in order!",
+    title: "Memory Sequence",
+    goal: "How far can your memory take you?",
     howToPlay: [
-      "Watch the orbs light up in sequence",
-      "Remember the order they appear",
-      "Tap them in the same order"
+      "Watch orbs light up in sequence",
+      "Numbers hide - tap from memory!",
+      "Wrong tap = lose a life, sequence replays",
+      "3 lives total - survive endless levels!"
     ],
     statBonus: 'mind',
     statIcon: Brain,

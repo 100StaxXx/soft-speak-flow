@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Heart } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
@@ -9,7 +10,7 @@ interface TapSequenceGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
-  maxTimer?: number; // Override timer for practice mode
+  maxTimer?: number;
   isPractice?: boolean;
 }
 
@@ -19,47 +20,18 @@ interface Orb {
   y: number;
   order: number;
   tapped: boolean;
-  isDecoy?: boolean;
 }
 
-// Difficulty configurations
-const DIFFICULTY_CONFIG = {
-  easy: {
-    baseOrbs: 5,
-    rounds: 3,
-    displayTime: 550,
-    timeLimit: 15,
-    hideNumbersAfter: null, // never hide
-    decoyCount: 0,
-    shrinkRate: 0.02, // slow
-    progressiveOrbIncrease: 0, // no increase
-    displayTimeDecrease: 30, // ms per round
-  },
-  medium: {
-    baseOrbs: 6,
-    rounds: 4,
-    displayTime: 450,
-    timeLimit: 12,
-    hideNumbersAfter: 2000, // hide after 2 seconds
-    decoyCount: 0,
-    shrinkRate: 0.03, // medium
-    progressiveOrbIncrease: 1, // +1 from round 3
-    displayTimeDecrease: 40,
-  },
-  hard: {
-    baseOrbs: 8,
-    rounds: 5,
-    displayTime: 350,
-    timeLimit: 10,
-    hideNumbersAfter: 0, // hide immediately
-    decoyCount: 3,
-    shrinkRate: 0.04, // fast
-    progressiveOrbIncrease: 1, // +1 from round 3
-    displayTimeDecrease: 50,
-  },
+// Progressive difficulty by level
+const getLevelConfig = (level: number) => {
+  if (level <= 2) return { orbs: 4, showTimePerOrb: 600 };
+  if (level <= 4) return { orbs: 5, showTimePerOrb: 500 };
+  if (level <= 6) return { orbs: 6, showTimePerOrb: 450 };
+  if (level <= 8) return { orbs: 7, showTimePerOrb: 400 };
+  return { orbs: 8, showTimePerOrb: 350 };
 };
 
-// Memoized star background component using CSS animations
+// Memoized star background component
 const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
     {stars.map(star => (
@@ -78,7 +50,7 @@ const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStar
 ));
 StarBackground.displayName = 'StarBackground';
 
-// Memoized Orb component for better performance
+// Memoized Orb component
 interface OrbComponentProps {
   orb: Orb;
   isHighlighted: boolean;
@@ -88,10 +60,8 @@ interface OrbComponentProps {
   tapResult: { id: number; success: boolean } | null;
   onClick: () => void;
   disabled: boolean;
-  shrinkScale: number;
 }
 
-// Premium Orb component with refined visuals
 const OrbComponent = memo(({ 
   orb, 
   isHighlighted, 
@@ -101,14 +71,8 @@ const OrbComponent = memo(({
   tapResult, 
   onClick, 
   disabled,
-  shrinkScale = 1
 }: OrbComponentProps) => {
   const getOrbStyle = useMemo(() => {
-    if (orb.isDecoy) return {
-      bg: 'linear-gradient(135deg, rgba(100,100,100,0.3), rgba(60,60,60,0.2))',
-      border: 'rgba(150,150,150,0.3)',
-      shadow: '0 4px 12px rgba(0,0,0,0.3)',
-    };
     if (orb.tapped) return {
       bg: 'linear-gradient(135deg, #22c55e, #16a34a)',
       border: 'rgba(34,197,94,0.6)',
@@ -134,20 +98,15 @@ const OrbComponent = memo(({
       border: 'rgba(255,255,255,0.1)',
       shadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)',
     };
-  }, [orb.tapped, orb.isDecoy, isHighlighted, isPast, isNext]);
-
-  const baseSize = 56; // 14 * 4 = 56px (w-14 h-14)
-  const actualSize = baseSize * shrinkScale;
+  }, [orb.tapped, isHighlighted, isPast, isNext]);
 
   return (
     <motion.button
-      className="absolute rounded-full flex items-center justify-center font-bold gpu-accelerated touch-target"
+      className="absolute rounded-full flex items-center justify-center font-bold gpu-accelerated touch-target w-14 h-14"
       style={{
         left: `${orb.x}%`,
         top: `${orb.y}%`,
         transform: 'translate(-50%, -50%)',
-        width: actualSize,
-        height: actualSize,
         background: getOrbStyle.bg,
         border: `2px solid ${getOrbStyle.border}`,
         boxShadow: getOrbStyle.shadow,
@@ -163,20 +122,18 @@ const OrbComponent = memo(({
       whileTap={{ scale: 0.92 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
     >
-      {/* Number with glow */}
       <span 
-        className={`text-lg ${isHighlighted || orb.tapped ? 'text-white' : orb.isDecoy ? 'text-white/40' : 'text-white/70'}`}
+        className={`text-lg ${isHighlighted || orb.tapped ? 'text-white' : 'text-white/70'}`}
         style={{ 
           textShadow: isHighlighted ? '0 0 10px white' : 'none',
           fontWeight: isHighlighted ? 800 : 600,
-          fontSize: `${Math.max(12, 18 * shrinkScale)}px`,
         }}
       >
-        {orb.isDecoy ? '?' : showNumber ? orb.order : '?'}
+        {showNumber ? orb.order : '?'}
       </span>
 
       {/* Pulse ring for next orb */}
-      {isNext && !orb.isDecoy && (
+      {isNext && (
         <motion.div 
           className="absolute inset-[-3px] rounded-full"
           style={{ border: '2px solid hsl(var(--primary))' }}
@@ -187,14 +144,12 @@ const OrbComponent = memo(({
 
       {/* Expanding rings for highlighted orb */}
       {isHighlighted && (
-        <>
-          <motion.div
-            className="absolute inset-0 rounded-full border-2 border-white"
-            initial={{ scale: 1, opacity: 0.8 }}
-            animate={{ scale: 2, opacity: 0 }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-          />
-        </>
+        <motion.div
+          className="absolute inset-0 rounded-full border-2 border-white"
+          initial={{ scale: 1, opacity: 0.8 }}
+          animate={{ scale: 2, opacity: 0 }}
+          transition={{ duration: 0.8, repeat: Infinity }}
+        />
       )}
 
       {/* Tap result feedback */}
@@ -213,18 +168,15 @@ const OrbComponent = memo(({
 });
 OrbComponent.displayName = 'OrbComponent';
 
-// Memoized connection lines - only renders when sequence is being shown
+// Connection lines during showing phase
 const ConnectionLines = memo(({ orbs, highlightIndex }: { orbs: Orb[]; highlightIndex: number }) => {
   if (highlightIndex <= 0) return null;
   
-  // Filter out decoys for connection lines
-  const sequenceOrbs = orbs.filter(o => !o.isDecoy);
-  
   return (
     <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
-      {sequenceOrbs.slice(0, highlightIndex).map((orb, i) => {
+      {orbs.slice(0, highlightIndex).map((orb, i) => {
         if (i === 0) return null;
-        const prevOrb = sequenceOrbs[i - 1];
+        const prevOrb = orbs[i - 1];
         return (
           <motion.line
             key={`line-${i}`}
@@ -247,120 +199,82 @@ const ConnectionLines = memo(({ orbs, highlightIndex }: { orbs: Orb[]; highlight
 });
 ConnectionLines.displayName = 'ConnectionLines';
 
-// Timer bar component
-const TimerBar = memo(({ timeRemaining, totalTime }: { timeRemaining: number; totalTime: number }) => {
-  const percentage = (timeRemaining / totalTime) * 100;
-  const isLow = percentage < 30;
-  const isCritical = percentage < 15;
-  
-  return (
-    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden mb-2">
+// Lives display component
+const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: number }) => (
+  <div className="flex items-center gap-1">
+    {Array.from({ length: maxLives }).map((_, i) => (
       <motion.div
-        className={`h-full rounded-full ${
-          isCritical ? 'bg-red-500' : isLow ? 'bg-yellow-500' : 'bg-primary'
-        }`}
-        initial={{ width: '100%' }}
-        animate={{ width: `${percentage}%` }}
-        transition={{ duration: 0.1 }}
-      />
-    </div>
-  );
-});
-TimerBar.displayName = 'TimerBar';
+        key={i}
+        initial={false}
+        animate={{ 
+          scale: i < lives ? 1 : 0.8,
+          opacity: i < lives ? 1 : 0.3 
+        }}
+        transition={{ type: 'spring', stiffness: 400 }}
+      >
+        <Heart 
+          className={`w-5 h-5 ${i < lives ? 'fill-red-500 text-red-500' : 'fill-gray-600 text-gray-600'}`}
+        />
+      </motion.div>
+    ))}
+  </div>
+));
+LivesDisplay.displayName = 'LivesDisplay';
 
 export const TapSequenceGame = ({ 
   companionStats, 
   onComplete,
   difficulty = 'medium',
-  questIntervalScale = 0,
-  maxTimer,
   isPractice = false,
 }: TapSequenceGameProps) => {
-  const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete'>('countdown');
+  const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete' | 'reshowing'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
   const [currentOrder, setCurrentOrder] = useState(1);
   const [highlightIndex, setHighlightIndex] = useState(0);
-  const [round, setRound] = useState(1);
+  const [level, setLevel] = useState(1);
   const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [maxCombo, setMaxCombo] = useState(0);
-  const [mistakes, setMistakes] = useState(0);
+  const [lives, setLives] = useState(3);
   const [shake, setShake] = useState(false);
   const [lastTapResult, setLastTapResult] = useState<{ id: number; success: boolean } | null>(null);
-  const [perfectStreak, setPerfectStreak] = useState(0);
-  const [showNumbers, setShowNumbers] = useState(true);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [shrinkScale, setShrinkScale] = useState(1);
-  const [perfectRounds, setPerfectRounds] = useState(0);
-  
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const shrinkRef = useRef<NodeJS.Timeout | null>(null);
-  const playStartTimeRef = useRef<number>(0);
+  const [attemptsThisLevel, setAttemptsThisLevel] = useState(0);
+  const [totalCorrectTaps, setTotalCorrectTaps] = useState(0);
+  const [totalTaps, setTotalTaps] = useState(0);
+  const [levelMessage, setLevelMessage] = useState<string | null>(null);
 
-  const config = DIFFICULTY_CONFIG[difficulty];
-  // For practice mode, limit to 1 round and use maxTimer if provided
-  const effectiveRounds = isPractice ? 1 : config.rounds;
-  const effectiveTimeLimit = maxTimer ?? config.timeLimit;
-  
-  // Calculate orbs for current round with progressive increase
-  const getOrbsForRound = useCallback((roundNum: number) => {
-    const baseOrbs = config.baseOrbs;
-    const extraOrbs = roundNum >= 3 ? config.progressiveOrbIncrease : 0;
-    return Math.round((baseOrbs + extraOrbs) * (1 + questIntervalScale * 0.2));
-  }, [config.baseOrbs, config.progressiveOrbIncrease, questIntervalScale]);
-  
-  const orbsPerRound = getOrbsForRound(round);
-  const maxRounds = config.rounds;
-  
-  // Calculate display time with progressive decrease
-  const getDisplayTimeForRound = useCallback((roundNum: number) => {
-    const mindBonus = Math.min(companionStats.mind / 100, 1);
-    const baseTime = config.displayTime + (mindBonus * 200);
-    const decrease = (roundNum - 1) * config.displayTimeDecrease;
-    return Math.max(200, baseTime - decrease) * (1 - questIntervalScale * 0.2);
-  }, [config.displayTime, config.displayTimeDecrease, companionStats.mind, questIntervalScale]);
-  
-  const displayTime = getDisplayTimeForRound(round);
-  const timeLimit = config.timeLimit;
+  // Get config based on current level and difficulty
+  const levelConfig = getLevelConfig(level);
+  const orbCount = levelConfig.orbs + (difficulty === 'hard' ? 1 : difficulty === 'easy' ? -1 : 0);
+  const showTimePerOrb = levelConfig.showTimePerOrb + (companionStats.mind / 100 * 150);
 
-  // Static stars - memoized
   const stars = useStaticStars(10);
 
-  // Generate orbs with decoys for hard mode - fully randomized order placement
+  // Generate orbs for current level
   const generateOrbs = useCallback(() => {
-    const totalOrbs = orbsPerRound + config.decoyCount;
-    const positions = getGridPositions(totalOrbs, 12, 75);
-    
-    // Shuffle positions first for random spatial distribution
+    const positions = getGridPositions(orbCount, 12, 75);
     const shuffledPositions = [...positions].sort(() => Math.random() - 0.5);
-    
-    // Create order array: [1, 2, 3, ..., orbsPerRound, 0, 0, 0...] for decoys
-    const orders = [
-      ...Array.from({ length: orbsPerRound }, (_, i) => i + 1),
-      ...Array.from({ length: config.decoyCount }, () => 0)
-    ];
-    
-    // Shuffle the orders separately so number placement is unpredictable
-    const shuffledOrders = [...orders].sort(() => Math.random() - 0.5);
     
     const newOrbs: Orb[] = shuffledPositions.map((pos, i) => ({
       id: i,
       x: pos.x,
       y: pos.y,
-      order: shuffledOrders[i],
+      order: i + 1,
       tapped: false,
-      isDecoy: shuffledOrders[i] === 0,
     }));
     
+    // Shuffle order assignment for unpredictability
+    const orders = Array.from({ length: orbCount }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+    newOrbs.forEach((orb, i) => {
+      orb.order = orders[i];
+    });
+    
     setOrbs(newOrbs);
-  }, [orbsPerRound, config.decoyCount]);
+  }, [orbCount]);
 
   // Initialize game
   useEffect(() => {
     generateOrbs();
   }, [generateOrbs]);
 
-  // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('showing');
     setHighlightIndex(0);
@@ -368,143 +282,45 @@ export const TapSequenceGame = ({
 
   // Show sequence animation
   useEffect(() => {
-    if (gameState !== 'showing' || orbs.length === 0) return;
+    if (gameState !== 'showing' && gameState !== 'reshowing') return;
+    if (orbs.length === 0) return;
 
-    // Only highlight non-decoy orbs
-    const sequenceOrbs = orbs.filter(o => !o.isDecoy);
+    const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);
     
     const timer = setTimeout(() => {
-      if (highlightIndex < sequenceOrbs.length) {
+      if (highlightIndex < sortedOrbs.length) {
         triggerHaptic('light');
         setHighlightIndex(prev => prev + 1);
       } else {
         // Start play phase
         setGameState('playing');
         setHighlightIndex(0);
-        setTimeRemaining(timeLimit);
-        setShrinkScale(1);
-        playStartTimeRef.current = Date.now();
-        
-        // Handle number hiding for medium/hard
-        if (config.hideNumbersAfter !== null) {
-          if (config.hideNumbersAfter === 0) {
-            setShowNumbers(false);
-          } else {
-            setTimeout(() => setShowNumbers(false), config.hideNumbersAfter);
-          }
-        } else {
-          setShowNumbers(true);
-        }
       }
-    }, displayTime);
+    }, showTimePerOrb);
 
     return () => clearTimeout(timer);
-  }, [gameState, highlightIndex, orbs, displayTime, timeLimit, config.hideNumbersAfter]);
+  }, [gameState, highlightIndex, orbs, showTimePerOrb]);
 
-  const finishGame = useCallback(() => {
-    const totalSequenceOrbs = Array.from({ length: effectiveRounds }, (_, i) => getOrbsForRound(i + 1))
-      .reduce((sum, count) => sum + count, 0);
+  // Complete game
+  const finishGame = useCallback((won: boolean) => {
+    setGameState('complete');
     
-    // Base accuracy from correct taps
-    const baseAccuracy = Math.round((score / totalSequenceOrbs) * 100);
-    
-    // Combo bonus (up to 20%)
-    const comboBonus = Math.min(maxCombo * 2, 20);
-    
-    // Perfect round bonus (5% per perfect round)
-    const perfectBonus = perfectRounds * 5;
-    
-    // Time bonus (average time remaining across rounds)
-    const timeBonus = Math.round((timeRemaining / timeLimit) * 10);
-    
-    // Mistake penalty
-    const mistakePenalty = Math.min(mistakes * 3, 30);
-    
-    const finalAccuracy = Math.min(100, Math.max(0, baseAccuracy + comboBonus + perfectBonus + timeBonus - mistakePenalty));
+    const accuracy = totalTaps > 0 ? Math.round((totalCorrectTaps / totalTaps) * 100) : 0;
+    const levelBonus = Math.min(level * 5, 50);
+    const finalAccuracy = Math.min(100, accuracy + levelBonus);
     
     onComplete({
-      success: finalAccuracy >= 50,
+      success: won && finalAccuracy >= 50,
       accuracy: finalAccuracy,
       result: finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 70 ? 'good' : finalAccuracy >= 50 ? 'partial' : 'fail'
     });
-  }, [score, effectiveRounds, getOrbsForRound, maxCombo, perfectRounds, timeRemaining, timeLimit, mistakes, onComplete]);
+  }, [level, totalCorrectTaps, totalTaps, onComplete]);
 
-  // Timer countdown during play phase
-  useEffect(() => {
-    if (gameState !== 'playing') {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 0.1) {
-          // Time's up! Round failed
-          triggerHaptic('error');
-          setMistakes(m => m + orbsPerRound - currentOrder + 1);
-          
-          const newRound = round + 1;
-          if (newRound > effectiveRounds) {
-            setGameState('complete');
-            finishGame();
-          } else {
-            setTimeout(() => {
-              setRound(newRound);
-              setCurrentOrder(1);
-              setGameState('showing');
-              setHighlightIndex(0);
-              setShowNumbers(true);
-              generateOrbs();
-            }, 800);
-          }
-          return 0;
-        }
-        return prev - 0.1;
-      });
-    }, 100);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [gameState, round, effectiveRounds, orbsPerRound, currentOrder, generateOrbs, finishGame]);
-
-  // Shrinking orbs during play phase
-  useEffect(() => {
-    if (gameState !== 'playing') {
-      if (shrinkRef.current) clearInterval(shrinkRef.current);
-      setShrinkScale(1);
-      return;
-    }
-
-    shrinkRef.current = setInterval(() => {
-      setShrinkScale(prev => Math.max(0.65, prev - config.shrinkRate));
-    }, 500);
-
-    return () => {
-      if (shrinkRef.current) clearInterval(shrinkRef.current);
-    };
-  }, [gameState, config.shrinkRate]);
-
+  // Handle orb tap
   const handleOrbTap = useCallback((orb: Orb) => {
     if (gameState !== 'playing' || orb.tapped) return;
 
-    // Tapping a decoy is a mistake
-    if (orb.isDecoy) {
-      triggerHaptic('error');
-      setMistakes(prev => prev + 1);
-      setCombo(0);
-      setPerfectStreak(0);
-      setShake(true);
-      setLastTapResult({ id: orb.id, success: false });
-      // Penalize time for decoy tap
-      setTimeRemaining(prev => Math.max(0, prev - 1));
-      
-      setTimeout(() => {
-        setShake(false);
-        setLastTapResult(null);
-      }, 400);
-      return;
-    }
+    setTotalTaps(prev => prev + 1);
 
     if (orb.order === currentOrder) {
       // Correct tap!
@@ -513,92 +329,77 @@ export const TapSequenceGame = ({
         o.id === orb.id ? { ...o, tapped: true } : o
       ));
       setCurrentOrder(prev => prev + 1);
+      setTotalCorrectTaps(prev => prev + 1);
       
-      // Score with time bonus
-      const timeBonus = Math.ceil(timeRemaining);
-      setScore(prev => prev + 10 + timeBonus);
+      // Score based on level and attempts
+      const attemptMultiplier = attemptsThisLevel === 0 ? 2 : 1;
+      setScore(prev => prev + (10 * level) * attemptMultiplier);
       
-      setCombo(c => {
-        const newCombo = c + 1;
-        setMaxCombo(m => Math.max(m, newCombo));
-        return newCombo;
-      });
-      setPerfectStreak(s => s + 1);
       setLastTapResult({ id: orb.id, success: true });
-
       setTimeout(() => setLastTapResult(null), 400);
 
-      // Check if round complete
-      if (currentOrder === orbsPerRound) {
-        // Check if this was a perfect round (no mistakes this round)
-        const roundMistakes = mistakes;
-        if (roundMistakes === 0) {
-          setPerfectRounds(p => p + 1);
-        }
+      // Check if level complete
+      if (currentOrder === orbCount) {
+        const perfectLevel = attemptsThisLevel === 0;
+        setLevelMessage(perfectLevel ? '⭐ Perfect!' : '✓ Level Complete!');
         
-        const newRound = round + 1;
-        
-        if (newRound > effectiveRounds) {
-          // Game complete
-          setGameState('complete');
-          const totalSequenceOrbs = Array.from({ length: effectiveRounds }, (_, i) => getOrbsForRound(i + 1))
-            .reduce((sum, count) => sum + count, 0);
-          
-          const baseAccuracy = Math.round(((score + 10 + Math.ceil(timeRemaining)) / (totalSequenceOrbs * 20)) * 100);
-          const comboBonus = Math.min(maxCombo * 2, 20);
-          const perfectBonus = (roundMistakes === 0 ? perfectRounds + 1 : perfectRounds) * 5;
-          const mistakePenalty = Math.min(mistakes * 3, 30);
-          const finalAccuracy = Math.min(100, Math.max(0, baseAccuracy + comboBonus + perfectBonus - mistakePenalty));
-          
-          onComplete({
-            success: finalAccuracy >= 50,
-            accuracy: finalAccuracy,
-            result: finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 70 ? 'good' : finalAccuracy >= 50 ? 'partial' : 'fail'
-          });
-        } else {
-          // Next round
-          setTimeout(() => {
-            setRound(newRound);
-            setCurrentOrder(1);
-            setGameState('showing');
-            setHighlightIndex(0);
-            setShowNumbers(true);
-            generateOrbs();
-          }, 600);
-        }
+        // Next level after brief delay
+        setTimeout(() => {
+          setLevelMessage(null);
+          setLevel(prev => prev + 1);
+          setCurrentOrder(1);
+          setAttemptsThisLevel(0);
+          setGameState('showing');
+          setHighlightIndex(0);
+          generateOrbs();
+        }, 1000);
       }
     } else {
       // Wrong tap!
       triggerHaptic('error');
-      setMistakes(prev => prev + 1);
-      setCombo(0);
-      setPerfectStreak(0);
+      setLives(prev => {
+        const newLives = prev - 1;
+        if (newLives <= 0) {
+          // Game over
+          setTimeout(() => finishGame(false), 500);
+        } else {
+          // Re-show sequence
+          setAttemptsThisLevel(prev => prev + 1);
+          setCurrentOrder(1);
+          setOrbs(prev => prev.map(o => ({ ...o, tapped: false })));
+          setLevelMessage('❌ Wrong! Watch again...');
+          
+          setTimeout(() => {
+            setLevelMessage(null);
+            setGameState('reshowing');
+            setHighlightIndex(0);
+          }, 1000);
+        }
+        return newLives;
+      });
+      
       setShake(true);
       setLastTapResult({ id: orb.id, success: false });
-      // Time penalty for wrong tap
-      setTimeRemaining(prev => Math.max(0, prev - 0.5));
-      
       setTimeout(() => {
         setShake(false);
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbsPerRound, round, score, maxCombo, mistakes, perfectRounds, effectiveRounds, timeRemaining, generateOrbs, onComplete, getOrbsForRound]);
+  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, generateOrbs, finishGame]);
 
-  const getRoundProgressText = useCallback(() => {
-    if (gameState === 'showing') return `Watch the sequence...`;
-    if (gameState === 'playing') return `Tap orb ${currentOrder} of ${orbsPerRound}`;
-    return '';
-  }, [gameState, currentOrder, orbsPerRound]);
-
-  // Determine which orb is highlighted during showing phase
   const getHighlightedOrbOrder = useCallback(() => {
-    const sequenceOrbs = orbs.filter(o => !o.isDecoy);
-    if (highlightIndex > 0 && highlightIndex <= sequenceOrbs.length) {
-      return highlightIndex;
+    const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);
+    if (highlightIndex > 0 && highlightIndex <= sortedOrbs.length) {
+      return sortedOrbs[highlightIndex - 1].order;
     }
     return 0;
   }, [orbs, highlightIndex]);
+
+  const getProgressText = useCallback(() => {
+    if (gameState === 'showing' || gameState === 'reshowing') return 'Watch the sequence...';
+    if (gameState === 'playing') return `Tap orb ${currentOrder} of ${orbCount}`;
+    return '';
+  }, [gameState, currentOrder, orbCount]);
 
   return (
     <div className={`flex flex-col items-center relative ${shake ? 'animate-shake' : ''}`}>
@@ -616,39 +417,29 @@ export const TapSequenceGame = ({
 
       {/* Game HUD */}
       <GameHUD
-        title="Cosmic Tap Sequence"
-        subtitle={getRoundProgressText()}
+        title="Memory Sequence"
+        subtitle={getProgressText()}
         score={score}
-        maxScore={maxRounds * 200}
-        combo={combo}
-        showCombo={true}
-        phase={round - 1}
-        totalPhases={maxRounds}
-        primaryStat={{ value: mistakes, label: 'Mistakes', color: 'hsl(0, 84%, 60%)' }}
+        maxScore={level * 200}
+        showCombo={false}
+        phase={level - 1}
+        totalPhases={10}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
 
-      {/* Timer bar during play phase */}
-      {gameState === 'playing' && (
-        <div className="w-full max-w-xs mb-2">
-          <TimerBar timeRemaining={timeRemaining} totalTime={timeLimit} />
-        </div>
-      )}
-
-      {/* Perfect streak indicator */}
-      <AnimatePresence>
-        {perfectStreak >= 3 && gameState === 'playing' && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-2 px-4 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full border border-yellow-500/50"
-          >
-            <span className="text-sm font-bold text-yellow-400">🔥 {perfectStreak} Perfect Streak!</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Lives and Level display */}
+      <div className="w-full max-w-xs mb-3 flex items-center justify-between">
+        <LivesDisplay lives={lives} />
+        <motion.div 
+          key={level}
+          initial={{ scale: 1.2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="px-3 py-1 bg-primary/20 rounded-full border border-primary/40"
+        >
+          <span className="text-sm font-bold text-primary">Level {level}</span>
+        </motion.div>
+      </div>
 
       {/* Difficulty indicator */}
       <div className="mb-2 flex items-center gap-2">
@@ -659,10 +450,10 @@ export const TapSequenceGame = ({
         }`}>
           {difficulty.toUpperCase()}
         </span>
-        <span className="text-xs text-muted-foreground">Round {round}/{effectiveRounds}</span>
+        <span className="text-xs text-muted-foreground">{orbCount} orbs</span>
       </div>
 
-      {/* Premium game area */}
+      {/* Game area */}
       <div 
         className="relative w-full aspect-square max-w-xs rounded-2xl overflow-hidden"
         style={{
@@ -671,29 +462,30 @@ export const TapSequenceGame = ({
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
         }}
       >
-        {/* Nebula background effect */}
+        {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/8 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-0 w-40 h-40 bg-cyan-500/6 rounded-full blur-3xl" />
         </div>
         
-        {/* Star particles */}
         <StarBackground stars={stars} />
 
-        {/* Connection lines */}
-        {gameState === 'showing' && <ConnectionLines orbs={orbs} highlightIndex={highlightIndex} />}
+        {/* Connection lines during showing */}
+        {(gameState === 'showing' || gameState === 'reshowing') && (
+          <ConnectionLines orbs={[...orbs].sort((a, b) => a.order - b.order)} highlightIndex={highlightIndex} />
+        )}
         
         {/* Orbs */}
         <AnimatePresence>
           {orbs.map((orb) => {
             const highlightedOrder = getHighlightedOrbOrder();
-            const isHighlighted = gameState === 'showing' && !orb.isDecoy && orb.order === highlightedOrder;
-            const isPast = gameState === 'showing' && !orb.isDecoy && orb.order < highlightedOrder;
-            const isNext = gameState === 'playing' && orb.order === currentOrder && !orb.tapped && !orb.isDecoy;
+            const isHighlighted = (gameState === 'showing' || gameState === 'reshowing') && orb.order === highlightedOrder;
+            const isPast = (gameState === 'showing' || gameState === 'reshowing') && orb.order < highlightedOrder;
+            const isNext = gameState === 'playing' && orb.order === currentOrder && !orb.tapped;
             const tapResult = lastTapResult?.id === orb.id ? lastTapResult : null;
             
-            // Show numbers logic
-            const shouldShowNumber = orb.isDecoy ? false : (gameState === 'showing' || orb.tapped || showNumbers);
+            // Show numbers during sequence display, hide during input
+            const shouldShowNumber = gameState === 'showing' || gameState === 'reshowing' || orb.tapped;
             
             return (
               <OrbComponent
@@ -705,20 +497,19 @@ export const TapSequenceGame = ({
                 showNumber={shouldShowNumber}
                 tapResult={tapResult}
                 onClick={() => handleOrbTap(orb)}
-                disabled={gameState === 'showing' || orb.tapped}
-                shrinkScale={gameState === 'playing' ? shrinkScale : 1}
+                disabled={gameState !== 'playing' || orb.tapped}
               />
             );
           })}
         </AnimatePresence>
 
-        {/* Round complete overlay */}
+        {/* Level message overlay */}
         <AnimatePresence>
-          {gameState === 'playing' && currentOrder > orbsPerRound && (
+          {levelMessage && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
               className="absolute inset-0 flex items-center justify-center z-30"
               style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
             >
@@ -727,30 +518,29 @@ export const TapSequenceGame = ({
                 animate={{ scale: 1 }}
                 className="text-center"
               >
-                <span className="text-5xl">🎉</span>
-                <p className="text-lg font-bold text-white mt-3">Round Complete!</p>
+                <p className="text-2xl font-bold text-white">{levelMessage}</p>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Time's up overlay */}
+        {/* Game over overlay */}
         <AnimatePresence>
-          {gameState === 'playing' && timeRemaining <= 0 && (
+          {lives <= 0 && gameState !== 'complete' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="absolute inset-0 flex items-center justify-center z-30"
-              style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+              style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(8px)' }}
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="text-center"
               >
-                <span className="text-5xl">⏰</span>
-                <p className="text-lg font-bold text-red-400 mt-3">Time's Up!</p>
+                <span className="text-5xl">💔</span>
+                <p className="text-xl font-bold text-white mt-3">Game Over!</p>
+                <p className="text-lg text-primary mt-1">Reached Level {level}</p>
               </motion.div>
             </motion.div>
           )}
@@ -763,23 +553,17 @@ export const TapSequenceGame = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        {gameState === 'showing' 
-          ? '👀 Watch carefully...' 
+        {gameState === 'showing' || gameState === 'reshowing'
+          ? '👀 Memorize the sequence...' 
           : gameState === 'playing' 
-            ? config.decoyCount > 0 
-              ? '👆 Tap in order! Avoid the decoys (?)' 
-              : '👆 Tap the orbs in order!' 
+            ? '👆 Tap the orbs in order!' 
             : ''}
       </motion.p>
 
       {/* Game info */}
       <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-        <span>Mind bonus: +{Math.round((Math.min(companionStats.mind / 100, 1)) * 200)}ms</span>
-        {config.hideNumbersAfter !== null && (
-          <span className="text-yellow-400">
-            {config.hideNumbersAfter === 0 ? 'Numbers hidden!' : `Numbers hide after ${config.hideNumbersAfter / 1000}s`}
-          </span>
-        )}
+        <span>3 lives • Endless levels</span>
+        <span className="text-primary">No time limit!</span>
       </div>
 
       {/* CSS animations */}
