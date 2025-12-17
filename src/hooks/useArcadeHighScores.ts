@@ -34,14 +34,19 @@ export const useArcadeHighScores = () => {
   );
 
   const setHighScore = useCallback(
-    (gameType: MiniGameType, accuracy: number, result: string) => {
+    (gameType: MiniGameType, accuracy: number, result: string): boolean => {
+      let isNewHighScore = false;
+      
       setHighScores((prev) => {
         const existing = prev[gameType];
         
         // Only update if this is a new high score
         if (existing && existing.accuracy >= accuracy) {
+          isNewHighScore = false;
           return prev;
         }
+
+        isNewHighScore = true;
 
         const newScores = {
           ...prev,
@@ -62,11 +67,9 @@ export const useArcadeHighScores = () => {
         return newScores;
       });
 
-      // Return whether this was a new high score
-      const existing = highScores[gameType];
-      return !existing || existing.accuracy < accuracy;
+      return isNewHighScore;
     },
-    [highScores]
+    []
   );
 
   const getAllHighScores = useCallback(() => {
