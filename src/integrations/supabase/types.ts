@@ -889,41 +889,68 @@ export type Database = {
       companion_postcards: {
         Row: {
           caption: string | null
+          chapter_number: number | null
+          chapter_title: string | null
+          characters_featured: string[] | null
+          clue_text: string | null
           companion_id: string
           created_at: string
           epic_id: string | null
           generated_at: string
           id: string
           image_url: string
+          is_finale: boolean | null
           location_description: string
           location_name: string
+          location_revealed: boolean | null
           milestone_percent: number
+          prophecy_line: string | null
+          seeds_planted: string[] | null
+          story_content: string | null
           user_id: string
         }
         Insert: {
           caption?: string | null
+          chapter_number?: number | null
+          chapter_title?: string | null
+          characters_featured?: string[] | null
+          clue_text?: string | null
           companion_id: string
           created_at?: string
           epic_id?: string | null
           generated_at?: string
           id?: string
           image_url: string
+          is_finale?: boolean | null
           location_description: string
           location_name: string
+          location_revealed?: boolean | null
           milestone_percent: number
+          prophecy_line?: string | null
+          seeds_planted?: string[] | null
+          story_content?: string | null
           user_id: string
         }
         Update: {
           caption?: string | null
+          chapter_number?: number | null
+          chapter_title?: string | null
+          characters_featured?: string[] | null
+          clue_text?: string | null
           companion_id?: string
           created_at?: string
           epic_id?: string | null
           generated_at?: string
           id?: string
           image_url?: string
+          is_finale?: boolean | null
           location_description?: string
           location_name?: string
+          location_revealed?: boolean | null
           milestone_percent?: number
+          prophecy_line?: string | null
+          seeds_planted?: string[] | null
+          story_content?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1070,6 +1097,72 @@ export type Database = {
           voice_style?: string
         }
         Relationships: []
+      }
+      completed_books: {
+        Row: {
+          book_title: string
+          boss_defeated_at: string | null
+          boss_defeated_name: string | null
+          companion_name: string | null
+          companion_species: string | null
+          completed_at: string | null
+          created_at: string | null
+          epic_id: string
+          final_wisdom: string | null
+          id: string
+          mentor_name: string | null
+          story_type_slug: string | null
+          total_chapters: number
+          user_id: string
+        }
+        Insert: {
+          book_title: string
+          boss_defeated_at?: string | null
+          boss_defeated_name?: string | null
+          companion_name?: string | null
+          companion_species?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          epic_id: string
+          final_wisdom?: string | null
+          id?: string
+          mentor_name?: string | null
+          story_type_slug?: string | null
+          total_chapters: number
+          user_id: string
+        }
+        Update: {
+          book_title?: string
+          boss_defeated_at?: string | null
+          boss_defeated_name?: string | null
+          companion_name?: string | null
+          companion_species?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          epic_id?: string
+          final_wisdom?: string | null
+          id?: string
+          mentor_name?: string | null
+          story_type_slug?: string | null
+          total_chapters?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "completed_books_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: true
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "completed_books_story_type_slug_fkey"
+            columns: ["story_type_slug"]
+            isOneToOne: false
+            referencedRelation: "epic_story_types"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       cosmic_codex_entries: {
         Row: {
@@ -1643,6 +1736,45 @@ export type Database = {
           },
         ]
       }
+      epic_story_types: {
+        Row: {
+          base_chapters: number
+          boss_lore_template: string | null
+          boss_name_template: string
+          boss_theme: string
+          created_at: string | null
+          description: string
+          icon: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          base_chapters?: number
+          boss_lore_template?: string | null
+          boss_name_template: string
+          boss_theme: string
+          created_at?: string | null
+          description: string
+          icon?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          base_chapters?: number
+          boss_lore_template?: string | null
+          boss_name_template?: string
+          boss_theme?: string
+          created_at?: string | null
+          description?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       epic_templates: {
         Row: {
           badge_icon: string | null
@@ -1690,6 +1822,7 @@ export type Database = {
       }
       epics: {
         Row: {
+          book_title: string | null
           completed_at: string | null
           created_at: string | null
           description: string | null
@@ -1703,14 +1836,18 @@ export type Database = {
           progress_percentage: number | null
           start_date: string
           status: string
+          story_seed: Json | null
+          story_type_slug: string | null
           target_days: number
           theme_color: string | null
           title: string
+          total_chapters: number | null
           updated_at: string | null
           user_id: string
           xp_reward: number
         }
         Insert: {
+          book_title?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
@@ -1724,14 +1861,18 @@ export type Database = {
           progress_percentage?: number | null
           start_date?: string
           status?: string
+          story_seed?: Json | null
+          story_type_slug?: string | null
           target_days?: number
           theme_color?: string | null
           title: string
+          total_chapters?: number | null
           updated_at?: string | null
           user_id: string
           xp_reward?: number
         }
         Update: {
+          book_title?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
@@ -1745,14 +1886,25 @@ export type Database = {
           progress_percentage?: number | null
           start_date?: string
           status?: string
+          story_seed?: Json | null
+          story_type_slug?: string | null
           target_days?: number
           theme_color?: string | null
           title?: string
+          total_chapters?: number | null
           updated_at?: string | null
           user_id?: string
           xp_reward?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "epics_story_type_slug_fkey"
+            columns: ["story_type_slug"]
+            isOneToOne: false
+            referencedRelation: "epic_story_types"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       evening_reflections: {
         Row: {
@@ -2331,6 +2483,53 @@ export type Database = {
           voice_url?: string | null
         }
         Relationships: []
+      }
+      mentor_story_relationship: {
+        Row: {
+          created_at: string | null
+          current_since: string | null
+          id: string
+          key_moments: string[] | null
+          mentor_id: string | null
+          mentor_transitions: Json | null
+          trust_level: number | null
+          updated_at: string | null
+          user_id: string
+          wisdom_shared: string[] | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_since?: string | null
+          id?: string
+          key_moments?: string[] | null
+          mentor_id?: string | null
+          mentor_transitions?: Json | null
+          trust_level?: number | null
+          updated_at?: string | null
+          user_id: string
+          wisdom_shared?: string[] | null
+        }
+        Update: {
+          created_at?: string | null
+          current_since?: string | null
+          id?: string
+          key_moments?: string[] | null
+          mentor_id?: string | null
+          mentor_transitions?: Json | null
+          trust_level?: number | null
+          updated_at?: string | null
+          user_id?: string
+          wisdom_shared?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_story_relationship_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mentors: {
         Row: {
@@ -3440,6 +3639,138 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      story_characters: {
+        Row: {
+          arc_stage: string | null
+          archetype: string
+          backstory: string | null
+          catchphrase: string | null
+          core_motivation: string | null
+          created_at: string | null
+          current_goal: string | null
+          fate: string | null
+          first_appeared_chapter: number | null
+          first_appeared_epic_id: string | null
+          greatest_fear: string | null
+          id: string
+          is_active: boolean | null
+          last_seen_chapter: number | null
+          last_seen_epic_id: string | null
+          name: string
+          relationship_history: string[] | null
+          relationship_to_user: string | null
+          secret_shame: string | null
+          signature_feature: string | null
+          species: string | null
+          speech_pattern: string | null
+          times_encountered: number | null
+          updated_at: string | null
+          user_id: string
+          visual_description: string | null
+        }
+        Insert: {
+          arc_stage?: string | null
+          archetype: string
+          backstory?: string | null
+          catchphrase?: string | null
+          core_motivation?: string | null
+          created_at?: string | null
+          current_goal?: string | null
+          fate?: string | null
+          first_appeared_chapter?: number | null
+          first_appeared_epic_id?: string | null
+          greatest_fear?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_seen_chapter?: number | null
+          last_seen_epic_id?: string | null
+          name: string
+          relationship_history?: string[] | null
+          relationship_to_user?: string | null
+          secret_shame?: string | null
+          signature_feature?: string | null
+          species?: string | null
+          speech_pattern?: string | null
+          times_encountered?: number | null
+          updated_at?: string | null
+          user_id: string
+          visual_description?: string | null
+        }
+        Update: {
+          arc_stage?: string | null
+          archetype?: string
+          backstory?: string | null
+          catchphrase?: string | null
+          core_motivation?: string | null
+          created_at?: string | null
+          current_goal?: string | null
+          fate?: string | null
+          first_appeared_chapter?: number | null
+          first_appeared_epic_id?: string | null
+          greatest_fear?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_seen_chapter?: number | null
+          last_seen_epic_id?: string | null
+          name?: string
+          relationship_history?: string[] | null
+          relationship_to_user?: string | null
+          secret_shame?: string | null
+          signature_feature?: string | null
+          species?: string | null
+          speech_pattern?: string | null
+          times_encountered?: number | null
+          updated_at?: string | null
+          user_id?: string
+          visual_description?: string | null
+        }
+        Relationships: []
+      }
+      story_universe: {
+        Row: {
+          active_mysteries: string[] | null
+          created_at: string | null
+          foreshadowing_seeds: string[] | null
+          id: string
+          memorable_moments: string[] | null
+          prophecy_fragments: string[] | null
+          resolved_mysteries: string[] | null
+          running_callbacks: string[] | null
+          updated_at: string | null
+          user_id: string
+          world_era: string | null
+          world_name: string | null
+        }
+        Insert: {
+          active_mysteries?: string[] | null
+          created_at?: string | null
+          foreshadowing_seeds?: string[] | null
+          id?: string
+          memorable_moments?: string[] | null
+          prophecy_fragments?: string[] | null
+          resolved_mysteries?: string[] | null
+          running_callbacks?: string[] | null
+          updated_at?: string | null
+          user_id: string
+          world_era?: string | null
+          world_name?: string | null
+        }
+        Update: {
+          active_mysteries?: string[] | null
+          created_at?: string | null
+          foreshadowing_seeds?: string[] | null
+          id?: string
+          memorable_moments?: string[] | null
+          prophecy_fragments?: string[] | null
+          resolved_mysteries?: string[] | null
+          running_callbacks?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+          world_era?: string | null
+          world_name?: string | null
+        }
+        Relationships: []
       }
       subscriptions: {
         Row: {
