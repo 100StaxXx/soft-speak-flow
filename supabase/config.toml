@@ -179,3 +179,6 @@ verify_jwt = false
 
 [functions.generate-weekly-recap]
 verify_jwt = false
+
+[functions.generate-rhythm-track]
+verify_jwt = false
