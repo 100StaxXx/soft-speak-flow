@@ -133,12 +133,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   galactic_match: {
     icon: Layers,
     title: "Galactic Match",
-    goal: "Find all matching cosmic pairs before time runs out!",
+    goal: "Memorize cards, match pairs, survive endless levels!",
     howToPlay: [
-      "Tap cards to flip and reveal symbols",
-      "Remember card positions",
-      "Match identical pairs to clear them",
-      "Chain matches for combo bonus!"
+      "All cards revealed at start - MEMORIZE!",
+      "Cards hide - match pairs from memory",
+      "Wrong match = lose a life (3 total)",
+      "Clear level → more cards next level!"
     ],
     statBonus: 'mind',
     statIcon: Brain,
