@@ -52,6 +52,7 @@ export const TodaysPepTalk = memo(() => {
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [hasAwardedXP, setHasAwardedXP] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState<'idle' | 'script' | 'audio' | 'loading'>('idle');
   const [isFallback, setIsFallback] = useState(false);
   const [mentorSlug, setMentorSlug] = useState<string | null>(null);
   const [isAudioReady, setIsAudioReady] = useState(false);
@@ -210,13 +211,16 @@ export const TodaysPepTalk = memo(() => {
     }
 
     setIsGenerating(true);
+    setGenerationStage('script');
     try {
-      toast.info("Generating your pep talk... This may take a moment.");
-      
+      // Stage 1: Generating script
       const { data, error } = await supabase.functions.invoke(
         'generate-single-daily-pep-talk',
         { body: { mentorSlug } }
       );
+      
+      // Stage 2: Audio generated (part of the edge function)
+      setGenerationStage('audio');
 
       if (error) {
         console.error("Generation error:", error);
@@ -224,6 +228,9 @@ export const TodaysPepTalk = memo(() => {
       }
 
       if (data?.pepTalk) {
+        // Stage 3: Loading audio file
+        setGenerationStage('loading');
+        
         // Fetch mentor name for display
         const { data: mentor } = await supabase
           .from("mentors")
@@ -261,6 +268,7 @@ export const TodaysPepTalk = memo(() => {
       toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
+      setGenerationStage('idle');
     }
   };
 
@@ -550,12 +558,14 @@ export const TodaysPepTalk = memo(() => {
             <Button 
               onClick={handleGeneratePepTalk}
               disabled={isGenerating || !mentorSlug}
-              className="rounded-full"
+              className="rounded-full min-w-[200px]"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
+                  {generationStage === 'script' && 'Generating script...'}
+                  {generationStage === 'audio' && 'Creating audio...'}
+                  {generationStage === 'loading' && 'Loading...'}
                 </>
               ) : (
                 <>
@@ -622,7 +632,14 @@ export const TodaysPepTalk = memo(() => {
                 onClick={handleGeneratePepTalk}
                 disabled={isGenerating}
               >
-                {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Generate today's"}
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    {generationStage === 'script' && 'Writing...'}
+                    {generationStage === 'audio' && 'Recording...'}
+                    {generationStage === 'loading' && 'Loading...'}
+                  </>
+                ) : "Generate today's"}
               </Button>
             </div>
           )}

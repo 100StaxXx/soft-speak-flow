@@ -182,3 +182,6 @@ verify_jwt = false
 
 [functions.generate-rhythm-track]
 verify_jwt = false
+
+[functions.generate-tomorrow-pep-talks]
+verify_jwt = false
