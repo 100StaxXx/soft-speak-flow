@@ -3192,7 +3192,7 @@ export type Database = {
           paypal_transaction_id: string | null
           referee_id: string
           referral_code_id: string | null
-          referrer_id: string
+          referrer_id: string | null
           rejected_at: string | null
           status: string
           subscription_id: string | null
@@ -3210,7 +3210,7 @@ export type Database = {
           paypal_transaction_id?: string | null
           referee_id: string
           referral_code_id?: string | null
-          referrer_id: string
+          referrer_id?: string | null
           rejected_at?: string | null
           status?: string
           subscription_id?: string | null
@@ -3228,7 +3228,7 @@ export type Database = {
           paypal_transaction_id?: string | null
           referee_id?: string
           referral_code_id?: string | null
-          referrer_id?: string
+          referrer_id?: string | null
           rejected_at?: string | null
           status?: string
           subscription_id?: string | null

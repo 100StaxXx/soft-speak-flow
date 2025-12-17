@@ -525,7 +525,55 @@ async function createReferralPayout(
 
   if (error) {
     console.error(`Failed to create payout for code ${referralCode}:`, error);
+    return;
+  }
+  
+  console.log(`Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`);
+
+  // Auto-approve payouts when threshold is reached ($50 minimum)
+  await autoApprovePayoutsIfThresholdReached(supabase, codeData.id, referralCode);
+}
+
+const MINIMUM_PAYOUT_THRESHOLD = 50.00;
+
+async function autoApprovePayoutsIfThresholdReached(
+  supabase: any,
+  referralCodeId: string,
+  referralCode: string
+) {
+  // Get total pending payouts for this referral code
+  const { data: pendingPayouts, error } = await supabase
+    .from("referral_payouts")
+    .select("id, amount")
+    .eq("referral_code_id", referralCodeId)
+    .eq("status", "pending");
+
+  if (error || !pendingPayouts) {
+    console.error("Failed to fetch pending payouts:", error);
+    return;
+  }
+
+  const totalPending = pendingPayouts.reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
+
+  if (totalPending >= MINIMUM_PAYOUT_THRESHOLD) {
+    // Auto-approve all pending payouts for this referral code
+    const payoutIds = pendingPayouts.map((p: { id: string }) => p.id);
+    
+    const { error: updateError } = await supabase
+      .from("referral_payouts")
+      .update({ 
+        status: "approved",
+        admin_notes: "Auto-approved: threshold reached",
+        updated_at: new Date().toISOString()
+      })
+      .in("id", payoutIds);
+
+    if (updateError) {
+      console.error("Failed to auto-approve payouts:", updateError);
+    } else {
+      console.log(`Auto-approved ${payoutIds.length} payouts ($${totalPending.toFixed(2)}) for code ${referralCode}`);
+    }
   } else {
-    console.log(`Created ${payoutType} payout of $${payoutAmount} for code ${referralCode} (${codeData.owner_type})`);
+    console.log(`Total pending $${totalPending.toFixed(2)} for code ${referralCode} - below threshold ($${MINIMUM_PAYOUT_THRESHOLD})`);
   }
 }
