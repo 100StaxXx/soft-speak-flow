@@ -474,7 +474,7 @@ export default function Tasks() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-4 relative z-10">
+      <div className="max-w-2xl mx-auto p-6 pb-24 space-y-4 relative z-10">
         <Tabs defaultValue="quests" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
