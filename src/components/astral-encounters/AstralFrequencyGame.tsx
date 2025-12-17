@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
-import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
+import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 
 interface AstralFrequencyGameProps {
@@ -15,28 +15,28 @@ interface AstralFrequencyGameProps {
   isPractice?: boolean;
 }
 
-// Difficulty configuration
+// Difficulty configuration - NO TIMER, endless until lives = 0
 const DIFFICULTY_CONFIG = {
   easy: {
-    gameTime: 30,
     startSpeed: 12,
-    maxSpeed: 20,
+    maxSpeed: 25,
     spawnInterval: 1.2,
-    obstacleChance: 0.6,
+    obstacleChance: 0.55,
+    speedIncrement: 0.015,
   },
   medium: {
-    gameTime: 35,
-    startSpeed: 16,
-    maxSpeed: 28,
-    spawnInterval: 0.9,
-    obstacleChance: 0.65,
+    startSpeed: 14,
+    maxSpeed: 32,
+    spawnInterval: 1.0,
+    obstacleChance: 0.6,
+    speedIncrement: 0.02,
   },
   hard: {
-    gameTime: 40,
-    startSpeed: 20,
-    maxSpeed: 35,
-    spawnInterval: 0.7,
-    obstacleChance: 0.7,
+    startSpeed: 16,
+    maxSpeed: 40,
+    spawnInterval: 0.8,
+    obstacleChance: 0.65,
+    speedIncrement: 0.025,
   },
 };
 
@@ -226,8 +226,6 @@ const GameScene = ({ gameState, playerLane, hasShield, speed, obstacles, onObsta
   useFrame(() => {
     if (gameState !== 'playing') return;
     
-    const playerX = LANE_POSITIONS[playerLane];
-    
     obstacles.forEach(obs => {
       // Check if obstacle has passed player (z > 5)
       if (obs.z > 4 && !passedRef.current.has(obs.id)) {
@@ -320,13 +318,19 @@ const Stars = memo(() => {
 });
 Stars.displayName = 'Stars';
 
-// UI Overlay for score/lives
-const GameUI = memo(({ score, lives, combo, hasShield }: { score: number; lives: number; combo: number; hasShield: boolean }) => (
+// UI Overlay for score/lives - NO TIME DISPLAY
+const GameUI = memo(({ score, lives, combo, hasShield, distance }: { 
+  score: number; lives: number; combo: number; hasShield: boolean; distance: number;
+}) => (
   <div className="absolute top-16 left-4 right-4 flex justify-between items-start pointer-events-none z-10">
     <div className="flex flex-col gap-2">
       <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
         <span className="text-yellow-400 font-bold">{score}</span>
         <span className="text-xs text-muted-foreground ml-1">pts</span>
+      </div>
+      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
+        <span className="text-cyan-400 font-bold">{Math.round(distance)}</span>
+        <span className="text-xs text-muted-foreground ml-1">m</span>
       </div>
       {combo > 1 && (
         <div className="bg-purple-500/50 backdrop-blur-sm rounded-lg px-3 py-1">
@@ -372,20 +376,17 @@ const LaneControls = memo(({ onLeft, onRight }: { onLeft: () => void; onRight: (
 ));
 LaneControls.displayName = 'LaneControls';
 
-// Main game component
+// Main game component - ENDLESS until lives = 0
 export const AstralFrequencyGame = ({
   companionStats,
   onComplete,
   difficulty = 'medium',
-  maxTimer,
   isPractice = false,
 }: AstralFrequencyGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
-  const effectiveTimer = maxTimer ?? config.gameTime;
   
   // Game state
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
-  const [timeLeft, setTimeLeft] = useState(effectiveTimer);
   const [score, setScore] = useState(0);
   const [distance, setDistance] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -480,27 +481,18 @@ export const AstralFrequencyGame = ({
       setHasShield(true);
       triggerHaptic('medium');
     }
-  }, []);
+  }, [combo]);
   
-  // Game loop - spawn obstacles and update timer
+  // Game loop - spawn obstacles and update distance (NO TIMER)
   useEffect(() => {
     if (gameState !== 'playing') return;
     
     const interval = setInterval(() => {
-      // Update timer
-      setTimeLeft(prev => {
-        if (prev <= 0) {
-          setGameState('complete');
-          return 0;
-        }
-        return prev - 0.1;
-      });
-      
       // Update distance
       setDistance(prev => prev + speed * 0.1);
       
       // Gradually increase speed
-      setSpeed(prev => Math.min(config.maxSpeed, prev + 0.02));
+      setSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrement));
       
       // Spawn obstacles
       const now = Date.now();
@@ -524,11 +516,19 @@ export const AstralFrequencyGame = ({
     return () => clearInterval(interval);
   }, [gameState, config, speed]);
   
-  // Complete game
+  // Complete game - calculate result based on distance and score
   useEffect(() => {
     if (gameState !== 'complete') return;
     
-    const accuracy = Math.min(100, Math.round((score / Math.max(1, distance * 0.3)) * 100));
+    // Score based on distance traveled + crystals collected
+    const distanceBonus = Math.round(distance * 0.5);
+    const finalScore = score + distanceBonus;
+    
+    // Accuracy based on how far they got relative to difficulty
+    const distanceThresholds = { easy: 500, medium: 400, hard: 300 };
+    const threshold = distanceThresholds[difficulty];
+    const accuracy = Math.min(100, Math.round((distance / threshold) * 100));
+    
     const result: 'perfect' | 'good' | 'partial' | 'fail' = 
       accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail';
     
@@ -537,7 +537,7 @@ export const AstralFrequencyGame = ({
       accuracy,
       result,
     });
-  }, [gameState, score, distance, maxCombo, onComplete]);
+  }, [gameState, score, distance, difficulty, onComplete]);
   
   return (
     <div 
@@ -562,9 +562,11 @@ export const AstralFrequencyGame = ({
         </Suspense>
       </Canvas>
       
-      {/* HUD */}
-      <GameHUD title="Cosmiq Dash" timeLeft={Math.ceil(timeLeft)} score={score} />
-      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} />
+      {/* HUD - No timer */}
+      <div className="absolute top-2 left-0 right-0 text-center z-10">
+        <h2 className="text-lg font-bold text-white/80">Cosmiq Dash</h2>
+      </div>
+      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} />
       
       {/* Controls */}
       <LaneControls 

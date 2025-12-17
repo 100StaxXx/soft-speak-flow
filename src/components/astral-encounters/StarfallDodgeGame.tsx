@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
-import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
+import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useGameLoop, useStaticStars, useParticleSystem } from './gameUtils';
 import { useDeviceOrientation } from '@/hooks/useDeviceOrientation';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,35 @@ interface FallingObject {
   size: number;
 }
 
-// Slowed down difficulty settings
+// ENDLESS mode config - progressive difficulty, 3 lives
 const DIFFICULTY_CONFIG = {
-  easy: { spawnRate: 800, debrisRatio: 0.45, baseSpeed: 1.2, time: 30 },
-  medium: { spawnRate: 600, debrisRatio: 0.55, baseSpeed: 1.8, time: 35 },
-  hard: { spawnRate: 450, debrisRatio: 0.65, baseSpeed: 2.5, time: 40 },
+  easy: { 
+    initialSpawnRate: 900, 
+    debrisRatio: 0.45, 
+    baseSpeed: 1.0,
+    speedIncrease: 0.02,
+    spawnRateDecrease: 3,
+    minSpawnRate: 400,
+    maxSpeed: 3.5,
+  },
+  medium: { 
+    initialSpawnRate: 700, 
+    debrisRatio: 0.55, 
+    baseSpeed: 1.4,
+    speedIncrease: 0.025,
+    spawnRateDecrease: 4,
+    minSpawnRate: 350,
+    maxSpeed: 4.5,
+  },
+  hard: { 
+    initialSpawnRate: 550, 
+    debrisRatio: 0.65, 
+    baseSpeed: 1.8,
+    speedIncrease: 0.03,
+    spawnRateDecrease: 5,
+    minSpawnRate: 300,
+    maxSpeed: 5.5,
+  },
 };
 
 // Memoized star background
@@ -132,23 +156,37 @@ const TiltPermissionOverlay = memo(({ onRequest, onSkip }: { onRequest: () => vo
 ));
 TiltPermissionOverlay.displayName = 'TiltPermissionOverlay';
 
+// Lives display
+const LivesDisplay = memo(({ lives }: { lives: number }) => (
+  <div className="flex gap-1">
+    {Array.from({ length: 3 }).map((_, i) => (
+      <span key={i} className={`text-xl ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
+        ❤️
+      </span>
+    ))}
+  </div>
+));
+LivesDisplay.displayName = 'LivesDisplay';
+
 export const StarfallDodgeGame = ({
   companionStats,
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
-  maxTimer,
   isPractice = false,
 }: StarfallDodgeGameProps) => {
   const [gameState, setGameState] = useState<'permission' | 'countdown' | 'playing' | 'paused' | 'complete'>('permission');
   const [useTilt, setUseTilt] = useState(false);
   const [playerX, setPlayerX] = useState(50);
   const [crystalsCollected, setCrystalsCollected] = useState(0);
-  const [hits, setHits] = useState(0);
+  const [lives, setLives] = useState(3);
   const [hasShield, setHasShield] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [totalCrystals, setTotalCrystals] = useState(0);
+  const [survivalTime, setSurvivalTime] = useState(0);
   const [shake, setShake] = useState(false);
+  
+  // Progressive difficulty state
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [currentSpawnRate, setCurrentSpawnRate] = useState(0);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const objectsRef = useRef<FallingObject[]>([]);
@@ -158,6 +196,8 @@ export const StarfallDodgeGame = ({
   const playerXRef = useRef(playerX);
   const gameStateRef = useRef(gameState);
   const touchStartRef = useRef<{ x: number; playerX: number } | null>(null);
+  const livesRef = useRef(lives);
+  const hasShieldRef = useRef(hasShield);
 
   // Device orientation hook
   const { available, permitted, requestPermission, getPositionFromTilt } = useDeviceOrientation();
@@ -165,6 +205,8 @@ export const StarfallDodgeGame = ({
   // Sync refs
   useEffect(() => { playerXRef.current = playerX; }, [playerX]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => { livesRef.current = lives; }, [lives]);
+  useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
 
   const { particles, emit: emitParticles } = useParticleSystem(40);
   const stars = useStaticStars(20);
@@ -176,14 +218,16 @@ export const StarfallDodgeGame = ({
     const s = DIFFICULTY_CONFIG[difficulty];
     return {
       ...s,
-      spawnRate: s.spawnRate - questIntervalScale * 30,
-      baseSpeed: s.baseSpeed + questIntervalScale * 0.2,
+      initialSpawnRate: s.initialSpawnRate - questIntervalScale * 30,
+      baseSpeed: s.baseSpeed + questIntervalScale * 0.1,
     };
   }, [difficulty, questIntervalScale]);
 
+  // Initialize progressive difficulty
   useEffect(() => {
-    setTimeLeft(maxTimer ?? config.time);
-  }, [config.time, maxTimer]);
+    setCurrentSpeed(config.baseSpeed);
+    setCurrentSpawnRate(config.initialSpawnRate);
+  }, [config]);
 
   // Handle permission request
   const handleRequestPermission = useCallback(async () => {
@@ -227,7 +271,7 @@ export const StarfallDodgeGame = ({
     setGameState('playing');
   }, []);
 
-  // Game loop
+  // Game loop - ENDLESS with progressive difficulty
   useGameLoop((deltaTime, time) => {
     if (gameStateRef.current !== 'playing') return;
 
@@ -238,23 +282,26 @@ export const StarfallDodgeGame = ({
       setPlayerX(currentPlayerX);
     }
 
+    // Update survival time
+    setSurvivalTime(prev => prev + deltaTime / 1000);
+
+    // Progressive difficulty - increase speed and spawn rate over time
+    setCurrentSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrease * deltaTime / 1000));
+    setCurrentSpawnRate(prev => Math.max(config.minSpawnRate, prev - config.spawnRateDecrease * deltaTime / 1000));
+
     // Spawn objects
-    if (time - lastSpawnRef.current > config.spawnRate) {
+    if (time - lastSpawnRef.current > currentSpawnRate) {
       lastSpawnRef.current = time;
       const rand = Math.random();
-      const isShield = rand > 0.95;
+      const isShield = rand > 0.96;
       const isCrystal = !isShield && rand > config.debrisRatio;
-      
-      if (isCrystal || isShield) {
-        if (isCrystal) setTotalCrystals(t => t + 1);
-      }
 
       const newObj: FallingObject = {
         id: objectIdRef.current++,
         x: 10 + Math.random() * 80,
         y: -5,
         type: isShield ? 'powerup_shield' : isCrystal ? 'crystal' : 'debris',
-        speed: config.baseSpeed * (0.8 + Math.random() * 0.4),
+        speed: currentSpeed * (0.8 + Math.random() * 0.4),
         size: isCrystal ? 28 : isShield ? 32 : 24,
       };
       objectsRef.current.push(newObj);
@@ -262,7 +309,7 @@ export const StarfallDodgeGame = ({
 
     // Update objects
     objectsRef.current = objectsRef.current.filter(obj => {
-      obj.y += obj.speed * deltaTime * 60 * 0.5; // Slowed down movement
+      obj.y += obj.speed * deltaTime * 60 * 0.5;
       
       // Collision detection
       if (obj.y > 75 && obj.y < 95) {
@@ -281,12 +328,19 @@ export const StarfallDodgeGame = ({
             triggerHaptic('medium');
             return false;
           } else if (obj.type === 'debris') {
-            if (hasShield) {
+            if (hasShieldRef.current) {
               setHasShield(false);
               emitParticles(obj.x, obj.y, '#ef4444', 6);
               triggerHaptic('medium');
             } else {
-              setHits(h => h + 1);
+              // Lose a life
+              setLives(prev => {
+                const newLives = prev - 1;
+                if (newLives <= 0) {
+                  setGameState('complete');
+                }
+                return newLives;
+              });
               setShake(true);
               setTimeout(() => setShake(false), 200);
               emitParticles(obj.x, obj.y, '#ef4444', 8);
@@ -303,38 +357,27 @@ export const StarfallDodgeGame = ({
     setObjects([...objectsRef.current]);
   }, gameState === 'playing');
 
-  // Timer
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 0) {
-          setGameState('complete');
-          return 0;
-        }
-        return prev - 0.1;
-      });
-    }, 100);
-    return () => clearInterval(interval);
-  }, [gameState]);
-
-  // Complete game
+  // Complete game - calculate result based on survival time and crystals
   useEffect(() => {
     if (gameState !== 'complete') return;
     
-    const accuracy = totalCrystals > 0 
-      ? Math.round((crystalsCollected / totalCrystals) * 100 * Math.max(0.3, 1 - hits * 0.15))
-      : 50;
+    const survivalBonus = Math.round(survivalTime * 2);
+    const score = crystalsCollected * 10 + survivalBonus;
+    
+    // Accuracy based on survival time
+    const timeThresholds = { easy: 60, medium: 45, hard: 30 };
+    const threshold = timeThresholds[difficulty];
+    const accuracy = Math.min(100, Math.round((survivalTime / threshold) * 100));
     
     const result: 'perfect' | 'good' | 'partial' | 'fail' = 
-      accuracy >= 85 ? 'perfect' : accuracy >= 65 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+      accuracy >= 90 ? 'perfect' : accuracy >= 65 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
     
     onComplete({
       success: result !== 'fail',
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
     });
-  }, [gameState, crystalsCollected, hits, totalCrystals, onComplete]);
+  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete]);
 
   return (
     <div
@@ -347,9 +390,14 @@ export const StarfallDodgeGame = ({
     >
       <StarBackground stars={stars} />
       
-      {/* Game HUD */}
+      {/* Game HUD - No timer, show lives and survival time */}
       {gameState !== 'permission' && (
-        <GameHUD title="Starfall Dodge" timeLeft={Math.ceil(timeLeft)} score={crystalsCollected * 10 - hits * 5} />
+        <div className="absolute top-2 left-0 right-0 z-20 px-4">
+          <div className="flex justify-between items-center">
+            <div className="text-lg font-bold text-white/80">Starfall Dodge</div>
+            <LivesDisplay lives={lives} />
+          </div>
+        </div>
       )}
       
       {/* Tilt indicator */}
@@ -367,12 +415,12 @@ export const StarfallDodgeGame = ({
       )}
       
       {/* Stats */}
-      <div className="absolute top-16 left-4 flex gap-2 z-20">
+      <div className="absolute top-16 left-4 flex flex-col gap-2 z-20">
         <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1">
           <span className="text-cyan-400">💎 {crystalsCollected}</span>
         </div>
         <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1">
-          <span className="text-red-400">💥 {hits}</span>
+          <span className="text-yellow-400">⏱️ {Math.floor(survivalTime)}s</span>
         </div>
       </div>
       

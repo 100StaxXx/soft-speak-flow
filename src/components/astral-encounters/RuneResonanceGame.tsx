@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
-import { triggerHaptic, useGameLoop, useParticleSystem, useGameTimer } from './gameUtils';
+import { triggerHaptic, useGameLoop, useParticleSystem } from './gameUtils';
 
 interface RuneResonanceGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -33,28 +33,37 @@ const RUNE_POSITIONS = [
   { x: 30, y: 80 }, { x: 70, y: 80 },
 ];
 
-// Simplified difficulty configuration
+// ENDLESS mode config - no timer, mistakes = lives
 const DIFFICULTY_CONFIG = {
   easy: {
-    runes: 4,
+    baseRunes: 4,
     maxMistakes: 5,
     rhythms: [55, 70],
-    decoyCount: 0,
-    roundTimer: 40,
+    baseDecoyCount: 0,
+    runeIncreasePerRound: 1,
+    decoyIncreasePerRound: 0.5,
+    maxRunes: 7,
+    maxDecoys: 3,
   },
   medium: {
-    runes: 5,
+    baseRunes: 4,
     maxMistakes: 4,
     rhythms: [60, 80],
-    decoyCount: 1,
-    roundTimer: 35,
+    baseDecoyCount: 1,
+    runeIncreasePerRound: 1,
+    decoyIncreasePerRound: 0.5,
+    maxRunes: 7,
+    maxDecoys: 4,
   },
   hard: {
-    runes: 6,
+    baseRunes: 5,
     maxMistakes: 3,
     rhythms: [70, 90],
-    decoyCount: 2,
-    roundTimer: 30,
+    baseDecoyCount: 1,
+    runeIncreasePerRound: 1,
+    decoyIncreasePerRound: 0.75,
+    maxRunes: 7,
+    maxDecoys: 5,
   },
 };
 
@@ -78,24 +87,6 @@ const ParticleRenderer = memo(({ particles }: { particles: { id: number; x: numb
   </>
 ));
 ParticleRenderer.displayName = 'ParticleRenderer';
-
-// Timer bar
-const TimerBar = memo(({ timeRemaining, maxTime }: { timeRemaining: number; maxTime: number }) => {
-  const percentage = (timeRemaining / maxTime) * 100;
-  const isLow = percentage < 25;
-  
-  return (
-    <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden mb-2">
-      <motion.div
-        className={`h-full ${isLow ? 'bg-gradient-to-r from-red-500 to-orange-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
-        style={{ width: `${percentage}%` }}
-        animate={isLow ? { opacity: [1, 0.6, 1] } : {}}
-        transition={isLow ? { duration: 0.5, repeat: Infinity } : {}}
-      />
-    </div>
-  );
-});
-TimerBar.displayName = 'TimerBar';
 
 // Stunned overlay
 const StunnedOverlay = memo(({ stunned }: { stunned: boolean }) => {
@@ -297,12 +288,66 @@ const TimingLegend = memo(() => (
 ));
 TimingLegend.displayName = 'TimingLegend';
 
+// Lives display
+const LivesDisplay = memo(({ lives, maxLives }: { lives: number; maxLives: number }) => (
+  <div className="flex gap-1">
+    {Array.from({ length: maxLives }).map((_, i) => (
+      <span key={i} className={`text-lg ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
+        ❤️
+      </span>
+    ))}
+  </div>
+));
+LivesDisplay.displayName = 'LivesDisplay';
+
+// Generate runes for a round
+const generateRunes = (round: number, config: typeof DIFFICULTY_CONFIG['easy']): Rune[] => {
+  const newRunes: Rune[] = [];
+  
+  const runeCount = Math.min(config.maxRunes, config.baseRunes + Math.floor((round - 1) * config.runeIncreasePerRound));
+  const decoyCount = Math.min(config.maxDecoys, Math.floor(config.baseDecoyCount + (round - 1) * config.decoyIncreasePerRound));
+  
+  // Generate regular runes
+  for (let i = 0; i < runeCount; i++) {
+    newRunes.push({
+      id: i,
+      symbol: RUNE_SYMBOLS[i % RUNE_SYMBOLS.length],
+      rhythm: config.rhythms[i % config.rhythms.length],
+      phase: Math.random() * Math.PI * 2,
+      activated: false,
+      x: RUNE_POSITIONS[i % RUNE_POSITIONS.length].x,
+      y: RUNE_POSITIONS[i % RUNE_POSITIONS.length].y,
+      isDecoy: false,
+    });
+  }
+  
+  // Generate decoys
+  for (let i = 0; i < decoyCount; i++) {
+    const decoyId = runeCount + i;
+    const posIndex = (runeCount + i) % RUNE_POSITIONS.length;
+    const offsetX = RUNE_POSITIONS[posIndex].x + (Math.random() - 0.5) * 20;
+    const offsetY = RUNE_POSITIONS[posIndex].y + (Math.random() - 0.5) * 15;
+    
+    newRunes.push({
+      id: decoyId,
+      symbol: DECOY_SYMBOLS[i % DECOY_SYMBOLS.length],
+      rhythm: config.rhythms[0] * 0.8,
+      phase: Math.random() * Math.PI * 2,
+      activated: false,
+      x: Math.max(10, Math.min(90, offsetX)),
+      y: Math.max(15, Math.min(85, offsetY)),
+      isDecoy: true,
+    });
+  }
+  
+  return newRunes;
+};
+
 export const RuneResonanceGame = ({
   companionStats,
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
-  maxTimer,
   isPractice = false,
 }: RuneResonanceGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
@@ -311,6 +356,7 @@ export const RuneResonanceGame = ({
   const [mistakes, setMistakes] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
+  const [round, setRound] = useState(1);
   const [showFeedback, setShowFeedback] = useState<{ id: number; success: boolean; perfect?: boolean; points?: number } | null>(null);
   const [stunned, setStunned] = useState(false);
   
@@ -329,60 +375,16 @@ export const RuneResonanceGame = ({
     const base = DIFFICULTY_CONFIG[difficulty];
     return {
       ...base,
-      requiredRunes: base.runes + Math.floor(questIntervalScale),
       maxMistakes: Math.max(2, base.maxMistakes - Math.floor(questIntervalScale)),
     };
   }, [difficulty, questIntervalScale]);
 
-  const effectiveTimer = maxTimer ?? settings.roundTimer;
+  const livesRemaining = settings.maxMistakes - mistakes;
 
-  const { timeLeft: timeRemaining } = useGameTimer(
-    effectiveTimer,
-    gameState === 'playing',
-    () => {
-      if (gameState === 'playing') {
-        setGameState('complete');
-      }
-    }
-  );
-
-  // Initialize runes
+  // Initialize first round
   useEffect(() => {
-    const newRunes: Rune[] = [];
-    
-    for (let i = 0; i < settings.requiredRunes; i++) {
-      newRunes.push({
-        id: i,
-        symbol: RUNE_SYMBOLS[i % RUNE_SYMBOLS.length],
-        rhythm: settings.rhythms[i % settings.rhythms.length],
-        phase: Math.random() * Math.PI * 2,
-        activated: false,
-        x: RUNE_POSITIONS[i % RUNE_POSITIONS.length].x,
-        y: RUNE_POSITIONS[i % RUNE_POSITIONS.length].y,
-        isDecoy: false,
-      });
-    }
-    
-    for (let i = 0; i < settings.decoyCount; i++) {
-      const decoyId = settings.requiredRunes + i;
-      const posIndex = (settings.requiredRunes + i) % RUNE_POSITIONS.length;
-      const offsetX = RUNE_POSITIONS[posIndex].x + (Math.random() - 0.5) * 20;
-      const offsetY = RUNE_POSITIONS[posIndex].y + (Math.random() - 0.5) * 15;
-      
-      newRunes.push({
-        id: decoyId,
-        symbol: DECOY_SYMBOLS[i % DECOY_SYMBOLS.length],
-        rhythm: settings.rhythms[0] * 0.8,
-        phase: Math.random() * Math.PI * 2,
-        activated: false,
-        x: Math.max(10, Math.min(90, offsetX)),
-        y: Math.max(15, Math.min(85, offsetY)),
-        isDecoy: true,
-      });
-    }
-    
-    setRunes(newRunes);
-  }, [settings.requiredRunes, settings.rhythms, settings.decoyCount]);
+    setRunes(generateRunes(1, settings));
+  }, [settings]);
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
@@ -410,7 +412,7 @@ export const RuneResonanceGame = ({
     return getPulseIntensity(rune) > 0.92;
   }, [getPulseIntensity]);
 
-  // Handle rune tap - simplified: tap ANY rune at peak glow
+  // Handle rune tap
   const handleRuneTap = useCallback((runeId: number) => {
     if (gameState !== 'playing' || stunned) return;
     
@@ -419,7 +421,13 @@ export const RuneResonanceGame = ({
 
     // Handle decoy tap
     if (rune.isDecoy) {
-      setMistakes(m => m + 1);
+      setMistakes(m => {
+        const newMistakes = m + 1;
+        if (newMistakes >= settings.maxMistakes) {
+          setGameState('complete');
+        }
+        return newMistakes;
+      });
       setCombo(0);
       setScore(s => Math.max(0, s - 50));
       setShowFeedback({ id: runeId, success: false, points: -50 });
@@ -439,6 +447,8 @@ export const RuneResonanceGame = ({
     if (onRhythm) {
       let points = isPerfect ? 150 : 100;
       points += combo * 10;
+      // Round bonus
+      points += (round - 1) * 20;
       
       setRunes(prev => prev.map(r => 
         r.id === runeId ? { ...r, activated: true } : r
@@ -453,7 +463,13 @@ export const RuneResonanceGame = ({
       emitParticles(rune.x, rune.y, isPerfect ? '#fbbf24' : '#a855f7', isPerfect ? 8 : 5);
       triggerHaptic(isPerfect ? 'success' : 'medium');
     } else {
-      setMistakes(m => m + 1);
+      setMistakes(m => {
+        const newMistakes = m + 1;
+        if (newMistakes >= settings.maxMistakes) {
+          setGameState('complete');
+        }
+        return newMistakes;
+      });
       setCombo(0);
       setScore(s => Math.max(0, s - 25));
       setShowFeedback({ id: runeId, success: false, points: -25 });
@@ -462,37 +478,50 @@ export const RuneResonanceGame = ({
     }
 
     setTimeout(() => setShowFeedback(null), 400);
-  }, [runes, gameState, stunned, combo, emitParticles, isOnRhythm, isPerfectRhythm]);
+  }, [runes, gameState, stunned, combo, round, emitParticles, isOnRhythm, isPerfectRhythm, settings.maxMistakes]);
 
-  // Check game end
+  // Check round completion - spawn next round if all activated
   const activatedCount = runes.filter(r => r.activated && !r.isDecoy).length;
+  const requiredRunes = runes.filter(r => !r.isDecoy).length;
   
   useEffect(() => {
-    if (activatedCount >= settings.requiredRunes || mistakes >= settings.maxMistakes) {
-      setGameState('complete');
-    }
-  }, [activatedCount, settings.requiredRunes, mistakes, settings.maxMistakes]);
+    if (gameState !== 'playing') return;
+    if (activatedCount < requiredRunes) return;
+    
+    // Round complete! Spawn next round
+    const nextRound = round + 1;
+    setRound(nextRound);
+    
+    // Add round clear bonus
+    setScore(s => s + 100 * round);
+    
+    // Generate new runes for next round
+    setTimeout(() => {
+      setRunes(generateRunes(nextRound, settings));
+    }, 500);
+  }, [activatedCount, requiredRunes, round, settings, gameState]);
 
-  // Complete game
+  // Complete game - calculate result based on rounds completed
   useEffect(() => {
-    if (gameState === 'complete') {
-      const timeBonus = Math.round(timeRemaining * 5);
-      const finalScore = score + timeBonus;
-      
-      const maxPossibleScore = settings.requiredRunes * 150;
-      const accuracy = Math.max(0, Math.min(100, Math.round((finalScore / maxPossibleScore) * 100)));
-      
-      const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
-      
-      setTimeout(() => {
-        onComplete({
-          success: accuracy >= 50,
-          accuracy,
-          result,
-        });
-      }, 500);
-    }
-  }, [gameState, score, timeRemaining, settings.requiredRunes, onComplete]);
+    if (gameState !== 'complete') return;
+    
+    const roundsCompleted = round - 1 + (activatedCount / Math.max(1, requiredRunes));
+    
+    // Accuracy based on rounds completed
+    const roundThresholds = { easy: 5, medium: 4, hard: 3 };
+    const threshold = roundThresholds[difficulty];
+    const accuracy = Math.min(100, Math.round((roundsCompleted / threshold) * 100));
+    
+    const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+    
+    setTimeout(() => {
+      onComplete({
+        success: roundsCompleted >= 1,
+        accuracy,
+        result,
+      });
+    }, 500);
+  }, [gameState, round, activatedCount, requiredRunes, difficulty, onComplete]);
 
   return (
     <div className="flex flex-col items-center relative">
@@ -508,10 +537,13 @@ export const RuneResonanceGame = ({
 
       {gameState === 'playing' && (
         <div className="w-full max-w-xs mb-1">
-          <TimerBar timeRemaining={timeRemaining} maxTime={effectiveTimer} />
+          <div className="flex justify-between items-center text-sm px-1 mb-2">
+            <span className="text-purple-400 font-bold">Round {round}</span>
+            <LivesDisplay lives={livesRemaining} maxLives={settings.maxMistakes} />
+          </div>
           <div className="flex justify-between text-xs text-muted-foreground px-1">
-            <span>⏱️ {Math.ceil(timeRemaining)}s</span>
             <span>🎯 Score: {score}</span>
+            <span>✨ {activatedCount}/{requiredRunes} Runes</span>
           </div>
         </div>
       )}
@@ -520,11 +552,11 @@ export const RuneResonanceGame = ({
         title="Rune Resonance"
         subtitle="Tap runes when they glow brightest!"
         score={activatedCount}
-        maxScore={settings.requiredRunes}
+        maxScore={requiredRunes}
         combo={combo}
         showCombo={true}
-        primaryStat={{ value: mistakes, label: 'Mistakes', color: 'hsl(0, 84%, 60%)' }}
-        secondaryStat={{ value: settings.maxMistakes - mistakes, label: 'Lives', color: 'hsl(142, 76%, 46%)' }}
+        primaryStat={{ value: round, label: 'Round', color: 'hsl(271, 91%, 65%)' }}
+        secondaryStat={{ value: livesRemaining, label: 'Lives', color: 'hsl(142, 76%, 46%)' }}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
