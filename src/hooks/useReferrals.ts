@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
-import type { ApplyReferralCodeResult } from "@/types/referral-functions";
+import type { ApplyReferralCodeResult, ApplyReferralCodeArgs } from "@/types/referral-functions";
 
 interface ReferralCodeData {
   id: string;
@@ -114,12 +114,16 @@ export const useReferrals = () => {
           throw new Error("Referral code is missing owner information");
         }
 
-        const { data: applyResult, error: applyError } = await supabase
-          .rpc("apply_referral_code_atomic" as any, {
-            p_user_id: user.id,
-            p_referrer_id: codeData.owner_user_id,
-            p_referral_code: normalizedCode,
-          });
+        // Type assertion needed: apply_referral_code_atomic is a custom RPC not in generated types
+        const rpcArgs: ApplyReferralCodeArgs = {
+          p_user_id: user.id,
+          p_referrer_id: codeData.owner_user_id,
+          p_referral_code: normalizedCode,
+        };
+        const { data: applyResult, error: applyError } = await (supabase.rpc as Function)(
+          "apply_referral_code_atomic",
+          rpcArgs
+        );
 
         if (applyError) {
           console.error("Failed to apply referral code atomically:", applyError);

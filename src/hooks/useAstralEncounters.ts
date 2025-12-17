@@ -234,7 +234,13 @@ export const useAstralEncounters = () => {
           console.error('Invalid stat type:', statField);
           return { result, xpEarned };
         }
-        const currentStat = (companion as any)[statField] || 0;
+        // Type-safe stat access using object lookup
+        const companionStats = {
+          mind: companion?.mind ?? 0,
+          body: companion?.body ?? 0,
+          soul: companion?.soul ?? 0,
+        };
+        const currentStat = companionStats[statField];
         const newStat = Math.min(100, currentStat + activeEncounter.adversary.statBoost);
 
         await supabase

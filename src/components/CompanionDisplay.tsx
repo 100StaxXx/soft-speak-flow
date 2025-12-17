@@ -103,7 +103,7 @@ export const CompanionDisplay = memo(() => {
   const isLongPressing = useRef(false);
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
   const previousImageUrl = useRef<string | null>(null);
-  const regenerationsUsed = (companion as any)?.image_regenerations_used ?? 0;
+  const regenerationsUsed = companion?.image_regenerations_used ?? 0;
   const regenerationsRemaining = Math.max(0, maxRegenerations - regenerationsUsed);
   
   // Long press handlers for hidden regenerate feature
