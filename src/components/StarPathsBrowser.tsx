@@ -151,10 +151,6 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
                 <Clock className="h-3 w-3 mr-1" />
                 {template.target_days} days
               </Badge>
-              <Badge variant="outline" className="text-xs">
-                <Target className="h-3 w-3 mr-1" />
-                {template.habits.length} habits
-              </Badge>
               {template.popularity_count > 0 && (
                 <Badge variant="outline" className="text-xs text-muted-foreground">
                   <Users className="h-3 w-3 mr-1" />
@@ -162,6 +158,31 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
                 </Badge>
               )}
             </div>
+            
+            {/* Habits Preview */}
+            {template.habits.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <p className="text-xs text-muted-foreground mb-2">Habits included:</p>
+                <div className="space-y-1.5">
+                  {template.habits.slice(0, 4).map((habit, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs">
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                        habit.difficulty === 'easy' && "bg-green-500",
+                        habit.difficulty === 'medium' && "bg-yellow-500",
+                        habit.difficulty === 'hard' && "bg-red-500",
+                        !habit.difficulty && "bg-muted-foreground"
+                      )} />
+                      <span className="truncate">{habit.title}</span>
+                      <span className="text-muted-foreground/70 flex-shrink-0">({habit.frequency})</span>
+                    </div>
+                  ))}
+                  {template.habits.length > 4 && (
+                    <p className="text-xs text-muted-foreground/70">+{template.habits.length - 4} more</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           
           <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
