@@ -65,13 +65,13 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statIcon: Sparkles,
   },
   eclipse_timing: {
-    icon: Moon,
-    title: "Eclipse Timing Duel",
-    goal: "Tap when sun and moon align!",
+    icon: Music,
+    title: "Stellar Beats",
+    goal: "Hit the notes in rhythm as they fall!",
     howToPlay: [
-      "Watch the sun and moon orbit",
-      "Tap exactly when they overlap (eclipse)",
-      "Windows get tighter each cycle"
+      "Watch notes scroll down the 3 lanes",
+      "Tap the lane when notes reach the glowing line",
+      "Chain combos for multiplied points!"
     ],
     statBonus: 'body',
     statIcon: Heart,
