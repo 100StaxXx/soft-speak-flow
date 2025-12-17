@@ -34,12 +34,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   energy_beam: {
     icon: Zap,
     title: "Star Defender",
-    goal: "Destroy the alien fleet before they reach you!",
+    goal: "Survive endless alien waves!",
     howToPlay: [
       "Move left/right to dodge attacks",
       "Auto-fire destroys enemies",
-      "Collect power-ups for shields & bonuses",
-      "Clear all waves to win"
+      "3 lives - survive as long as possible",
+      "Waves get harder - how far can you go?"
     ],
     statBonus: 'body',
     statIcon: Heart,
@@ -60,10 +60,10 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   astral_frequency: {
     icon: Rocket,
     title: "Cosmiq Dash",
-    goal: "Race through a 3D cosmic tunnel!",
+    goal: "Survive the endless cosmic tunnel!",
     howToPlay: [
       "Swipe or tap arrows to switch lanes",
-      "Dodge asteroids - they cost a life!",
+      "3 lives - asteroids cost one!",
       "Collect ✨ crystals for points",
       "Grab 🛡️ shields for protection"
     ],
@@ -85,12 +85,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   starfall_dodge: {
     icon: Smartphone,
     title: "Starfall Dodge",
-    goal: "Tilt to dodge, collect crystals!",
+    goal: "Survive the endless starfall!",
     howToPlay: [
-      "📱 Tilt your device left/right to move",
-      "Or swipe/drag to move manually",
-      "Collect 💎 crystals for points",
-      "Avoid 🔥 debris - shields protect you!"
+      "📱 Tilt or swipe to dodge debris",
+      "3 lives - debris hits cost one!",
+      "Collect 💎 crystals for bonus points",
+      "Speed increases - how long can you last?"
     ],
     statBonus: 'mind',
     statIcon: Brain,
@@ -98,11 +98,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   rune_resonance: {
     icon: Music,
     title: "Rune Resonance",
-    goal: "Tap runes at their peak brightness!",
+    goal: "Tap runes at peak brightness - endless rounds!",
     howToPlay: [
       "Each rune pulses at its own rhythm",
       "Tap when a rune glows brightest",
-      "Activate all runes to complete"
+      "Each round adds more runes & decoys",
+      "Limited lives - how many rounds can you beat?"
     ],
     statBonus: 'soul',
     statIcon: Sparkles,
@@ -122,7 +123,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   orb_match: {
     icon: Grid3X3,
     title: "Orb Match",
-    goal: "Drag orbs to create matches of 3 or more!",
+    goal: "Match orbs before time runs out!",
     howToPlay: [
       "Touch and drag any orb across the grid",
       "Orbs swap positions as you pass through",

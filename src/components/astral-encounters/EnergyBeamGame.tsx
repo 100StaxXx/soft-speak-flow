@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Shield, Zap, Bomb, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
-import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
+import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 
 interface EnergyBeamGameProps {
@@ -14,34 +14,37 @@ interface EnergyBeamGameProps {
   isPractice?: boolean;
 }
 
-// Difficulty configuration for Star Defender
+// ENDLESS mode config - no timer, no wave cap
 const DIFFICULTY_CONFIG = {
   easy: {
-    waves: 2,
-    enemiesPerWave: 10,
+    baseEnemiesPerWave: 8,
     enemyFireRate: 0,
     enemySpeed: 0.3,
     diveChance: 0.02,
     powerUpChance: 0.2,
-    roundTimer: 45,
+    enemyIncreasePerWave: 2,
+    speedIncreasePerWave: 0.05,
+    diveIncreasePerWave: 0.005,
   },
   medium: {
-    waves: 3,
-    enemiesPerWave: 14,
-    enemyFireRate: 0.005,
-    enemySpeed: 0.5,
-    diveChance: 0.04,
+    baseEnemiesPerWave: 10,
+    enemyFireRate: 0.003,
+    enemySpeed: 0.4,
+    diveChance: 0.03,
     powerUpChance: 0.15,
-    roundTimer: 50,
+    enemyIncreasePerWave: 2,
+    speedIncreasePerWave: 0.06,
+    diveIncreasePerWave: 0.006,
   },
   hard: {
-    waves: 4,
-    enemiesPerWave: 18,
-    enemyFireRate: 0.01,
-    enemySpeed: 0.7,
-    diveChance: 0.06,
+    baseEnemiesPerWave: 12,
+    enemyFireRate: 0.006,
+    enemySpeed: 0.5,
+    diveChance: 0.04,
     powerUpChance: 0.12,
-    roundTimer: 60,
+    enemyIncreasePerWave: 3,
+    speedIncreasePerWave: 0.08,
+    diveIncreasePerWave: 0.008,
   },
 };
 
@@ -366,7 +369,7 @@ const ScorePopupComponent = memo(({ popup }: { popup: ScorePopup }) => (
 ));
 ScorePopupComponent.displayName = 'ScorePopupComponent';
 
-// Wave transition
+// Wave transition - no max waves shown
 const WaveTransition = memo(({ wave }: { wave: number }) => (
   <motion.div
     className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm"
@@ -402,26 +405,26 @@ const LivesDisplay = memo(({ lives }: { lives: number }) => (
 ));
 LivesDisplay.displayName = 'LivesDisplay';
 
-// Generate enemy formation
+// Generate enemy formation - scales with wave number
 const generateEnemies = (wave: number, config: typeof DIFFICULTY_CONFIG['easy']): Enemy[] => {
   const enemies: Enemy[] = [];
-  const rows = Math.min(3 + Math.floor(wave / 2), 4);
-  const cols = Math.min(5 + wave, 8);
-  const totalEnemies = Math.min(rows * cols, config.enemiesPerWave + wave * 2);
+  const enemyCount = config.baseEnemiesPerWave + (wave - 1) * config.enemyIncreasePerWave;
+  const rows = Math.min(3 + Math.floor(wave / 3), 5);
+  const cols = Math.ceil(enemyCount / rows);
   
   let count = 0;
-  for (let row = 0; row < rows && count < totalEnemies; row++) {
-    for (let col = 0; col < cols && count < totalEnemies; col++) {
+  for (let row = 0; row < rows && count < enemyCount; row++) {
+    for (let col = 0; col < cols && count < enemyCount; col++) {
       const x = 15 + (col * 70) / (cols - 1 || 1);
       const y = 8 + row * 10;
       
-      // Determine enemy type based on row and wave
+      // Enemy type based on row and wave
       let type: EnemyType = 'scout';
-      if (row === 0 && wave >= 2) type = 'cruiser';
-      else if (row <= 1) type = 'fighter';
+      if (wave >= 3 && row === 0) type = 'cruiser';
+      else if (wave >= 2 && row <= 1) type = 'fighter';
       
-      // Add boss on last wave
-      if (wave >= config.waves && row === 0 && col === Math.floor(cols / 2)) {
+      // Add boss every 5 waves
+      if (wave % 5 === 0 && row === 0 && col === Math.floor(cols / 2)) {
         type = 'boss';
       }
       
@@ -454,16 +457,13 @@ export function EnergyBeamGame({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 1,
-  maxTimer,
   isPractice = false,
 }: EnergyBeamGameProps) {
   const config = DIFFICULTY_CONFIG[difficulty];
-  const gameTimer = maxTimer || config.roundTimer;
   
-  // Game state
+  // Game state - NO TIMER
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'wave-transition' | 'complete'>('countdown');
   const [countdown, setCountdown] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(gameTimer);
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
   const [lives, setLives] = useState(3);
@@ -499,6 +499,14 @@ export function EnergyBeamGame({
     powerUpsCollected: 0,
   });
   
+  // Current wave difficulty (scales with wave)
+  const currentConfig = useMemo(() => ({
+    enemySpeed: config.enemySpeed + (wave - 1) * config.speedIncreasePerWave,
+    diveChance: config.diveChance + (wave - 1) * config.diveIncreasePerWave,
+    enemyFireRate: config.enemyFireRate + (wave - 1) * 0.001,
+    powerUpChance: config.powerUpChance,
+  }), [config, wave]);
+  
   // Initialize first wave
   useEffect(() => {
     if (gameState === 'playing' && enemies.length === 0) {
@@ -514,23 +522,6 @@ export function EnergyBeamGame({
       setCountdown(prev => {
         if (prev <= 1) {
           setGameState('playing');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [gameState]);
-  
-  // Game timer
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          setGameState('complete');
           return 0;
         }
         return prev - 1;
@@ -641,7 +632,7 @@ export function EnergyBeamGame({
       fireProjectile();
       
       // Update formation movement
-      formationOffset.current += config.enemySpeed * formationDirection.current * 0.3;
+      formationOffset.current += currentConfig.enemySpeed * formationDirection.current * 0.3;
       if (Math.abs(formationOffset.current) > 12) {
         formationDirection.current *= -1;
       }
@@ -672,12 +663,12 @@ export function EnergyBeamGame({
         const newX = enemy.formationX + formationOffset.current;
         
         // Random dive attack
-        if (Math.random() < config.diveChance * 0.1 && !enemy.isDiving) {
+        if (Math.random() < currentConfig.diveChance * 0.1 && !enemy.isDiving) {
           return { ...enemy, isDiving: true, diveStartX: newX, divePhase: 0 };
         }
         
         // Enemy shooting
-        if (config.enemyFireRate > 0 && Math.random() < config.enemyFireRate) {
+        if (currentConfig.enemyFireRate > 0 && Math.random() < currentConfig.enemyFireRate) {
           setProjectiles(p => [...p, {
             id: `ep-${Date.now()}-${enemy.id}`,
             x: newX,
@@ -741,7 +732,7 @@ export function EnergyBeamGame({
                   }]);
                   
                   // Spawn power-up
-                  if (Math.random() < config.powerUpChance) {
+                  if (Math.random() < currentConfig.powerUpChance) {
                     const types: PowerUp['type'][] = ['shield', 'rapid', 'bomb', 'bonus'];
                     setPowerUps(p => [...p, {
                       id: `pu-${Date.now()}`,
@@ -898,70 +889,68 @@ export function EnergyBeamGame({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, playerX, config, fireProjectile, hasShield, isInvulnerable]);
+  }, [gameState, playerX, currentConfig, fireProjectile, hasShield, isInvulnerable]);
   
-  // Check wave completion
+  // Check wave completion - ENDLESS, always spawn next wave
   useEffect(() => {
     if (gameState !== 'playing') return;
     if (enemies.length > 0) return;
     
     const stats = statsRef.current;
+    stats.wavesCompleted++;
     
-    if (wave < config.waves) {
-      // Next wave
-      stats.wavesCompleted++;
-      setScore(s => s + 100 + wave * 50); // Wave clear bonus
-      setGameState('wave-transition');
-      
-      setTimeout(() => {
-        setWave(w => w + 1);
-        setEnemies(generateEnemies(wave + 1, config));
-        setGameState('playing');
-      }, 2000);
-    } else {
-      // All waves complete
-      stats.wavesCompleted++;
-      setScore(s => s + 100 + wave * 50 + lives * 100); // Final bonus
-      setGameState('complete');
-    }
-  }, [enemies.length, wave, config, gameState, lives]);
+    // Wave clear bonus
+    setScore(s => s + 100 + wave * 50);
+    setGameState('wave-transition');
+    
+    setTimeout(() => {
+      setWave(w => w + 1);
+      setEnemies(generateEnemies(wave + 1, config));
+      setGameState('playing');
+    }, 2000);
+  }, [enemies.length, wave, config, gameState]);
   
   // Determine result based on performance
-  const getResult = useCallback((normalizedAccuracy: number, hasLives: boolean): 'perfect' | 'good' | 'partial' | 'fail' => {
-    if (!hasLives) return 'fail';
-    if (normalizedAccuracy >= 90) return 'perfect';
-    if (normalizedAccuracy >= 70) return 'good';
-    if (normalizedAccuracy >= 40) return 'partial';
-    return 'fail';
+  const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'partial' | 'fail' => {
+    if (!hasLives) {
+      if (wavesCleared >= 5) return 'perfect';
+      if (wavesCleared >= 3) return 'good';
+      if (wavesCleared >= 1) return 'partial';
+      return 'fail';
+    }
+    return 'perfect';
   }, []);
   
-  // Complete game
+  // Complete game - calculate result based on waves cleared
   useEffect(() => {
     if (gameState !== 'complete') return;
     
     const stats = statsRef.current;
+    const wavesCleared = stats.wavesCompleted;
     
-    const finalScore = score + (lives * 100);
-    const maxPossibleScore = config.enemiesPerWave * config.waves * 50 + config.waves * 150 + 300;
-    const normalizedAccuracy = Math.min(100, Math.round((finalScore / maxPossibleScore) * 100));
-    const result = getResult(normalizedAccuracy, lives > 0 && stats.wavesCompleted > 0);
+    // Accuracy based on waves cleared
+    const waveThresholds = { easy: 4, medium: 3, hard: 2 };
+    const threshold = waveThresholds[difficulty];
+    const accuracy = Math.min(100, Math.round((wavesCleared / threshold) * 100));
+    
+    const result = getResult(wavesCleared, lives > 0);
     
     const timer = setTimeout(() => {
       onComplete({
-        success: lives > 0 && stats.wavesCompleted > 0,
-        accuracy: normalizedAccuracy,
+        success: wavesCleared >= 1,
+        accuracy,
         result,
       });
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [gameState, score, lives, config, onComplete, getResult]);
+  }, [gameState, lives, difficulty, onComplete, getResult]);
   
   return (
     <div className="relative w-full h-full min-h-[500px] flex flex-col items-center overflow-hidden select-none">
       <StarfieldBackground />
       
-      {/* HUD */}
+      {/* HUD - No timer, show wave without max */}
       <div className="absolute top-0 left-0 right-0 z-30 p-3">
         <div className="flex justify-between items-start">
           <div>
@@ -972,8 +961,8 @@ export function EnergyBeamGame({
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-bold text-cyan-400">WAVE {wave}/{config.waves}</div>
-            <div className="text-2xl font-mono text-white">{timeLeft}s</div>
+            <div className="text-lg font-bold text-cyan-400">WAVE {wave}</div>
+            <div className="text-xs text-muted-foreground">Endless Mode</div>
           </div>
           
           <LivesDisplay lives={lives} />
@@ -1042,15 +1031,13 @@ export function EnergyBeamGame({
         <div className="absolute bottom-2 left-0 right-0 flex justify-between px-4 z-20">
           <button
             className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-600 flex items-center justify-center active:bg-slate-700"
-            onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }}
-            onMouseDown={handleMoveLeft}
+            onTouchStart={handleMoveLeft}
           >
             <ChevronLeft className="w-8 h-8 text-white" />
           </button>
           <button
             className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-600 flex items-center justify-center active:bg-slate-700"
-            onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }}
-            onMouseDown={handleMoveRight}
+            onTouchStart={handleMoveRight}
           >
             <ChevronRight className="w-8 h-8 text-white" />
           </button>
@@ -1060,40 +1047,13 @@ export function EnergyBeamGame({
       {/* Overlays */}
       <AnimatePresence>
         {gameState === 'countdown' && (
-          <CountdownOverlay 
-            count={countdown} 
-            onComplete={() => setGameState('playing')} 
-          />
+          <CountdownOverlay count={countdown} onComplete={() => {}} />
+        )}
+        {gameState === 'wave-transition' && (
+          <WaveTransition wave={wave + 1} />
         )}
         {gameState === 'paused' && (
           <PauseOverlay onResume={() => setGameState('playing')} />
-        )}
-        {gameState === 'wave-transition' && <WaveTransition wave={wave + 1} />}
-      </AnimatePresence>
-      
-      {/* Game Over */}
-      <AnimatePresence>
-        {gameState === 'complete' && (
-          <motion.div
-            className="absolute inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.div
-              className="text-center"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-            >
-              <p className={`text-4xl font-black ${lives > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {lives > 0 ? 'VICTORY!' : 'GAME OVER'}
-              </p>
-              <p className="text-2xl font-bold text-white mt-2">{score.toLocaleString()} pts</p>
-              <p className="text-muted-foreground mt-1">
-                {statsRef.current.enemiesDestroyed} enemies • {statsRef.current.wavesCompleted} waves
-              </p>
-            </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
     </div>
