@@ -272,11 +272,11 @@ export interface NarrativePostcard {
   caption: string | null;
   clue_text: string | null;
   story_content: string | null;
-  location_revealed: boolean;
-  is_finale: boolean;
-  characters_featured: string[];
+  location_revealed: boolean | null;
+  is_finale: boolean | null;
+  characters_featured: string[] | null;
   prophecy_line: string | null;
-  seeds_planted: string[];
+  seeds_planted: string[] | null;
   generated_at: string;
   created_at: string;
 }

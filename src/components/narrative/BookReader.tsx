@@ -98,7 +98,7 @@ export const BookReader = ({ epicId, book, onClose }: BookReaderProps) => {
             ) : null}
 
             {/* Final Wisdom (show on last chapter) */}
-            {book.final_wisdom && currentChapter === totalChapters - 1 && (
+            {book.final_wisdom && totalChapters > 0 && currentChapter === totalChapters - 1 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -120,7 +120,7 @@ export const BookReader = ({ epicId, book, onClose }: BookReaderProps) => {
             )}
 
             {/* Boss Victory (show on last chapter) */}
-            {book.boss_defeated_name && currentChapter === totalChapters - 1 && (
+            {book.boss_defeated_name && totalChapters > 0 && currentChapter === totalChapters - 1 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
