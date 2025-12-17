@@ -177,12 +177,42 @@ export const getThemeForTrigger = (
   return randomFrom(allThemes);
 };
 
+// Boss override type for story-driven bosses
+export interface BossOverride {
+  name: string;
+  theme: AdversaryTheme;
+  lore: string;
+  tier?: AdversaryTier;
+}
+
 // Generate a complete adversary
 export const generateAdversary = (
   triggerType: TriggerType,
   epicProgress?: number,
-  epicCategory?: string
+  epicCategory?: string,
+  bossOverride?: BossOverride
 ): Adversary => {
+  // If boss override provided (story boss), use those values
+  if (bossOverride) {
+    const tier = bossOverride.tier || 'legendary';
+    const config = TIER_CONFIG[tier];
+    const essenceName = randomFrom(ESSENCE_NAMES[bossOverride.theme]);
+    const essenceDescription = ESSENCE_DESCRIPTIONS[bossOverride.theme];
+    
+    return {
+      name: bossOverride.name,
+      theme: bossOverride.theme,
+      tier,
+      lore: bossOverride.lore,
+      miniGameType: THEME_MINIGAME_MAP[bossOverride.theme],
+      phases: config.phases,
+      essenceName,
+      essenceDescription,
+      statType: THEME_STAT_MAP[bossOverride.theme],
+      statBoost: config.statBoost,
+    };
+  }
+
   const tier = getTierFromTrigger(triggerType, epicProgress);
   const theme = getThemeForTrigger(triggerType, epicCategory);
   const config = TIER_CONFIG[tier];

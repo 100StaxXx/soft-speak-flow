@@ -7,11 +7,13 @@ import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { PracticeRoundWrapper } from './PracticeRoundWrapper';
 import { BattleSceneHeader } from './BattleSceneHeader';
+import { BossBattleIntro } from '@/components/narrative/BossBattleIntro';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
+import type { BossBattleContext } from '@/types/narrativeTypes';
 
 // Lazy load mini-games for bundle optimization
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
@@ -34,9 +36,13 @@ interface AstralEncounterModalProps {
   adversary: Adversary | null;
   questInterval?: number;
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
+  // Boss battle props
+  isBossBattle?: boolean;
+  bossBattleContext?: BossBattleContext;
+  onBossBattleCancel?: () => void;
 }
 
-type Phase = 'reveal' | 'instructions' | 'practice' | 'battle' | 'result';
+type Phase = 'boss_intro' | 'reveal' | 'instructions' | 'practice' | 'battle' | 'result';
 
 export const AstralEncounterModal = ({
   open,
@@ -45,8 +51,12 @@ export const AstralEncounterModal = ({
   adversary,
   questInterval = 3,
   onComplete,
+  isBossBattle = false,
+  bossBattleContext,
+  onBossBattleCancel,
 }: AstralEncounterModalProps) => {
-  const [phase, setPhase] = useState<Phase>('reveal');
+  // Start with boss_intro phase if it's a boss battle
+  const [phase, setPhase] = useState<Phase>(isBossBattle ? 'boss_intro' : 'reveal');
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [phaseResults, setPhaseResults] = useState<MiniGameResult[]>([]);
   const [finalResult, setFinalResult] = useState<{
@@ -86,6 +96,15 @@ export const AstralEncounterModal = ({
       ? adversary.miniGameType 
       : themeGames[currentPhaseIndex % themeGames.length];
   }, [adversary, currentPhaseIndex]);
+
+  const handleBossIntroComplete = useCallback(() => {
+    setPhase('reveal');
+  }, []);
+
+  const handleBossIntroCancel = useCallback(() => {
+    onBossBattleCancel?.();
+    handleClose();
+  }, [onBossBattleCancel]);
 
   const handleBeginBattle = useCallback(() => {
     setPhase('instructions');
@@ -150,12 +169,12 @@ export const AstralEncounterModal = ({
   const handleClose = useCallback(() => {
     onOpenChange(false);
     setTimeout(() => {
-      setPhase('reveal');
+      setPhase(isBossBattle ? 'boss_intro' : 'reveal');
       setCurrentPhaseIndex(0);
       setPhaseResults([]);
       setFinalResult(null);
     }, 300);
-  }, [onOpenChange]);
+  }, [onOpenChange, isBossBattle]);
 
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
@@ -209,6 +228,22 @@ export const AstralEncounterModal = ({
           
           <div className="relative z-10">
             <AnimatePresence mode="wait">
+              {/* Boss Battle Intro Phase */}
+              {phase === 'boss_intro' && isBossBattle && bossBattleContext && (
+                <motion.div
+                  key="boss_intro"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <BossBattleIntro
+                    context={bossBattleContext}
+                    onBeginBattle={handleBossIntroComplete}
+                    onCancel={handleBossIntroCancel}
+                  />
+                </motion.div>
+              )}
+
               {phase === 'reveal' && (
                 <motion.div
                   key="reveal"
