@@ -106,6 +106,11 @@ export const AstralEncounterModal = ({
       : themeGames[currentPhaseIndex % themeGames.length];
   }, [adversary, currentPhaseIndex]);
 
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+    // State reset now happens in useEffect when open changes
+  }, [onOpenChange]);
+
   const handleBossIntroComplete = useCallback(() => {
     setPhase('reveal');
   }, []);
@@ -113,7 +118,7 @@ export const AstralEncounterModal = ({
   const handleBossIntroCancel = useCallback(() => {
     onBossBattleCancel?.();
     handleClose();
-  }, [onBossBattleCancel]);
+  }, [onBossBattleCancel, handleClose]);
 
   const handleBeginBattle = useCallback(() => {
     setPhase('instructions');
@@ -174,11 +179,6 @@ export const AstralEncounterModal = ({
       setPhase('result');
     }
   }, [adversary, encounter, currentPhaseIndex, phaseResults, onComplete]);
-
-  const handleClose = useCallback(() => {
-    onOpenChange(false);
-    // State reset now happens in useEffect when open changes
-  }, [onOpenChange]);
 
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
