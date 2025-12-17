@@ -3284,6 +3284,87 @@ export type Database = {
         }
         Relationships: []
       }
+      rhythm_track_ratings: {
+        Row: {
+          created_at: string | null
+          id: string
+          rating: string
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          rating: string
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          rating?: string
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rhythm_track_ratings_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "rhythm_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rhythm_track_ratings_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "rhythm_tracks_with_scores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rhythm_tracks: {
+        Row: {
+          audio_url: string
+          bpm: number
+          created_at: string | null
+          difficulty_tier: string | null
+          duration_seconds: number
+          genre: string | null
+          id: string
+          is_active: boolean | null
+          play_count: number | null
+          prompt: string
+          storage_path: string
+        }
+        Insert: {
+          audio_url: string
+          bpm: number
+          created_at?: string | null
+          difficulty_tier?: string | null
+          duration_seconds: number
+          genre?: string | null
+          id?: string
+          is_active?: boolean | null
+          play_count?: number | null
+          prompt: string
+          storage_path: string
+        }
+        Update: {
+          audio_url?: string
+          bpm?: number
+          created_at?: string | null
+          difficulty_tier?: string | null
+          duration_seconds?: number
+          genre?: string | null
+          id?: string
+          is_active?: boolean | null
+          play_count?: number | null
+          prompt?: string
+          storage_path?: string
+        }
+        Relationships: []
+      }
       security_audit_log: {
         Row: {
           created_at: string
@@ -4258,6 +4339,25 @@ export type Database = {
       }
     }
     Views: {
+      rhythm_tracks_with_scores: {
+        Row: {
+          audio_url: string | null
+          bpm: number | null
+          created_at: string | null
+          difficulty_tier: string | null
+          downvotes: number | null
+          duration_seconds: number | null
+          genre: string | null
+          id: string | null
+          is_active: boolean | null
+          play_count: number | null
+          prompt: string | null
+          score: number | null
+          storage_path: string | null
+          upvotes: number | null
+        }
+        Relationships: []
+      }
       user_achievement_stats: {
         Row: {
           bronze_count: number | null

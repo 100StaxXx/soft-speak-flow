@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars } from './gameUtils';
-import { Moon, Star, Sun } from 'lucide-react';
+import { TrackRatingUI } from './TrackRatingUI';
+import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
+import { Moon, Star, Sun, Music, Loader2 } from 'lucide-react';
 
 interface EclipseTimingGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -28,23 +30,20 @@ interface Note {
 
 type HitResult = 'perfect' | 'great' | 'good' | 'miss';
 
-// Difficulty configurations
+// Difficulty configurations for BPM-synced notes
 const DIFFICULTY_CONFIG = {
   easy: {
-    noteCount: 20,
-    spawnInterval: 800,
-    scrollSpeed: 0.035, // % per ms
+    notesPerBeat: 0.5,    // Every 2 beats
+    scrollSpeed: 0.035,
     patterns: ['single'] as const,
   },
   medium: {
-    noteCount: 30,
-    spawnInterval: 600,
+    notesPerBeat: 1,      // Every beat
     scrollSpeed: 0.045,
     patterns: ['single', 'double'] as const,
   },
   hard: {
-    noteCount: 45,
-    spawnInterval: 400,
+    notesPerBeat: 2,      // Every half-beat
     scrollSpeed: 0.055,
     patterns: ['single', 'double', 'triple'] as const,
   },
@@ -52,12 +51,12 @@ const DIFFICULTY_CONFIG = {
 
 // Timing windows (in % distance from hit zone)
 const TIMING_WINDOWS = {
-  perfect: 3,  // ±3%
-  great: 6,    // ±6%
-  good: 10,    // ±10%
+  perfect: 3,
+  great: 6,
+  good: 10,
 };
 
-const HIT_ZONE_Y = 85; // % from top
+const HIT_ZONE_Y = 85;
 
 const HIT_RESULTS: Record<HitResult, { label: string; points: number; color: string }> = {
   perfect: { label: 'PERFECT!', points: 100, color: 'hsl(45, 100%, 60%)' },
@@ -74,7 +73,6 @@ const LANE_CONFIG: Record<LaneType, { icon: typeof Moon; color: string; bgColor:
 
 const LANES: LaneType[] = ['moon', 'star', 'sun'];
 
-// Combo multiplier thresholds
 const getComboMultiplier = (combo: number): number => {
   if (combo >= 50) return 4;
   if (combo >= 25) return 3;
@@ -204,15 +202,23 @@ const LaneButton = memo(({
 });
 LaneButton.displayName = 'LaneButton';
 
-// Generate note patterns
-const generateNotes = (difficulty: 'easy' | 'medium' | 'hard'): Note[] => {
+// Generate BPM-synced notes
+const generateSyncedNotes = (
+  bpm: number, 
+  durationSeconds: number, 
+  difficulty: 'easy' | 'medium' | 'hard'
+): Note[] => {
   const config = DIFFICULTY_CONFIG[difficulty];
+  const beatInterval = 60000 / bpm; // ms per beat
+  const noteInterval = beatInterval / config.notesPerBeat;
   const notes: Note[] = [];
-  let time = 2000; // Start after 2 seconds
   
-  for (let i = 0; i < config.noteCount; i++) {
+  // Start after 2 seconds, end 2 seconds before track ends
+  let time = 2000;
+  const endTime = (durationSeconds - 2) * 1000;
+  
+  while (time < endTime) {
     const patternType = config.patterns[Math.floor(Math.random() * config.patterns.length)];
-    const variation = (Math.random() - 0.5) * config.spawnInterval * 0.4;
     
     if (patternType === 'single') {
       const lane = LANES[Math.floor(Math.random() * 3)];
@@ -228,11 +234,32 @@ const generateNotes = (difficulty: 'easy' | 'medium' | 'hard'): Note[] => {
       });
     }
     
-    time += config.spawnInterval + variation;
+    time += noteInterval;
   }
   
   return notes;
 };
+
+// Fallback note generation (when no track available)
+const generateFallbackNotes = (difficulty: 'easy' | 'medium' | 'hard'): Note[] => {
+  // Default to 120 BPM, 30 seconds
+  return generateSyncedNotes(120, 30, difficulty);
+};
+
+// Loading screen component
+const TrackLoadingScreen = memo(() => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+    >
+      <Music className="w-16 h-16 text-primary" />
+    </motion.div>
+    <p className="text-lg font-medium text-foreground">Loading music...</p>
+    <p className="text-sm text-muted-foreground">Preparing your rhythm experience</p>
+  </div>
+));
+TrackLoadingScreen.displayName = 'TrackLoadingScreen';
 
 export const EclipseTimingGame = ({
   companionStats,
@@ -242,7 +269,7 @@ export const EclipseTimingGame = ({
   maxTimer,
   isPractice = false,
 }: EclipseTimingGameProps) => {
-  const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
+  const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>('loading');
   const [notes, setNotes] = useState<Note[]>([]);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -251,27 +278,85 @@ export const EclipseTimingGame = ({
   const [pressedLanes, setPressedLanes] = useState<Record<LaneType, boolean>>({ moon: false, star: false, sun: false });
   const [notesHit, setNotesHit] = useState(0);
   const [notesMissed, setNotesMissed] = useState(0);
+  const [gameResult, setGameResult] = useState<MiniGameResult | null>(null);
   
   const gameStartTimeRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>();
   const notesRef = useRef<Note[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentTrackRef = useRef<RhythmTrack | null>(null);
   
   const stars = useStaticStars(20);
   const config = DIFFICULTY_CONFIG[difficulty];
   
-  // Initialize notes
+  const { track, isLoading, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
+
+  // Load track and initialize notes
   useEffect(() => {
-    const generatedNotes = generateNotes(difficulty);
-    setNotes(generatedNotes);
-    notesRef.current = generatedNotes;
-  }, [difficulty]);
+    const initGame = async () => {
+      const loadedTrack = await fetchRandomTrack(difficulty);
+      
+      if (loadedTrack) {
+        currentTrackRef.current = loadedTrack;
+        // Generate BPM-synced notes
+        const syncedNotes = generateSyncedNotes(loadedTrack.bpm, loadedTrack.duration_seconds, difficulty);
+        setNotes(syncedNotes);
+        notesRef.current = syncedNotes;
+        
+        // Preload audio
+        const audio = new Audio(loadedTrack.audio_url);
+        audio.preload = 'auto';
+        audioRef.current = audio;
+        
+        // Wait for audio to be ready
+        audio.addEventListener('canplaythrough', () => {
+          setGameState('countdown');
+        }, { once: true });
+        
+        audio.addEventListener('error', (e) => {
+          console.error('Audio load error:', e);
+          // Fallback to no-track mode
+          const fallbackNotes = generateFallbackNotes(difficulty);
+          setNotes(fallbackNotes);
+          notesRef.current = fallbackNotes;
+          setGameState('countdown');
+        });
+        
+        audio.load();
+      } else {
+        // No track available, use fallback
+        console.log('No track available, using fallback notes');
+        const fallbackNotes = generateFallbackNotes(difficulty);
+        setNotes(fallbackNotes);
+        notesRef.current = fallbackNotes;
+        setGameState('countdown');
+      }
+    };
+    
+    initGame();
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [difficulty, fetchRandomTrack]);
 
   // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
     gameStartTimeRef.current = performance.now();
     lastFrameTimeRef.current = performance.now();
+    
+    // Start audio playback
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(err => {
+        console.error('Audio playback error:', err);
+      });
+    }
   }, []);
 
   // Game loop
@@ -288,13 +373,11 @@ export const EclipseTimingGame = ({
         const updatedNotes = prevNotes.map(note => {
           if (note.hit || note.missed) return note;
           
-          // Calculate Y position based on time since spawn
           const timeSinceSpawn = gameTime - note.spawnTime;
-          if (timeSinceSpawn < 0) return note; // Not spawned yet
+          if (timeSinceSpawn < 0) return note;
           
           const newY = timeSinceSpawn * config.scrollSpeed;
           
-          // Check if note passed hit zone without being hit
           if (newY > HIT_ZONE_Y + TIMING_WINDOWS.good + 5 && !note.hit && !note.missed) {
             setNotesMissed(m => m + 1);
             setCombo(0);
@@ -311,7 +394,28 @@ export const EclipseTimingGame = ({
       // Check if game is complete
       const allNotesProcessed = notesRef.current.every(n => n.hit || n.missed || n.y > 100);
       if (allNotesProcessed && notesRef.current.length > 0) {
-        setGameState('complete');
+        // Stop audio
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        
+        // Calculate result
+        const totalNotes = notesRef.current.length;
+        const accuracy = totalNotes > 0 ? Math.round((notesHit / totalNotes) * 100) : 0;
+        const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+        
+        setGameResult({
+          success: accuracy >= 50,
+          accuracy,
+          result,
+        });
+        
+        // Show rating UI if we have a track, otherwise complete immediately
+        if (currentTrackRef.current && !isPractice) {
+          setGameState('rating');
+        } else {
+          setGameState('complete');
+        }
         return;
       }
       
@@ -325,7 +429,7 @@ export const EclipseTimingGame = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, config.scrollSpeed]);
+  }, [gameState, config.scrollSpeed, notesHit, isPractice]);
 
   // Handle lane tap
   const handleLaneTap = useCallback((lane: LaneType) => {
@@ -334,11 +438,9 @@ export const EclipseTimingGame = ({
     setPressedLanes(prev => ({ ...prev, [lane]: true }));
     setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 100);
     
-    // Find closest unhit note in this lane
     const laneNotes = notesRef.current.filter(n => n.lane === lane && !n.hit && !n.missed);
     if (laneNotes.length === 0) return;
     
-    // Find note closest to hit zone
     const closestNote = laneNotes.reduce((closest, note) => {
       const distToHitZone = Math.abs(note.y - HIT_ZONE_Y);
       const closestDist = Math.abs(closest.y - HIT_ZONE_Y);
@@ -347,7 +449,6 @@ export const EclipseTimingGame = ({
     
     const distance = Math.abs(closestNote.y - HIT_ZONE_Y);
     
-    // Determine hit result
     let result: HitResult;
     if (distance <= TIMING_WINDOWS.perfect) {
       result = 'perfect';
@@ -356,35 +457,29 @@ export const EclipseTimingGame = ({
     } else if (distance <= TIMING_WINDOWS.good) {
       result = 'good';
     } else {
-      // Too far from hit zone
       return;
     }
     
-    // Mark note as hit
     setNotes(prev => prev.map(n => n.id === closestNote.id ? { ...n, hit: true } : n));
     notesRef.current = notesRef.current.map(n => n.id === closestNote.id ? { ...n, hit: true } : n);
     
-    // Update score with combo multiplier
     const multiplier = getComboMultiplier(combo);
     const points = HIT_RESULTS[result].points * multiplier;
     setScore(s => s + points);
     setNotesHit(h => h + 1);
     
-    // Update combo
     setCombo(c => {
       const newCombo = c + 1;
       setMaxCombo(m => Math.max(m, newCombo));
       return newCombo;
     });
     
-    // Show hit effect
     const effectId = Date.now() + Math.random();
     setHitEffects(prev => [...prev, { id: effectId, lane, result }]);
     setTimeout(() => {
       setHitEffects(prev => prev.filter(e => e.id !== effectId));
     }, 500);
     
-    // Haptic feedback
     triggerHaptic(result === 'perfect' ? 'success' : result === 'great' ? 'medium' : 'light');
   }, [gameState, combo]);
 
@@ -402,26 +497,71 @@ export const EclipseTimingGame = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState, handleLaneTap]);
 
+  // Handle rating
+  const handleRate = useCallback(async (rating: 'up' | 'down') => {
+    if (currentTrackRef.current) {
+      await rateTrack(currentTrackRef.current.id, rating);
+    }
+    setGameState('complete');
+  }, [rateTrack]);
+
+  const handleSkipRating = useCallback(() => {
+    setGameState('complete');
+  }, []);
+
   // Complete game
   useEffect(() => {
-    if (gameState === 'complete') {
-      const totalNotes = notes.length;
-      const accuracy = totalNotes > 0 ? Math.round((notesHit / totalNotes) * 100) : 0;
-      const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
-      
+    if (gameState === 'complete' && gameResult) {
       setTimeout(() => {
-        onComplete({
-          success: accuracy >= 50,
-          accuracy,
-          result,
-        });
-      }, 500);
+        onComplete(gameResult);
+      }, 300);
     }
-  }, [gameState, notes.length, notesHit, onComplete]);
+  }, [gameState, gameResult, onComplete]);
+
+  // Pause/resume audio with game state
+  useEffect(() => {
+    if (audioRef.current) {
+      if (gameState === 'paused') {
+        audioRef.current.pause();
+      } else if (gameState === 'playing') {
+        audioRef.current.play().catch(() => {});
+      }
+    }
+  }, [gameState]);
 
   const comboMultiplier = getComboMultiplier(combo);
   const totalNotes = notes.length;
   const processedNotes = notesHit + notesMissed;
+
+  // Loading state
+  if (gameState === 'loading') {
+    return (
+      <div className="flex flex-col items-center relative w-full h-full min-h-[500px]">
+        <TrackLoadingScreen />
+      </div>
+    );
+  }
+
+  // Rating state
+  if (gameState === 'rating' && currentTrackRef.current) {
+    return (
+      <div className="flex flex-col items-center justify-center relative w-full h-full min-h-[500px] gap-6 p-4">
+        <div className="text-center mb-4">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Game Complete!</h2>
+          <p className="text-lg text-muted-foreground">
+            Score: <span className="text-primary font-bold">{score}</span> • 
+            Accuracy: <span className="text-primary font-bold">{gameResult?.accuracy}%</span>
+          </p>
+        </div>
+        <TrackRatingUI
+          trackName={currentTrackRef.current.genre}
+          onRate={handleRate}
+          onSkip={handleSkipRating}
+          currentRating={userRating}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center relative w-full h-full min-h-[500px]">
@@ -440,7 +580,7 @@ export const EclipseTimingGame = ({
       {/* Game HUD */}
       <GameHUD
         title="Stellar Beats"
-        subtitle={`${processedNotes}/${totalNotes} notes`}
+        subtitle={`${processedNotes}/${totalNotes} notes${currentTrackRef.current ? ` • ${currentTrackRef.current.bpm} BPM` : ''}`}
         score={score}
         maxScore={totalNotes * 100 * 4}
         combo={combo}
@@ -491,13 +631,13 @@ export const EclipseTimingGame = ({
         {/* Lane glow trails */}
         <div className="absolute inset-0 flex pointer-events-none">
           {LANES.map((lane, i) => {
-            const config = LANE_CONFIG[lane];
+            const laneConfig = LANE_CONFIG[lane];
             return (
               <div
                 key={lane}
                 className="flex-1"
                 style={{
-                  background: `linear-gradient(to bottom, transparent 0%, ${config.color}08 50%, ${config.color}15 100%)`,
+                  background: `linear-gradient(to bottom, transparent 0%, ${laneConfig.color}08 50%, ${laneConfig.color}15 100%)`,
                 }}
               />
             );
@@ -527,11 +667,11 @@ export const EclipseTimingGame = ({
         {/* Lane icons at top */}
         <div className="absolute top-3 left-0 right-0 flex justify-around pointer-events-none z-20">
           {LANES.map(lane => {
-            const config = LANE_CONFIG[lane];
-            const Icon = config.icon;
+            const laneConfig = LANE_CONFIG[lane];
+            const Icon = laneConfig.icon;
             return (
               <div key={lane} className="flex flex-col items-center">
-                <Icon className="w-6 h-6" style={{ color: config.color, opacity: 0.6 }} />
+                <Icon className="w-6 h-6" style={{ color: laneConfig.color, opacity: 0.6 }} />
               </div>
             );
           })}
