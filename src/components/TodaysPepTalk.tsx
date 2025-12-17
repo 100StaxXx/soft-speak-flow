@@ -54,12 +54,18 @@ export const TodaysPepTalk = memo(() => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
   const [mentorSlug, setMentorSlug] = useState<string | null>(null);
+  const [isAudioReady, setIsAudioReady] = useState(false);
   // Removed walkthrough check - was causing play button to be permanently disabled
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
+
+  // Reset audio ready state when audio URL changes
+  useEffect(() => {
+    setIsAudioReady(false);
+  }, [pepTalk?.audio_url]);
 
   // Listen for global mute changes
   useEffect(() => {
@@ -633,7 +639,8 @@ export const TodaysPepTalk = memo(() => {
           <audio 
             ref={audioRef} 
             src={pepTalk.audio_url} 
-            preload="metadata"
+            preload="auto"
+            onCanPlayThrough={() => setIsAudioReady(true)}
             onError={() => {
               logger.error('Audio loading error', { 
                 audioUrl: pepTalk.audio_url,
@@ -653,16 +660,18 @@ export const TodaysPepTalk = memo(() => {
               <Button
                 size="icon"
                 onClick={togglePlayPause}
-                disabled={false}
+                disabled={!isAudioReady}
                 className={cn(
                   "h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                   isPlaying
                     ? "bg-gradient-to-br from-accent to-primary shadow-glow-lg scale-110"
                     : "bg-gradient-to-br from-primary to-accent shadow-glow hover:scale-110"
                 )}
-                aria-label={isPlaying ? "Pause pep talk" : "Play pep talk"}
+                aria-label={!isAudioReady ? "Loading audio" : isPlaying ? "Pause pep talk" : "Play pep talk"}
               >
-                {isPlaying ? (
+                {!isAudioReady ? (
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                ) : isPlaying ? (
                   <Pause className="h-8 w-8" fill="currentColor" />
                 ) : (
                   <Play className="h-8 w-8 ml-1" fill="currentColor" />
