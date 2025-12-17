@@ -47,6 +47,7 @@ export const ArcadeGameCard = memo(({
         'backdrop-blur-sm transition-all duration-300',
         'hover:scale-105 hover:border-white/20',
         'active:scale-95',
+        'min-h-[160px] w-full',
         STAT_GLOW[stat],
         'hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]'
       )}
@@ -61,7 +62,7 @@ export const ArcadeGameCard = memo(({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center gap-2">
+      <div className="relative z-10 flex flex-col items-center gap-2 h-full justify-between">
         {/* Icon with glow */}
         <div className={cn(
           'p-3 rounded-lg bg-gradient-to-br',
@@ -72,7 +73,7 @@ export const ArcadeGameCard = memo(({
         </div>
 
         {/* Game name */}
-        <span className="text-sm font-semibold text-white/90 text-center leading-tight">
+        <span className="text-sm font-semibold text-white/90 text-center leading-tight line-clamp-2">
           {label}
         </span>
 
@@ -86,13 +87,17 @@ export const ArcadeGameCard = memo(({
           {stat}
         </span>
 
-        {/* High score */}
-        {highScore !== null && highScore !== undefined && (
-          <div className="flex items-center gap-1 mt-1">
-            <span className="text-[10px] text-yellow-400/80">★</span>
-            <span className="text-xs text-yellow-400 font-mono">{highScore}%</span>
-          </div>
-        )}
+        {/* High score - always rendered for consistent height */}
+        <div className="flex items-center gap-1 mt-1 h-4">
+          {highScore !== null && highScore !== undefined ? (
+            <>
+              <span className="text-[10px] text-yellow-400/80">★</span>
+              <span className="text-xs text-yellow-400 font-mono">{highScore}%</span>
+            </>
+          ) : (
+            <span className="text-[10px] text-muted-foreground/50">No record</span>
+          )}
+        </div>
       </div>
     </button>
   );
