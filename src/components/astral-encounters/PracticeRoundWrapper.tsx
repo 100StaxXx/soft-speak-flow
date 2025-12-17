@@ -65,13 +65,14 @@ const PracticeIntro = memo(({
 }) => {
   const gameName = {
     energy_beam: 'Star Defender',
-    tap_sequence: 'Tap Sequence',
-    astral_frequency: 'Astral Frequency',
-    eclipse_timing: 'Eclipse Timing',
+    tap_sequence: 'Cosmic Tap Sequence',
+    astral_frequency: 'Cosmic Dash',
+    eclipse_timing: 'Stellar Beats',
     starfall_dodge: 'Starfall Dodge',
     rune_resonance: 'Rune Resonance',
     soul_serpent: 'Soul Serpent',
-    orb_match: 'Orb Match',
+    orb_match: 'Cosmic Orb Match',
+    galactic_match: 'Galactic Match',
   }[gameType];
 
   return (
