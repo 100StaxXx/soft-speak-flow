@@ -9,6 +9,8 @@ interface TapSequenceGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 interface Orb {
@@ -270,7 +272,9 @@ export const TapSequenceGame = ({
   companionStats, 
   onComplete,
   difficulty = 'medium',
-  questIntervalScale = 0
+  questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: TapSequenceGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -294,6 +298,9 @@ export const TapSequenceGame = ({
   const playStartTimeRef = useRef<number>(0);
 
   const config = DIFFICULTY_CONFIG[difficulty];
+  // For practice mode, limit to 1 round and use maxTimer if provided
+  const effectiveRounds = isPractice ? 1 : config.rounds;
+  const effectiveTimeLimit = maxTimer ?? config.timeLimit;
   
   // Calculate orbs for current round with progressive increase
   const getOrbsForRound = useCallback((roundNum: number) => {

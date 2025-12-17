@@ -9,6 +9,8 @@ interface EclipseTimingGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode (limits cycles)
+  isPractice?: boolean;
 }
 
 interface Asteroid {
@@ -188,6 +190,8 @@ export const EclipseTimingGame = ({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: EclipseTimingGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [cycle, setCycle] = useState(1);

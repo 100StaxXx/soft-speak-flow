@@ -10,6 +10,8 @@ interface AstralFrequencyGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 // Difficulty configuration with all features
@@ -610,8 +612,12 @@ export const AstralFrequencyGame = ({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: AstralFrequencyGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
+  const effectiveTimer = maxTimer ?? config.roundTime;
+  const effectiveRounds = isPractice ? 1 : config.rounds;
   
   // Game state
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
@@ -619,7 +625,7 @@ export const AstralFrequencyGame = ({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [roundTimeLeft, setRoundTimeLeft] = useState(config.roundTime);
+  const [roundTimeLeft, setRoundTimeLeft] = useState(effectiveTimer);
   
   // Player position
   const [playerFreq, setPlayerFreq] = useState({ x: 50, y: 50 });

@@ -19,17 +19,8 @@ interface PracticeRoundWrapperProps {
   onSkipPractice: () => void;
 }
 
-// Practice duration per game type (shorter versions)
-const PRACTICE_DURATION: Record<MiniGameType, number> = {
-  energy_beam: 8,
-  tap_sequence: 10,
-  astral_frequency: 8,
-  eclipse_timing: 10,
-  starfall_dodge: 10,
-  rune_resonance: 10,
-  astral_serpent: 8,
-  orb_match: 10,
-};
+// Practice duration - short rounds for all games
+const PRACTICE_TIMER = 12; // 12 seconds for all practice rounds
 
 const PracticeBanner = memo(() => (
   <motion.div
@@ -209,14 +200,15 @@ export const PracticeRoundWrapper = ({
     setPracticePhase('complete');
   }, []);
 
-  // Render the practice game with easier settings
+  // Render the practice game with easier settings and shorter timer
   const renderPracticeGame = () => {
     const props = {
       companionStats,
       onComplete: handlePracticeGameComplete,
       difficulty: 'easy' as const,
       questIntervalScale: 0,
-      isPractice: true, // Flag for games that support it
+      isPractice: true,
+      maxTimer: PRACTICE_TIMER, // Short practice duration
     };
 
     switch (gameType) {

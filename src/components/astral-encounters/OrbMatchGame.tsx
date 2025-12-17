@@ -9,6 +9,8 @@ interface OrbMatchGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 type OrbColor = 'fire' | 'water' | 'earth' | 'light' | 'dark' | 'cosmic';
@@ -481,6 +483,8 @@ export const OrbMatchGame = ({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: OrbMatchGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -523,11 +527,17 @@ export const OrbMatchGame = ({
       hard: { colors: 6 as const, moveTime: 4, targetScore: 280, totalTime: 30 },
     };
     const s = settings[difficulty];
+    // Use maxTimer override if provided
+    const effectiveTotalTime = maxTimer ?? s.totalTime;
+    // Lower target in practice mode
+    const effectiveTargetScore = isPractice ? Math.floor(s.targetScore * 0.5) : s.targetScore;
     return {
       ...s,
+      totalTime: effectiveTotalTime,
+      targetScore: effectiveTargetScore,
       moveTime: Math.max(3, s.moveTime - questIntervalScale * 0.5 + soulBonus * 1.5),
     };
-  }, [difficulty, questIntervalScale, soulBonus]);
+  }, [difficulty, questIntervalScale, soulBonus, maxTimer, isPractice]);
 
   const availableColors = useMemo((): OrbColor[] => {
     const allColors: OrbColor[] = ['fire', 'water', 'earth', 'light', 'dark', 'cosmic'];

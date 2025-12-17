@@ -10,6 +10,8 @@ interface EnergyBeamGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 // Difficulty configuration
@@ -573,13 +575,16 @@ const generateShields = (config: typeof DIFFICULTY_CONFIG['easy'], waveIndex: nu
   return shields;
 };
 
-export const EnergyBeamGame = ({ 
-  companionStats, 
+export const EnergyBeamGame = ({
+  companionStats,
   onComplete,
   difficulty = 'medium',
-  questIntervalScale = 0
+  questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: EnergyBeamGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
+  const effectiveTimer = maxTimer ?? config.roundTimer;
   
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete' | 'wave-transition'>('countdown');
   const [isCharging, setIsCharging] = useState(false);
@@ -589,7 +594,7 @@ export const EnergyBeamGame = ({
   const [maxCombo, setMaxCombo] = useState(0);
   const [chainHits, setChainHits] = useState(0);
   const [currentWave, setCurrentWave] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(config.roundTimer);
+  const [timeLeft, setTimeLeft] = useState(effectiveTimer);
   const [isStunned, setIsStunned] = useState(false);
   const [shake, setShake] = useState(false);
   
