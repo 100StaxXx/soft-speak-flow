@@ -58,9 +58,9 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const isValid = mood.length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange}>
+    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true}>
       <DrawerContent className="max-h-[90vh]">
-        <div className="mx-auto w-full max-w-lg px-4 pb-8">
+        <div className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto" data-vaul-no-drag>
           <DrawerHeader className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Moon className="h-6 w-6 text-purple-400" />
@@ -96,7 +96,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
             </div>
 
             {/* Wins */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-vaul-no-drag>
               <label className="text-sm font-medium text-foreground">
                 What went well today? <span className="text-muted-foreground">(optional)</span>
               </label>
@@ -105,12 +105,13 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 value={wins}
                 onChange={(e) => setWins(e.target.value.slice(0, 280))}
                 className="resize-none h-20 bg-muted/30 border-border/50"
+                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
               />
               <p className="text-xs text-muted-foreground text-right">{wins.length}/280</p>
             </div>
 
             {/* Gratitude */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-vaul-no-drag>
               <label className="text-sm font-medium text-foreground">
                 What are you grateful for? <span className="text-muted-foreground">(optional)</span>
               </label>
@@ -119,6 +120,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 value={gratitude}
                 onChange={(e) => setGratitude(e.target.value.slice(0, 280))}
                 className="resize-none h-20 bg-muted/30 border-border/50"
+                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
               />
               <p className="text-xs text-muted-foreground text-right">{gratitude.length}/280</p>
             </div>

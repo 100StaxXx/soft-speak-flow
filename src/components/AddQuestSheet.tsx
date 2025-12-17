@@ -92,7 +92,7 @@ export function AddQuestSheet({
   };
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="text-left">
           <DrawerTitle className="flex items-center gap-2">
@@ -104,15 +104,18 @@ export function AddQuestSheet({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-4 pb-4 space-y-4 overflow-y-auto">
-          <Input
-            placeholder="What's your quest?"
-            value={taskText}
-            onChange={(e) => setTaskText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleSubmit()}
-            disabled={isAdding}
-            autoFocus
-          />
+        <div className="px-4 pb-4 space-y-4 overflow-y-auto" data-vaul-no-drag>
+          <div data-vaul-no-drag>
+            <Input
+              placeholder="What's your quest?"
+              value={taskText}
+              onChange={(e) => setTaskText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleSubmit()}
+              disabled={isAdding}
+              autoFocus
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            />
+          </div>
 
           {/* Difficulty Buttons */}
           <div className="flex gap-2">
@@ -158,22 +161,24 @@ export function AddQuestSheet({
           </button>
 
           {showAdvanced && (
-            <AdvancedQuestOptions
-              scheduledTime={scheduledTime}
-              estimatedDuration={estimatedDuration}
-              recurrencePattern={recurrencePattern}
-              recurrenceDays={recurrenceDays}
-              reminderEnabled={reminderEnabled}
-              reminderMinutesBefore={reminderMinutesBefore}
-              onScheduledTimeChange={setScheduledTime}
-              onEstimatedDurationChange={setEstimatedDuration}
-              onRecurrencePatternChange={setRecurrencePattern}
-              onRecurrenceDaysChange={setRecurrenceDays}
-              onReminderEnabledChange={setReminderEnabled}
-              onReminderMinutesBeforeChange={setReminderMinutesBefore}
-              moreInformation={moreInformation}
-              onMoreInformationChange={setMoreInformation}
-            />
+            <div data-vaul-no-drag>
+              <AdvancedQuestOptions
+                scheduledTime={scheduledTime}
+                estimatedDuration={estimatedDuration}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                onScheduledTimeChange={setScheduledTime}
+                onEstimatedDurationChange={setEstimatedDuration}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                moreInformation={moreInformation}
+                onMoreInformationChange={setMoreInformation}
+              />
+            </div>
           )}
         </div>
 

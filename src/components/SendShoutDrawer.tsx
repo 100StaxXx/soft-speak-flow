@@ -55,7 +55,7 @@ export const SendShoutDrawer = ({
   };
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
@@ -76,7 +76,7 @@ export const SendShoutDrawer = ({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-4 pb-6 space-y-4">
+        <div className="px-4 pb-6 space-y-4" data-vaul-no-drag>
           {/* Shout Type Tabs */}
           <Tabs value={selectedType} onValueChange={(v) => {
             setSelectedType(v as ShoutType);
@@ -96,7 +96,7 @@ export const SendShoutDrawer = ({
 
             {(Object.keys(SHOUT_TYPE_CONFIG) as ShoutType[]).map((type) => (
               <TabsContent key={type} value={type} className="mt-4">
-                <div className="grid gap-2 max-h-[40vh] overflow-y-auto">
+                <div className="grid gap-2 max-h-[40vh] overflow-y-auto" data-vaul-no-drag>
                   {getShoutsByType(type).map((message) => (
                     <MessageCard
                       key={message.key}
