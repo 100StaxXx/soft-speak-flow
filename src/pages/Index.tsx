@@ -14,6 +14,7 @@ import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
+import { IndexPageSkeleton } from "@/components/skeletons";
 
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
@@ -199,18 +200,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     }
   }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
 
-  // Show loading state while critical data loads
+  // Show loading state with skeleton while critical data loads
   if (isTransitioning || !isReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground">
-            {isTransitioning ? "Switching mentor..." : "Loading..."}
-          </p>
-        </div>
-      </div>
-    );
+    return <IndexPageSkeleton />;
   }
 
   // Show error state if critical data failed to load

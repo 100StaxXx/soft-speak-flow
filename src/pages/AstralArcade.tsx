@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PageTransition } from '@/components/PageTransition';
@@ -12,6 +12,8 @@ import { MiniGameType, MiniGameResult } from '@/types/astralEncounters';
 import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcadeHighScore } from '@/utils/soundEffects';
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
 import { toast } from 'sonner';
+import { PracticeRoundWrapper } from '@/components/astral-encounters';
+import { MiniGameSkeleton } from '@/components/skeletons';
 import {
   ArrowLeft,
   Zap,
@@ -27,18 +29,15 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-// Game components
-import {
-  EnergyBeamGame,
-  TapSequenceGame,
-  AstralFrequencyGame,
-  EclipseTimingGame,
-  StarfallDodgeGame,
-  RuneResonanceGame,
-  AstralSerpentGame,
-  OrbMatchGame,
-  PracticeRoundWrapper,
-} from '@/components/astral-encounters';
+// Lazy load mini-games for bundle optimization
+const EnergyBeamGame = lazy(() => import('@/components/astral-encounters/EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
+const TapSequenceGame = lazy(() => import('@/components/astral-encounters/TapSequenceGame').then(m => ({ default: m.TapSequenceGame })));
+const AstralFrequencyGame = lazy(() => import('@/components/astral-encounters/AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
+const EclipseTimingGame = lazy(() => import('@/components/astral-encounters/EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
+const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
+const RuneResonanceGame = lazy(() => import('@/components/astral-encounters/RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
+const AstralSerpentGame = lazy(() => import('@/components/astral-encounters/AstralSerpentGame').then(m => ({ default: m.AstralSerpentGame })));
+const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 
 // Track which games user has practiced in this arcade session
 const arcadePracticedGames = new Set<MiniGameType>();
@@ -200,26 +199,27 @@ export default function AstralArcade() {
       onComplete: handleGameComplete,
     };
 
-    switch (activeGame) {
-      case 'energy_beam':
-        return <EnergyBeamGame {...gameProps} />;
-      case 'tap_sequence':
-        return <TapSequenceGame {...gameProps} />;
-      case 'astral_frequency':
-        return <AstralFrequencyGame {...gameProps} />;
-      case 'eclipse_timing':
-        return <EclipseTimingGame {...gameProps} />;
-      case 'starfall_dodge':
-        return <StarfallDodgeGame {...gameProps} />;
-      case 'rune_resonance':
-        return <RuneResonanceGame {...gameProps} />;
-      case 'astral_serpent':
-        return <AstralSerpentGame {...gameProps} />;
-      case 'orb_match':
-        return <OrbMatchGame {...gameProps} />;
-      default:
-        return null;
-    }
+    const GameComponent = (() => {
+      switch (activeGame) {
+        case 'energy_beam': return EnergyBeamGame;
+        case 'tap_sequence': return TapSequenceGame;
+        case 'astral_frequency': return AstralFrequencyGame;
+        case 'eclipse_timing': return EclipseTimingGame;
+        case 'starfall_dodge': return StarfallDodgeGame;
+        case 'rune_resonance': return RuneResonanceGame;
+        case 'astral_serpent': return AstralSerpentGame;
+        case 'orb_match': return OrbMatchGame;
+        default: return null;
+      }
+    })();
+
+    if (!GameComponent) return null;
+
+    return (
+      <Suspense fallback={<MiniGameSkeleton />}>
+        <GameComponent {...gameProps} />
+      </Suspense>
+    );
   };
 
   return (

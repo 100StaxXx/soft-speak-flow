@@ -1,24 +1,21 @@
+// Core encounter components (always needed when using encounters)
 export { AstralEncounterModal } from './AstralEncounterModal';
 export { AdversaryReveal } from './AdversaryReveal';
 export { EncounterResultScreen } from './EncounterResult';
-export { EnergyBeamGame } from './EnergyBeamGame';
-export { TapSequenceGame } from './TapSequenceGame';
-export { AstralFrequencyGame } from './AstralFrequencyGame';
-export { EclipseTimingGame } from './EclipseTimingGame';
-export { StarfallDodgeGame } from './StarfallDodgeGame';
-export { RuneResonanceGame } from './RuneResonanceGame';
-export { AstralSerpentGame } from './AstralSerpentGame';
-export { OrbMatchGame } from './OrbMatchGame';
 export { GameInstructionsOverlay } from './GameInstructionsOverlay';
 export { PracticeRoundWrapper } from './PracticeRoundWrapper';
 export { BattleSceneHeader } from './BattleSceneHeader';
 export { BattleVSScreen } from './BattleVSScreen';
 export { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
+
+// Supporting components
 export { MiniGameTester } from './MiniGameTester';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';
 export { GameHUD, CountdownOverlay, ScorePopup, PauseOverlay } from './GameHUD';
+
+// Utilities (tree-shakeable)
 export { 
   useScreenShake, 
   triggerHaptic, 
@@ -30,3 +27,7 @@ export {
   getGridPositions,
   shakeKeyframes 
 } from './gameUtils';
+
+// ⚠️ MINI-GAMES ARE NOT EXPORTED HERE FOR BUNDLE SIZE OPTIMIZATION
+// Import them directly when needed:
+// const EnergyBeamGame = lazy(() => import('@/components/astral-encounters/EnergyBeamGame'));

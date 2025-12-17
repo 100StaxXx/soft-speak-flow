@@ -1,16 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
 import { BattleVSScreen } from './BattleVSScreen';
-import { EnergyBeamGame } from './EnergyBeamGame';
-import { TapSequenceGame } from './TapSequenceGame';
-import { AstralFrequencyGame } from './AstralFrequencyGame';
-import { EclipseTimingGame } from './EclipseTimingGame';
-import { StarfallDodgeGame } from './StarfallDodgeGame';
-import { RuneResonanceGame } from './RuneResonanceGame';
-import { AstralSerpentGame } from './AstralSerpentGame';
-import { OrbMatchGame } from './OrbMatchGame';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { PracticeRoundWrapper } from './PracticeRoundWrapper';
@@ -19,6 +11,17 @@ import { useCompanion } from '@/hooks/useCompanion';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
+import { MiniGameSkeleton } from '@/components/skeletons';
+
+// Lazy load mini-games for bundle optimization
+const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
+const TapSequenceGame = lazy(() => import('./TapSequenceGame').then(m => ({ default: m.TapSequenceGame })));
+const AstralFrequencyGame = lazy(() => import('./AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
+const EclipseTimingGame = lazy(() => import('./EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
+const StarfallDodgeGame = lazy(() => import('./StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
+const RuneResonanceGame = lazy(() => import('./RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
+const AstralSerpentGame = lazy(() => import('./AstralSerpentGame').then(m => ({ default: m.AstralSerpentGame })));
+const OrbMatchGame = lazy(() => import('./OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 
 // Track which games user has practiced (persists in session)
 const practicedGames = new Set<MiniGameType>();
@@ -173,26 +176,25 @@ export const AstralEncounterModal = ({
       questIntervalScale: intervalScale,
     };
 
-    switch (gameType) {
-      case 'energy_beam':
-        return <EnergyBeamGame {...props} />;
-      case 'tap_sequence':
-        return <TapSequenceGame {...props} />;
-      case 'astral_frequency':
-        return <AstralFrequencyGame {...props} />;
-      case 'eclipse_timing':
-        return <EclipseTimingGame {...props} />;
-      case 'starfall_dodge':
-        return <StarfallDodgeGame {...props} />;
-      case 'rune_resonance':
-        return <RuneResonanceGame {...props} />;
-      case 'astral_serpent':
-        return <AstralSerpentGame {...props} />;
-      case 'orb_match':
-        return <OrbMatchGame {...props} />;
-      default:
-        return <EnergyBeamGame {...props} />;
-    }
+    const GameComponent = (() => {
+      switch (gameType) {
+        case 'energy_beam': return EnergyBeamGame;
+        case 'tap_sequence': return TapSequenceGame;
+        case 'astral_frequency': return AstralFrequencyGame;
+        case 'eclipse_timing': return EclipseTimingGame;
+        case 'starfall_dodge': return StarfallDodgeGame;
+        case 'rune_resonance': return RuneResonanceGame;
+        case 'astral_serpent': return AstralSerpentGame;
+        case 'orb_match': return OrbMatchGame;
+        default: return EnergyBeamGame;
+      }
+    })();
+
+    return (
+      <Suspense fallback={<MiniGameSkeleton />}>
+        <GameComponent {...props} />
+      </Suspense>
+    );
   }, [adversary, getCurrentGameType, companionStats, handleMiniGameComplete, questInterval]);
 
   if (!encounter || !adversary) return null;
