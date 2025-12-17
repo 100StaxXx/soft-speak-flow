@@ -17,15 +17,23 @@ export interface Companion {
   favorite_color: string;
   spirit_animal: string;
   core_element: string;
+  story_tone?: string;
   current_stage: number;
   current_xp: number;
   current_image_url: string | null;
+  initial_image_url?: string | null;
   eye_color?: string;
   fur_color?: string;
   body?: number;
   mind?: number;
   soul?: number;
+  current_mood?: string | null;
+  last_mood_update?: string | null;
+  last_activity_date?: string | null;
   last_energy_update?: string;
+  inactive_days?: number;
+  neglected_image_url?: string | null;
+  image_regenerations_used?: number;
   created_at: string;
   updated_at: string;
 }
