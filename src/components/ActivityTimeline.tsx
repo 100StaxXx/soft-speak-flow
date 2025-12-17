@@ -93,10 +93,12 @@ export const ActivityTimeline = () => {
     if (!touchStart.current) return;
     
     const deltaX = e.touches[0].clientX - touchStart.current.x;
-    const deltaY = Math.abs(e.touches[0].clientY - touchStart.current.y);
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(e.touches[0].clientY - touchStart.current.y);
     
-    // Only swipe horizontally if vertical movement is minimal
-    if (deltaY < 30 && deltaX < 0) {
+    // Only swipe if clearly horizontal (2:1 ratio) and minimum threshold met
+    // This prevents accidental swipes when scrolling vertically
+    if (absDeltaX > absDeltaY * 2 && absDeltaX > 15 && deltaX < 0) {
       setSwipedItems(prev => ({ ...prev, [activityId]: Math.max(deltaX, -100) }));
     }
   }, []);
@@ -169,6 +171,7 @@ export const ActivityTimeline = () => {
           <div 
             key={activity.id} 
             className="relative overflow-hidden"
+            style={{ touchAction: 'pan-y pinch-zoom' }}
             onTouchStart={(e) => handleTouchStart(e, activity.id)}
             onTouchMove={(e) => handleTouchMove(e, activity.id)}
             onTouchEnd={() => handleTouchEnd(activity.id)}
@@ -250,6 +253,10 @@ export const ActivityTimeline = () => {
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       className="min-h-[80px] text-sm"
+                      style={{ 
+                        touchAction: 'pan-y',
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
                     />
                     <div className="flex gap-2 justify-end">
                       <Button

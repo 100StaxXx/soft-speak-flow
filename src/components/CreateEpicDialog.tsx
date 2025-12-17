@@ -172,7 +172,13 @@ export const CreateEpicDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-md max-h-[90vh] overflow-y-auto"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain'
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {template?.badge_icon && <span className="text-xl">{template.badge_icon}</span>}
@@ -203,6 +209,7 @@ export const CreateEpicDialog = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={60}
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             />
           </div>
 
@@ -216,6 +223,7 @@ export const CreateEpicDialog = ({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               maxLength={200}
+              style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
             />
           </div>
 
