@@ -158,7 +158,7 @@ export function QuestAgenda({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 no-text-select">
       {/* Header with Streak and XP */}
       <div className="flex items-center justify-between">
         <div className="flex-1">

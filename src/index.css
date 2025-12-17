@@ -236,6 +236,15 @@ All colors MUST be HSL.
     font-family: 'Bebas Neue', 'Oswald', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     letter-spacing: 0.02em;
   }
+
+  /* Prevent text selection on interactive elements (iOS) */
+  .no-text-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   
   /* 3D flip utilities */
   .preserve-3d {
