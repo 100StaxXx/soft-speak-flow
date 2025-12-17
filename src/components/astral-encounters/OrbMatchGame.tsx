@@ -24,6 +24,26 @@ interface Orb {
   isNew?: boolean;
 }
 
+const GRID_ROWS = 5;
+const GRID_COLS = 6;
+
+// Pure function - check if grid has any match (moved outside component to avoid recreation)
+const hasMatchInGrid = (grid: (Orb | null)[][]): boolean => {
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS - 2; col++) {
+      const o1 = grid[row][col], o2 = grid[row][col + 1], o3 = grid[row][col + 2];
+      if (o1 && o2 && o3 && o1.color === o2.color && o2.color === o3.color) return true;
+    }
+  }
+  for (let col = 0; col < GRID_COLS; col++) {
+    for (let row = 0; row < GRID_ROWS - 2; row++) {
+      const o1 = grid[row][col], o2 = grid[row + 1][col], o3 = grid[row + 2][col];
+      if (o1 && o2 && o3 && o1.color === o2.color && o2.color === o3.color) return true;
+    }
+  }
+  return false;
+};
+
 interface MatchExplosion {
   id: string;
   x: number;
@@ -88,8 +108,6 @@ const ORB_COLORS: Record<OrbColor, { gradient: string; glow: string; inner: stri
   },
 };
 
-const GRID_ROWS = 5;
-const GRID_COLS = 6;
 
 // Star Background
 const StarBackground = memo(({ stars, intensity }: { stars: ReturnType<typeof useStaticStars>; intensity?: number }) => (
@@ -553,22 +571,6 @@ export const OrbMatchGame = ({
     return null;
   }, []);
 
-  // Check if grid has any match
-  const hasMatchInGrid = (grid: (Orb | null)[][]): boolean => {
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS - 2; col++) {
-        const o1 = grid[row][col], o2 = grid[row][col + 1], o3 = grid[row][col + 2];
-        if (o1 && o2 && o3 && o1.color === o2.color && o2.color === o3.color) return true;
-      }
-    }
-    for (let col = 0; col < GRID_COLS; col++) {
-      for (let row = 0; row < GRID_ROWS - 2; row++) {
-        const o1 = grid[row][col], o2 = grid[row + 1][col], o3 = grid[row + 2][col];
-        if (o1 && o2 && o3 && o1.color === o2.color && o2.color === o3.color) return true;
-      }
-    }
-    return false;
-  };
 
   // Shuffle board if no moves available
   const shuffleBoard = useCallback(() => {
