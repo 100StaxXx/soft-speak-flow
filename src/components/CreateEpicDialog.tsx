@@ -12,11 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Target, Zap, Plus, Swords, Sparkles, Leaf, Sun } from "lucide-react";
+import { Target, Zap, Plus, Swords, Sparkles, Leaf, Sun, ChevronLeft, ChevronRight } from "lucide-react";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
+import { StoryTypeSelector } from "@/components/narrative/StoryTypeSelector";
 import { cn } from "@/lib/utils";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
+import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -70,6 +72,7 @@ interface CreateEpicDialogProps {
     habits: NewHabit[];
     is_public?: boolean;
     theme_color?: EpicTheme;
+    story_type_slug?: StoryTypeSlug;
   }) => void;
   isCreating: boolean;
   template?: EpicTemplate | null;
@@ -82,6 +85,8 @@ export const CreateEpicDialog = ({
   isCreating,
   template,
 }: CreateEpicDialogProps) => {
+  const [step, setStep] = useState<"story" | "details">("story");
+  const [storyType, setStoryType] = useState<StoryTypeSlug | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
@@ -144,13 +149,16 @@ export const CreateEpicDialog = ({
       habits: newHabits,
       is_public: true,
       theme_color: themeColor,
+      story_type_slug: storyType || undefined,
     });
 
     // Reset form
     resetForm();
-  }, [title, description, targetDays, newHabits, themeColor, onCreateEpic]);
+  }, [title, description, targetDays, newHabits, themeColor, storyType, onCreateEpic]);
 
   const resetForm = () => {
+    setStep("story");
+    setStoryType(null);
     setTitle("");
     setDescription("");
     setTargetDays(30);
@@ -183,7 +191,7 @@ export const CreateEpicDialog = ({
           <DialogTitle className="flex items-center gap-2">
             {template?.badge_icon && <span className="text-xl">{template.badge_icon}</span>}
             <Target className="w-5 h-5 text-primary" />
-            {template ? `Start: ${template.name}` : "Create Legendary Epic"}
+            {template ? `Start: ${template.name}` : step === "story" ? "Choose Your Adventure" : "Create Legendary Epic"}
           </DialogTitle>
           <DialogDescription>
             {template ? (
@@ -193,152 +201,222 @@ export const CreateEpicDialog = ({
                   {template.difficulty_tier}
                 </Badge>
               </span>
+            ) : step === "story" ? (
+              "Select the type of story you want to experience"
             ) : (
               "Create an epic and add habits to track your progress."
             )}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Epic Name */}
-          <div className="space-y-2">
-            <Label htmlFor="epic-title">Epic Name *</Label>
-            <Input
-              id="epic-title"
-              placeholder="e.g., Become a Morning Warrior"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={60}
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        {/* Step 1: Story Type Selection */}
+        {step === "story" && !template && (
+          <div className="space-y-4">
+            <StoryTypeSelector
+              selectedType={storyType}
+              onSelect={setStoryType}
+              targetDays={targetDays}
             />
-          </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="epic-description">Epic Quest Description</Label>
-            <Textarea
-              id="epic-description"
-              placeholder="What legendary feat will you accomplish?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              maxLength={200}
-              style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
-            />
-          </div>
-
-          {/* Duration */}
-          <div className="space-y-2">
-            <Label htmlFor="target-days">Epic Duration (Days)</Label>
-            <div className="flex gap-2">
-              {[7, 14, 21, 30, 60].map((days) => (
-                <Button
-                  key={days}
-                  type="button"
-                  variant={targetDays === days ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setTargetDays(days)}
-                  className="flex-1"
-                >
-                  {days}d
-                </Button>
-              ))}
-            </div>
-            <Input
-              id="target-days"
-              type="number"
-              min={1}
-              max={365}
-              value={targetDays}
-              onChange={(e) => {
-                const value = parseInt(e.target.value);
-                if (!isNaN(value) && value >= 1 && value <= 365) {
-                  setTargetDays(value);
-                } else if (e.target.value === "") {
-                  setTargetDays(1); // Reset to minimum if cleared
-                }
-              }}
-              className="mt-2"
-            />
-          </div>
-
-          {/* Epic Theme Selector */}
-          <div className="space-y-2">
-            <Label>Epic Theme</Label>
-            <div className="grid grid-cols-5 gap-2">
-              {(Object.keys(themeConfig) as EpicTheme[]).map((theme) => {
-                const config = themeConfig[theme];
-                const Icon = config.icon;
-                return (
+            {/* Duration Preview */}
+            <div className="space-y-2">
+              <Label>Epic Duration</Label>
+              <div className="flex gap-2">
+                {[14, 30, 45, 60].map((days) => (
                   <Button
-                    key={theme}
+                    key={days}
                     type="button"
-                    variant="outline"
+                    variant={targetDays === days ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setThemeColor(theme)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 h-auto py-3 transition-all",
-                      themeColor === theme 
-                        ? `${config.gradient} border-2 shadow-lg` 
-                        : "hover:bg-muted"
-                    )}
+                    onClick={() => setTargetDays(days)}
+                    className="flex-1"
                   >
-                    <Icon className={cn(
-                      "h-5 w-5",
-                      themeColor === theme && `bg-gradient-to-r ${config.colors} bg-clip-text text-transparent`
-                    )} />
-                    <span className="text-xs">{config.label}</span>
+                    {days}d
                   </Button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Habits */}
-          <div className="space-y-3">
-            <Label>Epic Habits {template ? "(from template)" : "(Required)"}</Label>
-            
-            <EpicHabitList habits={newHabits} onRemove={removeHabit} />
-            
-            {/* Add new habit form */}
-            {newHabits.length < 2 && (
-              <EpicHabitForm
-                habitTitle={currentHabitTitle}
-                difficulty={currentHabitDifficulty}
-                selectedDays={currentHabitDays}
-                habitCount={newHabits.length}
-                onTitleChange={setCurrentHabitTitle}
-                onDifficultyChange={setCurrentHabitDifficulty}
-                onDaysChange={setCurrentHabitDays}
-                onAddHabit={addHabit}
-              />
+            <Button
+              onClick={() => setStep("details")}
+              disabled={!storyType}
+              className="w-full"
+            >
+              Continue
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setStoryType(null);
+                setStep("details");
+              }}
+              className="w-full text-muted-foreground"
+            >
+              Skip story selection
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2: Epic Details (or direct if template) */}
+        {(step === "details" || template) && (
+          <div className="space-y-4">
+            {/* Back button */}
+            {!template && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStep("story")}
+                className="mb-2"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Change story type
+              </Button>
             )}
-            
-            <p className="text-xs text-muted-foreground">
-              Add up to 2 habits that contribute to this epic
-            </p>
-          </div>
 
-          {/* XP Reward Preview */}
-          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-yellow-500" />
-              <span className="text-sm font-medium">Epic Completion Reward</span>
+            {/* Epic Name */}
+            <div className="space-y-2">
+              <Label htmlFor="epic-title">Epic Name *</Label>
+              <Input
+                id="epic-title"
+                placeholder="e.g., Become a Morning Warrior"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={60}
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              />
             </div>
-            <span className="text-lg font-bold text-primary">
-              +{calculateXPReward()} XP
-            </span>
-          </div>
 
-          {/* Submit */}
-          <Button
-            onClick={handleSubmit}
-            disabled={!title.trim() || newHabits.length === 0 || isCreating}
-            className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
-          >
-            {isCreating ? "Creating Epic..." : template ? `Start ${template.name}! 🎯` : "Begin Epic Quest! 🎯"}
-          </Button>
-        </div>
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="epic-description">Epic Quest Description</Label>
+              <Textarea
+                id="epic-description"
+                placeholder="What legendary feat will you accomplish?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                maxLength={200}
+                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+              />
+            </div>
+
+            {/* Duration (if not already set in story step) */}
+            {template && (
+              <div className="space-y-2">
+                <Label htmlFor="target-days">Epic Duration (Days)</Label>
+                <div className="flex gap-2">
+                  {[7, 14, 21, 30, 60].map((days) => (
+                    <Button
+                      key={days}
+                      type="button"
+                      variant={targetDays === days ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTargetDays(days)}
+                      className="flex-1"
+                    >
+                      {days}d
+                    </Button>
+                  ))}
+                </div>
+                <Input
+                  id="target-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={targetDays}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value >= 1 && value <= 365) {
+                      setTargetDays(value);
+                    } else if (e.target.value === "") {
+                      setTargetDays(1);
+                    }
+                  }}
+                  className="mt-2"
+                />
+              </div>
+            )}
+
+            {/* Epic Theme Selector */}
+            <div className="space-y-2">
+              <Label>Epic Theme</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {(Object.keys(themeConfig) as EpicTheme[]).map((theme) => {
+                  const config = themeConfig[theme];
+                  const Icon = config.icon;
+                  return (
+                    <Button
+                      key={theme}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setThemeColor(theme)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 h-auto py-3 transition-all",
+                        themeColor === theme 
+                          ? `${config.gradient} border-2 shadow-lg` 
+                          : "hover:bg-muted"
+                      )}
+                    >
+                      <Icon className={cn(
+                        "h-5 w-5",
+                        themeColor === theme && `bg-gradient-to-r ${config.colors} bg-clip-text text-transparent`
+                      )} />
+                      <span className="text-xs">{config.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Habits */}
+            <div className="space-y-3">
+              <Label>Epic Habits {template ? "(from template)" : "(Required)"}</Label>
+              
+              <EpicHabitList habits={newHabits} onRemove={removeHabit} />
+              
+              {/* Add new habit form */}
+              {newHabits.length < 2 && (
+                <EpicHabitForm
+                  habitTitle={currentHabitTitle}
+                  difficulty={currentHabitDifficulty}
+                  selectedDays={currentHabitDays}
+                  habitCount={newHabits.length}
+                  onTitleChange={setCurrentHabitTitle}
+                  onDifficultyChange={setCurrentHabitDifficulty}
+                  onDaysChange={setCurrentHabitDays}
+                  onAddHabit={addHabit}
+                />
+              )}
+              
+              <p className="text-xs text-muted-foreground">
+                Add up to 2 habits that contribute to this epic
+              </p>
+            </div>
+
+            {/* XP Reward Preview */}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-yellow-500" />
+                <span className="text-sm font-medium">Epic Completion Reward</span>
+              </div>
+              <span className="text-lg font-bold text-primary">
+                +{calculateXPReward()} XP
+              </span>
+            </div>
+
+            {/* Submit */}
+            <Button
+              onClick={handleSubmit}
+              disabled={!title.trim() || newHabits.length === 0 || isCreating}
+              className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+            >
+              {isCreating ? "Creating Epic..." : template ? `Start ${template.name}! 🎯` : "Begin Epic Quest! 🎯"}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
