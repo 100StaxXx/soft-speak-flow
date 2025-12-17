@@ -1,9 +1,18 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAstralEncounters } from '@/hooks/useAstralEncounters';
 import { useEncounterTrigger } from '@/hooks/useEncounterTrigger';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
 import { AdversaryTier, TriggerType } from '@/types/astralEncounters';
+import { useEvolution } from '@/contexts/EvolutionContext';
+
+interface QueuedEncounter {
+  triggerType: TriggerType;
+  sourceId?: string;
+  epicProgress?: number;
+  epicCategory?: string;
+  questInterval?: number;
+}
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;
@@ -18,6 +27,10 @@ interface EpicCheckpointEventDetail {
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
+  const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
+  const isEvolutionActiveRef = useRef(false);
+
+  const { isEvolvingLoading } = useEvolution();
 
   const {
     activeEncounter,
@@ -30,7 +43,32 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
   const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
 
-  // Wrap checkEncounterTrigger to show overlay first
+  // Track evolution state in ref for immediate access
+  useEffect(() => {
+    isEvolutionActiveRef.current = isEvolvingLoading;
+    console.log('[AstralEncounterProvider] Evolution active:', isEvolvingLoading);
+  }, [isEvolvingLoading]);
+
+  // Process queued encounter when evolution modal closes
+  useEffect(() => {
+    const handleEvolutionClosed = () => {
+      console.log('[AstralEncounterProvider] Evolution modal closed, checking queue');
+      // Add small delay to ensure evolution cleanup is complete
+      setTimeout(() => {
+        if (queuedEncounter) {
+          console.log('[AstralEncounterProvider] Processing queued encounter:', queuedEncounter.triggerType);
+          const { triggerType, sourceId, epicProgress, epicCategory, questInterval } = queuedEncounter;
+          setQueuedEncounter(null);
+          checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
+        }
+      }, 500);
+    };
+
+    window.addEventListener('evolution-modal-closed', handleEvolutionClosed);
+    return () => window.removeEventListener('evolution-modal-closed', handleEvolutionClosed);
+  }, [queuedEncounter, checkEncounterTrigger]);
+
+  // Wrap checkEncounterTrigger to show overlay first (and queue if evolution active)
   const triggerEncounterWithOverlay = useCallback(async (
     triggerType: TriggerType,
     sourceId?: string,
@@ -38,6 +76,12 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     epicCategory?: string,
     questInterval?: number
   ) => {
+    // If evolution is active, queue the encounter
+    if (isEvolutionActiveRef.current) {
+      console.log('[AstralEncounterProvider] Evolution in progress, queueing encounter:', triggerType);
+      setQueuedEncounter({ triggerType, sourceId, epicProgress, epicCategory, questInterval });
+      return;
+    }
     // Start by triggering the encounter logic (which generates the adversary)
     await checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
   }, [checkEncounterTrigger]);
