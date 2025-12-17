@@ -149,13 +149,13 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, companionId, epicId, milestonePercent } = await req.json();
+    const { userId, companionId, epicId, milestonePercent, chapterNumber } = await req.json();
 
     if (!userId || !companionId || !milestonePercent) {
       throw new Error("Missing required fields: userId, companionId, milestonePercent");
     }
 
-    console.log(`[Cosmic Postcard] Starting for user ${userId}, companion ${companionId}, milestone ${milestonePercent}%`);
+    console.log(`[Cosmic Postcard] Starting for user ${userId}, companion ${companionId}, milestone ${milestonePercent}%, chapter ${chapterNumber || 'N/A'}`);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -204,6 +204,32 @@ serve(async (req) => {
     }
 
     console.log(`[Cosmic Postcard] Using companion image for ${companion.spirit_animal}`);
+
+    // Fetch epic with story_seed if epicId provided
+    let storySeed: any = null;
+    let chapterBlueprint: any = null;
+    let epicData: any = null;
+    
+    if (epicId) {
+      const { data: epic, error: epicError } = await supabase
+        .from('epics')
+        .select('story_seed, book_title, story_type_slug, total_chapters')
+        .eq('id', epicId)
+        .maybeSingle();
+      
+      if (!epicError && epic?.story_seed) {
+        epicData = epic;
+        storySeed = epic.story_seed;
+        
+        // Find the chapter blueprint for this chapter number
+        if (chapterNumber && storySeed.chapter_blueprints) {
+          chapterBlueprint = storySeed.chapter_blueprints.find(
+            (cb: any) => cb.chapter === chapterNumber
+          );
+          console.log(`[Cosmic Postcard] Found chapter blueprint for chapter ${chapterNumber}`);
+        }
+      }
+    }
 
     // Determine species type for location matching
     const speciesType = getSpeciesType(companion.spirit_animal);
@@ -329,10 +355,38 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
       }
     }
 
-    // Generate a caption
-    const caption = `Greetings from ${location.name}! 🌟 ${milestonePercent}% milestone reached!`;
+    // Generate caption and narrative content
+    let caption = `Greetings from ${location.name}! 🌟 ${milestonePercent}% milestone reached!`;
+    let chapterTitle: string | null = null;
+    let storyContent: string | null = null;
+    let clueText: string | null = null;
+    let prophecyLine: string | null = null;
+    let charactersFeatured: string[] | null = null;
+    let seedsPlanted: string[] | null = null;
+    let isFinale = milestonePercent === 100;
 
-    // Save postcard to database
+    // Populate narrative fields if we have a chapter blueprint
+    if (chapterBlueprint) {
+      chapterTitle = chapterBlueprint.title || null;
+      storyContent = chapterBlueprint.opening_hook || null;
+      clueText = chapterBlueprint.mystery_seed || null;
+      charactersFeatured = chapterBlueprint.featured_characters || null;
+      seedsPlanted = chapterBlueprint.prophecy_seed ? [chapterBlueprint.prophecy_seed] : null;
+      
+      // Get prophecy line for this chapter
+      if (storySeed?.the_prophecy?.when_revealed && storySeed?.the_prophecy?.full_text) {
+        const prophecyLines = storySeed.the_prophecy.full_text.split('\n').filter((l: string) => l.trim());
+        const lineIndex = storySeed.the_prophecy.when_revealed.indexOf(chapterNumber);
+        if (lineIndex >= 0 && prophecyLines[lineIndex]) {
+          prophecyLine = prophecyLines[lineIndex];
+        }
+      }
+      
+      // Enhanced caption with chapter info
+      caption = `Chapter ${chapterNumber}: ${chapterTitle || location.name} 🌟`;
+    }
+
+    // Save postcard to database with narrative fields
     const { data: postcard, error: insertError } = await supabase
       .from('companion_postcards')
       .insert({
@@ -340,10 +394,19 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
         companion_id: companionId,
         epic_id: epicId,
         milestone_percent: milestonePercent,
+        chapter_number: chapterNumber || null,
+        chapter_title: chapterTitle,
         location_name: location.name,
         location_description: location.description,
         image_url: permanentImageUrl,
         caption: caption,
+        story_content: storyContent,
+        clue_text: clueText,
+        prophecy_line: prophecyLine,
+        characters_featured: charactersFeatured,
+        seeds_planted: seedsPlanted,
+        is_finale: isFinale,
+        location_revealed: true,
       })
       .select()
       .single();
