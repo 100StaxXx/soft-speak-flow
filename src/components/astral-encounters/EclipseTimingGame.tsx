@@ -589,23 +589,25 @@ export const EclipseTimingGame = ({
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
-
-      {/* Combo multiplier indicator */}
-      {combo >= 10 && (
-        <motion.div
-          className="mb-2 px-3 py-1 rounded-full text-sm font-bold"
-          style={{
-            background: 'linear-gradient(135deg, hsl(45, 100%, 50%), hsl(25, 95%, 50%))',
-            color: 'white',
-            textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-          }}
-          initial={{ scale: 0 }}
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 0.3 }}
-        >
-          {comboMultiplier}x MULTIPLIER
-        </motion.div>
-      )}
+      {/* Combo multiplier indicator - absolute positioned to avoid layout shift */}
+      <AnimatePresence>
+        {combo >= 10 && (
+          <motion.div
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full text-sm font-bold"
+            style={{
+              background: 'linear-gradient(135deg, hsl(45, 100%, 50%), hsl(25, 95%, 50%))',
+              color: 'white',
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [1, 1.1, 1], opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {comboMultiplier}x MULTIPLIER
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Game arena */}
       <div 
