@@ -391,64 +391,8 @@ export const TapSequenceGame = ({
     return () => clearTimeout(timer);
   }, [gameState, highlightIndex, orbs, displayTime, timeLimit, config.hideNumbersAfter]);
 
-  // Timer countdown during play phase
-  useEffect(() => {
-    if (gameState !== 'playing') {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 0.1) {
-          // Time's up! Round failed
-          triggerHaptic('error');
-          setMistakes(m => m + orbsPerRound - currentOrder + 1);
-          
-          const newRound = round + 1;
-          if (newRound > maxRounds) {
-            setGameState('complete');
-            finishGame();
-          } else {
-            setTimeout(() => {
-              setRound(newRound);
-              setCurrentOrder(1);
-              setGameState('showing');
-              setHighlightIndex(0);
-              setShowNumbers(true);
-              generateOrbs();
-            }, 800);
-          }
-          return 0;
-        }
-        return prev - 0.1;
-      });
-    }, 100);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [gameState, round, maxRounds, orbsPerRound, currentOrder, generateOrbs]);
-
-  // Shrinking orbs during play phase
-  useEffect(() => {
-    if (gameState !== 'playing') {
-      if (shrinkRef.current) clearInterval(shrinkRef.current);
-      setShrinkScale(1);
-      return;
-    }
-
-    shrinkRef.current = setInterval(() => {
-      setShrinkScale(prev => Math.max(0.65, prev - config.shrinkRate));
-    }, 500);
-
-    return () => {
-      if (shrinkRef.current) clearInterval(shrinkRef.current);
-    };
-  }, [gameState, config.shrinkRate]);
-
   const finishGame = useCallback(() => {
-    const totalSequenceOrbs = Array.from({ length: maxRounds }, (_, i) => getOrbsForRound(i + 1))
+    const totalSequenceOrbs = Array.from({ length: effectiveRounds }, (_, i) => getOrbsForRound(i + 1))
       .reduce((sum, count) => sum + count, 0);
     
     // Base accuracy from correct taps
@@ -473,7 +417,63 @@ export const TapSequenceGame = ({
       accuracy: finalAccuracy,
       result: finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 70 ? 'good' : finalAccuracy >= 50 ? 'partial' : 'fail'
     });
-  }, [score, maxRounds, getOrbsForRound, maxCombo, perfectRounds, timeRemaining, timeLimit, mistakes, onComplete]);
+  }, [score, effectiveRounds, getOrbsForRound, maxCombo, perfectRounds, timeRemaining, timeLimit, mistakes, onComplete]);
+
+  // Timer countdown during play phase
+  useEffect(() => {
+    if (gameState !== 'playing') {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 0.1) {
+          // Time's up! Round failed
+          triggerHaptic('error');
+          setMistakes(m => m + orbsPerRound - currentOrder + 1);
+          
+          const newRound = round + 1;
+          if (newRound > effectiveRounds) {
+            setGameState('complete');
+            finishGame();
+          } else {
+            setTimeout(() => {
+              setRound(newRound);
+              setCurrentOrder(1);
+              setGameState('showing');
+              setHighlightIndex(0);
+              setShowNumbers(true);
+              generateOrbs();
+            }, 800);
+          }
+          return 0;
+        }
+        return prev - 0.1;
+      });
+    }, 100);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState, round, effectiveRounds, orbsPerRound, currentOrder, generateOrbs, finishGame]);
+
+  // Shrinking orbs during play phase
+  useEffect(() => {
+    if (gameState !== 'playing') {
+      if (shrinkRef.current) clearInterval(shrinkRef.current);
+      setShrinkScale(1);
+      return;
+    }
+
+    shrinkRef.current = setInterval(() => {
+      setShrinkScale(prev => Math.max(0.65, prev - config.shrinkRate));
+    }, 500);
+
+    return () => {
+      if (shrinkRef.current) clearInterval(shrinkRef.current);
+    };
+  }, [gameState, config.shrinkRate]);
 
   const handleOrbTap = useCallback((orb: Orb) => {
     if (gameState !== 'playing' || orb.tapped) return;
