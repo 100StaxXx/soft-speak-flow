@@ -10,7 +10,8 @@ import {
   Brain,
   Heart,
   Grid3X3,
-  Target
+  Target,
+  Layers
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -127,6 +128,19 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     ],
     statBonus: 'soul',
     statIcon: Sparkles,
+  },
+  galactic_match: {
+    icon: Layers,
+    title: "Galactic Match",
+    goal: "Find all matching cosmic pairs before time runs out!",
+    howToPlay: [
+      "Tap cards to flip and reveal symbols",
+      "Remember card positions",
+      "Match identical pairs to clear them",
+      "Chain matches for combo bonus!"
+    ],
+    statBonus: 'mind',
+    statIcon: Brain,
   },
 };
 
