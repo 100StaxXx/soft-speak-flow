@@ -330,10 +330,9 @@ export const StarfallDodgeGame = ({
       accuracy >= 85 ? 'perfect' : accuracy >= 65 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
     
     onComplete({
-      score: crystalsCollected * 10 - hits * 5,
+      success: result !== 'fail',
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
-      bonusXp: crystalsCollected * 2,
     });
   }, [gameState, crystalsCollected, hits, totalCrystals, onComplete]);
 
@@ -350,7 +349,7 @@ export const StarfallDodgeGame = ({
       
       {/* Game HUD */}
       {gameState !== 'permission' && (
-        <GameHUD timeLeft={Math.ceil(timeLeft)} score={crystalsCollected * 10 - hits * 5} />
+        <GameHUD title="Starfall Dodge" timeLeft={Math.ceil(timeLeft)} score={crystalsCollected * 10 - hits * 5} />
       )}
       
       {/* Tilt indicator */}
@@ -433,13 +432,10 @@ export const StarfallDodgeGame = ({
           />
         )}
         {gameState === 'countdown' && (
-          <CountdownOverlay onComplete={handleCountdownComplete} />
+          <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
         )}
         {gameState === 'paused' && (
-          <PauseOverlay 
-            onResume={() => setGameState('playing')} 
-            onQuit={() => onComplete({ score: 0, accuracy: 0, result: 'fail', bonusXp: 0 })} 
-          />
+          <PauseOverlay onResume={() => setGameState('playing')} />
         )}
       </AnimatePresence>
     </div>

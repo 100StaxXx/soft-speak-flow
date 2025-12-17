@@ -533,10 +533,9 @@ export const AstralFrequencyGame = ({
       accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail';
     
     onComplete({
-      score,
+      success: result !== 'fail',
       accuracy,
       result,
-      bonusXp: Math.round(score * 0.1) + (maxCombo * 2),
     });
   }, [gameState, score, distance, maxCombo, onComplete]);
   
@@ -564,7 +563,7 @@ export const AstralFrequencyGame = ({
       </Canvas>
       
       {/* HUD */}
-      <GameHUD timeLeft={Math.ceil(timeLeft)} score={score} />
+      <GameHUD title="Cosmiq Dash" timeLeft={Math.ceil(timeLeft)} score={score} />
       <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} />
       
       {/* Controls */}
@@ -576,15 +575,10 @@ export const AstralFrequencyGame = ({
       {/* Overlays */}
       <AnimatePresence>
         {gameState === 'countdown' && (
-          <CountdownOverlay onComplete={handleCountdownComplete} />
+          <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
         )}
         {gameState === 'paused' && (
-          <PauseOverlay 
-            onResume={() => setGameState('playing')} 
-            onQuit={() => {
-              onComplete({ score: 0, accuracy: 0, result: 'fail', bonusXp: 0 });
-            }} 
-          />
+          <PauseOverlay onResume={() => setGameState('playing')} />
         )}
       </AnimatePresence>
     </div>
