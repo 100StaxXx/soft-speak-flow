@@ -61,7 +61,7 @@ export const BookCover = ({ book, onClick, size = "md" }: BookCoverProps) => {
           gradient
         )}
         style={{
-          boxShadow: "4px 4px 15px rgba(0,0,0,0.3), inset 0 0 30px rgba(255,255,255,0.1)",
+          boxShadow: "4px 4px 15px hsl(var(--background) / 0.3), inset 0 0 30px hsl(var(--foreground) / 0.1)",
         }}
       >
         {/* Book spine effect */}
