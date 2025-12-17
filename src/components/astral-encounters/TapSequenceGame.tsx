@@ -528,10 +528,10 @@ export const TapSequenceGame = ({
         
         const newRound = round + 1;
         
-        if (newRound > maxRounds) {
+        if (newRound > effectiveRounds) {
           // Game complete
           setGameState('complete');
-          const totalSequenceOrbs = Array.from({ length: maxRounds }, (_, i) => getOrbsForRound(i + 1))
+          const totalSequenceOrbs = Array.from({ length: effectiveRounds }, (_, i) => getOrbsForRound(i + 1))
             .reduce((sum, count) => sum + count, 0);
           
           const baseAccuracy = Math.round(((score + 10 + Math.ceil(timeRemaining)) / (totalSequenceOrbs * 20)) * 100);
@@ -573,7 +573,7 @@ export const TapSequenceGame = ({
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbsPerRound, round, score, maxCombo, mistakes, perfectRounds, maxRounds, timeRemaining, generateOrbs, onComplete, getOrbsForRound]);
+  }, [gameState, currentOrder, orbsPerRound, round, score, maxCombo, mistakes, perfectRounds, effectiveRounds, timeRemaining, generateOrbs, onComplete, getOrbsForRound]);
 
   const getRoundProgressText = useCallback(() => {
     if (gameState === 'showing') return `Watch the sequence...`;
@@ -649,7 +649,7 @@ export const TapSequenceGame = ({
         }`}>
           {difficulty.toUpperCase()}
         </span>
-        <span className="text-xs text-muted-foreground">Round {round}/{maxRounds}</span>
+        <span className="text-xs text-muted-foreground">Round {round}/{effectiveRounds}</span>
       </div>
 
       {/* Premium game area */}
