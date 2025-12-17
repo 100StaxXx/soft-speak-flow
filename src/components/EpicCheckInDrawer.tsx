@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,10 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loadingCompletions, setLoadingCompletions] = useState(false);
+  const [processingHabits, setProcessingHabits] = useState<Set<string>>(new Set());
+  
+  // Ref-based guard for rapid click prevention
+  const processingRef = useRef(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   
@@ -65,11 +69,13 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   }, [open, user?.id, fetchTodayCompletions]);
 
   const handleToggleHabit = async (habitId: string, checked: boolean) => {
-    console.log('[EpicCheckIn] handleToggleHabit called', { habitId, checked, userId: user?.id });
-    if (!user?.id) {
-      console.log('[EpicCheckIn] No user ID, returning early');
-      return;
-    }
+    // Synchronous guard - prevents rapid double-taps
+    if (processingRef.current) return;
+    if (processingHabits.has(habitId)) return;
+    if (!user?.id) return;
+    
+    processingRef.current = true;
+    setProcessingHabits(prev => new Set([...prev, habitId]));
     
     // Optimistically update UI
     const previousState = new Set(completedToday);
@@ -111,6 +117,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
       // Invalidate queries to refresh progress
       queryClient.invalidateQueries({ queryKey: ['epics'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
     } catch (err) {
       // Rollback on error
       setCompletedToday(previousState);
@@ -118,6 +125,12 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
       toast.error('Failed to update habit');
     } finally {
       setSubmitting(false);
+      processingRef.current = false;
+      setProcessingHabits(prev => {
+        const next = new Set(prev);
+        next.delete(habitId);
+        return next;
+      });
     }
   };
 
@@ -155,6 +168,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
       
       queryClient.invalidateQueries({ queryKey: ['epics'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
     } catch (err) {
       console.error('Error completing all habits:', err);
       toast.error('Failed to complete habits');
@@ -169,7 +183,12 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   if (!isActive || habits.length === 0) return null;
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer 
+      open={open} 
+      onOpenChange={setOpen}
+      shouldScaleBackground={false}
+      handleOnly={true}
+    >
       <DrawerTrigger asChild>
         <Button
           variant="outline"
@@ -265,14 +284,17 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
               >
                 {habits.map((habit, index) => {
                   const isCompleted = completedToday.has(habit.id);
+                  const isProcessing = processingHabits.has(habit.id);
                   return (
                     <motion.div
                       key={habit.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      onClick={() => {
-                        if (!submitting) {
+                      data-vaul-no-drag
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        if (!submitting && !isProcessing) {
                           handleToggleHabit(habit.id, !isCompleted);
                         }
                       }}
@@ -282,16 +304,22 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                         userSelect: 'none'
                       }}
                       className={cn(
-                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer min-h-[56px]",
+                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer min-h-[60px]",
                         "bg-secondary/30 border border-border/50",
-                        isCompleted && "bg-primary/10 border-primary/30"
+                        "active:scale-[0.98] active:bg-primary/20",
+                        isCompleted && "bg-primary/10 border-primary/30",
+                        isProcessing && "opacity-50 pointer-events-none"
                       )}
                     >
                       <Checkbox
                         checked={isCompleted}
-                        disabled={submitting}
+                        disabled={submitting || isProcessing}
+                        onCheckedChange={(checked) => {
+                          handleToggleHabit(habit.id, Boolean(checked));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                         className={cn(
-                          "h-6 w-6 rounded-full border-2 pointer-events-none",
+                          "h-6 w-6 rounded-full border-2",
                           isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
                         )}
                       />
