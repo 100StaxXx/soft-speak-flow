@@ -17,13 +17,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: 'mind' | 'body' | 'soul' }[] = [
   { type: 'energy_beam', label: 'Star Defender', icon: <Zap className="w-4 h-4" />, stat: 'body' },
-  { type: 'tap_sequence', label: 'Cosmic Tap Sequence', icon: <Target className="w-4 h-4" />, stat: 'mind' },
-  { type: 'astral_frequency', label: 'Cosmic Dash', icon: <Radio className="w-4 h-4" />, stat: 'soul' },
+  { type: 'tap_sequence', label: 'Tap Sequence', icon: <Target className="w-4 h-4" />, stat: 'mind' },
+  { type: 'astral_frequency', label: 'Cosmiq Dash', icon: <Radio className="w-4 h-4" />, stat: 'soul' },
   { type: 'eclipse_timing', label: 'Stellar Beats', icon: <Moon className="w-4 h-4" />, stat: 'body' },
   { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" />, stat: 'mind' },
   { type: 'rune_resonance', label: 'Rune Resonance', icon: <Music className="w-4 h-4" />, stat: 'soul' },
   { type: 'soul_serpent', label: 'Soul Serpent', icon: <Zap className="w-4 h-4" />, stat: 'body' },
-  { type: 'orb_match', label: 'Cosmic Orb Match', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
+  { type: 'orb_match', label: 'Orb Match', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
   { type: 'galactic_match', label: 'Galactic Match', icon: <Layers className="w-4 h-4" />, stat: 'mind' },
 ];
 

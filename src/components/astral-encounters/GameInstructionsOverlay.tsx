@@ -45,7 +45,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   tap_sequence: {
     icon: Circle,
-    title: "Cosmic Tap Sequence",
+    title: "Tap Sequence",
     goal: "Memorize and tap the orbs in order!",
     howToPlay: [
       "Watch the orbs light up in sequence",
@@ -57,7 +57,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   astral_frequency: {
     icon: Rocket,
-    title: "Cosmic Dash",
+    title: "Cosmiq Dash",
     goal: "Dash through the cosmic tunnel! Collect stardust, avoid obstacles!",
     howToPlay: [
       "Swipe or tap arrows to switch lanes",
@@ -118,7 +118,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   orb_match: {
     icon: Grid3X3,
-    title: "Cosmic Orb Match",
+    title: "Orb Match",
     goal: "Drag orbs to create matches of 3 or more!",
     howToPlay: [
       "Touch and drag any orb across the grid",
