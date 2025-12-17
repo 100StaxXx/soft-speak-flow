@@ -38,6 +38,7 @@ const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/Star
 const RuneResonanceGame = lazy(() => import('@/components/astral-encounters/RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
 const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
+const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
 
 // Track which games user has practiced in this arcade session
 const arcadePracticedGames = new Set<MiniGameType>();
@@ -51,6 +52,7 @@ const GAMES = [
   { type: 'rune_resonance' as MiniGameType, label: 'Rune Resonance', icon: Hexagon, stat: 'soul' as const },
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Orb Match', icon: Grid3X3, stat: 'mind' as const },
+  { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -209,6 +211,7 @@ export default function AstralArcade() {
         case 'rune_resonance': return RuneResonanceGame;
         case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
+        case 'galactic_match': return GalacticMatchGame;
         default: return null;
       }
     })();
@@ -328,7 +331,7 @@ export default function AstralArcade() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/8</p>
+                  <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/9</p>
                   <p className="text-[10px] text-muted-foreground">Games mastered</p>
                 </div>
                 <div>

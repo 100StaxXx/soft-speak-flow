@@ -22,6 +22,7 @@ const StarfallDodgeGame = lazy(() => import('./StarfallDodgeGame').then(m => ({ 
 const RuneResonanceGame = lazy(() => import('./RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
 const SoulSerpentGame = lazy(() => import('./SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('./OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
+const GalacticMatchGame = lazy(() => import('./GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
 
 // Track which games user has practiced (persists in session)
 const practicedGames = new Set<MiniGameType>();
@@ -186,6 +187,7 @@ export const AstralEncounterModal = ({
         case 'rune_resonance': return RuneResonanceGame;
         case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
+        case 'galactic_match': return GalacticMatchGame;
         default: return EnergyBeamGame;
       }
     })();

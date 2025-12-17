@@ -10,8 +10,9 @@ import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { RuneResonanceGame } from './RuneResonanceGame';
 import { SoulSerpentGame } from './SoulSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
+import { GalacticMatchGame } from './GalacticMatchGame';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { Zap, Target, Radio, Moon, Sparkles, Music, X, Trophy, Brain, Heart, Grid3X3 } from 'lucide-react';
+import { Zap, Target, Radio, Moon, Sparkles, Music, X, Trophy, Brain, Heart, Grid3X3, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: 'mind' | 'body' | 'soul' }[] = [
@@ -23,6 +24,7 @@ const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: '
   { type: 'rune_resonance', label: 'Rune Resonance', icon: <Music className="w-4 h-4" />, stat: 'soul' },
   { type: 'soul_serpent', label: 'Soul Serpent', icon: <Zap className="w-4 h-4" />, stat: 'body' },
   { type: 'orb_match', label: 'Orb Match', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
+  { type: 'galactic_match', label: 'Galactic Match', icon: <Layers className="w-4 h-4" />, stat: 'mind' },
 ];
 
 interface MiniGameTesterProps {
@@ -72,6 +74,8 @@ export const MiniGameTester = ({ companionStats: initialStats }: MiniGameTesterP
         return <SoulSerpentGame {...props} />;
       case 'orb_match':
         return <OrbMatchGame {...props} />;
+      case 'galactic_match':
+        return <GalacticMatchGame {...props} />;
       default:
         return null;
     }

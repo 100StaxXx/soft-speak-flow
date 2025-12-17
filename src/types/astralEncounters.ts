@@ -23,7 +23,8 @@ export type MiniGameType =
   | 'starfall_dodge'
   | 'rune_resonance'
   | 'soul_serpent'
-  | 'orb_match';
+  | 'orb_match'
+  | 'galactic_match';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
