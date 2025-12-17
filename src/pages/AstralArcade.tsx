@@ -249,7 +249,7 @@ export default function AstralArcade() {
         {/* Active game overlay */}
         {activeGame && (
           <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-md h-[500px]">
               <Button
                 variant="ghost"
                 size="sm"

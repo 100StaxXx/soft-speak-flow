@@ -255,7 +255,7 @@ export const PracticeRoundWrapper = ({
             className="relative"
           >
             <PracticeBanner />
-            <div className="pt-2">
+            <div className="pt-2 h-[500px]">
               {renderPracticeGame()}
             </div>
           </motion.div>
