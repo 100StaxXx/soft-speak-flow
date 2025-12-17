@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
+import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
@@ -88,6 +89,7 @@ export const CompanionDisplay = memo(() => {
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations } = useCompanionRegenerate();
+  const { equippedRewards } = useEpicRewards();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -204,6 +206,40 @@ export const CompanionDisplay = memo(() => {
     return {};
   }, [equippedSkin]);
 
+  // Parse equipped epic reward cosmetics
+  const equippedCosmeticStyles = useMemo(() => {
+    const styles: React.CSSProperties = {};
+    
+    // Apply equipped frame
+    if (equippedRewards.frame?.epic_rewards?.css_effect) {
+      const frameEffect = equippedRewards.frame.epic_rewards.css_effect as Record<string, any>;
+      if (frameEffect.borderColor) {
+        styles.borderColor = frameEffect.borderColor;
+        styles.borderWidth = frameEffect.borderWidth || '4px';
+        styles.borderStyle = 'solid';
+      }
+    }
+    
+    // Apply equipped effect (glow)
+    if (equippedRewards.effect?.epic_rewards?.css_effect) {
+      const effectData = equippedRewards.effect.epic_rewards.css_effect as Record<string, any>;
+      if (effectData.glowColor) {
+        styles.boxShadow = `0 0 30px ${effectData.glowColor}, 0 0 60px ${effectData.glowColor}`;
+      }
+    }
+    
+    return styles;
+  }, [equippedRewards]);
+
+  // Get equipped background gradient
+  const equippedBackgroundStyle = useMemo(() => {
+    if (equippedRewards.background?.epic_rewards?.css_effect) {
+      const bgEffect = equippedRewards.background.epic_rewards.css_effect as Record<string, any>;
+      return bgEffect.gradient || null;
+    }
+    return null;
+  }, [equippedRewards]);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     setPrefersReducedMotion(mediaQuery.matches);
@@ -304,10 +340,19 @@ export const CompanionDisplay = memo(() => {
       />
 
       <Card className="relative overflow-hidden cosmiq-glass border-celestial-blue/40 hover:border-nebula-pink/60 transition-all duration-500 animate-scale-in">
-        {/* Nebula background gradients */}
-        <div className="absolute inset-0 bg-gradient-to-br from-nebula-pink/10 via-celestial-blue/10 to-cosmiq-glow/10 opacity-60 animate-nebula-shift" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--celestial-blue)/0.2),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--nebula-pink)/0.2),transparent_50%)]" />
+        {/* Equipped background or default nebula gradients */}
+        {equippedBackgroundStyle ? (
+          <div 
+            className="absolute inset-0 opacity-70 transition-opacity duration-500" 
+            style={{ background: equippedBackgroundStyle }}
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-nebula-pink/10 via-celestial-blue/10 to-cosmiq-glow/10 opacity-60 animate-nebula-shift" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--celestial-blue)/0.2),transparent_50%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--nebula-pink)/0.2),transparent_50%)]" />
+          </>
+        )}
         
         <div className="relative p-6 space-y-6">
           {/* Stage Badge */}
@@ -386,7 +431,7 @@ export const CompanionDisplay = memo(() => {
                 src={effectiveImageUrl}
                 alt={`${stageName} companion at stage ${companion.current_stage}${health.moodState !== 'happy' ? ` (${health.moodState})` : ''}`}
                 className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''}`}
-                style={{ ...skinStyles, ...moodStyles }}
+                style={{ ...skinStyles, ...moodStyles, ...equippedCosmeticStyles }}
                 onLoad={() => {
                   setImageLoaded(true);
                   setImageError(false); // Clear error on successful load
