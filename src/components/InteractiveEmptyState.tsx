@@ -57,7 +57,7 @@ export function InteractiveEmptyState({
   }, []);
   
   return (
-    <Card className="p-8 text-center space-y-6 bg-gradient-to-br from-muted/30 via-primary/5 to-muted/10 border-dashed border-2 border-primary/20 relative overflow-hidden">
+    <Card className="p-4 sm:p-8 text-center space-y-4 sm:space-y-6 bg-gradient-to-br from-muted/30 via-primary/5 to-muted/10 border-dashed border-2 border-primary/20 relative overflow-hidden">
       {/* Background particles */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(5)].map((_, i) => (
@@ -74,15 +74,15 @@ export function InteractiveEmptyState({
       </div>
       
       {/* Animated icon */}
-      <div className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center relative">
+      <div className="mx-auto w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center relative">
         <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2s' }} />
-        <Icon className="h-12 w-12 text-primary animate-float-slow" />
-        <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-stardust-gold animate-sparkle" />
+        <Icon className="h-8 w-8 sm:h-12 sm:w-12 text-primary animate-float-slow" />
+        <Sparkles className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 text-stardust-gold animate-sparkle" />
       </div>
       
       {/* Title and description */}
       <div className="space-y-2 relative z-10">
-        <h3 className="text-2xl font-bold text-foreground">{title}</h3>
+        <h3 className="text-xl sm:text-2xl font-bold text-foreground">{title}</h3>
         <p className="text-muted-foreground max-w-md mx-auto">{description}</p>
       </div>
       
@@ -121,7 +121,7 @@ export function InteractiveEmptyState({
         <Button 
           onClick={onAddQuest} 
           size="lg" 
-          className="mt-4 gap-2 animate-pulse-subtle shadow-lg shadow-primary/25"
+          className="mt-4 gap-2 animate-pulse-subtle shadow-lg shadow-primary/25 w-full sm:w-auto"
         >
           <Plus className="h-5 w-5" />
           Add Your First Quest
