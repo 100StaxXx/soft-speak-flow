@@ -9,6 +9,8 @@ interface StarfallDodgeGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 interface FallingObject {
@@ -221,6 +223,8 @@ export const StarfallDodgeGame = ({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: StarfallDodgeGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [playerX, setPlayerX] = useState(50);
@@ -290,10 +294,10 @@ export const StarfallDodgeGame = ({
     };
   }, [difficulty, questIntervalScale]);
 
-  // Initialize time based on difficulty
+  // Initialize time based on difficulty or maxTimer override
   useEffect(() => {
-    setTimeLeft(config.time);
-  }, [config.time]);
+    setTimeLeft(maxTimer ?? config.time);
+  }, [config.time, maxTimer]);
 
   // Check active power-ups
   const hasPowerUp = useCallback((type: ActivePowerUp['type']) => {

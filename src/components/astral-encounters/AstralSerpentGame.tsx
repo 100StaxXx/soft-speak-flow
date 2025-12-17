@@ -11,6 +11,8 @@ interface AstralSerpentGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Optional timer limit for practice mode
+  isPractice?: boolean;
 }
 
 interface Position {
@@ -260,7 +262,9 @@ export const AstralSerpentGame = ({
   companionStats,
   onComplete,
   difficulty = 'medium',
-  questIntervalScale = 0
+  questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: AstralSerpentGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [snake, setSnake] = useState<Position[]>([{ x: 5, y: 5 }]);

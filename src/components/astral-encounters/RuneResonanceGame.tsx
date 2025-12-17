@@ -9,6 +9,8 @@ interface RuneResonanceGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
+  maxTimer?: number; // Override timer for practice mode
+  isPractice?: boolean;
 }
 
 interface Rune {
@@ -427,6 +429,8 @@ export const RuneResonanceGame = ({
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
+  maxTimer,
+  isPractice = false,
 }: RuneResonanceGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [runes, setRunes] = useState<Rune[]>([]);
@@ -471,9 +475,12 @@ export const RuneResonanceGame = ({
     };
   }, [difficulty, questIntervalScale]);
 
+  // Effective timer (use maxTimer override or default)
+  const effectiveTimer = maxTimer ?? settings.roundTimer;
+
   // Game timer
   const { timeLeft: timeRemaining } = useGameTimer(
-    settings.roundTimer,
+    effectiveTimer,
     gameState === 'playing',
     () => {
       if (gameState === 'playing') {
