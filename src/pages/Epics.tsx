@@ -8,6 +8,7 @@ import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight } from "lucide-react";
+import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -44,6 +45,7 @@ const Epics = () => {
     title: string;
     description?: string;
     target_days: number;
+    story_type_slug?: StoryTypeSlug;
     habits: Array<{
       title: string;
       difficulty: string;
