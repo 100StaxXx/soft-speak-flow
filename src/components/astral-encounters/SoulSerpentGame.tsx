@@ -36,6 +36,7 @@ const CELL_SIZE = 32;
 const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
 const MIN_SWIPE_DISTANCE = 30;
+const INTERPOLATION_STEPS = 8; // Smoothness - higher = smoother movement
 
 // D-Pad button component
 const DPadButton = memo(({ 
@@ -151,20 +152,36 @@ const TrailParticleComponent = memo(({ particle }: { particle: TrailParticle }) 
 ));
 TrailParticleComponent.displayName = 'TrailParticleComponent';
 
-// Continuous serpent renderer using SVG
+// Continuous serpent renderer using SVG with smooth interpolation
 const ContinuousSerpent = memo(({ 
   snake, 
-  direction 
+  direction,
+  interpolation = 0
 }: { 
   snake: Position[]; 
   direction: Direction;
+  interpolation?: number;
 }) => {
-  const pathPoints = useMemo(() => 
-    snake.map(seg => ({
-      x: seg.x * CELL_SIZE + CELL_SIZE / 2,
-      y: seg.y * CELL_SIZE + CELL_SIZE / 2
-    })), [snake]
-  );
+  // Calculate interpolated positions for smooth movement
+  const pathPoints = useMemo(() => {
+    return snake.map((seg, index) => {
+      let x = seg.x * CELL_SIZE + CELL_SIZE / 2;
+      let y = seg.y * CELL_SIZE + CELL_SIZE / 2;
+      
+      // Only interpolate the head for smoother feel
+      if (index === 0 && interpolation > 0) {
+        const moveDistance = CELL_SIZE * interpolation;
+        switch (direction) {
+          case 'up': y -= moveDistance; break;
+          case 'down': y += moveDistance; break;
+          case 'left': x -= moveDistance; break;
+          case 'right': x += moveDistance; break;
+        }
+      }
+      
+      return { x, y };
+    });
+  }, [snake, direction, interpolation]);
 
   // Build smooth bezier curve path through all points
   const pathD = useMemo(() => {
@@ -374,19 +391,24 @@ export const SoulSerpentGame = ({
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
   const [swipeIndicator, setSwipeIndicator] = useState<Direction | null>(null);
   const [showSwipeHint, setShowSwipeHint] = useState(true);
+  const [interpolation, setInterpolation] = useState(0); // 0 to 1 for smooth movement
   
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const trailCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const directionRef = useRef<Direction>('right');
+  const lastDirectionRef = useRef<Direction>('right'); // Track last applied direction
+  const directionQueueRef = useRef<Direction[]>([]); // Queue for buffered inputs
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const particleIdRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastMoveTimeRef = useRef<number>(0);
 
-  // Speed based on difficulty
-  const baseSpeed = difficulty === 'easy' ? 280 : difficulty === 'medium' ? 220 : 170;
+  // Speed based on difficulty (slower for smoother feel)
+  const baseSpeed = difficulty === 'easy' ? 320 : difficulty === 'medium' ? 260 : 200;
   const adjustedSpeed = baseSpeed * (1 - questIntervalScale * 0.1);
-  const gameSpeed = Math.max(120, adjustedSpeed);
+  const gameSpeed = Math.max(150, adjustedSpeed);
 
   // Add trail particle when snake moves
   const addTrailParticle = useCallback((position: Position, snakeLength: number) => {
@@ -462,6 +484,14 @@ export const SoulSerpentGame = ({
   const moveSnake = useCallback(() => {
     if (gameState !== 'playing') return;
 
+    // Process direction queue
+    if (directionQueueRef.current.length > 0) {
+      const nextDirection = directionQueueRef.current.shift()!;
+      directionRef.current = nextDirection;
+      lastDirectionRef.current = nextDirection;
+      setDirection(nextDirection);
+    }
+
     setSnake(prevSnake => {
       const head = prevSnake[0];
       const currentDirection = directionRef.current;
@@ -492,8 +522,9 @@ export const SoulSerpentGame = ({
       if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
       if (newHead.y >= GRID_SIZE) newHead.y = 0;
 
-      // Self collision = game over (endless mode)
-      if (prevSnake.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+      // Self collision = game over (check against body, not including tail that will be removed)
+      const bodyToCheck = prevSnake.slice(0, -1); // Exclude tail since it moves
+      if (bodyToCheck.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
         setGameState('complete');
         triggerHaptic('error');
         setShake(true);
@@ -531,21 +562,46 @@ export const SoulSerpentGame = ({
       newSnake.pop(); // Remove tail if no food eaten
       return newSnake;
     });
+    
+    // Reset interpolation for smooth animation
+    setInterpolation(0);
   }, [gameState, stardust, score, highScore, spawnStardust, onComplete, addTrailParticle, calculateAccuracy]);
 
-  // Game loop
+  // Game loop with smooth interpolation
   useEffect(() => {
-    if (gameState === 'playing') {
-      gameLoopRef.current = setInterval(moveSnake, gameSpeed);
-    }
+    if (gameState !== 'playing') return;
+    
+    let lastTime = performance.now();
+    let accumulator = 0;
+    
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      lastTime = currentTime;
+      accumulator += deltaTime;
+      
+      // Update interpolation for smooth visual movement
+      const progress = Math.min(1, accumulator / gameSpeed);
+      setInterpolation(progress);
+      
+      // Move snake at fixed intervals
+      if (accumulator >= gameSpeed) {
+        moveSnake();
+        accumulator = 0;
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(gameLoop);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(gameLoop);
+    
     return () => {
-      if (gameLoopRef.current) {
-        clearInterval(gameLoopRef.current);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, [gameState, moveSnake, gameSpeed]);
 
-  // Handle direction changes
+  // Handle direction changes with queue to prevent retreating
   const changeDirection = useCallback((newDirection: Direction) => {
     const opposites: Record<Direction, Direction> = {
       up: 'down',
@@ -554,22 +610,38 @@ export const SoulSerpentGame = ({
       right: 'left',
     };
     
-    if (opposites[newDirection] !== directionRef.current) {
-      directionRef.current = newDirection;
-      setDirection(newDirection);
-      triggerHaptic('light');
-      
-      setSwipeIndicator(newDirection);
-      if (swipeTimeoutRef.current) {
-        clearTimeout(swipeTimeoutRef.current);
-      }
-      swipeTimeoutRef.current = setTimeout(() => {
-        setSwipeIndicator(null);
-      }, 200);
-      
-      if (showSwipeHint) {
-        setShowSwipeHint(false);
-      }
+    // Get the effective current direction (last in queue, or current if queue empty)
+    const effectiveDirection = directionQueueRef.current.length > 0 
+      ? directionQueueRef.current[directionQueueRef.current.length - 1] 
+      : lastDirectionRef.current;
+    
+    // Don't allow reversing into yourself
+    if (opposites[newDirection] === effectiveDirection) {
+      return; // Block reverse direction
+    }
+    
+    // Don't queue the same direction twice
+    if (newDirection === effectiveDirection) {
+      return;
+    }
+    
+    // Add to queue (max 2 buffered inputs)
+    if (directionQueueRef.current.length < 2) {
+      directionQueueRef.current.push(newDirection);
+    }
+    
+    triggerHaptic('light');
+    
+    setSwipeIndicator(newDirection);
+    if (swipeTimeoutRef.current) {
+      clearTimeout(swipeTimeoutRef.current);
+    }
+    swipeTimeoutRef.current = setTimeout(() => {
+      setSwipeIndicator(null);
+    }, 200);
+    
+    if (showSwipeHint) {
+      setShowSwipeHint(false);
     }
   }, [showSwipeHint]);
 
@@ -665,6 +737,9 @@ export const SoulSerpentGame = ({
     return () => {
       if (swipeTimeoutRef.current) {
         clearTimeout(swipeTimeoutRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, []);
@@ -770,7 +845,7 @@ export const SoulSerpentGame = ({
           <Stardust position={stardust} />
 
           {/* Continuous Serpent */}
-          <ContinuousSerpent snake={snake} direction={direction} />
+          <ContinuousSerpent snake={snake} direction={direction} interpolation={interpolation} />
 
           {/* Collection effect */}
           <AnimatePresence>
