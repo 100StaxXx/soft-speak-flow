@@ -135,6 +135,12 @@ export const TaskCard = ({
         showCheckAnimation && "animate-task-complete"
       )}
       data-tutorial-quest={isTutorialQuest ? "true" : undefined}
+      style={{
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        WebkitTouchCallout: 'none',
+        touchAction: 'manipulation',
+      }}
     >
       {/* Enhanced Floating XP Animation */}
       {showXP && (
