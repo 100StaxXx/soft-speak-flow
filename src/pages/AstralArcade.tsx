@@ -44,7 +44,7 @@ const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/Gala
 const arcadePracticedGames = new Set<MiniGameType>();
 
 const GAMES = [
-  { type: 'energy_beam' as MiniGameType, label: 'Energy Beam', icon: Zap, stat: 'mind' as const },
+  { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'mind' as const },
   { type: 'tap_sequence' as MiniGameType, label: 'Tap Sequence', icon: Target, stat: 'mind' as const },
   { type: 'astral_frequency' as MiniGameType, label: 'Astral Frequency', icon: Radio, stat: 'soul' as const },
   { type: 'eclipse_timing' as MiniGameType, label: 'Eclipse Timing', icon: Clock, stat: 'body' as const },

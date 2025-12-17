@@ -64,7 +64,7 @@ const PracticeIntro = memo(({
   onSkip: () => void;
 }) => {
   const gameName = {
-    energy_beam: 'Energy Beam',
+    energy_beam: 'Star Defender',
     tap_sequence: 'Tap Sequence',
     astral_frequency: 'Astral Frequency',
     eclipse_timing: 'Eclipse Timing',
