@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArcadeGameCard } from '@/components/astral-encounters/ArcadeGameCard';
+import { GameInstructionsOverlay } from '@/components/astral-encounters/GameInstructionsOverlay';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
 import { useAchievements } from '@/hooks/useAchievements';
@@ -56,6 +57,7 @@ const GAMES = [
 ];
 
 type Difficulty = 'easy' | 'medium' | 'hard';
+type GamePhase = 'instructions' | 'practice' | 'playing';
 
 // Animation variants
 const containerVariants = {
@@ -102,21 +104,25 @@ export default function AstralArcade() {
   const { checkArcadeDiscovery } = useAchievements();
 
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
-  const [gamePhase, setGamePhase] = useState<'practice' | 'playing'>('practice');
+  const [gamePhase, setGamePhase] = useState<GamePhase>('instructions');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [sessionPlays, setSessionPlays] = useState(0);
   const [sessionBestAccuracy, setSessionBestAccuracy] = useState(0);
 
-  // Handle selecting a game - check if practice needed
+  // Handle selecting a game - always show instructions first
   const handleSelectGame = useCallback((gameType: MiniGameType) => {
     setActiveGame(gameType);
-    // Show practice if user hasn't practiced this game in arcade session
-    if (!arcadePracticedGames.has(gameType)) {
+    setGamePhase('instructions'); // Always show instructions first
+  }, []);
+
+  // After instructions, go to practice or playing
+  const handleInstructionsReady = useCallback(() => {
+    if (activeGame && !arcadePracticedGames.has(activeGame)) {
       setGamePhase('practice');
     } else {
       setGamePhase('playing');
     }
-  }, []);
+  }, [activeGame]);
 
   const handlePracticeComplete = useCallback(() => {
     if (activeGame) {
@@ -260,16 +266,49 @@ export default function AstralArcade() {
                 Exit Game
               </Button>
               
-              {gamePhase === 'practice' ? (
-                <PracticeRoundWrapper
-                  gameType={activeGame}
-                  companionStats={companionStats}
-                  onPracticeComplete={handlePracticeComplete}
-                  onSkipPractice={handleSkipPractice}
-                />
-              ) : (
-                renderGame()
-              )}
+              <AnimatePresence mode="wait">
+                {gamePhase === 'instructions' && (
+                  <motion.div
+                    key="instructions"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="h-full flex items-center justify-center"
+                  >
+                    <GameInstructionsOverlay 
+                      gameType={activeGame} 
+                      onReady={handleInstructionsReady} 
+                    />
+                  </motion.div>
+                )}
+                
+                {gamePhase === 'practice' && (
+                  <motion.div
+                    key="practice"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                  >
+                    <PracticeRoundWrapper
+                      gameType={activeGame}
+                      companionStats={companionStats}
+                      onPracticeComplete={handlePracticeComplete}
+                      onSkipPractice={handleSkipPractice}
+                    />
+                  </motion.div>
+                )}
+                
+                {gamePhase === 'playing' && (
+                  <motion.div
+                    key="playing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {renderGame()}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         )}
