@@ -326,23 +326,33 @@ export const TapSequenceGame = ({
   // Static stars - memoized
   const stars = useStaticStars(10);
 
-  // Generate orbs with decoys for hard mode
+  // Generate orbs with decoys for hard mode - fully randomized order placement
   const generateOrbs = useCallback(() => {
     const totalOrbs = orbsPerRound + config.decoyCount;
     const positions = getGridPositions(totalOrbs, 12, 75);
     
-    const newOrbs: Orb[] = positions.map((pos, i) => ({
+    // Shuffle positions first for random spatial distribution
+    const shuffledPositions = [...positions].sort(() => Math.random() - 0.5);
+    
+    // Create order array: [1, 2, 3, ..., orbsPerRound, 0, 0, 0...] for decoys
+    const orders = [
+      ...Array.from({ length: orbsPerRound }, (_, i) => i + 1),
+      ...Array.from({ length: config.decoyCount }, () => 0)
+    ];
+    
+    // Shuffle the orders separately so number placement is unpredictable
+    const shuffledOrders = [...orders].sort(() => Math.random() - 0.5);
+    
+    const newOrbs: Orb[] = shuffledPositions.map((pos, i) => ({
       id: i,
       x: pos.x,
       y: pos.y,
-      order: i < orbsPerRound ? i + 1 : 0,
+      order: shuffledOrders[i],
       tapped: false,
-      isDecoy: i >= orbsPerRound,
+      isDecoy: shuffledOrders[i] === 0,
     }));
     
-    // Shuffle positions so decoys aren't always at the end
-    const shuffled = [...newOrbs].sort(() => Math.random() - 0.5);
-    setOrbs(shuffled);
+    setOrbs(newOrbs);
   }, [orbsPerRound, config.decoyCount]);
 
   // Initialize game
