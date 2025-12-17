@@ -178,6 +178,34 @@ export const useEpics = () => {
 
         // Trigger narrative seed generation in background if story type selected
         if (epicData.story_type_slug) {
+          // Fetch companion and mentor data for richer narrative generation
+          const [companionResult, profileResult] = await Promise.all([
+            supabase
+              .from('user_companion')
+              .select('spirit_animal, core_element, favorite_color, fur_color')
+              .eq('user_id', user.id)
+              .maybeSingle(),
+            supabase
+              .from('profiles')
+              .select('selected_mentor_id')
+              .eq('id', user.id)
+              .maybeSingle(),
+          ]);
+
+          let mentorData: { id?: string; name?: string; slug?: string } | undefined;
+          
+          if (profileResult.data?.selected_mentor_id) {
+            const { data: mentor } = await supabase
+              .from('mentors')
+              .select('id, name, slug')
+              .eq('id', profileResult.data.selected_mentor_id)
+              .maybeSingle();
+            
+            if (mentor) {
+              mentorData = { id: mentor.id, name: mentor.name, slug: mentor.slug || undefined };
+            }
+          }
+
           supabase.functions.invoke('generate-epic-narrative-seed', {
             body: {
               userId: user.id,
@@ -186,6 +214,9 @@ export const useEpics = () => {
               epicDescription: epicData.description,
               targetDays: epicData.target_days,
               storyTypeSlug: epicData.story_type_slug,
+              companionData: companionResult.data || undefined,
+              mentorData,
+              userGoal: epicData.description,
             },
           }).catch(err => {
             console.error('Narrative seed generation failed:', err);
