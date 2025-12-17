@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
@@ -6,12 +6,12 @@ import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 import { GameStyleWrapper } from './GameStyles';
 
-interface AstralSerpentGameProps {
+interface SoulSerpentGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
-  maxTimer?: number; // Optional timer limit for practice mode
+  maxTimer?: number;
   isPractice?: boolean;
 }
 
@@ -31,7 +31,6 @@ interface TrailParticle {
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
-// Larger cells for better mobile UX
 const GRID_SIZE = 10;
 const CELL_SIZE = 32;
 const TRAIL_LIFETIME = 600;
@@ -132,112 +131,6 @@ const SwipeHint = memo(({ show }: { show: boolean }) => (
 ));
 SwipeHint.displayName = 'SwipeHint';
 
-// Direction indicator arrow for serpent head
-const DirectionArrow = memo(({ direction }: { direction: Direction }) => {
-  const rotations: Record<Direction, number> = {
-    up: -90,
-    down: 90,
-    left: 180,
-    right: 0,
-  };
-  
-  return (
-    <motion.div
-      className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-primary/80 flex items-center justify-center z-10"
-      style={{ rotate: rotations[direction] }}
-      animate={{ scale: [1, 1.2, 1] }}
-      transition={{ duration: 0.5, repeat: Infinity }}
-    >
-      <ArrowRight className="w-3 h-3 text-primary-foreground" />
-    </motion.div>
-  );
-});
-DirectionArrow.displayName = 'DirectionArrow';
-
-// Memoized cell component for performance
-const Cell = memo(({ 
-  isHead, 
-  isBody, 
-  isStardust,
-  bodyIndex,
-  totalLength,
-  direction
-}: { 
-  isHead: boolean; 
-  isBody: boolean; 
-  isStardust: boolean;
-  bodyIndex: number;
-  totalLength: number;
-  direction?: Direction;
-}) => {
-  if (isHead) {
-    return (
-      <div className="relative">
-        <motion.div
-          className="rounded-full"
-          style={{
-            width: CELL_SIZE - 2,
-            height: CELL_SIZE - 2,
-            background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
-            boxShadow: '0 0 15px hsl(var(--primary)), 0 0 25px hsl(var(--primary) / 0.5), inset 0 0 8px hsl(var(--primary-foreground) / 0.3)',
-          }}
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 0.3, repeat: Infinity }}
-        />
-        {direction && <DirectionArrow direction={direction} />}
-      </div>
-    );
-  }
-
-  if (isBody) {
-    const opacity = 1 - (bodyIndex / totalLength) * 0.5;
-    return (
-      <div
-        className="rounded-full"
-        style={{
-          width: CELL_SIZE - 4,
-          height: CELL_SIZE - 4,
-          margin: 1,
-          background: `linear-gradient(135deg, hsl(var(--primary) / ${opacity}), hsl(var(--accent) / ${opacity}))`,
-          boxShadow: `0 0 8px hsl(var(--primary) / ${opacity * 0.5})`,
-        }}
-      />
-    );
-  }
-
-  if (isStardust) {
-    return (
-      <motion.div
-        className="relative"
-        style={{
-          width: CELL_SIZE - 2,
-          height: CELL_SIZE - 2,
-        }}
-        animate={{ 
-          rotate: 360,
-          scale: [0.9, 1.3, 0.9],
-        }}
-        transition={{ 
-          rotate: { duration: 3, repeat: Infinity, ease: "linear" },
-          scale: { duration: 1, repeat: Infinity }
-        }}
-      >
-        <div 
-          className="w-full h-full rounded-full"
-          style={{ 
-            background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-            boxShadow: '0 0 15px #fbbf24, 0 0 25px #fbbf24, 0 0 35px #fbbf24' 
-          }}
-        />
-        <span className="absolute inset-0 flex items-center justify-center text-sm">✨</span>
-      </motion.div>
-    );
-  }
-
-  return null;
-});
-Cell.displayName = 'Cell';
-
 // Trail particle component
 const TrailParticleComponent = memo(({ particle }: { particle: TrailParticle }) => (
   <motion.div
@@ -258,19 +151,224 @@ const TrailParticleComponent = memo(({ particle }: { particle: TrailParticle }) 
 ));
 TrailParticleComponent.displayName = 'TrailParticleComponent';
 
-export const AstralSerpentGame = ({
+// Continuous serpent renderer using SVG
+const ContinuousSerpent = memo(({ 
+  snake, 
+  direction 
+}: { 
+  snake: Position[]; 
+  direction: Direction;
+}) => {
+  const pathPoints = useMemo(() => 
+    snake.map(seg => ({
+      x: seg.x * CELL_SIZE + CELL_SIZE / 2,
+      y: seg.y * CELL_SIZE + CELL_SIZE / 2
+    })), [snake]
+  );
+
+  // Build smooth bezier curve path through all points
+  const pathD = useMemo(() => {
+    if (pathPoints.length < 2) return '';
+    
+    let d = `M ${pathPoints[0].x} ${pathPoints[0].y}`;
+    
+    for (let i = 1; i < pathPoints.length; i++) {
+      const prev = pathPoints[i - 1];
+      const curr = pathPoints[i];
+      
+      // Use quadratic bezier for smooth curves
+      const midX = (prev.x + curr.x) / 2;
+      const midY = (prev.y + curr.y) / 2;
+      
+      if (i === 1) {
+        d += ` Q ${prev.x} ${prev.y} ${midX} ${midY}`;
+      } else {
+        d += ` T ${midX} ${midY}`;
+      }
+    }
+    
+    // End at the last point
+    const last = pathPoints[pathPoints.length - 1];
+    d += ` L ${last.x} ${last.y}`;
+    
+    return d;
+  }, [pathPoints]);
+
+  // Calculate eye positions based on direction
+  const eyeOffset = useMemo(() => {
+    const offset = CELL_SIZE / 4;
+    switch (direction) {
+      case 'up': return { left: { x: -offset, y: -offset / 2 }, right: { x: offset, y: -offset / 2 } };
+      case 'down': return { left: { x: -offset, y: offset / 2 }, right: { x: offset, y: offset / 2 } };
+      case 'left': return { left: { x: -offset / 2, y: -offset }, right: { x: -offset / 2, y: offset } };
+      case 'right': return { left: { x: offset / 2, y: -offset }, right: { x: offset / 2, y: offset } };
+    }
+  }, [direction]);
+
+  const gridSize = GRID_SIZE * CELL_SIZE;
+
+  return (
+    <svg 
+      className="absolute inset-0 pointer-events-none" 
+      width={gridSize} 
+      height={gridSize}
+      style={{ overflow: 'visible' }}
+    >
+      <defs>
+        {/* Serpent body gradient */}
+        <linearGradient id="serpentBodyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="hsl(var(--primary))" />
+          <stop offset="50%" stopColor="hsl(var(--accent))" />
+          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+        </linearGradient>
+        
+        {/* Head gradient */}
+        <radialGradient id="serpentHeadGradient">
+          <stop offset="0%" stopColor="hsl(var(--primary))" />
+          <stop offset="70%" stopColor="hsl(var(--accent))" />
+          <stop offset="100%" stopColor="hsl(var(--primary))" />
+        </radialGradient>
+
+        {/* Glow filter */}
+        <filter id="serpentGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+          <feMerge>
+            <feMergeNode in="coloredBlur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Body glow layer */}
+      {pathPoints.length >= 2 && (
+        <path
+          d={pathD}
+          stroke="hsl(var(--primary) / 0.4)"
+          strokeWidth={CELL_SIZE + 4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          filter="url(#serpentGlow)"
+        />
+      )}
+
+      {/* Main body */}
+      {pathPoints.length >= 2 && (
+        <path
+          d={pathD}
+          stroke="url(#serpentBodyGradient)"
+          strokeWidth={CELL_SIZE - 6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      )}
+
+      {/* Scales pattern overlay */}
+      {pathPoints.length >= 2 && (
+        <path
+          d={pathD}
+          stroke="hsl(var(--primary-foreground) / 0.15)"
+          strokeWidth={CELL_SIZE - 10}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="4 8"
+          fill="none"
+        />
+      )}
+
+      {/* Head */}
+      <motion.circle
+        cx={pathPoints[0]?.x || 0}
+        cy={pathPoints[0]?.y || 0}
+        r={(CELL_SIZE / 2) + 2}
+        fill="url(#serpentHeadGradient)"
+        filter="url(#serpentGlow)"
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 0.5, repeat: Infinity }}
+      />
+
+      {/* Left eye */}
+      <circle
+        cx={(pathPoints[0]?.x || 0) + eyeOffset.left.x}
+        cy={(pathPoints[0]?.y || 0) + eyeOffset.left.y}
+        r={4}
+        fill="hsl(var(--background))"
+      />
+      <circle
+        cx={(pathPoints[0]?.x || 0) + eyeOffset.left.x + 1}
+        cy={(pathPoints[0]?.y || 0) + eyeOffset.left.y}
+        r={2}
+        fill="hsl(var(--foreground))"
+      />
+
+      {/* Right eye */}
+      <circle
+        cx={(pathPoints[0]?.x || 0) + eyeOffset.right.x}
+        cy={(pathPoints[0]?.y || 0) + eyeOffset.right.y}
+        r={4}
+        fill="hsl(var(--background))"
+      />
+      <circle
+        cx={(pathPoints[0]?.x || 0) + eyeOffset.right.x + 1}
+        cy={(pathPoints[0]?.y || 0) + eyeOffset.right.y}
+        r={2}
+        fill="hsl(var(--foreground))"
+      />
+    </svg>
+  );
+});
+ContinuousSerpent.displayName = 'ContinuousSerpent';
+
+// Stardust component
+const Stardust = memo(({ position }: { position: Position }) => (
+  <motion.div
+    className="absolute"
+    style={{
+      left: position.x * CELL_SIZE,
+      top: position.y * CELL_SIZE,
+      width: CELL_SIZE,
+      height: CELL_SIZE,
+    }}
+  >
+    <motion.div
+      className="relative w-full h-full flex items-center justify-center"
+      animate={{ 
+        rotate: 360,
+        scale: [0.9, 1.3, 0.9],
+      }}
+      transition={{ 
+        rotate: { duration: 3, repeat: Infinity, ease: "linear" },
+        scale: { duration: 1, repeat: Infinity }
+      }}
+    >
+      <div 
+        className="w-[90%] h-[90%] rounded-full"
+        style={{ 
+          background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+          boxShadow: '0 0 15px #fbbf24, 0 0 25px #fbbf24, 0 0 35px #fbbf24' 
+        }}
+      />
+      <span className="absolute text-sm">✨</span>
+    </motion.div>
+  </motion.div>
+));
+Stardust.displayName = 'Stardust';
+
+export const SoulSerpentGame = ({
   companionStats,
   onComplete,
   difficulty = 'medium',
   questIntervalScale = 0,
   maxTimer,
   isPractice = false,
-}: AstralSerpentGameProps) => {
+}: SoulSerpentGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [snake, setSnake] = useState<Position[]>([{ x: 5, y: 5 }]);
   const [direction, setDirection] = useState<Direction>('right');
   const [stardust, setStardust] = useState<Position>({ x: 7, y: 5 });
   const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
   const [shake, setShake] = useState(false);
   const [showCollect, setShowCollect] = useState(false);
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
@@ -285,14 +383,10 @@ export const AstralSerpentGame = ({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // EASIER: Much slower base speeds (280/220/170ms)
+  // Speed based on difficulty
   const baseSpeed = difficulty === 'easy' ? 280 : difficulty === 'medium' ? 220 : 170;
-  // Slight difficulty scaling, no body stat penalty
   const adjustedSpeed = baseSpeed * (1 - questIntervalScale * 0.1);
   const gameSpeed = Math.max(120, adjustedSpeed);
-
-  // EASIER: Lower target scores (3/4/6)
-  const targetScore = difficulty === 'easy' ? 3 : difficulty === 'medium' ? 4 : 6;
 
   // Add trail particle when snake moves
   const addTrailParticle = useCallback((position: Position, snakeLength: number) => {
@@ -341,6 +435,30 @@ export const AstralSerpentGame = ({
     return newPos;
   }, []);
 
+  // Calculate accuracy based on score achieved (endless mode)
+  const calculateAccuracy = useCallback((finalScore: number): { accuracy: number; result: 'perfect' | 'good' | 'partial' | 'fail' } => {
+    // Score thresholds based on difficulty
+    const thresholds = {
+      easy: { fail: 2, partial: 4, good: 6, perfect: 10 },
+      medium: { fail: 3, partial: 5, good: 8, perfect: 12 },
+      hard: { fail: 4, partial: 6, good: 10, perfect: 15 },
+    };
+    
+    const t = thresholds[difficulty];
+    
+    if (finalScore < t.fail) {
+      return { accuracy: Math.round((finalScore / t.fail) * 30), result: 'fail' };
+    } else if (finalScore < t.partial) {
+      return { accuracy: 30 + Math.round(((finalScore - t.fail) / (t.partial - t.fail)) * 20), result: 'partial' };
+    } else if (finalScore < t.good) {
+      return { accuracy: 50 + Math.round(((finalScore - t.partial) / (t.good - t.partial)) * 25), result: 'good' };
+    } else if (finalScore < t.perfect) {
+      return { accuracy: 75 + Math.round(((finalScore - t.good) / (t.perfect - t.good)) * 15), result: 'good' };
+    } else {
+      return { accuracy: Math.min(100, 90 + Math.round((finalScore - t.perfect) * 0.5)), result: 'perfect' };
+    }
+  }, [difficulty]);
+
   const moveSnake = useCallback(() => {
     if (gameState !== 'playing') return;
 
@@ -368,25 +486,26 @@ export const AstralSerpentGame = ({
           newHead = { x: head.x + 1, y: head.y };
       }
 
-      // EASIER: Wrap-around walls instead of death
+      // Wrap-around walls
       if (newHead.x < 0) newHead.x = GRID_SIZE - 1;
       if (newHead.x >= GRID_SIZE) newHead.x = 0;
       if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
       if (newHead.y >= GRID_SIZE) newHead.y = 0;
 
-      // Self collision still causes game over
+      // Self collision = game over (endless mode)
       if (prevSnake.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
         setGameState('complete');
         triggerHaptic('error');
         setShake(true);
         setTimeout(() => setShake(false), 300);
         
-        // EASIER: Lower thresholds (40% partial, 60% good, 85% perfect)
-        const accuracy = Math.round((score / targetScore) * 100);
+        // Calculate result based on score achieved
+        const { accuracy, result } = calculateAccuracy(score);
+        
         onComplete({
-          success: score >= Math.ceil(targetScore * 0.4),
-          accuracy: Math.min(100, accuracy),
-          result: accuracy >= 85 ? 'perfect' : accuracy >= 60 ? 'good' : accuracy >= 40 ? 'partial' : 'fail'
+          success: result !== 'fail',
+          accuracy,
+          result,
         });
         return prevSnake;
       }
@@ -397,14 +516,8 @@ export const AstralSerpentGame = ({
       if (newHead.x === stardust.x && newHead.y === stardust.y) {
         setScore(s => {
           const newScore = s + 1;
-          if (newScore >= targetScore) {
-            setGameState('complete');
-            triggerHaptic('success');
-            onComplete({
-              success: true,
-              accuracy: 100,
-              result: 'perfect'
-            });
+          if (newScore > highScore) {
+            setHighScore(newScore);
           }
           return newScore;
         });
@@ -412,13 +525,13 @@ export const AstralSerpentGame = ({
         setShowCollect(true);
         triggerHaptic('medium');
         setTimeout(() => setShowCollect(false), 300);
-        return newSnake;
+        return newSnake; // Grow snake
       }
 
-      newSnake.pop();
+      newSnake.pop(); // Remove tail if no food eaten
       return newSnake;
     });
-  }, [gameState, stardust, score, targetScore, spawnStardust, onComplete, addTrailParticle]);
+  }, [gameState, stardust, score, highScore, spawnStardust, onComplete, addTrailParticle, calculateAccuracy]);
 
   // Game loop
   useEffect(() => {
@@ -446,7 +559,6 @@ export const AstralSerpentGame = ({
       setDirection(newDirection);
       triggerHaptic('light');
       
-      // Show swipe indicator briefly
       setSwipeIndicator(newDirection);
       if (swipeTimeoutRef.current) {
         clearTimeout(swipeTimeoutRef.current);
@@ -455,7 +567,6 @@ export const AstralSerpentGame = ({
         setSwipeIndicator(null);
       }, 200);
       
-      // Hide hint after first input
       if (showSwipeHint) {
         setShowSwipeHint(false);
       }
@@ -499,15 +610,13 @@ export const AstralSerpentGame = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState, changeDirection]);
 
-  // Touch start handler - record starting position
+  // Touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (gameState !== 'playing') return;
-    
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   }, [gameState]);
 
-  // Touch end handler - detect swipe or tap
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (gameState !== 'playing' || !gameAreaRef.current || !touchStartRef.current) return;
     
@@ -516,14 +625,10 @@ export const AstralSerpentGame = ({
     const deltaY = touch.clientY - touchStartRef.current.y;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // Check if it's a swipe (minimum distance threshold)
     if (distance >= MIN_SWIPE_DISTANCE) {
-      // Determine swipe direction
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal swipe
         changeDirection(deltaX > 0 ? 'right' : 'left');
       } else {
-        // Vertical swipe
         changeDirection(deltaY > 0 ? 'down' : 'up');
       }
     }
@@ -531,7 +636,6 @@ export const AstralSerpentGame = ({
     touchStartRef.current = null;
   }, [gameState, changeDirection]);
 
-  // Mouse click handler (for desktop)
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (gameState !== 'playing' || !gameAreaRef.current) return;
     
@@ -557,7 +661,6 @@ export const AstralSerpentGame = ({
     setGameState('playing');
   }, []);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (swipeTimeoutRef.current) {
@@ -585,35 +688,28 @@ export const AstralSerpentGame = ({
 
         {/* Game HUD */}
         <GameHUD
-          title="Astral Serpent"
-          subtitle={`Collect ${targetScore} stardust!`}
+          title="Soul Serpent"
+          subtitle="Survive as long as possible!"
           score={score}
-          maxScore={targetScore}
-          combo={snake.length - 1}
           showCombo={true}
+          combo={snake.length - 1}
           primaryStat={{ value: snake.length, label: 'Length', color: 'hsl(var(--primary))' }}
           isPaused={gameState === 'paused'}
           onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
         />
 
-        {/* Score progress */}
-        <div className="flex gap-2 mb-4">
-          {Array.from({ length: targetScore }).map((_, i) => (
-            <motion.div
-              key={i}
-              className={`w-4 h-4 rounded-full border-2 transition-all ${
-                i < score
-                  ? 'border-yellow-400'
-                  : 'border-muted-foreground/30 bg-muted/20'
-              }`}
-              style={i < score ? {
-                background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-                boxShadow: '0 0 10px #fbbf24',
-              } : {}}
-              animate={i < score ? { scale: [1, 1.2, 1] } : {}}
-              transition={{ duration: 0.3 }}
-            />
-          ))}
+        {/* Score display */}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
+            <span className="text-yellow-400">✨</span>
+            <span className="text-sm font-bold text-yellow-400">{score}</span>
+          </div>
+          {highScore > 0 && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/30">
+              <span className="text-[10px] text-muted-foreground">Best:</span>
+              <span className="text-xs font-semibold text-foreground">{highScore}</span>
+            </div>
+          )}
         </div>
 
         {/* Game Grid */}
@@ -670,43 +766,11 @@ export const AstralSerpentGame = ({
             ))}
           </AnimatePresence>
 
-          {/* Render stardust */}
-          <div
-            style={{
-              position: 'absolute',
-              left: stardust.x * CELL_SIZE,
-              top: stardust.y * CELL_SIZE,
-            }}
-          >
-            <Cell 
-              isHead={false} 
-              isBody={false} 
-              isStardust={true}
-              bodyIndex={0}
-              totalLength={1}
-            />
-          </div>
+          {/* Stardust */}
+          <Stardust position={stardust} />
 
-          {/* Render snake */}
-          {snake.map((segment, index) => (
-            <div
-              key={`${segment.x}-${segment.y}-${index}`}
-              style={{
-                position: 'absolute',
-                left: segment.x * CELL_SIZE,
-                top: segment.y * CELL_SIZE,
-              }}
-            >
-              <Cell
-                isHead={index === 0}
-                isBody={index > 0}
-                isStardust={false}
-                bodyIndex={index}
-                totalLength={snake.length}
-                direction={index === 0 ? direction : undefined}
-              />
-            </div>
-          ))}
+          {/* Continuous Serpent */}
+          <ContinuousSerpent snake={snake} direction={direction} />
 
           {/* Collection effect */}
           <AnimatePresence>
