@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
@@ -55,8 +55,7 @@ export const AstralEncounterModal = ({
   bossBattleContext,
   onBossBattleCancel,
 }: AstralEncounterModalProps) => {
-  // Start with boss_intro phase if it's a boss battle
-  const [phase, setPhase] = useState<Phase>(isBossBattle ? 'boss_intro' : 'reveal');
+  const [phase, setPhase] = useState<Phase>('reveal');
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [phaseResults, setPhaseResults] = useState<MiniGameResult[]>([]);
   const [finalResult, setFinalResult] = useState<{
@@ -66,6 +65,16 @@ export const AstralEncounterModal = ({
   } | null>(null);
   
   const { companion } = useCompanion();
+
+  // Reset phase when modal opens - set to boss_intro for boss battles
+  useEffect(() => {
+    if (open) {
+      setPhase(isBossBattle ? 'boss_intro' : 'reveal');
+      setCurrentPhaseIndex(0);
+      setPhaseResults([]);
+      setFinalResult(null);
+    }
+  }, [open, isBossBattle]);
 
   // Fetch/generate adversary image
   const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
@@ -168,13 +177,8 @@ export const AstralEncounterModal = ({
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
-    setTimeout(() => {
-      setPhase(isBossBattle ? 'boss_intro' : 'reveal');
-      setCurrentPhaseIndex(0);
-      setPhaseResults([]);
-      setFinalResult(null);
-    }, 300);
-  }, [onOpenChange, isBossBattle]);
+    // State reset now happens in useEffect when open changes
+  }, [onOpenChange]);
 
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
