@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mentorNarrativeProfiles, getMentorNarrativeProfile, type MentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -231,7 +232,31 @@ serve(async (req) => {
       }
     }
 
-    // Determine species type for location matching
+    // Fetch user's mentor for narrative voice
+    let mentorProfile: MentorNarrativeProfile | null = null;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('selected_mentor_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profile?.selected_mentor_id) {
+      const { data: mentor } = await supabase
+        .from('mentors')
+        .select('slug, name')
+        .eq('id', profile.selected_mentor_id)
+        .maybeSingle();
+      
+      if (mentor?.slug) {
+        mentorProfile = getMentorNarrativeProfile(mentor.slug);
+        console.log(`[Cosmic Postcard] Using mentor voice: ${mentor.name}`);
+      }
+    }
+
+    // Default to Eli's nurturing voice if no mentor selected
+    if (!mentorProfile) {
+      mentorProfile = mentorNarrativeProfiles.eli;
+    }
     const speciesType = getSpeciesType(companion.spirit_animal);
     console.log(`[Cosmic Postcard] Species type: ${speciesType}`);
 
@@ -365,12 +390,11 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
     let seedsPlanted: string[] | null = null;
     let isFinale = milestonePercent === 100;
 
-    // Populate narrative fields if we have a chapter blueprint
-    if (chapterBlueprint) {
+    // Generate full chapter story content if we have blueprint and mentor voice
+    if (chapterBlueprint && mentorProfile) {
       chapterTitle = chapterBlueprint.title || null;
-      storyContent = chapterBlueprint.opening_hook || null;
-      clueText = chapterBlueprint.mystery_seed || null;
       charactersFeatured = chapterBlueprint.featured_characters || null;
+      clueText = chapterBlueprint.mystery_seed || null;
       seedsPlanted = chapterBlueprint.prophecy_seed ? [chapterBlueprint.prophecy_seed] : null;
       
       // Get prophecy line for this chapter
@@ -381,8 +405,101 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
           prophecyLine = prophecyLines[lineIndex];
         }
       }
+
+      // Generate full chapter story content with mentor voice
+      const chapterPrompt = `You are writing Chapter ${chapterNumber} of an epic narrative journey.
+
+═══════════════════════════════════════════════════════════════════
+                     NARRATOR'S VOICE: ${mentorProfile.name}
+═══════════════════════════════════════════════════════════════════
+You MUST write this chapter in ${mentorProfile.name}'s distinctive narrative voice:
+- Narrative Style: ${mentorProfile.narrativeVoice}
+- Speech Patterns: ${mentorProfile.speechPatterns.join('; ')}
+- Wisdom Style: ${mentorProfile.wisdomStyle}
+
+Example of ${mentorProfile.name}'s voice:
+${mentorProfile.exampleDialogue[0]}
+
+The mentor appears as: ${mentorProfile.storyAppearance}
+
+═══════════════════════════════════════════════════════════════════
+                         CHAPTER DETAILS
+═══════════════════════════════════════════════════════════════════
+CHAPTER NUMBER: ${chapterNumber}
+CHAPTER TITLE: ${chapterBlueprint.title || 'Untitled'}
+LOCATION: ${location.name} - ${location.description}
+NARRATIVE PURPOSE: ${chapterBlueprint.narrative_purpose || 'Advance the journey'}
+OPENING HOOK: ${chapterBlueprint.opening_hook || 'A new discovery awaits'}
+PLOT ADVANCEMENT: ${chapterBlueprint.plot_advancement || 'Move toward the goal'}
+
+COMPANION:
+- Species: ${companion.spirit_animal}
+- Element: ${companion.core_element}
+- This is their loyal companion who travels with them
+
+FEATURED CHARACTERS: ${(chapterBlueprint.featured_characters || []).join(', ') || 'None'}
+MENTOR WISDOM TO INCLUDE: ${chapterBlueprint.mentor_wisdom || 'A piece of guidance'}
+CLIFFHANGER: ${chapterBlueprint.cliffhanger || 'Leave them wanting more'}
+
+${isFinale ? 'THIS IS THE FINALE CHAPTER - Make it epic and conclusive!' : ''}
+
+Write a compelling 200-300 word chapter that:
+1. Opens with the hook scene at ${location.name}
+2. Features the companion prominently
+3. Includes a moment where ${mentorProfile.name} offers wisdom IN THEIR AUTHENTIC VOICE
+4. Advances the plot naturally
+5. Ends with the cliffhanger or resolution
+
+Return ONLY the story content - no JSON, no formatting markers, just the narrative text.`;
+
+      console.log('[Cosmic Postcard] Generating chapter content with mentor voice...');
+      
+      const storyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: `You are a master storyteller writing in ${mentorProfile.name}'s narrative voice. Every sentence should feel like ${mentorProfile.name} is telling the story.` },
+            { role: "user", content: chapterPrompt }
+          ],
+        }),
+      });
+
+      if (storyResponse.ok) {
+        const storyData = await storyResponse.json();
+        const generatedStory = storyData.choices?.[0]?.message?.content;
+        if (generatedStory) {
+          storyContent = generatedStory.trim();
+          console.log('[Cosmic Postcard] Generated chapter story content');
+        }
+      } else {
+        // Fallback to blueprint opening hook
+        storyContent = chapterBlueprint.opening_hook || null;
+        console.log('[Cosmic Postcard] Using blueprint opening hook as fallback');
+      }
       
       // Enhanced caption with chapter info
+      caption = `Chapter ${chapterNumber}: ${chapterTitle || location.name} 🌟`;
+    } else if (chapterBlueprint) {
+      // No mentor but have blueprint - use opening hook
+      chapterTitle = chapterBlueprint.title || null;
+      storyContent = chapterBlueprint.opening_hook || null;
+      clueText = chapterBlueprint.mystery_seed || null;
+      charactersFeatured = chapterBlueprint.featured_characters || null;
+      seedsPlanted = chapterBlueprint.prophecy_seed ? [chapterBlueprint.prophecy_seed] : null;
+      
+      if (storySeed?.the_prophecy?.when_revealed && storySeed?.the_prophecy?.full_text) {
+        const prophecyLines = storySeed.the_prophecy.full_text.split('\n').filter((l: string) => l.trim());
+        const lineIndex = storySeed.the_prophecy.when_revealed.indexOf(chapterNumber);
+        if (lineIndex >= 0 && prophecyLines[lineIndex]) {
+          prophecyLine = prophecyLines[lineIndex];
+        }
+      }
+      
       caption = `Chapter ${chapterNumber}: ${chapterTitle || location.name} 🌟`;
     }
 

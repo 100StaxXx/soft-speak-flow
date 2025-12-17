@@ -206,6 +206,7 @@ export const useGenerateNarrativeSeed = () => {
       mentorData?: {
         id?: string;
         name?: string;
+        slug?: string;
         narrativeVoice?: string;
         storyRole?: string;
       };

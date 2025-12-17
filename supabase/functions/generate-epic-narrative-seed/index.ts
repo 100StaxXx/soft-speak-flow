@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mentorNarrativeProfiles, getMentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,7 +100,11 @@ serve(async (req) => {
       return `${key.toUpperCase()}: ${template.role}. Arc: ${template.arc}. Traits: ${template.traits.join(', ')}.`;
     }).join('\n');
 
-    // Build the master prompt
+    // Get mentor narrative profile
+    const mentorSlug = mentorData?.slug || 'eli';
+    const mentorProfile = getMentorNarrativeProfile(mentorSlug) || mentorNarrativeProfiles.eli;
+
+    // Build the master prompt with rich mentor context
     const prompt = `You are COSMIC STORYTELLER — a master narrative architect creating an interconnected epic journey.
 
 STORY TYPE: ${storyType.name}
@@ -109,16 +114,35 @@ EPIC TITLE: ${epicTitle}
 EPIC DESCRIPTION: ${epicDescription || 'A personal journey of growth'}
 USER'S REAL-LIFE GOAL: ${userGoal || 'Self-improvement and personal growth'}
 
-COMPANION:
+═══════════════════════════════════════════════════════════════════
+                         THE COMPANION
+═══════════════════════════════════════════════════════════════════
 - Species: ${companionData?.spirit_animal || 'Cosmic creature'}
 - Element: ${companionData?.core_element || 'Starlight'}
 - Colors: ${companionData?.favorite_color || 'Cosmic purple'}, ${companionData?.fur_color || 'silver'}
-- Personality: Loyal companion on this journey
+- Personality: Loyal companion who evolves alongside the hero
 
-MENTOR (appears as guide figure):
-- Name: ${mentorData?.name || 'The Guide'}
-- Voice: ${mentorData?.narrativeVoice || 'Wise and encouraging'}
-- Role: ${mentorData?.storyRole || 'Guide'}
+═══════════════════════════════════════════════════════════════════
+                     THE GUIDING VOICE: ${mentorProfile.name}
+═══════════════════════════════════════════════════════════════════
+MENTOR NAME: ${mentorProfile.name}
+MENTOR ROLE: ${mentorProfile.storyRole}
+MENTOR'S NARRATIVE VOICE: ${mentorProfile.narrativeVoice}
+MENTOR'S SPEECH PATTERNS:
+${mentorProfile.speechPatterns.map(p => `  - ${p}`).join('\n')}
+MENTOR'S WISDOM STYLE: ${mentorProfile.wisdomStyle}
+MENTOR'S STORY APPEARANCE: ${mentorProfile.storyAppearance}
+MENTOR'S FINALE ROLE: ${mentorProfile.finaleRole}
+
+EXAMPLE MENTOR DIALOGUE (study these to capture their voice):
+${mentorProfile.exampleDialogue.map(d => `  ${d}`).join('\n')}
+
+THE MENTOR AS CHARACTER:
+- The mentor appears as a guiding presence in the hero's cosmic journey
+- They observe, comment, and occasionally intervene at critical moments  
+- Their wisdom reflects their unique perspective and style
+- They have their own arc: from distant guide → trusted companion → respected equal
+- Each chapter should include a "mentor wisdom moment" in their authentic voice
 
 CHARACTER ARCHETYPES TO INCLUDE:
 ${archetypeDescriptions}
