@@ -20,7 +20,7 @@ const AstralFrequencyGame = lazy(() => import('./AstralFrequencyGame').then(m =>
 const EclipseTimingGame = lazy(() => import('./EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
 const StarfallDodgeGame = lazy(() => import('./StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
 const RuneResonanceGame = lazy(() => import('./RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
-const AstralSerpentGame = lazy(() => import('./AstralSerpentGame').then(m => ({ default: m.AstralSerpentGame })));
+const SoulSerpentGame = lazy(() => import('./SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('./OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 
 // Track which games user has practiced (persists in session)
@@ -184,7 +184,7 @@ export const AstralEncounterModal = ({
         case 'eclipse_timing': return EclipseTimingGame;
         case 'starfall_dodge': return StarfallDodgeGame;
         case 'rune_resonance': return RuneResonanceGame;
-        case 'astral_serpent': return AstralSerpentGame;
+        case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
         default: return EnergyBeamGame;
       }

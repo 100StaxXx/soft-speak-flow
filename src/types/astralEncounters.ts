@@ -22,7 +22,7 @@ export type MiniGameType =
   | 'eclipse_timing'
   | 'starfall_dodge'
   | 'rune_resonance'
-  | 'astral_serpent'
+  | 'soul_serpent'
   | 'orb_match';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
@@ -111,8 +111,8 @@ export interface EncounterPhase {
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   distraction: 'tap_sequence',      // Focus challenge - pattern recognition
   chaos: 'tap_sequence',            // Order from chaos - memorize sequences
-  stagnation: 'astral_serpent',     // Movement/growth - get moving
-  laziness: 'astral_serpent',       // Action required - keep the serpent alive
+  stagnation: 'soul_serpent',       // Movement/growth - get moving
+  laziness: 'soul_serpent',         // Action required - keep the serpent alive
   anxiety: 'astral_frequency',      // Finding calm through meditative focus
   overthinking: 'astral_frequency', // Quieting mental noise - find clarity
   doubt: 'starfall_dodge',          // Facing fears - courage under fire

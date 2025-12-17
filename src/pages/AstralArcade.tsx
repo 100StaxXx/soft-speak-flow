@@ -36,7 +36,7 @@ const AstralFrequencyGame = lazy(() => import('@/components/astral-encounters/As
 const EclipseTimingGame = lazy(() => import('@/components/astral-encounters/EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
 const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
 const RuneResonanceGame = lazy(() => import('@/components/astral-encounters/RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
-const AstralSerpentGame = lazy(() => import('@/components/astral-encounters/AstralSerpentGame').then(m => ({ default: m.AstralSerpentGame })));
+const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 
 // Track which games user has practiced in this arcade session
@@ -49,7 +49,7 @@ const GAMES = [
   { type: 'eclipse_timing' as MiniGameType, label: 'Eclipse Timing', icon: Clock, stat: 'body' as const },
   { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
   { type: 'rune_resonance' as MiniGameType, label: 'Rune Resonance', icon: Hexagon, stat: 'soul' as const },
-  { type: 'astral_serpent' as MiniGameType, label: 'Astral Serpent', icon: Gamepad2, stat: 'body' as const },
+  { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Orb Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 
@@ -207,7 +207,7 @@ export default function AstralArcade() {
         case 'eclipse_timing': return EclipseTimingGame;
         case 'starfall_dodge': return StarfallDodgeGame;
         case 'rune_resonance': return RuneResonanceGame;
-        case 'astral_serpent': return AstralSerpentGame;
+        case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
         default: return null;
       }

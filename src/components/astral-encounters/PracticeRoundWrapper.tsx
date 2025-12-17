@@ -7,7 +7,7 @@ import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { RuneResonanceGame } from './RuneResonanceGame';
-import { AstralSerpentGame } from './AstralSerpentGame';
+import { SoulSerpentGame } from './SoulSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
 import { Button } from '@/components/ui/button';
 import { Play, SkipForward } from 'lucide-react';
@@ -70,7 +70,7 @@ const PracticeIntro = memo(({
     eclipse_timing: 'Eclipse Timing',
     starfall_dodge: 'Starfall Dodge',
     rune_resonance: 'Rune Resonance',
-    astral_serpent: 'Astral Serpent',
+    soul_serpent: 'Soul Serpent',
     orb_match: 'Orb Match',
   }[gameType];
 
@@ -224,8 +224,8 @@ export const PracticeRoundWrapper = ({
         return <StarfallDodgeGame {...props} />;
       case 'rune_resonance':
         return <RuneResonanceGame {...props} />;
-      case 'astral_serpent':
-        return <AstralSerpentGame {...props} />;
+      case 'soul_serpent':
+        return <SoulSerpentGame {...props} />;
       case 'orb_match':
         return <OrbMatchGame {...props} />;
       default:

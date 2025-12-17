@@ -100,14 +100,14 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statBonus: 'soul',
     statIcon: Sparkles,
   },
-  astral_serpent: {
+  soul_serpent: {
     icon: Zap,
-    title: "Astral Serpent",
-    goal: "Guide the cosmic serpent to consume stardust!",
+    title: "Soul Serpent",
+    goal: "Guide the serpent and survive as long as possible!",
     howToPlay: [
-      "Swipe or use arrows to change direction",
-      "Collect glowing stardust to grow",
-      "Don't hit the walls or yourself!"
+      "Swipe or use D-Pad to change direction",
+      "Collect glowing stardust to grow longer",
+      "Game ends when you hit yourself!"
     ],
     statBonus: 'body',
     statIcon: Heart,
