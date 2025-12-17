@@ -21,15 +21,19 @@ import { GuildActivityFeed } from "./GuildActivityFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
+import { EpicRewardReveal } from "./EpicRewardReveal";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
+import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { generateAdversary } from "@/utils/adversaryGenerator";
 import type { StorySeed, BossBattleContext, NarrativeCheckpoint } from "@/types/narrativeTypes";
 import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
+import type { RewardRevealData } from "@/types/epicRewards";
+import { STORY_TYPE_BADGES } from "@/types/epicRewards";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -63,7 +67,8 @@ interface Epic {
   is_public?: boolean;
   invite_code?: string;
   theme_color?: string;
-  story_seed?: unknown; // JSON from DB, cast to StorySeed when needed
+  story_seed?: unknown;
+  story_type_slug?: string | null;
   book_title?: string | null;
   total_chapters?: number | null;
   epic_habits?: Array<{
@@ -86,6 +91,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [showBossBattle, setShowBossBattle] = useState(false);
+  const [showRewardReveal, setShowRewardReveal] = useState(false);
+  const [rewardRevealData, setRewardRevealData] = useState<RewardRevealData | null>(null);
   const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
   const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
   const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
@@ -94,6 +101,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
   const { checkEpicCheckpoint } = useEncounterTrigger();
+  const { generateRewardReveal } = useEpicRewards();
   
   // Initialize to -1 on first render to catch any milestones that may have been
   // crossed before this component mounted. Server handles duplicate prevention.
@@ -216,11 +224,28 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
       .eq('id', encounterId);
     
     if (accuracy >= 50) {
-      toast.success('Boss Defeated!', {
-        description: 'You have conquered the final challenge!',
-      });
+      // Generate and show reward reveal
+      const rewards = await generateRewardReveal(epic.story_type_slug || null, epic.id);
+      setRewardRevealData(rewards);
+      setShowBossBattle(false);
+      setShowRewardReveal(true);
+      
+      // Award the story-type achievement
+      const storyType = epic.story_type_slug || 'treasure_hunt';
+      const badgeInfo = STORY_TYPE_BADGES[storyType];
+      if (badgeInfo) {
+        // Insert achievement (ignore if already exists via unique constraint)
+        await supabase.from('achievements').upsert({
+          user_id: epic.user_id,
+          achievement_type: badgeInfo.achievementType,
+          title: badgeInfo.title,
+          description: badgeInfo.description,
+          icon: badgeInfo.icon,
+          tier: badgeInfo.tier,
+        }, { onConflict: 'user_id,achievement_type', ignoreDuplicates: true });
+      }
     }
-  }, []);
+  }, [epic.id, epic.story_type_slug, epic.user_id, generateRewardReveal]);
 
   const handleBossBattleCancel = useCallback(() => {
     setShowBossBattle(false);
@@ -505,6 +530,18 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reward Reveal Modal */}
+      <EpicRewardReveal
+        open={showRewardReveal}
+        onOpenChange={setShowRewardReveal}
+        rewardData={rewardRevealData}
+        onClaim={() => {
+          toast.success('Boss Defeated!', {
+            description: 'Rewards claimed! Check your collection.',
+          });
+        }}
+      />
     </motion.div>
   );
 };

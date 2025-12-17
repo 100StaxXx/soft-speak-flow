@@ -1736,6 +1736,53 @@ export type Database = {
           },
         ]
       }
+      epic_rewards: {
+        Row: {
+          created_at: string | null
+          css_effect: Json | null
+          description: string
+          drop_weight: number | null
+          id: string
+          image_url: string | null
+          name: string
+          rarity: string
+          reward_type: string
+          story_type_slug: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          css_effect?: Json | null
+          description: string
+          drop_weight?: number | null
+          id?: string
+          image_url?: string | null
+          name: string
+          rarity: string
+          reward_type: string
+          story_type_slug?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          css_effect?: Json | null
+          description?: string
+          drop_weight?: number | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          rarity?: string
+          reward_type?: string
+          story_type_slug?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_rewards_story_type_slug_fkey"
+            columns: ["story_type_slug"]
+            isOneToOne: false
+            referencedRelation: "epic_story_types"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       epic_story_types: {
         Row: {
           base_chapters: number
@@ -4296,6 +4343,55 @@ export type Database = {
             columns: ["daily_quote_id"]
             isOneToOne: false
             referencedRelation: "daily_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_epic_rewards: {
+        Row: {
+          epic_id: string | null
+          id: string
+          is_equipped: boolean | null
+          reward_id: string
+          unlocked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          epic_id?: string | null
+          id?: string
+          is_equipped?: boolean | null
+          reward_id: string
+          unlocked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          epic_id?: string | null
+          id?: string
+          is_equipped?: boolean | null
+          reward_id?: string
+          unlocked_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_epic_rewards_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_epic_rewards_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "epic_rewards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_epic_rewards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
