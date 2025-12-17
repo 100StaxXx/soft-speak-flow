@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { safeLocalStorage } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -8,22 +8,42 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export function useFirstTimeModal(tabName: string) {
   const { user } = useAuth();
-  const [showModal, setShowModal] = useState(false);
-
-  const storageKey = `tab_intro_${tabName}_${user?.id || 'anonymous'}`;
+  const hasCheckedRef = useRef(false);
+  
+  const userId = user?.id;
+  const storageKey = userId ? `tab_intro_${tabName}_${userId}` : null;
+  
+  const [showModal, setShowModal] = useState(() => {
+    if (!userId) return false;
+    const hasSeenModal = safeLocalStorage.getItem(`tab_intro_${tabName}_${userId}`);
+    return !hasSeenModal;
+  });
 
   useEffect(() => {
-    if (!user?.id) return;
+    // Skip if no user or already checked this mount cycle
+    if (!userId || hasCheckedRef.current) return;
     
-    const hasSeenModal = safeLocalStorage.getItem(storageKey);
+    hasCheckedRef.current = true;
+    
+    const key = `tab_intro_${tabName}_${userId}`;
+    const hasSeenModal = safeLocalStorage.getItem(key);
     if (!hasSeenModal) {
       setShowModal(true);
     }
-  }, [user?.id, storageKey]);
+  }, [userId, tabName]);
+
+  // Reset check flag when component unmounts
+  useEffect(() => {
+    return () => {
+      hasCheckedRef.current = false;
+    };
+  }, []);
 
   const dismissModal = () => {
     setShowModal(false);
-    safeLocalStorage.setItem(storageKey, 'true');
+    if (storageKey) {
+      safeLocalStorage.setItem(storageKey, 'true');
+    }
   };
 
   return { showModal, dismissModal };
