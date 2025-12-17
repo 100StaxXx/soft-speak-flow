@@ -288,6 +288,30 @@ All colors MUST be HSL.
     display: none;
   }
 
+  /* iOS Touch Optimizations */
+  .ios-scroll-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent rubber-banding on iOS for modals/dialogs */
+  [data-radix-dialog-content],
+  [data-vaul-drawer] {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Better touch targets for iOS inputs */
+  input, textarea, select {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Swipeable elements - allow horizontal swipe only */
+  .swipe-horizontal {
+    touch-action: pan-y pinch-zoom;
+  }
+
   /* Haptic Feedback Utility */
   .haptic-press {
     transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
