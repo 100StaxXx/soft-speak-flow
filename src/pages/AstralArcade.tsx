@@ -45,13 +45,13 @@ const arcadePracticedGames = new Set<MiniGameType>();
 
 const GAMES = [
   { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'mind' as const },
-  { type: 'tap_sequence' as MiniGameType, label: 'Cosmic Tap Sequence', icon: Target, stat: 'mind' as const },
-  { type: 'astral_frequency' as MiniGameType, label: 'Cosmic Dash', icon: Radio, stat: 'soul' as const },
+  { type: 'tap_sequence' as MiniGameType, label: 'Tap Sequence', icon: Target, stat: 'mind' as const },
+  { type: 'astral_frequency' as MiniGameType, label: 'Cosmiq Dash', icon: Radio, stat: 'soul' as const },
   { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'body' as const },
   { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
   { type: 'rune_resonance' as MiniGameType, label: 'Rune Resonance', icon: Hexagon, stat: 'soul' as const },
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
-  { type: 'orb_match' as MiniGameType, label: 'Cosmic Orb Match', icon: Grid3X3, stat: 'mind' as const },
+  { type: 'orb_match' as MiniGameType, label: 'Orb Match', icon: Grid3X3, stat: 'mind' as const },
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 
