@@ -293,10 +293,15 @@ export const GalacticMatchGame = ({
   const timerProgress = (timeLeft / gameTime) * 100;
   const timerColor = timerProgress > 50 ? 'bg-cyan-500' : timerProgress > 25 ? 'bg-yellow-500' : 'bg-red-500';
 
-  // Memoize grid style
-  const gridStyle = useMemo(() => ({
-    gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
-  }), [config.cols]);
+  // Calculate card size to fit all cards on screen
+  const gridStyle = useMemo(() => {
+    const aspectRatio = config.cols / config.rows;
+    return {
+      gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
+      gridTemplateRows: `repeat(${config.rows}, 1fr)`,
+      aspectRatio: `${aspectRatio}`,
+    };
+  }, [config.cols, config.rows]);
 
   return (
     <div className="flex flex-col items-center gap-4 p-4 select-none touch-none">
@@ -341,7 +346,10 @@ export const GalacticMatchGame = ({
       </div>
 
       {/* Card grid */}
-      <div className="relative w-full aspect-[3/4] max-w-sm">
+      <div 
+        className="relative w-full max-w-xs mx-auto"
+        style={{ aspectRatio: `${config.cols}/${config.rows}` }}
+      >
         {/* Countdown overlay */}
         <AnimatePresence>
           {countdown > 0 && (
@@ -393,7 +401,7 @@ export const GalacticMatchGame = ({
 
         {/* Cards */}
         <div 
-          className="grid gap-2 w-full h-full p-2"
+          className="grid gap-1.5 w-full h-full"
           style={gridStyle}
         >
           {cards.map((card) => (
@@ -401,7 +409,7 @@ export const GalacticMatchGame = ({
               key={card.id}
               onClick={() => handleCardClick(card.id)}
               disabled={card.isFlipped || card.isMatched || isLocked || !gameStarted}
-              className="relative w-full aspect-square perspective-1000"
+              className="relative w-full h-full"
               style={{ perspective: '1000px' }}
               whileTap={{ scale: 0.95 }}
             >
