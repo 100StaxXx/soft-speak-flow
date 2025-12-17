@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { HoroscopePageSkeleton } from "@/components/skeletons";
 
 // Type definitions for horoscope data
 interface EnergyForecast {

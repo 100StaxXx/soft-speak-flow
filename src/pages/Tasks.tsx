@@ -38,6 +38,7 @@ import { EpicsTab } from "@/features/epics/components/EpicsTab";
 import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { useComboTracker } from "@/hooks/useComboTracker";
+import { TasksPageSkeleton } from "@/components/skeletons";
 
 // New components
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
@@ -395,16 +396,9 @@ export default function Tasks() {
     );
   }
 
-  // Loading state
+  // Loading state with skeleton
   if (companionLoading) {
-    return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-          <p className="text-muted-foreground">Loading your adventure...</p>
-        </div>
-      </div>
-    );
+    return <TasksPageSkeleton />;
   }
 
   // No companion - redirect to onboarding
