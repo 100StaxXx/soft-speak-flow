@@ -26,7 +26,6 @@ import {
   Gamepad2,
   Grid3X3,
   Trophy,
-  Star,
   Sparkles,
 } from 'lucide-react';
 
@@ -106,8 +105,6 @@ export default function AstralArcade() {
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
   const [gamePhase, setGamePhase] = useState<GamePhase>('instructions');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [sessionPlays, setSessionPlays] = useState(0);
-  const [sessionBestAccuracy, setSessionBestAccuracy] = useState(0);
 
   // Handle selecting a game - always show instructions first
   const handleSelectGame = useCallback((gameType: MiniGameType) => {
@@ -178,12 +175,6 @@ export default function AstralArcade() {
   } : { mind: 10, body: 10, soul: 10 };
 
   const handleGameComplete = useCallback((result: MiniGameResult) => {
-    setSessionPlays((p) => p + 1);
-    
-    if (result.accuracy > sessionBestAccuracy) {
-      setSessionBestAccuracy(result.accuracy);
-    }
-
     if (activeGame) {
       const isNewHighScore = setHighScore(activeGame, result.accuracy, result.result);
       if (isNewHighScore) {
@@ -196,7 +187,7 @@ export default function AstralArcade() {
     }
 
     setActiveGame(null);
-  }, [activeGame, sessionBestAccuracy, setHighScore]);
+  }, [activeGame, setHighScore]);
 
   const renderGame = () => {
     if (!activeGame) return null;
@@ -334,48 +325,23 @@ export default function AstralArcade() {
             </p>
           </motion.div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <motion.div variants={cardVariants}>
-              <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-                <div className="flex items-center gap-2 text-purple-400 mb-1">
-                  <Gamepad2 className="w-4 h-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wide">Session</span>
-                </div>
-                <p className="text-2xl font-bold">{sessionPlays}</p>
-                <p className="text-[10px] text-muted-foreground">Games played</p>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={cardVariants}>
-              <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
-                <div className="flex items-center gap-2 text-yellow-400 mb-1">
-                  <Star className="w-4 h-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wide">Best</span>
-                </div>
-                <p className="text-2xl font-bold">{sessionBestAccuracy}%</p>
-                <p className="text-[10px] text-muted-foreground">Session accuracy</p>
-              </Card>
-            </motion.div>
-          </div>
-
           {/* High Scores Card */}
           <motion.div variants={cardVariants}>
             <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-cyan-400">
-                  <Trophy className="w-4 h-4" />
-                  <span className="text-sm font-semibold uppercase tracking-wide">All-Time Records</span>
+                  <Trophy className="w-5 h-5" />
+                  <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/9</p>
-                  <p className="text-[10px] text-muted-foreground">Games mastered</p>
+                  <p className="text-xs text-muted-foreground">Games mastered</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-cyan-400">{getAverageHighScore()}%</p>
-                  <p className="text-[10px] text-muted-foreground">Average best</p>
+                  <p className="text-xs text-muted-foreground">Average best</p>
                 </div>
               </div>
             </Card>
