@@ -13,11 +13,8 @@ export function useFirstTimeModal(tabName: string) {
   const userId = user?.id;
   const storageKey = userId ? `tab_intro_${tabName}_${userId}` : null;
   
-  const [showModal, setShowModal] = useState(() => {
-    if (!userId) return false;
-    const hasSeenModal = safeLocalStorage.getItem(`tab_intro_${tabName}_${userId}`);
-    return !hasSeenModal;
-  });
+  // Initialize to false - let useEffect determine if modal should show
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     // Skip if no user or already checked this mount cycle
