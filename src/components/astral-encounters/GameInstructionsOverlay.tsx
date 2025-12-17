@@ -30,12 +30,13 @@ interface GameInstruction {
 const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   energy_beam: {
     icon: Zap,
-    title: "Energy Beam",
-    goal: "Release your energy at the perfect moment!",
+    title: "Star Defender",
+    goal: "Destroy the alien fleet before they reach you!",
     howToPlay: [
-      "Hold the button to charge your beam",
-      "Watch for the glowing sweet spot zone",
-      "Release when the charge is in the zone"
+      "Move left/right to dodge attacks",
+      "Auto-fire destroys enemies",
+      "Collect power-ups for shields & bonuses",
+      "Clear all waves to win"
     ],
     statBonus: 'body',
     statIcon: Heart,
