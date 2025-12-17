@@ -49,15 +49,22 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     console.log('[AstralEncounterProvider] Evolution active:', isEvolvingLoading);
   }, [isEvolvingLoading]);
 
+  // Use ref to access queued encounter in event handler without stale closure
+  const queuedEncounterRef = useRef<QueuedEncounter | null>(null);
+  useEffect(() => {
+    queuedEncounterRef.current = queuedEncounter;
+  }, [queuedEncounter]);
+
   // Process queued encounter when evolution modal closes
   useEffect(() => {
     const handleEvolutionClosed = () => {
       console.log('[AstralEncounterProvider] Evolution modal closed, checking queue');
       // Add small delay to ensure evolution cleanup is complete
       setTimeout(() => {
-        if (queuedEncounter) {
-          console.log('[AstralEncounterProvider] Processing queued encounter:', queuedEncounter.triggerType);
-          const { triggerType, sourceId, epicProgress, epicCategory, questInterval } = queuedEncounter;
+        const pending = queuedEncounterRef.current;
+        if (pending) {
+          console.log('[AstralEncounterProvider] Processing queued encounter:', pending.triggerType);
+          const { triggerType, sourceId, epicProgress, epicCategory, questInterval } = pending;
           setQueuedEncounter(null);
           checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
         }
@@ -66,7 +73,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
     window.addEventListener('evolution-modal-closed', handleEvolutionClosed);
     return () => window.removeEventListener('evolution-modal-closed', handleEvolutionClosed);
-  }, [queuedEncounter, checkEncounterTrigger]);
+  }, [checkEncounterTrigger]);
 
   // Wrap checkEncounterTrigger to show overlay first (and queue if evolution active)
   const triggerEncounterWithOverlay = useCallback(async (
