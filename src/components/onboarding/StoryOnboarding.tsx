@@ -13,6 +13,7 @@ import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
+import { MentorCalculating } from "./MentorCalculating";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
@@ -57,6 +58,7 @@ type OnboardingStage =
   | "faction" 
   | "cosmic-birth" 
   | "questionnaire" 
+  | "calculating"
   | "mentor-result" 
   | "mentor-grid"
   | "companion"
@@ -253,6 +255,9 @@ export const StoryOnboarding = () => {
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
+    
+    // Show loading screen immediately
+    setStage("calculating");
 
     // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
     const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
@@ -590,6 +595,18 @@ export const StoryOnboarding = () => {
               faction={faction}
               onComplete={handleQuestionnaireComplete}
             />
+          </motion.div>
+        )}
+
+        {stage === "calculating" && (
+          <motion.div
+            key="calculating"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10"
+          >
+            <MentorCalculating />
           </motion.div>
         )}
 
