@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { 
   Zap, 
   Circle, 
-  Radio,
+  Rocket,
   Moon,
   Sparkles,
   Music,
   Brain,
   Heart,
-  Grid3X3
+  Grid3X3,
+  Target
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -54,16 +55,17 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statIcon: Brain,
   },
   astral_frequency: {
-    icon: Radio,
-    title: "Astral Frequency Align",
-    goal: "Match your frequency with the cosmic wave!",
+    icon: Rocket,
+    title: "Cosmic Dash",
+    goal: "Dash through the cosmic tunnel! Collect stardust, avoid obstacles!",
     howToPlay: [
-      "Drag the slider to adjust your frequency",
-      "Align with the target wavelength",
-      "Hold alignment for the required time"
+      "Swipe or tap arrows to switch lanes",
+      "Collect ✨ stardust for points",
+      "Grab 🛡️ shields for protection",
+      "Speed increases - stay alert!"
     ],
-    statBonus: 'soul',
-    statIcon: Sparkles,
+    statBonus: 'mind',
+    statIcon: Brain,
   },
   eclipse_timing: {
     icon: Music,

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Timer, Lock } from 'lucide-react';
+import { Shield, Star, Zap } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
-import { triggerHaptic, useGameLoop, useParticleSystem } from './gameUtils';
+import { triggerHaptic } from './gameUtils';
 
 interface AstralFrequencyGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -14,299 +14,303 @@ interface AstralFrequencyGameProps {
   isPractice?: boolean;
 }
 
-// Simplified difficulty configuration
+// Difficulty configuration for Cosmic Dash
 const DIFFICULTY_CONFIG = {
   easy: {
-    rounds: 2,
-    lockOnTime: 1.5,
-    roundTime: 40,
-    decoyCount: 0,
-    alignmentTolerance: 12,
-    interferenceChance: 0,
+    gameTime: 30,
+    startSpeed: 1.0,
+    maxSpeed: 2.0,
+    spawnInterval: 1400,
+    obstacleTypes: ['asteroid'] as const,
+    collectibleChance: 0.5,
+    shieldChance: 0.15,
   },
   medium: {
-    rounds: 3,
-    lockOnTime: 1.5,
-    roundTime: 35,
-    decoyCount: 1,
-    alignmentTolerance: 10,
-    interferenceChance: 0,
+    gameTime: 35,
+    startSpeed: 1.3,
+    maxSpeed: 2.5,
+    spawnInterval: 1100,
+    obstacleTypes: ['asteroid', 'dark_matter'] as const,
+    collectibleChance: 0.45,
+    shieldChance: 0.12,
   },
   hard: {
-    rounds: 4,
-    lockOnTime: 1.5,
-    roundTime: 30,
-    decoyCount: 2,
-    alignmentTolerance: 8,
-    interferenceChance: 0.2,
+    gameTime: 40,
+    startSpeed: 1.6,
+    maxSpeed: 3.2,
+    spawnInterval: 850,
+    obstacleTypes: ['asteroid', 'dark_matter', 'storm', 'void'] as const,
+    collectibleChance: 0.35,
+    shieldChance: 0.08,
   },
 };
 
-interface FrequencyTarget {
-  x: number;
-  isDecoy: boolean;
-  isLocked: boolean;
+type ObstacleType = 'asteroid' | 'dark_matter' | 'storm' | 'void';
+type CollectibleType = 'stardust' | 'crystal' | 'shield';
+
+interface Obstacle {
   id: string;
+  lanes: number[]; // Which lanes are blocked (0, 1, 2)
+  y: number; // 0 = bottom (player), 100 = top
+  type: ObstacleType;
 }
 
-// Round timer component
-const RoundTimer = memo(({ timeLeft, maxTime, isUrgent }: { timeLeft: number; maxTime: number; isUrgent: boolean }) => (
-  <div className="w-full max-w-xs mb-2">
-    <div className="flex items-center justify-between text-xs mb-1">
-      <div className="flex items-center gap-1">
-        <Timer className={`w-3 h-3 ${isUrgent ? 'text-red-400 animate-pulse' : 'text-muted-foreground'}`} />
-        <span className={isUrgent ? 'text-red-400 font-bold' : 'text-muted-foreground'}>
-          {timeLeft.toFixed(1)}s
-        </span>
+interface Collectible {
+  id: string;
+  lane: number;
+  y: number;
+  type: CollectibleType;
+  collected: boolean;
+}
+
+// Lane positions (percentages)
+const LANE_POSITIONS = [20, 50, 80];
+const PLAYER_Y = 85;
+const COLLISION_THRESHOLD = 12;
+
+// Obstacle visuals
+const OBSTACLE_CONFIG: Record<ObstacleType, { emoji: string; color: string; name: string }> = {
+  asteroid: { emoji: '🪨', color: '#8b7355', name: 'Asteroid' },
+  dark_matter: { emoji: '🌑', color: '#1a1a2e', name: 'Dark Matter' },
+  storm: { emoji: '⚡', color: '#fbbf24', name: 'Energy Storm' },
+  void: { emoji: '🕳️', color: '#4c1d95', name: 'Void Rift' },
+};
+
+// Collectible visuals
+const COLLECTIBLE_CONFIG: Record<CollectibleType, { emoji: string; color: string; points: number }> = {
+  stardust: { emoji: '✨', color: '#fbbf24', points: 10 },
+  crystal: { emoji: '💎', color: '#a855f7', points: 25 },
+  shield: { emoji: '🛡️', color: '#22d3ee', points: 0 },
+};
+
+// Cosmic tunnel background
+const CosmicTunnel = memo(({ speed }: { speed: number }) => (
+  <div className="absolute inset-0 overflow-hidden rounded-lg">
+    {/* Deep space background */}
+    <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950" />
+    
+    {/* Parallax stars */}
+    <div 
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `radial-gradient(1px 1px at 10% 10%, white, transparent),
+                          radial-gradient(1px 1px at 30% 25%, white, transparent),
+                          radial-gradient(2px 2px at 50% 15%, #a855f7, transparent),
+                          radial-gradient(1px 1px at 70% 35%, white, transparent),
+                          radial-gradient(1px 1px at 90% 20%, white, transparent),
+                          radial-gradient(1px 1px at 20% 60%, white, transparent),
+                          radial-gradient(2px 2px at 40% 80%, #22d3ee, transparent),
+                          radial-gradient(1px 1px at 60% 70%, white, transparent),
+                          radial-gradient(1px 1px at 80% 90%, white, transparent)`,
+        animation: `cosmic-scroll ${3 / speed}s linear infinite`,
+      }}
+    />
+    
+    {/* Lane dividers */}
+    <div className="absolute inset-0">
+      <div 
+        className="absolute top-0 bottom-0 w-px opacity-30"
+        style={{ 
+          left: '35%', 
+          background: 'linear-gradient(to bottom, transparent, #a855f7, transparent)',
+        }} 
+      />
+      <div 
+        className="absolute top-0 bottom-0 w-px opacity-30"
+        style={{ 
+          left: '65%', 
+          background: 'linear-gradient(to bottom, transparent, #a855f7, transparent)',
+        }} 
+      />
+    </div>
+    
+    {/* Speed lines */}
+    {speed > 1.5 && (
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: Math.floor(speed * 3) }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 bg-gradient-to-b from-white/30 to-transparent"
+            style={{
+              left: `${10 + (i * 15) % 80}%`,
+              top: 0,
+              height: `${20 + (i * 7) % 30}%`,
+              animation: `speed-line ${0.5 / speed}s linear infinite`,
+              animationDelay: `${i * 0.1}s`,
+            }}
+          />
+        ))}
       </div>
-      {isUrgent && <span className="text-red-400 text-xs animate-pulse">⚠️ Hurry!</span>}
-    </div>
-    <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
-      <motion.div
-        className="h-full rounded-full"
-        animate={{ width: `${(timeLeft / maxTime) * 100}%` }}
-        transition={{ duration: 0.1 }}
-        style={{
-          background: isUrgent 
-            ? 'linear-gradient(90deg, #ef4444, #f97316)'
-            : 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))',
-          boxShadow: isUrgent ? '0 0 10px #ef4444' : 'none',
-        }}
-      />
-    </div>
-  </div>
-));
-RoundTimer.displayName = 'RoundTimer';
-
-// Lock-on ring component
-const LockOnRing = memo(({ 
-  progress, 
-  isLocking, 
-  isLocked,
-  isDecoy = false
-}: { 
-  progress: number;
-  isLocking: boolean;
-  isLocked: boolean;
-  isDecoy?: boolean;
-}) => {
-  const size = 76;
-  const radius = size / 2 - 4;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progress * circumference);
-  
-  return (
-    <svg 
-      className="absolute -inset-2 pointer-events-none" 
-      width={size + 16} 
-      height={size + 16}
-      style={{ transform: 'rotate(-90deg)' }}
-    >
-      <circle
-        cx={(size + 16) / 2}
-        cy={(size + 16) / 2}
-        r={radius + 8}
-        fill="none"
-        stroke={isDecoy ? 'rgba(239, 68, 68, 0.2)' : 'rgba(168, 85, 247, 0.2)'}
-        strokeWidth={3}
-      />
-      <circle
-        cx={(size + 16) / 2}
-        cy={(size + 16) / 2}
-        r={radius + 8}
-        fill="none"
-        stroke={isLocked ? '#22c55e' : isDecoy ? '#ef4444' : '#a855f7'}
-        strokeWidth={3}
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
-        strokeLinecap="round"
-        style={{
-          transition: 'stroke-dashoffset 0.1s ease-out',
-          filter: isLocking ? `drop-shadow(0 0 6px ${isDecoy ? '#ef4444' : '#a855f7'})` : 'none'
-        }}
-      />
-      {isLocked && (
-        <g transform={`translate(${(size + 16) / 2 - 6}, ${(size + 16) / 2 - 6}) rotate(90 6 6)`}>
-          <Lock className="w-3 h-3 text-green-400" />
-        </g>
-      )}
-    </svg>
-  );
-});
-LockOnRing.displayName = 'LockOnRing';
-
-// Stun overlay
-const StunOverlay = memo(({ active, timeLeft }: { active: boolean; timeLeft: number }) => (
-  <AnimatePresence>
-    {active && (
-      <motion.div
-        className="absolute inset-0 bg-red-500/20 z-40 flex items-center justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <motion.div
-          animate={{ rotate: [0, 10, -10, 0] }}
-          transition={{ duration: 0.2, repeat: Infinity }}
-          className="text-center"
-        >
-          <span className="text-4xl">💫</span>
-          <p className="text-red-400 font-bold text-sm mt-2">STUNNED!</p>
-          <p className="text-red-400/80 text-xs">{timeLeft.toFixed(1)}s</p>
-        </motion.div>
-      </motion.div>
     )}
-  </AnimatePresence>
-));
-StunOverlay.displayName = 'StunOverlay';
-
-// Particle renderer
-const ParticleRenderer = memo(({ particles }: { particles: { id: number; x: number; y: number; color: string; life: number; maxLife: number }[] }) => (
-  <>
-    {particles.map(particle => (
-      <div
-        key={particle.id}
-        className="absolute w-2 h-2 rounded-full pointer-events-none"
-        style={{
-          left: `${particle.x}%`,
-          top: `${particle.y}%`,
-          backgroundColor: particle.color,
-          boxShadow: `0 0 8px ${particle.color}`,
-          opacity: particle.life / particle.maxLife,
-          transform: `translate(-50%, -50%) translateY(${-30 * (1 - particle.life / particle.maxLife)}px)`,
-        }}
-      />
-    ))}
-  </>
-));
-ParticleRenderer.displayName = 'ParticleRenderer';
-
-// Simplified oscilloscope display
-const OscilloscopeDisplay = memo(({ children }: { children: React.ReactNode }) => (
-  <div className="relative w-full h-full bg-slate-950 rounded-lg border-2 border-emerald-500/30 overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-radial from-emerald-500/5 via-transparent to-transparent" />
-    <svg className="absolute inset-0 w-full h-full opacity-15 pointer-events-none">
-      {Array.from({ length: 11 }).map((_, i) => (
-        <line key={`v-${i}`} x1={`${i * 10}%`} y1="0" x2={`${i * 10}%`} y2="100%" stroke="#22c55e" strokeWidth="0.5" />
-      ))}
-      {Array.from({ length: 11 }).map((_, i) => (
-        <line key={`h-${i}`} x1="0" y1={`${i * 10}%`} x2="100%" y2={`${i * 10}%`} stroke="#22c55e" strokeWidth="0.5" />
-      ))}
-      <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#22c55e" strokeWidth="1" />
-      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#22c55e" strokeWidth="1" />
-    </svg>
-    <div 
-      className="absolute inset-0 pointer-events-none opacity-10"
-      style={{
-        background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
-      }}
-    />
-    {children}
   </div>
 ));
-OscilloscopeDisplay.displayName = 'OscilloscopeDisplay';
+CosmicTunnel.displayName = 'CosmicTunnel';
 
-// Wave SVG
-const WaveSVG = memo(({ 
-  frequency, 
-  phase, 
-  color, 
-  isAligned, 
-  index, 
-  noiseAmount = 0,
-}: {
-  frequency: number;
-  phase: number;
-  color: string;
-  isAligned: boolean;
-  index: number;
-  noiseAmount?: number;
-}) => {
-  const points = useMemo(() => {
-    const width = 280;
-    const height = 50;
-    const freq = frequency / 10;
-    const amp = height / 2.5;
-    const pts: string[] = [];
-    
-    for (let x = 0; x <= width; x += 4) {
-      const noise = noiseAmount * (Math.random() - 0.5) * 10;
-      const y = height / 2 + Math.sin((x / 20) * freq + phase) * amp + noise;
-      pts.push(`${x},${Math.max(5, Math.min(height - 5, y))}`);
-    }
-    
-    return pts.join(' ');
-  }, [frequency, phase, noiseAmount]);
-
-  return (
-    <svg width={280} height={50} className="overflow-visible">
-      <defs>
-        <filter id={`glow-${index}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={isAligned ? 3 : 2}
-        strokeLinecap="round"
-        filter={isAligned ? `url(#glow-${index})` : undefined}
-      />
-    </svg>
-  );
-});
-WaveSVG.displayName = 'WaveSVG';
-
-// Target marker on frequency bar
-const TargetMarker = memo(({ 
-  x, 
-  isDecoy, 
-  isLocked,
-  isActive 
-}: { 
-  x: number; 
-  isDecoy: boolean; 
-  isLocked: boolean;
-  isActive: boolean;
-}) => (
+// Player orb component
+const PlayerOrb = memo(({ lane, hasShield, isHit }: { lane: number; hasShield: boolean; isHit: boolean }) => (
   <motion.div
-    className="absolute top-0 bottom-0 w-1 -translate-x-1/2"
-    style={{ left: `${x}%` }}
-    animate={isActive ? { opacity: [0.5, 1, 0.5] } : {}}
-    transition={{ duration: 1, repeat: Infinity }}
+    className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2"
+    animate={{ 
+      left: `${LANE_POSITIONS[lane]}%`,
+      scale: isHit ? [1, 0.8, 1] : 1,
+    }}
+    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    style={{ top: `${PLAYER_Y}%` }}
   >
+    {/* Shield effect */}
+    {hasShield && (
+      <motion.div
+        className="absolute -inset-2 rounded-full border-2 border-cyan-400"
+        animate={{ 
+          scale: [1, 1.1, 1],
+          opacity: [0.8, 0.4, 0.8],
+        }}
+        transition={{ duration: 1, repeat: Infinity }}
+        style={{ boxShadow: '0 0 20px #22d3ee, inset 0 0 10px #22d3ee50' }}
+      />
+    )}
+    
+    {/* Player core */}
     <div 
-      className={`w-full h-full rounded-full ${
-        isLocked 
-          ? 'bg-green-500' 
-          : isDecoy 
-            ? 'bg-red-500/70' 
-            : 'bg-purple-500'
-      }`}
+      className="w-full h-full rounded-full relative"
       style={{
-        boxShadow: isLocked 
-          ? '0 0 10px #22c55e' 
-          : isDecoy 
-            ? '0 0 10px #ef4444' 
-            : '0 0 10px #a855f7',
+        background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+        boxShadow: `0 0 20px #a855f7, 0 0 40px #a855f750, inset 0 0 15px white`,
       }}
-    />
-    <div 
-      className={`absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold ${
-        isLocked ? 'text-green-400' : isDecoy ? 'text-red-400' : 'text-purple-400'
-      }`}
     >
-      {isLocked ? '✓' : isDecoy ? '?' : '🎯'}
+      {/* Inner glow */}
+      <div className="absolute inset-2 rounded-full bg-white/30" />
+      
+      {/* Trail effect */}
+      <motion.div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 w-8 h-16 opacity-40"
+        style={{
+          background: 'linear-gradient(to bottom, #a855f7, transparent)',
+          filter: 'blur(4px)',
+          transformOrigin: 'center top',
+        }}
+      />
     </div>
+    
+    {/* Hit effect */}
+    <AnimatePresence>
+      {isHit && !hasShield && (
+        <motion.div
+          className="absolute inset-0 rounded-full bg-red-500"
+          initial={{ opacity: 0.8, scale: 1 }}
+          animate={{ opacity: 0, scale: 2 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+    </AnimatePresence>
   </motion.div>
 ));
-TargetMarker.displayName = 'TargetMarker';
+PlayerOrb.displayName = 'PlayerOrb';
 
+// Obstacle sprite
+const ObstacleSprite = memo(({ obstacle, speed }: { obstacle: Obstacle; speed: number }) => {
+  const config = OBSTACLE_CONFIG[obstacle.type];
+  const isWide = obstacle.lanes.length > 1;
+  
+  return (
+    <>
+      {obstacle.lanes.map((lane) => (
+        <motion.div
+          key={`${obstacle.id}-${lane}`}
+          className="absolute w-10 h-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+          style={{ 
+            left: `${LANE_POSITIONS[lane]}%`,
+            top: `${obstacle.y}%`,
+          }}
+          animate={{ rotate: obstacle.type === 'asteroid' ? [0, 360] : 0 }}
+          transition={{ duration: 4 / speed, repeat: Infinity, ease: 'linear' }}
+        >
+          <span 
+            className="text-3xl" 
+            style={{ 
+              filter: `drop-shadow(0 0 10px ${config.color})`,
+              transform: isWide ? 'scale(1.2)' : 'scale(1)',
+            }}
+          >
+            {config.emoji}
+          </span>
+        </motion.div>
+      ))}
+    </>
+  );
+});
+ObstacleSprite.displayName = 'ObstacleSprite';
+
+// Collectible sprite
+const CollectibleSprite = memo(({ collectible }: { collectible: Collectible }) => {
+  const config = COLLECTIBLE_CONFIG[collectible.type];
+  
+  if (collectible.collected) return null;
+  
+  return (
+    <motion.div
+      className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+      style={{ 
+        left: `${LANE_POSITIONS[collectible.lane]}%`,
+        top: `${collectible.y}%`,
+      }}
+      animate={{ 
+        scale: [1, 1.2, 1],
+        rotate: collectible.type === 'crystal' ? [0, 10, -10, 0] : 0,
+      }}
+      transition={{ duration: 1, repeat: Infinity }}
+    >
+      <span 
+        className="text-2xl" 
+        style={{ filter: `drop-shadow(0 0 8px ${config.color})` }}
+      >
+        {config.emoji}
+      </span>
+    </motion.div>
+  );
+});
+CollectibleSprite.displayName = 'CollectibleSprite';
+
+// Score popup
+const ScorePopup = memo(({ score, x, y }: { score: number; x: number; y: number }) => (
+  <motion.div
+    className="absolute text-sm font-bold pointer-events-none"
+    style={{ left: `${x}%`, top: `${y}%` }}
+    initial={{ opacity: 1, y: 0, scale: 1 }}
+    animate={{ opacity: 0, y: -30, scale: 1.5 }}
+    exit={{ opacity: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <span className="text-yellow-400 drop-shadow-glow">+{score}</span>
+  </motion.div>
+));
+ScorePopup.displayName = 'ScorePopup';
+
+// Lane touch controls
+const LaneControls = memo(({ onLaneChange, currentLane }: { onLaneChange: (lane: number) => void; currentLane: number }) => (
+  <div className="absolute bottom-4 left-4 right-4 flex justify-between">
+    <button
+      className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+        currentLane === 0 ? 'bg-purple-500/50' : 'bg-white/10'
+      }`}
+      onPointerDown={() => onLaneChange(Math.max(0, currentLane - 1))}
+    >
+      <span className="text-2xl">◀</span>
+    </button>
+    <button
+      className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+        currentLane === 2 ? 'bg-purple-500/50' : 'bg-white/10'
+      }`}
+      onPointerDown={() => onLaneChange(Math.min(2, currentLane + 1))}
+    >
+      <span className="text-2xl">▶</span>
+    </button>
+  </div>
+));
+LaneControls.displayName = 'LaneControls';
+
+// Main game component
 export const AstralFrequencyGame = ({
   companionStats,
   onComplete,
@@ -315,455 +319,400 @@ export const AstralFrequencyGame = ({
   isPractice = false,
 }: AstralFrequencyGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
-  const effectiveTimer = maxTimer ?? config.roundTime;
-  const effectiveRounds = isPractice ? 1 : config.rounds;
+  const effectiveTimer = maxTimer ?? config.gameTime;
   
+  // Game state
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
-  const [round, setRound] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(effectiveTimer);
   const [score, setScore] = useState(0);
+  const [distance, setDistance] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [roundTimeLeft, setRoundTimeLeft] = useState(effectiveTimer);
   
-  const [playerFreq, setPlayerFreq] = useState(50);
-  const [targets, setTargets] = useState<FrequencyTarget[]>([]);
-  const [currentTargetIndex, setCurrentTargetIndex] = useState(0);
+  // Player state
+  const [playerLane, setPlayerLane] = useState(1); // Center lane
+  const [hasShield, setHasShield] = useState(false);
+  const [isHit, setIsHit] = useState(false);
+  const [lives, setLives] = useState(3);
   
-  const [lockProgress, setLockProgress] = useState(0);
-  const [isLocking, setIsLocking] = useState(false);
+  // Game objects
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [collectibles, setCollectibles] = useState<Collectible[]>([]);
+  const [speed, setSpeed] = useState(config.startSpeed);
+  const [scorePopups, setScorePopups] = useState<{ id: string; score: number; x: number; y: number }[]>([]);
   
-  const [isStunned, setIsStunned] = useState(false);
-  const [stunTimeLeft, setStunTimeLeft] = useState(0);
-  
-  const [showRoundComplete, setShowRoundComplete] = useState(false);
-  const [wavePhases, setWavePhases] = useState([0, 0]);
-  const [interferenceActive, setInterferenceActive] = useState(false);
-  
+  // Refs
   const gameStateRef = useRef(gameState);
-  const playerFreqRef = useRef(playerFreq);
-  const lockProgressRef = useRef(lockProgress);
-  const stunRef = useRef(isStunned);
+  const playerLaneRef = useRef(playerLane);
+  const hasShieldRef = useRef(hasShield);
+  const lastSpawnRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   
+  // Sync refs
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
-  useEffect(() => { playerFreqRef.current = playerFreq; }, [playerFreq]);
-  useEffect(() => { lockProgressRef.current = lockProgress; }, [lockProgress]);
-  useEffect(() => { stunRef.current = isStunned; }, [isStunned]);
+  useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
+  useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
   
-  const { particles, emit: emitParticles } = useParticleSystem(30);
-  
+  // Stat bonus affects collectible value
   const statBonus = Math.round((companionStats.mind + companionStats.soul) / 2);
-  const alignmentTolerance = config.alignmentTolerance + Math.floor(statBonus / 25);
+  const collectibleMultiplier = 1 + (statBonus / 100);
   
-  const generateTargets = useCallback(() => {
-    const newTargets: FrequencyTarget[] = [];
-    
-    newTargets.push({
-      x: 15 + Math.random() * 70,
-      isDecoy: false,
-      isLocked: false,
-      id: `target-${Date.now()}`,
-    });
-    
-    for (let i = 0; i < config.decoyCount; i++) {
-      newTargets.push({
-        x: 15 + Math.random() * 70,
-        isDecoy: true,
-        isLocked: false,
-        id: `decoy-${Date.now()}-${i}`,
-      });
-    }
-    
-    return newTargets;
-  }, [config.decoyCount]);
-  
+  // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
-    setTargets(generateTargets());
-    setRoundTimeLeft(effectiveTimer);
-  }, [effectiveTimer, generateTargets]);
+  }, []);
   
-  // Handle tap on oscilloscope to tune frequency
-  const handleTuneClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (isStunned || gameState !== 'playing' || !containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-    
-    setPlayerFreq(x);
+  // Change lane
+  const changeLane = useCallback((newLane: number) => {
+    if (gameStateRef.current !== 'playing') return;
+    const clampedLane = Math.max(0, Math.min(2, newLane));
+    setPlayerLane(clampedLane);
     triggerHaptic('light');
-  }, [isStunned, gameState]);
+  }, []);
   
-  // Handle drag/touch move
-  const handleTuneMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (isStunned || gameState !== 'playing' || !containerRef.current) return;
-    if ('buttons' in e && e.buttons !== 1) return; // Only track when mouse is pressed
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-    
-    setPlayerFreq(x);
-  }, [isStunned, gameState]);
+  // Handle swipe
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
   
-  // Interference effect (hard mode only)
-  useEffect(() => {
-    if (gameState !== 'playing' || config.interferenceChance === 0) return;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
     
-    const interval = setInterval(() => {
-      if (Math.random() < config.interferenceChance) {
-        setInterferenceActive(true);
-        setTimeout(() => setInterferenceActive(false), 2000);
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+    
+    // Only process horizontal swipes
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
+      if (deltaX > 0) {
+        changeLane(playerLaneRef.current + 1);
+      } else {
+        changeLane(playerLaneRef.current - 1);
       }
-    }, 5000);
+    }
     
-    return () => clearInterval(interval);
-  }, [gameState, config.interferenceChance]);
+    touchStartRef.current = null;
+  }, [changeLane]);
+  
+  // Handle keyboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameStateRef.current !== 'playing') return;
+      
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        changeLane(playerLaneRef.current - 1);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        changeLane(playerLaneRef.current + 1);
+      } else if (e.key === 'Escape') {
+        setGameState('paused');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [changeLane]);
+  
+  // Add score popup
+  const addScorePopup = useCallback((points: number, x: number, y: number) => {
+    const id = `popup-${Date.now()}-${Math.random()}`;
+    setScorePopups(prev => [...prev, { id, score: points, x, y }]);
+    setTimeout(() => {
+      setScorePopups(prev => prev.filter(p => p.id !== id));
+    }, 500);
+  }, []);
+  
+  // Spawn objects
+  const spawnObjects = useCallback((now: number) => {
+    if (now - lastSpawnRef.current < config.spawnInterval / speed) return;
+    lastSpawnRef.current = now;
+    
+    const rand = Math.random();
+    
+    if (rand < config.collectibleChance) {
+      // Spawn collectible
+      const type: CollectibleType = rand < config.shieldChance ? 'shield' : 
+                                     rand < config.shieldChance + 0.15 ? 'crystal' : 'stardust';
+      const lane = Math.floor(Math.random() * 3);
+      
+      setCollectibles(prev => [...prev, {
+        id: `col-${now}-${Math.random()}`,
+        lane,
+        y: -10,
+        type,
+        collected: false,
+      }]);
+    } else {
+      // Spawn obstacle
+      const obstacleTypes = config.obstacleTypes;
+      const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+      
+      // Determine lanes blocked (sometimes multi-lane obstacles)
+      let lanes: number[];
+      if (difficulty === 'hard' && Math.random() < 0.3) {
+        // Two-lane obstacle - leave one lane open
+        const openLane = Math.floor(Math.random() * 3);
+        lanes = [0, 1, 2].filter(l => l !== openLane);
+      } else {
+        lanes = [Math.floor(Math.random() * 3)];
+      }
+      
+      setObstacles(prev => [...prev, {
+        id: `obs-${now}-${Math.random()}`,
+        lanes,
+        y: -10,
+        type,
+      }]);
+    }
+  }, [config, speed, difficulty]);
   
   // Main game loop
-  useGameLoop((deltaTime) => {
-    if (gameStateRef.current !== 'playing') return;
+  useEffect(() => {
+    if (gameState !== 'playing') return;
     
-    // Update wave phases
-    setWavePhases(prev => [
-      (prev[0] + deltaTime * 2) % (Math.PI * 2),
-      (prev[1] + deltaTime * 2.5) % (Math.PI * 2),
-    ]);
+    let animationId: number;
+    let lastTime = performance.now();
     
-    // Update stun timer
-    if (stunRef.current) {
-      setStunTimeLeft(prev => {
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      
+      if (gameStateRef.current !== 'playing') return;
+      
+      // Update timer
+      setTimeLeft(prev => {
         const newTime = prev - deltaTime;
         if (newTime <= 0) {
-          setIsStunned(false);
+          setGameState('complete');
           return 0;
         }
         return newTime;
       });
-      return;
-    }
-    
-    // Update round timer
-    setRoundTimeLeft(prev => {
-      const newTime = prev - deltaTime;
-      if (newTime <= 0) {
-        setCombo(0);
-        triggerHaptic('error');
+      
+      // Update speed (gradually increase)
+      setSpeed(prev => Math.min(config.maxSpeed, prev + deltaTime * 0.02));
+      
+      // Update distance
+      setDistance(prev => prev + deltaTime * speed * 10);
+      
+      // Spawn new objects
+      spawnObjects(currentTime);
+      
+      // Move obstacles
+      setObstacles(prev => {
+        const updated = prev
+          .map(obs => ({ ...obs, y: obs.y + deltaTime * 60 * speed }))
+          .filter(obs => obs.y < 110);
         
-        if (round >= effectiveRounds) {
-          setGameState('complete');
-        } else {
-          setShowRoundComplete(true);
-          setTimeout(() => {
-            setShowRoundComplete(false);
-            setRound(r => r + 1);
-            setTargets(generateTargets());
-            setRoundTimeLeft(effectiveTimer);
-            setLockProgress(0);
-            setCurrentTargetIndex(0);
-          }, 800);
-        }
-        return 0;
-      }
-      return newTime;
-    });
-    
-    // Check alignment with current target
-    const currentTarget = targets[currentTargetIndex];
-    if (!currentTarget || currentTarget.isLocked) return;
-    
-    const dist = Math.abs(playerFreqRef.current - currentTarget.x);
-    const effectiveTolerance = interferenceActive ? alignmentTolerance * 0.6 : alignmentTolerance;
-    const isAligned = dist <= effectiveTolerance;
-    const isPerfectlyAligned = dist <= effectiveTolerance / 3;
-    
-    if (isAligned) {
-      setIsLocking(true);
-      
-      if (Math.random() < 0.08) {
-        emitParticles(
-          20 + Math.random() * 60,
-          30 + Math.random() * 40,
-          isPerfectlyAligned ? '#fbbf24' : currentTarget.isDecoy ? '#ef4444' : '#a855f7',
-          2
-        );
-      }
-      
-      const progressSpeed = isPerfectlyAligned ? 1.5 : 1;
-      const newProgress = Math.min(1, lockProgressRef.current + (deltaTime / config.lockOnTime) * progressSpeed);
-      setLockProgress(newProgress);
-      
-      if (newProgress >= 1) {
-        if (currentTarget.isDecoy) {
-          setScore(s => Math.max(0, s - 100));
-          setCombo(0);
-          setIsStunned(true);
-          setStunTimeLeft(1.5);
-          triggerHaptic('error');
-          setLockProgress(0);
-          setCurrentTargetIndex(prev => prev + 1);
-        } else {
-          const pointsEarned = isPerfectlyAligned ? 150 : 100;
-          
-          setScore(s => s + pointsEarned);
-          setCombo(c => {
-            const newCombo = c + 1;
-            setMaxCombo(m => Math.max(m, newCombo));
-            return newCombo;
-          });
-          
-          triggerHaptic('success');
-          
-          setTargets(prev => prev.map((t, i) => 
-            i === currentTargetIndex ? { ...t, isLocked: true } : t
-          ));
-          
-          setShowRoundComplete(true);
-          setLockProgress(0);
-          
-          setTimeout(() => {
-            setShowRoundComplete(false);
-            if (round >= effectiveRounds) {
-              setGameState('complete');
+        // Check collisions
+        updated.forEach(obs => {
+          if (Math.abs(obs.y - PLAYER_Y) < COLLISION_THRESHOLD && obs.lanes.includes(playerLaneRef.current)) {
+            if (hasShieldRef.current) {
+              setHasShield(false);
+              triggerHaptic('medium');
+              setCombo(0);
             } else {
-              setRound(r => r + 1);
-              setTargets(generateTargets());
-              setRoundTimeLeft(effectiveTimer);
-              setCurrentTargetIndex(0);
+              setIsHit(true);
+              triggerHaptic('error');
+              setLives(l => {
+                const newLives = l - 1;
+                if (newLives <= 0) {
+                  setGameState('complete');
+                }
+                return newLives;
+              });
+              setCombo(0);
+              setScore(s => Math.max(0, s - 25));
+              setTimeout(() => setIsHit(false), 300);
             }
-          }, 800);
-        }
-      }
-    } else {
-      setIsLocking(false);
-      const newProgress = Math.max(0, lockProgressRef.current - deltaTime * 0.5);
-      setLockProgress(newProgress);
-    }
-  }, gameState === 'playing');
+            // Mark obstacle as processed by moving it off screen
+            obs.y = 200;
+          }
+        });
+        
+        return updated.filter(obs => obs.y < 110);
+      });
+      
+      // Move collectibles
+      setCollectibles(prev => {
+        const updated = prev
+          .map(col => ({ ...col, y: col.y + deltaTime * 60 * speed }))
+          .filter(col => col.y < 110 && !col.collected);
+        
+        // Check collection
+        updated.forEach(col => {
+          if (!col.collected && Math.abs(col.y - PLAYER_Y) < COLLISION_THRESHOLD && col.lane === playerLaneRef.current) {
+            col.collected = true;
+            
+            if (col.type === 'shield') {
+              setHasShield(true);
+              triggerHaptic('success');
+            } else {
+              const config = COLLECTIBLE_CONFIG[col.type];
+              const points = Math.round(config.points * collectibleMultiplier);
+              setScore(s => s + points);
+              setCombo(c => {
+                const newCombo = c + 1;
+                setMaxCombo(m => Math.max(m, newCombo));
+                return newCombo;
+              });
+              addScorePopup(points, LANE_POSITIONS[col.lane], PLAYER_Y - 10);
+              triggerHaptic('light');
+            }
+          }
+        });
+        
+        return updated.filter(col => !col.collected && col.y < 110);
+      });
+      
+      animationId = requestAnimationFrame(gameLoop);
+    };
+    
+    animationId = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(animationId);
+  }, [gameState, config, spawnObjects, collectibleMultiplier, addScorePopup, speed]);
   
-  // Complete game
+  // Calculate final result
+  const calculateResult = useCallback((): MiniGameResult => {
+    const distanceBonus = Math.floor(distance / 10);
+    const comboBonus = maxCombo * 5;
+    const finalScore = score + distanceBonus + comboBonus;
+    
+    // Accuracy based on survival and collection
+    const survivalRatio = lives / 3;
+    const accuracy = Math.min(100, Math.round((finalScore / 300) * 100 * survivalRatio));
+    
+    let result: MiniGameResult['result'];
+    if (accuracy >= 90) result = 'perfect';
+    else if (accuracy >= 70) result = 'good';
+    else if (accuracy >= 40) result = 'partial';
+    else result = 'fail';
+    
+    return {
+      success: result !== 'fail',
+      accuracy,
+      result,
+    };
+  }, [score, distance, maxCombo, lives]);
+  
+  // Handle game complete
   useEffect(() => {
     if (gameState === 'complete') {
-      const maxPossibleScore = effectiveRounds * 200;
-      const baseAccuracy = Math.round((score / maxPossibleScore) * 100);
-      const comboBonus = Math.min(maxCombo * 3, 15);
-      const accuracy = Math.min(100, baseAccuracy + comboBonus);
-      const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
-      
-      setTimeout(() => {
-        onComplete({
-          success: accuracy >= 50,
-          accuracy,
-          result,
-        });
-      }, 500);
+      const result = calculateResult();
+      setTimeout(() => onComplete(result), 500);
     }
-  }, [gameState, score, effectiveRounds, maxCombo, onComplete]);
-  
-  const currentTarget = targets[currentTargetIndex];
-  const dist = currentTarget ? Math.abs(playerFreq - currentTarget.x) : 100;
-  const effectiveTolerance = interferenceActive ? alignmentTolerance * 0.6 : alignmentTolerance;
-  const isAligned = dist <= effectiveTolerance;
-  const isPerfectlyAligned = dist <= effectiveTolerance / 3;
-  const isTimeUrgent = roundTimeLeft <= 5;
-  
-  const playerWaveColor = isPerfectlyAligned ? 'hsl(45, 100%, 50%)' : isAligned ? 'hsl(142, 76%, 46%)' : 'hsl(217, 91%, 60%)';
+  }, [gameState, calculateResult, onComplete]);
   
   return (
-    <div className="flex flex-col items-center relative">
-      {gameState === 'countdown' && (
-        <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
-      )}
-
-      <AnimatePresence>
-        {gameState === 'paused' && (
-          <PauseOverlay onResume={() => setGameState('playing')} />
-        )}
-      </AnimatePresence>
-
+    <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-4 z-50">
+      <style>{`
+        @keyframes cosmic-scroll {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(100%); }
+        }
+        @keyframes speed-line {
+          0% { transform: translateY(-100%); opacity: 0; }
+          50% { opacity: 1; }
+          100% { transform: translateY(400%); opacity: 0; }
+        }
+      `}</style>
+      
       <GameHUD
-        title="Astral Frequency"
-        subtitle={`Round ${round}/${effectiveRounds} - Tap to tune the signal!`}
-        score={Math.round(score)}
+        title="Cosmic Dash"
+        subtitle={isPractice ? 'Practice Mode' : undefined}
+        score={score}
+        timeLeft={Math.ceil(timeLeft)}
+        totalTime={effectiveTimer}
         combo={combo}
-        showCombo={true}
-        phase={round - 1}
-        totalPhases={effectiveRounds}
-        isPaused={gameState === 'paused'}
-        onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
+        showCombo={combo > 1}
       />
-
-      <RoundTimer timeLeft={roundTimeLeft} maxTime={effectiveTimer} isUrgent={isTimeUrgent} />
-
-      {/* Lock-on progress */}
-      <div className="w-full max-w-xs mb-3">
-        <div className="flex justify-between text-xs text-muted-foreground mb-1">
-          <span className="flex items-center gap-1">
-            <Lock className="w-3 h-3" />
-            Lock-On
-          </span>
-          <span className={isLocking ? 'text-primary font-bold' : ''}>
-            {Math.round(lockProgress * 100)}%
-          </span>
-        </div>
-        <div className="h-3 bg-muted/50 rounded-full overflow-hidden border border-border/50">
-          <motion.div
-            className="h-full rounded-full"
-            animate={{ width: `${lockProgress * 100}%` }}
-            transition={{ duration: 0.05 }}
-            style={{
-              background: currentTarget?.isDecoy && lockProgress > 0.3
-                ? 'linear-gradient(90deg, #ef4444, #dc2626)'
-                : isPerfectlyAligned 
-                  ? 'linear-gradient(90deg, hsl(45, 100%, 50%), hsl(38, 92%, 60%))' 
-                  : isAligned 
-                    ? 'linear-gradient(90deg, hsl(271, 91%, 65%), hsl(217, 91%, 60%))' 
-                    : 'hsl(var(--muted-foreground))',
-              boxShadow: isLocking ? '0 0 15px hsl(271, 91%, 65%)' : 'none',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Oscilloscope - tap to tune */}
-      <div 
-        ref={containerRef}
-        className="relative w-full max-w-xs h-48 mb-4 cursor-crosshair touch-none"
-        onMouseDown={handleTuneClick}
-        onMouseMove={handleTuneMove}
-        onTouchStart={handleTuneClick}
-        onTouchMove={handleTuneMove}
-      >
-        <OscilloscopeDisplay>
-          <StunOverlay active={isStunned} timeLeft={stunTimeLeft} />
-          <ParticleRenderer particles={particles} />
-          
-          {/* Interference overlay */}
-          {interferenceActive && (
-            <div className="absolute inset-0 pointer-events-none bg-red-500/10 animate-pulse" />
-          )}
-          
-          {/* Waves */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 pointer-events-none">
-            {currentTarget && (
-              <div className="relative">
-                <div className="absolute -left-8 top-1/2 -translate-y-1/2 text-xs text-purple-400 font-medium">
-                  {currentTarget.isDecoy ? '???' : 'Target'}
-                </div>
-                <WaveSVG
-                  frequency={currentTarget.x}
-                  phase={wavePhases[0]}
-                  color={currentTarget.isDecoy ? 'hsl(0, 70%, 55%)' : 'hsl(271, 91%, 65%)'}
-                  isAligned={false}
-                  index={0}
-                />
-                {isLocking && (
-                  <LockOnRing 
-                    progress={lockProgress} 
-                    isLocking={isLocking} 
-                    isLocked={currentTarget.isLocked}
-                    isDecoy={currentTarget.isDecoy}
-                  />
-                )}
-              </div>
-            )}
-            
-            <div className="relative">
-              <div className="absolute -left-8 top-1/2 -translate-y-1/2 text-xs text-blue-400 font-medium">You</div>
-              <WaveSVG
-                frequency={playerFreq}
-                phase={wavePhases[1]}
-                color={playerWaveColor}
-                isAligned={isAligned && !currentTarget?.isDecoy}
-                index={1}
-                noiseAmount={interferenceActive ? 0.3 : 0}
-              />
-            </div>
+      
+      {/* Lives indicator */}
+      <div className="absolute top-4 right-4 flex gap-1">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-6 h-6 rounded-full flex items-center justify-center ${
+              i < lives ? 'bg-red-500/80' : 'bg-gray-700/50'
+            }`}
+          >
+            <span className="text-sm">❤️</span>
           </div>
-          
-          {/* Alignment indicator */}
-          <AnimatePresence>
-            {isAligned && !currentTarget?.isDecoy && (
-              <motion.div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
-                  transition={{ duration: 0.8, repeat: Infinity }}
-                >
-                  <span className="text-3xl">{isPerfectlyAligned ? '🔐' : '🎯'}</span>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          
-          {/* Round complete overlay */}
-          <AnimatePresence>
-            {showRoundComplete && (
-              <motion.div
-                className="absolute inset-0 bg-background/80 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  className="text-center"
-                >
-                  <span className="text-5xl">🔒</span>
-                  <p className="text-xl font-bold text-foreground mt-2">LOCKED!</p>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </OscilloscopeDisplay>
+        ))}
       </div>
-
-      {/* Frequency tuning bar */}
-      <div className="w-full max-w-xs relative h-8 bg-slate-900/80 rounded-lg border border-primary/30 overflow-hidden mb-2">
-        {/* Target markers */}
-        {targets.map((target, i) => (
-          <TargetMarker 
-            key={target.id} 
-            x={target.x} 
-            isDecoy={target.isDecoy} 
-            isLocked={target.isLocked}
-            isActive={i === currentTargetIndex}
-          />
+      
+      {/* Shield indicator */}
+      {hasShield && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-cyan-500/20 px-3 py-1 rounded-full">
+          <Shield className="w-4 h-4 text-cyan-400" />
+          <span className="text-cyan-400 text-sm font-bold">SHIELD</span>
+        </div>
+      )}
+      
+      {/* Speed indicator */}
+      <div className="absolute top-16 left-4 flex items-center gap-2">
+        <Zap className={`w-4 h-4 ${speed > 2 ? 'text-yellow-400' : 'text-muted-foreground'}`} />
+        <span className="text-xs text-muted-foreground">{speed.toFixed(1)}x</span>
+      </div>
+      
+      {/* Distance */}
+      <div className="absolute top-16 right-4 flex items-center gap-2">
+        <Star className="w-4 h-4 text-purple-400" />
+        <span className="text-xs text-purple-400">{Math.floor(distance)}m</span>
+      </div>
+      
+      {/* Main game area */}
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-sm h-[70vh] max-h-[600px] rounded-xl overflow-hidden border-2 border-purple-500/30"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <CosmicTunnel speed={speed} />
+        
+        {/* Game objects */}
+        {obstacles.map(obs => (
+          <ObstacleSprite key={obs.id} obstacle={obs} speed={speed} />
         ))}
         
-        {/* Player position */}
-        <motion.div
-          className="absolute top-0 bottom-0 w-2 -translate-x-1/2 bg-blue-500 rounded-full"
-          style={{ left: `${playerFreq}%` }}
-          animate={{ boxShadow: isAligned ? '0 0 15px #3b82f6' : '0 0 5px #3b82f6' }}
+        {collectibles.map(col => (
+          <CollectibleSprite key={col.id} collectible={col} />
+        ))}
+        
+        {/* Player */}
+        <PlayerOrb lane={playerLane} hasShield={hasShield} isHit={isHit} />
+        
+        {/* Score popups */}
+        <AnimatePresence>
+          {scorePopups.map(popup => (
+            <ScorePopup key={popup.id} {...popup} />
+          ))}
+        </AnimatePresence>
+        
+        {/* Lane touch controls */}
+        <LaneControls onLaneChange={changeLane} currentLane={playerLane} />
+      </div>
+      
+      {/* Instructions */}
+      <div className="mt-4 text-center text-muted-foreground text-xs">
+        <p>Swipe or tap arrows to change lanes</p>
+        <p>Collect ✨ stardust • Avoid 🪨 obstacles</p>
+      </div>
+      
+      {/* Overlays */}
+      {gameState === 'countdown' && (
+        <CountdownOverlay 
+          count={3}
+          onComplete={handleCountdownComplete} 
         />
-      </div>
-
-      {/* Status */}
-      <div className={`mt-2 text-center ${isPerfectlyAligned ? 'text-yellow-400' : isAligned ? 'text-green-400' : 'text-muted-foreground'}`}>
-        <p className="text-sm font-medium">
-          {isStunned 
-            ? '💫 STUNNED! Controls disabled...'
-            : interferenceActive 
-              ? '⚡ INTERFERENCE! Hold steady!'
-              : isPerfectlyAligned 
-                ? '🔐 PERFECT LOCK! Hold steady!' 
-                : isAligned 
-                  ? '🎯 Signal acquired! Locking on...' 
-                  : '👆 Tap on the display to tune frequency'}
-        </p>
-      </div>
-
-      <p className="mt-2 text-xs text-muted-foreground">
-        Mind + Soul bonus: ±{alignmentTolerance} tolerance
-      </p>
+      )}
+      
+      {gameState === 'paused' && (
+        <PauseOverlay
+          onResume={() => setGameState('playing')}
+        />
+      )}
     </div>
   );
 };
+
+export default AstralFrequencyGame;
