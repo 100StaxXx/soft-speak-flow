@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Shield, Skull, Target, Crosshair } from 'lucide-react';
+import { Heart, Shield, Zap, Bomb, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
@@ -10,622 +10,518 @@ interface EnergyBeamGameProps {
   onComplete: (result: MiniGameResult) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
-  maxTimer?: number; // Override timer for practice mode
+  maxTimer?: number;
   isPractice?: boolean;
 }
 
-// Difficulty configuration
+// Difficulty configuration for Star Defender
 const DIFFICULTY_CONFIG = {
   easy: {
-    targetCount: 3,
-    targetSpeed: 0,
-    targetSize: 55,
-    chargeDecayRate: 0,
-    overloadThreshold: 110,
-    shieldCount: 0,
-    decoyCount: 0,
-    multiTargetBonus: false,
-    roundTimer: 45,
     waves: 2,
-    targetFading: false,
+    enemiesPerWave: 10,
+    enemyFireRate: 0,
+    enemySpeed: 0.3,
+    diveChance: 0.02,
+    powerUpChance: 0.2,
+    roundTimer: 45,
   },
   medium: {
-    targetCount: 4,
-    targetSpeed: 0.4,
-    targetSize: 48,
-    chargeDecayRate: 2,
-    overloadThreshold: 105,
-    shieldCount: 1,
-    decoyCount: 1,
-    multiTargetBonus: true,
-    roundTimer: 40,
-    waves: 2,
-    targetFading: false,
+    waves: 3,
+    enemiesPerWave: 14,
+    enemyFireRate: 0.005,
+    enemySpeed: 0.5,
+    diveChance: 0.04,
+    powerUpChance: 0.15,
+    roundTimer: 50,
   },
   hard: {
-    targetCount: 5,
-    targetSpeed: 0.7,
-    targetSize: 40,
-    chargeDecayRate: 4,
-    overloadThreshold: 100,
-    shieldCount: 2,
-    decoyCount: 2,
-    multiTargetBonus: true,
-    roundTimer: 35,
-    waves: 3,
-    targetFading: true,
+    waves: 4,
+    enemiesPerWave: 18,
+    enemyFireRate: 0.01,
+    enemySpeed: 0.7,
+    diveChance: 0.06,
+    powerUpChance: 0.12,
+    roundTimer: 60,
   },
 };
 
-interface GameTarget {
-  id: string;
-  x: number;
-  y: number;
-  size: number;
-  type: 'normal' | 'bonus' | 'decoy';
-  health: number;
-  points: number;
-  velocityX: number;
-  velocityY: number;
-  opacity: number;
-  isHit: boolean;
-}
+// Enemy types
+type EnemyType = 'scout' | 'fighter' | 'cruiser' | 'boss';
 
-interface GameShield {
+interface Enemy {
   id: string;
+  type: EnemyType;
   x: number;
   y: number;
-  width: number;
-  height: number;
   hp: number;
-  rotation: number;
+  maxHp: number;
+  points: number;
+  isDiving: boolean;
+  diveStartX: number;
+  divePhase: number;
+  formationX: number;
+  formationY: number;
 }
 
-interface BeamShot {
+interface Projectile {
   id: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  power: number;
-  hits: { x: number; y: number; type: string }[];
+  x: number;
+  y: number;
+  isEnemy: boolean;
+  speed: number;
 }
 
-// Timer bar component
-const TimerBar = memo(({ timeLeft, maxTime }: { timeLeft: number; maxTime: number }) => {
-  const percentage = (timeLeft / maxTime) * 100;
+interface PowerUp {
+  id: string;
+  type: 'shield' | 'rapid' | 'bomb' | 'bonus';
+  x: number;
+  y: number;
+}
+
+interface Explosion {
+  id: string;
+  x: number;
+  y: number;
+  size: 'small' | 'large';
+}
+
+interface ScorePopup {
+  id: string;
+  x: number;
+  y: number;
+  score: number;
+  type: string;
+}
+
+const ENEMY_CONFIG: Record<EnemyType, { hp: number; points: number; color: string; size: number }> = {
+  scout: { hp: 1, points: 10, color: '#22c55e', size: 24 },
+  fighter: { hp: 1, points: 25, color: '#3b82f6', size: 28 },
+  cruiser: { hp: 2, points: 50, color: '#a855f7', size: 32 },
+  boss: { hp: 5, points: 200, color: '#ef4444', size: 40 },
+};
+
+// Starfield background
+const StarfieldBackground = memo(() => {
+  const stars = useMemo(() => 
+    Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 2 + 1,
+      speed: Math.random() * 2 + 1,
+      opacity: Math.random() * 0.5 + 0.3,
+    })), []
+  );
   
   return (
-    <div className="w-full max-w-xs h-3 bg-slate-800/80 rounded-full overflow-hidden mb-3">
-      <motion.div
-        className="h-full rounded-full"
-        animate={{ width: `${percentage}%` }}
-        transition={{ duration: 0.1 }}
-        style={{
-          background: percentage > 30
-            ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-            : percentage > 15
-              ? 'linear-gradient(90deg, #eab308, #facc15)'
-              : 'linear-gradient(90deg, #ef4444, #f87171)',
-          boxShadow: percentage <= 15 ? '0 0 10px #ef4444' : 'none',
-        }}
-      />
-    </div>
-  );
-});
-TimerBar.displayName = 'TimerBar';
-
-// Wave indicator component
-const WaveIndicator = memo(({ wave, totalWaves }: { wave: number; totalWaves: number }) => (
-  <div className="flex items-center gap-2 mb-2">
-    <span className="text-xs text-muted-foreground">Wave</span>
-    <div className="flex gap-1">
-      {Array.from({ length: totalWaves }).map((_, i) => (
-        <div
-          key={i}
-          className={`w-6 h-1.5 rounded-full transition-all ${
-            i < wave 
-              ? 'bg-primary' 
-              : i === wave 
-                ? 'bg-primary/50 animate-pulse' 
-                : 'bg-muted/30'
-          }`}
+    <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950">
+      {stars.map(star => (
+        <motion.div
+          key={star.id}
+          className="absolute rounded-full bg-white"
+          style={{
+            left: `${star.x}%`,
+            width: star.size,
+            height: star.size,
+            opacity: star.opacity,
+          }}
+          animate={{
+            top: ['0%', '100%'],
+          }}
+          transition={{
+            duration: 8 / star.speed,
+            repeat: Infinity,
+            ease: 'linear',
+            delay: (star.y / 100) * (8 / star.speed),
+          }}
         />
       ))}
     </div>
+  );
+});
+StarfieldBackground.displayName = 'StarfieldBackground';
+
+// Player ship component
+const PlayerShip = memo(({ x, hasShield, isInvulnerable }: { x: number; hasShield: boolean; isInvulnerable: boolean }) => (
+  <div
+    className="absolute bottom-16 transition-transform duration-75"
+    style={{ left: `${x}%`, transform: 'translateX(-50%)' }}
+  >
+    {/* Shield effect */}
+    {hasShield && (
+      <motion.div
+        className="absolute -inset-4 rounded-full"
+        style={{
+          background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)',
+          border: '2px solid rgba(59,130,246,0.5)',
+        }}
+        animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 1, repeat: Infinity }}
+      />
+    )}
+    
+    {/* Invulnerability flash */}
+    <motion.div
+      animate={isInvulnerable ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
+      transition={{ duration: 0.2, repeat: isInvulnerable ? Infinity : 0 }}
+    >
+      {/* Ship body */}
+      <svg width="36" height="40" viewBox="0 0 36 40" className="drop-shadow-lg">
+        {/* Engine glow */}
+        <ellipse cx="18" cy="38" rx="6" ry="4" fill="#f59e0b" opacity="0.8">
+          <animate attributeName="ry" values="3;5;3" dur="0.2s" repeatCount="indefinite" />
+        </ellipse>
+        <ellipse cx="18" cy="38" rx="3" ry="2" fill="#fef3c7">
+          <animate attributeName="ry" values="2;3;2" dur="0.15s" repeatCount="indefinite" />
+        </ellipse>
+        
+        {/* Main hull */}
+        <path
+          d="M18 2 L4 36 L18 30 L32 36 Z"
+          fill="url(#shipGradient)"
+          stroke="#60a5fa"
+          strokeWidth="1.5"
+        />
+        
+        {/* Cockpit */}
+        <ellipse cx="18" cy="16" rx="4" ry="6" fill="#0ea5e9" opacity="0.8" />
+        <ellipse cx="18" cy="14" rx="2" ry="3" fill="#7dd3fc" />
+        
+        {/* Wing details */}
+        <line x1="8" y1="28" x2="14" y2="24" stroke="#3b82f6" strokeWidth="2" />
+        <line x1="28" y1="28" x2="22" y2="24" stroke="#3b82f6" strokeWidth="2" />
+        
+        <defs>
+          <linearGradient id="shipGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#1e40af" />
+            <stop offset="50%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#1e3a8a" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </motion.div>
   </div>
 ));
-WaveIndicator.displayName = 'WaveIndicator';
+PlayerShip.displayName = 'PlayerShip';
 
-// Target component
-const TargetComponent = memo(({ target, isAiming }: { target: GameTarget; isAiming: boolean }) => {
-  if (target.isHit) return null;
-  
-  const isDecoy = target.type === 'decoy';
-  const isBonus = target.type === 'bonus';
+// Enemy component
+const EnemySprite = memo(({ enemy }: { enemy: Enemy }) => {
+  const config = ENEMY_CONFIG[enemy.type];
   
   return (
     <motion.div
-      className="absolute pointer-events-none"
+      className="absolute"
       style={{
-        left: `${target.x}%`,
-        top: `${target.y}%`,
+        left: `${enemy.x}%`,
+        top: `${enemy.y}%`,
         transform: 'translate(-50%, -50%)',
       }}
-      animate={{
-        opacity: target.opacity,
-        scale: isAiming ? 1.1 : 1,
-      }}
-      transition={{ duration: 0.2 }}
+      animate={enemy.isDiving ? { rotate: [0, 10, -10, 0] } : {}}
+      transition={{ duration: 0.3, repeat: enemy.isDiving ? Infinity : 0 }}
     >
-      {/* Outer ring */}
+      <svg width={config.size} height={config.size} viewBox="0 0 32 32">
+        {enemy.type === 'scout' && (
+          <>
+            <path d="M16 4 L4 28 L16 22 L28 28 Z" fill={config.color} stroke="#fff" strokeWidth="1" />
+            <circle cx="16" cy="14" r="4" fill="#1a1a2e" stroke="#fff" strokeWidth="1" />
+          </>
+        )}
+        {enemy.type === 'fighter' && (
+          <>
+            <path d="M16 2 L2 30 L16 24 L30 30 Z" fill={config.color} stroke="#fff" strokeWidth="1" />
+            <path d="M8 20 L2 26 L8 24 Z" fill={config.color} />
+            <path d="M24 20 L30 26 L24 24 Z" fill={config.color} />
+            <circle cx="16" cy="12" r="5" fill="#1a1a2e" stroke="#fff" strokeWidth="1" />
+            <circle cx="16" cy="12" r="2" fill="#ef4444" />
+          </>
+        )}
+        {enemy.type === 'cruiser' && (
+          <>
+            <rect x="6" y="4" width="20" height="24" rx="4" fill={config.color} stroke="#fff" strokeWidth="1" />
+            <rect x="2" y="12" width="6" height="12" rx="2" fill={config.color} />
+            <rect x="24" y="12" width="6" height="12" rx="2" fill={config.color} />
+            <circle cx="16" cy="12" r="4" fill="#1a1a2e" stroke="#fff" strokeWidth="1" />
+            <circle cx="12" cy="22" r="2" fill="#ef4444" />
+            <circle cx="20" cy="22" r="2" fill="#ef4444" />
+          </>
+        )}
+        {enemy.type === 'boss' && (
+          <>
+            <ellipse cx="16" cy="16" rx="14" ry="12" fill={config.color} stroke="#fbbf24" strokeWidth="2" />
+            <ellipse cx="10" cy="12" rx="4" ry="5" fill="#1a1a2e" stroke="#fff" strokeWidth="1" />
+            <ellipse cx="22" cy="12" rx="4" ry="5" fill="#1a1a2e" stroke="#fff" strokeWidth="1" />
+            <circle cx="10" cy="12" r="2" fill="#22c55e" />
+            <circle cx="22" cy="12" r="2" fill="#22c55e" />
+            <path d="M8 22 Q16 28 24 22" stroke="#fff" strokeWidth="2" fill="none" />
+          </>
+        )}
+      </svg>
+      
+      {/* HP bar for multi-hit enemies */}
+      {enemy.maxHp > 1 && (
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-green-500 transition-all"
+            style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}
+          />
+        </div>
+      )}
+    </motion.div>
+  );
+});
+EnemySprite.displayName = 'EnemySprite';
+
+// Projectile component
+const ProjectileSprite = memo(({ projectile }: { projectile: Projectile }) => (
+  <motion.div
+    className="absolute w-1 h-4 rounded-full"
+    style={{
+      left: `${projectile.x}%`,
+      top: `${projectile.y}%`,
+      transform: 'translate(-50%, -50%)',
+      background: projectile.isEnemy
+        ? 'linear-gradient(180deg, #ef4444, #fca5a5)'
+        : 'linear-gradient(0deg, #3b82f6, #93c5fd)',
+      boxShadow: projectile.isEnemy
+        ? '0 0 8px #ef4444'
+        : '0 0 8px #3b82f6',
+    }}
+  />
+));
+ProjectileSprite.displayName = 'ProjectileSprite';
+
+// Power-up component
+const PowerUpSprite = memo(({ powerUp }: { powerUp: PowerUp }) => {
+  const config = {
+    shield: { icon: Shield, color: '#3b82f6', bg: 'rgba(59,130,246,0.3)' },
+    rapid: { icon: Zap, color: '#f59e0b', bg: 'rgba(245,158,11,0.3)' },
+    bomb: { icon: Bomb, color: '#ef4444', bg: 'rgba(239,68,68,0.3)' },
+    bonus: { icon: Star, color: '#fbbf24', bg: 'rgba(251,191,36,0.3)' },
+  }[powerUp.type];
+  
+  const Icon = config.icon;
+  
+  return (
+    <motion.div
+      className="absolute"
+      style={{
+        left: `${powerUp.x}%`,
+        top: `${powerUp.y}%`,
+        transform: 'translate(-50%, -50%)',
+      }}
+      animate={{ rotate: 360, scale: [1, 1.1, 1] }}
+      transition={{ rotate: { duration: 2, repeat: Infinity, ease: 'linear' }, scale: { duration: 0.5, repeat: Infinity } }}
+    >
       <div
-        className="rounded-full flex items-center justify-center"
+        className="w-8 h-8 rounded-full flex items-center justify-center"
         style={{
-          width: target.size,
-          height: target.size,
-          background: isDecoy
-            ? 'radial-gradient(circle, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0.4) 100%)'
-            : isBonus
-              ? 'radial-gradient(circle, rgba(250,204,21,0.2) 0%, rgba(250,204,21,0.4) 100%)'
-              : 'radial-gradient(circle, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.4) 100%)',
-          border: `2px solid ${isDecoy ? 'rgba(239,68,68,0.6)' : isBonus ? 'rgba(250,204,21,0.6)' : 'rgba(168,85,247,0.6)'}`,
-          boxShadow: `0 0 20px ${isDecoy ? 'rgba(239,68,68,0.4)' : isBonus ? 'rgba(250,204,21,0.4)' : 'rgba(168,85,247,0.3)'}`,
+          background: config.bg,
+          border: `2px solid ${config.color}`,
+          boxShadow: `0 0 15px ${config.color}`,
         }}
       >
-        {/* Middle ring */}
-        <div
-          className="rounded-full flex items-center justify-center"
-          style={{
-            width: target.size * 0.65,
-            height: target.size * 0.65,
-            background: isDecoy
-              ? 'radial-gradient(circle, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.5) 100%)'
-              : isBonus
-                ? 'radial-gradient(circle, rgba(250,204,21,0.3) 0%, rgba(250,204,21,0.5) 100%)'
-                : 'radial-gradient(circle, rgba(168,85,247,0.3) 0%, rgba(168,85,247,0.5) 100%)',
-            border: `1px solid ${isDecoy ? 'rgba(239,68,68,0.5)' : isBonus ? 'rgba(250,204,21,0.5)' : 'rgba(168,85,247,0.5)'}`,
-          }}
-        >
-          {/* Bullseye center */}
-          <div
-            className="rounded-full flex items-center justify-center"
-            style={{
-              width: target.size * 0.3,
-              height: target.size * 0.3,
-              background: isDecoy
-                ? 'radial-gradient(circle, #ef4444 0%, #dc2626 100%)'
-                : isBonus
-                  ? 'radial-gradient(circle, #fbbf24 0%, #f59e0b 100%)'
-                  : 'radial-gradient(circle, #a855f7 0%, #9333ea 100%)',
-              boxShadow: `0 0 10px ${isDecoy ? '#ef4444' : isBonus ? '#fbbf24' : '#a855f7'}`,
-            }}
-          >
-            {isDecoy && <Skull className="w-3 h-3 text-white" />}
-            {isBonus && <span className="text-[8px] font-bold text-white">★</span>}
-          </div>
-        </div>
-      </div>
-      
-      {/* Points indicator */}
-      <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-bold ${
-        isDecoy ? 'text-red-400' : isBonus ? 'text-yellow-400' : 'text-purple-400'
-      }`}>
-        {isDecoy ? '-50' : `+${target.points}`}
+        <Icon className="w-4 h-4" style={{ color: config.color }} />
       </div>
     </motion.div>
   );
 });
-TargetComponent.displayName = 'TargetComponent';
+PowerUpSprite.displayName = 'PowerUpSprite';
 
-// Shield component
-const ShieldComponent = memo(({ shield }: { shield: GameShield }) => (
+// Explosion effect
+const ExplosionEffect = memo(({ explosion }: { explosion: Explosion }) => (
   <motion.div
     className="absolute pointer-events-none"
     style={{
-      left: `${shield.x}%`,
-      top: `${shield.y}%`,
-      transform: `translate(-50%, -50%) rotate(${shield.rotation}deg)`,
+      left: `${explosion.x}%`,
+      top: `${explosion.y}%`,
+      transform: 'translate(-50%, -50%)',
     }}
-    animate={{
-      rotate: [shield.rotation, shield.rotation + 5, shield.rotation - 5, shield.rotation],
-    }}
-    transition={{ duration: 3, repeat: Infinity }}
+    initial={{ scale: 0, opacity: 1 }}
+    animate={{ scale: explosion.size === 'large' ? 3 : 1.5, opacity: 0 }}
+    transition={{ duration: 0.4 }}
   >
     <div
-      className="flex items-center justify-center"
+      className="w-8 h-8 rounded-full"
       style={{
-        width: shield.width,
-        height: shield.height,
-        background: 'linear-gradient(135deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.6) 50%, rgba(59,130,246,0.3) 100%)',
-        border: '2px solid rgba(59,130,246,0.8)',
-        borderRadius: 8,
-        boxShadow: '0 0 20px rgba(59,130,246,0.5), inset 0 0 15px rgba(59,130,246,0.3)',
-        clipPath: 'polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%)',
+        background: 'radial-gradient(circle, #fbbf24 0%, #f59e0b 30%, #ef4444 60%, transparent 100%)',
       }}
-    >
-      <Shield className="w-5 h-5 text-blue-300" />
-    </div>
-    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-blue-400 font-bold">
-      HP: {shield.hp}
-    </div>
+    />
   </motion.div>
 ));
-ShieldComponent.displayName = 'ShieldComponent';
-
-// Beam projectile component
-const BeamProjectile = memo(({ beam, onComplete }: { beam: BeamShot; onComplete: () => void }) => {
-  useEffect(() => {
-    const timer = setTimeout(onComplete, 400);
-    return () => clearTimeout(timer);
-  }, [onComplete]);
-  
-  const powerColor = beam.power >= 90
-    ? '#fbbf24'
-    : beam.power >= 70
-      ? '#a855f7'
-      : '#6366f1';
-  
-  const beamWidth = Math.max(2, beam.power / 20);
-  
-  return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" style={{ overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={`beam-${beam.id}`} x1="0%" y1="100%" x2="0%" y2="0%">
-          <stop offset="0%" stopColor={powerColor} stopOpacity="1" />
-          <stop offset="100%" stopColor="white" stopOpacity="0.8" />
-        </linearGradient>
-        <filter id={`glow-${beam.id}`}>
-          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      
-      <motion.line
-        x1={`${beam.startX}%`}
-        y1={`${beam.startY}%`}
-        x2={`${beam.startX}%`}
-        y2={`${beam.startY}%`}
-        stroke={`url(#beam-${beam.id})`}
-        strokeWidth={beamWidth}
-        strokeLinecap="round"
-        filter={`url(#glow-${beam.id})`}
-        animate={{
-          x2: `${beam.endX}%`,
-          y2: `${beam.endY}%`,
-        }}
-        transition={{ duration: 0.15, ease: 'easeOut' }}
-      />
-      
-      {/* Impact effects */}
-      {beam.hits.map((hit, i) => (
-        <motion.circle
-          key={i}
-          cx={`${hit.x}%`}
-          cy={`${hit.y}%`}
-          r="0"
-          fill="none"
-          stroke={hit.type === 'decoy' ? '#ef4444' : hit.type === 'bonus' ? '#fbbf24' : powerColor}
-          strokeWidth="2"
-          initial={{ r: 0, opacity: 1 }}
-          animate={{ r: 30, opacity: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        />
-      ))}
-    </svg>
-  );
-});
-BeamProjectile.displayName = 'BeamProjectile';
-
-// Charge bar component
-const ChargeBar = memo(({ 
-  chargeLevel, 
-  isCharging,
-  isOverheating,
-  overloadThreshold,
-}: { 
-  chargeLevel: number;
-  isCharging: boolean;
-  isOverheating: boolean;
-  overloadThreshold: number;
-}) => {
-  return (
-    <div className="relative w-full max-w-xs h-8 mb-4">
-      <div 
-        className="absolute inset-0 rounded-xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(10,10,30,0.4) 100%)',
-          border: isOverheating ? '2px solid rgba(239,68,68,0.8)' : '1px solid rgba(255,255,255,0.1)',
-          boxShadow: isOverheating ? '0 0 20px rgba(239,68,68,0.5)' : 'inset 0 3px 8px rgba(0,0,0,0.5)',
-        }}
-      >
-        {/* Overload zone indicator */}
-        <div
-          className="absolute top-0 bottom-0 right-0"
-          style={{
-            width: `${110 - overloadThreshold}%`,
-            background: 'linear-gradient(90deg, transparent, rgba(239,68,68,0.3))',
-          }}
-        />
-        
-        {/* Charge fill */}
-        <motion.div 
-          className="absolute top-1 bottom-1 left-1 rounded-lg"
-          animate={{ width: `calc(${Math.min(chargeLevel, 100)}% - 4px)` }}
-          transition={{ duration: 0.05 }}
-          style={{ 
-            background: isOverheating
-              ? 'linear-gradient(90deg, #ef4444, #f87171, #ef4444)'
-              : chargeLevel >= 80
-                ? 'linear-gradient(90deg, #fbbf24, #fcd34d, #fbbf24)'
-                : chargeLevel >= 50
-                  ? 'linear-gradient(90deg, #a855f7, #c084fc, #a855f7)'
-                  : 'linear-gradient(90deg, #6366f1, #818cf8, #6366f1)',
-            backgroundSize: isCharging ? '200% 100%' : '100% 100%',
-            animation: isCharging ? 'shimmer 1s linear infinite' : 'none',
-            boxShadow: isOverheating
-              ? '0 0 20px rgba(239,68,68,0.6)'
-              : '0 0 15px rgba(168,85,247,0.4)',
-          }}
-        />
-        
-        {/* Charge indicator line */}
-        <motion.div
-          className="absolute top-1 bottom-1 w-1 rounded-full bg-white"
-          animate={{ left: `${Math.min(chargeLevel, 100)}%` }}
-          transition={{ duration: 0.05 }}
-          style={{ 
-            boxShadow: '0 0 10px white',
-          }}
-        />
-      </div>
-      
-      {/* Labels */}
-      <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[10px]">
-        <span className="text-muted-foreground">0%</span>
-        <span className={`font-bold ${chargeLevel >= 80 ? 'text-yellow-400' : 'text-primary'}`}>
-          {Math.round(chargeLevel)}%
-        </span>
-        <span className="text-red-400">{overloadThreshold}%</span>
-      </div>
-      
-      {/* Overheat warning */}
-      <AnimatePresence>
-        {isOverheating && (
-          <motion.div
-            className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-red-400"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: [1, 0.5, 1], y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, repeat: Infinity }}
-          >
-            ⚠️ OVERHEATING!
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-});
-ChargeBar.displayName = 'ChargeBar';
-
-// Combo display
-const ComboDisplay = memo(({ combo, chainHits }: { combo: number; chainHits: number }) => (
-  <AnimatePresence>
-    {(combo > 1 || chainHits > 1) && (
-      <motion.div
-        className="absolute top-4 right-4 text-right z-30"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0, opacity: 0 }}
-      >
-        {combo > 1 && (
-          <div className="text-2xl font-black text-orange-400" style={{ textShadow: '0 0 10px rgba(249,115,22,0.5)' }}>
-            {combo}x COMBO
-          </div>
-        )}
-        {chainHits > 1 && (
-          <motion.div
-            className="text-lg font-bold text-yellow-400"
-            initial={{ scale: 1.5 }}
-            animate={{ scale: 1 }}
-          >
-            ⚡ {chainHits}-HIT CHAIN!
-          </motion.div>
-        )}
-      </motion.div>
-    )}
-  </AnimatePresence>
-));
-ComboDisplay.displayName = 'ComboDisplay';
+ExplosionEffect.displayName = 'ExplosionEffect';
 
 // Score popup
-const ScorePopup = memo(({ score, x, y, type }: { score: number; x: number; y: number; type: string }) => (
+const ScorePopupComponent = memo(({ popup }: { popup: ScorePopup }) => (
   <motion.div
-    className={`absolute pointer-events-none font-bold text-lg z-30 ${
-      score < 0 ? 'text-red-400' : type === 'bonus' ? 'text-yellow-400' : 'text-green-400'
+    className={`absolute pointer-events-none font-bold text-sm z-30 ${
+      popup.score < 0 ? 'text-red-400' : popup.type === 'bonus' ? 'text-yellow-400' : 'text-green-400'
     }`}
-    style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-    initial={{ opacity: 1, y: 0, scale: 1.5 }}
-    animate={{ opacity: 0, y: -30, scale: 1 }}
-    transition={{ duration: 0.8 }}
+    style={{ left: `${popup.x}%`, top: `${popup.y}%`, transform: 'translate(-50%, -50%)' }}
+    initial={{ opacity: 1, y: 0, scale: 1.2 }}
+    animate={{ opacity: 0, y: -20, scale: 1 }}
+    transition={{ duration: 0.6 }}
   >
-    {score > 0 ? `+${score}` : score}
+    {popup.score > 0 ? `+${popup.score}` : popup.score}
   </motion.div>
 ));
-ScorePopup.displayName = 'ScorePopup';
+ScorePopupComponent.displayName = 'ScorePopupComponent';
 
-// Wave transition overlay
+// Wave transition
 const WaveTransition = memo(({ wave }: { wave: number }) => (
   <motion.div
-    className="absolute inset-0 z-40 flex items-center justify-center bg-background/90 backdrop-blur-sm"
+    className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm"
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
   >
     <motion.div
       className="text-center"
-      initial={{ scale: 0, rotate: -180 }}
-      animate={{ scale: 1, rotate: 0 }}
-      exit={{ scale: 0, rotate: 180 }}
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 200 }}
     >
-      <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.5, repeat: 2 }}>
-        <Target className="w-16 h-16 text-primary mx-auto mb-2" />
-      </motion.div>
-      <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-        WAVE {wave + 1}
+      <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+        WAVE {wave}
       </p>
-      <p className="text-sm text-muted-foreground mt-1">New targets incoming!</p>
+      <p className="text-sm text-muted-foreground mt-2">Enemies incoming!</p>
     </motion.div>
   </motion.div>
 ));
 WaveTransition.displayName = 'WaveTransition';
 
-// Generate targets for a wave
-const generateTargets = (
-  config: typeof DIFFICULTY_CONFIG['easy'],
-  waveIndex: number
-): GameTarget[] => {
-  const targets: GameTarget[] = [];
-  const usedPositions: { x: number; y: number }[] = [];
+// Lives display
+const LivesDisplay = memo(({ lives }: { lives: number }) => (
+  <div className="flex items-center gap-1">
+    {Array.from({ length: 3 }).map((_, i) => (
+      <Heart
+        key={i}
+        className={`w-5 h-5 ${i < lives ? 'text-red-500 fill-red-500' : 'text-slate-600'}`}
+      />
+    ))}
+  </div>
+));
+LivesDisplay.displayName = 'LivesDisplay';
+
+// Generate enemy formation
+const generateEnemies = (wave: number, config: typeof DIFFICULTY_CONFIG['easy']): Enemy[] => {
+  const enemies: Enemy[] = [];
+  const rows = Math.min(3 + Math.floor(wave / 2), 4);
+  const cols = Math.min(5 + wave, 8);
+  const totalEnemies = Math.min(rows * cols, config.enemiesPerWave + wave * 2);
   
-  const isValidPosition = (x: number, y: number) => {
-    return usedPositions.every(pos => 
-      Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2)) > 20
-    );
-  };
-  
-  // Normal targets
-  for (let i = 0; i < config.targetCount - config.decoyCount; i++) {
-    let x, y;
-    let attempts = 0;
-    do {
-      x = 15 + Math.random() * 70;
-      y = 10 + Math.random() * 50;
-      attempts++;
-    } while (!isValidPosition(x, y) && attempts < 20);
-    
-    usedPositions.push({ x, y });
-    
-    const isBonus = i === 0 && waveIndex > 0;
-    targets.push({
-      id: `target-${waveIndex}-${i}`,
-      x,
-      y,
-      size: config.targetSize,
-      type: isBonus ? 'bonus' : 'normal',
-      health: 1,
-      points: isBonus ? 200 : Math.random() > 0.5 ? 150 : 100,
-      velocityX: (Math.random() - 0.5) * config.targetSpeed,
-      velocityY: (Math.random() - 0.5) * config.targetSpeed,
-      opacity: 1,
-      isHit: false,
-    });
+  let count = 0;
+  for (let row = 0; row < rows && count < totalEnemies; row++) {
+    for (let col = 0; col < cols && count < totalEnemies; col++) {
+      const x = 15 + (col * 70) / (cols - 1 || 1);
+      const y = 8 + row * 10;
+      
+      // Determine enemy type based on row and wave
+      let type: EnemyType = 'scout';
+      if (row === 0 && wave >= 2) type = 'cruiser';
+      else if (row <= 1) type = 'fighter';
+      
+      // Add boss on last wave
+      if (wave >= config.waves && row === 0 && col === Math.floor(cols / 2)) {
+        type = 'boss';
+      }
+      
+      const enemyConfig = ENEMY_CONFIG[type];
+      
+      enemies.push({
+        id: `enemy-${wave}-${row}-${col}`,
+        type,
+        x,
+        y,
+        hp: enemyConfig.hp,
+        maxHp: enemyConfig.hp,
+        points: enemyConfig.points,
+        isDiving: false,
+        diveStartX: x,
+        divePhase: 0,
+        formationX: x,
+        formationY: y,
+      });
+      
+      count++;
+    }
   }
   
-  // Decoy targets
-  for (let i = 0; i < config.decoyCount; i++) {
-    let x, y;
-    let attempts = 0;
-    do {
-      x = 15 + Math.random() * 70;
-      y = 10 + Math.random() * 50;
-      attempts++;
-    } while (!isValidPosition(x, y) && attempts < 20);
-    
-    usedPositions.push({ x, y });
-    
-    targets.push({
-      id: `decoy-${waveIndex}-${i}`,
-      x,
-      y,
-      size: config.targetSize * 0.9,
-      type: 'decoy',
-      health: 1,
-      points: -50,
-      velocityX: (Math.random() - 0.5) * config.targetSpeed * 1.2,
-      velocityY: (Math.random() - 0.5) * config.targetSpeed * 1.2,
-      opacity: 1,
-      isHit: false,
-    });
-  }
-  
-  return targets;
+  return enemies;
 };
 
-// Generate shields for a wave
-const generateShields = (config: typeof DIFFICULTY_CONFIG['easy'], waveIndex: number): GameShield[] => {
-  const shields: GameShield[] = [];
-  
-  for (let i = 0; i < config.shieldCount; i++) {
-    shields.push({
-      id: `shield-${waveIndex}-${i}`,
-      x: 20 + Math.random() * 60,
-      y: 35 + Math.random() * 25,
-      width: 50,
-      height: 30,
-      hp: waveIndex > 0 ? 2 : 1,
-      rotation: Math.random() * 30 - 15,
-    });
-  }
-  
-  return shields;
-};
-
-export const EnergyBeamGame = ({
+export function EnergyBeamGame({
   companionStats,
   onComplete,
   difficulty = 'medium',
-  questIntervalScale = 0,
+  questIntervalScale = 1,
   maxTimer,
   isPractice = false,
-}: EnergyBeamGameProps) => {
+}: EnergyBeamGameProps) {
   const config = DIFFICULTY_CONFIG[difficulty];
-  const effectiveTimer = maxTimer ?? config.roundTimer;
+  const gameTimer = maxTimer || config.roundTimer;
   
-  const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete' | 'wave-transition'>('countdown');
-  const [isCharging, setIsCharging] = useState(false);
-  const [chargeLevel, setChargeLevel] = useState(0);
+  // Game state
+  const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'wave-transition' | 'complete'>('countdown');
+  const [countdown, setCountdown] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(gameTimer);
   const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [maxCombo, setMaxCombo] = useState(0);
-  const [chainHits, setChainHits] = useState(0);
-  const [currentWave, setCurrentWave] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(effectiveTimer);
-  const [isStunned, setIsStunned] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [wave, setWave] = useState(1);
+  const [lives, setLives] = useState(3);
   
-  const [targets, setTargets] = useState<GameTarget[]>([]);
-  const [shields, setShields] = useState<GameShield[]>([]);
-  const [activeBeams, setActiveBeams] = useState<BeamShot[]>([]);
-  const [scorePopups, setScorePopups] = useState<{ id: string; score: number; x: number; y: number; type: string }[]>([]);
+  // Player state
+  const [playerX, setPlayerX] = useState(50);
+  const [hasShield, setHasShield] = useState(false);
+  const [rapidFire, setRapidFire] = useState(false);
+  const [isInvulnerable, setIsInvulnerable] = useState(false);
   
-  const [aimPosition, setAimPosition] = useState({ x: 50, y: 50 });
-  const arenaRef = useRef<HTMLDivElement>(null);
-  const chargeRef = useRef<NodeJS.Timeout | null>(null);
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+  // Game objects
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [projectiles, setProjectiles] = useState<Projectile[]>([]);
+  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [explosions, setExplosions] = useState<Explosion[]>([]);
+  const [scorePopups, setScorePopups] = useState<ScorePopup[]>([]);
   
-  const bodyBonus = Math.min(companionStats.body / 100, 1);
-  const mindBonus = Math.min(companionStats.mind / 100, 1);
+  // Refs
+  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const lastFireTime = useRef(0);
+  const formationDirection = useRef(1);
+  const formationOffset = useRef(0);
+  const touchStartX = useRef<number | null>(null);
+  const animationFrameRef = useRef<number>();
+  const lastUpdateTime = useRef(0);
   
-  const isOverheating = chargeLevel >= config.overloadThreshold - 10;
+  // Stats tracking
+  const statsRef = useRef({
+    enemiesDestroyed: 0,
+    shotsHit: 0,
+    shotsFired: 0,
+    wavesCompleted: 0,
+    powerUpsCollected: 0,
+  });
   
-  // Initialize wave
-  const initializeWave = useCallback((waveIndex: number) => {
-    setTargets(generateTargets(config, waveIndex));
-    setShields(generateShields(config, waveIndex));
-    setChainHits(0);
-  }, [config]);
-  
-  // Start game
+  // Initialize first wave
   useEffect(() => {
-    if (gameState === 'playing' && targets.length === 0) {
-      initializeWave(0);
+    if (gameState === 'playing' && enemies.length === 0) {
+      setEnemies(generateEnemies(wave, config));
     }
-  }, [gameState, targets.length, initializeWave]);
+  }, [gameState, wave, config, enemies.length]);
+  
+  // Countdown timer
+  useEffect(() => {
+    if (gameState !== 'countdown') return;
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          setGameState('playing');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [gameState]);
   
   // Game timer
   useEffect(() => {
@@ -634,7 +530,6 @@ export const EnergyBeamGame = ({
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          clearInterval(timer);
           setGameState('complete');
           return 0;
         }
@@ -645,522 +540,562 @@ export const EnergyBeamGame = ({
     return () => clearInterval(timer);
   }, [gameState]);
   
-  // Game loop for target movement and fading
+  // Fire projectile
+  const fireProjectile = useCallback(() => {
+    const now = Date.now();
+    const fireDelay = rapidFire ? 100 : 180;
+    
+    if (now - lastFireTime.current < fireDelay) return;
+    lastFireTime.current = now;
+    
+    statsRef.current.shotsFired++;
+    
+    setProjectiles(prev => [...prev, {
+      id: `p-${now}`,
+      x: playerX,
+      y: 82,
+      isEnemy: false,
+      speed: 3,
+    }]);
+  }, [playerX, rapidFire]);
+  
+  // Handle keyboard input
   useEffect(() => {
     if (gameState !== 'playing') return;
     
-    gameLoopRef.current = setInterval(() => {
-      setTargets(prev => prev.map(target => {
-        if (target.isHit) return target;
-        
-        let newX = target.x + target.velocityX;
-        let newY = target.y + target.velocityY;
-        let newVelocityX = target.velocityX;
-        let newVelocityY = target.velocityY;
-        
-        // Bounce off walls
-        if (newX < 10 || newX > 90) newVelocityX *= -1;
-        if (newY < 5 || newY > 60) newVelocityY *= -1;
-        
-        // Fading effect for hard mode
-        let newOpacity = target.opacity;
-        if (config.targetFading) {
-          newOpacity = 0.4 + Math.sin(Date.now() / 1000 + parseInt(target.id.split('-')[2])) * 0.6;
-        }
-        
-        return {
-          ...target,
-          x: Math.max(10, Math.min(90, newX)),
-          y: Math.max(5, Math.min(60, newY)),
-          velocityX: newVelocityX,
-          velocityY: newVelocityY,
-          opacity: newOpacity,
-        };
-      }));
-    }, 50);
+    const keysPressed = new Set<string>();
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysPressed.add(e.key.toLowerCase());
+      
+      if (e.key === ' ' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        fireProjectile();
+      }
+      if (e.key === 'Escape') {
+        setGameState('paused');
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysPressed.delete(e.key.toLowerCase());
+    };
+    
+    const movePlayer = () => {
+      if (keysPressed.has('arrowleft') || keysPressed.has('a')) {
+        setPlayerX(prev => Math.max(5, prev - 2));
+      }
+      if (keysPressed.has('arrowright') || keysPressed.has('d')) {
+        setPlayerX(prev => Math.min(95, prev + 2));
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    const moveInterval = setInterval(movePlayer, 16);
     
     return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      clearInterval(moveInterval);
     };
-  }, [gameState, config.targetFading]);
+  }, [gameState, fireProjectile]);
   
-  // Charge decay
-  useEffect(() => {
-    if (gameState !== 'playing' || isCharging || chargeLevel <= 0 || config.chargeDecayRate === 0) return;
-    
-    const decayInterval = setInterval(() => {
-      setChargeLevel(prev => Math.max(0, prev - config.chargeDecayRate / 10));
-    }, 100);
-    
-    return () => clearInterval(decayInterval);
-  }, [gameState, isCharging, chargeLevel, config.chargeDecayRate]);
+  // Touch controls
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
   
-  // Check for overload
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!gameAreaRef.current || touchStartX.current === null) return;
+    
+    const rect = gameAreaRef.current.getBoundingClientRect();
+    const touchX = e.touches[0].clientX;
+    const relativeX = ((touchX - rect.left) / rect.width) * 100;
+    
+    setPlayerX(Math.max(5, Math.min(95, relativeX)));
+  }, []);
+  
+  const handleMoveLeft = useCallback(() => {
+    setPlayerX(prev => Math.max(5, prev - 8));
+  }, []);
+  
+  const handleMoveRight = useCallback(() => {
+    setPlayerX(prev => Math.min(95, prev + 8));
+  }, []);
+  
+  // Main game loop
   useEffect(() => {
-    if (chargeLevel >= config.overloadThreshold && isCharging) {
-      fireBeam(true);
-    }
-  }, [chargeLevel, config.overloadThreshold, isCharging]);
+    if (gameState !== 'playing') return;
+    
+    const gameLoop = (timestamp: number) => {
+      const deltaTime = timestamp - lastUpdateTime.current;
+      if (deltaTime < 16) {
+        animationFrameRef.current = requestAnimationFrame(gameLoop);
+        return;
+      }
+      lastUpdateTime.current = timestamp;
+      
+      // Auto-fire
+      fireProjectile();
+      
+      // Update formation movement
+      formationOffset.current += config.enemySpeed * formationDirection.current * 0.3;
+      if (Math.abs(formationOffset.current) > 12) {
+        formationDirection.current *= -1;
+      }
+      
+      // Update enemies
+      setEnemies(prev => prev.map(enemy => {
+        if (enemy.isDiving) {
+          // Diving behavior - swooping attack
+          enemy.divePhase += 0.05;
+          const newY = enemy.formationY + Math.sin(enemy.divePhase) * 50 + enemy.divePhase * 15;
+          const newX = enemy.diveStartX + Math.sin(enemy.divePhase * 2) * 20;
+          
+          // Return to formation after dive
+          if (newY > 90) {
+            return {
+              ...enemy,
+              isDiving: false,
+              divePhase: 0,
+              x: enemy.formationX + formationOffset.current,
+              y: enemy.formationY,
+            };
+          }
+          
+          return { ...enemy, x: Math.max(5, Math.min(95, newX)), y: newY };
+        }
+        
+        // Normal formation movement
+        const newX = enemy.formationX + formationOffset.current;
+        
+        // Random dive attack
+        if (Math.random() < config.diveChance * 0.1 && !enemy.isDiving) {
+          return { ...enemy, isDiving: true, diveStartX: newX, divePhase: 0 };
+        }
+        
+        // Enemy shooting
+        if (config.enemyFireRate > 0 && Math.random() < config.enemyFireRate) {
+          setProjectiles(p => [...p, {
+            id: `ep-${Date.now()}-${enemy.id}`,
+            x: newX,
+            y: enemy.y + 3,
+            isEnemy: true,
+            speed: 1.5,
+          }]);
+        }
+        
+        return { ...enemy, x: newX };
+      }));
+      
+      // Update projectiles
+      setProjectiles(prev => {
+        const updated: Projectile[] = [];
+        
+        prev.forEach(proj => {
+          const newY = proj.y + (proj.isEnemy ? proj.speed : -proj.speed);
+          
+          if (newY < 0 || newY > 100) return;
+          
+          // Check player projectile hitting enemies
+          if (!proj.isEnemy) {
+            let hitEnemy = false;
+            
+            setEnemies(enemies => enemies.map(enemy => {
+              if (hitEnemy) return enemy;
+              
+              const dx = Math.abs(proj.x - enemy.x);
+              const dy = Math.abs(newY - enemy.y);
+              const hitRadius = ENEMY_CONFIG[enemy.type].size / 8;
+              
+              if (dx < hitRadius && dy < hitRadius) {
+                hitEnemy = true;
+                statsRef.current.shotsHit++;
+                
+                const newHp = enemy.hp - 1;
+                
+                if (newHp <= 0) {
+                  // Enemy destroyed
+                  statsRef.current.enemiesDestroyed++;
+                  const points = enemy.isDiving ? enemy.points * 2 : enemy.points;
+                  setScore(s => s + points);
+                  triggerHaptic('light');
+                  
+                  // Add explosion
+                  setExplosions(e => [...e, {
+                    id: `exp-${Date.now()}-${enemy.id}`,
+                    x: enemy.x,
+                    y: enemy.y,
+                    size: enemy.type === 'boss' ? 'large' : 'small',
+                  }]);
+                  
+                  // Add score popup
+                  setScorePopups(p => [...p, {
+                    id: `sp-${Date.now()}`,
+                    x: enemy.x,
+                    y: enemy.y,
+                    score: points,
+                    type: 'normal',
+                  }]);
+                  
+                  // Spawn power-up
+                  if (Math.random() < config.powerUpChance) {
+                    const types: PowerUp['type'][] = ['shield', 'rapid', 'bomb', 'bonus'];
+                    setPowerUps(p => [...p, {
+                      id: `pu-${Date.now()}`,
+                      type: types[Math.floor(Math.random() * types.length)],
+                      x: enemy.x,
+                      y: enemy.y,
+                    }]);
+                  }
+                  
+                  return { ...enemy, hp: 0 };
+                }
+                
+                return { ...enemy, hp: newHp };
+              }
+              
+              return enemy;
+            }).filter(e => e.hp > 0));
+            
+            if (hitEnemy) return;
+          }
+          
+          // Check enemy projectile hitting player
+          if (proj.isEnemy && !isInvulnerable) {
+            const dx = Math.abs(proj.x - playerX);
+            const dy = Math.abs(newY - 85);
+            
+            if (dx < 4 && dy < 4) {
+              if (hasShield) {
+                setHasShield(false);
+                triggerHaptic('medium');
+              } else {
+                setLives(l => {
+                  const newLives = l - 1;
+                  if (newLives <= 0) {
+                    setGameState('complete');
+                  }
+                  return newLives;
+                });
+                setIsInvulnerable(true);
+                setTimeout(() => setIsInvulnerable(false), 2000);
+                triggerHaptic('heavy');
+              }
+              return;
+            }
+          }
+          
+          updated.push({ ...proj, y: newY });
+        });
+        
+        return updated;
+      });
+      
+      // Update power-ups
+      setPowerUps(prev => {
+        const updated: PowerUp[] = [];
+        
+        prev.forEach(pu => {
+          const newY = pu.y + 0.5;
+          
+          if (newY > 100) return;
+          
+          // Check collision with player
+          const dx = Math.abs(pu.x - playerX);
+          const dy = Math.abs(newY - 85);
+          
+          if (dx < 6 && dy < 6) {
+            statsRef.current.powerUpsCollected++;
+            triggerHaptic('medium');
+            
+            switch (pu.type) {
+              case 'shield':
+                setHasShield(true);
+                break;
+              case 'rapid':
+                setRapidFire(true);
+                setTimeout(() => setRapidFire(false), 5000);
+                break;
+              case 'bomb':
+                // Clear all enemies on screen
+                setEnemies(enemies => {
+                  enemies.forEach(e => {
+                    setScore(s => s + e.points);
+                    statsRef.current.enemiesDestroyed++;
+                    setExplosions(ex => [...ex, {
+                      id: `exp-bomb-${e.id}`,
+                      x: e.x,
+                      y: e.y,
+                      size: 'small',
+                    }]);
+                  });
+                  return [];
+                });
+                break;
+              case 'bonus':
+                setScore(s => s + 200);
+                setScorePopups(p => [...p, {
+                  id: `sp-bonus-${Date.now()}`,
+                  x: pu.x,
+                  y: pu.y,
+                  score: 200,
+                  type: 'bonus',
+                }]);
+                break;
+            }
+            
+            return;
+          }
+          
+          updated.push({ ...pu, y: newY });
+        });
+        
+        return updated;
+      });
+      
+      // Check enemy collision with player
+      if (!isInvulnerable) {
+        setEnemies(prev => {
+          prev.forEach(enemy => {
+            const dx = Math.abs(enemy.x - playerX);
+            const dy = Math.abs(enemy.y - 85);
+            
+            if (dx < 5 && dy < 5) {
+              if (hasShield) {
+                setHasShield(false);
+              } else {
+                setLives(l => {
+                  const newLives = l - 1;
+                  if (newLives <= 0) {
+                    setGameState('complete');
+                  }
+                  return newLives;
+                });
+                setIsInvulnerable(true);
+                setTimeout(() => setIsInvulnerable(false), 2000);
+              }
+              triggerHaptic('heavy');
+            }
+          });
+          return prev;
+        });
+      }
+      
+      // Clean up old explosions and popups
+      setExplosions(prev => prev.slice(-10));
+      setScorePopups(prev => prev.slice(-10));
+      
+      animationFrameRef.current = requestAnimationFrame(gameLoop);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(gameLoop);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [gameState, playerX, config, fireProjectile, hasShield, isInvulnerable]);
   
   // Check wave completion
   useEffect(() => {
     if (gameState !== 'playing') return;
+    if (enemies.length > 0) return;
     
-    const remainingTargets = targets.filter(t => !t.isHit && t.type !== 'decoy');
-    if (remainingTargets.length === 0 && targets.length > 0) {
-      // Wave clear bonus
-      const waveBonus = 100;
-      setScore(prev => prev + waveBonus);
-      addScorePopup(waveBonus, 50, 40, 'bonus');
+    const stats = statsRef.current;
+    
+    if (wave < config.waves) {
+      // Next wave
+      stats.wavesCompleted++;
+      setScore(s => s + 100 + wave * 50); // Wave clear bonus
+      setGameState('wave-transition');
       
-      if (currentWave < config.waves - 1) {
-        setGameState('wave-transition');
-        setTimeout(() => {
-          setCurrentWave(w => w + 1);
-          initializeWave(currentWave + 1);
-          setGameState('playing');
-        }, 1500);
-      } else {
-        // Time bonus
-        const timeBonus = timeLeft * 5;
-        setScore(prev => prev + timeBonus);
-        setGameState('complete');
-      }
+      setTimeout(() => {
+        setWave(w => w + 1);
+        setEnemies(generateEnemies(wave + 1, config));
+        setGameState('playing');
+      }, 2000);
+    } else {
+      // All waves complete
+      stats.wavesCompleted++;
+      setScore(s => s + 100 + wave * 50 + lives * 100); // Final bonus
+      setGameState('complete');
     }
-  }, [targets, gameState, currentWave, config.waves, timeLeft, initializeWave]);
+  }, [enemies.length, wave, config, gameState, lives]);
   
-  // Calculate final result on game complete
+  // Determine result based on performance
+  const getResult = useCallback((normalizedAccuracy: number, hasLives: boolean): 'perfect' | 'good' | 'partial' | 'fail' => {
+    if (!hasLives) return 'fail';
+    if (normalizedAccuracy >= 90) return 'perfect';
+    if (normalizedAccuracy >= 70) return 'good';
+    if (normalizedAccuracy >= 40) return 'partial';
+    return 'fail';
+  }, []);
+  
+  // Complete game
   useEffect(() => {
     if (gameState !== 'complete') return;
     
-    const maxPossibleScore = config.targetCount * config.waves * 150 + config.waves * 100 + config.roundTimer * 5;
-    const accuracy = Math.min(100, Math.round((score / maxPossibleScore) * 150 + mindBonus * 10));
+    const stats = statsRef.current;
     
-    setTimeout(() => {
+    const finalScore = score + (lives * 100);
+    const maxPossibleScore = config.enemiesPerWave * config.waves * 50 + config.waves * 150 + 300;
+    const normalizedAccuracy = Math.min(100, Math.round((finalScore / maxPossibleScore) * 100));
+    const result = getResult(normalizedAccuracy, lives > 0 && stats.wavesCompleted > 0);
+    
+    const timer = setTimeout(() => {
       onComplete({
-        success: accuracy >= 50,
-        accuracy,
-        result: accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail'
+        success: lives > 0 && stats.wavesCompleted > 0,
+        accuracy: normalizedAccuracy,
+        result,
       });
-    }, 500);
-  }, [gameState, score, config, mindBonus, onComplete]);
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [gameState, score, lives, config, onComplete, getResult]);
   
-  const addScorePopup = (points: number, x: number, y: number, type: string) => {
-    const id = `popup-${Date.now()}-${Math.random()}`;
-    setScorePopups(prev => [...prev, { id, score: points, x, y, type }]);
-    setTimeout(() => {
-      setScorePopups(prev => prev.filter(p => p.id !== id));
-    }, 800);
-  };
-  
-  const startCharging = useCallback(() => {
-    if (gameState !== 'playing' || isStunned) return;
-    setIsCharging(true);
-    triggerHaptic('light');
-    
-    chargeRef.current = setInterval(() => {
-      setChargeLevel(prev => {
-        const newLevel = prev + (2.5 + bodyBonus);
-        if (newLevel >= 100 && Math.floor(prev / 20) < Math.floor(newLevel / 20)) {
-          triggerHaptic('light');
-        }
-        return Math.min(newLevel, config.overloadThreshold + 5);
-      });
-    }, 25);
-  }, [gameState, isStunned, bodyBonus, config.overloadThreshold]);
-  
-  const fireBeam = useCallback((isOverload = false) => {
-    if (!isCharging && !isOverload) return;
-    
-    setIsCharging(false);
-    if (chargeRef.current) clearInterval(chargeRef.current);
-    
-    const power = isOverload ? chargeLevel * 0.8 : chargeLevel; // Overload penalty
-    const beamId = `beam-${Date.now()}`;
-    
-    // Find targets in line of fire
-    const hitTargets: { target: GameTarget; distance: number }[] = [];
-    const hitShields: GameShield[] = [];
-    
-    // Check shields first
-    shields.forEach(shield => {
-      const dx = Math.abs(shield.x - aimPosition.x);
-      const dy = Math.abs(shield.y - aimPosition.y);
-      if (dx < 15 && dy < 15) {
-        hitShields.push(shield);
-      }
-    });
-    
-    // If no shields blocking, check targets
-    if (hitShields.length === 0) {
-      targets.forEach(target => {
-        if (target.isHit) return;
-        const distance = Math.sqrt(
-          Math.pow(target.x - aimPosition.x, 2) + 
-          Math.pow(target.y - aimPosition.y, 2)
-        );
-        const hitRadius = (target.size / 2) / 4; // Convert px to %
-        if (distance < hitRadius + 8) { // Some tolerance
-          hitTargets.push({ target, distance });
-        }
-      });
-    }
-    
-    // Sort by distance for multi-target
-    hitTargets.sort((a, b) => a.distance - b.distance);
-    
-    // Determine pierce count based on power
-    const maxPierce = config.multiTargetBonus 
-      ? (power >= 90 ? 3 : power >= 70 ? 2 : 1)
-      : 1;
-    
-    const targetsToHit = hitTargets.slice(0, maxPierce);
-    const hits: { x: number; y: number; type: string }[] = [];
-    
-    // Process shield hits
-    if (hitShields.length > 0) {
-      const shield = hitShields[0];
-      hits.push({ x: shield.x, y: shield.y, type: 'shield' });
-      
-      setShields(prev => prev.map(s => {
-        if (s.id === shield.id) {
-          const newHp = s.hp - 1;
-          if (newHp <= 0) {
-            addScorePopup(25, s.x, s.y, 'normal');
-            setScore(p => p + 25);
-            return { ...s, hp: 0 };
-          }
-          return { ...s, hp: newHp };
-        }
-        return s;
-      }).filter(s => s.hp > 0));
-      
-      triggerHaptic('medium');
-    } else if (targetsToHit.length > 0) {
-      // Process target hits
-      let chainBonus = 0;
-      
-      targetsToHit.forEach((hit, index) => {
-        const { target } = hit;
-        hits.push({ x: target.x, y: target.y, type: target.type });
-        
-        if (target.type === 'decoy') {
-          // Hit a decoy - penalty
-          setScore(p => Math.max(0, p + target.points));
-          addScorePopup(target.points, target.x, target.y, 'decoy');
-          setCombo(0);
-          setShake(true);
-          setIsStunned(true);
-          triggerHaptic('error');
-          setTimeout(() => {
-            setShake(false);
-            setIsStunned(false);
-          }, 1500);
-        } else {
-          // Calculate points based on accuracy
-          const distance = hit.distance;
-          const basePoints = target.points;
-          const accuracyMultiplier = distance < 3 ? 1.5 : distance < 6 ? 1 : 0.7;
-          const points = Math.round(basePoints * accuracyMultiplier);
-          
-          chainBonus += index > 0 ? (index === 1 ? 100 : 200) : 0;
-          
-          setScore(p => p + points);
-          addScorePopup(points, target.x, target.y, target.type);
-          setCombo(c => {
-            const newCombo = c + 1;
-            setMaxCombo(m => Math.max(m, newCombo));
-            return newCombo;
-          });
-          triggerHaptic(distance < 3 ? 'success' : 'medium');
-        }
-        
-        setTargets(prev => prev.map(t => 
-          t.id === target.id ? { ...t, isHit: true } : t
-        ));
-      });
-      
-      if (chainBonus > 0) {
-        setChainHits(targetsToHit.filter(h => h.target.type !== 'decoy').length);
-        setScore(p => p + chainBonus);
-        addScorePopup(chainBonus, aimPosition.x, aimPosition.y - 10, 'chain');
-        setTimeout(() => setChainHits(0), 1000);
-      }
-    } else {
-      // Missed everything
-      setCombo(0);
-      triggerHaptic('light');
-    }
-    
-    // Create beam visual
-    const beam: BeamShot = {
-      id: beamId,
-      startX: 50,
-      startY: 95,
-      endX: aimPosition.x,
-      endY: aimPosition.y,
-      power,
-      hits,
-    };
-    
-    setActiveBeams(prev => [...prev, beam]);
-    setChargeLevel(0);
-    
-    if (isOverload) {
-      setShake(true);
-      setTimeout(() => setShake(false), 300);
-    }
-  }, [isCharging, chargeLevel, aimPosition, targets, shields, config.multiTargetBonus]);
-  
-  const releaseBeam = useCallback(() => {
-    if (!isCharging || gameState !== 'playing') return;
-    fireBeam(false);
-  }, [isCharging, gameState, fireBeam]);
-  
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!arenaRef.current || gameState !== 'playing') return;
-    
-    const rect = arenaRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    setAimPosition({
-      x: Math.max(5, Math.min(95, x)),
-      y: Math.max(5, Math.min(70, y)),
-    });
-  }, [gameState]);
-  
-  const removeBeam = useCallback((beamId: string) => {
-    setActiveBeams(prev => prev.filter(b => b.id !== beamId));
-  }, []);
-  
-  const handleCountdownComplete = useCallback(() => {
-    setGameState('playing');
-  }, []);
-  
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (chargeRef.current) clearInterval(chargeRef.current);
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    };
-  }, []);
-
   return (
-    <div className={`flex flex-col items-center relative ${shake ? 'animate-shake' : ''}`}>
-      {/* Countdown Overlay */}
-      {gameState === 'countdown' && (
-        <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
+    <div className="relative w-full h-full min-h-[500px] flex flex-col items-center overflow-hidden select-none">
+      <StarfieldBackground />
+      
+      {/* HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="text-2xl font-black text-white" style={{ textShadow: '0 0 10px rgba(59,130,246,0.5)' }}>
+              {score.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground">SCORE</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-lg font-bold text-cyan-400">WAVE {wave}/{config.waves}</div>
+            <div className="text-2xl font-mono text-white">{timeLeft}s</div>
+          </div>
+          
+          <LivesDisplay lives={lives} />
+        </div>
+        
+        {/* Power-up indicators */}
+        <div className="flex gap-2 mt-2">
+          {hasShield && (
+            <div className="px-2 py-1 bg-blue-500/30 rounded text-xs text-blue-400 flex items-center gap-1">
+              <Shield className="w-3 h-3" /> SHIELD
+            </div>
+          )}
+          {rapidFire && (
+            <div className="px-2 py-1 bg-amber-500/30 rounded text-xs text-amber-400 flex items-center gap-1">
+              <Zap className="w-3 h-3" /> RAPID
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Game area */}
+      <div
+        ref={gameAreaRef}
+        className="relative w-full h-full"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onClick={fireProjectile}
+      >
+        {/* Enemies */}
+        {enemies.map(enemy => (
+          <EnemySprite key={enemy.id} enemy={enemy} />
+        ))}
+        
+        {/* Projectiles */}
+        {projectiles.map(proj => (
+          <ProjectileSprite key={proj.id} projectile={proj} />
+        ))}
+        
+        {/* Power-ups */}
+        {powerUps.map(pu => (
+          <PowerUpSprite key={pu.id} powerUp={pu} />
+        ))}
+        
+        {/* Explosions */}
+        <AnimatePresence>
+          {explosions.map(exp => (
+            <ExplosionEffect key={exp.id} explosion={exp} />
+          ))}
+        </AnimatePresence>
+        
+        {/* Score popups */}
+        <AnimatePresence>
+          {scorePopups.map(popup => (
+            <ScorePopupComponent key={popup.id} popup={popup} />
+          ))}
+        </AnimatePresence>
+        
+        {/* Player */}
+        {gameState === 'playing' && (
+          <PlayerShip x={playerX} hasShield={hasShield} isInvulnerable={isInvulnerable} />
+        )}
+      </div>
+      
+      {/* Touch controls */}
+      {gameState === 'playing' && (
+        <div className="absolute bottom-2 left-0 right-0 flex justify-between px-4 z-20">
+          <button
+            className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-600 flex items-center justify-center active:bg-slate-700"
+            onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }}
+            onMouseDown={handleMoveLeft}
+          >
+            <ChevronLeft className="w-8 h-8 text-white" />
+          </button>
+          <button
+            className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-600 flex items-center justify-center active:bg-slate-700"
+            onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }}
+            onMouseDown={handleMoveRight}
+          >
+            <ChevronRight className="w-8 h-8 text-white" />
+          </button>
+        </div>
       )}
-
-      {/* Wave Transition Overlay */}
+      
+      {/* Overlays */}
       <AnimatePresence>
-        {gameState === 'wave-transition' && <WaveTransition wave={currentWave} />}
-      </AnimatePresence>
-
-      {/* Pause Overlay */}
-      <AnimatePresence>
+        {gameState === 'countdown' && (
+          <CountdownOverlay 
+            count={countdown} 
+            onComplete={() => setGameState('playing')} 
+          />
+        )}
         {gameState === 'paused' && (
           <PauseOverlay onResume={() => setGameState('playing')} />
         )}
+        {gameState === 'wave-transition' && <WaveTransition wave={wave + 1} />}
       </AnimatePresence>
-
-      {/* Game HUD */}
-      <GameHUD
-        title="Energy Beam"
-        subtitle="Aim and fire at targets!"
-        score={score}
-        maxScore={config.targetCount * config.waves * 150}
-        combo={combo}
-        showCombo={true}
-        primaryStat={{ value: timeLeft, label: 'Time', color: timeLeft <= 10 ? '#ef4444' : '#22c55e' }}
-        isPaused={gameState === 'paused'}
-        onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
-      />
-
-      {/* Timer bar */}
-      <TimerBar timeLeft={timeLeft} maxTime={config.roundTimer} />
-
-      {/* Wave indicator */}
-      <WaveIndicator wave={currentWave} totalWaves={config.waves} />
-
-      {/* Combo display */}
-      <ComboDisplay combo={combo} chainHits={chainHits} />
-
-      {/* Target Arena */}
-      <div
-        ref={arenaRef}
-        className="relative w-full max-w-sm h-64 rounded-xl overflow-hidden mb-4 touch-none"
-        style={{
-          background: 'linear-gradient(180deg, rgba(10,10,30,0.9) 0%, rgba(30,20,50,0.8) 100%)',
-          border: '1px solid rgba(168,85,247,0.3)',
-          boxShadow: '0 0 30px rgba(168,85,247,0.15), inset 0 0 50px rgba(0,0,0,0.5)',
-        }}
-        onPointerMove={handlePointerMove}
-      >
-        {/* Star background */}
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              opacity: 0.3 + Math.random() * 0.4,
-              animation: `twinkle ${2 + Math.random() * 2}s ease-in-out infinite`,
-            }}
-          />
-        ))}
-        
-        {/* Shields */}
-        {shields.map(shield => (
-          <ShieldComponent key={shield.id} shield={shield} />
-        ))}
-        
-        {/* Targets */}
-        {targets.map(target => (
-          <TargetComponent 
-            key={target.id} 
-            target={target} 
-            isAiming={
-              Math.abs(target.x - aimPosition.x) < 15 && 
-              Math.abs(target.y - aimPosition.y) < 15
-            }
-          />
-        ))}
-        
-        {/* Crosshair */}
-        {gameState === 'playing' && (
+      
+      {/* Game Over */}
+      <AnimatePresence>
+        {gameState === 'complete' && (
           <motion.div
-            className="absolute pointer-events-none z-10"
-            style={{
-              left: `${aimPosition.x}%`,
-              top: `${aimPosition.y}%`,
-              transform: 'translate(-50%, -50%)',
-            }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
           >
-            <Crosshair 
-              className={`w-10 h-10 ${isStunned ? 'text-red-400' : 'text-white/80'}`}
-              style={{
-                filter: isCharging ? 'drop-shadow(0 0 10px white)' : 'none',
-              }}
-            />
+            <motion.div
+              className="text-center"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+            >
+              <p className={`text-4xl font-black ${lives > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {lives > 0 ? 'VICTORY!' : 'GAME OVER'}
+              </p>
+              <p className="text-2xl font-bold text-white mt-2">{score.toLocaleString()} pts</p>
+              <p className="text-muted-foreground mt-1">
+                {statsRef.current.enemiesDestroyed} enemies • {statsRef.current.wavesCompleted} waves
+              </p>
+            </motion.div>
           </motion.div>
         )}
-        
-        {/* Active beams */}
-        {activeBeams.map(beam => (
-          <BeamProjectile 
-            key={beam.id} 
-            beam={beam} 
-            onComplete={() => removeBeam(beam.id)} 
-          />
-        ))}
-        
-        {/* Score popups */}
-        {scorePopups.map(popup => (
-          <ScorePopup 
-            key={popup.id} 
-            score={popup.score} 
-            x={popup.x} 
-            y={popup.y}
-            type={popup.type}
-          />
-        ))}
-      </div>
-
-      {/* Charge bar */}
-      <ChargeBar
-        chargeLevel={chargeLevel}
-        isCharging={isCharging}
-        isOverheating={isOverheating}
-        overloadThreshold={config.overloadThreshold}
-      />
-
-      {/* Fire button */}
-      {(gameState === 'playing' || gameState === 'wave-transition') && (
-        <motion.button
-          className={`relative w-28 h-28 rounded-full flex items-center justify-center overflow-hidden touch-none ${
-            isStunned ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-          style={{
-            background: isCharging 
-              ? 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))'
-              : 'linear-gradient(135deg, hsl(var(--primary)/0.9), hsl(var(--accent)/0.9))',
-            backgroundSize: isCharging ? '200% 200%' : '100% 100%',
-            animation: isCharging ? 'shimmer 1.5s linear infinite' : 'none',
-            border: isOverheating ? '3px solid rgba(239,68,68,0.8)' : '3px solid rgba(255,255,255,0.25)',
-            boxShadow: isCharging 
-              ? '0 0 40px hsl(var(--primary)), 0 0 80px hsl(var(--primary)/0.5)'
-              : '0 8px 30px rgba(0,0,0,0.3), 0 0 20px hsl(var(--primary)/0.3)',
-            opacity: gameState === 'wave-transition' ? 0.5 : 1,
-            pointerEvents: gameState === 'wave-transition' || isStunned ? 'none' : 'auto',
-          }}
-          onPointerDown={startCharging}
-          onPointerUp={releaseBeam}
-          onPointerLeave={releaseBeam}
-          onPointerCancel={releaseBeam}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className={`absolute inset-3 rounded-full border border-white/25 ${isCharging ? 'animate-ping' : ''}`} />
-          
-          <Zap 
-            className="w-12 h-12 text-white relative z-10"
-            style={{ 
-              filter: isCharging ? 'drop-shadow(0 0 15px white)' : 'drop-shadow(0 0 8px rgba(255,255,255,0.5))',
-            }}
-          />
-          
-          <div 
-            className="absolute bottom-0 left-0 right-0 transition-all duration-75"
-            style={{ 
-              height: `${chargeLevel}%`,
-              background: 'linear-gradient(to top, rgba(255,255,255,0.3), rgba(255,255,255,0.1))',
-              borderRadius: '0 0 50% 50%',
-            }}
-          />
-        </motion.button>
-      )}
-
-      {/* Instructions */}
-      <motion.p 
-        className="mt-3 text-sm text-muted-foreground text-center"
-        animate={{ opacity: gameState === 'playing' ? 1 : 0.5 }}
-      >
-        {isStunned ? (
-          <span className="text-red-400">⚠️ Stunned! Wait...</span>
-        ) : isCharging ? (
-          <span className={chargeLevel >= 80 ? 'text-yellow-400 font-bold' : ''}>
-            {chargeLevel >= 80 ? '⚡ Maximum power!' : 'Charging...'}
-          </span>
-        ) : (
-          'Hold to charge • Move to aim • Release to fire!'
-        )}
-      </motion.p>
-
-      {/* Difficulty indicator */}
-      <p className="mt-1 text-xs text-muted-foreground">
-        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} • Body +{Math.round(bodyBonus * 10)}% charge
-      </p>
-
-      {/* CSS animations */}
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-          20%, 40%, 60%, 80% { transform: translateX(4px); }
-        }
-        .animate-shake { animation: shake 0.3s ease-in-out; }
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.8; }
-        }
-      `}</style>
+      </AnimatePresence>
     </div>
   );
-};
+}
