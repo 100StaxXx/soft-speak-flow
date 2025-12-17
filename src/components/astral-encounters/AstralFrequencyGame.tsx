@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, Suspense } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Star, Zap } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
@@ -14,297 +15,358 @@ interface AstralFrequencyGameProps {
   isPractice?: boolean;
 }
 
-// Difficulty configuration for Cosmic Dash
+// Difficulty configuration
 const DIFFICULTY_CONFIG = {
   easy: {
     gameTime: 30,
-    startSpeed: 1.0,
-    maxSpeed: 2.0,
-    spawnInterval: 1400,
-    obstacleTypes: ['asteroid'] as const,
-    collectibleChance: 0.5,
-    shieldChance: 0.15,
+    startSpeed: 12,
+    maxSpeed: 20,
+    spawnInterval: 1.2,
+    obstacleChance: 0.6,
   },
   medium: {
     gameTime: 35,
-    startSpeed: 1.3,
-    maxSpeed: 2.5,
-    spawnInterval: 1100,
-    obstacleTypes: ['asteroid', 'dark_matter'] as const,
-    collectibleChance: 0.45,
-    shieldChance: 0.12,
+    startSpeed: 16,
+    maxSpeed: 28,
+    spawnInterval: 0.9,
+    obstacleChance: 0.65,
   },
   hard: {
     gameTime: 40,
-    startSpeed: 1.6,
-    maxSpeed: 3.2,
-    spawnInterval: 850,
-    obstacleTypes: ['asteroid', 'dark_matter', 'storm', 'void'] as const,
-    collectibleChance: 0.35,
-    shieldChance: 0.08,
+    startSpeed: 20,
+    maxSpeed: 35,
+    spawnInterval: 0.7,
+    obstacleChance: 0.7,
   },
 };
 
-type ObstacleType = 'asteroid' | 'dark_matter' | 'storm' | 'void';
-type CollectibleType = 'stardust' | 'crystal' | 'shield';
+const LANE_POSITIONS = [-2.5, 0, 2.5];
 
-interface Obstacle {
-  id: string;
-  lanes: number[]; // Which lanes are blocked (0, 1, 2)
-  y: number; // 0 = bottom (player), 100 = top
-  type: ObstacleType;
-}
+// 3D Tunnel component
+const Tunnel = memo(({ speed }: { speed: number }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += delta * 0.1 * (speed / 15);
+    }
+  });
 
-interface Collectible {
+  return (
+    <group>
+      {/* Tunnel walls */}
+      <mesh ref={meshRef} position={[0, 0, -50]}>
+        <cylinderGeometry args={[8, 8, 120, 32, 1, true]} />
+        <meshBasicMaterial 
+          color="#1a0a2e" 
+          side={THREE.BackSide}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      
+      {/* Glowing grid lines on tunnel */}
+      {Array.from({ length: 12 }).map((_, i) => (
+        <mesh key={i} position={[0, 0, -50]} rotation={[0, 0, (i * Math.PI * 2) / 12]}>
+          <boxGeometry args={[0.05, 120, 0.05]} />
+          <meshBasicMaterial color="#a855f7" transparent opacity={0.3} />
+        </mesh>
+      ))}
+      
+      {/* Lane markers */}
+      {LANE_POSITIONS.map((x, i) => (
+        <mesh key={`lane-${i}`} position={[x, -3, 0]}>
+          <boxGeometry args={[0.1, 0.1, 200]} />
+          <meshBasicMaterial color="#6366f1" transparent opacity={0.4} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+Tunnel.displayName = 'Tunnel';
+
+// Scrolling floor
+const ScrollingFloor = memo(({ speed }: { speed: number }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const offsetRef = useRef(0);
+
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      offsetRef.current += delta * speed * 0.5;
+      (meshRef.current.material as THREE.MeshBasicMaterial).map!.offset.y = offsetRef.current;
+    }
+  });
+
+  // Create grid texture
+  const texture = new THREE.DataTexture(
+    new Uint8Array([100, 50, 150, 255, 50, 25, 100, 255, 50, 25, 100, 255, 100, 50, 150, 255]),
+    2, 2
+  );
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(10, 100);
+  texture.needsUpdate = true;
+
+  return (
+    <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -3, -50]}>
+      <planeGeometry args={[8, 150]} />
+      <meshBasicMaterial map={texture} transparent opacity={0.5} />
+    </mesh>
+  );
+});
+ScrollingFloor.displayName = 'ScrollingFloor';
+
+// 3D Player orb
+const Player = memo(({ lane, hasShield }: { lane: number; hasShield: boolean }) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const targetX = useRef(LANE_POSITIONS[lane]);
+  
+  useEffect(() => {
+    targetX.current = LANE_POSITIONS[lane];
+  }, [lane]);
+
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      // Smooth lane transition
+      groupRef.current.position.x += (targetX.current - groupRef.current.position.x) * 10 * delta;
+      groupRef.current.rotation.z += delta * 2;
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[LANE_POSITIONS[1], -1.5, 5]}>
+      {/* Main orb */}
+      <mesh>
+        <sphereGeometry args={[0.5, 32, 32]} />
+        <meshBasicMaterial color="#a855f7" />
+      </mesh>
+      
+      {/* Glow */}
+      <mesh>
+        <sphereGeometry args={[0.7, 16, 16]} />
+        <meshBasicMaterial color="#a855f7" transparent opacity={0.3} />
+      </mesh>
+      
+      {/* Shield effect */}
+      {hasShield && (
+        <mesh>
+          <sphereGeometry args={[0.9, 16, 16]} />
+          <meshBasicMaterial color="#22d3ee" transparent opacity={0.4} wireframe />
+        </mesh>
+      )}
+      
+      {/* Trail */}
+      <mesh position={[0, 0, -1]}>
+        <coneGeometry args={[0.3, 2, 8]} />
+        <meshBasicMaterial color="#a855f7" transparent opacity={0.4} />
+      </mesh>
+    </group>
+  );
+});
+Player.displayName = 'Player';
+
+// Obstacle component
+interface ObstacleProps {
   id: string;
   lane: number;
-  y: number;
-  type: CollectibleType;
-  collected: boolean;
+  z: number;
+  type: 'asteroid' | 'crystal' | 'shield';
+  onCollect?: () => void;
+  onHit?: () => void;
 }
 
-// Lane positions (percentages)
-const LANE_POSITIONS = [20, 50, 80];
-const PLAYER_Y = 85;
-const COLLISION_THRESHOLD = 12;
-
-// Obstacle visuals
-const OBSTACLE_CONFIG: Record<ObstacleType, { emoji: string; color: string; name: string }> = {
-  asteroid: { emoji: '🪨', color: '#8b7355', name: 'Asteroid' },
-  dark_matter: { emoji: '🌑', color: '#1a1a2e', name: 'Dark Matter' },
-  storm: { emoji: '⚡', color: '#fbbf24', name: 'Energy Storm' },
-  void: { emoji: '🕳️', color: '#4c1d95', name: 'Void Rift' },
-};
-
-// Collectible visuals
-const COLLECTIBLE_CONFIG: Record<CollectibleType, { emoji: string; color: string; points: number }> = {
-  stardust: { emoji: '✨', color: '#fbbf24', points: 10 },
-  crystal: { emoji: '💎', color: '#a855f7', points: 25 },
-  shield: { emoji: '🛡️', color: '#22d3ee', points: 0 },
-};
-
-// Cosmic tunnel background
-const CosmicTunnel = memo(({ speed }: { speed: number }) => (
-  <div className="absolute inset-0 overflow-hidden rounded-lg">
-    {/* Deep space background */}
-    <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950" />
-    
-    {/* Parallax stars */}
-    <div 
-      className="absolute inset-0"
-      style={{
-        backgroundImage: `radial-gradient(1px 1px at 10% 10%, white, transparent),
-                          radial-gradient(1px 1px at 30% 25%, white, transparent),
-                          radial-gradient(2px 2px at 50% 15%, #a855f7, transparent),
-                          radial-gradient(1px 1px at 70% 35%, white, transparent),
-                          radial-gradient(1px 1px at 90% 20%, white, transparent),
-                          radial-gradient(1px 1px at 20% 60%, white, transparent),
-                          radial-gradient(2px 2px at 40% 80%, #22d3ee, transparent),
-                          radial-gradient(1px 1px at 60% 70%, white, transparent),
-                          radial-gradient(1px 1px at 80% 90%, white, transparent)`,
-        animation: `cosmic-scroll ${3 / speed}s linear infinite`,
-      }}
-    />
-    
-    {/* Lane dividers */}
-    <div className="absolute inset-0">
-      <div 
-        className="absolute top-0 bottom-0 w-px opacity-30"
-        style={{ 
-          left: '35%', 
-          background: 'linear-gradient(to bottom, transparent, #a855f7, transparent)',
-        }} 
-      />
-      <div 
-        className="absolute top-0 bottom-0 w-px opacity-30"
-        style={{ 
-          left: '65%', 
-          background: 'linear-gradient(to bottom, transparent, #a855f7, transparent)',
-        }} 
-      />
-    </div>
-    
-    {/* Speed lines */}
-    {speed > 1.5 && (
-      <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: Math.floor(speed * 3) }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-0.5 bg-gradient-to-b from-white/30 to-transparent"
-            style={{
-              left: `${10 + (i * 15) % 80}%`,
-              top: 0,
-              height: `${20 + (i * 7) % 30}%`,
-              animation: `speed-line ${0.5 / speed}s linear infinite`,
-              animationDelay: `${i * 0.1}s`,
-            }}
-          />
-        ))}
-      </div>
-    )}
-  </div>
-));
-CosmicTunnel.displayName = 'CosmicTunnel';
-
-// Player orb component
-const PlayerOrb = memo(({ lane, hasShield, isHit }: { lane: number; hasShield: boolean; isHit: boolean }) => (
-  <motion.div
-    className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2"
-    animate={{ 
-      left: `${LANE_POSITIONS[lane]}%`,
-      scale: isHit ? [1, 0.8, 1] : 1,
-    }}
-    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-    style={{ top: `${PLAYER_Y}%` }}
-  >
-    {/* Shield effect */}
-    {hasShield && (
-      <motion.div
-        className="absolute -inset-2 rounded-full border-2 border-cyan-400"
-        animate={{ 
-          scale: [1, 1.1, 1],
-          opacity: [0.8, 0.4, 0.8],
-        }}
-        transition={{ duration: 1, repeat: Infinity }}
-        style={{ boxShadow: '0 0 20px #22d3ee, inset 0 0 10px #22d3ee50' }}
-      />
-    )}
-    
-    {/* Player core */}
-    <div 
-      className="w-full h-full rounded-full relative"
-      style={{
-        background: 'linear-gradient(135deg, #a855f7, #6366f1)',
-        boxShadow: `0 0 20px #a855f7, 0 0 40px #a855f750, inset 0 0 15px white`,
-      }}
-    >
-      {/* Inner glow */}
-      <div className="absolute inset-2 rounded-full bg-white/30" />
-      
-      {/* Trail effect */}
-      <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 w-8 h-16 opacity-40"
-        style={{
-          background: 'linear-gradient(to bottom, #a855f7, transparent)',
-          filter: 'blur(4px)',
-          transformOrigin: 'center top',
-        }}
-      />
-    </div>
-    
-    {/* Hit effect */}
-    <AnimatePresence>
-      {isHit && !hasShield && (
-        <motion.div
-          className="absolute inset-0 rounded-full bg-red-500"
-          initial={{ opacity: 0.8, scale: 1 }}
-          animate={{ opacity: 0, scale: 2 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        />
-      )}
-    </AnimatePresence>
-  </motion.div>
-));
-PlayerOrb.displayName = 'PlayerOrb';
-
-// Obstacle sprite
-const ObstacleSprite = memo(({ obstacle, speed }: { obstacle: Obstacle; speed: number }) => {
-  const config = OBSTACLE_CONFIG[obstacle.type];
-  const isWide = obstacle.lanes.length > 1;
+const Obstacle = memo(({ lane, z, type }: Omit<ObstacleProps, 'id' | 'onCollect' | 'onHit'>) => {
+  const meshRef = useRef<THREE.Mesh>(null);
   
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x += delta * 2;
+      meshRef.current.rotation.y += delta * 1.5;
+    }
+  });
+
+  const color = type === 'asteroid' ? '#ef4444' : type === 'crystal' ? '#fbbf24' : '#22d3ee';
+  const size = type === 'asteroid' ? 0.6 : 0.4;
+
+  return (
+    <mesh ref={meshRef} position={[LANE_POSITIONS[lane], -1.5, z]}>
+      {type === 'asteroid' ? (
+        <dodecahedronGeometry args={[size]} />
+      ) : type === 'crystal' ? (
+        <octahedronGeometry args={[size]} />
+      ) : (
+        <icosahedronGeometry args={[size]} />
+      )}
+      <meshBasicMaterial color={color} />
+    </mesh>
+  );
+});
+Obstacle.displayName = 'Obstacle';
+
+// Game scene that handles all 3D logic
+interface GameSceneProps {
+  gameState: 'countdown' | 'playing' | 'paused' | 'complete';
+  playerLane: number;
+  hasShield: boolean;
+  speed: number;
+  obstacles: Array<{ id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield' }>;
+  onObstaclePass: (id: string, type: string) => void;
+}
+
+const GameScene = ({ gameState, playerLane, hasShield, speed, obstacles, onObstaclePass }: GameSceneProps) => {
+  const { camera } = useThree();
+  const passedRef = useRef(new Set<string>());
+  
+  // Set up camera
+  useEffect(() => {
+    camera.position.set(0, 2, 10);
+    camera.lookAt(0, 0, -10);
+  }, [camera]);
+
+  // Check for collisions/collections
+  useFrame(() => {
+    if (gameState !== 'playing') return;
+    
+    const playerX = LANE_POSITIONS[playerLane];
+    
+    obstacles.forEach(obs => {
+      // Check if obstacle has passed player (z > 5)
+      if (obs.z > 4 && !passedRef.current.has(obs.id)) {
+        const distance = Math.abs(obs.lane - playerLane);
+        
+        if (distance === 0) {
+          // Hit!
+          passedRef.current.add(obs.id);
+          onObstaclePass(obs.id, obs.type);
+        }
+      }
+      
+      // Remove from tracking once fully passed
+      if (obs.z > 10) {
+        passedRef.current.delete(obs.id);
+      }
+    });
+  });
+
   return (
     <>
-      {obstacle.lanes.map((lane) => (
-        <motion.div
-          key={`${obstacle.id}-${lane}`}
-          className="absolute w-10 h-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-          style={{ 
-            left: `${LANE_POSITIONS[lane]}%`,
-            top: `${obstacle.y}%`,
-          }}
-          animate={{ rotate: obstacle.type === 'asteroid' ? [0, 360] : 0 }}
-          transition={{ duration: 4 / speed, repeat: Infinity, ease: 'linear' }}
-        >
-          <span 
-            className="text-3xl" 
-            style={{ 
-              filter: `drop-shadow(0 0 10px ${config.color})`,
-              transform: isWide ? 'scale(1.2)' : 'scale(1)',
-            }}
-          >
-            {config.emoji}
-          </span>
-        </motion.div>
+      {/* Ambient lighting */}
+      <ambientLight intensity={0.3} />
+      <pointLight position={[0, 5, 10]} intensity={1} color="#a855f7" />
+      
+      {/* Background stars */}
+      <Stars />
+      
+      {/* Tunnel */}
+      <Tunnel speed={speed} />
+      <ScrollingFloor speed={speed} />
+      
+      {/* Player */}
+      <Player lane={playerLane} hasShield={hasShield} />
+      
+      {/* Obstacles */}
+      {obstacles.map(obs => (
+        <MovingObstacle key={obs.id} {...obs} speed={speed} gameState={gameState} />
       ))}
     </>
   );
-});
-ObstacleSprite.displayName = 'ObstacleSprite';
+};
 
-// Collectible sprite
-const CollectibleSprite = memo(({ collectible }: { collectible: Collectible }) => {
-  const config = COLLECTIBLE_CONFIG[collectible.type];
-  
-  if (collectible.collected) return null;
-  
+// Moving obstacle wrapper
+const MovingObstacle = memo(({ id, lane, z, type, speed, gameState }: { 
+  id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield'; speed: number; gameState: string 
+}) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const zRef = useRef(z);
+
+  useFrame((_, delta) => {
+    if (gameState !== 'playing' || !groupRef.current) return;
+    zRef.current += delta * speed;
+    groupRef.current.position.z = zRef.current;
+  });
+
   return (
-    <motion.div
-      className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-      style={{ 
-        left: `${LANE_POSITIONS[collectible.lane]}%`,
-        top: `${collectible.y}%`,
-      }}
-      animate={{ 
-        scale: [1, 1.2, 1],
-        rotate: collectible.type === 'crystal' ? [0, 10, -10, 0] : 0,
-      }}
-      transition={{ duration: 1, repeat: Infinity }}
-    >
-      <span 
-        className="text-2xl" 
-        style={{ filter: `drop-shadow(0 0 8px ${config.color})` }}
-      >
-        {config.emoji}
-      </span>
-    </motion.div>
+    <group ref={groupRef} position={[0, 0, z]}>
+      <Obstacle lane={lane} z={0} type={type} />
+    </group>
   );
 });
-CollectibleSprite.displayName = 'CollectibleSprite';
+MovingObstacle.displayName = 'MovingObstacle';
 
-// Score popup
-const ScorePopup = memo(({ score, x, y }: { score: number; x: number; y: number }) => (
-  <motion.div
-    className="absolute text-sm font-bold pointer-events-none"
-    style={{ left: `${x}%`, top: `${y}%` }}
-    initial={{ opacity: 1, y: 0, scale: 1 }}
-    animate={{ opacity: 0, y: -30, scale: 1.5 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.5 }}
-  >
-    <span className="text-yellow-400 drop-shadow-glow">+{score}</span>
-  </motion.div>
+// Stars background
+const Stars = memo(() => {
+  const starsRef = useRef<THREE.Points>(null);
+  
+  const positions = new Float32Array(1000 * 3);
+  for (let i = 0; i < 1000; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 100;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 50 + 10;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 200 - 50;
+  }
+
+  useFrame((_, delta) => {
+    if (starsRef.current) {
+      starsRef.current.rotation.z += delta * 0.02;
+    }
+  });
+
+  return (
+    <points ref={starsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.2} color="#ffffff" transparent opacity={0.8} />
+    </points>
+  );
+});
+Stars.displayName = 'Stars';
+
+// UI Overlay for score/lives
+const GameUI = memo(({ score, lives, combo, hasShield }: { score: number; lives: number; combo: number; hasShield: boolean }) => (
+  <div className="absolute top-16 left-4 right-4 flex justify-between items-start pointer-events-none z-10">
+    <div className="flex flex-col gap-2">
+      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
+        <span className="text-yellow-400 font-bold">{score}</span>
+        <span className="text-xs text-muted-foreground ml-1">pts</span>
+      </div>
+      {combo > 1 && (
+        <div className="bg-purple-500/50 backdrop-blur-sm rounded-lg px-3 py-1">
+          <span className="text-white font-bold">{combo}x</span>
+          <span className="text-xs text-purple-200 ml-1">combo</span>
+        </div>
+      )}
+    </div>
+    <div className="flex items-center gap-2">
+      {hasShield && (
+        <div className="bg-cyan-500/50 backdrop-blur-sm rounded-lg px-3 py-1">
+          <span className="text-cyan-200">🛡️</span>
+        </div>
+      )}
+      <div className="flex gap-1">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <span key={i} className={`text-xl ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
+            ❤️
+          </span>
+        ))}
+      </div>
+    </div>
+  </div>
 ));
-ScorePopup.displayName = 'ScorePopup';
+GameUI.displayName = 'GameUI';
 
-// Lane touch controls
-const LaneControls = memo(({ onLaneChange, currentLane }: { onLaneChange: (lane: number) => void; currentLane: number }) => (
-  <div className="absolute bottom-4 left-4 right-4 flex justify-between">
+// Lane controls
+const LaneControls = memo(({ onLeft, onRight }: { onLeft: () => void; onRight: () => void }) => (
+  <div className="absolute bottom-4 left-4 right-4 flex justify-between z-10">
     <button
-      className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-        currentLane === 0 ? 'bg-purple-500/50' : 'bg-white/10'
-      }`}
-      onPointerDown={() => onLaneChange(Math.max(0, currentLane - 1))}
+      className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center active:bg-white/20 transition-colors"
+      onPointerDown={onLeft}
     >
-      <span className="text-2xl">◀</span>
+      <span className="text-3xl">◀</span>
     </button>
     <button
-      className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-        currentLane === 2 ? 'bg-purple-500/50' : 'bg-white/10'
-      }`}
-      onPointerDown={() => onLaneChange(Math.min(2, currentLane + 1))}
+      className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center active:bg-white/20 transition-colors"
+      onPointerDown={onRight}
     >
-      <span className="text-2xl">▶</span>
+      <span className="text-3xl">▶</span>
     </button>
   </div>
 ));
@@ -330,389 +392,201 @@ export const AstralFrequencyGame = ({
   const [maxCombo, setMaxCombo] = useState(0);
   
   // Player state
-  const [playerLane, setPlayerLane] = useState(1); // Center lane
+  const [playerLane, setPlayerLane] = useState(1);
   const [hasShield, setHasShield] = useState(false);
-  const [isHit, setIsHit] = useState(false);
   const [lives, setLives] = useState(3);
   
   // Game objects
-  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
-  const [collectibles, setCollectibles] = useState<Collectible[]>([]);
+  const [obstacles, setObstacles] = useState<Array<{ id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield' }>>([]);
   const [speed, setSpeed] = useState(config.startSpeed);
-  const [scorePopups, setScorePopups] = useState<{ id: string; score: number; x: number; y: number }[]>([]);
   
   // Refs
   const gameStateRef = useRef(gameState);
   const playerLaneRef = useRef(playerLane);
   const hasShieldRef = useRef(hasShield);
   const lastSpawnRef = useRef(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<{ x: number } | null>(null);
   
   // Sync refs
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
   
-  // Stat bonus affects collectible value
-  const statBonus = Math.round((companionStats.mind + companionStats.soul) / 2);
-  const collectibleMultiplier = 1 + (statBonus / 100);
-  
-  // Handle countdown complete
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
   }, []);
   
-  // Change lane
-  const changeLane = useCallback((newLane: number) => {
+  const changeLane = useCallback((direction: -1 | 1) => {
     if (gameStateRef.current !== 'playing') return;
-    const clampedLane = Math.max(0, Math.min(2, newLane));
-    setPlayerLane(clampedLane);
+    setPlayerLane(prev => Math.max(0, Math.min(2, prev + direction)));
     triggerHaptic('light');
   }, []);
   
-  // Handle swipe
+  // Touch controls
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchStartRef.current = { x: e.touches[0].clientX };
   }, []);
   
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
-    
     const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
-    
-    // Only process horizontal swipes
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
-      if (deltaX > 0) {
-        changeLane(playerLaneRef.current + 1);
-      } else {
-        changeLane(playerLaneRef.current - 1);
-      }
+    if (Math.abs(deltaX) > 30) {
+      changeLane(deltaX > 0 ? 1 : -1);
     }
-    
     touchStartRef.current = null;
   }, [changeLane]);
   
-  // Handle keyboard
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameStateRef.current !== 'playing') return;
-      
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        changeLane(playerLaneRef.current - 1);
-      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        changeLane(playerLaneRef.current + 1);
-      } else if (e.key === 'Escape') {
-        setGameState('paused');
-      }
+      if (e.key === 'ArrowLeft' || e.key === 'a') changeLane(-1);
+      if (e.key === 'ArrowRight' || e.key === 'd') changeLane(1);
+      if (e.key === 'Escape') setGameState('paused');
     };
-    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [changeLane]);
   
-  // Add score popup
-  const addScorePopup = useCallback((points: number, x: number, y: number) => {
-    const id = `popup-${Date.now()}-${Math.random()}`;
-    setScorePopups(prev => [...prev, { id, score: points, x, y }]);
-    setTimeout(() => {
-      setScorePopups(prev => prev.filter(p => p.id !== id));
-    }, 500);
+  // Handle obstacle interactions
+  const handleObstaclePass = useCallback((id: string, type: string) => {
+    setObstacles(prev => prev.filter(o => o.id !== id));
+    
+    if (type === 'asteroid') {
+      if (hasShieldRef.current) {
+        setHasShield(false);
+        triggerHaptic('medium');
+      } else {
+        setLives(prev => {
+          const newLives = prev - 1;
+          if (newLives <= 0) {
+            setGameState('complete');
+          }
+          return newLives;
+        });
+        setCombo(0);
+        triggerHaptic('heavy');
+      }
+    } else if (type === 'crystal') {
+      const points = 10 * (1 + combo * 0.1);
+      setScore(prev => prev + Math.round(points));
+      setCombo(prev => {
+        const newCombo = prev + 1;
+        setMaxCombo(max => Math.max(max, newCombo));
+        return newCombo;
+      });
+      triggerHaptic('light');
+    } else if (type === 'shield') {
+      setHasShield(true);
+      triggerHaptic('medium');
+    }
   }, []);
   
-  // Spawn objects
-  const spawnObjects = useCallback((now: number) => {
-    if (now - lastSpawnRef.current < config.spawnInterval / speed) return;
-    lastSpawnRef.current = now;
-    
-    const rand = Math.random();
-    
-    if (rand < config.collectibleChance) {
-      // Spawn collectible
-      const type: CollectibleType = rand < config.shieldChance ? 'shield' : 
-                                     rand < config.shieldChance + 0.15 ? 'crystal' : 'stardust';
-      const lane = Math.floor(Math.random() * 3);
-      
-      setCollectibles(prev => [...prev, {
-        id: `col-${now}-${Math.random()}`,
-        lane,
-        y: -10,
-        type,
-        collected: false,
-      }]);
-    } else {
-      // Spawn obstacle
-      const obstacleTypes = config.obstacleTypes;
-      const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
-      
-      // Determine lanes blocked (sometimes multi-lane obstacles)
-      let lanes: number[];
-      if (difficulty === 'hard' && Math.random() < 0.3) {
-        // Two-lane obstacle - leave one lane open
-        const openLane = Math.floor(Math.random() * 3);
-        lanes = [0, 1, 2].filter(l => l !== openLane);
-      } else {
-        lanes = [Math.floor(Math.random() * 3)];
-      }
-      
-      setObstacles(prev => [...prev, {
-        id: `obs-${now}-${Math.random()}`,
-        lanes,
-        y: -10,
-        type,
-      }]);
-    }
-  }, [config, speed, difficulty]);
-  
-  // Main game loop
+  // Game loop - spawn obstacles and update timer
   useEffect(() => {
     if (gameState !== 'playing') return;
     
-    let animationId: number;
-    let lastTime = performance.now();
-    
-    const gameLoop = (currentTime: number) => {
-      const deltaTime = (currentTime - lastTime) / 1000;
-      lastTime = currentTime;
-      
-      if (gameStateRef.current !== 'playing') return;
-      
+    const interval = setInterval(() => {
       // Update timer
       setTimeLeft(prev => {
-        const newTime = prev - deltaTime;
-        if (newTime <= 0) {
+        if (prev <= 0) {
           setGameState('complete');
           return 0;
         }
-        return newTime;
+        return prev - 0.1;
       });
-      
-      // Update speed (gradually increase)
-      setSpeed(prev => Math.min(config.maxSpeed, prev + deltaTime * 0.02));
       
       // Update distance
-      setDistance(prev => prev + deltaTime * speed * 10);
+      setDistance(prev => prev + speed * 0.1);
       
-      // Spawn new objects
-      spawnObjects(currentTime);
+      // Gradually increase speed
+      setSpeed(prev => Math.min(config.maxSpeed, prev + 0.02));
       
-      // Move obstacles
-      setObstacles(prev => {
-        const updated = prev
-          .map(obs => ({ ...obs, y: obs.y + deltaTime * 60 * speed }))
-          .filter(obs => obs.y < 110);
+      // Spawn obstacles
+      const now = Date.now();
+      if (now - lastSpawnRef.current > config.spawnInterval * 1000) {
+        lastSpawnRef.current = now;
         
-        // Check collisions
-        updated.forEach(obs => {
-          if (Math.abs(obs.y - PLAYER_Y) < COLLISION_THRESHOLD && obs.lanes.includes(playerLaneRef.current)) {
-            if (hasShieldRef.current) {
-              setHasShield(false);
-              triggerHaptic('medium');
-              setCombo(0);
-            } else {
-              setIsHit(true);
-              triggerHaptic('error');
-              setLives(l => {
-                const newLives = l - 1;
-                if (newLives <= 0) {
-                  setGameState('complete');
-                }
-                return newLives;
-              });
-              setCombo(0);
-              setScore(s => Math.max(0, s - 25));
-              setTimeout(() => setIsHit(false), 300);
-            }
-            // Mark obstacle as processed by moving it off screen
-            obs.y = 200;
-          }
-        });
+        const rand = Math.random();
+        const type: 'asteroid' | 'crystal' | 'shield' = 
+          rand < config.obstacleChance ? 'asteroid' : 
+          rand < 0.95 ? 'crystal' : 'shield';
         
-        return updated.filter(obs => obs.y < 110);
-      });
-      
-      // Move collectibles
-      setCollectibles(prev => {
-        const updated = prev
-          .map(col => ({ ...col, y: col.y + deltaTime * 60 * speed }))
-          .filter(col => col.y < 110 && !col.collected);
+        const lane = Math.floor(Math.random() * 3);
         
-        // Check collection
-        updated.forEach(col => {
-          if (!col.collected && Math.abs(col.y - PLAYER_Y) < COLLISION_THRESHOLD && col.lane === playerLaneRef.current) {
-            col.collected = true;
-            
-            if (col.type === 'shield') {
-              setHasShield(true);
-              triggerHaptic('success');
-            } else {
-              const config = COLLECTIBLE_CONFIG[col.type];
-              const points = Math.round(config.points * collectibleMultiplier);
-              setScore(s => s + points);
-              setCombo(c => {
-                const newCombo = c + 1;
-                setMaxCombo(m => Math.max(m, newCombo));
-                return newCombo;
-              });
-              addScorePopup(points, LANE_POSITIONS[col.lane], PLAYER_Y - 10);
-              triggerHaptic('light');
-            }
-          }
-        });
-        
-        return updated.filter(col => !col.collected && col.y < 110);
-      });
-      
-      animationId = requestAnimationFrame(gameLoop);
-    };
+        setObstacles(prev => [
+          ...prev.filter(o => o.z < 15), // Clean up passed obstacles
+          { id: `${now}-${Math.random()}`, lane, z: -80, type }
+        ]);
+      }
+    }, 100);
     
-    animationId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animationId);
-  }, [gameState, config, spawnObjects, collectibleMultiplier, addScorePopup, speed]);
+    return () => clearInterval(interval);
+  }, [gameState, config, speed]);
   
-  // Calculate final result
-  const calculateResult = useCallback((): MiniGameResult => {
-    const distanceBonus = Math.floor(distance / 10);
-    const comboBonus = maxCombo * 5;
-    const finalScore = score + distanceBonus + comboBonus;
+  // Complete game
+  useEffect(() => {
+    if (gameState !== 'complete') return;
     
-    // Accuracy based on survival and collection
-    const survivalRatio = lives / 3;
-    const accuracy = Math.min(100, Math.round((finalScore / 300) * 100 * survivalRatio));
+    const accuracy = Math.min(100, Math.round((score / Math.max(1, distance * 0.3)) * 100));
+    const result: 'perfect' | 'good' | 'partial' | 'fail' = 
+      accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail';
     
-    let result: MiniGameResult['result'];
-    if (accuracy >= 90) result = 'perfect';
-    else if (accuracy >= 70) result = 'good';
-    else if (accuracy >= 40) result = 'partial';
-    else result = 'fail';
-    
-    return {
-      success: result !== 'fail',
+    onComplete({
+      score,
       accuracy,
       result,
-    };
-  }, [score, distance, maxCombo, lives]);
-  
-  // Handle game complete
-  useEffect(() => {
-    if (gameState === 'complete') {
-      const result = calculateResult();
-      setTimeout(() => onComplete(result), 500);
-    }
-  }, [gameState, calculateResult, onComplete]);
+      bonusXp: Math.round(score * 0.1) + (maxCombo * 2),
+    });
+  }, [gameState, score, distance, maxCombo, onComplete]);
   
   return (
-    <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-4 z-50">
-      <style>{`
-        @keyframes cosmic-scroll {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(100%); }
-        }
-        @keyframes speed-line {
-          0% { transform: translateY(-100%); opacity: 0; }
-          50% { opacity: 1; }
-          100% { transform: translateY(400%); opacity: 0; }
-        }
-      `}</style>
+    <div 
+      className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden bg-slate-950"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* 3D Canvas */}
+      <Canvas
+        camera={{ fov: 75, near: 0.1, far: 200 }}
+        style={{ background: 'linear-gradient(to bottom, #0f0a1a, #1a0a2e)' }}
+      >
+        <Suspense fallback={null}>
+          <GameScene
+            gameState={gameState}
+            playerLane={playerLane}
+            hasShield={hasShield}
+            speed={speed}
+            obstacles={obstacles}
+            onObstaclePass={handleObstaclePass}
+          />
+        </Suspense>
+      </Canvas>
       
-      <GameHUD
-        title="Cosmic Dash"
-        subtitle={isPractice ? 'Practice Mode' : undefined}
-        score={score}
-        timeLeft={Math.ceil(timeLeft)}
-        totalTime={effectiveTimer}
-        combo={combo}
-        showCombo={combo > 1}
+      {/* HUD */}
+      <GameHUD timeLeft={Math.ceil(timeLeft)} score={score} />
+      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} />
+      
+      {/* Controls */}
+      <LaneControls 
+        onLeft={() => changeLane(-1)} 
+        onRight={() => changeLane(1)} 
       />
       
-      {/* Lives indicator */}
-      <div className="absolute top-4 right-4 flex gap-1">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-6 h-6 rounded-full flex items-center justify-center ${
-              i < lives ? 'bg-red-500/80' : 'bg-gray-700/50'
-            }`}
-          >
-            <span className="text-sm">❤️</span>
-          </div>
-        ))}
-      </div>
-      
-      {/* Shield indicator */}
-      {hasShield && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-cyan-500/20 px-3 py-1 rounded-full">
-          <Shield className="w-4 h-4 text-cyan-400" />
-          <span className="text-cyan-400 text-sm font-bold">SHIELD</span>
-        </div>
-      )}
-      
-      {/* Speed indicator */}
-      <div className="absolute top-16 left-4 flex items-center gap-2">
-        <Zap className={`w-4 h-4 ${speed > 2 ? 'text-yellow-400' : 'text-muted-foreground'}`} />
-        <span className="text-xs text-muted-foreground">{speed.toFixed(1)}x</span>
-      </div>
-      
-      {/* Distance */}
-      <div className="absolute top-16 right-4 flex items-center gap-2">
-        <Star className="w-4 h-4 text-purple-400" />
-        <span className="text-xs text-purple-400">{Math.floor(distance)}m</span>
-      </div>
-      
-      {/* Main game area */}
-      <div
-        ref={containerRef}
-        className="relative w-full max-w-sm h-[70vh] max-h-[600px] rounded-xl overflow-hidden border-2 border-purple-500/30"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <CosmicTunnel speed={speed} />
-        
-        {/* Game objects */}
-        {obstacles.map(obs => (
-          <ObstacleSprite key={obs.id} obstacle={obs} speed={speed} />
-        ))}
-        
-        {collectibles.map(col => (
-          <CollectibleSprite key={col.id} collectible={col} />
-        ))}
-        
-        {/* Player */}
-        <PlayerOrb lane={playerLane} hasShield={hasShield} isHit={isHit} />
-        
-        {/* Score popups */}
-        <AnimatePresence>
-          {scorePopups.map(popup => (
-            <ScorePopup key={popup.id} {...popup} />
-          ))}
-        </AnimatePresence>
-        
-        {/* Lane touch controls */}
-        <LaneControls onLaneChange={changeLane} currentLane={playerLane} />
-      </div>
-      
-      {/* Instructions */}
-      <div className="mt-4 text-center text-muted-foreground text-xs">
-        <p>Swipe or tap arrows to change lanes</p>
-        <p>Collect ✨ stardust • Avoid 🪨 obstacles</p>
-      </div>
-      
       {/* Overlays */}
-      {gameState === 'countdown' && (
-        <CountdownOverlay 
-          count={3}
-          onComplete={handleCountdownComplete} 
-        />
-      )}
-      
-      {gameState === 'paused' && (
-        <PauseOverlay
-          onResume={() => setGameState('playing')}
-        />
-      )}
+      <AnimatePresence>
+        {gameState === 'countdown' && (
+          <CountdownOverlay onComplete={handleCountdownComplete} />
+        )}
+        {gameState === 'paused' && (
+          <PauseOverlay 
+            onResume={() => setGameState('playing')} 
+            onQuit={() => {
+              onComplete({ score: 0, accuracy: 0, result: 'fail', bonusXp: 0 });
+            }} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-
-export default AstralFrequencyGame;

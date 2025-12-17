@@ -11,7 +11,8 @@ import {
   Heart,
   Grid3X3,
   Target,
-  Layers
+  Layers,
+  Smartphone
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -59,12 +60,12 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   astral_frequency: {
     icon: Rocket,
     title: "Cosmiq Dash",
-    goal: "Dash through the cosmic tunnel! Collect stardust, avoid obstacles!",
+    goal: "Race through a 3D cosmic tunnel!",
     howToPlay: [
       "Swipe or tap arrows to switch lanes",
-      "Collect ✨ stardust for points",
-      "Grab 🛡️ shields for protection",
-      "Speed increases - stay alert!"
+      "Dodge asteroids - they cost a life!",
+      "Collect ✨ crystals for points",
+      "Grab 🛡️ shields for protection"
     ],
     statBonus: 'mind',
     statIcon: Brain,
@@ -82,13 +83,14 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statIcon: Heart,
   },
   starfall_dodge: {
-    icon: Sparkles,
+    icon: Smartphone,
     title: "Starfall Dodge",
-    goal: "Dodge debris and collect crystals!",
+    goal: "Tilt to dodge, collect crystals!",
     howToPlay: [
-      "Move left and right to dodge falling debris",
-      "Collect glowing crystals for points",
-      "Survive the 10-second starfall"
+      "📱 Tilt your device left/right to move",
+      "Or swipe/drag to move manually",
+      "Collect 💎 crystals for points",
+      "Avoid 🔥 debris - shields protect you!"
     ],
     statBonus: 'mind',
     statIcon: Brain,

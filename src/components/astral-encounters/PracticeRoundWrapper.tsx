@@ -9,6 +9,7 @@ import { StarfallDodgeGame } from './StarfallDodgeGame';
 import { RuneResonanceGame } from './RuneResonanceGame';
 import { SoulSerpentGame } from './SoulSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
+import { GalacticMatchGame } from './GalacticMatchGame';
 import { Button } from '@/components/ui/button';
 import { Play, SkipForward } from 'lucide-react';
 
@@ -229,6 +230,8 @@ export const PracticeRoundWrapper = ({
         return <SoulSerpentGame {...props} />;
       case 'orb_match':
         return <OrbMatchGame {...props} />;
+      case 'galactic_match':
+        return <GalacticMatchGame {...props} />;
       default:
         return <EnergyBeamGame {...props} />;
     }
