@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Skull, Sparkles, Zap, Loader2 } from "lucide-react";
+import { Skull, Sparkles, Zap, Loader2, SkipForward } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +11,7 @@ interface BattleVSScreenProps {
   adversaryImageUrl?: string;
   isLoadingImage?: boolean;
   onReady: () => void;
+  onPass?: () => void;
 }
 
 const TIER_COLORS: Record<AdversaryTier, { primary: string; glow: string; bg: string }> = {
@@ -28,6 +29,7 @@ export const BattleVSScreen = ({
   adversaryImageUrl,
   isLoadingImage,
   onReady,
+  onPass,
 }: BattleVSScreenProps) => {
   const tierColors = TIER_COLORS[adversary.tier as AdversaryTier] || TIER_COLORS.common;
 
@@ -342,15 +344,28 @@ export const BattleVSScreen = ({
             "{adversary.lore}"
           </p>
 
-          {/* Battle Button */}
-          <Button
-            onClick={onReady}
-            size="lg"
-            className="w-full h-12 text-base font-bold bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 shadow-lg shadow-primary/30"
-          >
-            <Zap className="w-5 h-5 mr-2" />
-            Begin Harmonization
-          </Button>
+          {/* Battle Buttons */}
+          <div className="flex gap-3">
+            {onPass && (
+              <Button
+                onClick={onPass}
+                variant="ghost"
+                size="lg"
+                className="h-12 px-4 text-muted-foreground hover:text-foreground"
+              >
+                <SkipForward className="w-5 h-5 mr-1" />
+                Pass
+              </Button>
+            )}
+            <Button
+              onClick={onReady}
+              size="lg"
+              className="flex-1 h-12 text-base font-bold bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 shadow-lg shadow-primary/30"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Begin Harmonization
+            </Button>
+          </div>
         </motion.div>
       </div>
     </div>

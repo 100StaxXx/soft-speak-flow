@@ -39,6 +39,7 @@ interface AstralEncounterModalProps {
   adversary: Adversary | null;
   questInterval?: number;
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
+  onPass?: () => void;
   // Boss battle props
   isBossBattle?: boolean;
   bossBattleContext?: BossBattleContext;
@@ -54,6 +55,7 @@ export const AstralEncounterModal = ({
   adversary,
   questInterval = 3,
   onComplete,
+  onPass,
   isBossBattle = false,
   bossBattleContext,
   onBossBattleCancel,
@@ -326,7 +328,8 @@ export const AstralEncounterModal = ({
                     isLoadingImage={isLoadingImage}
                     companionImageUrl={companion?.current_image_url || undefined}
                     companionName={companion?.spirit_animal || "Companion"}
-                    onReady={handleBeginBattle} 
+                    onReady={handleBeginBattle}
+                    onPass={onPass}
                   />
                 </motion.div>
               )}

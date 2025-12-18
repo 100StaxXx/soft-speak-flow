@@ -1,10 +1,15 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAstralEncounters } from '@/hooks/useAstralEncounters';
 import { useEncounterTrigger, ActivityType } from '@/hooks/useEncounterTrigger';
+import { useEncounterPasses } from '@/hooks/useEncounterPasses';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
+import { DisableEncountersDialog } from './DisableEncountersDialog';
 import { AdversaryTier, TriggerType } from '@/types/astralEncounters';
 import { useEvolution } from '@/contexts/EvolutionContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 interface QueuedEncounter {
   triggerType: TriggerType;
@@ -28,9 +33,12 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
   const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
   const isEvolutionActiveRef = useRef(false);
 
+  const { user } = useAuth();
   const { isEvolvingLoading } = useEvolution();
+  const { passCount, recordPass, shouldPromptDisable } = useEncounterPasses();
 
   const {
     activeEncounter,
@@ -39,6 +47,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     checkEncounterTrigger,
     completeEncounter,
     closeEncounter,
+    passEncounter,
   } = useAstralEncounters();
 
   const { checkActivityMilestone, checkWeeklyTrigger } = useEncounterTrigger();
@@ -188,6 +197,39 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     completeEncounter(params);
   }, [completeEncounter]);
 
+  // Handle passing on an encounter
+  const handlePass = useCallback(async () => {
+    const newCount = recordPass();
+    await passEncounter();
+    
+    // After the 3rd pass, show the disable prompt
+    if (newCount >= 3) {
+      setShowDisableDialog(true);
+    }
+  }, [recordPass, passEncounter]);
+
+  // Handle disabling encounters via profile setting
+  const handleDisableEncounters = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      await supabase
+        .from('profiles')
+        .update({ astral_encounters_enabled: false })
+        .eq('id', user.id);
+      
+      setShowDisableDialog(false);
+      toast.success('Astral Encounters disabled. Re-enable in Profile settings.');
+    } catch (error) {
+      console.error('Failed to disable encounters:', error);
+      toast.error('Failed to disable encounters');
+    }
+  }, [user?.id]);
+
+  const handleKeepEncountersOn = useCallback(() => {
+    setShowDisableDialog(false);
+  }, []);
+
   return (
     <>
       {children}
@@ -207,6 +249,15 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         adversary={activeEncounter?.adversary || null}
         questInterval={activeEncounter?.questInterval}
         onComplete={handleComplete}
+        onPass={handlePass}
+      />
+
+      {/* Disable encounters prompt */}
+      <DisableEncountersDialog
+        open={showDisableDialog}
+        onDisable={handleDisableEncounters}
+        onKeepOn={handleKeepEncountersOn}
+        passCount={passCount}
       />
     </>
   );
