@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAstralEncounters } from '@/hooks/useAstralEncounters';
-import { useEncounterTrigger } from '@/hooks/useEncounterTrigger';
+import { useEncounterTrigger, ActivityType } from '@/hooks/useEncounterTrigger';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
 import { AdversaryTier, TriggerType } from '@/types/astralEncounters';
@@ -11,17 +11,16 @@ interface QueuedEncounter {
   sourceId?: string;
   epicProgress?: number;
   epicCategory?: string;
-  questInterval?: number;
+  activityInterval?: number;
 }
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;
 }
 
-interface EpicCheckpointEventDetail {
+interface EpicCheckinEventDetail {
   epicId: string;
-  previousProgress: number;
-  currentProgress: number;
+  currentProgress?: number;
 }
 
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
@@ -41,7 +40,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     closeEncounter,
   } = useAstralEncounters();
 
-  const { checkQuestMilestone, checkWeeklyTrigger, checkEpicCheckpoint } = useEncounterTrigger();
+  const { checkActivityMilestone, checkWeeklyTrigger } = useEncounterTrigger();
 
   // Track evolution state in ref for immediate access
   useEffect(() => {
@@ -64,9 +63,9 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         const pending = queuedEncounterRef.current;
         if (pending) {
           console.log('[AstralEncounterProvider] Processing queued encounter:', pending.triggerType);
-          const { triggerType, sourceId, epicProgress, epicCategory, questInterval } = pending;
+          const { triggerType, sourceId, epicProgress, epicCategory, activityInterval } = pending;
           setQueuedEncounter(null);
-          checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
+          checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, activityInterval);
         }
       }, 500);
     };
@@ -81,16 +80,16 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     sourceId?: string,
     epicProgress?: number,
     epicCategory?: string,
-    questInterval?: number
+    activityInterval?: number
   ) => {
     // If evolution is active, queue the encounter
     if (isEvolutionActiveRef.current) {
       console.log('[AstralEncounterProvider] Evolution in progress, queueing encounter:', triggerType);
-      setQueuedEncounter({ triggerType, sourceId, epicProgress, epicCategory, questInterval });
+      setQueuedEncounter({ triggerType, sourceId, epicProgress, epicCategory, activityInterval });
       return;
     }
     // Start by triggering the encounter logic (which generates the adversary)
-    await checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, questInterval);
+    await checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, activityInterval);
   }, [checkEncounterTrigger]);
 
   // Watch for activeEncounter changes to show overlay
@@ -118,19 +117,39 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     setShowEncounterModal(true);
   }, [closeEncounter, setShowEncounterModal]);
 
-  // Listen for quest completion events
-  const handleQuestCompleted = useCallback(async () => {
-    const result = await checkQuestMilestone();
+  // Unified handler for activity milestones (quests + epic check-ins)
+  const handleActivityCompleted = useCallback(async (
+    activityType: ActivityType,
+    epicId?: string,
+    epicProgress?: number
+  ) => {
+    console.log('[AstralEncounterProvider] Activity completed:', activityType, epicId);
+    const result = await checkActivityMilestone(activityType, epicId, epicProgress);
     if (result.shouldTrigger && result.triggerType) {
       triggerEncounterWithOverlay(
         result.triggerType,
         result.sourceId,
         result.epicProgress,
         result.epicCategory,
-        result.questInterval
+        result.activityInterval
       );
     }
-  }, [checkQuestMilestone, triggerEncounterWithOverlay]);
+  }, [checkActivityMilestone, triggerEncounterWithOverlay]);
+
+  // Listen for quest completion events
+  const handleQuestCompleted = useCallback(async () => {
+    await handleActivityCompleted('quest');
+  }, [handleActivityCompleted]);
+
+  // Listen for epic check-in events (any progress update counts as +1 activity)
+  const handleEpicCheckin = useCallback(
+    async (event: CustomEvent<EpicCheckinEventDetail>) => {
+      if (!event.detail) return;
+      const { epicId, currentProgress } = event.detail;
+      await handleActivityCompleted('epic_checkin', epicId, currentProgress);
+    },
+    [handleActivityCompleted]
+  );
 
   // Check for weekly trigger on mount
   useEffect(() => {
@@ -152,29 +171,13 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     return () => window.removeEventListener('quest-completed', handleQuestCompleted);
   }, [handleQuestCompleted]);
 
-  const handleEpicCheckpointEvent = useCallback(
-    async (event: CustomEvent<EpicCheckpointEventDetail>) => {
-      if (!event.detail) return;
-      const { epicId, previousProgress, currentProgress } = event.detail;
-      const result = await checkEpicCheckpoint(epicId, previousProgress, currentProgress);
-      if (result.shouldTrigger && result.triggerType) {
-        triggerEncounterWithOverlay(
-          result.triggerType,
-          result.sourceId,
-          result.epicProgress,
-          result.epicCategory
-        );
-      }
-    },
-    [checkEpicCheckpoint, triggerEncounterWithOverlay]
-  );
-
+  // Listen for epic check-in events (replaces old epic-progress-checkpoint)
   useEffect(() => {
     const listener = (event: Event) =>
-      handleEpicCheckpointEvent(event as CustomEvent<EpicCheckpointEventDetail>);
+      handleEpicCheckin(event as CustomEvent<EpicCheckinEventDetail>);
     window.addEventListener('epic-progress-checkpoint', listener as EventListener);
     return () => window.removeEventListener('epic-progress-checkpoint', listener as EventListener);
-  }, [handleEpicCheckpointEvent]);
+  }, [handleEpicCheckin]);
 
   const handleComplete = useCallback((params: {
     encounterId: string;

@@ -27,7 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
-import { useEncounterTrigger } from "@/hooks/useEncounterTrigger";
+
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { generateAdversary } from "@/utils/adversaryGenerator";
 import type { StorySeed, BossBattleContext, NarrativeCheckpoint } from "@/types/narrativeTypes";
@@ -100,7 +100,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
-  const { checkEpicCheckpoint } = useEncounterTrigger();
+  // Encounter triggering is handled centrally by AstralEncounterProvider
   const { generateRewardReveal } = useEpicRewards();
   
   // Initialize to -1 on first render to catch any milestones that may have been

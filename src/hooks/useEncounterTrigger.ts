@@ -3,27 +3,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TriggerType } from '@/types/astralEncounters';
 
+export type ActivityType = 'quest' | 'epic_checkin';
+
 interface TriggerResult {
   shouldTrigger: boolean;
   triggerType?: TriggerType;
   sourceId?: string;
   epicProgress?: number;
   epicCategory?: string;
-  questInterval?: number; // Number of quests since last encounter (2-4)
+  activityInterval?: number; // Number of activities since last encounter (2-4)
+  activityType?: ActivityType;
 }
 
-// Generate random interval between 2-4 quests
+// Generate random interval between 2-4 activities
 const getRandomInterval = () => Math.floor(Math.random() * 3) + 2;
-const MIN_QUESTS_BEFORE_ENCOUNTERS = 2;
+const MIN_ACTIVITIES_BEFORE_ENCOUNTERS = 2;
 
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
-  const questCountRef = useRef<number | null>(null);
+  const activityCountRef = useRef<number | null>(null);
   const nextEncounterRef = useRef<number | null>(null);
   const encountersEnabledRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    questCountRef.current = null;
+    activityCountRef.current = null;
     nextEncounterRef.current = null;
     encountersEnabledRef.current = null;
   }, [user?.id]);
@@ -54,9 +57,10 @@ export const useEncounterTrigger = () => {
       return false;
     }
 
-    // Require at least a couple of quest completions before unlocking encounters
-    const totalQuestsCompleted = profile?.total_quests_completed ?? 0;
-    if (totalQuestsCompleted < MIN_QUESTS_BEFORE_ENCOUNTERS) {
+    // Require at least a couple of activities before unlocking encounters
+    // We use total_quests_completed as the unified activity counter
+    const totalActivities = profile?.total_quests_completed ?? 0;
+    if (totalActivities < MIN_ACTIVITIES_BEFORE_ENCOUNTERS) {
       encountersEnabledRef.current = false;
       return false;
     }
@@ -65,14 +69,18 @@ export const useEncounterTrigger = () => {
     return encountersEnabledRef.current;
   }, [user?.id]);
 
-  // Check for quest milestone trigger (random 2-4 quests)
-  const checkQuestMilestone = useCallback(async (): Promise<TriggerResult> => {
+  // Unified activity milestone check (quests AND epic check-ins use same counter)
+  const checkActivityMilestone = useCallback(async (
+    activityType: ActivityType,
+    epicId?: string,
+    epicProgress?: number
+  ): Promise<TriggerResult> => {
     if (!user?.id) return { shouldTrigger: false };
 
     const encountersEnabled = await ensureEncountersEnabled();
 
     // Fetch current counts if not cached
-    if (questCountRef.current === null || nextEncounterRef.current === null) {
+    if (activityCountRef.current === null || nextEncounterRef.current === null) {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('total_quests_completed, next_encounter_quest_count, astral_encounters_enabled')
@@ -80,7 +88,7 @@ export const useEncounterTrigger = () => {
         .single();
 
       if (error || !profile) {
-        console.error('Failed to fetch quest count', error);
+        console.error('Failed to fetch activity count', error);
         return { shouldTrigger: false };
       }
 
@@ -88,31 +96,31 @@ export const useEncounterTrigger = () => {
       encountersEnabledRef.current = profile.astral_encounters_enabled !== false;
 
       if (profile.astral_encounters_enabled === false) {
-        // Still update quest count but don't trigger encounters
-        questCountRef.current = (profile.total_quests_completed || 0) + 1;
+        // Still update activity count but don't trigger encounters
+        activityCountRef.current = (profile.total_quests_completed || 0) + 1;
         await supabase
           .from('profiles')
-          .update({ total_quests_completed: questCountRef.current })
+          .update({ total_quests_completed: activityCountRef.current })
           .eq('id', user.id);
         return { shouldTrigger: false };
       }
 
-      questCountRef.current = profile.total_quests_completed || 0;
+      activityCountRef.current = profile.total_quests_completed || 0;
       // If no next encounter set, initialize with random 2-4
       nextEncounterRef.current = profile.next_encounter_quest_count ?? getRandomInterval();
     }
 
     if (!encountersEnabled) {
-      questCountRef.current += 1;
+      activityCountRef.current += 1;
       await supabase
         .from('profiles')
-        .update({ total_quests_completed: questCountRef.current })
+        .update({ total_quests_completed: activityCountRef.current })
         .eq('id', user.id);
       return { shouldTrigger: false };
     }
 
-    questCountRef.current += 1;
-    const newTotal = questCountRef.current;
+    activityCountRef.current += 1;
+    const newTotal = activityCountRef.current;
 
     // Check if we've reached the encounter threshold
     const shouldTrigger = newTotal >= (nextEncounterRef.current ?? 0);
@@ -122,7 +130,7 @@ export const useEncounterTrigger = () => {
       ? newTotal + getRandomInterval() 
       : nextEncounterRef.current;
 
-    // Update database with new quest count and potentially new encounter threshold
+    // Update database with new activity count and potentially new encounter threshold
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ 
@@ -132,8 +140,8 @@ export const useEncounterTrigger = () => {
       .eq('id', user.id);
 
     if (updateError) {
-      console.error('Failed to update quest count', updateError);
-      questCountRef.current -= 1;
+      console.error('Failed to update activity count', updateError);
+      activityCountRef.current -= 1;
       return { shouldTrigger: false };
     }
 
@@ -143,61 +151,36 @@ export const useEncounterTrigger = () => {
     }
 
     if (shouldTrigger) {
-      // Calculate how many quests since last encounter
-      const questInterval = newTotal - ((nextEncounterRef.current ?? newTotal) - getRandomInterval());
-      return { 
-        shouldTrigger: true, 
-        triggerType: 'quest_milestone',
-        questInterval: Math.min(Math.max(questInterval, 2), 4), // Clamp to 2-4
-      };
-    }
+      // Get epic category if this was an epic check-in
+      let epicCategory: string | undefined;
+      if (activityType === 'epic_checkin' && epicId) {
+        const { data: epic } = await supabase
+          .from('epics')
+          .select('title, description')
+          .eq('id', epicId)
+          .single();
 
-    return { shouldTrigger: false };
-  }, [user?.id, ensureEncountersEnabled]);
-
-  // Check for epic checkpoint trigger (25%, 50%, 75%, 100%)
-  const checkEpicCheckpoint = useCallback(async (
-    epicId: string,
-    previousProgress: number,
-    currentProgress: number
-  ): Promise<TriggerResult> => {
-    if (!user?.id) return { shouldTrigger: false };
-
-    const encountersEnabled = await ensureEncountersEnabled();
-    if (!encountersEnabled) return { shouldTrigger: false };
-
-    const milestones = [25, 50, 75, 100];
-    
-    // Find if we crossed a milestone
-    const crossedMilestone = milestones.find(
-      m => previousProgress < m && currentProgress >= m
-    );
-
-    if (crossedMilestone) {
-      // Get epic category for themed adversary
-      const { data: epic } = await supabase
-        .from('epics')
-        .select('title, description')
-        .eq('id', epicId)
-        .single();
-
-      // Infer category from title/description
-      const text = `${epic?.title || ''} ${epic?.description || ''}`.toLowerCase();
-      let category = 'general';
-      if (text.includes('fitness') || text.includes('workout') || text.includes('exercise')) {
-        category = 'fitness';
-      } else if (text.includes('meditat') || text.includes('mindful') || text.includes('calm')) {
-        category = 'mindfulness';
-      } else if (text.includes('read') || text.includes('learn') || text.includes('study')) {
-        category = 'learning';
+        // Infer category from title/description
+        const text = `${epic?.title || ''} ${epic?.description || ''}`.toLowerCase();
+        if (text.includes('fitness') || text.includes('workout') || text.includes('exercise')) {
+          epicCategory = 'fitness';
+        } else if (text.includes('meditat') || text.includes('mindful') || text.includes('calm')) {
+          epicCategory = 'mindfulness';
+        } else if (text.includes('read') || text.includes('learn') || text.includes('study')) {
+          epicCategory = 'learning';
+        } else {
+          epicCategory = 'general';
+        }
       }
 
-      return {
-        shouldTrigger: true,
-        triggerType: 'epic_checkpoint',
+      return { 
+        shouldTrigger: true, 
+        triggerType: activityType === 'quest' ? 'quest_milestone' : 'epic_checkpoint',
         sourceId: epicId,
-        epicProgress: crossedMilestone,
-        epicCategory: category
+        epicProgress,
+        epicCategory,
+        activityInterval: getRandomInterval(), // Report the interval used
+        activityType,
       };
     }
 
@@ -233,8 +216,7 @@ export const useEncounterTrigger = () => {
   }, [user?.id, ensureEncountersEnabled]);
 
   return {
-    checkQuestMilestone,
-    checkEpicCheckpoint,
+    checkActivityMilestone,
     checkWeeklyTrigger
   };
 };
