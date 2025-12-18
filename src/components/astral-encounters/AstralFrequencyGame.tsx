@@ -543,7 +543,16 @@ export const AstralFrequencyGame = ({
     
     const interval = setInterval(() => {
       // Update distance
-      setDistance(prev => prev + speed * 0.1);
+      setDistance(prev => {
+        const newDistance = prev + speed * 0.1;
+        
+        // Practice mode: end after reaching 500 distance
+        if (isPractice && newDistance >= 500) {
+          setGameState('complete');
+        }
+        
+        return newDistance;
+      });
       
       // Gradually increase speed - NO LIMIT
       setSpeed(prev => prev + config.speedIncrement);
@@ -576,7 +585,7 @@ export const AstralFrequencyGame = ({
     }, 100);
     
     return () => clearInterval(interval);
-  }, [gameState, config, speed]);
+  }, [gameState, config, speed, isPractice]);
   
   // Complete game - calculate result based on distance and score
   useEffect(() => {

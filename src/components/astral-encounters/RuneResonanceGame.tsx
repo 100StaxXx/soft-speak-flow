@@ -490,6 +490,13 @@ export const RuneResonanceGame = ({
     
     // Round complete! Spawn next round
     const nextRound = round + 1;
+    
+    // Practice mode: end after completing 2 rounds
+    if (isPractice && nextRound > 2) {
+      setGameState('complete');
+      return;
+    }
+    
     setRound(nextRound);
     
     // Add round clear bonus
@@ -499,7 +506,7 @@ export const RuneResonanceGame = ({
     setTimeout(() => {
       setRunes(generateRunes(nextRound, settings));
     }, 500);
-  }, [activatedCount, requiredRunes, round, settings, gameState]);
+  }, [activatedCount, requiredRunes, round, settings, gameState, isPractice]);
 
   // Complete game - calculate result based on rounds completed
   useEffect(() => {
