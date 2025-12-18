@@ -38,6 +38,19 @@ const getPositionOnPath = (progress: number) => {
   return { x, y };
 };
 
+// Generate SVG path string for the curved journey
+const generatePathString = (fromPercent: number, toPercent: number) => {
+  const steps = 50;
+  const points: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = fromPercent / 100 + (i / steps) * ((toPercent - fromPercent) / 100);
+    const x = 10 + t * 80;
+    const y = 50 + Math.sin(t * Math.PI * 1.5) * 25;
+    points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
+  }
+  return points.join(' ');
+};
+
 // Get mood-based filter styles
 const getMoodStyles = (mood?: string) => {
   switch (mood) {
@@ -153,32 +166,63 @@ export const ConstellationTrail = ({
         />
       ))}
 
-      {/* Connection lines between stars */}
+      {/* Trail paths SVG */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {starPositions.slice(0, -1).map((pos, i) => {
-          const nextPos = starPositions[i + 1];
-          const isLit = progress >= milestones[i + 1];
-          const isPartiallyLit = progress > milestones[i] && progress < milestones[i + 1];
+        <defs>
+          {/* Animated pulsing gradient that travels along the path */}
+          <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="hsl(var(--primary) / 0.15)" />
+            <stop offset="40%" stopColor="hsl(var(--primary) / 0.15)" />
+            <stop offset="50%" stopColor="hsl(var(--primary) / 0.8)" />
+            <stop offset="60%" stopColor="hsl(var(--primary) / 0.15)" />
+            <stop offset="100%" stopColor="hsl(var(--primary) / 0.15)" />
+            <animate attributeName="x1" values="-100%;100%" dur="2.5s" repeatCount="indefinite" />
+            <animate attributeName="x2" values="0%;200%" dur="2.5s" repeatCount="indefinite" />
+          </linearGradient>
           
-          return (
-            <motion.line
-              key={`line-${i}`}
-              x1={pos.x}
-              y1={pos.y}
-              x2={nextPos.x}
-              y2={nextPos.y}
-              stroke={isLit ? "hsl(var(--primary))" : isPartiallyLit ? "hsl(var(--primary) / 0.4)" : "hsl(var(--muted) / 0.2)"}
-              strokeWidth={isLit ? 0.8 : 0.4}
-              strokeDasharray={isPartiallyLit ? "2,2" : "none"}
-              initial={{ pathLength: 0 }}
-              animate={{ 
-                pathLength: isLit || isPartiallyLit ? 1 : 0.3,
-                opacity: isLit ? 1 : 0.5
-              }}
-              transition={{ duration: 1, delay: i * 0.2 }}
-            />
-          );
-        })}
+          {/* Glow filter for solid trail */}
+          <filter id="trailGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* FULL PATH - Base dim path showing entire journey */}
+        <path
+          d={generatePathString(0, 100)}
+          fill="none"
+          stroke="hsl(var(--muted) / 0.15)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+
+        {/* FULL PATH - Pulsing energy effect */}
+        <path
+          d={generatePathString(0, 100)}
+          fill="none"
+          stroke="url(#pulseGradient)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+
+        {/* SOLID TRAIL - Completed portion behind companion */}
+        {progress > 0 && (
+          <motion.path
+            d={generatePathString(0, progress)}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            filter="url(#trailGlow)"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+          />
+        )}
       </svg>
 
       {/* Milestone stars */}
