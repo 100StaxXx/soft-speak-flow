@@ -12,6 +12,7 @@ interface SoulSerpentGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
