@@ -79,7 +79,8 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
           {/* Back Button */}
           <button
             onClick={handleBack}
-            className="absolute top-8 left-8 z-50 flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold transition-colors group cursor-pointer"
+            className="absolute left-8 z-50 flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold transition-colors group cursor-pointer"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
             aria-label="Back to mentor grid"
           >
             <ArrowLeft className="h-6 w-6 group-hover:-translate-x-1 transition-transform" />
@@ -87,7 +88,10 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
 
           {/* Current Mentor Indicator */}
           {currentMentorId === activeMentor.id && (
-            <div className="absolute top-8 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-royal-gold/20 border border-royal-gold rounded-full">
+            <div 
+              className="absolute right-8 z-10 flex items-center gap-2 px-4 py-2 bg-royal-gold/20 border border-royal-gold rounded-full"
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+            >
               <Check className="h-4 w-4 text-royal-gold" />
               <span className="text-royal-gold font-bold text-sm">Current Mentor</span>
             </div>
