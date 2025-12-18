@@ -54,7 +54,7 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
   }, [showFinalMessage]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative">
       {/* Ambient glow */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />

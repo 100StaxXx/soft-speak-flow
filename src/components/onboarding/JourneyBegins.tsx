@@ -54,7 +54,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
   }, [showFinalMessage]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative overflow-hidden">
       {/* Ambient glow - pulsing cosmic energy */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <motion.div 

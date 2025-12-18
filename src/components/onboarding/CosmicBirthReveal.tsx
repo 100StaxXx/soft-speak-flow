@@ -105,7 +105,7 @@ export const CosmicBirthReveal = ({ faction, onComplete }: CosmicBirthRevealProp
   const zodiacInfo = zodiacSign ? getZodiacInfo(zodiacSign) : null;
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 pt-safe-top safe-area-bottom">
       {/* Animated Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
         {starPositions.map((star, i) => (
