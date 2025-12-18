@@ -19,10 +19,10 @@ export const PostcardsInfoTooltip = () => {
           <div className="space-y-2 text-sm">
             <p className="font-semibold">Cosmic Postcards</p>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• Unlocked at Star Path milestones (25%, 50%, 75%, 100%)</li>
-              <li>• Your companion visits cosmic locations</li>
-              <li>• AI-generated images of their journey</li>
-              <li>• Tap to view fullscreen and share</li>
+              <li>• Chapters unlock as you progress Star Paths</li>
+              <li>• Each postcard tells part of your cosmic story</li>
+              <li>• Discover clues, prophecies & characters</li>
+              <li>• Tap to read the full chapter and share</li>
             </ul>
           </div>
         </TooltipContent>

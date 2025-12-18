@@ -16,6 +16,16 @@ export interface CompanionPostcard {
   caption: string | null;
   generated_at: string;
   created_at: string;
+  // Narrative fields
+  chapter_number: number | null;
+  chapter_title: string | null;
+  story_content: string | null;
+  clue_text: string | null;
+  prophecy_line: string | null;
+  characters_featured: string[] | null;
+  seeds_planted: string[] | null;
+  is_finale: boolean | null;
+  location_revealed: boolean | null;
 }
 
 export const useCompanionPostcards = () => {
