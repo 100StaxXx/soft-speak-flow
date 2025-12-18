@@ -13,6 +13,18 @@ export const lockToPortrait = async () => {
   }
 };
 
+export const lockToLandscape = async () => {
+  // Lock to landscape for games that need horizontal orientation
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+      console.log('Orientation locked to landscape');
+    } catch (error) {
+      console.error('Failed to lock to landscape:', error);
+    }
+  }
+};
+
 export const unlockOrientation = async () => {
   if (Capacitor.isNativePlatform()) {
     try {

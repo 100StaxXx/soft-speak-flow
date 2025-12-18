@@ -4,8 +4,9 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useGameLoop, useStaticStars, useParticleSystem } from './gameUtils';
 import { useDeviceOrientation } from '@/hooks/useDeviceOrientation';
+import { lockToLandscape, lockToPortrait } from '@/utils/orientationLock';
 import { Button } from '@/components/ui/button';
-import { Smartphone } from 'lucide-react';
+import { Smartphone, RotateCcw } from 'lucide-react';
 
 interface StarfallDodgeGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -132,6 +133,34 @@ const ParticleRenderer = memo(({ particles }: { particles: { id: number; x: numb
 ));
 ParticleRenderer.displayName = 'ParticleRenderer';
 
+// Rotate phone prompt overlay
+const RotatePhoneOverlay = memo(({ onContinue }: { onContinue: () => void }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-6"
+  >
+    <motion.div
+      animate={{ rotate: [0, -90, -90, 0] }}
+      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+      className="mb-6"
+    >
+      <Smartphone className="w-20 h-20 text-cyan-400" />
+    </motion.div>
+    <div className="flex items-center gap-2 mb-4">
+      <RotateCcw className="w-6 h-6 text-cyan-400" />
+      <h3 className="text-xl font-bold text-white">Rotate Your Phone</h3>
+    </div>
+    <p className="text-muted-foreground text-center text-sm mb-6 max-w-xs">
+      Turn your phone sideways (landscape mode) for the best gameplay experience!
+    </p>
+    <Button onClick={onContinue} className="bg-cyan-500 hover:bg-cyan-600">
+      Continue
+    </Button>
+  </motion.div>
+));
+RotatePhoneOverlay.displayName = 'RotatePhoneOverlay';
+
 // Tilt permission request overlay
 const TiltPermissionOverlay = memo(({ onRequest, onSkip }: { onRequest: () => void; onSkip: () => void }) => (
   <motion.div
@@ -175,7 +204,7 @@ export const StarfallDodgeGame = ({
   questIntervalScale = 0,
   isPractice = false,
 }: StarfallDodgeGameProps) => {
-  const [gameState, setGameState] = useState<'permission' | 'countdown' | 'playing' | 'paused' | 'complete'>('permission');
+  const [gameState, setGameState] = useState<'rotate' | 'permission' | 'countdown' | 'playing' | 'paused' | 'complete'>('rotate');
   const [useTilt, setUseTilt] = useState(false);
   const [playerX, setPlayerX] = useState(50);
   const [crystalsCollected, setCrystalsCollected] = useState(0);
@@ -199,14 +228,22 @@ export const StarfallDodgeGame = ({
   const livesRef = useRef(lives);
   const hasShieldRef = useRef(hasShield);
 
-  // Device orientation hook
-  const { available, permitted, requestPermission, getPositionFromTilt } = useDeviceOrientation();
+  // Device orientation hook - use landscape function for this game
+  const { available, permitted, requestPermission, getLandscapePositionFromTilt } = useDeviceOrientation();
 
   // Sync refs
   useEffect(() => { playerXRef.current = playerX; }, [playerX]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
   useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
+
+  // Lock to landscape on mount, restore portrait on unmount
+  useEffect(() => {
+    return () => {
+      // Restore portrait orientation when leaving the game
+      lockToPortrait();
+    };
+  }, []);
 
   const { particles, emit: emitParticles } = useParticleSystem(40);
   const stars = useStaticStars(20);
@@ -229,6 +266,12 @@ export const StarfallDodgeGame = ({
     setCurrentSpawnRate(config.initialSpawnRate);
   }, [config]);
 
+  // Handle rotate screen continue
+  const handleRotateContinue = useCallback(async () => {
+    await lockToLandscape();
+    setGameState('permission');
+  }, []);
+
   // Handle permission request
   const handleRequestPermission = useCallback(async () => {
     if (available) {
@@ -243,7 +286,7 @@ export const StarfallDodgeGame = ({
     setGameState('countdown');
   }, []);
 
-  // Touch controls
+  // Touch controls - adjusted for landscape
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (gameStateRef.current !== 'playing') return;
     const touch = e.touches[0];
@@ -256,10 +299,10 @@ export const StarfallDodgeGame = ({
     
     const touch = e.touches[0];
     const deltaX = touch.clientX - touchStartRef.current.x;
-    const gameWidth = gameAreaRef.current?.getBoundingClientRect().width || 300;
+    const gameWidth = gameAreaRef.current?.getBoundingClientRect().width || 500;
     const movePercent = (deltaX / gameWidth) * 100;
     
-    const newX = Math.max(8, Math.min(92, touchStartRef.current.playerX + movePercent));
+    const newX = Math.max(5, Math.min(95, touchStartRef.current.playerX + movePercent));
     setPlayerX(newX);
   }, [useTilt]);
 
@@ -275,7 +318,8 @@ export const StarfallDodgeGame = ({
   useGameLoop((deltaTime, time) => {
     if (gameStateRef.current !== 'playing') return;
 
-    const currentPlayerX = useTilt ? getPositionFromTilt(5, 2) : playerXRef.current;
+    // Use landscape tilt function with reduced sensitivity
+    const currentPlayerX = useTilt ? getLandscapePositionFromTilt(8, 1.2) : playerXRef.current;
     
     // Update player position from tilt
     if (useTilt) {
@@ -289,7 +333,7 @@ export const StarfallDodgeGame = ({
     setCurrentSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrease * deltaTime / 1000));
     setCurrentSpawnRate(prev => Math.max(config.minSpawnRate, prev - config.spawnRateDecrease * deltaTime / 1000));
 
-    // Spawn objects
+    // Spawn objects - use wider spawn zone for landscape
     if (time - lastSpawnRef.current > currentSpawnRate) {
       lastSpawnRef.current = time;
       const rand = Math.random();
@@ -298,7 +342,7 @@ export const StarfallDodgeGame = ({
 
       const newObj: FallingObject = {
         id: objectIdRef.current++,
-        x: 10 + Math.random() * 80,
+        x: 5 + Math.random() * 90, // Wider spawn zone for landscape
         y: -5,
         type: isShield ? 'powerup_shield' : isCrystal ? 'crystal' : 'debris',
         speed: currentSpeed * (0.8 + Math.random() * 0.4),
@@ -311,8 +355,8 @@ export const StarfallDodgeGame = ({
     objectsRef.current = objectsRef.current.filter(obj => {
       obj.y += obj.speed * deltaTime * 60 * 0.5;
       
-      // Collision detection
-      if (obj.y > 75 && obj.y < 95) {
+      // Collision detection - adjusted for landscape player position
+      if (obj.y > 70 && obj.y < 92) {
         const dist = Math.abs(obj.x - currentPlayerX);
         const hitDist = (obj.size + playerSize) / 3;
         
@@ -382,47 +426,49 @@ export const StarfallDodgeGame = ({
   return (
     <div
       ref={gameAreaRef}
-      className={`relative w-full h-full min-h-[500px] rounded-lg overflow-hidden ${shake ? 'animate-shake' : ''}`}
-      style={{ background: 'linear-gradient(to bottom, #0f0a1a, #1a1033)' }}
+      className={`relative w-full h-full min-h-[280px] rounded-lg overflow-hidden ${shake ? 'animate-shake' : ''}`}
+      style={{ 
+        background: 'linear-gradient(to bottom, #0f0a1a, #1a1033)',
+        // Encourage landscape aspect ratio
+        aspectRatio: gameState !== 'rotate' ? '16/9' : undefined,
+      }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       <StarBackground stars={stars} />
       
-      {/* Game HUD - No timer, show lives and survival time */}
-      {gameState !== 'permission' && (
+      {/* Game HUD - Landscape optimized */}
+      {gameState !== 'rotate' && gameState !== 'permission' && (
         <div className="absolute top-2 left-0 right-0 z-20 px-4">
           <div className="flex justify-between items-center">
-            <div className="text-lg font-bold text-white/80">Starfall Dodge</div>
-            <LivesDisplay lives={lives} />
+            <div className="flex items-center gap-4">
+              <div className="text-sm font-bold text-white/80">Starfall Dodge</div>
+              <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
+                <span className="text-cyan-400 text-sm">💎 {crystalsCollected}</span>
+              </div>
+              <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
+                <span className="text-yellow-400 text-sm">⏱️ {Math.floor(survivalTime)}s</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {hasShield && (
+                <div className="bg-emerald-500/30 backdrop-blur-sm rounded-full px-2 py-0.5">
+                  <span className="text-emerald-300 text-sm">🛡️</span>
+                </div>
+              )}
+              <LivesDisplay lives={lives} />
+            </div>
           </div>
         </div>
       )}
       
-      {/* Tilt indicator */}
+      {/* Tilt indicator - landscape position */}
       {useTilt && gameState === 'playing' && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-cyan-300">
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-cyan-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-cyan-300">
           📱 Tilt to move
         </div>
       )}
-      
-      {/* Shield indicator */}
-      {hasShield && (
-        <div className="absolute top-16 right-4 bg-emerald-500/30 backdrop-blur-sm rounded-full px-3 py-1">
-          <span className="text-emerald-300">🛡️ Shield</span>
-        </div>
-      )}
-      
-      {/* Stats */}
-      <div className="absolute top-16 left-4 flex flex-col gap-2 z-20">
-        <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1">
-          <span className="text-cyan-400">💎 {crystalsCollected}</span>
-        </div>
-        <div className="bg-black/40 backdrop-blur-sm rounded-lg px-3 py-1">
-          <span className="text-yellow-400">⏱️ {Math.floor(survivalTime)}s</span>
-        </div>
-      </div>
       
       {/* Falling objects */}
       {objects.map(obj => (
@@ -442,10 +488,10 @@ export const StarfallDodgeGame = ({
       {/* Particles */}
       <ParticleRenderer particles={particles} />
       
-      {/* Player */}
+      {/* Player - positioned for landscape */}
       <motion.div
         className="absolute"
-        style={{ left: `${playerX}%`, bottom: '10%', transform: 'translateX(-50%)' }}
+        style={{ left: `${playerX}%`, bottom: '8%', transform: 'translateX(-50%)' }}
         animate={{ x: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
       >
@@ -468,6 +514,9 @@ export const StarfallDodgeGame = ({
       
       {/* Overlays */}
       <AnimatePresence>
+        {gameState === 'rotate' && (
+          <RotatePhoneOverlay onContinue={handleRotateContinue} />
+        )}
         {gameState === 'permission' && available && (
           <TiltPermissionOverlay onRequest={handleRequestPermission} onSkip={handleSkipTilt} />
         )}
