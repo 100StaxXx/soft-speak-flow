@@ -71,6 +71,15 @@ export const ImageGenerationProgress = ({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showExtendedMessage, setShowExtendedMessage] = useState(false);
 
+  // Reset state when phase resets to starting
+  useEffect(() => {
+    if (phase === 'starting') {
+      setMessageIndex(0);
+      setElapsedTime(0);
+      setShowExtendedMessage(false);
+    }
+  }, [phase]);
+
   // Rotate messages every 3 seconds
   useEffect(() => {
     const messages = PHASE_MESSAGES[phase];
