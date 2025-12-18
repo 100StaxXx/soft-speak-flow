@@ -274,6 +274,7 @@ export const EclipseTimingGame = ({
   isPractice = false,
 }: EclipseTimingGameProps) => {
   const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>('loading');
+  const [songsPlayed, setSongsPlayed] = useState(0);
   const [notes, setNotes] = useState<Note[]>([]);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -511,10 +512,62 @@ export const EclipseTimingGame = ({
     if (currentTrackRef.current) {
       await rateTrack(currentTrackRef.current.id, rating);
     }
-    setGameState('complete');
   }, [rateTrack]);
 
-  const handleSkipRating = useCallback(() => {
+  // Load next song
+  const loadNextSong = useCallback(async () => {
+    // Stop current audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    // Reset game state
+    setScore(0);
+    setCombo(0);
+    setMaxCombo(0);
+    setNotesHit(0);
+    setNotesMissed(0);
+    setHitEffects([]);
+    setGameResult(null);
+    setSongsPlayed(prev => prev + 1);
+    setGameState('loading');
+    
+    // Fetch new track
+    const loadedTrack = await fetchRandomTrack(difficulty);
+    
+    if (loadedTrack) {
+      currentTrackRef.current = loadedTrack;
+      const syncedNotes = generateSyncedNotes(loadedTrack.bpm, loadedTrack.duration_seconds, difficulty);
+      setNotes(syncedNotes);
+      notesRef.current = syncedNotes;
+      
+      const audio = new Audio(loadedTrack.audio_url);
+      audio.preload = 'auto';
+      audioRef.current = audio;
+      
+      audio.addEventListener('canplaythrough', () => {
+        setGameState('countdown');
+      }, { once: true });
+      
+      audio.addEventListener('error', () => {
+        const fallbackNotes = generateFallbackNotes(difficulty);
+        setNotes(fallbackNotes);
+        notesRef.current = fallbackNotes;
+        setGameState('countdown');
+      });
+      
+      audio.load();
+    } else {
+      const fallbackNotes = generateFallbackNotes(difficulty);
+      setNotes(fallbackNotes);
+      notesRef.current = fallbackNotes;
+      currentTrackRef.current = null;
+      setGameState('countdown');
+    }
+  }, [difficulty, fetchRandomTrack]);
+
+  const handleFinish = useCallback(() => {
     setGameState('complete');
   }, []);
 
@@ -552,22 +605,45 @@ export const EclipseTimingGame = ({
   }
 
   // Rating state
-  if (gameState === 'rating' && currentTrackRef.current) {
+  if (gameState === 'rating') {
     return (
       <div className="flex flex-col items-center justify-center relative w-full h-full min-h-[500px] gap-6 p-4">
         <div className="text-center mb-4">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Game Complete!</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Song Complete!</h2>
           <p className="text-lg text-muted-foreground">
             Score: <span className="text-primary font-bold">{score}</span> • 
             Accuracy: <span className="text-primary font-bold">{gameResult?.accuracy}%</span>
           </p>
+          {songsPlayed > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Songs played: {songsPlayed + 1}
+            </p>
+          )}
         </div>
-        <TrackRatingUI
-          trackName={currentTrackRef.current.genre}
-          onRate={handleRate}
-          onSkip={handleSkipRating}
-          currentRating={userRating}
-        />
+        
+        {currentTrackRef.current && (
+          <TrackRatingUI
+            trackName={currentTrackRef.current.genre}
+            onRate={handleRate}
+            onSkip={() => {}}
+            currentRating={userRating}
+          />
+        )}
+        
+        <div className="flex gap-4 mt-4">
+          <button
+            onClick={loadNextSong}
+            className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Next Song →
+          </button>
+          <button
+            onClick={handleFinish}
+            className="px-6 py-3 rounded-lg bg-secondary text-secondary-foreground font-semibold hover:bg-secondary/90 transition-colors"
+          >
+            Finish
+          </button>
+        </div>
       </div>
     );
   }
