@@ -247,7 +247,7 @@ const generateFallbackNotes = (difficulty: 'easy' | 'medium' | 'hard'): Note[] =
 };
 
 // Loading screen component
-const TrackLoadingScreen = memo(() => (
+const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) => (
   <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
     <motion.div
       animate={{ rotate: 360 }}
@@ -255,8 +255,12 @@ const TrackLoadingScreen = memo(() => (
     >
       <Music className="w-16 h-16 text-primary" />
     </motion.div>
-    <p className="text-lg font-medium text-foreground">Loading music...</p>
-    <p className="text-sm text-muted-foreground">Preparing your rhythm experience</p>
+    <p className="text-lg font-medium text-foreground">
+      {isGenerating ? 'Generating music...' : 'Loading music...'}
+    </p>
+    <p className="text-sm text-muted-foreground">
+      {isGenerating ? 'Creating AI-powered rhythm track' : 'Preparing your rhythm experience'}
+    </p>
   </div>
 ));
 TrackLoadingScreen.displayName = 'TrackLoadingScreen';
@@ -290,7 +294,7 @@ export const EclipseTimingGame = ({
   const stars = useStaticStars(20);
   const config = DIFFICULTY_CONFIG[difficulty];
   
-  const { track, isLoading, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
+  const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
 
   // Load track and initialize notes
   useEffect(() => {
@@ -537,7 +541,7 @@ export const EclipseTimingGame = ({
   if (gameState === 'loading') {
     return (
       <div className="flex flex-col items-center relative w-full h-full min-h-[500px]">
-        <TrackLoadingScreen />
+        <TrackLoadingScreen isGenerating={isGenerating} />
       </div>
     );
   }

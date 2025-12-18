@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -18,6 +18,7 @@ export interface RhythmTrack {
 interface UseRhythmTrackReturn {
   track: RhythmTrack | null;
   isLoading: boolean;
+  isGenerating: boolean;
   error: string | null;
   userRating: 'up' | 'down' | null;
   fetchRandomTrack: (difficulty?: string) => Promise<RhythmTrack | null>;
@@ -29,8 +30,49 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
   const { user } = useAuth();
   const [track, setTrack] = useState<RhythmTrack | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userRating, setUserRating] = useState<'up' | 'down' | null>(null);
+  const generatingRef = useRef(false);
+
+  // Generate a new track using AI
+  const generateTrack = useCallback(async (difficulty?: string): Promise<RhythmTrack | null> => {
+    if (generatingRef.current) return null;
+    generatingRef.current = true;
+    setIsGenerating(true);
+
+    try {
+      console.log('Generating new rhythm track...');
+      const { data, error: genError } = await supabase.functions.invoke('generate-rhythm-track', {
+        body: { genre: 'stellar_beats', difficulty: difficulty || 'all' },
+      });
+
+      if (genError) {
+        console.error('Error generating track:', genError);
+        return null;
+      }
+
+      if (data?.track) {
+        console.log('Track generated successfully:', data.track);
+        const newTrack: RhythmTrack = {
+          ...data.track,
+          upvotes: 0,
+          downvotes: 0,
+          score: 0,
+          play_count: 0,
+        };
+        return newTrack;
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error generating track:', err);
+      return null;
+    } finally {
+      setIsGenerating(false);
+      generatingRef.current = false;
+    }
+  }, []);
 
   // Fetch a random track weighted by score
   const fetchRandomTrack = useCallback(async (difficulty?: string): Promise<RhythmTrack | null> => {
@@ -40,7 +82,6 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
 
     try {
       // Fetch tracks with scores using the view
-      // Using raw query since the view isn't in types
       let query = supabase
         .from('rhythm_tracks')
         .select('*')
@@ -59,8 +100,15 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
         return null;
       }
 
+      // If no tracks available, generate one
       if (!tracks || tracks.length === 0) {
-        console.log('No rhythm tracks available');
+        console.log('No rhythm tracks available, generating new track...');
+        const generatedTrack = await generateTrack(difficulty);
+        if (generatedTrack) {
+          setTrack(generatedTrack);
+          setIsLoading(false);
+          return generatedTrack;
+        }
         setError('No tracks available');
         setIsLoading(false);
         return null;
@@ -119,7 +167,7 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
       setIsLoading(false);
       return null;
     }
-  }, []);
+  }, [generateTrack]);
 
   // Fetch user's existing rating for a track
   const fetchUserRating = async (trackId: string) => {
@@ -207,6 +255,7 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
   return {
     track,
     isLoading,
+    isGenerating,
     error,
     userRating,
     fetchRandomTrack,
