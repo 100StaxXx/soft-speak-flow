@@ -36,12 +36,30 @@ export interface RewardCssEffect {
   particles?: string;
   glow?: string;
   
-  // Frame effects
+  // Frame effects - SMITE-inspired enhanced system
   borderColor?: string;
   borderWidth?: string;
-  borderStyle?: string;
+  borderStyle?: 'solid' | 'double' | 'groove' | 'ridge' | 'inset' | 'outset' | string;
+  borderRadius?: string;
   shimmer?: boolean;
   glowColor?: string;
+  
+  // Corner decoration styles
+  cornerStyle?: 'ornate' | 'crystal' | 'flame' | 'circuit' | 'scale' | 'thread' | 'wisp' | 
+                'aurora' | 'rift' | 'deity' | 'dimensional' | 'treasure' | 'mystery' | 
+                'lotus' | 'heroic' | 'shield' | 'compass';
+  cornerColor?: string;
+  
+  // Enhanced glow effects
+  glowIntensity?: 'subtle' | 'medium' | 'intense';
+  glowAnimation?: 'static' | 'pulse' | 'breathe' | 'flicker' | 'shift';
+  
+  // Particle effects
+  particleEffect?: 'stars' | 'embers' | 'ice' | 'void' | 'divine' | 'dimensional';
+  
+  // Gradient borders (for legendary frames)
+  gradientBorder?: string;
+  animatedGradient?: boolean;
   
   // Victory effects
   effectType?: 'particles' | 'overlay';
@@ -53,6 +71,18 @@ export interface RewardCssEffect {
   // Artifact effects
   icon?: string;
 }
+
+// Frame corner style to SVG path mapping
+export type FrameCornerStyle = RewardCssEffect['cornerStyle'];
+
+// Glow animation CSS class mapping
+export const GLOW_ANIMATION_CLASSES: Record<string, string> = {
+  static: '',
+  pulse: 'animate-frame-pulse',
+  breathe: 'animate-frame-breathe',
+  flicker: 'animate-frame-flicker',
+  shift: 'animate-frame-shift',
+};
 
 export interface RewardRevealData {
   badge: {

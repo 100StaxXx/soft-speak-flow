@@ -1,10 +1,13 @@
 import { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { X, Share2 } from "lucide-react";
 import { downloadCardElement } from "@/utils/imageDownload";
+import { cn } from "@/lib/utils";
+import type { RewardCssEffect } from "@/types/epicRewards";
+import { FrameCornerDecorations } from "./companion/FrameCornerDecorations";
 
 interface EvolutionCard {
   id: string;
@@ -23,6 +26,7 @@ interface EvolutionCard {
 
 interface Props {
   card: EvolutionCard;
+  equippedFrame?: RewardCssEffect | null;
 }
 
 const RARITY_COLORS: Record<string, string> = {
@@ -54,7 +58,7 @@ const fallbackEnergyCost = (stage: number) => {
   return 3;
 };
 
-export function EvolutionCardFlip({ card }: Props) {
+export function EvolutionCardFlip({ card, equippedFrame }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
@@ -90,6 +94,22 @@ export function EvolutionCardFlip({ card }: Props) {
       }
     );
   };
+
+  // Get frame styling from equipped frame
+  const hasEnhancedFrame = equippedFrame && equippedFrame.cornerStyle;
+  const glowAnimClass = equippedFrame?.glowAnimation === 'pulse' ? 'animate-frame-pulse' :
+                        equippedFrame?.glowAnimation === 'breathe' ? 'animate-frame-breathe' :
+                        equippedFrame?.glowAnimation === 'flicker' ? 'animate-frame-flicker' :
+                        equippedFrame?.glowAnimation === 'shift' ? 'animate-frame-shift' : '';
+
+  const frameStyle: React.CSSProperties = equippedFrame ? {
+    borderColor: equippedFrame.gradientBorder ? 'transparent' : equippedFrame.borderColor,
+    borderWidth: equippedFrame.borderWidth || '8px',
+    borderStyle: (equippedFrame.borderStyle as React.CSSProperties['borderStyle']) || 'solid',
+    boxShadow: equippedFrame.glowColor 
+      ? `0 0 20px ${equippedFrame.glowColor}, 0 0 40px ${equippedFrame.glowColor}40` 
+      : undefined,
+  } : {};
 
   return (
     <>
@@ -202,24 +222,66 @@ export function EvolutionCardFlip({ card }: Props) {
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden" style={{ transform: 'rotateY(0deg)' }}>
-                  <div ref={cardRef} className={`h-full rounded-2xl border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-0 shadow-2xl overflow-hidden relative`}>
-                    {/* Ornate Corner Decorations */}
-                    <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
-                      <div className="absolute inset-0 border-t-2 border-l-2 border-white/40 rounded-tl-xl" />
-                      <div className="absolute top-1 left-1 w-8 h-8 border-t border-l border-white/20 rounded-tl-lg" />
-                    </div>
-                    <div className="absolute top-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
-                      <div className="absolute inset-0 border-t-2 border-r-2 border-white/40 rounded-tr-xl" />
-                      <div className="absolute top-1 right-1 w-8 h-8 border-t border-r border-white/20 rounded-tr-lg" />
-                    </div>
-                    <div className="absolute bottom-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
-                      <div className="absolute inset-0 border-b-2 border-l-2 border-white/40 rounded-bl-xl" />
-                      <div className="absolute bottom-1 left-1 w-8 h-8 border-b border-l border-white/20 rounded-bl-lg" />
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
-                      <div className="absolute inset-0 border-b-2 border-r-2 border-white/40 rounded-br-xl" />
-                      <div className="absolute bottom-1 right-1 w-8 h-8 border-b border-r border-white/20 rounded-br-lg" />
-                    </div>
+                  <div 
+                    ref={cardRef} 
+                    className={cn(
+                      "h-full rounded-2xl p-0 shadow-2xl overflow-hidden relative",
+                      hasEnhancedFrame 
+                        ? glowAnimClass
+                        : `border-[8px] bg-gradient-to-br ${RARITY_COLORS[card.rarity]}`,
+                      equippedFrame?.shimmer && 'animate-frame-shimmer',
+                      equippedFrame?.animatedGradient && 'animate-gradient-border'
+                    )}
+                    style={hasEnhancedFrame ? frameStyle : {}}
+                  >
+                    {/* Gradient border background for animated gradients */}
+                    {equippedFrame?.gradientBorder && (
+                      <div 
+                        className={cn(
+                          "absolute inset-0 rounded-2xl -z-10",
+                          equippedFrame.animatedGradient && "animate-gradient-border"
+                        )}
+                        style={{
+                          background: equippedFrame.gradientBorder,
+                          backgroundSize: '200% 200%',
+                        }}
+                      />
+                    )}
+
+                    {/* Enhanced Corner Decorations */}
+                    {hasEnhancedFrame && equippedFrame ? (
+                      <FrameCornerDecorations cssEffect={equippedFrame} />
+                    ) : (
+                      <>
+                        {/* Default Ornate Corner Decorations */}
+                        <div className="absolute top-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
+                          <div className="absolute inset-0 border-t-2 border-l-2 border-white/40 rounded-tl-xl" />
+                          <div className="absolute top-1 left-1 w-8 h-8 border-t border-l border-white/20 rounded-tl-lg" />
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
+                          <div className="absolute inset-0 border-t-2 border-r-2 border-white/40 rounded-tr-xl" />
+                          <div className="absolute top-1 right-1 w-8 h-8 border-t border-r border-white/20 rounded-tr-lg" />
+                        </div>
+                        <div className="absolute bottom-0 left-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
+                          <div className="absolute inset-0 border-b-2 border-l-2 border-white/40 rounded-bl-xl" />
+                          <div className="absolute bottom-1 left-1 w-8 h-8 border-b border-l border-white/20 rounded-bl-lg" />
+                        </div>
+                        <div className="absolute bottom-0 right-0 w-12 h-12 z-30 pointer-events-none backface-hidden">
+                          <div className="absolute inset-0 border-b-2 border-r-2 border-white/40 rounded-br-xl" />
+                          <div className="absolute bottom-1 right-1 w-8 h-8 border-b border-r border-white/20 rounded-br-lg" />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Shimmer overlay */}
+                    {equippedFrame?.shimmer && (
+                      <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-2xl">
+                        <div 
+                          className="absolute inset-0 animate-frame-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent" 
+                          style={{ transform: 'skewX(-20deg)', width: '200%', marginLeft: '-50%' }} 
+                        />
+                      </div>
+                    )}
                     
                     {/* Inner Frame Lines */}
                     <div className="absolute inset-2 border border-white/20 rounded-lg z-20 pointer-events-none backface-hidden" />

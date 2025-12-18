@@ -1173,5 +1173,148 @@ All colors MUST be HSL.
     animation: cosmic-button-glow 3s ease-in-out infinite;
   }
 
+  /* ========== SMITE-INSPIRED FRAME ANIMATIONS ========== */
+  
+  /* Frame shimmer effect - light sweep across border */
+  @keyframes frame-shimmer {
+    0% {
+      transform: translateX(-100%) skewX(-20deg);
+    }
+    100% {
+      transform: translateX(200%) skewX(-20deg);
+    }
+  }
+  
+  .animate-frame-shimmer {
+    animation: frame-shimmer 3s ease-in-out infinite;
+  }
+  
+  /* Frame pulse glow - pulsing box shadow */
+  @keyframes frame-pulse {
+    0%, 100% {
+      filter: brightness(1);
+      box-shadow: 0 0 15px var(--glow-color, hsl(var(--primary) / 0.4));
+    }
+    50% {
+      filter: brightness(1.1);
+      box-shadow: 0 0 30px var(--glow-color, hsl(var(--primary) / 0.6)), 
+                  0 0 50px var(--glow-color, hsl(var(--primary) / 0.3));
+    }
+  }
+  
+  .animate-frame-pulse {
+    animation: frame-pulse 2s ease-in-out infinite;
+  }
+  
+  /* Frame breathe - slow subtle glow */
+  @keyframes frame-breathe {
+    0%, 100% {
+      opacity: 0.7;
+      filter: brightness(1);
+    }
+    50% {
+      opacity: 1;
+      filter: brightness(1.15);
+    }
+  }
+  
+  .animate-frame-breathe {
+    animation: frame-breathe 3s ease-in-out infinite;
+  }
+  
+  /* Frame flicker - fire/energy effect */
+  @keyframes frame-flicker {
+    0%, 100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    10% {
+      opacity: 0.9;
+      filter: brightness(1.2);
+    }
+    20% {
+      opacity: 1;
+      filter: brightness(0.95);
+    }
+    40% {
+      opacity: 0.95;
+      filter: brightness(1.1);
+    }
+    60% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    80% {
+      opacity: 0.92;
+      filter: brightness(1.15);
+    }
+  }
+  
+  .animate-frame-flicker {
+    animation: frame-flicker 1.5s ease-in-out infinite;
+  }
+  
+  /* Frame shift - color/gradient shift for dimensional */
+  @keyframes frame-shift {
+    0% {
+      filter: hue-rotate(0deg) brightness(1);
+    }
+    33% {
+      filter: hue-rotate(60deg) brightness(1.1);
+    }
+    66% {
+      filter: hue-rotate(-60deg) brightness(1.05);
+    }
+    100% {
+      filter: hue-rotate(0deg) brightness(1);
+    }
+  }
+  
+  .animate-frame-shift {
+    animation: frame-shift 4s linear infinite;
+  }
+  
+  /* Gradient border animation for legendary frames */
+  @keyframes gradient-border {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  .animate-gradient-border {
+    background-size: 200% 200%;
+    animation: gradient-border 3s ease infinite;
+  }
+  
+  /* Frame particles floating effect */
+  @keyframes frame-particle {
+    0% {
+      opacity: 0;
+      transform: translateY(0) scale(0.5);
+    }
+    20% {
+      opacity: 1;
+      transform: translateY(-5px) scale(1);
+    }
+    80% {
+      opacity: 0.8;
+      transform: translateY(-20px) scale(0.8);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-30px) scale(0.3);
+    }
+  }
+  
+  .animate-frame-particle {
+    animation: frame-particle 3s ease-out infinite;
+  }
+
 }
 
