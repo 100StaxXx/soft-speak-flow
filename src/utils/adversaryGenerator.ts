@@ -240,14 +240,17 @@ export const generateAdversary = (
 };
 
 // Calculate XP reward based on tier and result using centralized multipliers
+// Optional tilt bonus for players using gyroscope controls
 export const calculateXPReward = (
   tier: AdversaryTier,
-  accuracy: number
+  accuracy: number,
+  usedTiltControls?: boolean
 ): number => {
   const baseXP = TIER_CONFIG[tier].xpBase;
   const result = getResultFromAccuracy(accuracy);
   const multiplier = RESULT_MULTIPLIERS[result];
-  return Math.round(baseXP * multiplier);
+  const tiltBonus = usedTiltControls ? 1.25 : 1.0; // 25% bonus for tilt controls
+  return Math.round(baseXP * multiplier * tiltBonus);
 };
 
 // Get result from accuracy

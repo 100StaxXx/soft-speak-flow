@@ -93,6 +93,16 @@ export const ENCOUNTER_RESULT_MULTIPLIERS = {
 } as const;
 
 /**
+ * Control Method Bonuses
+ * 
+ * Bonus multipliers for using more challenging control schemes.
+ */
+export const CONTROL_BONUSES = {
+  /** 25% XP bonus for using tilt/gyroscope controls */
+  TILT_CONTROL: 1.25,
+} as const;
+
+/**
  * Epic XP Rewards
  * 
  * Formula: targetDays * XP_PER_DAY

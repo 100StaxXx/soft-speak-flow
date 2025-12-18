@@ -65,10 +65,12 @@ export const AstralEncounterModal = ({
   const [phase, setPhase] = useState<Phase>('reveal');
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [phaseResults, setPhaseResults] = useState<MiniGameResult[]>([]);
+  const [usedTiltControls, setUsedTiltControls] = useState(false);
   const [finalResult, setFinalResult] = useState<{
     result: 'perfect' | 'good' | 'partial' | 'fail';
     accuracy: number;
     xpEarned: number;
+    tiltBonus?: boolean;
   } | null>(null);
   const [showScreenShake, setShowScreenShake] = useState(false);
   
@@ -125,12 +127,17 @@ export const AstralEncounterModal = ({
     
     const result = outcome === 'fail' ? 'fail' : getResult();
     const accuracy = outcome === 'fail' ? 0 : Math.round(battleState.playerHPPercent);
-    const xpEarned = outcome === 'fail' ? 0 : calculateXPReward(adversary.tier as AdversaryTier, accuracy);
+    const xpEarned = outcome === 'fail' ? 0 : calculateXPReward(
+      adversary.tier as AdversaryTier, 
+      accuracy,
+      usedTiltControls
+    );
 
     setFinalResult({
       result,
       accuracy,
       xpEarned,
+      tiltBonus: usedTiltControls,
     });
 
     onComplete({
@@ -140,7 +147,7 @@ export const AstralEncounterModal = ({
     });
 
     setPhase('result');
-  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex]);
+  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex, usedTiltControls]);
 
   // Reset phase when modal opens - set to boss_intro for boss battles
   useEffect(() => {
@@ -149,6 +156,7 @@ export const AstralEncounterModal = ({
       setCurrentPhaseIndex(0);
       setPhaseResults([]);
       setFinalResult(null);
+      setUsedTiltControls(false);
       battleEndedRef.current = false;
       resetBattle();
     }
@@ -236,6 +244,11 @@ export const AstralEncounterModal = ({
 
   const handleMiniGameComplete = useCallback((result: MiniGameResult) => {
     if (!adversary || !encounter || battleEndedRef.current) return;
+
+    // Track if tilt controls were used
+    if (result.usedTiltControls) {
+      setUsedTiltControls(true);
+    }
 
     const newResults = [...phaseResults, result];
     setPhaseResults(newResults);
@@ -437,6 +450,7 @@ export const AstralEncounterModal = ({
                         ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
                         : undefined
                     }
+                    tiltBonus={finalResult.tiltBonus}
                   />
                 </motion.div>
               )}
