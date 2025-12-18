@@ -164,7 +164,7 @@ const Player = memo(({ lane, hasShield }: { lane: number; hasShield: boolean }) 
 });
 Player.displayName = 'Player';
 
-// Obstacle component
+// Obstacle component - LARGER and more obvious
 interface ObstacleProps {
   id: string;
   lane: number;
@@ -175,29 +175,76 @@ interface ObstacleProps {
 }
 
 const Obstacle = memo(({ lane, z, type }: Omit<ObstacleProps, 'id' | 'onCollect' | 'onHit'>) => {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
   
   useFrame((_, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x += delta * 2;
-      meshRef.current.rotation.y += delta * 1.5;
+    if (groupRef.current) {
+      groupRef.current.rotation.x += delta * 2;
+      groupRef.current.rotation.y += delta * 1.5;
     }
   });
 
-  const color = type === 'asteroid' ? '#ef4444' : type === 'crystal' ? '#fbbf24' : '#22d3ee';
-  const size = type === 'asteroid' ? 0.6 : 0.4;
-
+  // MUCH LARGER sizes for visibility
+  const size = type === 'asteroid' ? 1.2 : type === 'crystal' ? 0.8 : 0.9;
+  
   return (
-    <mesh ref={meshRef} position={[LANE_POSITIONS[lane], -1.5, z]}>
-      {type === 'asteroid' ? (
-        <dodecahedronGeometry args={[size]} />
-      ) : type === 'crystal' ? (
-        <octahedronGeometry args={[size]} />
-      ) : (
-        <icosahedronGeometry args={[size]} />
+    <group ref={groupRef} position={[LANE_POSITIONS[lane], -1.5, z]}>
+      {type === 'asteroid' && (
+        <>
+          {/* Main asteroid - red spiky */}
+          <mesh>
+            <dodecahedronGeometry args={[size]} />
+            <meshBasicMaterial color="#ef4444" />
+          </mesh>
+          {/* Glowing danger outline */}
+          <mesh>
+            <dodecahedronGeometry args={[size * 1.15]} />
+            <meshBasicMaterial color="#ff0000" transparent opacity={0.3} wireframe />
+          </mesh>
+          {/* Pulsing glow */}
+          <mesh>
+            <sphereGeometry args={[size * 1.4, 8, 8]} />
+            <meshBasicMaterial color="#ef4444" transparent opacity={0.15} />
+          </mesh>
+        </>
       )}
-      <meshBasicMaterial color={color} />
-    </mesh>
+      {type === 'crystal' && (
+        <>
+          {/* Golden crystal */}
+          <mesh>
+            <octahedronGeometry args={[size]} />
+            <meshBasicMaterial color="#fbbf24" />
+          </mesh>
+          {/* Sparkle glow */}
+          <mesh>
+            <octahedronGeometry args={[size * 1.2]} />
+            <meshBasicMaterial color="#fbbf24" transparent opacity={0.4} wireframe />
+          </mesh>
+          {/* Light emission */}
+          <pointLight color="#fbbf24" intensity={2} distance={5} />
+        </>
+      )}
+      {type === 'shield' && (
+        <>
+          {/* Cyan shield orb */}
+          <mesh>
+            <icosahedronGeometry args={[size]} />
+            <meshBasicMaterial color="#22d3ee" />
+          </mesh>
+          {/* Shield ring */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[size * 1.3, 0.1, 8, 16]} />
+            <meshBasicMaterial color="#22d3ee" transparent opacity={0.6} />
+          </mesh>
+          {/* Glow */}
+          <mesh>
+            <sphereGeometry args={[size * 1.5, 8, 8]} />
+            <meshBasicMaterial color="#22d3ee" transparent opacity={0.2} />
+          </mesh>
+          <pointLight color="#22d3ee" intensity={2} distance={5} />
+        </>
+      )}
+    </group>
   );
 });
 Obstacle.displayName = 'Obstacle';
@@ -318,38 +365,51 @@ const Stars = memo(() => {
 });
 Stars.displayName = 'Stars';
 
-// UI Overlay for score/lives - NO TIME DISPLAY
+// UI Overlay for score/lives - fullscreen positioning
 const GameUI = memo(({ score, lives, combo, hasShield, distance }: { 
   score: number; lives: number; combo: number; hasShield: boolean; distance: number;
 }) => (
-  <div className="absolute top-16 left-4 right-4 flex justify-between items-start pointer-events-none z-10">
+  <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none z-10 safe-area-inset-top">
     <div className="flex flex-col gap-2">
-      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
-        <span className="text-yellow-400 font-bold">{score}</span>
-        <span className="text-xs text-muted-foreground ml-1">pts</span>
+      <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2">
+        <span className="text-yellow-400 font-bold text-xl">{score}</span>
+        <span className="text-sm text-muted-foreground ml-1">pts</span>
       </div>
-      <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1">
-        <span className="text-cyan-400 font-bold">{Math.round(distance)}</span>
-        <span className="text-xs text-muted-foreground ml-1">m</span>
+      <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2">
+        <span className="text-cyan-400 font-bold text-xl">{Math.round(distance)}</span>
+        <span className="text-sm text-muted-foreground ml-1">m</span>
       </div>
       {combo > 1 && (
-        <div className="bg-purple-500/50 backdrop-blur-sm rounded-lg px-3 py-1">
-          <span className="text-white font-bold">{combo}x</span>
-          <span className="text-xs text-purple-200 ml-1">combo</span>
-        </div>
+        <motion.div 
+          className="bg-purple-500/60 backdrop-blur-sm rounded-xl px-4 py-2"
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+        >
+          <span className="text-white font-bold text-xl">{combo}x</span>
+          <span className="text-sm text-purple-200 ml-1">combo</span>
+        </motion.div>
       )}
     </div>
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {hasShield && (
-        <div className="bg-cyan-500/50 backdrop-blur-sm rounded-lg px-3 py-1">
-          <span className="text-cyan-200">🛡️</span>
-        </div>
+        <motion.div 
+          className="bg-cyan-500/60 backdrop-blur-sm rounded-xl px-3 py-2"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+        >
+          <span className="text-2xl">🛡️</span>
+        </motion.div>
       )}
-      <div className="flex gap-1">
+      <div className="flex gap-1.5 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <span key={i} className={`text-xl ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
+          <motion.span 
+            key={i} 
+            className={`text-2xl ${i < lives ? '' : 'grayscale opacity-30'}`}
+            animate={i < lives ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 0.3 }}
+          >
             ❤️
-          </span>
+          </motion.span>
         ))}
       </div>
     </div>
@@ -357,20 +417,20 @@ const GameUI = memo(({ score, lives, combo, hasShield, distance }: {
 ));
 GameUI.displayName = 'GameUI';
 
-// Lane controls
+// Lane controls - fullscreen positioning
 const LaneControls = memo(({ onLeft, onRight }: { onLeft: () => void; onRight: () => void }) => (
-  <div className="absolute bottom-4 left-4 right-4 flex justify-between z-10">
+  <div className="absolute bottom-8 left-4 right-4 flex justify-between z-10 safe-area-inset-bottom">
     <button
-      className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center active:bg-white/20 transition-colors"
+      className="w-24 h-24 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
       onPointerDown={onLeft}
     >
-      <span className="text-3xl">◀</span>
+      <span className="text-4xl text-white">◀</span>
     </button>
     <button
-      className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center active:bg-white/20 transition-colors"
+      className="w-24 h-24 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
       onPointerDown={onRight}
     >
-      <span className="text-3xl">▶</span>
+      <span className="text-4xl text-white">▶</span>
     </button>
   </div>
 ));
@@ -541,14 +601,18 @@ export const AstralFrequencyGame = ({
   
   return (
     <div 
-      className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden bg-slate-950"
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-950"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* 3D Canvas */}
+      {/* 3D Canvas - Full screen */}
       <Canvas
         camera={{ fov: 75, near: 0.1, far: 200 }}
-        style={{ background: 'linear-gradient(to bottom, #0f0a1a, #1a0a2e)' }}
+        style={{ 
+          background: 'linear-gradient(to bottom, #0f0a1a, #1a0a2e)',
+          position: 'absolute',
+          inset: 0,
+        }}
       >
         <Suspense fallback={null}>
           <GameScene
@@ -562,13 +626,10 @@ export const AstralFrequencyGame = ({
         </Suspense>
       </Canvas>
       
-      {/* HUD - No timer */}
-      <div className="absolute top-2 left-0 right-0 text-center z-10">
-        <h2 className="text-lg font-bold text-white/80">Cosmiq Dash</h2>
-      </div>
+      {/* HUD overlay */}
       <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} />
       
-      {/* Controls */}
+      {/* Controls - positioned at bottom */}
       <LaneControls 
         onLeft={() => changeLane(-1)} 
         onRight={() => changeLane(1)} 

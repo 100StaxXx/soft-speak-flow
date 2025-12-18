@@ -62,10 +62,11 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     title: "Cosmiq Dash",
     goal: "Survive the endless cosmic tunnel!",
     howToPlay: [
-      "Swipe or tap arrows to switch lanes",
-      "3 lives - asteroids cost one!",
-      "Collect ✨ crystals for points",
-      "Grab 🛡️ shields for protection"
+      "Swipe or tap ◀ ▶ to switch lanes",
+      "🔴 RED ASTEROIDS = DANGER! Lose a life",
+      "🟡 GOLD CRYSTALS = Points! Collect them",
+      "🔵 CYAN SHIELDS = Protection for 1 hit",
+      "Speed increases - survive as long as you can!"
     ],
     statBonus: 'mind',
     statIcon: Brain,
