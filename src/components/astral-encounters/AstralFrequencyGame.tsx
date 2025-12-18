@@ -16,28 +16,25 @@ interface AstralFrequencyGameProps {
 }
 
 // Difficulty configuration - NO TIMER, endless until lives = 0
-// Pure progressive speed - smooth continuous acceleration (5x faster than original)
+// UNLIMITED progressive speed - no cap, gets faster forever
 const DIFFICULTY_CONFIG = {
   easy: {
-    startSpeed: 12,
-    maxSpeed: 55,
+    startSpeed: 14,
     spawnInterval: 1.2,
     obstacleChance: 0.55,
-    speedIncrement: 0.08,
+    speedIncrement: 0.15,
   },
   medium: {
-    startSpeed: 14,
-    maxSpeed: 70,
+    startSpeed: 16,
     spawnInterval: 1.0,
     obstacleChance: 0.6,
-    speedIncrement: 0.10,
+    speedIncrement: 0.20,
   },
   hard: {
-    startSpeed: 16,
-    maxSpeed: 85,
+    startSpeed: 18,
     spawnInterval: 0.8,
     obstacleChance: 0.65,
-    speedIncrement: 0.12,
+    speedIncrement: 0.25,
   },
 };
 
@@ -548,8 +545,8 @@ export const AstralFrequencyGame = ({
       // Update distance
       setDistance(prev => prev + speed * 0.1);
       
-      // Gradually increase speed
-      setSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrement));
+      // Gradually increase speed - NO LIMIT
+      setSpeed(prev => prev + config.speedIncrement);
       
       // Update obstacle positions and spawn new ones
       setObstacles(prev => {
