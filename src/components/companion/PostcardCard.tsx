@@ -1,14 +1,34 @@
 import { motion } from "framer-motion";
-import { MapPin, Calendar } from "lucide-react";
+import { MapPin, Calendar, BookOpen, Sparkles } from "lucide-react";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 interface PostcardCardProps {
   postcard: CompanionPostcard;
   onClick: () => void;
 }
 
+const storyTypeColors: Record<StoryTypeSlug, string> = {
+  treasure_hunt: "from-amber-500/30 to-yellow-500/30 border-amber-500/40",
+  mystery: "from-purple-500/30 to-indigo-500/30 border-purple-500/40",
+  pilgrimage: "from-cyan-500/30 to-teal-500/30 border-cyan-500/40",
+  heroes_journey: "from-red-500/30 to-orange-500/30 border-red-500/40",
+  rescue_mission: "from-pink-500/30 to-rose-500/30 border-pink-500/40",
+  exploration: "from-emerald-500/30 to-green-500/30 border-emerald-500/40",
+};
+
+const storyTypeIcons: Record<StoryTypeSlug, string> = {
+  treasure_hunt: "🗺️",
+  mystery: "🔮",
+  pilgrimage: "🧭",
+  heroes_journey: "⚔️",
+  rescue_mission: "💖",
+  exploration: "🏔️",
+};
+
+// Fallback colors for non-narrative postcards
 const milestoneColors: Record<number, string> = {
   25: "from-blue-500/20 to-cyan-500/20 border-blue-500/30",
   50: "from-purple-500/20 to-pink-500/20 border-purple-500/30",
@@ -17,7 +37,15 @@ const milestoneColors: Record<number, string> = {
 };
 
 export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
-  const colorClass = milestoneColors[postcard.milestone_percent] || milestoneColors[25];
+  const storyType = (postcard as any).story_type_slug as StoryTypeSlug | undefined;
+  const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content);
+  
+  // Use story type colors if available, otherwise fallback to milestone colors
+  const colorClass = storyType 
+    ? storyTypeColors[storyType] || storyTypeColors.heroes_journey
+    : milestoneColors[postcard.milestone_percent] || milestoneColors[25];
+
+  const icon = storyType ? storyTypeIcons[storyType] : null;
 
   return (
     <motion.button
@@ -41,15 +69,45 @@ export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
       {/* Overlay gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-      {/* Milestone Badge */}
-      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm">
-        <span className="text-xs font-bold text-white">
-          {postcard.milestone_percent}%
-        </span>
+      {/* Top badges */}
+      <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
+        {/* Chapter badge */}
+        {postcard.chapter_number && (
+          <div className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm flex items-center gap-1">
+            <BookOpen className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-medium text-white">
+              Ch. {postcard.chapter_number}
+            </span>
+          </div>
+        )}
+        
+        {/* Story type or milestone badge */}
+        <div className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm flex items-center gap-1 ml-auto">
+          {icon ? (
+            <span className="text-xs">{icon}</span>
+          ) : (
+            <Sparkles className="w-3 h-3 text-yellow-400" />
+          )}
+          <span className="text-xs font-bold text-white">
+            {postcard.milestone_percent}%
+          </span>
+        </div>
       </div>
+
+      {/* Content indicator */}
+      {hasNarrativeContent && (
+        <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
+      )}
 
       {/* Content */}
       <div className="absolute bottom-0 left-0 right-0 p-3">
+        {/* Chapter title */}
+        {postcard.chapter_title && (
+          <h4 className="text-xs font-semibold text-white mb-0.5 line-clamp-1">
+            {postcard.chapter_title}
+          </h4>
+        )}
+        
         <div className="flex items-center gap-1 mb-1">
           <MapPin className="w-3 h-3 text-primary" />
           <span className="text-xs font-medium text-white truncate">
