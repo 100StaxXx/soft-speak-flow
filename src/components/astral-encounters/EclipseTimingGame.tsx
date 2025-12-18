@@ -598,7 +598,10 @@ export const EclipseTimingGame = ({
   // Loading state
   if (gameState === 'loading') {
     return (
-      <div className="flex flex-col items-center relative w-full h-full min-h-[500px]">
+      <div 
+        className="flex flex-col items-center relative w-full h-full min-h-[500px] overflow-hidden"
+        style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+      >
         <TrackLoadingScreen isGenerating={isGenerating} />
       </div>
     );
@@ -607,7 +610,10 @@ export const EclipseTimingGame = ({
   // Rating state
   if (gameState === 'rating') {
     return (
-      <div className="flex flex-col items-center justify-center relative w-full h-full min-h-[500px] gap-6 p-4">
+      <div 
+        className="flex flex-col items-center justify-center relative w-full h-full min-h-[500px] gap-6 p-4 overflow-hidden"
+        style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+      >
         <div className="text-center mb-4">
           <h2 className="text-2xl font-bold text-foreground mb-2">Song Complete!</h2>
           <p className="text-lg text-muted-foreground">
@@ -649,7 +655,10 @@ export const EclipseTimingGame = ({
   }
 
   return (
-    <div className="flex flex-col items-center relative w-full h-full min-h-[500px]">
+    <div 
+      className="flex flex-col items-center relative w-full h-full min-h-[500px] overflow-hidden"
+      style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+    >
       {/* Countdown Overlay */}
       {gameState === 'countdown' && (
         <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
@@ -696,10 +705,12 @@ export const EclipseTimingGame = ({
 
       {/* Game arena */}
       <div 
-        className="relative w-full flex-1 rounded-xl overflow-hidden"
+        className="relative w-full rounded-xl overflow-hidden"
         style={{
           background: 'linear-gradient(to bottom, hsl(240, 30%, 8%), hsl(260, 30%, 12%))',
-          minHeight: '400px',
+          height: 'calc(100% - 100px)',
+          minHeight: '350px',
+          touchAction: 'none',
         }}
       >
         <StarBackground stars={stars} />
@@ -793,12 +804,10 @@ export const EclipseTimingGame = ({
         </div>
       </div>
 
-      {/* Instructions */}
-      {gameState === 'playing' && (
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          Tap lanes when notes reach the line • Keyboard: A/S/D
-        </p>
-      )}
+      {/* Instructions - always render to prevent layout shift */}
+      <p className={`text-xs text-muted-foreground mt-2 text-center h-4 ${gameState !== 'playing' ? 'opacity-0' : ''}`}>
+        Tap lanes when notes reach the line • Keyboard: A/S/D
+      </p>
     </div>
   );
 };
