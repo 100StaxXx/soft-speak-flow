@@ -6,7 +6,7 @@ import { triggerHaptic, useStaticStars } from './gameUtils';
 import { TrackRatingUI } from './TrackRatingUI';
 import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
 import { Moon, Star, Sun, Music, Loader2 } from 'lucide-react';
-
+import { stopEncounterMusic } from '@/utils/soundEffects';
 interface EclipseTimingGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
@@ -295,6 +295,11 @@ export const EclipseTimingGame = ({
   const config = DIFFICULTY_CONFIG[difficulty];
   
   const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
+
+  // Stop encounter music when Stellar Beats starts (has its own audio)
+  useEffect(() => {
+    stopEncounterMusic();
+  }, []);
 
   // Load track and initialize notes
   useEffect(() => {
