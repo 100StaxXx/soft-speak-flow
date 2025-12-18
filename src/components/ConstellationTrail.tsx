@@ -14,8 +14,8 @@ interface ConstellationTrailProps {
   narrativeCheckpoints?: NarrativeCheckpoint[];
 }
 
-// Fixed constellation pattern - zigzag Y positions for dramatic visual variation
-const CONSTELLATION_Y_PATTERN = [50, 75, 25, 70, 30, 65, 45]; // Varies between 25-75 for more dramatic paths
+// Fixed constellation pattern - zigzag Y positions for visual interest
+const CONSTELLATION_Y_PATTERN = [45, 65, 35, 55, 40, 60, 50]; // Varies between 35-65
 
 // Generate star positions along a constellation-like zigzag path
 const generateStarPositions = (count: number) => {
