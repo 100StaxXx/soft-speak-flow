@@ -128,6 +128,24 @@ export default function AstralArcade() {
     enabled: !!adversary && arcadeMode === 'battle',
   });
 
+  // Battle callbacks - defined outside useBattleState to avoid hook rules violation
+  const handlePlayerDefeated = useCallback(() => {
+    setBattleResult('defeat');
+    setGamePhase('result');
+  }, []);
+
+  const handleAdversaryDefeated = useCallback(() => {
+    setBattleResult('victory');
+    setGamePhase('result');
+  }, []);
+
+  const handleDamageDealt = useCallback((event: DamageEvent) => {
+    if (event.target === 'player') {
+      setScreenShake(true);
+      setTimeout(() => setScreenShake(false), 300);
+    }
+  }, []);
+
   // Battle state hook
   const {
     battleState,
@@ -138,20 +156,9 @@ export default function AstralArcade() {
     damageEvents,
   } = useBattleState({
     tier: adversary?.tier || 'common',
-    onPlayerDefeated: useCallback(() => {
-      setBattleResult('defeat');
-      setGamePhase('result');
-    }, []),
-    onAdversaryDefeated: useCallback(() => {
-      setBattleResult('victory');
-      setGamePhase('result');
-    }, []),
-    onDamageDealt: useCallback((event: DamageEvent) => {
-      if (event.target === 'player') {
-        setScreenShake(true);
-        setTimeout(() => setScreenShake(false), 300);
-      }
-    }, []),
+    onPlayerDefeated: handlePlayerDefeated,
+    onAdversaryDefeated: handleAdversaryDefeated,
+    onDamageDealt: handleDamageDealt,
   });
 
   const companionStats = companion ? {
@@ -228,17 +235,33 @@ export default function AstralArcade() {
       }
       setActiveGame(null);
     } else {
-      // Battle mode - check if battle should end
-      // If game completed but neither side defeated, deal final damage based on accuracy
+      // Battle mode - game ended, determine outcome
+      // If neither side is defeated yet, deal final damage based on accuracy
       if (!battleState.isPlayerDefeated && !battleState.isAdversaryDefeated) {
-        // Good accuracy = deal damage to adversary
         if (result.accuracy >= 50) {
+          // Good performance - deal damage to adversary
           const damage = Math.round(result.accuracy * 0.5);
           dealDamage({ target: 'adversary', amount: damage, source: 'game_complete' });
         } else {
-          // Poor accuracy = take damage
+          // Poor performance - take damage
           dealDamage({ target: 'player', amount: tierAttackDamage, source: 'game_fail' });
         }
+        
+        // If damage didn't end the battle, force a result based on remaining HP
+        // Use setTimeout to let state updates settle
+        setTimeout(() => {
+          setBattleResult(prev => {
+            // Only set if not already set by defeat callbacks
+            if (prev === null) {
+              // Determine winner by remaining HP percentage
+              const playerHPPercent = battleState.playerHP / battleState.playerMaxHP;
+              const adversaryHPPercent = battleState.adversaryHP / battleState.adversaryMaxHP;
+              return playerHPPercent >= adversaryHPPercent ? 'victory' : 'defeat';
+            }
+            return prev;
+          });
+          setGamePhase('result');
+        }, 100);
       }
     }
   }, [activeGame, arcadeMode, battleState, dealDamage, setHighScore, tierAttackDamage]);
