@@ -441,11 +441,25 @@ export const StarfallDodgeGame = ({
   return (
     <div
       ref={gameAreaRef}
-      className={`relative w-full h-full min-h-[280px] rounded-lg overflow-hidden ${shake ? 'animate-shake' : ''}`}
+      className={`relative overflow-hidden ${shake ? 'animate-shake' : ''}`}
       style={{ 
         background: 'linear-gradient(to bottom, #0f0a1a, #1a1033)',
-        // Encourage landscape aspect ratio
-        aspectRatio: gameState !== 'rotate' ? '16/9' : undefined,
+        // Fill entire viewport in landscape mode
+        width: '100vw',
+        height: '100dvh',
+        // Fallback for browsers without dvh support
+        minHeight: '100vh',
+        // Remove any rounding in fullscreen landscape
+        borderRadius: 0,
+        // Ensure it's positioned at top-left
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        // Safe area padding for notched devices
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
