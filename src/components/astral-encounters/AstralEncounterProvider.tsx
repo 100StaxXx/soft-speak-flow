@@ -20,6 +20,7 @@ interface AstralEncounterProviderProps {
 
 interface EpicCheckinEventDetail {
   epicId: string;
+  previousProgress?: number;  // Not used but included for compatibility
   currentProgress?: number;
 }
 
