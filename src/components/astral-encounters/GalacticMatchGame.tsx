@@ -511,14 +511,14 @@ export const GalacticMatchGame = ({
           )}
         </AnimatePresence>
 
-        {/* Reveal phase overlay */}
+        {/* Reveal phase overlay - positioned above the grid */}
         <AnimatePresence>
           {phase === 'revealing' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-x-0 top-0 z-20 flex flex-col items-center py-2"
+              className="absolute inset-x-0 -top-12 z-20 flex flex-col items-center"
             >
               <motion.div
                 className="px-4 py-2 bg-cyan-500/90 rounded-full text-white font-bold shadow-lg"
