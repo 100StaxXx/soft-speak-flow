@@ -58,7 +58,7 @@ export const useDeviceOrientation = () => {
   }, [orientation.available]);
 
   // Convert gamma (-90 to 90) to a normalized position (0 to 100)
-  // with deadzone and smoothing
+  // with deadzone and smoothing - for PORTRAIT orientation
   const getPositionFromTilt = useCallback((deadzone = 5, sensitivity = 2.5) => {
     const { gamma } = orientation;
     
@@ -73,9 +73,27 @@ export const useDeviceOrientation = () => {
     return Math.max(8, Math.min(92, 50 + normalized));
   }, [orientation]);
 
+  // Convert beta to position for LANDSCAPE orientation
+  // In landscape, beta controls left/right movement
+  const getLandscapePositionFromTilt = useCallback((deadzone = 8, sensitivity = 1.5) => {
+    const { beta } = orientation;
+    
+    // In landscape mode, beta ranges from about -45 (tilt left) to +45 (tilt right)
+    // Apply deadzone for stability
+    const adjustedBeta = Math.abs(beta) < deadzone ? 0 : beta;
+    
+    // Use wider tilt range (45 degrees) for more natural landscape control
+    // Lower sensitivity for smoother, more forgiving controls
+    const normalized = (adjustedBeta / 45) * 50 * sensitivity;
+    
+    // Center at 50, clamp to 5-95 range (wider range for landscape)
+    return Math.max(5, Math.min(95, 50 + normalized));
+  }, [orientation]);
+
   return {
     ...orientation,
     requestPermission,
     getPositionFromTilt,
+    getLandscapePositionFromTilt,
   };
 };
