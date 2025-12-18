@@ -310,27 +310,18 @@ const GameScene = ({ gameState, playerLane, hasShield, speed, obstacles, onObsta
       
       {/* Obstacles */}
       {obstacles.map(obs => (
-        <MovingObstacle key={obs.id} {...obs} speed={speed} gameState={gameState} />
+        <MovingObstacle key={obs.id} {...obs} />
       ))}
     </>
   );
 };
 
-// Moving obstacle wrapper
-const MovingObstacle = memo(({ id, lane, z, type, speed, gameState }: { 
-  id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield'; speed: number; gameState: string 
+// Moving obstacle wrapper - position now controlled by parent state
+const MovingObstacle = memo(({ id, lane, z, type }: { 
+  id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield';
 }) => {
-  const groupRef = useRef<THREE.Group>(null);
-  const zRef = useRef(z);
-
-  useFrame((_, delta) => {
-    if (gameState !== 'playing' || !groupRef.current) return;
-    zRef.current += delta * speed;
-    groupRef.current.position.z = zRef.current;
-  });
-
   return (
-    <group ref={groupRef} position={[0, 0, z]}>
+    <group position={[0, 0, z]}>
       <Obstacle lane={lane} z={0} type={type} />
     </group>
   );
@@ -543,7 +534,7 @@ export const AstralFrequencyGame = ({
     }
   }, [combo]);
   
-  // Game loop - spawn obstacles and update distance (NO TIMER)
+  // Game loop - spawn obstacles, update positions, and update distance (NO TIMER)
   useEffect(() => {
     if (gameState !== 'playing') return;
     
@@ -554,23 +545,31 @@ export const AstralFrequencyGame = ({
       // Gradually increase speed
       setSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrement));
       
-      // Spawn obstacles
-      const now = Date.now();
-      if (now - lastSpawnRef.current > config.spawnInterval * 1000) {
-        lastSpawnRef.current = now;
+      // Update obstacle positions and spawn new ones
+      setObstacles(prev => {
+        // Move all obstacles forward
+        const moved = prev.map(o => ({ ...o, z: o.z + speed * 0.1 }));
         
-        const rand = Math.random();
-        const type: 'asteroid' | 'crystal' | 'shield' = 
-          rand < config.obstacleChance ? 'asteroid' : 
-          rand < 0.95 ? 'crystal' : 'shield';
+        // Filter out obstacles that are too far past player
+        const filtered = moved.filter(o => o.z < 15);
         
-        const lane = Math.floor(Math.random() * 3);
+        // Spawn new obstacle if needed
+        const now = Date.now();
+        if (now - lastSpawnRef.current > config.spawnInterval * 1000) {
+          lastSpawnRef.current = now;
+          
+          const rand = Math.random();
+          const type: 'asteroid' | 'crystal' | 'shield' = 
+            rand < config.obstacleChance ? 'asteroid' : 
+            rand < 0.95 ? 'crystal' : 'shield';
+          
+          const lane = Math.floor(Math.random() * 3);
+          
+          return [...filtered, { id: `${now}-${Math.random()}`, lane, z: -80, type }];
+        }
         
-        setObstacles(prev => [
-          ...prev.filter(o => o.z < 15), // Clean up passed obstacles
-          { id: `${now}-${Math.random()}`, lane, z: -80, type }
-        ]);
-      }
+        return filtered;
+      });
     }, 100);
     
     return () => clearInterval(interval);
