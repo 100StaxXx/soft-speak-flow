@@ -416,7 +416,7 @@ export const TapSequenceGame = ({
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, generateOrbs, finishGame]);
+  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice]);
 
   const getHighlightedOrbOrder = useCallback(() => {
     const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);

@@ -289,7 +289,7 @@ export const GalacticMatchGame = ({
         setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level]);
+  }, [matchedPairs, config.pairs, phase, level, isPractice, onComplete]);
 
   // Handle game over
   useEffect(() => {
