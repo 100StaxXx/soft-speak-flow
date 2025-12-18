@@ -586,7 +586,7 @@ export const SoulSerpentGame = ({
     
     // Reset interpolation for smooth animation
     setInterpolation(0);
-  }, [gameState, stardust, score, highScore, spawnStardust, onComplete, addTrailParticle, calculateAccuracy]);
+  }, [gameState, stardust, score, highScore, spawnStardust, onComplete, addTrailParticle, calculateAccuracy, onDamage, isPractice]);
 
   // Game loop with smooth interpolation
   useEffect(() => {

@@ -449,7 +449,7 @@ export const EclipseTimingGame = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, config.scrollSpeed, notesHit, isPractice]);
+  }, [gameState, config.scrollSpeed, notesHit, isPractice, onDamage, tierAttackDamage]);
 
   // Handle lane tap
   const handleLaneTap = useCallback((lane: LaneType) => {
