@@ -51,6 +51,16 @@
   }
 }
 
+/* Shimmer sweep animation for banners/CTAs */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
