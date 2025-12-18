@@ -14,14 +14,17 @@ interface ConstellationTrailProps {
   narrativeCheckpoints?: NarrativeCheckpoint[];
 }
 
-// Generate star positions along a straight path
+// Fixed constellation pattern - zigzag Y positions for visual interest
+const CONSTELLATION_Y_PATTERN = [45, 65, 35, 55, 40, 60, 50]; // Varies between 35-65
+
+// Generate star positions along a constellation-like zigzag path
 const generateStarPositions = (count: number) => {
   const positions: { x: number; y: number; size: number }[] = [];
   
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const x = 10 + t * 80; // 10% to 90% width
-    const y = 50; // Straight horizontal line at center
+    const y = CONSTELLATION_Y_PATTERN[i % CONSTELLATION_Y_PATTERN.length];
     const size = i === 0 || i === count - 1 ? 10 : 6 + Math.random() * 4;
     positions.push({ x, y, size });
   }
@@ -29,19 +32,56 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
-// Calculate position along the straight path for any progress percentage
-const getPositionOnPath = (progress: number) => {
+// Calculate position along the constellation path for any progress percentage
+const getPositionOnPath = (progress: number, starPositions: { x: number; y: number }[]) => {
+  if (starPositions.length < 2) return { x: 10, y: 50 };
+  
   const t = Math.max(0, Math.min(100, progress)) / 100;
-  const x = 10 + t * 80;
-  const y = 50;
-  return { x, y };
+  const totalSegments = starPositions.length - 1;
+  const segmentProgress = t * totalSegments;
+  const currentSegment = Math.min(Math.floor(segmentProgress), totalSegments - 1);
+  const segmentT = segmentProgress - currentSegment;
+  
+  const start = starPositions[currentSegment];
+  const end = starPositions[currentSegment + 1];
+  
+  return {
+    x: start.x + (end.x - start.x) * segmentT,
+    y: start.y + (end.y - start.y) * segmentT,
+  };
 };
 
-// Generate SVG path string for the straight journey
-const generatePathString = (fromPercent: number, toPercent: number) => {
-  const fromX = 10 + (fromPercent / 100) * 80;
-  const toX = 10 + (toPercent / 100) * 80;
-  return `M ${fromX} 50 L ${toX} 50`;
+// Generate SVG path string connecting all stars with straight lines
+const generateFullPathString = (starPositions: { x: number; y: number }[]) => {
+  if (starPositions.length < 2) return "";
+  return starPositions.map((pos, i) => 
+    i === 0 ? `M ${pos.x} ${pos.y}` : `L ${pos.x} ${pos.y}`
+  ).join(' ');
+};
+
+// Generate partial path up to a certain progress percentage
+const generatePartialPathString = (starPositions: { x: number; y: number }[], progress: number) => {
+  if (starPositions.length < 2 || progress <= 0) return "";
+  
+  const endPos = getPositionOnPath(progress, starPositions);
+  const t = Math.max(0, Math.min(100, progress)) / 100;
+  const totalSegments = starPositions.length - 1;
+  const segmentProgress = t * totalSegments;
+  const completedSegments = Math.floor(segmentProgress);
+  
+  let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
+  
+  // Add all completed segments
+  for (let i = 1; i <= completedSegments && i < starPositions.length; i++) {
+    path += ` L ${starPositions[i].x} ${starPositions[i].y}`;
+  }
+  
+  // Add partial segment to current position
+  if (completedSegments < totalSegments) {
+    path += ` L ${endPos.x} ${endPos.y}`;
+  }
+  
+  return path;
 };
 
 // Get mood-based filter styles
@@ -185,31 +225,34 @@ export const ConstellationTrail = ({
 
         {/* FULL PATH - Base dim path showing entire journey */}
         <path
-          d={generatePathString(0, 100)}
+          d={generateFullPathString(starPositions)}
           fill="none"
           stroke="hsl(var(--muted) / 0.15)"
           strokeWidth="1.5"
           strokeLinecap="round"
+          strokeLinejoin="round"
         />
 
         {/* FULL PATH - Pulsing energy effect */}
         <path
-          d={generatePathString(0, 100)}
+          d={generateFullPathString(starPositions)}
           fill="none"
           stroke="url(#pulseGradient)"
           strokeWidth="2"
           strokeLinecap="round"
+          strokeLinejoin="round"
           opacity="0.7"
         />
 
         {/* SOLID TRAIL - Completed portion behind companion */}
         {progress > 0 && (
           <motion.path
-            d={generatePathString(0, progress)}
+            d={generatePartialPathString(starPositions, progress)}
             fill="none"
             stroke="hsl(var(--primary))"
             strokeWidth="2.5"
             strokeLinecap="round"
+            strokeLinejoin="round"
             filter="url(#trailGlow)"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}
@@ -318,8 +361,8 @@ export const ConstellationTrail = ({
         <motion.div
           className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
           style={{
-            left: `${getPositionOnPath(progress).x}%`,
-            top: `${getPositionOnPath(progress).y}%`,
+            left: `${getPositionOnPath(progress, starPositions).x}%`,
+            top: `${getPositionOnPath(progress, starPositions).y}%`,
           }}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ 
