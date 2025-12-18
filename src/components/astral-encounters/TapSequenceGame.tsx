@@ -354,6 +354,13 @@ export const TapSequenceGame = ({
         // Next level after brief delay
         setTimeout(() => {
           setLevelMessage(null);
+          
+          // In practice mode, end after completing 2 levels
+          if (isPractice && level >= 2) {
+            finishGame(true);
+            return;
+          }
+          
           setLevel(prev => prev + 1);
           setCurrentOrder(1);
           setAttemptsThisLevel(0);
