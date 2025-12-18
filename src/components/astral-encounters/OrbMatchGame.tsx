@@ -18,7 +18,7 @@ interface OrbMatchGameProps {
 }
 
 type OrbColor = 'fire' | 'water' | 'earth' | 'light' | 'dark' | 'cosmic';
-type SpecialType = 'normal' | 'line_bomb' | 'star' | 'cross_bomb';
+type SpecialType = 'normal' | 'line_bomb' | 'star' | 'cross_bomb' | 'cosmic_nova';
 
 interface Orb {
   id: string;
@@ -28,6 +28,21 @@ interface Orb {
   matched?: boolean;
   special?: SpecialType;
   isNew?: boolean;
+}
+
+interface SpecialCreation {
+  row: number;
+  col: number;
+  type: SpecialType;
+  color: OrbColor;
+}
+
+interface SpecialEffect {
+  id: string;
+  type: 'beam_horizontal' | 'beam_vertical' | 'cross_beam' | 'color_burst' | 'cosmic_nova';
+  row: number;
+  col: number;
+  color?: string;
 }
 
 const GRID_ROWS = 5;
@@ -184,6 +199,151 @@ const ShuffleOverlay = memo(() => (
 ));
 ShuffleOverlay.displayName = 'ShuffleOverlay';
 
+// Special Effect: Beam (horizontal/vertical)
+const BeamEffect = memo(({ effect, cellSize, onComplete }: { effect: SpecialEffect; cellSize: number; onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 400);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  const isHorizontal = effect.type === 'beam_horizontal';
+  return (
+    <motion.div
+      className="absolute z-50 pointer-events-none"
+      initial={{ opacity: 0, scaleX: isHorizontal ? 0 : 1, scaleY: isHorizontal ? 1 : 0 }}
+      animate={{ opacity: 1, scaleX: 1, scaleY: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent)',
+        height: isHorizontal ? 6 : cellSize * GRID_ROWS,
+        width: isHorizontal ? cellSize * GRID_COLS : 6,
+        top: isHorizontal ? effect.row * cellSize + cellSize / 2 - 3 : 0,
+        left: isHorizontal ? 0 : effect.col * cellSize + cellSize / 2 - 3,
+        boxShadow: '0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(168,85,247,0.6)',
+      }}
+    />
+  );
+});
+BeamEffect.displayName = 'BeamEffect';
+
+// Special Effect: Cross Beam
+const CrossBeamEffect = memo(({ effect, cellSize, onComplete }: { effect: SpecialEffect; cellSize: number; onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 500);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <>
+      <motion.div
+        className="absolute z-50 pointer-events-none"
+        initial={{ opacity: 0, scaleX: 0 }}
+        animate={{ opacity: 1, scaleX: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.9), transparent)',
+          height: 6,
+          width: cellSize * GRID_COLS,
+          top: effect.row * cellSize + cellSize / 2 - 3,
+          left: 0,
+          boxShadow: '0 0 20px rgba(255,215,0,0.8)',
+        }}
+      />
+      <motion.div
+        className="absolute z-50 pointer-events-none"
+        initial={{ opacity: 0, scaleY: 0 }}
+        animate={{ opacity: 1, scaleY: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          background: 'linear-gradient(180deg, transparent, rgba(255,215,0,0.9), transparent)',
+          height: cellSize * GRID_ROWS,
+          width: 6,
+          top: 0,
+          left: effect.col * cellSize + cellSize / 2 - 3,
+          boxShadow: '0 0 20px rgba(255,215,0,0.8)',
+        }}
+      />
+    </>
+  );
+});
+CrossBeamEffect.displayName = 'CrossBeamEffect';
+
+// Special Effect: Color Burst (Star)
+const ColorBurstEffect = memo(({ effect, cellSize, onComplete }: { effect: SpecialEffect; cellSize: number; onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 600);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      className="absolute z-50 pointer-events-none"
+      initial={{ scale: 0, opacity: 1 }}
+      animate={{ scale: 4, opacity: 0 }}
+      transition={{ duration: 0.6 }}
+      style={{
+        width: cellSize,
+        height: cellSize,
+        left: effect.col * cellSize,
+        top: effect.row * cellSize,
+        background: `radial-gradient(circle, ${effect.color || 'rgba(255,215,0,0.8)'}, transparent)`,
+        borderRadius: '50%',
+      }}
+    />
+  );
+});
+ColorBurstEffect.displayName = 'ColorBurstEffect';
+
+// Special Effect: Cosmic Nova
+const CosmicNovaEffect = memo(({ effect, cellSize, onComplete }: { effect: SpecialEffect; cellSize: number; onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 700);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <>
+      <motion.div
+        className="absolute rounded-full z-50 pointer-events-none"
+        initial={{ scale: 0, opacity: 1 }}
+        animate={{ scale: 5, opacity: 0 }}
+        transition={{ duration: 0.7 }}
+        style={{
+          width: cellSize * 3,
+          height: cellSize * 3,
+          left: effect.col * cellSize - cellSize,
+          top: effect.row * cellSize - cellSize,
+          background: 'radial-gradient(circle, rgba(255,255,255,0.9), rgba(168,85,247,0.6), rgba(236,72,153,0.4), transparent)',
+        }}
+      />
+      {[...Array(8)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute z-50 pointer-events-none"
+          initial={{ scale: 0, opacity: 1, x: 0, y: 0 }}
+          animate={{
+            scale: [0, 1, 0.5],
+            opacity: [1, 0.8, 0],
+            x: Math.cos((i * Math.PI) / 4) * cellSize * 2,
+            y: Math.sin((i * Math.PI) / 4) * cellSize * 2,
+          }}
+          transition={{ duration: 0.5 }}
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            background: 'white',
+            left: effect.col * cellSize + cellSize / 2 - 6,
+            top: effect.row * cellSize + cellSize / 2 - 6,
+            boxShadow: '0 0 10px rgba(255,255,255,0.8)',
+          }}
+        />
+      ))}
+    </>
+  );
+});
+CosmicNovaEffect.displayName = 'CosmicNovaEffect';
+
 // OPTIMIZED Orb Component - CSS transforms only, no Framer layout
 const OrbComponent = memo(({ 
   orb, cellSize, isSelected, isDragging, isInPath, isReverting, showAccessibility,
@@ -194,11 +354,23 @@ const OrbComponent = memo(({
   const colorConfig = ORB_COLORS[orb.color];
   const orbSize = cellSize - 8;
   
-  const specialBorder = orb.special === 'line_bomb' ? '3px dashed rgba(255,255,255,0.8)' 
-    : orb.special === 'star' ? '3px solid gold'
-    : orb.special === 'cross_bomb' ? '3px double rgba(255,255,255,0.8)'
-    : '2px solid rgba(255,255,255,0.25)';
+  // Special orb styling
+  const getSpecialStyle = () => {
+    switch (orb.special) {
+      case 'line_bomb':
+        return { border: '3px dashed rgba(255,255,255,0.9)', animation: 'special-pulse 1s infinite', icon: '➖' };
+      case 'star':
+        return { border: '3px solid gold', animation: 'special-rainbow 1.5s infinite', icon: '★' };
+      case 'cross_bomb':
+        return { border: '3px double rgba(255,215,0,0.9)', animation: 'special-rotate 2s linear infinite', icon: '✚' };
+      case 'cosmic_nova':
+        return { border: '4px solid magenta', animation: 'special-nova 0.8s infinite', icon: '✦' };
+      default:
+        return { border: '2px solid rgba(255,255,255,0.25)', animation: undefined, icon: null };
+    }
+  };
   
+  const specialStyle = getSpecialStyle();
   const x = orb.col * cellSize + (cellSize - orbSize) / 2;
   const y = orb.row * cellSize + (cellSize - orbSize) / 2;
   const scale = orb.matched ? 0 : isSelected ? 1.15 : isInPath ? 1.08 : 1;
@@ -212,11 +384,14 @@ const OrbComponent = memo(({
         width: orbSize,
         height: orbSize,
         background: colorConfig.gradient,
-        border: specialBorder,
+        border: specialStyle.border,
         transform: `translate(${x}px, ${y}px) scale(${scale})`,
         boxShadow: isSelected || isInPath 
           ? `0 8px 20px rgba(0,0,0,0.4), 0 0 15px ${colorConfig.glow}` 
-          : `0 4px 10px rgba(0,0,0,0.3), 0 0 10px ${colorConfig.glow}`,
+          : orb.special !== 'normal'
+            ? `0 4px 15px rgba(0,0,0,0.4), 0 0 20px ${colorConfig.glow}, 0 0 30px ${orb.special === 'cosmic_nova' ? 'rgba(236,72,153,0.5)' : 'rgba(255,215,0,0.3)'}`
+            : `0 4px 10px rgba(0,0,0,0.3), 0 0 10px ${colorConfig.glow}`,
+        animation: specialStyle.animation,
         '--start-y': `${-cellSize * 2}px`,
       } as React.CSSProperties}
     >
@@ -227,9 +402,16 @@ const OrbComponent = memo(({
           background: `radial-gradient(circle at 30% 30%, ${colorConfig.inner}, transparent 70%)`,
         }}
       />
+      {/* Main content: emoji or shape */}
       <span className="text-base select-none relative z-10 drop-shadow-sm">
         {showAccessibility ? ORB_SHAPES[orb.color] : colorConfig.emoji}
       </span>
+      {/* Special orb indicator icon */}
+      {specialStyle.icon && (
+        <span className="absolute -top-1 -right-1 text-xs bg-black/60 rounded-full w-4 h-4 flex items-center justify-center z-20">
+          {specialStyle.icon}
+        </span>
+      )}
       {(isSelected || isInPath) && (
         <div 
           className="absolute inset-[-3px] rounded-full pointer-events-none selection-ring"
@@ -262,6 +444,7 @@ export const OrbMatchGame = ({
   const [showPerfect, setShowPerfect] = useState(false);
   const [revertingOrbs, setRevertingOrbs] = useState<Set<string>>(new Set());
   const [showAccessibility, setShowAccessibility] = useState(false);
+  const [specialEffects, setSpecialEffects] = useState<SpecialEffect[]>([]);
   
   const gridRef = useRef<HTMLDivElement>(null);
   const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -378,12 +561,24 @@ export const OrbMatchGame = ({
     }, 4000);
   }, [findValidMove]);
 
-  const findMatches = useCallback((currentOrbs: Orb[]): { matched: Set<string>; matchGroups: { ids: string[]; size: number; color: OrbColor; centerRow: number; centerCol: number }[] } => {
+  const findMatches = useCallback((currentOrbs: Orb[]): { 
+    matched: Set<string>; 
+    matchGroups: { ids: string[]; size: number; color: OrbColor; centerRow: number; centerCol: number; isHorizontal: boolean }[];
+    specialsToCreate: SpecialCreation[];
+    specialsActivated: { orb: Orb; affectedIds: string[]; bonusDamage: number; effectType: SpecialEffect['type'] }[];
+  } => {
     const matchedIds = new Set<string>();
-    const matchGroups: { ids: string[]; size: number; color: OrbColor; centerRow: number; centerCol: number }[] = [];
+    const matchGroups: { ids: string[]; size: number; color: OrbColor; centerRow: number; centerCol: number; isHorizontal: boolean }[] = [];
+    const specialsToCreate: SpecialCreation[] = [];
+    const specialsActivated: { orb: Orb; affectedIds: string[]; bonusDamage: number; effectType: SpecialEffect['type'] }[] = [];
+    
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
     currentOrbs.forEach(orb => { grid[orb.row][orb.col] = orb; });
 
+    // Track positions involved in matches for T/L shape detection
+    const matchPositions = new Map<string, { row: number; col: number; color: OrbColor }>();
+
+    // Horizontal matches
     for (let row = 0; row < GRID_ROWS; row++) {
       let col = 0;
       while (col < GRID_COLS) {
@@ -395,14 +590,27 @@ export const OrbMatchGame = ({
           const group: string[] = [];
           for (let i = 0; i < matchLength; i++) {
             const orb = grid[row][col + i];
-            if (orb) { matchedIds.add(orb.id); group.push(orb.id); }
+            if (orb) { 
+              matchedIds.add(orb.id); 
+              group.push(orb.id);
+              matchPositions.set(`${row}-${col + i}`, { row, col: col + i, color: startOrb.color });
+            }
           }
-          matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow: row, centerCol: col + Math.floor(matchLength / 2) });
+          const centerCol = col + Math.floor(matchLength / 2);
+          matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow: row, centerCol, isHorizontal: true });
+          
+          // Create special for 4+ matches
+          if (matchLength === 4) {
+            specialsToCreate.push({ row, col: centerCol, type: 'line_bomb', color: startOrb.color });
+          } else if (matchLength >= 5) {
+            specialsToCreate.push({ row, col: centerCol, type: 'cross_bomb', color: startOrb.color });
+          }
         }
         col += Math.max(1, matchLength);
       }
     }
 
+    // Vertical matches
     for (let col = 0; col < GRID_COLS; col++) {
       let row = 0;
       while (row < GRID_ROWS) {
@@ -415,36 +623,202 @@ export const OrbMatchGame = ({
           for (let i = 0; i < matchLength; i++) {
             const orb = grid[row + i][col];
             if (orb && !matchedIds.has(orb.id)) group.push(orb.id);
-            if (orb) matchedIds.add(orb.id);
+            if (orb) {
+              matchedIds.add(orb.id);
+              matchPositions.set(`${row + i}-${col}`, { row: row + i, col, color: startOrb.color });
+            }
           }
+          const centerRow = row + Math.floor(matchLength / 2);
           if (group.length > 0) {
-            matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow: row + Math.floor(matchLength / 2), centerCol: col });
+            matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow, centerCol: col, isHorizontal: false });
+          }
+          
+          // Create special for 4+ vertical matches
+          if (matchLength === 4) {
+            specialsToCreate.push({ row: centerRow, col, type: 'line_bomb', color: startOrb.color });
+          } else if (matchLength >= 5) {
+            specialsToCreate.push({ row: centerRow, col, type: 'cross_bomb', color: startOrb.color });
           }
         }
         row += Math.max(1, matchLength);
       }
     }
-    return { matched: matchedIds, matchGroups };
+
+    // Detect T/L shapes for star creation
+    for (const [key, pos] of matchPositions) {
+      // Check if this position is part of both horizontal and vertical matches (T or L intersection)
+      const hasHorizontalNeighbors = 
+        (matchPositions.has(`${pos.row}-${pos.col - 1}`) && matchPositions.get(`${pos.row}-${pos.col - 1}`)?.color === pos.color) ||
+        (matchPositions.has(`${pos.row}-${pos.col + 1}`) && matchPositions.get(`${pos.row}-${pos.col + 1}`)?.color === pos.color);
+      const hasVerticalNeighbors = 
+        (matchPositions.has(`${pos.row - 1}-${pos.col}`) && matchPositions.get(`${pos.row - 1}-${pos.col}`)?.color === pos.color) ||
+        (matchPositions.has(`${pos.row + 1}-${pos.col}`) && matchPositions.get(`${pos.row + 1}-${pos.col}`)?.color === pos.color);
+      
+      if (hasHorizontalNeighbors && hasVerticalNeighbors) {
+        // This is a T or L intersection - create a star (but avoid duplicates)
+        const existingStarAtPos = specialsToCreate.find(s => s.row === pos.row && s.col === pos.col && s.type === 'star');
+        if (!existingStarAtPos) {
+          // Replace any line bombs at this position with a star (star is better)
+          const existingIdx = specialsToCreate.findIndex(s => s.row === pos.row && s.col === pos.col);
+          if (existingIdx >= 0) {
+            specialsToCreate[existingIdx] = { row: pos.row, col: pos.col, type: 'star', color: pos.color };
+          } else {
+            specialsToCreate.push({ row: pos.row, col: pos.col, type: 'star', color: pos.color });
+          }
+        }
+      }
+    }
+
+    // Check for special orbs being matched and activate them
+    for (const id of matchedIds) {
+      const orb = currentOrbs.find(o => o.id === id);
+      if (orb && orb.special && orb.special !== 'normal') {
+        const activation = activateSpecial(orb, grid, currentOrbs);
+        if (activation) {
+          specialsActivated.push({ orb, ...activation });
+          // Add affected orbs to matched set
+          activation.affectedIds.forEach(aid => matchedIds.add(aid));
+        }
+      }
+    }
+
+    // Check for two specials being swapped together (cosmic nova)
+    const specialOrbs = Array.from(matchedIds)
+      .map(id => currentOrbs.find(o => o.id === id))
+      .filter(o => o && o.special && o.special !== 'normal') as Orb[];
+    
+    if (specialOrbs.length >= 2) {
+      // Create cosmic nova at first special's position
+      const first = specialOrbs[0];
+      const cosmicAffected: string[] = [];
+      // Clear 3x3 around each special
+      for (const sp of specialOrbs) {
+        for (let r = Math.max(0, sp.row - 1); r <= Math.min(GRID_ROWS - 1, sp.row + 1); r++) {
+          for (let c = Math.max(0, sp.col - 1); c <= Math.min(GRID_COLS - 1, sp.col + 1); c++) {
+            const o = grid[r][c];
+            if (o) cosmicAffected.push(o.id);
+          }
+        }
+      }
+      specialsActivated.push({
+        orb: first,
+        affectedIds: cosmicAffected,
+        bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
+        effectType: 'cosmic_nova'
+      });
+      cosmicAffected.forEach(id => matchedIds.add(id));
+    }
+
+    return { matched: matchedIds, matchGroups, specialsToCreate, specialsActivated };
   }, []);
 
-  const dropAndFill = useCallback((currentOrbs: Orb[]): Orb[] => {
+  // Activate a special orb and return affected orbs
+  const activateSpecial = useCallback((orb: Orb, grid: (Orb | null)[][], currentOrbs: Orb[]): {
+    affectedIds: string[];
+    bonusDamage: number;
+    effectType: SpecialEffect['type'];
+  } | null => {
+    switch (orb.special) {
+      case 'line_bomb': {
+        // Clear entire row OR column (alternate based on position)
+        const isHorizontal = orb.col % 2 === 0;
+        const affected: string[] = [];
+        if (isHorizontal) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            const o = grid[orb.row][c];
+            if (o) affected.push(o.id);
+          }
+        } else {
+          for (let r = 0; r < GRID_ROWS; r++) {
+            const o = grid[r][orb.col];
+            if (o) affected.push(o.id);
+          }
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_line_bomb,
+          effectType: isHorizontal ? 'beam_horizontal' : 'beam_vertical'
+        };
+      }
+      case 'cross_bomb': {
+        // Clear row AND column
+        const affected: string[] = [];
+        for (let c = 0; c < GRID_COLS; c++) {
+          const o = grid[orb.row][c];
+          if (o) affected.push(o.id);
+        }
+        for (let r = 0; r < GRID_ROWS; r++) {
+          const o = grid[r][orb.col];
+          if (o && !affected.includes(o.id)) affected.push(o.id);
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cross_bomb,
+          effectType: 'cross_beam'
+        };
+      }
+      case 'star': {
+        // Clear all orbs of the same color
+        const affected = currentOrbs.filter(o => o.color === orb.color).map(o => o.id);
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_star,
+          effectType: 'color_burst'
+        };
+      }
+      case 'cosmic_nova': {
+        // 3x3 area
+        const affected: string[] = [];
+        for (let r = Math.max(0, orb.row - 1); r <= Math.min(GRID_ROWS - 1, orb.row + 1); r++) {
+          for (let c = Math.max(0, orb.col - 1); c <= Math.min(GRID_COLS - 1, orb.col + 1); c++) {
+            const o = grid[r][c];
+            if (o) affected.push(o.id);
+          }
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
+          effectType: 'cosmic_nova'
+        };
+      }
+      default:
+        return null;
+    }
+  }, []);
+
+  const dropAndFill = useCallback((currentOrbs: Orb[], specialsToCreate: SpecialCreation[] = []): Orb[] => {
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
     currentOrbs.forEach(orb => { if (!orb.matched) grid[orb.row][orb.col] = orb; });
+
+    // Track where specials should be created (after drops settle)
+    const pendingSpecials = new Map<string, SpecialCreation>();
+    specialsToCreate.forEach(s => pendingSpecials.set(`${s.row}-${s.col}`, s));
 
     for (let col = 0; col < GRID_COLS; col++) {
       let emptyRow = GRID_ROWS - 1;
       for (let row = GRID_ROWS - 1; row >= 0; row--) {
         if (grid[row][col]) {
-          if (row !== emptyRow) { grid[emptyRow][col] = grid[row][col]; grid[row][col] = null; }
+          if (row !== emptyRow) { 
+            grid[emptyRow][col] = grid[row][col]; 
+            grid[row][col] = null; 
+          }
           emptyRow--;
         }
       }
       for (let row = emptyRow; row >= 0; row--) {
+        // Check if a special should be created here
+        const specialAtCol = Array.from(pendingSpecials.values()).find(s => s.col === col);
         grid[row][col] = {
           id: `${row}-${col}-${Date.now()}-${Math.random()}`,
-          color: availableColors[Math.floor(Math.random() * availableColors.length)],
-          row, col, special: 'normal', isNew: true,
+          color: specialAtCol?.color || availableColors[Math.floor(Math.random() * availableColors.length)],
+          row, col, 
+          special: row === emptyRow && specialAtCol ? specialAtCol.type : 'normal', 
+          isNew: true,
         };
+        // Remove used special
+        if (row === emptyRow && specialAtCol) {
+          pendingSpecials.delete(`${specialAtCol.row}-${specialAtCol.col}`);
+        }
       }
     }
 
@@ -475,12 +849,35 @@ export const OrbMatchGame = ({
     let totalScore = 0;
 
     const processNextCascade = async (): Promise<void> => {
-      const { matched, matchGroups } = findMatches(orbsToProcess);
+      const { matched, matchGroups, specialsToCreate, specialsActivated } = findMatches(orbsToProcess);
       
       if (matched.size >= 3) {
         currentCascade++;
         setCascadeLevel(currentCascade);
         if (currentCascade > 1) { setShowCascade(true); setTimeout(() => setShowCascade(false), 500); }
+
+        // Process special activations - add visual effects and deal bonus damage
+        for (const activation of specialsActivated) {
+          const newEffect: SpecialEffect = {
+            id: `effect-${Date.now()}-${Math.random()}`,
+            type: activation.effectType,
+            row: activation.orb.row,
+            col: activation.orb.col,
+            color: ORB_COLORS[activation.orb.color].glow,
+          };
+          setSpecialEffects(prev => [...prev, newEffect]);
+          
+          // Deal bonus damage for special
+          onDamage?.({ 
+            target: 'adversary', 
+            amount: activation.bonusDamage, 
+            source: `special_${activation.orb.special}`,
+            isCritical: true 
+          });
+          
+          totalScore += activation.bonusDamage * 5; // Bonus score for specials
+          triggerHaptic('heavy');
+        }
 
         const newExplosions: MatchExplosion[] = matchGroups.map(group => {
           const baseScore = group.size * 10;
@@ -509,10 +906,10 @@ export const OrbMatchGame = ({
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
         
-        matched.size >= 5 ? triggerHaptic('heavy') : triggerHaptic('success');
+        matched.size >= 5 || specialsActivated.length > 0 ? triggerHaptic('heavy') : triggerHaptic('success');
         
-        await new Promise(resolve => setTimeout(resolve, 200));
-        orbsToProcess = dropAndFill(orbsToProcess);
+        await new Promise(resolve => setTimeout(resolve, specialsActivated.length > 0 ? 350 : 200));
+        orbsToProcess = dropAndFill(orbsToProcess, specialsToCreate);
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
         
@@ -535,7 +932,7 @@ export const OrbMatchGame = ({
     }
     setCascadeLevel(0);
     return currentCascade;
-  }, [findMatches, dropAndFill, config.moveTime, cellSize, resetHintTimer, findValidMove, gameState, shuffleBoard]);
+  }, [findMatches, dropAndFill, config.moveTime, cellSize, resetHintTimer, findValidMove, gameState, shuffleBoard, onDamage]);
 
   const getCellFromPosition = useCallback((clientX: number, clientY: number): { row: number; col: number } | null => {
     if (!gridRef.current) return null;
@@ -649,6 +1046,7 @@ export const OrbMatchGame = ({
   }, [gameState, score, config.targetScore, maxCombo, timeLeft, onComplete]);
 
   const removeExplosion = useCallback((id: string) => setExplosions(prev => prev.filter(e => e.id !== id)), []);
+  const removeSpecialEffect = useCallback((id: string) => setSpecialEffects(prev => prev.filter(e => e.id !== id)), []);
   const scoreProgress = score / config.targetScore;
   const isUrgent = timeLeft <= 5 && gameState === 'playing';
 
@@ -716,6 +1114,25 @@ export const OrbMatchGame = ({
           <MatchExplosionEffect key={explosion.id} explosion={explosion} onComplete={() => removeExplosion(explosion.id)} />
         ))}
 
+        {/* Special ability effects */}
+        <AnimatePresence>
+          {specialEffects.map(effect => {
+            switch (effect.type) {
+              case 'beam_horizontal':
+              case 'beam_vertical':
+                return <BeamEffect key={effect.id} effect={effect} cellSize={cellSize} onComplete={() => removeSpecialEffect(effect.id)} />;
+              case 'cross_beam':
+                return <CrossBeamEffect key={effect.id} effect={effect} cellSize={cellSize} onComplete={() => removeSpecialEffect(effect.id)} />;
+              case 'color_burst':
+                return <ColorBurstEffect key={effect.id} effect={effect} cellSize={cellSize} onComplete={() => removeSpecialEffect(effect.id)} />;
+              case 'cosmic_nova':
+                return <CosmicNovaEffect key={effect.id} effect={effect} cellSize={cellSize} onComplete={() => removeSpecialEffect(effect.id)} />;
+              default:
+                return null;
+            }
+          })}
+        </AnimatePresence>
+
         {showCascade && cascadeLevel > 1 && <CascadeMultiplier multiplier={cascadeLevel} />}
         {isUrgent && <UrgencyOverlay />}
         {isShuffling && <ShuffleOverlay />}
@@ -731,7 +1148,7 @@ export const OrbMatchGame = ({
         ))}
       </div>
 
-      <p className="text-xs text-white/40 mt-3 text-center font-medium">Drag to swap • Match 3+ • Chain combos!</p>
+      <p className="text-xs text-white/40 mt-3 text-center font-medium">Match 4+ for specials • T/L shapes = ★ Star • Match specials for big damage!</p>
 
       <style>{`
         .orb-base {
@@ -848,6 +1265,26 @@ export const OrbMatchGame = ({
         }
         .drop-shadow-glow { text-shadow: 0 0 20px rgba(250,204,21,0.8); }
         .shadow-glow-yellow { box-shadow: 0 0 40px rgba(250,204,21,0.4); }
+        
+        /* Special orb animations */
+        @keyframes special-pulse {
+          0%, 100% { box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+          50% { box-shadow: 0 0 25px rgba(255,255,255,0.9), 0 0 35px rgba(255,255,255,0.4); }
+        }
+        @keyframes special-rainbow {
+          0% { border-color: gold; box-shadow: 0 0 15px gold; }
+          33% { border-color: #ff6b6b; box-shadow: 0 0 15px #ff6b6b; }
+          66% { border-color: #4facfe; box-shadow: 0 0 15px #4facfe; }
+          100% { border-color: gold; box-shadow: 0 0 15px gold; }
+        }
+        @keyframes special-rotate {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes special-nova {
+          0%, 100% { box-shadow: 0 0 15px rgba(236,72,153,0.6), 0 0 30px rgba(168,85,247,0.3); }
+          50% { box-shadow: 0 0 30px rgba(236,72,153,0.9), 0 0 50px rgba(168,85,247,0.6); }
+        }
       `}</style>
     </div>
   );
