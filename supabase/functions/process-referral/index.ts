@@ -3,16 +3,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
- * Process Referral Code from alilpush
+ * Process Referral Code
  * 
- * Called by alilpush after user signup when a referral code was used.
+ * Called after user signup when a referral code was used.
  * Records the signup and increments tracking metrics.
+ * 
+ * SECURITY: Requires authentication - validates the caller owns the user_id
  * 
  * Request body:
  * {
- *   user_id: string - UUID of the user who signed up (from alilpush)
  *   referral_code: string - The referral code used
- *   source_app: string - Which app the signup came from ("alilpush")
+ *   source_app: string - Which app the signup came from (optional)
  * }
  */
 
@@ -24,19 +25,81 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
+    // SECURITY: Require authentication
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Unauthorized: Missing authorization header" 
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Create authenticated client to get user
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Unauthorized: Invalid or expired token" 
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Use authenticated user's ID - don't trust client-provided user_id
+    const user_id = user.id;
+
+    // Service role client for database operations
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { user_id, referral_code, source_app } = await req.json();
+    const { referral_code, source_app } = await req.json();
 
     // Validate required fields
-    if (!user_id || !referral_code) {
+    if (!referral_code) {
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: "Missing required fields: user_id, referral_code" 
+          error: "Missing required field: referral_code" 
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate referral code format (alphanumeric with hyphens, max 20 chars)
+    const codePattern = /^[A-Za-z0-9-]{1,20}$/;
+    if (!codePattern.test(referral_code)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Invalid referral code format" 
         }),
         {
           status: 400,
@@ -48,7 +111,7 @@ serve(async (req) => {
     // Validate and retrieve referral code
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type, is_active")
+      .select("id, code, owner_type, is_active, owner_user_id")
       .eq("code", referral_code.toUpperCase())
       .single();
 
@@ -72,6 +135,20 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false,
           error: "Referral code is not active" 
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Prevent self-referral
+    if (codeData.owner_user_id === user_id) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Cannot use your own referral code" 
         }),
         {
           status: 400,
@@ -112,7 +189,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Recorded signup for referral code ${referral_code} from ${source_app || 'unknown'}`);
+    console.log(`Recorded signup for user ${user_id} with referral code ${referral_code} from ${source_app || 'unknown'}`);
 
     return new Response(
       JSON.stringify({
