@@ -99,6 +99,11 @@ export const GAME_DAMAGE_VALUES = {
     match4: 10,
     match5: 18,
     noMoves: 10, // Player takes damage
+    // Special ability bonus damages
+    special_line_bomb: 15,
+    special_cross_bomb: 20,
+    special_star: 25,
+    special_cosmic_nova: 40,
   },
   
   // Eclipse Timing
