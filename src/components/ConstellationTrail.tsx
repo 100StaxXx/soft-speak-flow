@@ -61,35 +61,41 @@ export const ConstellationTrail = ({
   showCompanion = true,
   narrativeCheckpoints
 }: ConstellationTrailProps) => {
-  // Create milestone checkpoints (start, 25%, 50%, 75%, 100%)
-  const milestones = useMemo(() => [0, 25, 50, 75, 100], []);
-  const starPositions = useMemo(() => generateStarPositions(5), []);
+  // Create milestone checkpoints dynamically from narrative checkpoints
+  const milestones = useMemo(() => {
+    if (narrativeCheckpoints && narrativeCheckpoints.length > 0) {
+      // Add 0 (start) + all chapter milestone percentages
+      return [0, ...narrativeCheckpoints.map(cp => cp.progressPercent)];
+    }
+    return [0, 25, 50, 75, 100]; // Fallback for non-narrative epics
+  }, [narrativeCheckpoints]);
+  
+  const starPositions = useMemo(() => generateStarPositions(milestones.length), [milestones.length]);
   
   // Get checkpoint label for a milestone index
   const getCheckpointLabel = (index: number, milestone: number): { label: string; isRevealed: boolean; isFinale: boolean } => {
-    if (!narrativeCheckpoints || narrativeCheckpoints.length === 0) {
-      // Default labels when no narrative checkpoints
-      return { 
-        label: milestone === 0 ? "Start" : milestone === 100 ? "Legend" : `${milestone}%`,
-        isRevealed: true,
-        isFinale: milestone === 100
-      };
+    // Index 0 is always "Start"
+    if (index === 0) {
+      return { label: "Start", isRevealed: true, isFinale: false };
     }
     
-    // Map milestone index to narrative checkpoint
-    const checkpoint = narrativeCheckpoints.find(cp => cp.progressPercent === milestone);
-    if (checkpoint) {
-      return {
-        label: checkpoint.locationRevealed ? checkpoint.locationName || `Ch.${checkpoint.chapter}` : "?",
-        isRevealed: checkpoint.locationRevealed,
-        isFinale: checkpoint.isFinale
-      };
+    // For narrative epics, use checkpoint data directly
+    if (narrativeCheckpoints && narrativeCheckpoints.length > 0) {
+      const checkpoint = narrativeCheckpoints[index - 1]; // -1 because index 0 is "Start"
+      if (checkpoint) {
+        return {
+          label: checkpoint.locationRevealed ? checkpoint.locationName || `Ch.${checkpoint.chapter}` : "?",
+          isRevealed: checkpoint.locationRevealed,
+          isFinale: checkpoint.isFinale
+        };
+      }
     }
     
+    // Fallback for non-narrative epics
     return { 
-      label: milestone === 0 ? "Start" : `${milestone}%`,
+      label: milestone === 100 ? "Legend" : `${milestone}%`,
       isRevealed: true,
-      isFinale: false
+      isFinale: milestone === 100
     };
   };
   
