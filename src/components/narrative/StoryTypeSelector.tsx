@@ -28,7 +28,7 @@ const storyTypes: StoryType[] = [
   },
   {
     slug: "mystery",
-    name: "Cosmic Mystery",
+    name: "Cosmiq Mystery",
     description: "Unravel secrets that threaten the fabric of reality",
     icon: Search,
     baseChapters: 6,

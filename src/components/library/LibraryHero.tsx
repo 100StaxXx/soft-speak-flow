@@ -75,7 +75,7 @@ export const LibraryHero = ({
           >
             <Sparkles className="h-5 w-5 text-stardust-gold" />
             <span className="text-stardust-gold text-sm font-medium uppercase tracking-widest">
-              Cosmic Library
+              Cosmiq Library
             </span>
             <Sparkles className="h-5 w-5 text-stardust-gold" />
           </motion.div>

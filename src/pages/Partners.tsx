@@ -122,7 +122,7 @@ export default function Partners() {
               </Card>
               <Card className="p-6 cosmic-glass text-center">
                 <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Cosmic Insights</h3>
+                <h3 className="font-semibold text-lg mb-2">Cosmiq Insights</h3>
                 <p className="text-sm text-muted-foreground">
                   Personalized astrology readings tailored to your zodiac profile
                 </p>

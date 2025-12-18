@@ -21,7 +21,7 @@ export const HoroscopeInfoTooltip = () => {
             <ul className="space-y-1 text-muted-foreground">
               <li>• Daily personalized horoscope based on your zodiac</li>
               <li>• Energy Forecast guides Mind, Body & Soul</li>
-              <li>• Add birth details for deeper cosmic insights</li>
+              <li>• Add birth details for deeper Cosmiq insights</li>
               <li>• Unlock your Big Three (Sun, Moon, Rising)</li>
             </ul>
           </div>

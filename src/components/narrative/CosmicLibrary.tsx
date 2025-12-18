@@ -36,7 +36,7 @@ export const CosmicLibrary = ({ userId }: CosmicLibraryProps) => {
       <Card className="p-8 text-center space-y-4">
         <Library className="w-16 h-16 mx-auto text-muted-foreground/50" />
         <div>
-          <h3 className="text-lg font-semibold mb-2">Your Cosmic Library Awaits</h3>
+          <h3 className="text-lg font-semibold mb-2">Your Cosmiq Library Awaits</h3>
           <p className="text-sm text-muted-foreground">
             Complete Star Path epics to add books to your collection.
             Each completed journey becomes a treasured volume.
@@ -51,7 +51,7 @@ export const CosmicLibrary = ({ userId }: CosmicLibraryProps) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Library className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold">Cosmic Library</h3>
+          <h3 className="font-semibold">Cosmiq Library</h3>
           <Badge variant="secondary" className="text-xs">
             {completedBooks.length} {completedBooks.length === 1 ? "Book" : "Books"}
           </Badge>
