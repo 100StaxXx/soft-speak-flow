@@ -16,27 +16,28 @@ interface AstralFrequencyGameProps {
 }
 
 // Difficulty configuration - NO TIMER, endless until lives = 0
+// Pure progressive speed - smooth continuous acceleration (5x faster than original)
 const DIFFICULTY_CONFIG = {
   easy: {
     startSpeed: 12,
-    maxSpeed: 25,
+    maxSpeed: 55,
     spawnInterval: 1.2,
     obstacleChance: 0.55,
-    speedIncrement: 0.015,
+    speedIncrement: 0.08,
   },
   medium: {
     startSpeed: 14,
-    maxSpeed: 32,
+    maxSpeed: 70,
     spawnInterval: 1.0,
     obstacleChance: 0.6,
-    speedIncrement: 0.02,
+    speedIncrement: 0.10,
   },
   hard: {
     startSpeed: 16,
-    maxSpeed: 40,
+    maxSpeed: 85,
     spawnInterval: 0.8,
     obstacleChance: 0.65,
-    speedIncrement: 0.025,
+    speedIncrement: 0.12,
   },
 };
 
@@ -447,6 +448,7 @@ export const AstralFrequencyGame = ({
   const [playerLane, setPlayerLane] = useState(1);
   const [hasShield, setHasShield] = useState(false);
   const [lives, setLives] = useState(3);
+  const [showDamageFlash, setShowDamageFlash] = useState(false);
   
   // Game objects
   const [obstacles, setObstacles] = useState<Array<{ id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield' }>>([]);
@@ -509,6 +511,10 @@ export const AstralFrequencyGame = ({
         setHasShield(false);
         triggerHaptic('medium');
       } else {
+        // Trigger damage flash animation
+        setShowDamageFlash(true);
+        setTimeout(() => setShowDamageFlash(false), 200);
+        
         setLives(prev => {
           const newLives = prev - 1;
           if (newLives <= 0) {
@@ -633,6 +639,19 @@ export const AstralFrequencyGame = ({
         onLeft={() => changeLane(-1)} 
         onRight={() => changeLane(1)} 
       />
+      
+      {/* Damage flash overlay */}
+      <AnimatePresence>
+        {showDamageFlash && (
+          <motion.div 
+            className="absolute inset-0 bg-red-500/40 pointer-events-none z-30"
+            initial={{ opacity: 0.8 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          />
+        )}
+      </AnimatePresence>
       
       {/* Overlays */}
       <AnimatePresence>
