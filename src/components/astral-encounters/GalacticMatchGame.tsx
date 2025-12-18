@@ -169,7 +169,7 @@ export const GalacticMatchGame = ({
   const config = useMemo(() => getLevelConfig(level), [level]);
 
   // Initialize/shuffle cards for current level
-  const initializeCards = useCallback(() => {
+  const initializeCards = useCallback((startFlipped: boolean = false) => {
     const symbolIndices = Array.from({ length: config.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
     const cardPairs = [...symbolIndices, ...symbolIndices];
     
@@ -182,7 +182,7 @@ export const GalacticMatchGame = ({
     setCards(cardPairs.map((symbolIndex, i) => ({
       id: `card-${level}-${i}`,
       symbolIndex,
-      isFlipped: false,
+      isFlipped: startFlipped,
       isMatched: false,
     })));
     setFlippedCards([]);
@@ -190,10 +190,12 @@ export const GalacticMatchGame = ({
     setCombo(0);
   }, [config.pairs, level]);
 
-  // Initialize cards when level changes
+  // Initialize cards only for first level (subsequent levels handled by phase transitions)
   useEffect(() => {
-    initializeCards();
-  }, [initializeCards]);
+    if (level === 1) {
+      initializeCards();
+    }
+  }, []);
 
   // Countdown timer (initial 3-2-1)
   useEffect(() => {
@@ -203,13 +205,12 @@ export const GalacticMatchGame = ({
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     } else {
-      // Start reveal phase
+      // Start reveal phase - initialize cards with flipped state
+      initializeCards(true);
       setPhase('revealing');
       setRevealCountdown(Math.ceil(config.revealTime));
-      // Flip all cards face-up
-      setCards(prev => prev.map(c => ({ ...c, isFlipped: true })));
     }
-  }, [countdown, phase, config.revealTime]);
+  }, [countdown, phase, config.revealTime, initializeCards]);
 
   // Reveal countdown
   useEffect(() => {
@@ -243,11 +244,30 @@ export const GalacticMatchGame = ({
       
       // Move to next level after delay
       setTimeout(() => {
-        setLevel(prev => prev + 1);
+        const nextLevel = level + 1;
+        const nextConfig = getLevelConfig(nextLevel);
+        
+        // Generate new shuffled cards for next level, starting flipped for memorization
+        const symbolIndices = Array.from({ length: nextConfig.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
+        const cardPairs = [...symbolIndices, ...symbolIndices];
+        for (let i = cardPairs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [cardPairs[i], cardPairs[j]] = [cardPairs[j], cardPairs[i]];
+        }
+        
+        setCards(cardPairs.map((symbolIndex, i) => ({
+          id: `card-${nextLevel}-${i}`,
+          symbolIndex,
+          isFlipped: true, // Start flipped for memorization
+          isMatched: false,
+        })));
+        setFlippedCards([]);
+        setMatchedPairs(0);
+        setCombo(0);
+        
+        setLevel(nextLevel);
         setPhase('revealing');
-        setRevealCountdown(Math.ceil(getLevelConfig(level + 1).revealTime));
-        // Flip all cards face-up for memorization phase
-        setCards(prev => prev.map(c => ({ ...c, isFlipped: true })));
+        setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
   }, [matchedPairs, config.pairs, phase, level]);
