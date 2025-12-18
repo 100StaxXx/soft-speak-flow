@@ -226,10 +226,13 @@ export const GalacticMatchGame = ({
       const timer = setTimeout(() => setRevealCountdown(revealCountdown - 1), 1000);
       return () => clearTimeout(timer);
     } else {
-      // Hide all cards and start playing
+      // Hide all unmatched cards and start playing (keep matched cards visible)
       setPhase('hiding');
       setTimeout(() => {
-        setCards(prev => prev.map(c => ({ ...c, isFlipped: false })));
+        setCards(prev => prev.map(c => ({ 
+          ...c, 
+          isFlipped: c.isMatched // Only matched cards stay flipped
+        })));
         setTimeout(() => setPhase('playing'), 400);
       }, 200);
     }
@@ -376,7 +379,7 @@ export const GalacticMatchGame = ({
           setIsLocked(false);
         }, 400);
       } else {
-        // No match - lose a life!
+        // No match - lose a life and show all cards again!
         const newLives = lives - 1;
         setLives(newLives);
         setCombo(0);
@@ -385,23 +388,40 @@ export const GalacticMatchGame = ({
         // Player takes damage from adversary attack
         onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'wrong_match' });
 
-        setTimeout(() => {
-          setCards(prev => prev.map(c => 
-            c.id === firstId || c.id === secondId 
-              ? { ...c, isFlipped: false } 
-              : c
-          ));
-          setFlippedCards([]);
-          setIsLocked(false);
-
-          // Check for game over
-          if (newLives <= 0) {
+        // Check for game over first
+        if (newLives <= 0) {
+          setTimeout(() => {
+            setCards(prev => prev.map(c => 
+              c.id === firstId || c.id === secondId 
+                ? { ...c, isFlipped: false } 
+                : c
+            ));
+            setFlippedCards([]);
+            setIsLocked(false);
             setPhase('gameOver');
-          }
-        }, 800);
+          }, 800);
+        } else {
+          // Show all unmatched cards again for re-memorization
+          setTimeout(() => {
+            // Flip all unmatched cards face-up (keep matched ones as matched)
+            setCards(prev => prev.map(c => ({
+              ...c,
+              isFlipped: c.isMatched || true, // Show all cards
+            })));
+            setFlippedCards([]);
+            
+            // Calculate reveal time based on remaining cards
+            const unmatchedCount = cards.filter(c => !c.isMatched).length;
+            const revealTime = Math.min(1.5 + (unmatchedCount / 4) * 0.5, 3); // 1.5-3 seconds
+            
+            setRevealCountdown(Math.ceil(revealTime));
+            setPhase('revealing');
+            setIsLocked(false);
+          }, 800);
+        }
       }
     }
-  }, [cards, flippedCards, isLocked, phase, combo, lives, level]);
+  }, [cards, flippedCards, isLocked, phase, combo, lives, level, onDamage, tierAttackDamage]);
 
   // Grid style
   const gridStyle = useMemo(() => ({
