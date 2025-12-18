@@ -188,3 +188,6 @@ verify_jwt = false
 
 [functions.generate-epic-narrative-seed]
 verify_jwt = true
+
+[functions.check-habit-reminders]
+verify_jwt = false

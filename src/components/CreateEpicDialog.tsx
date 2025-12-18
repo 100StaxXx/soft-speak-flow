@@ -60,6 +60,9 @@ interface NewHabit {
   difficulty: "easy" | "medium" | "hard";
   frequency: string;
   custom_days: number[];
+  preferred_time?: string;
+  reminder_enabled?: boolean;
+  reminder_minutes_before?: number;
 }
 
 interface CreateEpicDialogProps {
@@ -95,6 +98,10 @@ export const CreateEpicDialog = ({
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [currentHabitDays, setCurrentHabitDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [currentPreferredTime, setCurrentPreferredTime] = useState("");
+  const [currentReminderEnabled, setCurrentReminderEnabled] = useState(false);
+  const [currentReminderMinutes, setCurrentReminderMinutes] = useState(15);
+  const [editingHabitIndex, setEditingHabitIndex] = useState<number | null>(null);
 
   // Pre-fill from template when selected
   useEffect(() => {
@@ -121,19 +128,56 @@ export const CreateEpicDialog = ({
   }, [template, open]);
 
   const addHabit = useCallback(() => {
-    if (!currentHabitTitle.trim() || newHabits.length >= 2) return;
+    if (!currentHabitTitle.trim()) return;
     
-    setNewHabits(prev => [...prev, {
+    const newHabit: NewHabit = {
       title: currentHabitTitle.trim(),
       difficulty: currentHabitDifficulty,
       frequency: currentHabitDays.length === 7 ? 'daily' : 'custom',
       custom_days: currentHabitDays.length === 7 ? [] : currentHabitDays,
-    }]);
+      preferred_time: currentPreferredTime || undefined,
+      reminder_enabled: currentReminderEnabled,
+      reminder_minutes_before: currentReminderMinutes,
+    };
     
+    if (editingHabitIndex !== null) {
+      // Update existing habit
+      setNewHabits(prev => prev.map((h, i) => i === editingHabitIndex ? newHabit : h));
+      setEditingHabitIndex(null);
+    } else if (newHabits.length < 2) {
+      // Add new habit
+      setNewHabits(prev => [...prev, newHabit]);
+    }
+    
+    // Reset form fields
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
-  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, newHabits.length]);
+    setCurrentPreferredTime("");
+    setCurrentReminderEnabled(false);
+    setCurrentReminderMinutes(15);
+  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex]);
+
+  const editHabit = useCallback((index: number) => {
+    const habit = newHabits[index];
+    setCurrentHabitTitle(habit.title);
+    setCurrentHabitDifficulty(habit.difficulty);
+    setCurrentHabitDays(habit.frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : habit.custom_days);
+    setCurrentPreferredTime(habit.preferred_time || "");
+    setCurrentReminderEnabled(habit.reminder_enabled || false);
+    setCurrentReminderMinutes(habit.reminder_minutes_before || 15);
+    setEditingHabitIndex(index);
+  }, [newHabits]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingHabitIndex(null);
+    setCurrentHabitTitle("");
+    setCurrentHabitDifficulty("medium");
+    setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
+    setCurrentPreferredTime("");
+    setCurrentReminderEnabled(false);
+    setCurrentReminderMinutes(15);
+  }, []);
 
   const removeHabit = useCallback((index: number) => {
     setNewHabits(prev => prev.filter((_, i) => i !== index));
@@ -167,6 +211,10 @@ export const CreateEpicDialog = ({
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
+    setCurrentPreferredTime("");
+    setCurrentReminderEnabled(false);
+    setCurrentReminderMinutes(15);
+    setEditingHabitIndex(null);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -375,19 +423,31 @@ export const CreateEpicDialog = ({
             <div className="space-y-3">
               <Label>Epic Habits {template ? "(from template)" : "(Required)"}</Label>
               
-              <EpicHabitList habits={newHabits} onRemove={removeHabit} />
+              <EpicHabitList 
+                habits={newHabits} 
+                onRemove={removeHabit} 
+                onEdit={editHabit}
+              />
               
-              {/* Add new habit form */}
-              {newHabits.length < 2 && (
+              {/* Add/Edit habit form */}
+              {(newHabits.length < 2 || editingHabitIndex !== null) && (
                 <EpicHabitForm
                   habitTitle={currentHabitTitle}
                   difficulty={currentHabitDifficulty}
                   selectedDays={currentHabitDays}
                   habitCount={newHabits.length}
+                  preferredTime={currentPreferredTime}
+                  reminderEnabled={currentReminderEnabled}
+                  reminderMinutesBefore={currentReminderMinutes}
                   onTitleChange={setCurrentHabitTitle}
                   onDifficultyChange={setCurrentHabitDifficulty}
                   onDaysChange={setCurrentHabitDays}
+                  onPreferredTimeChange={setCurrentPreferredTime}
+                  onReminderEnabledChange={setCurrentReminderEnabled}
+                  onReminderMinutesChange={setCurrentReminderMinutes}
                   onAddHabit={addHabit}
+                  isEditing={editingHabitIndex !== null}
+                  onCancelEdit={cancelEdit}
                 />
               )}
               
