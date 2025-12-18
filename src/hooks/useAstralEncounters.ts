@@ -333,6 +333,27 @@ export const useAstralEncounters = () => {
     setActiveEncounter(null);
   }, []);
 
+  // Pass on an encounter (delete without completing)
+  const passEncounter = useCallback(async () => {
+    if (!activeEncounter) return;
+
+    try {
+      // Delete the incomplete encounter from DB
+      await supabase
+        .from('astral_encounters')
+        .delete()
+        .eq('id', activeEncounter.encounter.id);
+
+      // Close modal and clear state
+      setActiveEncounter(null);
+      setShowEncounterModal(false);
+      
+      queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+    } catch (error) {
+      console.error('Failed to pass encounter:', error);
+    }
+  }, [activeEncounter, queryClient]);
+
   return {
     // State
     activeEncounter,
@@ -354,6 +375,7 @@ export const useAstralEncounters = () => {
     completeEncounter: completeEncounter.mutate,
     checkEncounterTrigger,
     closeEncounter,
+    passEncounter,
     setShowEncounterModal,
   };
 };
