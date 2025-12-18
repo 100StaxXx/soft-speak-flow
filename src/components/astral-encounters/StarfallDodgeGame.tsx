@@ -31,33 +31,34 @@ interface FallingObject {
 }
 
 // ENDLESS mode config - progressive difficulty, 3 lives
+// Enhanced for more noticeable difficulty scaling
 const DIFFICULTY_CONFIG = {
   easy: { 
     initialSpawnRate: 900, 
     debrisRatio: 0.45, 
     baseSpeed: 1.0,
-    speedIncrease: 0.02,
-    spawnRateDecrease: 3,
-    minSpawnRate: 400,
-    maxSpeed: 3.5,
+    speedIncrease: 0.035,      // +75% faster speed increase
+    spawnRateDecrease: 6,      // 2x faster spawn rate increase
+    minSpawnRate: 300,         // Lower floor for endgame intensity
+    maxSpeed: 4.5,             // Higher ceiling
   },
   medium: { 
     initialSpawnRate: 700, 
     debrisRatio: 0.55, 
     baseSpeed: 1.4,
-    speedIncrease: 0.025,
-    spawnRateDecrease: 4,
-    minSpawnRate: 350,
-    maxSpeed: 4.5,
+    speedIncrease: 0.045,      // +80% faster speed increase
+    spawnRateDecrease: 8,      // 2x faster spawn rate increase
+    minSpawnRate: 250,         // Lower floor
+    maxSpeed: 5.5,             // Higher ceiling
   },
   hard: { 
     initialSpawnRate: 550, 
     debrisRatio: 0.65, 
     baseSpeed: 1.8,
-    speedIncrease: 0.03,
-    spawnRateDecrease: 5,
-    minSpawnRate: 300,
-    maxSpeed: 5.5,
+    speedIncrease: 0.055,      // +83% faster speed increase
+    spawnRateDecrease: 10,     // 2x faster spawn rate increase
+    minSpawnRate: 200,         // Intense endgame
+    maxSpeed: 6.5,             // Higher ceiling
   },
 };
 
@@ -462,6 +463,7 @@ export const StarfallDodgeGame = ({
       success: result !== 'fail',
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
+      usedTiltControls: useTilt,
     });
   }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete]);
 
@@ -520,10 +522,17 @@ export const StarfallDodgeGame = ({
         </div>
       )}
       
-      {/* Tilt indicator - landscape position */}
-      {useTilt && gameState === 'playing' && (
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-cyan-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-cyan-300">
-          📱 Tilt to move
+      {/* Tilt indicator + Speed indicator - landscape position */}
+      {gameState === 'playing' && (
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 flex gap-2">
+          {useTilt && (
+            <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-cyan-300">
+              📱 Tilt +25% XP
+            </div>
+          )}
+          <div className="bg-purple-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-purple-300">
+            ⚡ {((currentSpeed / config.baseSpeed) * 100).toFixed(0)}% Speed
+          </div>
         </div>
       )}
       

@@ -10,6 +10,7 @@ interface EncounterResultProps {
   xpEarned: number;
   onClose: () => void;
   retryAvailableAt?: string;
+  tiltBonus?: boolean;
 }
 
 const RESULT_CONFIG: Record<ResultType, {
@@ -50,7 +51,8 @@ export const EncounterResultScreen = ({
   accuracy, 
   xpEarned, 
   onClose,
-  retryAvailableAt 
+  retryAvailableAt,
+  tiltBonus,
 }: EncounterResultProps) => {
   const config = RESULT_CONFIG[result];
   const Icon = config.icon;
@@ -104,9 +106,17 @@ export const EncounterResultScreen = ({
           transition={{ delay: 0.5 }}
         >
           {/* XP */}
-          <div className="flex items-center justify-center gap-2 text-xl">
-            <Sparkles className="w-6 h-6 text-primary" />
-            <span className="font-bold text-primary">+{xpEarned} XP</span>
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center justify-center gap-2 text-xl">
+              <Sparkles className="w-6 h-6 text-primary" />
+              <span className="font-bold text-primary">+{xpEarned} XP</span>
+            </div>
+            {tiltBonus && (
+              <div className="flex items-center gap-1 text-xs text-cyan-400">
+                <span>📱</span>
+                <span>+25% Tilt Bonus Applied!</span>
+              </div>
+            )}
           </div>
 
           {/* Essence absorbed */}

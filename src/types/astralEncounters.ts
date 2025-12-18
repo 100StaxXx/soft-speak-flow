@@ -100,6 +100,7 @@ export interface MiniGameResult {
   success: boolean;
   accuracy: number; // 0-100
   result: EncounterResult;
+  usedTiltControls?: boolean; // Track if player used tilt controls for XP bonus
 }
 
 export interface EncounterPhase {
