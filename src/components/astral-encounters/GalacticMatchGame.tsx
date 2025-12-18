@@ -244,6 +244,16 @@ export const GalacticMatchGame = ({
       
       // Move to next level after delay
       setTimeout(() => {
+        // In practice mode, end after completing 2 levels
+        if (isPractice && level >= 2) {
+          onComplete({ 
+            success: true, 
+            accuracy: 100, 
+            result: 'good',
+          });
+          return;
+        }
+        
         const nextLevel = level + 1;
         const nextConfig = getLevelConfig(nextLevel);
         
