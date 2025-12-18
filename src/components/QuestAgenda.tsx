@@ -178,13 +178,14 @@ export function QuestAgenda({
           </div>
         </div>
         {onAddQuest && (
-          <Button
-            size="icon"
-            onClick={onAddQuest}
-            className="h-8 w-8 rounded-full shadow-lg shadow-primary/25 animate-pulse-subtle"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+            <Button
+              size="sm"
+              onClick={onAddQuest}
+              className="gap-1.5 shadow-lg shadow-primary/25"
+            >
+              <Plus className="h-4 w-4" />
+              Add Quest
+            </Button>
         )}
       </div>
 
