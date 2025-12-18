@@ -489,7 +489,8 @@ export const TapSequenceGame = ({
             const highlightedOrder = getHighlightedOrbOrder();
             const isHighlighted = (gameState === 'showing' || gameState === 'reshowing') && orb.order === highlightedOrder;
             const isPast = (gameState === 'showing' || gameState === 'reshowing') && orb.order < highlightedOrder;
-            const isNext = gameState === 'playing' && orb.order === currentOrder && !orb.tapped;
+            // Don't show indicator during playing - it's a memory game!
+            const isNext = false;
             const tapResult = lastTapResult?.id === orb.id ? lastTapResult : null;
             
             // Show numbers during sequence display, hide during input
