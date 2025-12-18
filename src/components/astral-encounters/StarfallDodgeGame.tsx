@@ -342,7 +342,16 @@ export const StarfallDodgeGame = ({
     }
 
     // Update survival time
-    setSurvivalTime(prev => prev + deltaTime / 1000);
+    setSurvivalTime(prev => {
+      const newTime = prev + deltaTime / 1000;
+      
+      // Practice mode: end after 15 seconds
+      if (isPractice && newTime >= 15) {
+        setGameState('complete');
+      }
+      
+      return newTime;
+    });
 
     // Progressive difficulty - increase speed and spawn rate over time
     setCurrentSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrease * deltaTime / 1000));

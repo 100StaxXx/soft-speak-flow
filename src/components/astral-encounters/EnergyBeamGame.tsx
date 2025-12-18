@@ -899,6 +899,12 @@ export function EnergyBeamGame({
     const stats = statsRef.current;
     stats.wavesCompleted++;
     
+    // Practice mode: end after completing 2 waves
+    if (isPractice && stats.wavesCompleted >= 2) {
+      setGameState('complete');
+      return;
+    }
+    
     // Wave clear bonus
     setScore(s => s + 100 + wave * 50);
     setGameState('wave-transition');
@@ -908,7 +914,7 @@ export function EnergyBeamGame({
       setEnemies(generateEnemies(wave + 1, config));
       setGameState('playing');
     }, 2000);
-  }, [enemies.length, wave, config, gameState]);
+  }, [enemies.length, wave, config, gameState, isPractice]);
   
   // Determine result based on performance
   const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'partial' | 'fail' => {

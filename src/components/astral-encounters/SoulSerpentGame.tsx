@@ -545,12 +545,22 @@ export const SoulSerpentGame = ({
 
       // Check stardust collection
       if (newHead.x === stardust.x && newHead.y === stardust.y) {
+        const newScore = score + 1;
+        
+        // Practice mode: end after collecting 5 stardust
+        if (isPractice && newScore >= 5) {
+          setScore(newScore);
+          setGameState('complete');
+          onComplete({ success: true, accuracy: 80, result: 'good' });
+          return newSnake;
+        }
+        
         setScore(s => {
-          const newScore = s + 1;
-          if (newScore > highScore) {
-            setHighScore(newScore);
+          const updated = s + 1;
+          if (updated > highScore) {
+            setHighScore(updated);
           }
-          return newScore;
+          return updated;
         });
         setStardust(spawnStardust(newSnake));
         setShowCollect(true);
