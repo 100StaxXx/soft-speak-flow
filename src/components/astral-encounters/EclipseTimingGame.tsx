@@ -77,6 +77,10 @@ const LANE_CONFIG: Record<LaneType, { icon: typeof Moon; color: string; bgColor:
 
 const LANES: LaneType[] = ['moon', 'star', 'sun'];
 
+// Loading buffer times to prevent lag
+const MIN_LOADING_TIME_MS = 1500; // Minimum 1.5 seconds of loading
+const READY_BUFFER_MS = 500;      // Extra buffer after audio is ready
+
 const getComboMultiplier = (combo: number): number => {
   if (combo >= 50) return 4;
   if (combo >= 25) return 3;
@@ -297,6 +301,7 @@ export const EclipseTimingGame = ({
   const notesRef = useRef<Note[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrackRef = useRef<RhythmTrack | null>(null);
+  const loadingStartRef = useRef<number>(0);
   
   const stars = useStaticStars(20);
   const config = DIFFICULTY_CONFIG[difficulty];
@@ -311,11 +316,21 @@ export const EclipseTimingGame = ({
   // Load track and initialize notes
   useEffect(() => {
     const initGame = async () => {
+      loadingStartRef.current = Date.now();
       const loadedTrack = await fetchRandomTrack(difficulty);
+      
+      // Helper to transition with minimum loading time
+      const transitionToCountdown = () => {
+        const loadingDuration = Date.now() - loadingStartRef.current;
+        const remainingTime = Math.max(0, MIN_LOADING_TIME_MS - loadingDuration);
+        setTimeout(() => {
+          setGameState('countdown');
+        }, remainingTime + READY_BUFFER_MS);
+      };
       
       if (loadedTrack) {
         currentTrackRef.current = loadedTrack;
-        // Generate BPM-synced notes
+        // Generate BPM-synced notes first (before audio load)
         const syncedNotes = generateSyncedNotes(loadedTrack.bpm, loadedTrack.duration_seconds, difficulty);
         setNotes(syncedNotes);
         notesRef.current = syncedNotes;
@@ -325,9 +340,9 @@ export const EclipseTimingGame = ({
         audio.preload = 'auto';
         audioRef.current = audio;
         
-        // Wait for audio to be ready
+        // Wait for audio to be ready, then add buffer time
         audio.addEventListener('canplaythrough', () => {
-          setGameState('countdown');
+          transitionToCountdown();
         }, { once: true });
         
         audio.addEventListener('error', (e) => {
@@ -336,7 +351,7 @@ export const EclipseTimingGame = ({
           const fallbackNotes = generateFallbackNotes(difficulty);
           setNotes(fallbackNotes);
           notesRef.current = fallbackNotes;
-          setGameState('countdown');
+          transitionToCountdown();
         });
         
         audio.load();
@@ -346,7 +361,7 @@ export const EclipseTimingGame = ({
         const fallbackNotes = generateFallbackNotes(difficulty);
         setNotes(fallbackNotes);
         notesRef.current = fallbackNotes;
-        setGameState('countdown');
+        transitionToCountdown();
       }
     };
     
@@ -550,6 +565,16 @@ export const EclipseTimingGame = ({
     setGameResult(null);
     setSongsPlayed(prev => prev + 1);
     setGameState('loading');
+    loadingStartRef.current = Date.now();
+    
+    // Helper to transition with minimum loading time
+    const transitionToCountdown = () => {
+      const loadingDuration = Date.now() - loadingStartRef.current;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME_MS - loadingDuration);
+      setTimeout(() => {
+        setGameState('countdown');
+      }, remainingTime + READY_BUFFER_MS);
+    };
     
     // Fetch new track
     const loadedTrack = await fetchRandomTrack(difficulty);
@@ -565,14 +590,14 @@ export const EclipseTimingGame = ({
       audioRef.current = audio;
       
       audio.addEventListener('canplaythrough', () => {
-        setGameState('countdown');
+        transitionToCountdown();
       }, { once: true });
       
       audio.addEventListener('error', () => {
         const fallbackNotes = generateFallbackNotes(difficulty);
         setNotes(fallbackNotes);
         notesRef.current = fallbackNotes;
-        setGameState('countdown');
+        transitionToCountdown();
       });
       
       audio.load();
@@ -581,7 +606,7 @@ export const EclipseTimingGame = ({
       setNotes(fallbackNotes);
       notesRef.current = fallbackNotes;
       currentTrackRef.current = null;
-      setGameState('countdown');
+      transitionToCountdown();
     }
   }, [difficulty, fetchRandomTrack]);
 
