@@ -1,16 +1,19 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
+import { DamageEvent, calculateResultFromHP } from '@/types/battleSystem';
 import { BattleVSScreen } from './BattleVSScreen';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { PracticeRoundWrapper } from './PracticeRoundWrapper';
 import { BattleSceneHeader } from './BattleSceneHeader';
 import { BossBattleIntro } from '@/components/narrative/BossBattleIntro';
+import { BattleOverlay, DamageNumberContainer } from './battle';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
-import { calculateXPReward, getResultFromAccuracy } from '@/utils/adversaryGenerator';
+import { useBattleState } from '@/hooks/useBattleState';
+import { calculateXPReward } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
 import type { BossBattleContext } from '@/types/narrativeTypes';
@@ -63,8 +66,61 @@ export const AstralEncounterModal = ({
     accuracy: number;
     xpEarned: number;
   } | null>(null);
+  const [showScreenShake, setShowScreenShake] = useState(false);
   
   const { companion } = useCompanion();
+  const battleEndedRef = useRef(false);
+
+  // Initialize battle state
+  const {
+    battleState,
+    dealDamage,
+    resetBattle,
+    getResult,
+    tierAttackDamage,
+    damageEvents,
+  } = useBattleState({
+    tier: (adversary?.tier as AdversaryTier) || 'common',
+    onPlayerDefeated: () => {
+      if (battleEndedRef.current) return;
+      battleEndedRef.current = true;
+      handleBattleEnd('fail');
+    },
+    onAdversaryDefeated: () => {
+      if (battleEndedRef.current) return;
+      battleEndedRef.current = true;
+      handleBattleEnd('victory');
+    },
+    onDamageDealt: (event) => {
+      if (event.target === 'player') {
+        setShowScreenShake(true);
+        setTimeout(() => setShowScreenShake(false), 300);
+      }
+    },
+  });
+
+  // Handle battle end (victory or defeat)
+  const handleBattleEnd = useCallback((outcome: 'victory' | 'fail') => {
+    if (!adversary || !encounter) return;
+    
+    const result = outcome === 'fail' ? 'fail' : getResult();
+    const accuracy = outcome === 'fail' ? 0 : Math.round(battleState.playerHPPercent);
+    const xpEarned = outcome === 'fail' ? 0 : calculateXPReward(adversary.tier as AdversaryTier, accuracy);
+
+    setFinalResult({
+      result,
+      accuracy,
+      xpEarned,
+    });
+
+    onComplete({
+      encounterId: encounter.id,
+      accuracy,
+      phasesCompleted: outcome === 'fail' ? currentPhaseIndex : adversary.phases,
+    });
+
+    setPhase('result');
+  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex]);
 
   // Reset phase when modal opens - set to boss_intro for boss battles
   useEffect(() => {
@@ -73,8 +129,10 @@ export const AstralEncounterModal = ({
       setCurrentPhaseIndex(0);
       setPhaseResults([]);
       setFinalResult(null);
+      battleEndedRef.current = false;
+      resetBattle();
     }
-  }, [open, isBossBattle]);
+  }, [open, isBossBattle, resetBattle]);
 
   // Fetch/generate adversary image
   const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
@@ -124,7 +182,9 @@ export const AstralEncounterModal = ({
     setPhase('instructions');
     setCurrentPhaseIndex(0);
     setPhaseResults([]);
-  }, []);
+    battleEndedRef.current = false;
+    resetBattle();
+  }, [resetBattle]);
 
   const handleInstructionsReady = useCallback(() => {
     const currentGameType = getCurrentGameType();
@@ -148,37 +208,31 @@ export const AstralEncounterModal = ({
     setPhase('battle');
   }, [getCurrentGameType]);
 
+  // Handle damage events from mini-games
+  const handleDamage = useCallback((event: DamageEvent) => {
+    if (battleEndedRef.current) return;
+    dealDamage(event);
+  }, [dealDamage]);
+
   const handleMiniGameComplete = useCallback((result: MiniGameResult) => {
-    if (!adversary || !encounter) return;
+    if (!adversary || !encounter || battleEndedRef.current) return;
 
     const newResults = [...phaseResults, result];
     setPhaseResults(newResults);
+
+    // Check if battle already ended via HP
+    if (battleState.isPlayerDefeated || battleState.isAdversaryDefeated) {
+      return; // Battle end already handled
+    }
 
     if (currentPhaseIndex < adversary.phases - 1) {
       setCurrentPhaseIndex(prev => prev + 1);
       setPhase('instructions');
     } else {
-      const totalAccuracy = Math.round(
-        newResults.reduce((sum, r) => sum + r.accuracy, 0) / newResults.length
-      );
-      const resultType = getResultFromAccuracy(totalAccuracy);
-      const xpEarned = calculateXPReward(adversary.tier as AdversaryTier, totalAccuracy);
-
-      setFinalResult({
-        result: resultType,
-        accuracy: totalAccuracy,
-        xpEarned,
-      });
-
-      onComplete({
-        encounterId: encounter.id,
-        accuracy: totalAccuracy,
-        phasesCompleted: adversary.phases,
-      });
-
-      setPhase('result');
+      // Final phase complete - determine result from HP
+      handleBattleEnd('victory');
     }
-  }, [adversary, encounter, currentPhaseIndex, phaseResults, onComplete]);
+  }, [adversary, encounter, currentPhaseIndex, phaseResults, battleState.isPlayerDefeated, battleState.isAdversaryDefeated, handleBattleEnd]);
 
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
@@ -198,6 +252,8 @@ export const AstralEncounterModal = ({
       onComplete: handleMiniGameComplete,
       difficulty: difficulty as 'easy' | 'medium' | 'hard',
       questIntervalScale: intervalScale,
+      onDamage: handleDamage,
+      tierAttackDamage,
     };
 
     const GameComponent = (() => {
@@ -220,15 +276,24 @@ export const AstralEncounterModal = ({
         <GameComponent {...props} />
       </Suspense>
     );
-  }, [adversary, getCurrentGameType, companionStats, handleMiniGameComplete, questInterval]);
+  }, [adversary, getCurrentGameType, companionStats, handleMiniGameComplete, questInterval, handleDamage, tierAttackDamage]);
 
   if (!encounter || !adversary) return null;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
-        <div className="relative min-h-[500px] max-h-[90vh] overflow-hidden">
+        <motion.div 
+          className="relative min-h-[500px] max-h-[90vh] overflow-hidden"
+          animate={showScreenShake ? { x: [0, -4, 4, -2, 2, 0] } : {}}
+          transition={{ duration: 0.3 }}
+        >
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+          
+          {/* Floating damage numbers */}
+          {phase === 'battle' && (
+            <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+          )}
           
           <div className="relative z-10">
             <AnimatePresence mode="wait">
@@ -303,11 +368,13 @@ export const AstralEncounterModal = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  <BattleSceneHeader
+                  {/* Battle HP Overlay */}
+                  <BattleOverlay
+                    battleState={battleState}
                     companionImageUrl={companion?.current_image_url || undefined}
                     companionName={companion?.spirit_animal || "Companion"}
-                    adversary={adversary}
                     adversaryImageUrl={adversaryImageUrl || undefined}
+                    adversaryName={adversary.name}
                   />
 
                   {adversary.phases > 1 && (
@@ -353,7 +420,7 @@ export const AstralEncounterModal = ({
               )}
             </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );
