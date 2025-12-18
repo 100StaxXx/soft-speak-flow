@@ -246,6 +246,8 @@ export const GalacticMatchGame = ({
         setLevel(prev => prev + 1);
         setPhase('revealing');
         setRevealCountdown(Math.ceil(getLevelConfig(level + 1).revealTime));
+        // Flip all cards face-up for memorization phase
+        setCards(prev => prev.map(c => ({ ...c, isFlipped: true })));
       }, 1500);
     }
   }, [matchedPairs, config.pairs, phase, level]);
