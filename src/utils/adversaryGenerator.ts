@@ -257,3 +257,50 @@ export const getResultFromAccuracy = (accuracy: number): 'perfect' | 'good' | 'p
   if (accuracy >= 50) return 'partial';
   return 'fail';
 };
+
+// Generate adversary for arcade mode (common/uncommon only)
+export const generateArcadeAdversary = (
+  difficulty: 'easy' | 'medium' | 'hard'
+): Adversary => {
+  // Determine tier based on difficulty
+  let tier: AdversaryTier;
+  if (difficulty === 'easy') {
+    tier = 'common';
+  } else if (difficulty === 'hard') {
+    tier = 'uncommon';
+  } else {
+    // Medium: 70% common, 30% uncommon
+    tier = Math.random() < 0.7 ? 'common' : 'uncommon';
+  }
+  
+  const config = TIER_CONFIG[tier];
+  
+  // Random theme
+  const allThemes: AdversaryTheme[] = [
+    'distraction', 'chaos', 'stagnation', 'laziness',
+    'anxiety', 'overthinking', 'doubt', 'fear',
+    'confusion', 'vulnerability', 'imbalance'
+  ];
+  const theme = randomFrom(allThemes);
+  
+  const prefix = randomFrom(NAME_PREFIXES[theme]);
+  const suffix = randomFrom(NAME_SUFFIXES[tier]);
+  const name = `${prefix} ${suffix}`;
+  
+  const lore = randomFrom(LORE_TEMPLATES[theme]);
+  const essenceName = randomFrom(ESSENCE_NAMES[theme]);
+  const essenceDescription = ESSENCE_DESCRIPTIONS[theme];
+  
+  return {
+    name,
+    theme,
+    tier,
+    lore,
+    miniGameType: THEME_MINIGAME_MAP[theme],
+    phases: config.phases,
+    essenceName,
+    essenceDescription,
+    statType: THEME_STAT_MAP[theme],
+    statBoost: config.statBoost,
+  };
+};

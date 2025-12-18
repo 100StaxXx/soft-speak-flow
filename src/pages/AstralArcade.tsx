@@ -6,10 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArcadeGameCard } from '@/components/astral-encounters/ArcadeGameCard';
 import { GameInstructionsOverlay } from '@/components/astral-encounters/GameInstructionsOverlay';
+import { BattleOverlay, DamageNumberContainer } from '@/components/astral-encounters/battle';
+import { BattleVSScreen } from '@/components/astral-encounters/BattleVSScreen';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
 import { useAchievements } from '@/hooks/useAchievements';
-import { MiniGameType, MiniGameResult } from '@/types/astralEncounters';
+import { useBattleState } from '@/hooks/useBattleState';
+import { useAdversaryImage } from '@/hooks/useAdversaryImage';
+import { MiniGameType, MiniGameResult, Adversary } from '@/types/astralEncounters';
+import { DamageEvent } from '@/types/battleSystem';
+import { generateArcadeAdversary } from '@/utils/adversaryGenerator';
 import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcadeHighScore } from '@/utils/soundEffects';
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
 import { toast } from 'sonner';
@@ -27,6 +33,8 @@ import {
   Grid3X3,
   Trophy,
   Sparkles,
+  Swords,
+  Heart,
 } from 'lucide-react';
 
 // Lazy load mini-games for bundle optimization
@@ -56,7 +64,9 @@ const GAMES = [
 ];
 
 type Difficulty = 'easy' | 'medium' | 'hard';
-type GamePhase = 'instructions' | 'practice' | 'playing';
+type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result';
+type ArcadeMode = 'practice' | 'battle';
+type BattleResult = 'victory' | 'defeat' | null;
 
 // Animation variants
 const containerVariants = {
@@ -105,21 +115,81 @@ export default function AstralArcade() {
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
   const [gamePhase, setGamePhase] = useState<GamePhase>('instructions');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [arcadeMode, setArcadeMode] = useState<ArcadeMode>('practice');
+  const [adversary, setAdversary] = useState<Adversary | null>(null);
+  const [battleResult, setBattleResult] = useState<BattleResult>(null);
+  const [screenShake, setScreenShake] = useState(false);
 
-  // Handle selecting a game - always show instructions first
+  // Get adversary image
+  const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
+    theme: adversary?.theme || '',
+    tier: adversary?.tier || '',
+    name: adversary?.name || '',
+    enabled: !!adversary && arcadeMode === 'battle',
+  });
+
+  // Battle state hook
+  const {
+    battleState,
+    dealDamage,
+    resetBattle,
+    getResult,
+    tierAttackDamage,
+    damageEvents,
+  } = useBattleState({
+    tier: adversary?.tier || 'common',
+    onPlayerDefeated: useCallback(() => {
+      setBattleResult('defeat');
+      setGamePhase('result');
+    }, []),
+    onAdversaryDefeated: useCallback(() => {
+      setBattleResult('victory');
+      setGamePhase('result');
+    }, []),
+    onDamageDealt: useCallback((event: DamageEvent) => {
+      if (event.target === 'player') {
+        setScreenShake(true);
+        setTimeout(() => setScreenShake(false), 300);
+      }
+    }, []),
+  });
+
+  const companionStats = companion ? {
+    mind: companion.mind ?? 10,
+    body: companion.body ?? 10,
+    soul: companion.soul ?? 10,
+  } : { mind: 10, body: 10, soul: 10 };
+
+  // Handle selecting a game
   const handleSelectGame = useCallback((gameType: MiniGameType) => {
     setActiveGame(gameType);
-    setGamePhase('instructions'); // Always show instructions first
-  }, []);
+    setBattleResult(null);
+    
+    if (arcadeMode === 'battle') {
+      // Generate adversary for battle mode
+      const newAdversary = generateArcadeAdversary(difficulty);
+      setAdversary(newAdversary);
+      resetBattle();
+      setGamePhase('instructions');
+    } else {
+      setGamePhase('instructions');
+    }
+  }, [arcadeMode, difficulty, resetBattle]);
 
-  // After instructions, go to practice or playing
+  // After instructions, go to practice, VS screen, or playing
   const handleInstructionsReady = useCallback(() => {
-    if (activeGame && !arcadePracticedGames.has(activeGame)) {
+    if (arcadeMode === 'battle') {
+      setGamePhase('vs_screen');
+    } else if (activeGame && !arcadePracticedGames.has(activeGame)) {
       setGamePhase('practice');
     } else {
       setGamePhase('playing');
     }
-  }, [activeGame]);
+  }, [activeGame, arcadeMode]);
+
+  const handleVSScreenReady = useCallback(() => {
+    setGamePhase('playing');
+  }, []);
 
   const handlePracticeComplete = useCallback(() => {
     if (activeGame) {
@@ -135,20 +205,71 @@ export default function AstralArcade() {
     setGamePhase('playing');
   }, [activeGame]);
 
+  // Handle damage from games (for battle mode)
+  const handleDamage = useCallback((event: DamageEvent) => {
+    if (arcadeMode === 'battle') {
+      dealDamage(event);
+    }
+  }, [arcadeMode, dealDamage]);
+
+  // Handle game complete
+  const handleGameComplete = useCallback((result: MiniGameResult) => {
+    if (arcadeMode === 'practice') {
+      // Practice mode - just update high scores
+      if (activeGame) {
+        const isNewHighScore = setHighScore(activeGame, result.accuracy, result.result);
+        if (isNewHighScore) {
+          playArcadeHighScore();
+          toast.success('New High Score!', {
+            description: `${result.accuracy}% accuracy`,
+            icon: '🏆',
+          });
+        }
+      }
+      setActiveGame(null);
+    } else {
+      // Battle mode - check if battle should end
+      // If game completed but neither side defeated, deal final damage based on accuracy
+      if (!battleState.isPlayerDefeated && !battleState.isAdversaryDefeated) {
+        // Good accuracy = deal damage to adversary
+        if (result.accuracy >= 50) {
+          const damage = Math.round(result.accuracy * 0.5);
+          dealDamage({ target: 'adversary', amount: damage, source: 'game_complete' });
+        } else {
+          // Poor accuracy = take damage
+          dealDamage({ target: 'player', amount: tierAttackDamage, source: 'game_fail' });
+        }
+      }
+    }
+  }, [activeGame, arcadeMode, battleState, dealDamage, setHighScore, tierAttackDamage]);
+
+  // Exit game and reset state
+  const handleExitGame = useCallback(() => {
+    setActiveGame(null);
+    setAdversary(null);
+    setBattleResult(null);
+    setGamePhase('instructions');
+  }, []);
+
+  // Retry battle
+  const handleRetryBattle = useCallback(() => {
+    if (adversary) {
+      resetBattle();
+      setBattleResult(null);
+      setGamePhase('playing');
+    }
+  }, [adversary, resetBattle]);
+
   // Award discovery badge and play entrance sound + background music
   useEffect(() => {
     checkArcadeDiscovery();
-    
-    // Pause ambient music before playing encounter/arcade sounds
     pauseAmbientForEvent();
     playEncounterTrigger();
     
-    // Start background music after trigger sound
     const musicTimeout = setTimeout(() => {
       playEncounterMusic();
     }, 500);
     
-    // Cleanup: stop music and resume ambient when leaving arcade
     return () => {
       clearTimeout(musicTimeout);
       stopEncounterMusic();
@@ -168,27 +289,6 @@ export default function AstralArcade() {
     })), []
   );
 
-  const companionStats = companion ? {
-    mind: companion.mind ?? 10,
-    body: companion.body ?? 10,
-    soul: companion.soul ?? 10,
-  } : { mind: 10, body: 10, soul: 10 };
-
-  const handleGameComplete = useCallback((result: MiniGameResult) => {
-    if (activeGame) {
-      const isNewHighScore = setHighScore(activeGame, result.accuracy, result.result);
-      if (isNewHighScore) {
-        playArcadeHighScore();
-        toast.success('New High Score!', {
-          description: `${result.accuracy}% accuracy`,
-          icon: '🏆',
-        });
-      }
-    }
-
-    setActiveGame(null);
-  }, [activeGame, setHighScore]);
-
   const renderGame = () => {
     if (!activeGame) return null;
 
@@ -196,6 +296,10 @@ export default function AstralArcade() {
       companionStats,
       difficulty,
       onComplete: handleGameComplete,
+      ...(arcadeMode === 'battle' && {
+        onDamage: handleDamage,
+        tierAttackDamage,
+      }),
     };
 
     const GameComponent = (() => {
@@ -222,6 +326,99 @@ export default function AstralArcade() {
     );
   };
 
+  const renderBattleResult = () => {
+    if (!battleResult) return null;
+
+    const isVictory = battleResult === 'victory';
+    const resultText = getResult();
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-full flex flex-col items-center justify-center text-center p-6"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', delay: 0.2 }}
+          className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${
+            isVictory 
+              ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border-2 border-emerald-500/50' 
+              : 'bg-gradient-to-br from-red-500/20 to-red-600/20 border-2 border-red-500/50'
+          }`}
+        >
+          {isVictory ? (
+            <Trophy className="w-12 h-12 text-emerald-400" />
+          ) : (
+            <Heart className="w-12 h-12 text-red-400" />
+          )}
+        </motion.div>
+
+        <motion.h2
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className={`text-3xl font-bold mb-2 ${
+            isVictory ? 'text-emerald-400' : 'text-red-400'
+          }`}
+        >
+          {isVictory ? 'Victory!' : 'Defeated'}
+        </motion.h2>
+
+        {adversary && (
+          <motion.p
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-muted-foreground mb-4"
+          >
+            {isVictory 
+              ? `You vanquished ${adversary.name}!`
+              : `${adversary.name} was too powerful...`
+            }
+          </motion.p>
+        )}
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="flex flex-col gap-2 mb-6"
+        >
+          <div className="text-sm text-muted-foreground">
+            HP Remaining: <span className={isVictory ? 'text-emerald-400' : 'text-red-400'}>
+              {battleState.playerHP}/{battleState.playerMaxHP}
+            </span>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Result: <span className="text-primary capitalize">{resultText}</span>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="flex gap-3"
+        >
+          <Button variant="outline" onClick={handleExitGame}>
+            Exit
+          </Button>
+          <Button 
+            onClick={handleRetryBattle}
+            className={isVictory 
+              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500'
+            }
+          >
+            {isVictory ? 'Battle Again' : 'Retry'}
+          </Button>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
   return (
     <PageTransition>
       <div className="min-h-screen bg-background relative overflow-hidden">
@@ -245,62 +442,114 @@ export default function AstralArcade() {
 
         {/* Active game overlay */}
         {activeGame && (
-          <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-md h-[500px]">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveGame(null)}
-                className="mb-4 text-muted-foreground"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Exit Game
-              </Button>
-              
-              <AnimatePresence mode="wait">
-                {gamePhase === 'instructions' && (
-                  <motion.div
-                    key="instructions"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="h-full flex items-center justify-center"
+          <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
+            {/* Battle Overlay - show during battle mode playing */}
+            {arcadeMode === 'battle' && gamePhase === 'playing' && adversary && (
+              <BattleOverlay
+                battleState={battleState}
+                companionImageUrl={companion?.current_image_url || undefined}
+                companionName={companion?.spirit_animal || 'Companion'}
+                adversaryImageUrl={adversaryImageUrl || undefined}
+                adversaryName={adversary.name}
+                showScreenShake={screenShake}
+              />
+            )}
+
+            {/* Floating damage numbers */}
+            {arcadeMode === 'battle' && gamePhase === 'playing' && (
+              <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+            )}
+
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="w-full max-w-md h-[500px]">
+                {gamePhase !== 'result' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExitGame}
+                    className="mb-4 text-muted-foreground"
                   >
-                    <GameInstructionsOverlay 
-                      gameType={activeGame} 
-                      onReady={handleInstructionsReady} 
-                    />
-                  </motion.div>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Exit Game
+                  </Button>
                 )}
                 
-                {gamePhase === 'practice' && (
-                  <motion.div
-                    key="practice"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                  >
-                    <PracticeRoundWrapper
-                      gameType={activeGame}
-                      companionStats={companionStats}
-                      onPracticeComplete={handlePracticeComplete}
-                      onSkipPractice={handleSkipPractice}
-                    />
-                  </motion.div>
-                )}
-                
-                {gamePhase === 'playing' && (
-                  <motion.div
-                    key="playing"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="h-[500px]"
-                  >
-                    {renderGame()}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                <AnimatePresence mode="wait">
+                  {gamePhase === 'instructions' && (
+                    <motion.div
+                      key="instructions"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="h-full flex items-center justify-center"
+                    >
+                      <GameInstructionsOverlay 
+                        gameType={activeGame} 
+                        onReady={handleInstructionsReady} 
+                      />
+                    </motion.div>
+                  )}
+                  
+                  {gamePhase === 'practice' && (
+                    <motion.div
+                      key="practice"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                    >
+                      <PracticeRoundWrapper
+                        gameType={activeGame}
+                        companionStats={companionStats}
+                        onPracticeComplete={handlePracticeComplete}
+                        onSkipPractice={handleSkipPractice}
+                      />
+                    </motion.div>
+                  )}
+
+                  {gamePhase === 'vs_screen' && adversary && (
+                    <motion.div
+                      key="vs_screen"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="h-full"
+                    >
+                      <BattleVSScreen
+                        companionName={companion?.spirit_animal || 'Companion'}
+                        companionImageUrl={companion?.current_image_url || undefined}
+                        adversary={adversary}
+                        adversaryImageUrl={adversaryImageUrl || undefined}
+                        isLoadingImage={isLoadingImage}
+                        onReady={handleVSScreenReady}
+                      />
+                    </motion.div>
+                  )}
+                  
+                  {gamePhase === 'playing' && (
+                    <motion.div
+                      key="playing"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="h-[500px]"
+                    >
+                      {renderGame()}
+                    </motion.div>
+                  )}
+
+                  {gamePhase === 'result' && (
+                    <motion.div
+                      key="result"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="h-[500px]"
+                    >
+                      {renderBattleResult()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         )}
@@ -322,31 +571,93 @@ export default function AstralArcade() {
               <Sparkles className="w-6 h-6 text-cyan-400" />
             </div>
             <p className="text-sm text-muted-foreground">
-              Practice mini-games and sharpen your skills
+              {arcadeMode === 'practice' 
+                ? 'Practice mini-games and sharpen your skills'
+                : 'Battle astral adversaries and prove your might!'
+              }
             </p>
           </motion.div>
 
-          {/* High Scores Card */}
+          {/* Mode Toggle */}
           <motion.div variants={cardVariants}>
-            <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-cyan-400">
-                  <Trophy className="w-5 h-5" />
-                  <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
-                </div>
+            <Card className="p-3 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setArcadeMode('practice')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    arcadeMode === 'practice'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30'
+                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                  }`}
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                  Practice
+                </button>
+                <button
+                  onClick={() => setArcadeMode('battle')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    arcadeMode === 'battle'
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/30'
+                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                  }`}
+                >
+                  <Swords className="w-4 h-4" />
+                  Battle
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/9</p>
-                  <p className="text-xs text-muted-foreground">Games mastered</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-cyan-400">{getAverageHighScore()}%</p>
-                  <p className="text-xs text-muted-foreground">Average best</p>
-                </div>
-              </div>
+              {arcadeMode === 'battle' && (
+                <motion.p 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="text-xs text-center text-muted-foreground mt-2"
+                >
+                  Face {difficulty === 'easy' ? 'Common' : difficulty === 'hard' ? 'Uncommon' : 'Common/Uncommon'} adversaries!
+                </motion.p>
+              )}
             </Card>
           </motion.div>
+
+          {/* High Scores Card - only show in practice mode */}
+          {arcadeMode === 'practice' && (
+            <motion.div variants={cardVariants}>
+              <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-cyan-400">
+                    <Trophy className="w-5 h-5" />
+                    <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/9</p>
+                    <p className="text-xs text-muted-foreground">Games mastered</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-cyan-400">{getAverageHighScore()}%</p>
+                    <p className="text-xs text-muted-foreground">Average best</p>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Battle Mode Info Card */}
+          {arcadeMode === 'battle' && (
+            <motion.div variants={cardVariants}>
+              <Card className="p-4 bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-red-400">
+                    <Swords className="w-5 h-5" />
+                    <span className="text-sm font-semibold uppercase tracking-wide">Battle Mode</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Select any game to face a randomly generated adversary. 
+                  Deal damage with good performance, take hits from mistakes!
+                </p>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Difficulty Selector */}
           <motion.div className="flex items-center justify-center gap-2" variants={cardVariants}>
@@ -381,7 +692,7 @@ export default function AstralArcade() {
                   label={game.label}
                   icon={game.icon}
                   stat={game.stat}
-                  highScore={getHighScore(game.type)?.accuracy}
+                  highScore={arcadeMode === 'practice' ? getHighScore(game.type)?.accuracy : undefined}
                   onSelect={handleSelectGame}
                 />
               </motion.div>
