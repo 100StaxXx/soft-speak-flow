@@ -142,7 +142,8 @@ const RotatePhoneOverlay = memo(({ onContinue }: { onContinue: () => void }) => 
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-6"
+    className="fixed inset-0 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-6"
+    style={{ zIndex: 100 }}
   >
     <motion.div
       animate={{ rotate: [0, -90, -90, 0] }}
@@ -158,7 +159,11 @@ const RotatePhoneOverlay = memo(({ onContinue }: { onContinue: () => void }) => 
     <p className="text-muted-foreground text-center text-sm mb-6 max-w-xs">
       Turn your phone sideways (landscape mode) for the best gameplay experience!
     </p>
-    <Button onClick={onContinue} className="bg-cyan-500 hover:bg-cyan-600">
+    <Button 
+      onClick={onContinue} 
+      className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 py-3"
+      style={{ zIndex: 101 }}
+    >
       Continue
     </Button>
   </motion.div>
@@ -472,10 +477,11 @@ export const StarfallDodgeGame = ({
         minHeight: '100vh',
         // Remove any rounding in fullscreen landscape
         borderRadius: 0,
-        // Ensure it's positioned at top-left
+        // Ensure it's positioned at top-left and above dialogs
         position: 'fixed',
         top: 0,
         left: 0,
+        zIndex: 60,
         // Safe area padding for notched devices
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
