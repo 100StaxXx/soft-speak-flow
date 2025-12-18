@@ -4,9 +4,13 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useGameLoop, useParticleSystem } from './gameUtils';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface RuneResonanceGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -346,6 +350,8 @@ const generateRunes = (round: number, config: typeof DIFFICULTY_CONFIG['easy']):
 export const RuneResonanceGame = ({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
   isPractice = false,
@@ -434,6 +440,9 @@ export const RuneResonanceGame = ({
       emitParticles(rune.x, rune.y, '#ef4444', 8);
       triggerHaptic('error');
       
+      // Player takes damage for tapping decoy
+      onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'decoy_tap' });
+      
       setStunned(true);
       setTimeout(() => setStunned(false), 1500);
       
@@ -449,6 +458,12 @@ export const RuneResonanceGame = ({
       points += combo * 10;
       // Round bonus
       points += (round - 1) * 20;
+      
+      // Deal damage to adversary based on hit quality
+      const damageAmount = isPerfect 
+        ? GAME_DAMAGE_VALUES.rune_resonance.perfectHit 
+        : GAME_DAMAGE_VALUES.rune_resonance.goodHit;
+      onDamage?.({ target: 'adversary', amount: damageAmount, source: isPerfect ? 'perfect_hit' : 'good_hit' });
       
       setRunes(prev => prev.map(r => 
         r.id === runeId ? { ...r, activated: true } : r
@@ -475,6 +490,9 @@ export const RuneResonanceGame = ({
       setShowFeedback({ id: runeId, success: false, points: -25 });
       emitParticles(rune.x, rune.y, '#ef4444', 3);
       triggerHaptic('error');
+      
+      // Player takes damage for mistimed tap
+      onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'miss' });
     }
 
     setTimeout(() => setShowFeedback(null), 400);

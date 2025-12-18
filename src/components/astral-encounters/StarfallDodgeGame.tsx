@@ -8,9 +8,13 @@ import { lockToLandscape, lockToPortrait } from '@/utils/orientationLock';
 import { Button } from '@/components/ui/button';
 import { Smartphone, RotateCcw } from 'lucide-react';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface StarfallDodgeGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -200,6 +204,8 @@ LivesDisplay.displayName = 'LivesDisplay';
 export const StarfallDodgeGame = ({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
   isPractice = false,
@@ -389,6 +395,9 @@ export const StarfallDodgeGame = ({
             setCrystalsCollected(c => c + 1);
             emitParticles(obj.x, obj.y, '#22d3ee', 6);
             triggerHaptic('light');
+            
+            // Deal damage to adversary for collecting crystal
+            onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.collectCrystal, source: 'collect_crystal' });
             return false;
           } else if (obj.type === 'powerup_shield') {
             setHasShield(true);
@@ -401,6 +410,9 @@ export const StarfallDodgeGame = ({
               emitParticles(obj.x, obj.y, '#ef4444', 6);
               triggerHaptic('medium');
             } else {
+              // Player takes damage from debris hit
+              onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'hit_by_projectile' });
+              
               // Lose a life
               setLives(prev => {
                 const newLives = prev - 1;

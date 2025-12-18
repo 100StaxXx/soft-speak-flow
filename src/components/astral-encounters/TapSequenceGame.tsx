@@ -5,9 +5,13 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface TapSequenceGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -231,6 +235,8 @@ LivesDisplay.displayName = 'LivesDisplay';
 export const TapSequenceGame = ({ 
   companionStats, 
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   isPractice = false,
 }: TapSequenceGameProps) => {
@@ -339,6 +345,9 @@ export const TapSequenceGame = ({
       setCurrentOrder(prev => prev + 1);
       setTotalCorrectTaps(prev => prev + 1);
       
+      // Deal damage to adversary for correct tap
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.tap_sequence.correctTap, source: 'correct_tap' });
+      
       // Score based on level and attempts
       const attemptMultiplier = attemptsThisLevel === 0 ? 2 : 1;
       setScore(prev => prev + (10 * level) * attemptMultiplier);
@@ -350,6 +359,9 @@ export const TapSequenceGame = ({
       if (currentOrder === orbCount) {
         const perfectLevel = attemptsThisLevel === 0;
         setLevelMessage(perfectLevel ? '⭐ Perfect!' : '✓ Level Complete!');
+        
+        // Deal bonus damage for completing the level
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.tap_sequence.levelComplete, source: 'level_complete' });
         
         // Next level after brief delay
         setTimeout(() => {
@@ -372,6 +384,10 @@ export const TapSequenceGame = ({
     } else {
       // Wrong tap!
       triggerHaptic('error');
+      
+      // Player takes damage from adversary attack
+      onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'wrong_tap' });
+      
       setLives(prev => {
         const newLives = prev - 1;
         if (newLives <= 0) {

@@ -12,9 +12,13 @@ interface Card {
   isMatched: boolean;
 }
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface GalacticMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -147,6 +151,8 @@ type GamePhase = 'countdown' | 'revealing' | 'hiding' | 'playing' | 'levelComple
 export const GalacticMatchGame = ({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
   maxTimer,
@@ -237,6 +243,9 @@ export const GalacticMatchGame = ({
       playMissionComplete();
       triggerHaptic('success');
       setPhase('levelComplete');
+      
+      // Deal bonus damage for completing the level
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.galactic_match.levelComplete, source: 'level_complete' });
       
       // Add level completion bonus
       const levelBonus = 15 * level;
@@ -344,6 +353,9 @@ export const GalacticMatchGame = ({
         
         playHabitComplete();
         triggerHaptic('success');
+        
+        // Deal damage to adversary for correct match
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.galactic_match.correctMatch, source: 'correct_match' });
 
         setCombo(newCombo);
         setScore(prev => prev + points);
@@ -369,6 +381,9 @@ export const GalacticMatchGame = ({
         setLives(newLives);
         setCombo(0);
         triggerHaptic('error');
+        
+        // Player takes damage from adversary attack
+        onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'wrong_match' });
 
         setTimeout(() => {
           setCards(prev => prev.map(c => 

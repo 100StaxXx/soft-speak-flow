@@ -4,9 +4,12 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars } from './gameUtils';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface OrbMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -239,7 +242,7 @@ OrbComponent.displayName = 'OrbComponent';
 
 // Main Game Component
 export const OrbMatchGame = ({
-  companionStats, onComplete, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
+  companionStats, onComplete, onDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
 }: OrbMatchGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -481,6 +484,15 @@ export const OrbMatchGame = ({
           const cascadeMultiplier = 1 + (currentCascade - 1) * 0.5;
           const groupScore = Math.round(baseScore * cascadeMultiplier);
           totalScore += groupScore;
+          
+          // Deal damage to adversary based on match size
+          const damageAmount = group.size >= 5 
+            ? GAME_DAMAGE_VALUES.orb_match.match5 
+            : group.size >= 4 
+              ? GAME_DAMAGE_VALUES.orb_match.match4 
+              : GAME_DAMAGE_VALUES.orb_match.match3;
+          onDamage?.({ target: 'adversary', amount: damageAmount, source: `match_${group.size}` });
+          
           return {
             id: `exp-${Date.now()}-${Math.random()}`,
             x: group.centerCol * cellSize + cellSize / 2,
