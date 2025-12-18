@@ -2263,6 +2263,10 @@ export type Database = {
           id: string
           is_active: boolean | null
           longest_streak: number | null
+          preferred_time: string | null
+          reminder_enabled: boolean | null
+          reminder_minutes_before: number | null
+          reminder_sent_today: boolean | null
           title: string
           user_id: string
         }
@@ -2275,6 +2279,10 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           longest_streak?: number | null
+          preferred_time?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent_today?: boolean | null
           title: string
           user_id: string
         }
@@ -2287,6 +2295,10 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           longest_streak?: number | null
+          preferred_time?: string | null
+          reminder_enabled?: boolean | null
+          reminder_minutes_before?: number | null
+          reminder_sent_today?: boolean | null
           title?: string
           user_id?: string
         }

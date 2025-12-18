@@ -77,6 +77,9 @@ export const useEpics = () => {
         difficulty: string;
         frequency: string;
         custom_days: number[];
+        preferred_time?: string;
+        reminder_enabled?: boolean;
+        reminder_minutes_before?: number;
       }>;
     }) => {
       if (!user) throw new Error("Not authenticated");
@@ -104,6 +107,9 @@ export const useEpics = () => {
               difficulty: habit.difficulty,
               frequency: habit.frequency,
               custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
+              preferred_time: habit.preferred_time || null,
+              reminder_enabled: habit.reminder_enabled || false,
+              reminder_minutes_before: habit.reminder_minutes_before || 15,
             }))
           )
           .select();
