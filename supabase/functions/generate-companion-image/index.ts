@@ -109,14 +109,40 @@ serve(async (req) => {
 
     console.log(`User authenticated: ${user.id}`);
 
-    const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor } = await req.json();
+    const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor, retryAttempt = 0 } = await req.json();
 
-    console.log(`Request params - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}`);
+    console.log(`Request params - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}, Retry: ${retryAttempt}`);
 
     if (!spiritAnimal) throw new Error("spiritAnimal is required");
     if (!element) throw new Error("element is required");
     if (stage === undefined || stage === null) throw new Error("stage is required");
     if (!favoriteColor) throw new Error("favoriteColor is required");
+
+    // Enhanced anatomical enforcement for retry attempts
+    const getRetryEnforcement = (attempt: number): string => {
+      if (attempt === 0) return '';
+      
+      const enforcements = [
+        `\n\nCRITICAL ANATOMY ENFORCEMENT (RETRY ${attempt}):
+- SINGLE HEAD ONLY - absolutely NO multiple heads, NO extra faces
+- COUNT LIMBS CAREFULLY - exactly the correct number for ${spiritAnimal} species
+- NO EXTRA LIMBS - no phantom legs, no duplicate arms, no additional appendages
+- NO MERGED BODY PARTS - each limb must be separate and distinct
+- ANATOMICALLY CORRECT - follow real ${spiritAnimal} bone structure exactly`,
+
+        `\n\nMANDATORY ANATOMICAL CORRECTNESS (FINAL ATTEMPT):
+- THIS IS CRITICAL: Generate a ${spiritAnimal} with EXACTLY the correct anatomy
+- ONE HEAD - never two heads, never fused heads, ONE face only
+- CORRECT LIMB COUNT - real ${spiritAnimal} have a specific number of legs/arms - match exactly
+- NO ANOMALIES - no extra eyes, no extra ears, no phantom limbs
+- CLEAN ANATOMY - every body part distinct and properly connected
+- REFERENCE: Study a real ${spiritAnimal} photograph for correct anatomy`
+      ];
+
+      return enforcements[Math.min(attempt - 1, enforcements.length - 1)];
+    };
+
+    const retryEnforcement = getRetryEnforcement(retryAttempt);
 
     const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
     if (!stageInfo) {
@@ -247,6 +273,7 @@ STYLE DIRECTION:
 BASE DESCRIPTION:
 ${basePrompt}
 ${speciesGuidance}
+${retryEnforcement}
 
 COLOR PALETTE:
 - Primary colors: Rich ${favoriteColor} tones
