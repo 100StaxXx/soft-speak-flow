@@ -9,6 +9,8 @@ import { GameInstructionsOverlay } from '@/components/astral-encounters/GameInst
 import { BattleOverlay, DamageNumberContainer } from '@/components/astral-encounters/battle';
 import { BattleVSScreen } from '@/components/astral-encounters/BattleVSScreen';
 import { useCompanion } from '@/hooks/useCompanion';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
 import { useAchievements } from '@/hooks/useAchievements';
 import { useBattleState } from '@/hooks/useBattleState';
@@ -126,6 +128,22 @@ export default function AstralArcade() {
     tier: adversary?.tier || '',
     name: adversary?.name || '',
     enabled: !!adversary && arcadeMode === 'battle',
+  });
+
+  // Query current evolution card for creature name
+  const { data: currentCard } = useQuery({
+    queryKey: ['current-evolution-card', companion?.id],
+    queryFn: async () => {
+      if (!companion?.id) return null;
+      const { data } = await supabase
+        .from('companion_evolution_cards')
+        .select('creature_name')
+        .eq('companion_id', companion.id)
+        .eq('evolution_stage', companion.current_stage || 0)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!companion?.id,
   });
 
   // Battle callbacks - defined outside useBattleState to avoid hook rules violation
@@ -538,7 +556,8 @@ export default function AstralArcade() {
                       className="h-full"
                     >
                       <BattleVSScreen
-                        companionName={companion?.spirit_animal || 'Companion'}
+                        companionName={currentCard?.creature_name || companion?.spirit_animal || 'Companion'}
+                        companionStage={companion?.current_stage || 0}
                         companionImageUrl={companion?.current_image_url || undefined}
                         adversary={adversary}
                         adversaryImageUrl={adversaryImageUrl || undefined}

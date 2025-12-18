@@ -13,6 +13,8 @@ import { BattleOverlay, DamageNumberContainer } from './battle';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { useBattleState } from '@/hooks/useBattleState';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { calculateXPReward } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
@@ -72,6 +74,22 @@ export const AstralEncounterModal = ({
   
   const { companion } = useCompanion();
   const battleEndedRef = useRef(false);
+
+  // Query current evolution card for creature name
+  const { data: currentCard } = useQuery({
+    queryKey: ['current-evolution-card', companion?.id],
+    queryFn: async () => {
+      if (!companion?.id) return null;
+      const { data } = await supabase
+        .from('companion_evolution_cards')
+        .select('creature_name')
+        .eq('companion_id', companion.id)
+        .eq('evolution_stage', companion.current_stage || 0)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!companion?.id && open,
+  });
 
   // Initialize battle state
   const {
@@ -327,7 +345,8 @@ export const AstralEncounterModal = ({
                     adversaryImageUrl={adversaryImageUrl || undefined}
                     isLoadingImage={isLoadingImage}
                     companionImageUrl={companion?.current_image_url || undefined}
-                    companionName={companion?.spirit_animal || "Companion"}
+                    companionName={currentCard?.creature_name || companion?.spirit_animal || "Companion"}
+                    companionStage={companion?.current_stage || 0}
                     onReady={handleBeginBattle}
                     onPass={onPass}
                   />

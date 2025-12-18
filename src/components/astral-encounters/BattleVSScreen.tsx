@@ -3,10 +3,12 @@ import { motion } from "framer-motion";
 import { Skull, Sparkles, Zap, Loader2, SkipForward } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
+import { getStageName } from "@/config/companionStages";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
   companionName?: string;
+  companionStage?: number;
   adversary: Adversary;
   adversaryImageUrl?: string;
   isLoadingImage?: boolean;
@@ -25,6 +27,7 @@ const TIER_COLORS: Record<AdversaryTier, { primary: string; glow: string; bg: st
 export const BattleVSScreen = ({
   companionImageUrl,
   companionName = "Companion",
+  companionStage = 0,
   adversary,
   adversaryImageUrl,
   isLoadingImage,
@@ -185,7 +188,7 @@ export const BattleVSScreen = ({
               transition={{ delay: 0.5 }}
             >
               <p className="text-base font-bold text-foreground">{companionName}</p>
-              <p className="text-[10px] text-primary/80 font-medium uppercase tracking-wider">Your Companion</p>
+              <p className="text-[10px] text-primary/80 font-medium uppercase tracking-wider">{getStageName(companionStage)}</p>
             </motion.div>
           </motion.div>
 
