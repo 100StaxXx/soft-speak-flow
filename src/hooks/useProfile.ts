@@ -40,6 +40,9 @@ interface Profile {
   cosmic_profile_generated_at: string | null;
   // Faction
   faction: string | null;
+  // Global notification settings
+  habit_reminders_enabled: boolean | null;
+  task_reminders_enabled: boolean | null;
 }
 
 export const useProfile = () => {
