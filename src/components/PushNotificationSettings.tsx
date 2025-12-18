@@ -71,7 +71,6 @@ export const PushNotificationSettings = () => {
   const handleTogglePepTalk = async (enabled: boolean) => {
     if (!user) return;
     
-    // If enabling, ensure push is enabled first
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
@@ -89,7 +88,6 @@ export const PushNotificationSettings = () => {
       
       if (error) throw error;
       toast({ title: enabled ? "Daily Push Enabled" : "Daily Push Disabled", description: "Settings updated successfully" });
-      // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling pep talk:", error);
@@ -100,7 +98,6 @@ export const PushNotificationSettings = () => {
   const handleToggleQuote = async (enabled: boolean) => {
     if (!user) return;
     
-    // If enabling, ensure push is enabled first
     if (enabled && !pushEnabled) {
       toast({ 
         title: "Enable push notifications first", 
@@ -118,11 +115,64 @@ export const PushNotificationSettings = () => {
       
       if (error) throw error;
       toast({ title: enabled ? "Quote Push Enabled" : "Quote Push Disabled", description: "Settings updated successfully" });
-      // Reload to sync state
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error toggling quote push:", error);
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle quote push", variant: "destructive" });
+    }
+  };
+
+  const handleToggleHabitReminders = async (enabled: boolean) => {
+    if (!user) return;
+    
+    if (enabled && !pushEnabled) {
+      toast({ 
+        title: "Enable push notifications first", 
+        description: "Please enable browser notifications before activating habit reminders",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ habit_reminders_enabled: enabled })
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      toast({ title: enabled ? "Habit Reminders Enabled" : "Habit Reminders Disabled", description: "Settings updated successfully" });
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error("Error toggling habit reminders:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle habit reminders", variant: "destructive" });
+    }
+  };
+
+  const handleToggleTaskReminders = async (enabled: boolean) => {
+    if (!user) return;
+    
+    if (enabled && !pushEnabled) {
+      toast({ 
+        title: "Enable push notifications first", 
+        description: "Please enable browser notifications before activating quest reminders",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ task_reminders_enabled: enabled })
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      toast({ title: enabled ? "Quest Reminders Enabled" : "Quest Reminders Disabled", description: "Settings updated successfully" });
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error("Error toggling task reminders:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle task reminders", variant: "destructive" });
     }
   };
 
@@ -273,6 +323,40 @@ export const PushNotificationSettings = () => {
               </Select>
             </div>
           )}
+        </div>
+
+        {/* Star Path Habit Reminders */}
+        <div className="space-y-3 pt-4 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-foreground font-medium">Star Path Habit Reminders</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Get notified when your habits are due
+              </p>
+            </div>
+            <Switch
+              checked={profile?.habit_reminders_enabled ?? true}
+              onCheckedChange={handleToggleHabitReminders}
+              disabled={!pushEnabled}
+            />
+          </div>
+        </div>
+
+        {/* Quest Reminders */}
+        <div className="space-y-3 pt-4 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-foreground font-medium">Quest Reminders</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Get notified before scheduled quests
+              </p>
+            </div>
+            <Switch
+              checked={profile?.task_reminders_enabled ?? true}
+              onCheckedChange={handleToggleTaskReminders}
+              disabled={!pushEnabled}
+            />
+          </div>
         </div>
 
         {/* Notification Preview */}

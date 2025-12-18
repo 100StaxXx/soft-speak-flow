@@ -56,6 +56,18 @@ Deno.serve(async (req) => {
     
     for (const task of tasksToRemind) {
       try {
+        // Check if user has global task reminders disabled
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('task_reminders_enabled')
+          .eq('id', task.user_id)
+          .maybeSingle();
+
+        if (userProfile?.task_reminders_enabled === false) {
+          console.log(`Task reminders disabled for user ${task.user_id}`);
+          continue;
+        }
+
         const { data: deviceTokens } = await supabase
           .from('push_device_tokens')
           .select('device_token')
