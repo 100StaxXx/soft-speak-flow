@@ -1,8 +1,9 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Map, Search, Compass, Sword, Heart, Mountain } from "lucide-react";
+import { Map, Search, Compass, Sword, Heart, Mountain, ChevronDown } from "lucide-react";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 interface StoryType {
@@ -79,12 +80,25 @@ interface StoryTypeSelectorProps {
 }
 
 export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryTypeSelectorProps) => {
+  const [expandedType, setExpandedType] = useState<StoryTypeSlug | null>(null);
+
   // Calculate chapters based on duration
   const calculateChapters = (baseChapters: number) => {
     if (targetDays <= 14) return Math.max(3, baseChapters - 2);
     if (targetDays <= 30) return baseChapters;
     if (targetDays <= 60) return baseChapters + 1;
     return baseChapters + 2;
+  };
+
+  const handleCardClick = (slug: StoryTypeSlug) => {
+    if (expandedType === slug) {
+      // If already expanded, just select it
+      onSelect(slug);
+    } else {
+      // Expand the card
+      setExpandedType(slug);
+      onSelect(slug);
+    }
   };
 
   return (
@@ -97,6 +111,7 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
           const Icon = type.icon;
           const chapters = calculateChapters(type.baseChapters);
           const isSelected = selectedType === type.slug;
+          const isExpanded = expandedType === type.slug;
           
           return (
             <motion.div
@@ -104,6 +119,7 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
+              layout
             >
               <Card
                 className={cn(
@@ -113,11 +129,11 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
                     ? "border-primary bg-primary/10 shadow-glow" 
                     : "border-transparent hover:border-primary/30"
                 )}
-                onClick={() => onSelect(type.slug)}
+                onClick={() => handleCardClick(type.slug)}
               >
                 <div className="flex items-start gap-3">
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
                     "bg-gradient-to-br",
                     type.color
                   )}>
@@ -132,9 +148,35 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
-                      {type.description}
-                    </p>
+                    
+                    <AnimatePresence mode="wait">
+                      {isExpanded ? (
+                        <motion.p
+                          key="full"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="text-[11px] text-muted-foreground mt-0.5"
+                        >
+                          {type.description}
+                        </motion.p>
+                      ) : (
+                        <motion.div
+                          key="truncated"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center gap-1 mt-0.5"
+                        >
+                          <p className="text-[11px] text-muted-foreground line-clamp-1 flex-1">
+                            {type.description}
+                          </p>
+                          <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
                     <div className="flex items-center gap-2 mt-1.5">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                         {chapters} Chapters
