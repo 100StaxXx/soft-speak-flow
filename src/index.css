@@ -1326,5 +1326,30 @@ All colors MUST be HSL.
     animation: frame-particle 3s ease-out infinite;
   }
 
+  /* Stellar Beats - Hit effect pop animation */
+  @keyframes hit-pop {
+    0% {
+      opacity: 1;
+      transform: scale(0.5) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.5) translateY(-30px);
+    }
+  }
+  
+  .animate-hit-pop {
+    animation: hit-pop 0.5s ease-out forwards;
+    will-change: transform, opacity;
+  }
+  
+  /* GPU acceleration layer hint */
+  .gpu-layer {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform;
+  }
+
 }
 
