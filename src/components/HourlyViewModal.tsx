@@ -34,12 +34,22 @@ export function HourlyViewModal({
     if (open && scrollRef.current) {
       const now = new Date();
       const currentHour = now.getHours();
-      // Each hour slot is roughly 120px (60px per 30min slot)
-      const scrollTarget = Math.max(0, (currentHour - 1) * 120);
+      const currentMinutes = now.getMinutes();
       
+      // Each hour has 2 time slots (30min each), each slot is ~60px height
+      // So each hour = 120px. Add partial hour offset for more precision.
+      const hourOffset = currentHour * 120;
+      const minuteOffset = (currentMinutes / 60) * 120;
+      // Scroll to show current time roughly in the upper third of the viewport
+      const viewportOffset = 100;
+      const scrollTarget = Math.max(0, hourOffset + minuteOffset - viewportOffset);
+      
+      // Use a longer timeout to ensure DOM is fully rendered
       setTimeout(() => {
-        scrollRef.current?.scrollTo({ top: scrollTarget, behavior: "smooth" });
-      }, 100);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({ top: scrollTarget, behavior: "smooth" });
+        }
+      }, 150);
     }
   }, [open]);
 
