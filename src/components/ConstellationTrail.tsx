@@ -14,15 +14,14 @@ interface ConstellationTrailProps {
   narrativeCheckpoints?: NarrativeCheckpoint[];
 }
 
-// Generate star positions along a curved path
+// Generate star positions along a straight path
 const generateStarPositions = (count: number) => {
   const positions: { x: number; y: number; size: number }[] = [];
   
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
-    // Create a gentle wave/arc path
     const x = 10 + t * 80; // 10% to 90% width
-    const y = 50 + Math.sin(t * Math.PI * 1.5) * 25; // Wavy path
+    const y = 50; // Straight horizontal line at center
     const size = i === 0 || i === count - 1 ? 10 : 6 + Math.random() * 4;
     positions.push({ x, y, size });
   }
@@ -30,25 +29,19 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
-// Calculate position along the wave path for any progress percentage
+// Calculate position along the straight path for any progress percentage
 const getPositionOnPath = (progress: number) => {
   const t = Math.max(0, Math.min(100, progress)) / 100;
   const x = 10 + t * 80;
-  const y = 50 + Math.sin(t * Math.PI * 1.5) * 25;
+  const y = 50;
   return { x, y };
 };
 
-// Generate SVG path string for the curved journey
+// Generate SVG path string for the straight journey
 const generatePathString = (fromPercent: number, toPercent: number) => {
-  const steps = 50;
-  const points: string[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = fromPercent / 100 + (i / steps) * ((toPercent - fromPercent) / 100);
-    const x = 10 + t * 80;
-    const y = 50 + Math.sin(t * Math.PI * 1.5) * 25;
-    points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
-  }
-  return points.join(' ');
+  const fromX = 10 + (fromPercent / 100) * 80;
+  const toX = 10 + (toPercent / 100) * 80;
+  return `M ${fromX} 50 L ${toX} 50`;
 };
 
 // Get mood-based filter styles
