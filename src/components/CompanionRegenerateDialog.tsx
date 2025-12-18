@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Sparkles, Loader2 } from "lucide-react";
+import { ImageGenerationProgress, type GenerationPhase } from "./ImageGenerationProgress";
 
 interface CompanionRegenerateDialogProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ interface CompanionRegenerateDialogProps {
   onConfirm: () => void;
   isRegenerating: boolean;
   regenerationsRemaining: number;
+  generationPhase?: GenerationPhase;
+  retryCount?: number;
 }
 
 export const CompanionRegenerateDialog = ({
@@ -24,48 +27,78 @@ export const CompanionRegenerateDialog = ({
   onConfirm,
   isRegenerating,
   regenerationsRemaining,
+  generationPhase = 'starting',
+  retryCount = 0,
 }: CompanionRegenerateDialogProps) => {
+  const isComplete = generationPhase === 'complete' || generationPhase === 'warning';
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && !isRegenerating && onClose()}>
       <AlertDialogContent className="cosmic-glass border-primary/30">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Regenerate Companion?
+            {isRegenerating ? "Creating New Look..." : "Regenerate Companion?"}
           </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-2">
-            <p>
-              This will create a new unique appearance for your companion while keeping 
-              all stats, XP, and progress intact.
-            </p>
-            <p className="text-sm text-muted-foreground/80">
-              You have <span className="font-semibold text-primary">{regenerationsRemaining}</span> regeneration
-              {regenerationsRemaining === 1 ? '' : 's'} remaining (lifetime limit).
-            </p>
+          <AlertDialogDescription className="space-y-3">
+            {isRegenerating ? (
+              <div className="py-2">
+                <ImageGenerationProgress 
+                  phase={generationPhase}
+                  retryCount={retryCount}
+                  estimatedTime={15}
+                />
+                {retryCount > 0 && (
+                  <p className="text-xs text-muted-foreground mt-3 text-center">
+                    We're ensuring your companion looks perfect
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <p>
+                  This will create a new unique appearance for your companion while keeping 
+                  all stats, XP, and progress intact.
+                </p>
+                <p className="text-sm text-muted-foreground/80">
+                  You have <span className="font-semibold text-primary">{regenerationsRemaining}</span> regeneration
+                  {regenerationsRemaining === 1 ? '' : 's'} remaining (lifetime limit).
+                </p>
+                <p className="text-xs text-muted-foreground/60">
+                  Generation usually takes 10-20 seconds. We'll ensure quality by validating the result.
+                </p>
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isRegenerating}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(e) => {
-              e.preventDefault();
-              onConfirm();
-            }}
-            disabled={isRegenerating || regenerationsRemaining <= 0}
-            className="bg-primary hover:bg-primary/90"
-          >
-            {isRegenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Regenerating...
-              </>
-            ) : (
-              <>
+          {!isRegenerating && (
+            <>
+              <AlertDialogCancel disabled={isRegenerating}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  onConfirm();
+                }}
+                disabled={isRegenerating || regenerationsRemaining <= 0}
+                className="bg-primary hover:bg-primary/90"
+              >
                 <Sparkles className="h-4 w-4 mr-2" />
                 Regenerate
-              </>
-            )}
-          </AlertDialogAction>
+              </AlertDialogAction>
+            </>
+          )}
+          {isComplete && (
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                onClose();
+              }}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Done
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

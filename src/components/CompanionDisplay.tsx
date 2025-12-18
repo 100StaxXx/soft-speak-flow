@@ -88,7 +88,7 @@ export const CompanionDisplay = memo(() => {
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
-  const { regenerate, isRegenerating, maxRegenerations } = useCompanionRegenerate();
+  const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
@@ -517,6 +517,8 @@ export const CompanionDisplay = memo(() => {
         onConfirm={handleRegenerateConfirm}
         isRegenerating={isRegenerating}
         regenerationsRemaining={regenerationsRemaining}
+        generationPhase={generationPhase}
+        retryCount={retryCount}
       />
     </>
   );
