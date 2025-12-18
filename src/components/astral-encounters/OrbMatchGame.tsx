@@ -10,6 +10,7 @@ interface OrbMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -242,7 +243,7 @@ OrbComponent.displayName = 'OrbComponent';
 
 // Main Game Component
 export const OrbMatchGame = ({
-  companionStats, onComplete, onDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
+  companionStats, onComplete, onDamage, tierAttackDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
 }: OrbMatchGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -323,6 +324,8 @@ export const OrbMatchGame = ({
   const shuffleBoard = useCallback(() => {
     setIsShuffling(true);
     triggerHaptic('medium');
+    // Deal damage to player for no valid moves
+    onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.orb_match.noMoves, source: 'no_moves' });
     setTimeout(() => {
       setOrbs(currentOrbs => {
         const colors = currentOrbs.map(o => o.color);
@@ -334,7 +337,7 @@ export const OrbMatchGame = ({
       });
       setIsShuffling(false);
     }, 600);
-  }, []);
+  }, [onDamage]);
 
   const initializeGrid = useCallback(() => {
     const newOrbs: Orb[] = [];
