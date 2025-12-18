@@ -495,6 +495,7 @@ export function EnergyBeamGame({
   const touchStartX = useRef<number | null>(null);
   const animationFrameRef = useRef<number>();
   const lastUpdateTime = useRef(0);
+  const isWaveTransitioning = useRef(false);
   
   // Stats tracking
   const statsRef = useRef({
@@ -513,9 +514,9 @@ export function EnergyBeamGame({
     powerUpChance: config.powerUpChance,
   }), [config, wave]);
   
-  // Initialize first wave
+  // Initialize first wave - only run if not in wave transition
   useEffect(() => {
-    if (gameState === 'playing' && enemies.length === 0) {
+    if (gameState === 'playing' && enemies.length === 0 && !isWaveTransitioning.current) {
       setEnemies(generateEnemies(wave, config));
     }
   }, [gameState, wave, config, enemies.length]);
@@ -912,12 +913,16 @@ export function EnergyBeamGame({
   useEffect(() => {
     if (gameState !== 'playing') return;
     if (enemies.length > 0) return;
+    if (isWaveTransitioning.current) return; // Prevent double-triggering
+    
+    isWaveTransitioning.current = true; // Lock transition
     
     const stats = statsRef.current;
     stats.wavesCompleted++;
     
     // Practice mode: end after completing 2 waves
     if (isPractice && stats.wavesCompleted >= 2) {
+      isWaveTransitioning.current = false;
       setGameState('complete');
       return;
     }
@@ -927,9 +932,13 @@ export function EnergyBeamGame({
     setGameState('wave-transition');
     
     setTimeout(() => {
-      setWave(w => w + 1);
-      setEnemies(generateEnemies(wave + 1, config));
+      setWave(prevWave => {
+        const nextWave = prevWave + 1;
+        setEnemies(generateEnemies(nextWave, config));
+        return nextWave;
+      });
       setGameState('playing');
+      isWaveTransitioning.current = false; // Unlock after complete
     }, 2000);
   }, [enemies.length, wave, config, gameState, isPractice]);
   
