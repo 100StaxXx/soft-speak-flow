@@ -561,6 +561,76 @@ export const OrbMatchGame = ({
     }, 4000);
   }, [findValidMove]);
 
+  // Activate a special orb and return affected orbs - MUST be defined before findMatches
+  const activateSpecial = useCallback((orb: Orb, grid: (Orb | null)[][], currentOrbs: Orb[]): {
+    affectedIds: string[];
+    bonusDamage: number;
+    effectType: SpecialEffect['type'];
+  } | null => {
+    switch (orb.special) {
+      case 'line_bomb': {
+        const isHorizontal = orb.col % 2 === 0;
+        const affected: string[] = [];
+        if (isHorizontal) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            const o = grid[orb.row][c];
+            if (o) affected.push(o.id);
+          }
+        } else {
+          for (let r = 0; r < GRID_ROWS; r++) {
+            const o = grid[r][orb.col];
+            if (o) affected.push(o.id);
+          }
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_line_bomb,
+          effectType: isHorizontal ? 'beam_horizontal' : 'beam_vertical'
+        };
+      }
+      case 'cross_bomb': {
+        const affected: string[] = [];
+        for (let c = 0; c < GRID_COLS; c++) {
+          const o = grid[orb.row][c];
+          if (o) affected.push(o.id);
+        }
+        for (let r = 0; r < GRID_ROWS; r++) {
+          const o = grid[r][orb.col];
+          if (o && !affected.includes(o.id)) affected.push(o.id);
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cross_bomb,
+          effectType: 'cross_beam'
+        };
+      }
+      case 'star': {
+        const affected = currentOrbs.filter(o => o.color === orb.color).map(o => o.id);
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_star,
+          effectType: 'color_burst'
+        };
+      }
+      case 'cosmic_nova': {
+        const affected: string[] = [];
+        for (let r = Math.max(0, orb.row - 1); r <= Math.min(GRID_ROWS - 1, orb.row + 1); r++) {
+          for (let c = Math.max(0, orb.col - 1); c <= Math.min(GRID_COLS - 1, orb.col + 1); c++) {
+            const o = grid[r][c];
+            if (o) affected.push(o.id);
+          }
+        }
+        return {
+          affectedIds: affected,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
+          effectType: 'cosmic_nova'
+        };
+      }
+      default:
+        return null;
+    }
+  }, []);
+
   const findMatches = useCallback((currentOrbs: Orb[]): { 
     matched: Set<string>; 
     matchGroups: { ids: string[]; size: number; color: OrbColor; centerRow: number; centerCol: number; isHorizontal: boolean }[];
@@ -575,7 +645,6 @@ export const OrbMatchGame = ({
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
     currentOrbs.forEach(orb => { grid[orb.row][orb.col] = orb; });
 
-    // Track positions involved in matches for T/L shape detection
     const matchPositions = new Map<string, { row: number; col: number; color: OrbColor }>();
 
     // Horizontal matches
@@ -599,7 +668,6 @@ export const OrbMatchGame = ({
           const centerCol = col + Math.floor(matchLength / 2);
           matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow: row, centerCol, isHorizontal: true });
           
-          // Create special for 4+ matches
           if (matchLength === 4) {
             specialsToCreate.push({ row, col: centerCol, type: 'line_bomb', color: startOrb.color });
           } else if (matchLength >= 5) {
@@ -633,7 +701,6 @@ export const OrbMatchGame = ({
             matchGroups.push({ ids: group, size: matchLength, color: startOrb.color, centerRow, centerCol: col, isHorizontal: false });
           }
           
-          // Create special for 4+ vertical matches
           if (matchLength === 4) {
             specialsToCreate.push({ row: centerRow, col, type: 'line_bomb', color: startOrb.color });
           } else if (matchLength >= 5) {
@@ -645,8 +712,7 @@ export const OrbMatchGame = ({
     }
 
     // Detect T/L shapes for star creation
-    for (const [key, pos] of matchPositions) {
-      // Check if this position is part of both horizontal and vertical matches (T or L intersection)
+    for (const [, pos] of matchPositions) {
       const hasHorizontalNeighbors = 
         (matchPositions.has(`${pos.row}-${pos.col - 1}`) && matchPositions.get(`${pos.row}-${pos.col - 1}`)?.color === pos.color) ||
         (matchPositions.has(`${pos.row}-${pos.col + 1}`) && matchPositions.get(`${pos.row}-${pos.col + 1}`)?.color === pos.color);
@@ -655,10 +721,8 @@ export const OrbMatchGame = ({
         (matchPositions.has(`${pos.row + 1}-${pos.col}`) && matchPositions.get(`${pos.row + 1}-${pos.col}`)?.color === pos.color);
       
       if (hasHorizontalNeighbors && hasVerticalNeighbors) {
-        // This is a T or L intersection - create a star (but avoid duplicates)
         const existingStarAtPos = specialsToCreate.find(s => s.row === pos.row && s.col === pos.col && s.type === 'star');
         if (!existingStarAtPos) {
-          // Replace any line bombs at this position with a star (star is better)
           const existingIdx = specialsToCreate.findIndex(s => s.row === pos.row && s.col === pos.col);
           if (existingIdx >= 0) {
             specialsToCreate[existingIdx] = { row: pos.row, col: pos.col, type: 'star', color: pos.color };
@@ -676,22 +740,19 @@ export const OrbMatchGame = ({
         const activation = activateSpecial(orb, grid, currentOrbs);
         if (activation) {
           specialsActivated.push({ orb, ...activation });
-          // Add affected orbs to matched set
           activation.affectedIds.forEach(aid => matchedIds.add(aid));
         }
       }
     }
 
-    // Check for two specials being swapped together (cosmic nova)
+    // Check for two specials being matched together (cosmic nova)
     const specialOrbs = Array.from(matchedIds)
       .map(id => currentOrbs.find(o => o.id === id))
       .filter(o => o && o.special && o.special !== 'normal') as Orb[];
     
     if (specialOrbs.length >= 2) {
-      // Create cosmic nova at first special's position
       const first = specialOrbs[0];
       const cosmicAffected: string[] = [];
-      // Clear 3x3 around each special
       for (const sp of specialOrbs) {
         for (let r = Math.max(0, sp.row - 1); r <= Math.min(GRID_ROWS - 1, sp.row + 1); r++) {
           for (let c = Math.max(0, sp.col - 1); c <= Math.min(GRID_COLS - 1, sp.col + 1); c++) {
@@ -710,89 +771,19 @@ export const OrbMatchGame = ({
     }
 
     return { matched: matchedIds, matchGroups, specialsToCreate, specialsActivated };
-  }, []);
-
-  // Activate a special orb and return affected orbs
-  const activateSpecial = useCallback((orb: Orb, grid: (Orb | null)[][], currentOrbs: Orb[]): {
-    affectedIds: string[];
-    bonusDamage: number;
-    effectType: SpecialEffect['type'];
-  } | null => {
-    switch (orb.special) {
-      case 'line_bomb': {
-        // Clear entire row OR column (alternate based on position)
-        const isHorizontal = orb.col % 2 === 0;
-        const affected: string[] = [];
-        if (isHorizontal) {
-          for (let c = 0; c < GRID_COLS; c++) {
-            const o = grid[orb.row][c];
-            if (o) affected.push(o.id);
-          }
-        } else {
-          for (let r = 0; r < GRID_ROWS; r++) {
-            const o = grid[r][orb.col];
-            if (o) affected.push(o.id);
-          }
-        }
-        return {
-          affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_line_bomb,
-          effectType: isHorizontal ? 'beam_horizontal' : 'beam_vertical'
-        };
-      }
-      case 'cross_bomb': {
-        // Clear row AND column
-        const affected: string[] = [];
-        for (let c = 0; c < GRID_COLS; c++) {
-          const o = grid[orb.row][c];
-          if (o) affected.push(o.id);
-        }
-        for (let r = 0; r < GRID_ROWS; r++) {
-          const o = grid[r][orb.col];
-          if (o && !affected.includes(o.id)) affected.push(o.id);
-        }
-        return {
-          affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cross_bomb,
-          effectType: 'cross_beam'
-        };
-      }
-      case 'star': {
-        // Clear all orbs of the same color
-        const affected = currentOrbs.filter(o => o.color === orb.color).map(o => o.id);
-        return {
-          affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_star,
-          effectType: 'color_burst'
-        };
-      }
-      case 'cosmic_nova': {
-        // 3x3 area
-        const affected: string[] = [];
-        for (let r = Math.max(0, orb.row - 1); r <= Math.min(GRID_ROWS - 1, orb.row + 1); r++) {
-          for (let c = Math.max(0, orb.col - 1); c <= Math.min(GRID_COLS - 1, orb.col + 1); c++) {
-            const o = grid[r][c];
-            if (o) affected.push(o.id);
-          }
-        }
-        return {
-          affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
-          effectType: 'cosmic_nova'
-        };
-      }
-      default:
-        return null;
-    }
-  }, []);
+  }, [activateSpecial]);
 
   const dropAndFill = useCallback((currentOrbs: Orb[], specialsToCreate: SpecialCreation[] = []): Orb[] => {
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
     currentOrbs.forEach(orb => { if (!orb.matched) grid[orb.row][orb.col] = orb; });
 
-    // Track where specials should be created (after drops settle)
-    const pendingSpecials = new Map<string, SpecialCreation>();
-    specialsToCreate.forEach(s => pendingSpecials.set(`${s.row}-${s.col}`, s));
+    // Group specials by column for proper placement
+    const specialsByCol = new Map<number, SpecialCreation[]>();
+    specialsToCreate.forEach(s => {
+      const existing = specialsByCol.get(s.col) || [];
+      existing.push(s);
+      specialsByCol.set(s.col, existing);
+    });
 
     for (let col = 0; col < GRID_COLS; col++) {
       let emptyRow = GRID_ROWS - 1;
@@ -805,20 +796,25 @@ export const OrbMatchGame = ({
           emptyRow--;
         }
       }
+      
+      // Get specials for this column
+      const colSpecials = specialsByCol.get(col) || [];
+      let specialIndex = 0;
+      
       for (let row = emptyRow; row >= 0; row--) {
-        // Check if a special should be created here
-        const specialAtCol = Array.from(pendingSpecials.values()).find(s => s.col === col);
+        // Create special orb if available for this column
+        const special = colSpecials[specialIndex];
+        const isSpecialOrb = special && specialIndex < colSpecials.length;
+        
         grid[row][col] = {
           id: `${row}-${col}-${Date.now()}-${Math.random()}`,
-          color: specialAtCol?.color || availableColors[Math.floor(Math.random() * availableColors.length)],
+          color: isSpecialOrb ? special.color : availableColors[Math.floor(Math.random() * availableColors.length)],
           row, col, 
-          special: row === emptyRow && specialAtCol ? specialAtCol.type : 'normal', 
+          special: isSpecialOrb ? special.type : 'normal', 
           isNew: true,
         };
-        // Remove used special
-        if (row === emptyRow && specialAtCol) {
-          pendingSpecials.delete(`${specialAtCol.row}-${specialAtCol.col}`);
-        }
+        
+        if (isSpecialOrb) specialIndex++;
       }
     }
 
