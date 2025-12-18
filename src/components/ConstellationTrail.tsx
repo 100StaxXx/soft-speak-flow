@@ -91,14 +91,15 @@ export const ConstellationTrail = ({
       }
     }
     
-    // Fallback for non-narrative epics
+    // Fallback for non-narrative epics - show "?" until reached
+    const isReached = progress >= milestone;
+    const isFinale = milestone === 100;
     return { 
-      label: milestone === 100 ? "Legend" : `${milestone}%`,
-      isRevealed: true,
-      isFinale: milestone === 100
+      label: isReached ? (isFinale ? "Legend" : `${milestone}%`) : "?",
+      isRevealed: isReached,
+      isFinale
     };
   };
-  
   // Background stars for ambiance - use seeded pseudo-random for consistency
   const bgStars = useMemo(() => {
     // Simple seeded random function for consistent star positions across renders
