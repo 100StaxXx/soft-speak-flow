@@ -258,7 +258,7 @@ export const PracticeRoundWrapper = ({
             className="relative"
           >
             <PracticeBanner />
-            <div className="pt-2 h-[500px]">
+            <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
               {renderPracticeGame()}
             </div>
           </motion.div>

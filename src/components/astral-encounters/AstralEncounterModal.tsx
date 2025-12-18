@@ -227,7 +227,7 @@ export const AstralEncounterModal = ({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
-        <div className="relative min-h-[500px]">
+        <div className="relative min-h-[500px] max-h-[90vh] overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
           
           <div className="relative z-10">
