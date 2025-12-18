@@ -191,3 +191,6 @@ verify_jwt = true
 
 [functions.check-habit-reminders]
 verify_jwt = false
+
+[functions.batch-generate-rhythm-tracks]
+verify_jwt = false
