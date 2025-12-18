@@ -227,6 +227,10 @@ export const StarfallDodgeGame = ({
   const touchStartRef = useRef<{ x: number; playerX: number } | null>(null);
   const livesRef = useRef(lives);
   const hasShieldRef = useRef(hasShield);
+  
+  // Smooth player movement interpolation
+  const targetPlayerXRef = useRef(50);
+  const smoothPlayerXRef = useRef(50);
 
   // Device orientation hook - use landscape function for this game
   const { available, permitted, requestPermission, getLandscapePositionFromTilt } = useDeviceOrientation();
@@ -318,12 +322,23 @@ export const StarfallDodgeGame = ({
   useGameLoop((deltaTime, time) => {
     if (gameStateRef.current !== 'playing') return;
 
-    // Use landscape tilt function with reduced sensitivity
-    const currentPlayerX = useTilt ? getLandscapePositionFromTilt(8, 1.2) : playerXRef.current;
+    // Smoothing factor for player movement interpolation (per frame)
+    // Higher = more responsive, lower = smoother
+    const LERP_SPEED = 0.12;
     
-    // Update player position from tilt
+    let currentPlayerX: number;
+    
     if (useTilt) {
+      // Get target position from tilt
+      targetPlayerXRef.current = getLandscapePositionFromTilt(6, 1.4);
+      
+      // Smooth interpolation (lerp) toward target
+      smoothPlayerXRef.current += (targetPlayerXRef.current - smoothPlayerXRef.current) * LERP_SPEED;
+      currentPlayerX = smoothPlayerXRef.current;
+      
       setPlayerX(currentPlayerX);
+    } else {
+      currentPlayerX = playerXRef.current;
     }
 
     // Update survival time

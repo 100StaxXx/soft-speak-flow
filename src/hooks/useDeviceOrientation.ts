@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface DeviceOrientation {
   gamma: number; // left/right tilt (-90 to 90)
@@ -7,6 +7,9 @@ interface DeviceOrientation {
   available: boolean;
 }
 
+// Smoothing factor (0 = no smoothing, 1 = instant response)
+const SMOOTHING_FACTOR = 0.15;
+
 export const useDeviceOrientation = () => {
   const [orientation, setOrientation] = useState<DeviceOrientation>({
     gamma: 0,
@@ -14,6 +17,12 @@ export const useDeviceOrientation = () => {
     permitted: false,
     available: typeof DeviceOrientationEvent !== 'undefined',
   });
+
+  // Smoothed values for interpolation
+  const smoothedGammaRef = useRef(0);
+  const smoothedBetaRef = useRef(0);
+  const rawGammaRef = useRef(0);
+  const rawBetaRef = useRef(0);
 
   const requestPermission = useCallback(async () => {
     // iOS 13+ requires explicit permission
@@ -39,12 +48,18 @@ export const useDeviceOrientation = () => {
     if (!orientation.available) return;
 
     const handleOrientation = (e: DeviceOrientationEvent) => {
-      // gamma: left/right tilt (-90 to 90)
-      // beta: front/back tilt (-180 to 180)
+      // Store raw values
+      rawGammaRef.current = e.gamma ?? 0;
+      rawBetaRef.current = e.beta ?? 0;
+
+      // Apply exponential smoothing (low-pass filter)
+      smoothedGammaRef.current = smoothedGammaRef.current + SMOOTHING_FACTOR * (rawGammaRef.current - smoothedGammaRef.current);
+      smoothedBetaRef.current = smoothedBetaRef.current + SMOOTHING_FACTOR * (rawBetaRef.current - smoothedBetaRef.current);
+
       setOrientation(prev => ({
         ...prev,
-        gamma: e.gamma ?? 0,
-        beta: e.beta ?? 0,
+        gamma: smoothedGammaRef.current,
+        beta: smoothedBetaRef.current,
         permitted: true,
       }));
     };
@@ -79,21 +94,34 @@ export const useDeviceOrientation = () => {
     const { beta } = orientation;
     
     // In landscape mode, beta ranges from about -45 (tilt left) to +45 (tilt right)
-    // Apply deadzone for stability
-    const adjustedBeta = Math.abs(beta) < deadzone ? 0 : beta;
+    // Apply soft deadzone - gradual transition instead of hard cutoff
+    const sign = beta >= 0 ? 1 : -1;
+    const absBeta = Math.abs(beta);
     
-    // Use wider tilt range (45 degrees) for more natural landscape control
+    // Soft deadzone: values below deadzone are reduced, not zeroed
+    const adjustedBeta = absBeta < deadzone 
+      ? sign * (absBeta * absBeta / deadzone) // Quadratic ramp in deadzone
+      : sign * absBeta;
+    
+    // Use wider tilt range (50 degrees) for more natural landscape control
     // Lower sensitivity for smoother, more forgiving controls
-    const normalized = (adjustedBeta / 45) * 50 * sensitivity;
+    const normalized = (adjustedBeta / 50) * 50 * sensitivity;
     
-    // Center at 50, clamp to 5-95 range (wider range for landscape)
-    return Math.max(5, Math.min(95, 50 + normalized));
+    // Center at 50, clamp to 3-97 range (wider range for landscape)
+    return Math.max(3, Math.min(97, 50 + normalized));
   }, [orientation]);
+
+  // Get raw (unsmoothed) values for debugging
+  const getRawOrientation = useCallback(() => ({
+    gamma: rawGammaRef.current,
+    beta: rawBetaRef.current,
+  }), []);
 
   return {
     ...orientation,
     requestPermission,
     getPositionFromTilt,
     getLandscapePositionFromTilt,
+    getRawOrientation,
   };
 };
