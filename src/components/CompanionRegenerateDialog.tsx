@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { ImageGenerationProgress, type GenerationPhase } from "./ImageGenerationProgress";
 
 interface CompanionRegenerateDialogProps {
@@ -72,7 +72,7 @@ export const CompanionRegenerateDialog = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          {!isRegenerating && (
+          {!isRegenerating && !isComplete && (
             <>
               <AlertDialogCancel disabled={isRegenerating}>Cancel</AlertDialogCancel>
               <AlertDialogAction
