@@ -5,9 +5,13 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface EnergyBeamGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -455,6 +459,8 @@ const generateEnemies = (wave: number, config: typeof DIFFICULTY_CONFIG['easy'])
 export function EnergyBeamGame({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 1,
   isPractice = false,
@@ -714,6 +720,14 @@ export function EnergyBeamGame({
                   setScore(s => s + points);
                   triggerHaptic('light');
                   
+                  // Deal damage to adversary based on enemy type
+                  const damageAmount = enemy.type === 'boss' 
+                    ? GAME_DAMAGE_VALUES.energy_beam.destroyBoss
+                    : enemy.type === 'scout' 
+                      ? GAME_DAMAGE_VALUES.energy_beam.destroyAsteroid
+                      : GAME_DAMAGE_VALUES.energy_beam.destroyEnemy;
+                  onDamage?.({ target: 'adversary', amount: damageAmount, source: `destroy_${enemy.type}` });
+                  
                   // Add explosion
                   setExplosions(e => [...e, {
                     id: `exp-${Date.now()}-${enemy.id}`,
@@ -764,6 +778,9 @@ export function EnergyBeamGame({
                 setHasShield(false);
                 triggerHaptic('medium');
               } else {
+                // Player takes damage from enemy projectile
+                onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'player_hit' });
+                
                 setLives(l => {
                   const newLives = l - 1;
                   if (newLives <= 0) {

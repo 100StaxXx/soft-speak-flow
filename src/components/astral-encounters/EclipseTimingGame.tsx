@@ -7,9 +7,13 @@ import { TrackRatingUI } from './TrackRatingUI';
 import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
 import { Moon, Star, Sun, Music, Loader2 } from 'lucide-react';
 import { stopEncounterMusic } from '@/utils/soundEffects';
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface EclipseTimingGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -268,6 +272,8 @@ TrackLoadingScreen.displayName = 'TrackLoadingScreen';
 export const EclipseTimingGame = ({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
   maxTimer,
@@ -391,6 +397,10 @@ export const EclipseTimingGame = ({
           if (newY > HIT_ZONE_Y + TIMING_WINDOWS.good + 5 && !note.hit && !note.missed) {
             setNotesMissed(m => m + 1);
             setCombo(0);
+            
+            // Player takes damage for missing note
+            onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'miss' });
+            
             return { ...note, y: newY, missed: true };
           }
           
@@ -472,6 +482,14 @@ export const EclipseTimingGame = ({
     
     setNotes(prev => prev.map(n => n.id === closestNote.id ? { ...n, hit: true } : n));
     notesRef.current = notesRef.current.map(n => n.id === closestNote.id ? { ...n, hit: true } : n);
+    
+    // Deal damage to adversary based on hit quality
+    const damageAmount = result === 'perfect' 
+      ? GAME_DAMAGE_VALUES.eclipse_timing.perfect 
+      : result === 'great' 
+        ? GAME_DAMAGE_VALUES.eclipse_timing.great 
+        : GAME_DAMAGE_VALUES.eclipse_timing.good;
+    onDamage?.({ target: 'adversary', amount: damageAmount, source: result });
     
     const multiplier = getComboMultiplier(combo);
     const points = HIT_RESULTS[result].points * multiplier;

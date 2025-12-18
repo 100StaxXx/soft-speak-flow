@@ -6,9 +6,13 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface AstralFrequencyGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
+  tierAttackDamage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -429,6 +433,8 @@ LaneControls.displayName = 'LaneControls';
 export const AstralFrequencyGame = ({
   companionStats,
   onComplete,
+  onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   isPractice = false,
 }: AstralFrequencyGameProps) => {
@@ -512,6 +518,9 @@ export const AstralFrequencyGame = ({
         setShowDamageFlash(true);
         setTimeout(() => setShowDamageFlash(false), 200);
         
+        // Player takes damage from collision
+        onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
+        
         setLives(prev => {
           const newLives = prev - 1;
           if (newLives <= 0) {
@@ -531,11 +540,14 @@ export const AstralFrequencyGame = ({
         return newCombo;
       });
       triggerHaptic('light');
+      
+      // Deal damage to adversary for collecting crystal
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.astral_frequency.collectOrb, source: 'collect_orb' });
     } else if (type === 'shield') {
       setHasShield(true);
       triggerHaptic('medium');
     }
-  }, [combo]);
+  }, [combo, onDamage, tierAttackDamage]);
   
   // Game loop - spawn obstacles, update positions, and update distance (NO TIMER)
   useEffect(() => {

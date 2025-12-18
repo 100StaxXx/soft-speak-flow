@@ -6,9 +6,12 @@ import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 import { GameStyleWrapper } from './GameStyles';
 
+import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+
 interface SoulSerpentGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
+  onDamage?: (event: DamageEvent) => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   questIntervalScale?: number;
   maxTimer?: number;
@@ -375,6 +378,7 @@ Stardust.displayName = 'Stardust';
 export const SoulSerpentGame = ({
   companionStats,
   onComplete,
+  onDamage,
   difficulty = 'medium',
   questIntervalScale = 0,
   maxTimer,
@@ -530,6 +534,9 @@ export const SoulSerpentGame = ({
         setShake(true);
         setTimeout(() => setShake(false), 300);
         
+        // Player takes self-inflicted collision damage
+        onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.soul_serpent.collision, source: 'collision' });
+        
         // Calculate result based on score achieved
         const { accuracy, result } = calculateAccuracy(score);
         
@@ -546,6 +553,9 @@ export const SoulSerpentGame = ({
       // Check stardust collection
       if (newHead.x === stardust.x && newHead.y === stardust.y) {
         const newScore = score + 1;
+        
+        // Deal damage to adversary for collecting stardust
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.collectStardust, source: 'collect_stardust' });
         
         // Practice mode: end after collecting 5 stardust
         if (isPractice && newScore >= 5) {
