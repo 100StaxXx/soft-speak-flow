@@ -119,7 +119,6 @@ export const GAME_DAMAGE_VALUES = {
   // Astral Frequency (endless runner)
   astral_frequency: {
     collectOrb: 4,
-    perfectLock: 15,
     collision: 'tier_attack',
   },
 } as const;
