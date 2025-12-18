@@ -2988,6 +2988,7 @@ export type Database = {
           daily_quote_push_window: string | null
           email: string | null
           faction: string | null
+          habit_reminders_enabled: boolean | null
           id: string
           is_premium: boolean | null
           last_encounter_quest_count: number | null
@@ -3017,6 +3018,7 @@ export type Database = {
           subscription_expires_at: string | null
           subscription_started_at: string | null
           subscription_status: string | null
+          task_reminders_enabled: boolean | null
           timezone: string | null
           total_quests_completed: number | null
           trial_ends_at: string | null
@@ -3041,6 +3043,7 @@ export type Database = {
           daily_quote_push_window?: string | null
           email?: string | null
           faction?: string | null
+          habit_reminders_enabled?: boolean | null
           id: string
           is_premium?: boolean | null
           last_encounter_quest_count?: number | null
@@ -3070,6 +3073,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_started_at?: string | null
           subscription_status?: string | null
+          task_reminders_enabled?: boolean | null
           timezone?: string | null
           total_quests_completed?: number | null
           trial_ends_at?: string | null
@@ -3094,6 +3098,7 @@ export type Database = {
           daily_quote_push_window?: string | null
           email?: string | null
           faction?: string | null
+          habit_reminders_enabled?: boolean | null
           id?: string
           is_premium?: boolean | null
           last_encounter_quest_count?: number | null
@@ -3123,6 +3128,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_started_at?: string | null
           subscription_status?: string | null
+          task_reminders_enabled?: boolean | null
           timezone?: string | null
           total_quests_completed?: number | null
           trial_ends_at?: string | null

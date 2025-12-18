@@ -63,6 +63,17 @@ Deno.serve(async (req) => {
     let remindersSent = 0;
 
     for (const habit of habits) {
+      // Check if user has global habit reminders disabled
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("habit_reminders_enabled")
+        .eq("id", habit.user_id)
+        .maybeSingle();
+
+      if (userProfile?.habit_reminders_enabled === false) {
+        continue;
+      }
+
       // Check if habit is due today
       const isDueToday = habit.frequency === "daily" ||
         (habit.frequency === "custom" && habit.custom_days?.includes(currentDayOfWeek));
@@ -109,7 +120,7 @@ Deno.serve(async (req) => {
 
       // Get user's push tokens
       const { data: tokens } = await supabase
-        .from("push_subscriptions")
+        .from("push_device_tokens")
         .select("device_token, platform")
         .eq("user_id", habit.user_id)
         .eq("platform", "ios");
