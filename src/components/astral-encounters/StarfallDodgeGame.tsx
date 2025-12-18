@@ -393,7 +393,8 @@ export const StarfallDodgeGame = ({
       // Collision detection - adjusted for landscape player position
       if (obj.y > 70 && obj.y < 92) {
         const dist = Math.abs(obj.x - currentPlayerX);
-        const hitDist = (obj.size + playerSize) / 3;
+        // Hit distance in percentage units (3-4% of screen width)
+        const hitDist = obj.type === 'debris' ? 3.5 : 4.5;
         
         if (dist < hitDist) {
           if (obj.type === 'crystal') {
