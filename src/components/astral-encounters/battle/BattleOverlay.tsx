@@ -48,63 +48,78 @@ export const BattleOverlay = memo(function BattleOverlay({
         )}
       </AnimatePresence>
       
-      {/* HP Bars Container */}
-      <div className="px-4 py-2 flex items-center justify-between gap-4 bg-background/80 backdrop-blur-sm border-b border-border/50">
-        {/* Player/Companion Side */}
-        <div className="flex items-center gap-2 flex-1">
-          {/* Companion Portrait */}
-          <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/50 flex-shrink-0">
-            {companionImageUrl ? (
-              <img
-                src={companionImageUrl}
-                alt={companionName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                <span className="text-lg">✨</span>
+      {/* Battle Header with iPhone Safe Area */}
+      <div className="safe-area-top">
+        <div className="px-4 py-3 bg-gradient-to-b from-background via-background/95 to-background/80 backdrop-blur-md border-b border-border/50">
+          {/* Portraits Row with Names */}
+          <div className="flex items-center justify-between mb-3">
+            {/* Companion Side */}
+            <div className="flex items-center gap-3">
+              {/* Companion Portrait - Larger with glow */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-primary/50 shadow-lg shadow-primary/20 flex-shrink-0">
+                {companionImageUrl ? (
+                  <img
+                    src={companionImageUrl}
+                    alt={companionName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                )}
               </div>
-            )}
+              <span className="text-sm font-semibold text-primary truncate max-w-[80px]">
+                {companionName}
+              </span>
+            </div>
+            
+            {/* VS Badge - Centered */}
+            <div className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 flex-shrink-0">
+              <span className="text-sm font-bold text-purple-400">VS</span>
+            </div>
+            
+            {/* Adversary Side */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-purple-400 truncate max-w-[80px]">
+                {adversaryName}
+              </span>
+              {/* Adversary Portrait - Larger with glow */}
+              <AdversaryPortraitWithCracks
+                imageUrl={adversaryImageUrl}
+                name={adversaryName}
+                hpPercent={battleState.adversaryHPPercent}
+                isDefeated={battleState.isAdversaryDefeated}
+                size="md"
+              />
+            </div>
           </div>
           
-          {/* Player HP Bar */}
-          <div className="flex-1 min-w-0">
-            <BattleHPBar
-              currentHP={battleState.playerHP}
-              maxHP={battleState.playerMaxHP}
-              isPlayer={true}
-              label={companionName}
-              showNumbers={true}
-            />
+          {/* HP Bars Row - Below Portraits */}
+          <div className="flex items-center gap-4">
+            {/* Player HP Bar */}
+            <div className="flex-1 min-w-0">
+              <BattleHPBar
+                currentHP={battleState.playerHP}
+                maxHP={battleState.playerMaxHP}
+                isPlayer={true}
+                showNumbers={true}
+              />
+            </div>
+            
+            {/* Spacer for VS alignment */}
+            <div className="w-14 flex-shrink-0" />
+            
+            {/* Adversary HP Bar */}
+            <div className="flex-1 min-w-0">
+              <BattleHPBar
+                currentHP={battleState.adversaryHP}
+                maxHP={battleState.adversaryMaxHP}
+                isPlayer={false}
+                showNumbers={true}
+              />
+            </div>
           </div>
-        </div>
-        
-        {/* VS Divider */}
-        <div className="flex-shrink-0 px-1">
-          <span className="text-xs font-bold text-muted-foreground">VS</span>
-        </div>
-        
-        {/* Adversary Side */}
-        <div className="flex items-center gap-2 flex-1">
-          {/* Adversary HP Bar */}
-          <div className="flex-1 min-w-0">
-            <BattleHPBar
-              currentHP={battleState.adversaryHP}
-              maxHP={battleState.adversaryMaxHP}
-              isPlayer={false}
-              label={adversaryName}
-              showNumbers={true}
-            />
-          </div>
-          
-          {/* Adversary Portrait with Cracks */}
-          <AdversaryPortraitWithCracks
-            imageUrl={adversaryImageUrl}
-            name={adversaryName}
-            hpPercent={battleState.adversaryHPPercent}
-            isDefeated={battleState.isAdversaryDefeated}
-            size="sm"
-          />
         </div>
       </div>
     </motion.div>

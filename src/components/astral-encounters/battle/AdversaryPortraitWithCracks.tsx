@@ -27,7 +27,7 @@ export const AdversaryPortraitWithCracks = memo(function AdversaryPortraitWithCr
   
   const sizeClasses = {
     sm: 'w-12 h-12',
-    md: 'w-16 h-16',
+    md: 'w-14 h-14',
     lg: 'w-20 h-20',
   };
   
