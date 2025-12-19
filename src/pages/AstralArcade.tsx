@@ -684,8 +684,6 @@ export default function AstralArcade() {
             {arcadeMode === 'battle' && gamePhase === 'playing' && adversary && (
               <BattleOverlay
                 battleState={battleState}
-                companionImageUrl={companion?.current_image_url || undefined}
-                companionName={companion?.spirit_animal || 'Companion'}
                 adversaryImageUrl={adversaryImageUrl || undefined}
                 adversaryName={adversary.name}
                 showScreenShake={screenShake}

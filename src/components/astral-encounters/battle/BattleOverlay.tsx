@@ -6,8 +6,6 @@ import { BossPortraitWidescreen } from './BossPortraitWidescreen';
 
 interface BattleOverlayProps {
   battleState: BattleState;
-  companionImageUrl?: string;
-  companionName: string;
   adversaryImageUrl?: string;
   adversaryName: string;
   showScreenShake?: boolean;
