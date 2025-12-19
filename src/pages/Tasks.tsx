@@ -19,7 +19,6 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { BrandTagline } from "@/components/BrandTagline";
 import { BottomNav } from "@/components/BottomNav";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useQueryClient } from "@tanstack/react-query";
@@ -458,7 +457,6 @@ export default function Tasks() {
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
         <div className="max-w-2xl mx-auto px-6 py-4">
-          <BrandTagline />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Target className="h-8 w-8 text-primary" />
