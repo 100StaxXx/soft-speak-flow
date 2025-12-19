@@ -75,10 +75,12 @@ const TIMING_WINDOWS = {
 };
 
 // Max misses allowed by difficulty before losing
-const MAX_MISSES_BY_DIFFICULTY = {
+const MAX_MISSES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
+  beginner: 12,
   easy: 10,
   medium: 8,
   hard: 5,
+  master: 3,
 };
 
 const HIT_ZONE_Y = 85;
@@ -651,7 +653,7 @@ export const EclipseTimingGame = ({
     requestIdleCallback(() => {
       triggerHaptic(result === 'perfect' ? 'success' : result === 'great' ? 'medium' : 'light');
     }, { timeout: 50 });
-  }, [gameState, onDamage]);
+  }, [gameState]);
 
   // Keyboard controls
   useEffect(() => {
