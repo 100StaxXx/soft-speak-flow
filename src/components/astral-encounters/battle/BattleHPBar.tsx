@@ -92,7 +92,7 @@ export const BattleHPBar = memo(function BattleHPBar({
         
         {/* Bar */}
         <div 
-          className={`relative h-3 rounded-full overflow-hidden bg-muted/50 border border-border/50 ${getGlowColor()}`}
+          className={`relative h-4 rounded-full overflow-hidden bg-muted/50 border border-border/50 ${getGlowColor()}`}
         >
           {/* Background glow for low HP */}
           <AnimatePresence>
