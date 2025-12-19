@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StarPathsInfoTooltip } from "./StarPathsInfoTooltip";
 import { Target, Clock, Users, Sparkles, ChevronRight, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getHabitLimitForTier } from "@/config/habitLimits";
 
 interface StarPathsBrowserProps {
   onSelectTemplate: (template: EpicTemplate) => void;
@@ -116,6 +117,8 @@ interface StarPathCardProps {
 const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
   const difficultyConfig = DIFFICULTY_CONFIG[template.difficulty_tier];
   const themeGradient = THEME_COLORS[template.theme_color] || THEME_COLORS.heroic;
+  const habitLimit = getHabitLimitForTier(template.difficulty_tier);
+  const displayedHabits = template.habits.slice(0, habitLimit);
 
   return (
     <Card 
@@ -160,11 +163,13 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
             </div>
             
             {/* Habits Preview */}
-            {template.habits.length > 0 && (
+            {displayedHabits.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/30">
-                <p className="text-xs text-muted-foreground mb-2">Habits included:</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Habits included ({displayedHabits.length}):
+                </p>
                 <div className="space-y-1.5">
-                  {template.habits.slice(0, 4).map((habit, idx) => (
+                  {displayedHabits.map((habit, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-xs">
                       <span className={cn(
                         "w-1.5 h-1.5 rounded-full flex-shrink-0",
@@ -177,9 +182,6 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
                       <span className="text-muted-foreground/70 flex-shrink-0">({habit.frequency})</span>
                     </div>
                   ))}
-                  {template.habits.length > 4 && (
-                    <p className="text-xs text-muted-foreground/70">+{template.habits.length - 4} more</p>
-                  )}
                 </div>
               </div>
             )}

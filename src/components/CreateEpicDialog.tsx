@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { EPIC_XP_REWARDS } from "@/config/xpRewards";
+import { getHabitLimitForTier, DifficultyTier } from "@/config/habitLimits";
 import {
   Dialog,
   DialogContent,
@@ -94,6 +95,7 @@ export const CreateEpicDialog = ({
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
   const [themeColor, setThemeColor] = useState<EpicTheme>('heroic');
+  const [difficultyTier, setDifficultyTier] = useState<DifficultyTier>("beginner");
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -103,6 +105,8 @@ export const CreateEpicDialog = ({
   const [currentReminderMinutes, setCurrentReminderMinutes] = useState(15);
   const [editingHabitIndex, setEditingHabitIndex] = useState<number | null>(null);
 
+  // Dynamic habit limit based on difficulty tier
+  const maxHabits = useMemo(() => getHabitLimitForTier(difficultyTier), [difficultyTier]);
   // Pre-fill from template when selected
   useEffect(() => {
     if (template && open) {
@@ -111,8 +115,13 @@ export const CreateEpicDialog = ({
       setTargetDays(template.target_days);
       setThemeColor(template.theme_color as EpicTheme || 'heroic');
       
-      // Convert template habits to NewHabit format (max 2 habits per epic)
-      const templateHabits: NewHabit[] = template.habits.slice(0, 2).map(h => ({
+      // Set difficulty tier from template
+      const tier = (template.difficulty_tier as DifficultyTier) || "beginner";
+      setDifficultyTier(tier);
+      const limit = getHabitLimitForTier(tier);
+      
+      // Convert template habits to NewHabit format (respect tier limit)
+      const templateHabits: NewHabit[] = template.habits.slice(0, limit).map(h => ({
         title: h.title,
         difficulty: h.difficulty as "easy" | "medium" | "hard",
         frequency: h.frequency || 'daily',
@@ -120,9 +129,9 @@ export const CreateEpicDialog = ({
       }));
       setNewHabits(templateHabits);
       
-      // Warn if template had more habits than allowed
-      if (template.habits.length > 2) {
-        console.info(`Template "${template.name}" has ${template.habits.length} habits, truncated to 2`);
+      // Warn if template had more habits than allowed for tier
+      if (template.habits.length > limit) {
+        console.info(`Template "${template.name}" has ${template.habits.length} habits, truncated to ${limit} for ${tier} tier`);
       }
     }
   }, [template, open]);
@@ -144,7 +153,7 @@ export const CreateEpicDialog = ({
       // Update existing habit
       setNewHabits(prev => prev.map((h, i) => i === editingHabitIndex ? newHabit : h));
       setEditingHabitIndex(null);
-    } else if (newHabits.length < 2) {
+    } else if (newHabits.length < maxHabits) {
       // Add new habit
       setNewHabits(prev => [...prev, newHabit]);
     }
@@ -156,7 +165,7 @@ export const CreateEpicDialog = ({
     setCurrentPreferredTime("");
     setCurrentReminderEnabled(false);
     setCurrentReminderMinutes(15);
-  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex]);
+  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex, maxHabits]);
 
   const editHabit = useCallback((index: number) => {
     const habit = newHabits[index];
@@ -207,6 +216,7 @@ export const CreateEpicDialog = ({
     setDescription("");
     setTargetDays(30);
     setThemeColor('heroic');
+    setDifficultyTier("beginner");
     setNewHabits([]);
     setCurrentHabitTitle("");
     setCurrentHabitDifficulty("medium");
@@ -430,12 +440,13 @@ export const CreateEpicDialog = ({
               />
               
               {/* Add/Edit habit form */}
-              {(newHabits.length < 2 || editingHabitIndex !== null) && (
+              {(newHabits.length < maxHabits || editingHabitIndex !== null) && (
                 <EpicHabitForm
                   habitTitle={currentHabitTitle}
                   difficulty={currentHabitDifficulty}
                   selectedDays={currentHabitDays}
                   habitCount={newHabits.length}
+                  maxHabits={maxHabits}
                   preferredTime={currentPreferredTime}
                   reminderEnabled={currentReminderEnabled}
                   reminderMinutesBefore={currentReminderMinutes}
@@ -452,7 +463,8 @@ export const CreateEpicDialog = ({
               )}
               
               <p className="text-xs text-muted-foreground">
-                Add up to 2 habits that contribute to this epic
+                Add up to {maxHabits} habit{maxHabits > 1 ? 's' : ''} that contribute to this epic
+                {difficultyTier === 'advanced' && ' (Advanced tier unlocks 3 habits)'}
               </p>
             </div>
 

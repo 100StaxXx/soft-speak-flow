@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Target, Calendar, Zap, Users, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { getHabitLimitForTier } from "@/config/habitLimits";
 
 const JoinEpic = () => {
   const { code } = useParams<{ code: string }>();
@@ -99,12 +99,20 @@ const JoinEpic = () => {
 
       if (memberError) throw memberError;
 
-      // Copy epic's habits to user's habits
+      // Copy epic's habits to user's habits (respect tier-based limit)
       if (epic.epic_habits && epic.epic_habits.length > 0) {
+        // Infer tier from target_days as a heuristic
+        let tier: string = 'beginner';
+        if (epic.target_days >= 45) tier = 'advanced';
+        else if (epic.target_days >= 21) tier = 'intermediate';
+        
+        const habitLimit = getHabitLimitForTier(tier);
+        const limitedHabits = epic.epic_habits.slice(0, habitLimit);
+        
         const { data: copiedHabits, error: habitError } = await supabase
           .from("habits")
           .insert(
-            epic.epic_habits.map((eh: any) => ({
+            limitedHabits.map((eh: any) => ({
               user_id: user.id,
               title: eh.habits.title,
               difficulty: eh.habits.difficulty,

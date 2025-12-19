@@ -19,6 +19,7 @@ interface EpicHabitFormProps {
   difficulty: "easy" | "medium" | "hard";
   selectedDays: number[];
   habitCount: number;
+  maxHabits?: number;
   preferredTime: string;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
@@ -38,6 +39,7 @@ export const EpicHabitForm = memo(({
   difficulty,
   selectedDays,
   habitCount,
+  maxHabits = 2,
   preferredTime,
   reminderEnabled,
   reminderMinutesBefore,
@@ -51,6 +53,7 @@ export const EpicHabitForm = memo(({
   isEditing = false,
   onCancelEdit,
 }: EpicHabitFormProps) => {
+  const remaining = maxHabits - habitCount;
   return (
     <div className="border rounded-lg p-3 space-y-3">
       <Input
@@ -149,7 +152,7 @@ export const EpicHabitForm = memo(({
           ) : (
             <>
               <Plus className="h-4 w-4 mr-2" />
-              Add Habit {habitCount > 0 && `(${2 - habitCount} remaining)`}
+              Add Habit {habitCount > 0 && `(${remaining} remaining)`}
             </>
           )}
         </Button>
