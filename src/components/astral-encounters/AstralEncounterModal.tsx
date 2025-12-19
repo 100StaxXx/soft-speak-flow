@@ -258,14 +258,17 @@ export const AstralEncounterModal = ({
       return; // Battle end already handled
     }
 
+    // FIXED: Continue battle until HP is depleted - no auto-win on phase complete
     if (currentPhaseIndex < adversary.phases - 1) {
+      // More phases available - continue to next phase
       setCurrentPhaseIndex(prev => prev + 1);
       setPhase('instructions');
     } else {
-      // Final phase complete - determine result from HP
-      handleBattleEnd('victory');
+      // All phases exhausted but adversary still alive - loop back to continue battle
+      setCurrentPhaseIndex(0);
+      setPhase('instructions');
     }
-  }, [adversary, encounter, currentPhaseIndex, phaseResults, battleState.isPlayerDefeated, battleState.isAdversaryDefeated, handleBattleEnd]);
+  }, [adversary, encounter, currentPhaseIndex, phaseResults, battleState.isPlayerDefeated, battleState.isAdversaryDefeated]);
 
   const renderMiniGame = useCallback(() => {
     if (!adversary) return null;
