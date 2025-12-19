@@ -316,7 +316,7 @@ export const AstralEncounterModal = ({
   if (!encounter || !adversary) return null;
 
   // Games that need fullscreen rendering outside the Dialog
-  const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge'];
+  const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge', 'astral_frequency'];
   const currentGameType = getCurrentGameType();
   const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
 

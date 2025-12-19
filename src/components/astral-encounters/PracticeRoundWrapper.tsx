@@ -22,7 +22,7 @@ interface PracticeRoundWrapperProps {
 }
 
 // Games that need fullscreen rendering
-const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge'];
+const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge', 'astral_frequency'];
 
 // Practice duration - short rounds for all games
 const PRACTICE_TIMER = 12; // 12 seconds for all practice rounds
