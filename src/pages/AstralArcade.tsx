@@ -657,19 +657,26 @@ export default function AstralArcade() {
             </Card>
           </motion.div>
 
-          {/* High Scores Card - only show in practice mode */}
-          {arcadeMode === 'practice' && (
+          {/* High Scores Card - only show in practice mode if there are scores */}
+          {arcadeMode === 'practice' && getTotalGamesWithHighScores() > 0 && (
             <motion.div variants={cardVariants}>
               <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-cyan-400">
-                    <Trophy className="w-5 h-5" />
-                    <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
-                  </div>
+                <div className="flex items-center gap-2 text-cyan-400 mb-3">
+                  <Trophy className="w-5 h-5" />
+                  <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/8</p>
-                  <p className="text-xs text-muted-foreground">Games with high scores</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {GAMES.map((game) => {
+                    const score = getFormattedHighScore(game.type);
+                    if (!score) return null;
+                    return (
+                      <div key={game.type} className="flex items-center gap-2 text-xs">
+                        <game.icon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground truncate">{game.label}:</span>
+                        <span className="text-cyan-400 font-medium">★ {score}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
             </motion.div>
