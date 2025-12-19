@@ -318,46 +318,62 @@ export const AstralEncounterModal = ({
   // Games that need fullscreen rendering outside the Dialog
   const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge'];
   const currentGameType = getCurrentGameType();
-  const needsFullscreen = phase === 'battle' && FULLSCREEN_GAMES.includes(currentGameType);
+  const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
 
   return (
     <>
       {/* Fullscreen overlay for games that need it (like StarfallDodge) */}
       {open && needsFullscreen && (
         <div className="fixed inset-0 z-[100] bg-background">
-          {/* Battle HP Overlay */}
-          <BattleOverlay
-            battleState={battleState}
-            companionImageUrl={companion?.current_image_url || undefined}
-            companionName={companion?.spirit_animal || "Companion"}
-            adversaryImageUrl={adversaryImageUrl || undefined}
-            adversaryName={adversary.name}
-            showScreenShake={showScreenShake}
-          />
-          
-          {/* Floating damage numbers */}
-          <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
-          
-          {/* Phase indicators */}
-          {adversary.phases > 1 && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex gap-2">
-              {Array.from({ length: adversary.phases }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-3 h-3 rounded-full ${
-                    i < currentPhaseIndex 
-                      ? 'bg-green-500' 
-                      : i === currentPhaseIndex
-                        ? 'bg-primary animate-pulse'
-                        : 'bg-muted'
-                  }`}
-                />
-              ))}
-            </div>
+          {/* Practice mode in fullscreen */}
+          {phase === 'practice' && (
+            <PracticeRoundWrapper
+              gameType={currentGameType}
+              companionStats={companionStats}
+              onPracticeComplete={handlePracticeComplete}
+              onSkipPractice={handleSkipPractice}
+              isFullscreen
+            />
           )}
           
-          {/* The fullscreen game */}
-          {renderMiniGame()}
+          {/* Battle mode in fullscreen */}
+          {phase === 'battle' && (
+            <>
+              {/* Battle HP Overlay */}
+              <BattleOverlay
+                battleState={battleState}
+                companionImageUrl={companion?.current_image_url || undefined}
+                companionName={companion?.spirit_animal || "Companion"}
+                adversaryImageUrl={adversaryImageUrl || undefined}
+                adversaryName={adversary.name}
+                showScreenShake={showScreenShake}
+              />
+              
+              {/* Floating damage numbers */}
+              <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+              
+              {/* Phase indicators */}
+              {adversary.phases > 1 && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex gap-2">
+                  {Array.from({ length: adversary.phases }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-full ${
+                        i < currentPhaseIndex 
+                          ? 'bg-green-500' 
+                          : i === currentPhaseIndex
+                            ? 'bg-primary animate-pulse'
+                            : 'bg-muted'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {/* The fullscreen game */}
+              {renderMiniGame()}
+            </>
+          )}
         </div>
       )}
 

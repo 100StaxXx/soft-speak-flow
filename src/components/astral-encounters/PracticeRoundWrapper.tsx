@@ -18,7 +18,11 @@ interface PracticeRoundWrapperProps {
   companionStats: { mind: number; body: number; soul: number };
   onPracticeComplete: () => void;
   onSkipPractice: () => void;
+  isFullscreen?: boolean;
 }
+
+// Games that need fullscreen rendering
+const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge'];
 
 // Practice duration - short rounds for all games
 const PRACTICE_TIMER = 12; // 12 seconds for all practice rounds
@@ -189,8 +193,12 @@ export const PracticeRoundWrapper = ({
   companionStats,
   onPracticeComplete,
   onSkipPractice,
+  isFullscreen = false,
 }: PracticeRoundWrapperProps) => {
   const [practicePhase, setPracticePhase] = useState<'intro' | 'playing' | 'complete'>('intro');
+  
+  // Check if this game needs fullscreen rendering
+  const isFullscreenGame = isFullscreen || FULLSCREEN_GAMES.includes(gameType);
 
   const handleStartPractice = useCallback(() => {
     setPracticePhase('playing');
@@ -235,7 +243,7 @@ export const PracticeRoundWrapper = ({
   };
 
   return (
-    <div className="relative">
+    <div className={isFullscreenGame ? "relative h-full" : "relative"}>
       <AnimatePresence mode="wait">
         {practicePhase === 'intro' && (
           <PracticeIntro
@@ -252,12 +260,18 @@ export const PracticeRoundWrapper = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="relative"
+            className={isFullscreenGame ? "relative h-full" : "relative"}
           >
             <PracticeBanner />
-            <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
-              {renderPracticeGame()}
-            </div>
+            {isFullscreenGame ? (
+              // Fullscreen games render without constraints
+              renderPracticeGame()
+            ) : (
+              // Non-fullscreen games keep the scroll container
+              <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
+                {renderPracticeGame()}
+              </div>
+            )}
           </motion.div>
         )}
 
