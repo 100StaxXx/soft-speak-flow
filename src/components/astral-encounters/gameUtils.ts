@@ -251,25 +251,6 @@ export const useDebouncedCallback = <T extends (...args: unknown[]) => unknown>(
   }, [delay]) as T;
 };
 
-// CSS-based shake animation styles (to be added to global CSS)
-export const shakeKeyframes = `
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-    20%, 40%, 60%, 80% { transform: translateX(4px); }
-  }
-  .animate-shake {
-    animation: shake 0.3s ease-in-out;
-  }
-  .will-animate {
-    will-change: transform, opacity;
-  }
-  .gpu-accelerated {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-  }
-`;
-
 // Pre-calculated positions for orb/object spawning
 export const getGridPositions = (count: number, padding: number = 15, areaSize: number = 70) => {
   const positions: { x: number; y: number }[] = [];
