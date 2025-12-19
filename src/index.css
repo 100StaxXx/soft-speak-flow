@@ -2,6 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   STELLAR BEATS ENHANCED ANIMATIONS
+   ============================================ */
+
+/* Floating ambient particles */
+@keyframes stellar-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px) scale(1.1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-10px) translateX(-5px) scale(0.9);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-25px) translateX(5px) scale(1.05);
+    opacity: 0.6;
+  }
+}
+
+.animate-stellar-float {
+  animation: stellar-float 6s ease-in-out infinite;
+}
+
+/* Note orb pulsing */
+@keyframes stellar-orb-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+.animate-stellar-orb-pulse {
+  animation: stellar-orb-pulse 0.8s ease-in-out infinite;
+}
+
+/* Particle burst on hit */
+@keyframes stellar-particle-burst {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateY(0);
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateY(calc(var(--particle-distance) * -1));
+    opacity: 0;
+    scale: 0.3;
+  }
+}
+
+.animate-stellar-particle-burst {
+  animation: stellar-particle-burst 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Ring burst effect */
+@keyframes stellar-ring-burst {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.animate-stellar-ring-burst {
+  animation: stellar-ring-burst 0.4s ease-out forwards;
+}
+
+/* Hit text animation */
+@keyframes stellar-hit-text {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(-10px) scale(1.2);
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(-20px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+.animate-stellar-hit-text {
+  animation: stellar-hit-text 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Perfect hit flash */
+@keyframes stellar-perfect-flash {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+}
+
+.animate-stellar-perfect-flash {
+  animation: stellar-perfect-flash 0.4s ease-out forwards;
+}
+
+/* Screen flash effect */
+@keyframes stellar-screen-flash {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-stellar-screen-flash {
+  animation: stellar-screen-flash 0.15s ease-out forwards;
+}
+
+/* Button press ripple */
+@keyframes stellar-ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-stellar-ripple {
+  animation: stellar-ripple 0.3s ease-out forwards;
+}
+
+/* Legacy hit-pop animation (keeping for backwards compatibility) */
+@keyframes hit-pop {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.8);
+  }
+}
+
+.animate-hit-pop {
+  animation: hit-pop 0.5s ease-out forwards;
+}
+
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
