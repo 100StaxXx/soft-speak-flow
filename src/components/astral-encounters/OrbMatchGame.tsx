@@ -5,17 +5,27 @@ import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars } from './gameUtils';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 interface OrbMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
   tierAttackDamage?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: ArcadeDifficulty;
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
 }
+
+// Difficulty config for timer and move time
+const ARCADE_DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { gameTime: number; moveTime: number }> = {
+  beginner: { gameTime: 90, moveTime: 15 },
+  easy: { gameTime: 75, moveTime: 12 },
+  medium: { gameTime: 60, moveTime: 10 },
+  hard: { gameTime: 45, moveTime: 8 },
+  master: { gameTime: 30, moveTime: 6 },
+};
 
 type OrbColor = 'fire' | 'water' | 'earth' | 'light' | 'dark' | 'cosmic';
 type SpecialType = 'normal' | 'line_bomb' | 'star' | 'cross_bomb' | 'cosmic_nova';
