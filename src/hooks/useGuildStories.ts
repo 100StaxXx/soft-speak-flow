@@ -24,21 +24,41 @@ export interface GuildStory {
   created_at: string;
 }
 
-export const useGuildStories = (epicId?: string) => {
+interface UseGuildStoriesOptions {
+  epicId?: string;
+  communityId?: string;
+}
+
+export const useGuildStories = (options: UseGuildStoriesOptions | string = {}) => {
+  // Support both old signature (epicId string) and new options object
+  const { epicId, communityId } = typeof options === 'string' 
+    ? { epicId: options, communityId: undefined } 
+    : options;
+
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch all stories for an epic
-  const { data: stories, isLoading } = useQuery<GuildStory[]>({
-    queryKey: ["guild-stories", epicId],
-    queryFn: async () => {
-      if (!epicId) return [];
+  const queryKeyId = communityId || epicId;
+  const queryKeyType = communityId ? 'community' : 'epic';
 
-      const { data, error } = await supabase
+  // Fetch all stories for an epic or community
+  const { data: stories, isLoading } = useQuery<GuildStory[]>({
+    queryKey: ["guild-stories", queryKeyType, queryKeyId],
+    queryFn: async () => {
+      if (!epicId && !communityId) return [];
+
+      let query = supabase
         .from("guild_stories")
         .select("*")
-        .eq("epic_id", epicId)
         .order("chapter_number", { ascending: true });
+
+      if (communityId) {
+        query = query.eq("community_id", communityId);
+      } else if (epicId) {
+        query = query.eq("epic_id", epicId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data || []).map(story => ({
@@ -46,7 +66,7 @@ export const useGuildStories = (epicId?: string) => {
         companion_spotlights: story.companion_spotlights as GuildStory['companion_spotlights']
       })) as GuildStory[];
     },
-    enabled: !!epicId,
+    enabled: !!(epicId || communityId),
   });
 
   // Get latest story

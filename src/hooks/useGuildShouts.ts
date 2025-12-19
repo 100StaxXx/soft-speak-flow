@@ -8,7 +8,8 @@ import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 export interface GuildShout {
   id: string;
-  epic_id: string;
+  epic_id: string | null;
+  community_id: string | null;
   sender_id: string;
   recipient_id: string;
   shout_type: ShoutType;
@@ -25,31 +26,51 @@ export interface GuildShout {
   };
 }
 
-export const useGuildShouts = (epicId?: string) => {
+interface UseGuildShoutsOptions {
+  epicId?: string;
+  communityId?: string;
+}
+
+export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => {
+  // Support both old signature (epicId string) and new options object
+  const { epicId, communityId } = typeof options === 'string' 
+    ? { epicId: options, communityId: undefined } 
+    : options;
+
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  const queryKeyId = communityId || epicId;
+  const queryKeyType = communityId ? 'community' : 'epic';
 
-  // Fetch shouts for an epic
+  // Fetch shouts for an epic or community
   const { data: shouts, isLoading } = useQuery<GuildShout[]>({
-    queryKey: ["guild-shouts", epicId],
+    queryKey: ["guild-shouts", queryKeyType, queryKeyId],
     queryFn: async () => {
-      if (!epicId) return [];
+      if (!epicId && !communityId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("guild_shouts")
         .select(`
           *,
           sender:profiles!guild_shouts_sender_id_fkey(email, onboarding_data),
           recipient:profiles!guild_shouts_recipient_id_fkey(email, onboarding_data)
         `)
-        .eq("epic_id", epicId)
         .order("created_at", { ascending: false })
         .limit(50);
+
+      if (communityId) {
+        query = query.eq("community_id", communityId);
+      } else if (epicId) {
+        query = query.eq("epic_id", epicId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as GuildShout[];
     },
-    enabled: !!epicId,
+    enabled: !!(epicId || communityId),
   });
 
   // Send a shout
@@ -63,22 +84,26 @@ export const useGuildShouts = (epicId?: string) => {
       shoutType: ShoutType;
       messageKey: string;
     }) => {
-      if (!user || !epicId) throw new Error("Not authenticated or no epic");
+      if (!user) throw new Error("Not authenticated");
+      if (!epicId && !communityId) throw new Error("No epic or community specified");
 
       // Prevent sending shouts to yourself
       if (recipientId === user.id) {
         throw new Error("You cannot send a shout to yourself");
       }
 
+      const insertData = {
+        sender_id: user.id,
+        recipient_id: recipientId,
+        shout_type: shoutType,
+        message_key: messageKey,
+        epic_id: epicId || null,
+        community_id: communityId || null,
+      };
+
       const { data, error } = await supabase
         .from("guild_shouts")
-        .insert({
-          epic_id: epicId,
-          sender_id: user.id,
-          recipient_id: recipientId,
-          shout_type: shoutType,
-          message_key: messageKey,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -101,7 +126,8 @@ export const useGuildShouts = (epicId?: string) => {
           shoutId: data.id,
           senderId: user.id,
           recipientId,
-          epicId,
+          epicId: epicId || null,
+          communityId: communityId || null,
           senderName,
           shoutType,
           messageText: message?.text || 'Someone sent you a shout!',
@@ -113,7 +139,7 @@ export const useGuildShouts = (epicId?: string) => {
     onSuccess: (_, variables) => {
       const message = getShoutByKey(variables.messageKey);
       toast.success(`Shout sent! ${message?.emoji || '📢'}`);
-      queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
     },
     onError: (error) => {
       toast.error("Failed to send shout");
@@ -135,26 +161,29 @@ export const useGuildShouts = (epicId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
     },
   });
 
   // Real-time subscription
   useEffect(() => {
-    if (!epicId) return;
+    if (!epicId && !communityId) return;
+
+    const filterColumn = communityId ? 'community_id' : 'epic_id';
+    const filterValue = communityId || epicId;
 
     const channel = supabase
-      .channel(`shouts-${epicId}`)
+      .channel(`shouts-${filterColumn}-${filterValue}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'guild_shouts',
-          filter: `epic_id=eq.${epicId}`,
+          filter: `${filterColumn}=eq.${filterValue}`,
         },
         (payload) => {
-          queryClient.invalidateQueries({ queryKey: ["guild-shouts", epicId] });
+          queryClient.invalidateQueries({ queryKey: ["guild-shouts", queryKeyType, queryKeyId] });
           
           // Show toast for received shouts
           if (payload.new && (payload.new as GuildShout).recipient_id === user?.id) {
@@ -172,7 +201,7 @@ export const useGuildShouts = (epicId?: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [epicId, user?.id, queryClient]);
+  }, [epicId, communityId, user?.id, queryClient, queryKeyType, queryKeyId]);
 
   const unreadCount = shouts?.filter(s => s.recipient_id === user?.id && !s.is_read).length || 0;
   const myShouts = shouts?.filter(s => s.recipient_id === user?.id) || [];
