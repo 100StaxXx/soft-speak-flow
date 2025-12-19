@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BattleState } from '@/types/battleSystem';
 import { BattleHPBar } from './BattleHPBar';
-import { AdversaryPortraitWithCracks } from './AdversaryPortraitWithCracks';
+import { BossPortraitWidescreen } from './BossPortraitWidescreen';
 
 interface BattleOverlayProps {
   battleState: BattleState;
@@ -15,8 +15,6 @@ interface BattleOverlayProps {
 
 export const BattleOverlay = memo(function BattleOverlay({
   battleState,
-  companionImageUrl,
-  companionName,
   adversaryImageUrl,
   adversaryName,
   showScreenShake = false,
@@ -32,7 +30,7 @@ export const BattleOverlay = memo(function BattleOverlay({
       } : {}}
       transition={{ duration: 0.3 }}
     >
-      {/* Red vignette for low HP */}
+      {/* Red vignette for low player HP - warning effect */}
       <AnimatePresence>
         {isLowHP && !battleState.isPlayerDefeated && (
           <motion.div
@@ -48,77 +46,39 @@ export const BattleOverlay = memo(function BattleOverlay({
         )}
       </AnimatePresence>
       
-      {/* Battle Header with iPhone Safe Area */}
+      {/* Boss Fight Header with iPhone Safe Area */}
       <div className="safe-area-top">
-        <div className="px-4 py-3 bg-gradient-to-b from-background via-background/95 to-background/80 backdrop-blur-md border-b border-border/50">
-          {/* Portraits Row with Names */}
-          <div className="flex items-center justify-between mb-3">
-            {/* Companion Side */}
-            <div className="flex items-center gap-3">
-              {/* Companion Portrait - Larger with glow */}
-              <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-primary/50 shadow-lg shadow-primary/20 flex-shrink-0">
-                {companionImageUrl ? (
-                  <img
-                    src={companionImageUrl}
-                    alt={companionName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                    <span className="text-2xl">✨</span>
-                  </div>
-                )}
-              </div>
-              <span className="text-sm font-semibold text-primary truncate max-w-[80px]">
-                {companionName}
-              </span>
-            </div>
-            
-            {/* VS Badge - Centered */}
-            <div className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 flex-shrink-0">
-              <span className="text-sm font-bold text-purple-400">VS</span>
-            </div>
-            
-            {/* Adversary Side */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-purple-400 truncate max-w-[80px]">
-                {adversaryName}
-              </span>
-              {/* Adversary Portrait - Larger with glow */}
-              <AdversaryPortraitWithCracks
-                imageUrl={adversaryImageUrl}
-                name={adversaryName}
-                hpPercent={battleState.adversaryHPPercent}
-                isDefeated={battleState.isAdversaryDefeated}
-                size="md"
-              />
-            </div>
-          </div>
+        <div className="px-3 pt-3 pb-2 bg-gradient-to-b from-background via-background/95 to-transparent">
+          {/* Large Widescreen Adversary Image */}
+          <BossPortraitWidescreen
+            imageUrl={adversaryImageUrl}
+            name={adversaryName}
+            hpPercent={battleState.adversaryHPPercent}
+            isDefeated={battleState.isAdversaryDefeated}
+          />
           
-          {/* HP Bars Row - Below Portraits */}
-          <div className="flex items-center gap-4">
-            {/* Player HP Bar */}
-            <div className="flex-1 min-w-0">
-              <BattleHPBar
-                currentHP={battleState.playerHP}
-                maxHP={battleState.playerMaxHP}
-                isPlayer={true}
-                showNumbers={true}
-              />
-            </div>
-            
-            {/* Spacer for VS alignment */}
-            <div className="w-14 flex-shrink-0" />
-            
-            {/* Adversary HP Bar */}
-            <div className="flex-1 min-w-0">
-              <BattleHPBar
-                currentHP={battleState.adversaryHP}
-                maxHP={battleState.adversaryMaxHP}
-                isPlayer={false}
-                showNumbers={true}
-              />
-            </div>
+          {/* Adversary Name - Prominent & Centered */}
+          <motion.div 
+            className="flex items-center justify-center gap-2 mt-3 mb-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <span className="text-purple-400">⚔️</span>
+            <h2 className="text-lg font-bold text-purple-300 tracking-wide uppercase">
+              {adversaryName}
+            </h2>
+            <span className="text-purple-400">⚔️</span>
+          </motion.div>
+          
+          {/* Full-Width Adversary HP Bar */}
+          <div className="w-full">
+            <BattleHPBar
+              currentHP={battleState.adversaryHP}
+              maxHP={battleState.adversaryMaxHP}
+              isPlayer={false}
+              showNumbers={true}
+            />
           </div>
         </div>
       </div>
