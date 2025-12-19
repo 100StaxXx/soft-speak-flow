@@ -307,19 +307,20 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     previousProgressRef.current = currentProgress;
     
     // Dispatch event for Astral Encounter trigger on epic milestone crossings
-    if (encounterCheckRef.current !== currentProgress && currentProgress > 0) {
-      const prevCheck = encounterCheckRef.current < 0 ? 0 : encounterCheckRef.current;
-      encounterCheckRef.current = currentProgress;
+    // Only dispatch if progress INCREASED from a valid previous value (not initial -1)
+    if (encounterCheckRef.current >= 0 && currentProgress > encounterCheckRef.current) {
       window.dispatchEvent(
         new CustomEvent('epic-progress-checkpoint', {
           detail: {
             epicId: epic.id,
-            previousProgress: prevCheck,
+            previousProgress: encounterCheckRef.current,
             currentProgress,
           },
         })
       );
     }
+    // Always update the ref to track current progress
+    encounterCheckRef.current = currentProgress;
   }, [epic.progress_percentage, epic.id, companion, isActive, checkAndGeneratePostcard]);
 
   const handleShareEpic = async () => {
