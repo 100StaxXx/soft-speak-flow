@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getHabitLimitForTier } from "@/config/habitLimits";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -40,10 +41,10 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       const code = inviteCode.trim().toUpperCase().replace('EPIC-', '');
       const fullCode = `EPIC-${code}`;
 
-      // Look up the epic by invite code (include frequency and custom_days)
+      // Look up the epic by invite code (include frequency, custom_days, and story_type for difficulty)
       const { data: epic, error: epicError } = await supabase
         .from('epics')
-        .select('*, epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days))')
+        .select('*, epic_story_types(slug), epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days))')
         .eq('invite_code', fullCode)
         .eq('is_public', true)
         .maybeSingle();
@@ -109,9 +110,18 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
 
       if (memberError) throw memberError;
 
-      // Copy habits to user's account (preserve all habit properties)
+      // Copy habits to user's account (respect tier-based limit)
       if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+        // Determine difficulty tier from epic (default to beginner if not set)
+        // For joined epics, we infer tier from target_days as a heuristic
+        let tier: string = 'beginner';
+        if (epic.target_days >= 45) tier = 'advanced';
+        else if (epic.target_days >= 21) tier = 'intermediate';
+        
+        const habitLimit = getHabitLimitForTier(tier);
+        const limitedHabits = epic.epic_habits.slice(0, habitLimit);
+        
+        const habitsToCreate = limitedHabits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
           user_id: user.user.id,
           title: eh.habits.title,
           difficulty: eh.habits.difficulty,
