@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ArcadeGameCard } from '@/components/astral-encounters/ArcadeGameCard';
 import { GameInstructionsOverlay } from '@/components/astral-encounters/GameInstructionsOverlay';
 import { BattleOverlay, DamageNumberContainer } from '@/components/astral-encounters/battle';
@@ -34,13 +33,15 @@ import {
   Radio,
   Clock,
   Shield,
-  Hexagon,
   Gamepad2,
   Grid3X3,
   Trophy,
   Sparkles,
   Swords,
   Heart,
+  Star,
+  Crown,
+  Flame,
 } from 'lucide-react';
 
 // Lazy load mini-games for bundle optimization
@@ -49,7 +50,6 @@ const TapSequenceGame = lazy(() => import('@/components/astral-encounters/TapSeq
 const AstralFrequencyGame = lazy(() => import('@/components/astral-encounters/AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
 const EclipseTimingGame = lazy(() => import('@/components/astral-encounters/EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
 const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
-
 const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
@@ -68,55 +68,267 @@ const GAMES = [
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 
-// Re-export ArcadeDifficulty as Difficulty for internal use
 type Difficulty = ArcadeDifficulty;
 type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result' | 'summary';
 type ArcadeMode = 'practice' | 'battle';
 type BattleResult = 'victory' | 'defeat' | null;
 
+// Animated floating orb component
+const FloatingOrb = ({ delay, size, color, x, y }: { delay: number; size: number; color: string; x: string; y: string }) => (
+  <motion.div
+    className="absolute rounded-full pointer-events-none"
+    style={{
+      width: size,
+      height: size,
+      left: x,
+      top: y,
+      background: `radial-gradient(circle at 30% 30%, ${color}, transparent 70%)`,
+      filter: 'blur(1px)',
+    }}
+    animate={{
+      y: [0, -30, 0],
+      x: [0, 10, -10, 0],
+      scale: [1, 1.1, 1],
+      opacity: [0.3, 0.6, 0.3],
+    }}
+    transition={{
+      duration: 6 + Math.random() * 4,
+      delay,
+      repeat: Infinity,
+      ease: 'easeInOut',
+    }}
+  />
+);
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-  }
-} as const;
+// Immersive background component
+const ArcadeBackground = () => {
+  const stars = useMemo(() => 
+    [...Array(80)].map((_, i) => ({
+      id: i,
+      x: `${Math.random() * 100}%`,
+      y: `${Math.random() * 100}%`,
+      size: 1 + Math.random() * 2,
+      delay: Math.random() * 3,
+      duration: 2 + Math.random() * 3,
+      color: ['#fff', '#a5f3fc', '#c4b5fd', '#fcd34d'][Math.floor(Math.random() * 4)],
+    })), []
+  );
 
-const headerVariants = {
-  hidden: { opacity: 0, y: -20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] as const }
-  }
-} as const;
+  const orbs = useMemo(() => [
+    { delay: 0, size: 200, color: 'hsl(271, 91%, 65%)', x: '10%', y: '20%' },
+    { delay: 1.5, size: 150, color: 'hsl(45, 100%, 60%)', x: '80%', y: '60%' },
+    { delay: 3, size: 180, color: 'hsl(190, 95%, 50%)', x: '60%', y: '10%' },
+    { delay: 2, size: 120, color: 'hsl(340, 82%, 60%)', x: '20%', y: '70%' },
+  ], []);
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: { type: 'spring' as const, stiffness: 300, damping: 20 }
-  }
-} as const;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Deep space gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(260,40%,8%)] via-[hsl(250,35%,6%)] to-[hsl(240,30%,4%)]" />
+      
+      {/* Nebula effects */}
+      <div className="absolute inset-0 opacity-40">
+        <div 
+          className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(271, 50%, 30%) 0%, transparent 70%)',
+            filter: 'blur(60px)',
+            transform: 'translate(-30%, -30%)',
+          }}
+        />
+        <div 
+          className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(200, 50%, 25%) 0%, transparent 70%)',
+            filter: 'blur(50px)',
+            transform: 'translate(30%, 30%)',
+          }}
+        />
+        <div 
+          className="absolute top-1/2 left-1/2 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(340, 50%, 25%) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+      </div>
 
-const gameCardVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.9 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: { type: 'spring' as const, stiffness: 400, damping: 25 }
-  }
-} as const;
+      {/* Floating orbs */}
+      {orbs.map((orb, i) => (
+        <FloatingOrb key={i} {...orb} />
+      ))}
+
+      {/* Stars */}
+      {stars.map((star) => (
+        <motion.div
+          key={star.id}
+          className="absolute rounded-full"
+          style={{
+            left: star.x,
+            top: star.y,
+            width: star.size,
+            height: star.size,
+            backgroundColor: star.color,
+          }}
+          animate={{
+            opacity: [0.2, 0.8, 0.2],
+            scale: [0.8, 1.2, 0.8],
+          }}
+          transition={{
+            duration: star.duration,
+            delay: star.delay,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+
+      {/* Grid overlay for depth */}
+      <div 
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `linear-gradient(hsl(271, 50%, 50%) 1px, transparent 1px),
+                            linear-gradient(90deg, hsl(271, 50%, 50%) 1px, transparent 1px)`,
+          backgroundSize: '50px 50px',
+        }}
+      />
+
+      {/* Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,hsl(240,30%,4%)_100%)]" />
+    </div>
+  );
+};
+
+// Mode toggle component
+const ModeToggle = ({ mode, onModeChange }: { mode: ArcadeMode; onModeChange: (mode: ArcadeMode) => void }) => (
+  <div className="relative p-1 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
+    {/* Sliding background */}
+    <motion.div
+      className="absolute inset-y-1 rounded-xl"
+      style={{ width: 'calc(50% - 4px)' }}
+      animate={{
+        x: mode === 'practice' ? 4 : 'calc(100% + 4px)',
+        background: mode === 'practice'
+          ? 'linear-gradient(135deg, hsl(190, 95%, 45%) 0%, hsl(220, 90%, 55%) 100%)'
+          : 'linear-gradient(135deg, hsl(350, 85%, 55%) 0%, hsl(25, 90%, 55%) 100%)',
+      }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    />
+    
+    <div className="relative flex">
+      <button
+        onClick={() => onModeChange('practice')}
+        className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors z-10 ${
+          mode === 'practice' ? 'text-white' : 'text-muted-foreground hover:text-white/70'
+        }`}
+      >
+        <Gamepad2 className="w-5 h-5" />
+        Practice
+      </button>
+      <button
+        onClick={() => onModeChange('battle')}
+        className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors z-10 ${
+          mode === 'battle' ? 'text-white' : 'text-muted-foreground hover:text-white/70'
+        }`}
+      >
+        <Swords className="w-5 h-5" />
+        Battle
+      </button>
+    </div>
+  </div>
+);
+
+// Stats display component
+const CompanionStatsDisplay = ({ stats, companionName }: { stats: { mind: number; body: number; soul: number }; companionName?: string }) => (
+  <motion.div 
+    className="flex items-center justify-center gap-6 p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.3 }}
+  >
+    {companionName && (
+      <div className="text-xs text-muted-foreground font-medium pr-4 border-r border-white/10">
+        {companionName}
+      </div>
+    )}
+    <div className="flex items-center gap-1.5">
+      <span className="text-cyan-400">🧠</span>
+      <span className="text-sm font-bold text-cyan-300">{stats.mind}</span>
+    </div>
+    <div className="flex items-center gap-1.5">
+      <span className="text-red-400">💪</span>
+      <span className="text-sm font-bold text-red-300">{stats.body}</span>
+    </div>
+    <div className="flex items-center gap-1.5">
+      <span className="text-purple-400">✨</span>
+      <span className="text-sm font-bold text-purple-300">{stats.soul}</span>
+    </div>
+  </motion.div>
+);
+
+// High scores card component
+const HighScoresCard = ({ games, getBestHighScore }: { games: typeof GAMES; getBestHighScore: (type: MiniGameType) => { displayValue: string } | null }) => {
+  const scoresWithData = games.filter(game => getBestHighScore(game.type));
+  if (scoresWithData.length === 0) return null;
+
+  return (
+    <motion.div 
+      className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent backdrop-blur-xl border border-amber-500/20"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-lg bg-amber-500/20">
+          <Trophy className="w-5 h-5 text-amber-400" />
+        </div>
+        <span className="text-sm font-bold text-amber-300 uppercase tracking-wider">High Scores</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {scoresWithData.map((game) => {
+          const score = getBestHighScore(game.type);
+          return (
+            <div 
+              key={game.type} 
+              className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/5"
+            >
+              <game.icon className="w-4 h-4 text-amber-400/70" />
+              <span className="text-xs text-muted-foreground truncate flex-1">{game.label}</span>
+              <span className="text-xs font-bold text-amber-300">{score?.displayValue}</span>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+};
+
+// Battle info card
+const BattleInfoCard = ({ difficulty }: { difficulty: Difficulty }) => (
+  <motion.div 
+    className="p-4 rounded-2xl bg-gradient-to-br from-red-500/10 via-orange-500/5 to-transparent backdrop-blur-xl border border-red-500/20"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.4 }}
+  >
+    <div className="flex items-center gap-2 mb-3">
+      <div className="p-2 rounded-lg bg-red-500/20">
+        <Flame className="w-5 h-5 text-red-400" />
+      </div>
+      <span className="text-sm font-bold text-red-300 uppercase tracking-wider">Battle Mode</span>
+    </div>
+    <p className="text-sm text-muted-foreground leading-relaxed">
+      Face randomly generated adversaries! Deal damage with good performance, take hits from mistakes. 
+      <span className="text-red-400 font-medium"> Survive to claim victory!</span>
+    </p>
+  </motion.div>
+);
 
 export default function AstralArcade() {
   const navigate = useNavigate();
   const { companion } = useCompanion();
-  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getFormattedHighScore, getBestHighScore, getFormattedHighScoresForGame } = useArcadeHighScores();
+  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getFormattedHighScore, getBestHighScore } = useArcadeHighScores();
   const { recordGameResult, getRecommendedDifficulty } = useArcadeSkillTracker();
   const { checkArcadeDiscovery } = useAchievements();
 
@@ -130,7 +342,6 @@ export default function AstralArcade() {
   const [practiceResult, setPracticeResult] = useState<MiniGameResult | null>(null);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
 
-  // Get adversary image
   const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
     theme: adversary?.theme || '',
     tier: adversary?.tier || '',
@@ -138,7 +349,6 @@ export default function AstralArcade() {
     enabled: !!adversary && arcadeMode === 'battle',
   });
 
-  // Query current evolution card for creature name
   const { data: currentCard } = useQuery({
     queryKey: ['current-evolution-card', companion?.id],
     queryFn: async () => {
@@ -154,7 +364,6 @@ export default function AstralArcade() {
     enabled: !!companion?.id,
   });
 
-  // Battle callbacks - defined outside useBattleState to avoid hook rules violation
   const handlePlayerDefeated = useCallback(() => {
     setBattleResult('defeat');
     setGamePhase('result');
@@ -172,7 +381,6 @@ export default function AstralArcade() {
     }
   }, []);
 
-  // Battle state hook
   const {
     battleState,
     dealDamage,
@@ -193,23 +401,18 @@ export default function AstralArcade() {
     soul: companion.soul ?? 10,
   } : { mind: 10, body: 10, soul: 10 };
 
-  // Handle selecting a game
   const handleSelectGame = useCallback((gameType: MiniGameType) => {
     setActiveGame(gameType);
     setBattleResult(null);
     
     if (arcadeMode === 'battle') {
-      // Generate adversary for battle mode
       const newAdversary = generateArcadeAdversary(difficulty);
       setAdversary(newAdversary);
       resetBattle();
-      setGamePhase('instructions');
-    } else {
-      setGamePhase('instructions');
     }
+    setGamePhase('instructions');
   }, [arcadeMode, difficulty, resetBattle]);
 
-  // After instructions, go to practice, VS screen, or playing
   const handleInstructionsReady = useCallback(() => {
     if (arcadeMode === 'battle') {
       setGamePhase('vs_screen');
@@ -238,53 +441,37 @@ export default function AstralArcade() {
     setGamePhase('playing');
   }, [activeGame]);
 
-  // Handle damage from games (for battle mode)
   const handleDamage = useCallback((event: DamageEvent) => {
     if (arcadeMode === 'battle') {
       dealDamage(event);
     }
   }, [arcadeMode, dealDamage]);
 
-  // Handle game complete
   const handleGameComplete = useCallback((result: MiniGameResult) => {
     if (arcadeMode === 'practice') {
-      // Practice mode - update high scores and skill tracker, then show summary
       let newHighScore = false;
       if (activeGame && result.highScoreValue !== undefined) {
         newHighScore = setHighScore(activeGame, difficulty, result.highScoreValue);
-        
-        // Record result for skill-based recommendations
         recordGameResult(activeGame, difficulty, result.accuracy, result.success);
-        
         if (newHighScore) {
           playArcadeHighScore();
         }
       }
-      
-      // Store result and show summary modal
       setPracticeResult(result);
       setIsNewHighScore(newHighScore);
       setGamePhase('summary');
     } else {
-      // Battle mode - game ended, determine outcome
-      // If neither side is defeated yet, deal final damage based on accuracy
       if (!battleState.isPlayerDefeated && !battleState.isAdversaryDefeated) {
         if (result.accuracy >= 50) {
-          // Good performance - deal damage to adversary
           const damage = Math.round(result.accuracy * 0.5);
           dealDamage({ target: 'adversary', amount: damage, source: 'game_complete' });
         } else {
-          // Poor performance - take damage
           dealDamage({ target: 'player', amount: tierAttackDamage, source: 'game_fail' });
         }
         
-        // If damage didn't end the battle, force a result based on remaining HP
-        // Use setTimeout to let state updates settle
         setTimeout(() => {
           setBattleResult(prev => {
-            // Only set if not already set by defeat callbacks
             if (prev === null) {
-              // Determine winner by remaining HP percentage
               const playerHPPercent = battleState.playerHP / battleState.playerMaxHP;
               const adversaryHPPercent = battleState.adversaryHP / battleState.adversaryMaxHP;
               return playerHPPercent >= adversaryHPPercent ? 'victory' : 'defeat';
@@ -295,9 +482,8 @@ export default function AstralArcade() {
         }, 100);
       }
     }
-  }, [activeGame, arcadeMode, battleState, dealDamage, setHighScore, tierAttackDamage]);
+  }, [activeGame, arcadeMode, battleState, dealDamage, setHighScore, tierAttackDamage, difficulty, recordGameResult]);
 
-  // Exit game and reset state
   const handleExitGame = useCallback(() => {
     setActiveGame(null);
     setAdversary(null);
@@ -307,7 +493,6 @@ export default function AstralArcade() {
     setGamePhase('instructions');
   }, []);
 
-  // Handle play again from summary modal
   const handlePlayAgain = useCallback(() => {
     if (activeGame) {
       setPracticeResult(null);
@@ -316,7 +501,6 @@ export default function AstralArcade() {
     }
   }, [activeGame]);
 
-  // Retry battle
   const handleRetryBattle = useCallback(() => {
     if (adversary) {
       resetBattle();
@@ -325,7 +509,6 @@ export default function AstralArcade() {
     }
   }, [adversary, resetBattle]);
 
-  // Award discovery badge and play entrance sound + background music
   useEffect(() => {
     checkArcadeDiscovery();
     pauseAmbientForEvent();
@@ -341,18 +524,6 @@ export default function AstralArcade() {
       resumeAmbientAfterEvent();
     };
   }, [checkArcadeDiscovery]);
-
-  // Memoize star positions for consistent rendering
-  const stars = useMemo(() => 
-    [...Array(50)].map((_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      delay: `${Math.random() * 3}s`,
-      duration: `${2 + Math.random() * 2}s`,
-      opacity: 0.3 + Math.random() * 0.5,
-    })), []
-  );
 
   const renderGame = () => {
     if (!activeGame) return null;
@@ -403,19 +574,24 @@ export default function AstralArcade() {
         className="h-full flex flex-col items-center justify-center text-center p-6"
       >
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', delay: 0.2 }}
-          className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${
+          className={`w-28 h-28 rounded-full flex items-center justify-center mb-6 ${
             isVictory 
-              ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border-2 border-emerald-500/50' 
-              : 'bg-gradient-to-br from-red-500/20 to-red-600/20 border-2 border-red-500/50'
+              ? 'bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border-2 border-emerald-500/50' 
+              : 'bg-gradient-to-br from-red-500/30 to-red-600/10 border-2 border-red-500/50'
           }`}
+          style={{
+            boxShadow: isVictory 
+              ? '0 0 60px rgba(52, 211, 153, 0.4), inset 0 0 30px rgba(52, 211, 153, 0.2)'
+              : '0 0 60px rgba(239, 68, 68, 0.4), inset 0 0 30px rgba(239, 68, 68, 0.2)',
+          }}
         >
           {isVictory ? (
-            <Trophy className="w-12 h-12 text-emerald-400" />
+            <Crown className="w-14 h-14 text-emerald-400" />
           ) : (
-            <Heart className="w-12 h-12 text-red-400" />
+            <Heart className="w-14 h-14 text-red-400" />
           )}
         </motion.div>
 
@@ -423,9 +599,14 @@ export default function AstralArcade() {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className={`text-3xl font-bold mb-2 ${
+          className={`text-4xl font-black mb-2 ${
             isVictory ? 'text-emerald-400' : 'text-red-400'
           }`}
+          style={{
+            textShadow: isVictory 
+              ? '0 0 30px rgba(52, 211, 153, 0.5)'
+              : '0 0 30px rgba(239, 68, 68, 0.5)',
+          }}
         >
           {isVictory ? 'Victory!' : 'Defeated'}
         </motion.h2>
@@ -435,7 +616,7 @@ export default function AstralArcade() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-muted-foreground mb-4"
+            className="text-muted-foreground mb-6 text-lg"
           >
             {isVictory 
               ? `You vanquished ${adversary.name}!`
@@ -448,15 +629,20 @@ export default function AstralArcade() {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex flex-col gap-2 mb-6"
+          className="flex items-center gap-6 mb-8 p-4 rounded-xl bg-white/5 border border-white/10"
         >
-          <div className="text-sm text-muted-foreground">
-            HP Remaining: <span className={isVictory ? 'text-emerald-400' : 'text-red-400'}>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-foreground">
               {battleState.playerHP}/{battleState.playerMaxHP}
-            </span>
+            </div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide">HP Left</div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Result: <span className="text-primary capitalize">{resultText}</span>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="text-center">
+            <div className="text-2xl font-bold text-primary capitalize">
+              {resultText}
+            </div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide">Result</div>
           </div>
         </motion.div>
 
@@ -464,17 +650,21 @@ export default function AstralArcade() {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="flex gap-3"
+          className="flex gap-4"
         >
-          <Button variant="outline" onClick={handleExitGame}>
+          <Button 
+            variant="outline" 
+            onClick={handleExitGame}
+            className="px-6 border-white/20 hover:bg-white/10"
+          >
             Exit
           </Button>
           <Button 
             onClick={handleRetryBattle}
-            className={isVictory 
-              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' 
-              : 'bg-gradient-to-r from-purple-500 to-pink-500'
-            }
+            className={`px-6 ${isVictory 
+              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
+            }`}
           >
             {isVictory ? 'Battle Again' : 'Retry'}
           </Button>
@@ -485,29 +675,12 @@ export default function AstralArcade() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background relative overflow-hidden">
-        {/* Animated starfield background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-background to-background" />
-          {stars.map((star) => (
-            <div
-              key={star.id}
-              className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-              style={{
-                left: star.left,
-                top: star.top,
-                animationDelay: star.delay,
-                animationDuration: star.duration,
-                opacity: star.opacity,
-              }}
-            />
-          ))}
-        </div>
+      <div className="min-h-screen relative overflow-hidden">
+        <ArcadeBackground />
 
         {/* Active game overlay */}
         {activeGame && (
           <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-            {/* Battle Overlay - show during battle mode playing */}
             {arcadeMode === 'battle' && gamePhase === 'playing' && adversary && (
               <BattleOverlay
                 battleState={battleState}
@@ -519,7 +692,6 @@ export default function AstralArcade() {
               />
             )}
 
-            {/* Floating damage numbers */}
             {arcadeMode === 'battle' && gamePhase === 'playing' && (
               <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
             )}
@@ -531,7 +703,7 @@ export default function AstralArcade() {
                     variant="ghost"
                     size="sm"
                     onClick={handleExitGame}
-                    className="mb-4 text-muted-foreground"
+                    className="mb-4 text-muted-foreground hover:text-white"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Exit Game
@@ -632,113 +804,79 @@ export default function AstralArcade() {
         )}
 
         {/* Main content */}
-        <motion.div 
-          className="relative z-10 p-4 max-w-lg mx-auto space-y-6 pb-8"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
+        <div className="relative z-10 p-4 max-w-lg mx-auto space-y-5 pb-8">
           {/* Header */}
-          <motion.div className="text-center pt-4" variants={headerVariants}>
-            <div className="inline-flex items-center gap-2 mb-2">
-              <Sparkles className="w-6 h-6 text-purple-400" />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-                Astral Arcade
+          <motion.div 
+            className="text-center pt-6 pb-2"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <motion.div 
+              className="inline-flex items-center gap-3 mb-3"
+              animate={{ scale: [1, 1.02, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <motion.div
+                animate={{ rotate: [0, 15, -15, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <Star className="w-7 h-7 text-amber-400 fill-amber-400/50" />
+              </motion.div>
+              <h1 className="text-3xl font-black tracking-tight">
+                <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+                  Astral
+                </span>
+                {' '}
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                  Arcade
+                </span>
               </h1>
-              <Sparkles className="w-6 h-6 text-cyan-400" />
-            </div>
-            <p className="text-sm text-muted-foreground">
+              <motion.div
+                animate={{ rotate: [0, -15, 15, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+              >
+                <Sparkles className="w-7 h-7 text-cyan-400" />
+              </motion.div>
+            </motion.div>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
               {arcadeMode === 'practice' 
-                ? 'Practice mini-games and sharpen your skills'
-                : 'Battle astral adversaries and prove your might!'
+                ? 'Master your skills and climb the leaderboards'
+                : 'Face cosmic adversaries in epic battles!'
               }
             </p>
           </motion.div>
 
+          {/* Companion Stats */}
+          <CompanionStatsDisplay 
+            stats={companionStats} 
+            companionName={currentCard?.creature_name || companion?.spirit_animal}
+          />
+
           {/* Mode Toggle */}
-          <motion.div variants={cardVariants}>
-            <Card className="p-3 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={() => setArcadeMode('practice')}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                    arcadeMode === 'practice'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30'
-                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
-                  }`}
-                >
-                  <Gamepad2 className="w-4 h-4" />
-                  Practice
-                </button>
-                <button
-                  onClick={() => setArcadeMode('battle')}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                    arcadeMode === 'battle'
-                      ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/30'
-                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
-                  }`}
-                >
-                  <Swords className="w-4 h-4" />
-                  Battle
-                </button>
-              </div>
-              {arcadeMode === 'battle' && (
-                <motion.p 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="text-xs text-center text-muted-foreground mt-2"
-                >
-                  Face {difficulty === 'easy' ? 'Common' : difficulty === 'hard' ? 'Uncommon' : 'Common/Uncommon'} adversaries!
-                </motion.p>
-              )}
-            </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <ModeToggle mode={arcadeMode} onModeChange={setArcadeMode} />
           </motion.div>
 
-          {/* High Scores Card - only show in practice mode if there are scores */}
-          {arcadeMode === 'practice' && getTotalGamesWithHighScores() > 0 && (
-            <motion.div variants={cardVariants}>
-              <Card className="p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
-                <div className="flex items-center gap-2 text-cyan-400 mb-3">
-                  <Trophy className="w-5 h-5" />
-                  <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {GAMES.map((game) => {
-                    const bestScore = getBestHighScore(game.type);
-                    if (!bestScore) return null;
-                    return (
-                      <div key={game.type} className="flex items-center gap-2 text-xs">
-                        <game.icon className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground truncate">{game.label}:</span>
-                        <span className="text-cyan-400 font-medium">★ {bestScore.displayValue}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            </motion.div>
-          )}
-
-          {/* Battle Mode Info Card */}
-          {arcadeMode === 'battle' && (
-            <motion.div variants={cardVariants}>
-              <Card className="p-4 bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-red-400">
-                    <Swords className="w-5 h-5" />
-                    <span className="text-sm font-semibold uppercase tracking-wide">Battle Mode</span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Select any game to face a randomly generated adversary. 
-                  Deal damage with good performance, take hits from mistakes!
-                </p>
-              </Card>
-            </motion.div>
-          )}
+          {/* High Scores or Battle Info */}
+          <AnimatePresence mode="wait">
+            {arcadeMode === 'practice' ? (
+              <HighScoresCard key="scores" games={GAMES} getBestHighScore={getBestHighScore} />
+            ) : (
+              <BattleInfoCard key="battle" difficulty={difficulty} />
+            )}
+          </AnimatePresence>
 
           {/* Difficulty Selector */}
-          <motion.div variants={cardVariants} className="w-full max-w-md mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
             <ArcadeDifficultySelector
               selected={difficulty}
               onSelect={setDifficulty}
@@ -748,14 +886,29 @@ export default function AstralArcade() {
 
           {/* Game Grid */}
           <motion.div 
-            className="grid grid-cols-2 gap-3"
-            variants={containerVariants}
+            className="grid grid-cols-2 gap-4"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: { staggerChildren: 0.08, delayChildren: 0.6 }
+              }
+            }}
           >
             {GAMES.map((game, index) => (
               <motion.div 
-                key={game.type} 
-                variants={gameCardVariants}
-                custom={index}
+                key={game.type}
+                variants={{
+                  hidden: { opacity: 0, y: 30, scale: 0.9 },
+                  visible: { 
+                    opacity: 1, 
+                    y: 0, 
+                    scale: 1,
+                    transition: { type: 'spring', stiffness: 400, damping: 25 }
+                  }
+                }}
               >
                 <ArcadeGameCard
                   gameType={game.type}
@@ -764,23 +917,28 @@ export default function AstralArcade() {
                   stat={game.stat}
                   highScoreDisplay={arcadeMode === 'practice' ? getFormattedHighScore(game.type, difficulty) : null}
                   onSelect={handleSelectGame}
+                  index={index}
                 />
               </motion.div>
             ))}
           </motion.div>
 
           {/* Return Button */}
-          <motion.div variants={cardVariants}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+          >
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => navigate('/tasks')}
-              className="w-full border-white/10 hover:bg-white/5"
+              className="w-full py-6 border border-white/10 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Return to Quests
             </Button>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
     </PageTransition>
   );
