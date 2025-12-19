@@ -10,6 +10,7 @@ import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
+import { generateWithValidation } from "@/utils/validateCompanionImage";
 
 export interface Companion {
   id: string;
@@ -95,79 +96,37 @@ export const useCompanion = () => {
         const eyeColor = `glowing ${data.favoriteColor}`;
         const furColor = data.favoriteColor;
 
-        // Generate initial companion image with color specifications (with retry)
-        logger.log("Generating companion image...");
-        const imageData = await retryWithBackoff(
-          async () => {
-            const { data: imageResult, error } = await supabase.functions.invoke(
-              "generate-companion-image",
-              {
-                body: {
-                  favoriteColor: data.favoriteColor,
-                  spiritAnimal: data.spiritAnimal,
-                  element: data.coreElement,
-                  stage: 0,
-                  eyeColor,
-                  furColor,
-                },
-              }
-            );
-            
-            // Handle specific error codes from edge function
-            if (error) {
-              console.error("Companion image generation error:", error);
-              const errorMsg = error.message || String(error);
-              
-              // Check for specific error codes
-              if (errorMsg.includes("INSUFFICIENT_CREDITS") || errorMsg.includes("Insufficient AI credits")) {
-                throw new Error("The companion creation service is temporarily unavailable. Please contact support.");
-              }
-              if (errorMsg.includes("RATE_LIMITED") || errorMsg.includes("AI service is currently busy")) {
-                throw new Error("The service is currently busy. Please wait a moment and try again.");
-              }
-              if (errorMsg.includes("NO_AUTH_HEADER") || errorMsg.includes("INVALID_AUTH") || 
-                  errorMsg.includes("Authentication required") || errorMsg.includes("Invalid authentication")) {
-                throw new Error("Your session has expired. Please refresh the page and try again.");
-              }
-              if (errorMsg.includes("NETWORK_ERROR") || errorMsg.includes("Network error")) {
-                throw new Error("Network error. Please check your connection and try again.");
-              }
-              if (errorMsg.includes("SERVER_CONFIG_ERROR") || errorMsg.includes("AI_SERVICE_NOT_CONFIGURED")) {
-                throw new Error("Service configuration error. Please contact support.");
-              }
-              
-              throw new Error(errorMsg || "Failed to generate companion image. Please try again.");
-            }
-            
-            if (!imageResult?.imageUrl) {
-              console.error("No image URL in result:", imageResult);
-              throw new Error("Unable to create your companion's image. Please try again.");
-            }
-            return imageResult;
+        // Generate initial companion image with validation (retries on anatomical issues)
+        logger.log("Generating companion image with validation...");
+        const { imageUrl, validationPassed, retryCount } = await generateWithValidation(
+          {
+            favoriteColor: data.favoriteColor,
+            spiritAnimal: data.spiritAnimal,
+            element: data.coreElement,
+            stage: 0,
+            eyeColor,
+            furColor,
           },
           {
-            maxAttempts: 3,
-            initialDelay: 2000,
-            shouldRetry: (error: unknown) => {
-              // Don't retry on payment/credits errors or auth errors
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              if (errorMessage.includes("INSUFFICIENT_CREDITS") ||
-                  errorMessage.includes("temporarily unavailable") ||
-                  errorMessage.includes("Authentication failed") ||
-                  errorMessage.includes("contact support")) {
-                return false;
-              }
-              return true;
-            }
+            maxRetries: 2,
+            onRetry: (attempt) => {
+              logger.log(`Validation failed, retrying image generation (attempt ${attempt})...`);
+            },
+            onValidating: () => {
+              logger.log("Validating generated image for anatomical issues...");
+            },
           }
         );
 
-        if (!imageData?.imageUrl) {
-        logger.error("Missing imageUrl after generation:", imageData);
-        throw new Error("Unable to create your companion's image. Please try again.");
-      }
+        if (retryCount > 0) {
+          logger.log(`Image generated after ${retryCount} validation retry(ies), passed: ${validationPassed}`);
+        } else {
+          logger.log(`Image generated on first attempt, validation passed: ${validationPassed}`);
+        }
 
-      logger.log("Image generated successfully, creating companion record...");
+        const imageData = { imageUrl };
+
+        logger.log("Image generated successfully, creating companion record...");
 
         // Use atomic database function to create companion (prevents duplicates)
         const result = await supabase.rpc('create_companion_if_not_exists', {

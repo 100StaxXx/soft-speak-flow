@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import type { GenerationPhase } from "@/components/ImageGenerationProgress";
+import { generateWithValidation } from "@/utils/validateCompanionImage";
 
 const MAX_REGENERATIONS = 2;
 
@@ -50,74 +51,30 @@ export const useCompanionRegenerate = () => {
       // Start generation phase
       setGenerationPhase('generating');
 
-      // Call the image generation function with validation and retry support
-      const generateWithRetry = async (retryAttempt: number = 0): Promise<{ imageUrl: string; validationPassed: boolean }> => {
-        if (retryAttempt > 0) {
-          setGenerationPhase('retrying');
-          setRetryCount(retryAttempt);
+      // Use shared validation helper for consistent behavior with initial hatching
+      const { imageUrl, validationPassed, retryCount: finalRetryCount } = await generateWithValidation(
+        {
+          favoriteColor: companion.favorite_color,
+          spiritAnimal: companion.spirit_animal,
+          element: companion.core_element,
+          stage: companion.current_stage,
+          eyeColor: companion.eye_color,
+          furColor: companion.fur_color,
+        },
+        {
+          maxRetries: 2,
+          onRetry: (attempt) => {
+            setGenerationPhase('retrying');
+            setRetryCount(attempt);
+          },
+          onValidating: () => {
+            setGenerationPhase('validating');
+          },
         }
+      );
 
-        const { data: imageResult, error: imageError } = await supabase.functions.invoke(
-          "generate-companion-image",
-          {
-            body: {
-              favoriteColor: companion.favorite_color,
-              spiritAnimal: companion.spirit_animal,
-              element: companion.core_element,
-              stage: companion.current_stage,
-              eyeColor: companion.eye_color,
-              furColor: companion.fur_color,
-              retryAttempt,
-            },
-          }
-        );
-
-        if (imageError) {
-          const errorMsg = imageError.message || String(imageError);
-          if (errorMsg.includes("RATE_LIMITED") || errorMsg.includes("busy")) {
-            throw new Error("Service is busy. Please try again in a moment.");
-          }
-          throw new Error("Failed to regenerate image. Please try again.");
-        }
-
-        if (!imageResult?.imageUrl) {
-          throw new Error("Failed to generate new image");
-        }
-
-        // Validate the generated image
-        setGenerationPhase('validating');
-        
-        try {
-          const { data: validationResult } = await supabase.functions.invoke(
-            "validate-companion-image",
-            {
-              body: {
-                imageUrl: imageResult.imageUrl,
-                spiritAnimal: companion.spirit_animal,
-              },
-            }
-          );
-
-          // If validation fails and we haven't exhausted retries, try again
-          if (validationResult && !validationResult.valid && validationResult.confidence > 70 && retryAttempt < 2) {
-            console.log(`Validation failed (confidence: ${validationResult.confidence}), retrying...`, validationResult.issues);
-            return generateWithRetry(retryAttempt + 1);
-          }
-
-          return {
-            imageUrl: imageResult.imageUrl,
-            validationPassed: validationResult?.valid !== false
-          };
-        } catch (validationError) {
-          console.warn("Validation service unavailable, accepting image:", validationError);
-          return {
-            imageUrl: imageResult.imageUrl,
-            validationPassed: true
-          };
-        }
-      };
-
-      const { imageUrl, validationPassed } = await generateWithRetry();
+      // Update local retry count state
+      setRetryCount(finalRetryCount);
 
       // Finalizing phase
       setGenerationPhase('finalizing');
