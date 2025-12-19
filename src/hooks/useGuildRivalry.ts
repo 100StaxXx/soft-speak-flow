@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface GuildRivalry {
   id: string;
   epic_id: string;
+  community_id: string | null;
   user_id: string;
   rival_id: string;
   created_at: string;

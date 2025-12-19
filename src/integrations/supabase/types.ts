@@ -760,6 +760,83 @@ export type Database = {
         }
         Relationships: []
       }
+      communities: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          invite_code: string | null
+          is_public: boolean | null
+          name: string
+          owner_id: string
+          theme_color: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          invite_code?: string | null
+          is_public?: boolean | null
+          name: string
+          owner_id: string
+          theme_color?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          invite_code?: string | null
+          is_public?: boolean | null
+          name?: string
+          owner_id?: string
+          theme_color?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      community_members: {
+        Row: {
+          community_id: string
+          id: string
+          joined_at: string | null
+          last_activity_at: string | null
+          role: string | null
+          total_contribution: number | null
+          user_id: string
+        }
+        Insert: {
+          community_id: string
+          id?: string
+          joined_at?: string | null
+          last_activity_at?: string | null
+          role?: string | null
+          total_contribution?: number | null
+          user_id: string
+        }
+        Update: {
+          community_id?: string
+          id?: string
+          joined_at?: string | null
+          last_activity_at?: string | null
+          role?: string | null
+          total_contribution?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_members_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_evolution_cards: {
         Row: {
           bond_level: number | null
@@ -1870,6 +1947,7 @@ export type Database = {
       epics: {
         Row: {
           book_title: string | null
+          community_id: string | null
           completed_at: string | null
           created_at: string | null
           description: string | null
@@ -1895,6 +1973,7 @@ export type Database = {
         }
         Insert: {
           book_title?: string | null
+          community_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
@@ -1920,6 +1999,7 @@ export type Database = {
         }
         Update: {
           book_title?: string | null
+          community_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
@@ -1944,6 +2024,13 @@ export type Database = {
           xp_reward?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "epics_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "epics_story_type_slug_fkey"
             columns: ["story_type_slug"]
@@ -2030,6 +2117,7 @@ export type Database = {
       }
       guild_rivalries: {
         Row: {
+          community_id: string | null
           created_at: string | null
           epic_id: string
           id: string
@@ -2037,6 +2125,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          community_id?: string | null
           created_at?: string | null
           epic_id: string
           id?: string
@@ -2044,6 +2133,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          community_id?: string | null
           created_at?: string | null
           epic_id?: string
           id?: string
@@ -2051,6 +2141,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "guild_rivalries_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "guild_rivalries_epic_id_fkey"
             columns: ["epic_id"]
@@ -2076,6 +2173,7 @@ export type Database = {
       }
       guild_shouts: {
         Row: {
+          community_id: string | null
           created_at: string | null
           epic_id: string
           id: string
@@ -2086,6 +2184,7 @@ export type Database = {
           shout_type: string
         }
         Insert: {
+          community_id?: string | null
           created_at?: string | null
           epic_id: string
           id?: string
@@ -2096,6 +2195,7 @@ export type Database = {
           shout_type: string
         }
         Update: {
+          community_id?: string | null
           created_at?: string | null
           epic_id?: string
           id?: string
@@ -2106,6 +2206,13 @@ export type Database = {
           shout_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "guild_shouts_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "guild_shouts_epic_id_fkey"
             columns: ["epic_id"]
@@ -2135,6 +2242,7 @@ export type Database = {
           chapter_number: number
           chapter_title: string
           climax_moment: string
+          community_id: string | null
           companion_spotlights: Json
           created_at: string | null
           epic_id: string
@@ -2150,6 +2258,7 @@ export type Database = {
           chapter_number?: number
           chapter_title: string
           climax_moment: string
+          community_id?: string | null
           companion_spotlights?: Json
           created_at?: string | null
           epic_id: string
@@ -2165,6 +2274,7 @@ export type Database = {
           chapter_number?: number
           chapter_title?: string
           climax_moment?: string
+          community_id?: string | null
           companion_spotlights?: Json
           created_at?: string | null
           epic_id?: string
@@ -2176,6 +2286,13 @@ export type Database = {
           trigger_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "guild_stories_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "guild_stories_epic_id_fkey"
             columns: ["epic_id"]
