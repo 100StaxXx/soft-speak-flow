@@ -6,17 +6,27 @@ import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 interface TapSequenceGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
   tierAttackDamage?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: ArcadeDifficulty;
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
 }
+
+// Difficulty config for orb adjustment and show time
+const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { orbModifier: number; showTimeBonus: number; startLives: number }> = {
+  beginner: { orbModifier: -2, showTimeBonus: 200, startLives: 5 },
+  easy: { orbModifier: -1, showTimeBonus: 100, startLives: 4 },
+  medium: { orbModifier: 0, showTimeBonus: 0, startLives: 3 },
+  hard: { orbModifier: 1, showTimeBonus: -50, startLives: 3 },
+  master: { orbModifier: 2, showTimeBonus: -100, startLives: 2 },
+};
 
 interface Orb {
   id: number;
@@ -240,13 +250,14 @@ export const TapSequenceGame = ({
   difficulty = 'medium',
   isPractice = false,
 }: TapSequenceGameProps) => {
+  const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete' | 'reshowing'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
   const [currentOrder, setCurrentOrder] = useState(1);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [level, setLevel] = useState(1);
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
+  const [lives, setLives] = useState(diffConfig.startLives);
   const [shake, setShake] = useState(false);
   const [lastTapResult, setLastTapResult] = useState<{ id: number; success: boolean } | null>(null);
   const [attemptsThisLevel, setAttemptsThisLevel] = useState(0);
@@ -257,8 +268,8 @@ export const TapSequenceGame = ({
 
   // Get config based on current level and difficulty
   const levelConfig = getLevelConfig(level);
-  const orbCount = levelConfig.orbs + (difficulty === 'hard' ? 1 : difficulty === 'easy' ? -1 : 0);
-  const showTimePerOrb = levelConfig.showTimePerOrb + (companionStats.mind / 100 * 150);
+  const orbCount = Math.max(3, levelConfig.orbs + diffConfig.orbModifier);
+  const showTimePerOrb = levelConfig.showTimePerOrb + diffConfig.showTimeBonus + (companionStats.mind / 100 * 150);
 
   const stars = useStaticStars(10);
 

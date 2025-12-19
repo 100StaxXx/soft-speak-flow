@@ -7,17 +7,27 @@ import { triggerHaptic } from './gameUtils';
 import { GameStyleWrapper } from './GameStyles';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 interface SoulSerpentGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
   tierAttackDamage?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: ArcadeDifficulty;
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
 }
+
+// Difficulty config for speed adjustments
+const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { baseSpeed: number }> = {
+  beginner: { baseSpeed: 400 },
+  easy: { baseSpeed: 320 },
+  medium: { baseSpeed: 260 },
+  hard: { baseSpeed: 200 },
+  master: { baseSpeed: 160 },
+};
 
 interface Position {
   x: number;
@@ -468,9 +478,9 @@ export const SoulSerpentGame = ({
   const lastMoveTimeRef = useRef<number>(0);
 
   // Speed based on difficulty (slower for smoother feel)
-  const baseSpeed = difficulty === 'easy' ? 320 : difficulty === 'medium' ? 260 : 200;
-  const adjustedSpeed = baseSpeed * (1 - questIntervalScale * 0.1);
-  const gameSpeed = Math.max(150, adjustedSpeed);
+  const diffConfig = DIFFICULTY_CONFIG[difficulty];
+  const adjustedSpeed = diffConfig.baseSpeed * (1 - questIntervalScale * 0.1);
+  const gameSpeed = Math.max(120, adjustedSpeed);
 
   // Add trail particle when snake moves
   const addTrailParticle = useCallback((position: Position, snakeLength: number) => {

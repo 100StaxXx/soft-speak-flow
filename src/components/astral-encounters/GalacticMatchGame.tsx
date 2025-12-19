@@ -13,17 +13,35 @@ interface Card {
 }
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 interface GalacticMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
   tierAttackDamage?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: ArcadeDifficulty;
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
 }
+
+// Difficulty config for lives and reveal time
+const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { startLives: number; revealTimeMultiplier: number; startPairs: number }> = {
+  beginner: { startLives: 5, revealTimeMultiplier: 1.5, startPairs: 2 },
+  easy: { startLives: 4, revealTimeMultiplier: 1.25, startPairs: 2 },
+  medium: { startLives: 3, revealTimeMultiplier: 1.0, startPairs: 2 },
+  hard: { startLives: 2, revealTimeMultiplier: 0.8, startPairs: 3 },
+  master: { startLives: 1, revealTimeMultiplier: 0.6, startPairs: 4 },
+};
+
+const MAX_LIVES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
+  beginner: 5,
+  easy: 4,
+  medium: 3,
+  hard: 2,
+  master: 1,
+};
 
 // Cosmic symbols with colors
 const COSMIC_SYMBOLS = [
@@ -44,12 +62,11 @@ const COSMIC_SYMBOLS = [
   { emoji: '🍀', name: 'Clover', color: 'hsl(120, 60%, 50%)' },
 ];
 
-const MAX_LIVES = 3;
 const MAX_XP = 150;
 
-// Get level configuration - starts at 2 pairs, adds 1 per level
-const getLevelConfig = (level: number) => {
-  const pairs = Math.min(level + 1, 15); // Level 1 = 2 pairs, caps at 15
+// Get level configuration - starts at startPairs, adds 1 per level
+const getLevelConfig = (level: number, startPairs: number = 2, revealTimeMultiplier: number = 1.0) => {
+  const pairs = Math.min(level + startPairs - 1, 15); // Level 1 = startPairs, caps at 15
   const totalCards = pairs * 2;
   
   // Calculate optimal grid layout
@@ -65,8 +82,9 @@ const getLevelConfig = (level: number) => {
   else if (totalCards <= 30) { cols = 6; rows = 5; }
   else { cols = 6; rows = 5; } // Max grid
   
-  // Reveal time scales with cards: 2s base + 0.2s per pair, max 5s
-  const revealTime = Math.min(2 + (pairs - 2) * 0.25, 5);
+  // Reveal time scales with cards: 2s base + 0.2s per pair, max 5s, modified by difficulty
+  const baseRevealTime = Math.min(2 + (pairs - 2) * 0.25, 5);
+  const revealTime = baseRevealTime * revealTimeMultiplier;
   
   return { pairs, cols, rows, revealTime, totalCards };
 };
@@ -158,8 +176,10 @@ export const GalacticMatchGame = ({
   maxTimer,
   isPractice = false,
 }: GalacticMatchGameProps) => {
+  const diffConfig = DIFFICULTY_CONFIG[difficulty];
+  const maxLives = MAX_LIVES_BY_DIFFICULTY[difficulty];
   const [level, setLevel] = useState(1);
-  const [lives, setLives] = useState(MAX_LIVES);
+  const [lives, setLives] = useState(diffConfig.startLives);
   const [phase, setPhase] = useState<GamePhase>('countdown');
   const [cards, setCards] = useState<Card[]>([]);
   const [flippedCards, setFlippedCards] = useState<string[]>([]);
@@ -173,7 +193,7 @@ export const GalacticMatchGame = ({
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
   
-  const config = useMemo(() => getLevelConfig(level), [level]);
+  const config = useMemo(() => getLevelConfig(level, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, diffConfig]);
 
   // Initialize/shuffle cards for current level
   const initializeCards = useCallback((startFlipped: boolean = false) => {
@@ -452,7 +472,7 @@ export const GalacticMatchGame = ({
 
         {/* Lives */}
         <div className="flex items-center gap-1">
-          {[...Array(MAX_LIVES)].map((_, i) => (
+          {[...Array(maxLives)].map((_, i) => (
             <motion.div
               key={i}
               initial={false}
