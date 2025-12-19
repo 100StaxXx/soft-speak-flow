@@ -46,7 +46,7 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
   }, [crackLevel]);
 
   return (
-    <div className="relative w-full aspect-[16/7] max-h-[180px] overflow-hidden rounded-xl">
+    <div className="relative w-full aspect-[2.5/1] max-h-[140px] overflow-hidden rounded-xl">
       {/* Main Image Container */}
       <motion.div
         className={`
@@ -67,13 +67,13 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 flex items-center justify-center">
-            <span className="text-6xl">👹</span>
+            <span className="text-5xl">👹</span>
           </div>
         )}
 
         {/* Cinematic gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/20 via-transparent to-background/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/30 via-transparent to-background/30" />
 
         {/* Damage overlay - gets darker and redder as HP drops */}
         <motion.div
@@ -102,7 +102,7 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
         <div 
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.5) 100%)',
           }}
         />
       </motion.div>
@@ -165,7 +165,7 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
             {Array.from({ length: 12 }).map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-4 h-4 bg-purple-500/50 rounded-sm"
+                className="absolute w-3 h-3 bg-purple-500/50 rounded-sm"
                 style={{
                   left: `${(i % 4) * 25 + 12}%`,
                   top: `${Math.floor(i / 4) * 33 + 16}%`,
@@ -195,12 +195,12 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
         className="absolute inset-0 rounded-xl pointer-events-none"
         animate={hpPercent <= 25 && !isDefeated ? {
           boxShadow: [
-            'inset 0 0 20px rgba(239,68,68,0.2)',
-            'inset 0 0 30px rgba(239,68,68,0.4)',
-            'inset 0 0 20px rgba(239,68,68,0.2)',
+            'inset 0 0 15px rgba(239,68,68,0.2)',
+            'inset 0 0 25px rgba(239,68,68,0.4)',
+            'inset 0 0 15px rgba(239,68,68,0.2)',
           ]
         } : {
-          boxShadow: 'inset 0 0 20px rgba(147,51,234,0.2)'
+          boxShadow: 'inset 0 0 15px rgba(147,51,234,0.2)'
         }}
         transition={{ duration: 1.5, repeat: Infinity }}
       />
