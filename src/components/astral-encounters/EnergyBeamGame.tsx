@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Shield, Zap, Clock, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, Shield, Zap, Clock, Star, ChevronLeft, ChevronRight, Crosshair } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
@@ -80,7 +80,7 @@ interface Projectile {
 
 interface PowerUp {
   id: string;
-  type: 'shield' | 'rapid' | 'repair' | 'slowmo' | 'bonus';
+  type: 'shield' | 'rapid' | 'repair' | 'slowmo' | 'spread' | 'bonus';
   x: number;
   y: number;
 }
@@ -304,6 +304,7 @@ const PowerUpSprite = memo(({ powerUp }: { powerUp: PowerUp }) => {
     rapid: { icon: Zap, color: '#f59e0b', bg: 'rgba(245,158,11,0.3)' },
     repair: { icon: Heart, color: '#22c55e', bg: 'rgba(34,197,94,0.3)' },
     slowmo: { icon: Clock, color: '#a855f7', bg: 'rgba(168,85,247,0.3)' },
+    spread: { icon: Crosshair, color: '#ec4899', bg: 'rgba(236,72,153,0.3)' },
     bonus: { icon: Star, color: '#fbbf24', bg: 'rgba(251,191,36,0.3)' },
   }[powerUp.type];
   
@@ -481,6 +482,7 @@ export function EnergyBeamGame({
   const [hasShield, setHasShield] = useState(false);
   const [rapidFire, setRapidFire] = useState(false);
   const [isSlowMo, setIsSlowMo] = useState(false);
+  const [spreadShot, setSpreadShot] = useState(false);
   const [isInvulnerable, setIsInvulnerable] = useState(false);
   
   // Game objects
@@ -554,14 +556,24 @@ export function EnergyBeamGame({
     
     statsRef.current.shotsFired++;
     
-    setProjectiles(prev => [...prev, {
-      id: `p-${now}`,
-      x: playerX,
-      y: 82,
-      isEnemy: false,
-      speed: 3,
-    }]);
-  }, [playerX, rapidFire]);
+    if (spreadShot) {
+      // Fire 3 projectiles in a spread pattern
+      setProjectiles(prev => [
+        ...prev,
+        { id: `p-${now}-l`, x: playerX - 4, y: 82, isEnemy: false, speed: 3 },
+        { id: `p-${now}-c`, x: playerX, y: 82, isEnemy: false, speed: 3 },
+        { id: `p-${now}-r`, x: playerX + 4, y: 82, isEnemy: false, speed: 3 },
+      ]);
+    } else {
+      setProjectiles(prev => [...prev, {
+        id: `p-${now}`,
+        x: playerX,
+        y: 82,
+        isEnemy: false,
+        speed: 3,
+      }]);
+    }
+  }, [playerX, rapidFire, spreadShot]);
   
   // Handle keyboard input
   useEffect(() => {
@@ -754,7 +766,7 @@ export function EnergyBeamGame({
                   
                   // Spawn power-up
                   if (Math.random() < currentConfig.powerUpChance) {
-                    const types: PowerUp['type'][] = ['shield', 'rapid', 'repair', 'slowmo', 'bonus'];
+                    const types: PowerUp['type'][] = ['shield', 'rapid', 'repair', 'slowmo', 'spread', 'bonus'];
                     setPowerUps(p => [...p, {
                       id: `pu-${Date.now()}`,
                       type: types[Math.floor(Math.random() * types.length)],
@@ -849,6 +861,11 @@ export function EnergyBeamGame({
                 // Slow everything down for 5 seconds
                 setIsSlowMo(true);
                 setTimeout(() => setIsSlowMo(false), 5000);
+                break;
+              case 'spread':
+                // Fire 3 projectiles at once for 5 seconds
+                setSpreadShot(true);
+                setTimeout(() => setSpreadShot(false), 5000);
                 break;
               case 'bonus':
                 setScore(s => s + 200);
@@ -1025,6 +1042,11 @@ export function EnergyBeamGame({
           {isSlowMo && (
             <div className="px-2 py-1 bg-purple-500/30 rounded text-xs text-purple-400 flex items-center gap-1">
               <Clock className="w-3 h-3" /> SLOW-MO
+            </div>
+          )}
+          {spreadShot && (
+            <div className="px-2 py-1 bg-pink-500/30 rounded text-xs text-pink-400 flex items-center gap-1">
+              <Crosshair className="w-3 h-3" /> SPREAD
             </div>
           )}
         </div>
