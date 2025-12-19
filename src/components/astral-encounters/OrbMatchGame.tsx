@@ -1047,7 +1047,17 @@ export const OrbMatchGame = ({
         ? Math.round(Math.min(100, 70 + ((finalScore - config.targetScore) / config.targetScore) * 30 + comboBonus))
         : Math.round(Math.min(50, (finalScore / config.targetScore) * 50));
       const result: 'perfect' | 'good' | 'fail' = passed ? (accuracy >= 90 ? 'perfect' : 'good') : 'fail';
-      setTimeout(() => onComplete({ success: passed, accuracy, result, highScoreValue: finalScore }), isPerfect ? 1200 : 400);
+      setTimeout(() => onComplete({ 
+        success: passed, 
+        accuracy, 
+        result, 
+        highScoreValue: finalScore,
+        gameStats: {
+          score: finalScore,
+          maxCombo,
+          time: timeLeft,
+        },
+      }), isPerfect ? 1200 : 400);
     }
   }, [gameState, score, config.targetScore, maxCombo, timeLeft, onComplete, onDamage]);
 

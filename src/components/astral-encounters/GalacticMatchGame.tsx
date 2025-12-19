@@ -287,7 +287,12 @@ export const GalacticMatchGame = ({
             success: true, 
             accuracy: 100, 
             result: 'good',
-            highScoreValue: level, // Level reached for high score
+            highScoreValue: level,
+            gameStats: {
+              level,
+              score,
+              maxCombo: combo,
+            },
           });
           return;
         }
@@ -343,10 +348,15 @@ export const GalacticMatchGame = ({
         success: result !== 'fail', 
         accuracy: Math.min(accuracy, 100), 
         result,
-        highScoreValue: level, // Level reached for high score
+        highScoreValue: level,
+        gameStats: {
+          level,
+          score,
+          maxCombo: combo,
+        },
       });
     }, 1500);
-  }, [phase, score, level, onComplete]);
+  }, [phase, score, level, onComplete, combo]);
 
   // Handle card click
   const handleCardClick = useCallback((cardId: string) => {

@@ -1016,10 +1016,14 @@ export function EnergyBeamGame({
     
     const timer = setTimeout(() => {
       onComplete({
-        success: result !== 'fail', // Must clear at least 2 waves to win
+        success: result !== 'fail',
         accuracy,
         result,
         highScoreValue: wavesCleared,
+        gameStats: {
+          wavesCleared,
+          score,
+        },
       });
     }, 1500);
     

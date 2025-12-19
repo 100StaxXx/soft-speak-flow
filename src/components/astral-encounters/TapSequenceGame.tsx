@@ -340,8 +340,12 @@ export const TapSequenceGame = ({
       accuracy: Math.min(finalAccuracy, 100),
       result: won ? (finalAccuracy >= 90 ? 'perfect' : 'good') : 'fail',
       highScoreValue: level,
+      gameStats: {
+        level,
+        score,
+      },
     });
-  }, [level, totalCorrectTaps, totalTaps, onComplete]);
+  }, [level, totalCorrectTaps, totalTaps, onComplete, score]);
 
   // Handle orb tap
   const handleOrbTap = useCallback((orb: Orb) => {

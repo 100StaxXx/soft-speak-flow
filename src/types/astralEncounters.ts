@@ -35,6 +35,25 @@ export interface MiniGameResult {
   result: EncounterResult;
   usedTiltControls?: boolean;
   highScoreValue?: number; // Game-specific metric for high score tracking
+  gameStats?: GameStats; // Game-specific stats for summary modal
+}
+
+// Game-specific stats for the summary modal
+export interface GameStats {
+  score?: number;
+  level?: number;
+  combo?: number;
+  maxCombo?: number;
+  time?: number;
+  distance?: number;
+  itemsCollected?: number;
+  wavesCleared?: number;
+  livesRemaining?: number;
+  perfectHits?: number;
+  greatHits?: number;
+  goodHits?: number;
+  misses?: number;
+  notesHit?: number;
 }
 
 export interface Adversary {
@@ -103,12 +122,7 @@ export interface CosmicCodexEntry {
   created_at: string;
 }
 
-export interface MiniGameResult {
-  success: boolean;
-  accuracy: number; // 0-100
-  result: EncounterResult;
-  usedTiltControls?: boolean; // Track if player used tilt controls for XP bonus
-}
+// Note: MiniGameResult is defined above with gameStats support
 
 export interface EncounterPhase {
   miniGameType: MiniGameType;
