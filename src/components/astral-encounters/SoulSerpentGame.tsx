@@ -156,7 +156,16 @@ const TrailParticleComponent = memo(({ particle }: { particle: TrailParticle }) 
 ));
 TrailParticleComponent.displayName = 'TrailParticleComponent';
 
+// Check if two adjacent segments are on opposite sides (wrap-around)
+const isWrapAround = (p1: { x: number; y: number }, p2: { x: number; y: number }): boolean => {
+  const xDiff = Math.abs(p1.x - p2.x);
+  const yDiff = Math.abs(p1.y - p2.y);
+  // If difference is greater than 1 cell, it's a wrap
+  return xDiff > CELL_SIZE * 1.5 || yDiff > CELL_SIZE * 1.5;
+};
+
 // Continuous serpent renderer using SVG with smooth interpolation
+// Handles wrap-around by breaking the path into segments
 const ContinuousSerpent = memo(({ 
   snake, 
   direction,
@@ -187,15 +196,46 @@ const ContinuousSerpent = memo(({
     });
   }, [snake, direction, interpolation]);
 
-  // Build smooth bezier curve path through all points
-  const pathD = useMemo(() => {
-    if (pathPoints.length < 2) return '';
+  // Split path into segments that don't cross the wrap boundary
+  const pathSegments = useMemo(() => {
+    if (pathPoints.length < 2) return [pathPoints];
     
-    let d = `M ${pathPoints[0].x} ${pathPoints[0].y}`;
+    const segments: { x: number; y: number }[][] = [];
+    let currentSegment: { x: number; y: number }[] = [pathPoints[0]];
     
     for (let i = 1; i < pathPoints.length; i++) {
       const prev = pathPoints[i - 1];
       const curr = pathPoints[i];
+      
+      // Check if this is a wrap-around (segments on opposite sides of grid)
+      if (isWrapAround(prev, curr)) {
+        // End current segment and start a new one
+        if (currentSegment.length > 0) {
+          segments.push(currentSegment);
+        }
+        currentSegment = [curr];
+      } else {
+        currentSegment.push(curr);
+      }
+    }
+    
+    // Add the last segment
+    if (currentSegment.length > 0) {
+      segments.push(currentSegment);
+    }
+    
+    return segments;
+  }, [pathPoints]);
+
+  // Build smooth bezier curve path for a segment
+  const buildPathD = (points: { x: number; y: number }[]): string => {
+    if (points.length < 2) return '';
+    
+    let d = `M ${points[0].x} ${points[0].y}`;
+    
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
       
       // Use quadratic bezier for smooth curves
       const midX = (prev.x + curr.x) / 2;
@@ -209,11 +249,11 @@ const ContinuousSerpent = memo(({
     }
     
     // End at the last point
-    const last = pathPoints[pathPoints.length - 1];
+    const last = points[points.length - 1];
     d += ` L ${last.x} ${last.y}`;
     
     return d;
-  }, [pathPoints]);
+  };
 
   // Calculate eye positions based on direction
   const eyeOffset = useMemo(() => {
@@ -260,43 +300,59 @@ const ContinuousSerpent = memo(({
         </filter>
       </defs>
 
-      {/* Body glow layer */}
-      {pathPoints.length >= 2 && (
-        <path
-          d={pathD}
-          stroke="hsl(var(--primary) / 0.4)"
-          strokeWidth={CELL_SIZE + 4}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-          filter="url(#serpentGlow)"
-        />
-      )}
+      {/* Render each path segment separately to handle wrap-around */}
+      {pathSegments.map((segment, segIndex) => {
+        if (segment.length < 2) {
+          // Single point segment - render as a circle
+          return (
+            <circle
+              key={`seg-${segIndex}`}
+              cx={segment[0].x}
+              cy={segment[0].y}
+              r={(CELL_SIZE - 6) / 2}
+              fill="url(#serpentBodyGradient)"
+              filter="url(#serpentGlow)"
+            />
+          );
+        }
+        
+        const pathD = buildPathD(segment);
+        return (
+          <g key={`seg-${segIndex}`}>
+            {/* Body glow layer */}
+            <path
+              d={pathD}
+              stroke="hsl(var(--primary) / 0.4)"
+              strokeWidth={CELL_SIZE + 4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              filter="url(#serpentGlow)"
+            />
 
-      {/* Main body */}
-      {pathPoints.length >= 2 && (
-        <path
-          d={pathD}
-          stroke="url(#serpentBodyGradient)"
-          strokeWidth={CELL_SIZE - 6}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      )}
+            {/* Main body */}
+            <path
+              d={pathD}
+              stroke="url(#serpentBodyGradient)"
+              strokeWidth={CELL_SIZE - 6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
 
-      {/* Scales pattern overlay */}
-      {pathPoints.length >= 2 && (
-        <path
-          d={pathD}
-          stroke="hsl(var(--primary-foreground) / 0.15)"
-          strokeWidth={CELL_SIZE - 10}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray="4 8"
-          fill="none"
-        />
-      )}
+            {/* Scales pattern overlay */}
+            <path
+              d={pathD}
+              stroke="hsl(var(--primary-foreground) / 0.15)"
+              strokeWidth={CELL_SIZE - 10}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="4 8"
+              fill="none"
+            />
+          </g>
+        );
+      })}
 
       {/* Head */}
       <motion.circle
