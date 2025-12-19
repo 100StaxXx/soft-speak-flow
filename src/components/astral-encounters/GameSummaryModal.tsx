@@ -14,6 +14,7 @@ interface GameSummaryModalProps {
   result: MiniGameResult;
   isNewHighScore?: boolean;
   previousHighScore?: number;
+  isPracticeMode?: boolean;
   onPlayAgain: () => void;
   onExit: () => void;
 }
@@ -113,6 +114,14 @@ const RESULT_CONFIG = {
     borderColor: 'border-red-500/50',
     glowColor: 'shadow-red-500/30',
   },
+  practice: {
+    icon: Target,
+    title: 'Practice Complete!',
+    color: 'text-cyan-400',
+    bgColor: 'from-cyan-500/20 to-blue-500/20',
+    borderColor: 'border-cyan-500/50',
+    glowColor: 'shadow-cyan-500/30',
+  },
 };
 
 export function GameSummaryModal({
@@ -122,12 +131,16 @@ export function GameSummaryModal({
   result,
   isNewHighScore = false,
   previousHighScore,
+  isPracticeMode = false,
   onPlayAgain,
   onExit,
 }: GameSummaryModalProps) {
-  const resultConfig = RESULT_CONFIG[result.result];
+  // In practice mode, use encouraging "practice" config instead of "fail"
+  const effectiveResult = isPracticeMode && result.result === 'fail' ? 'practice' : result.result;
+  const resultConfig = RESULT_CONFIG[effectiveResult];
   const gameConfig = GAME_STAT_CONFIG[gameType];
   const ResultIcon = resultConfig.icon;
+  const showCelebration = effectiveResult !== 'fail';
 
   // Get stats to display
   const statsToShow = Object.entries(gameConfig?.statLabels || {}).filter(
@@ -144,7 +157,7 @@ export function GameSummaryModal({
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm"
         >
           {/* Celebration particles for success */}
-          {result.result !== 'fail' && (
+          {showCelebration && (
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               {[...Array(20)].map((_, i) => (
                 <motion.div
@@ -153,8 +166,10 @@ export function GameSummaryModal({
                   style={{
                     left: `${Math.random() * 100}%`,
                     top: `${Math.random() * 100}%`,
-                    backgroundColor: result.result === 'perfect' 
+                    backgroundColor: effectiveResult === 'perfect' 
                       ? `hsl(${45 + Math.random() * 20}, 100%, ${50 + Math.random() * 30}%)` 
+                      : effectiveResult === 'practice'
+                      ? `hsl(${190 + Math.random() * 20}, 80%, ${50 + Math.random() * 30}%)`
                       : `hsl(${270 + Math.random() * 30}, 70%, ${50 + Math.random() * 30}%)`,
                   }}
                   initial={{ scale: 0, opacity: 0 }}
@@ -273,8 +288,9 @@ export function GameSummaryModal({
                   animate={{ width: `${result.accuracy}%` }}
                   transition={{ delay: 0.4, duration: 0.5, ease: 'easeOut' }}
                   className={`h-full rounded-full ${
-                    result.result === 'perfect' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
-                    result.result === 'good' ? 'bg-gradient-to-r from-purple-400 to-pink-500' :
+                    effectiveResult === 'perfect' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
+                    effectiveResult === 'good' ? 'bg-gradient-to-r from-purple-400 to-pink-500' :
+                    effectiveResult === 'practice' ? 'bg-gradient-to-r from-cyan-400 to-blue-500' :
                     'bg-gradient-to-r from-red-400 to-orange-500'
                   }`}
                 />
@@ -299,10 +315,12 @@ export function GameSummaryModal({
               <Button
                 onClick={onPlayAgain}
                 className={`flex-1 ${
-                  result.result === 'perfect' 
+                  effectiveResult === 'perfect' 
                     ? 'bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600' 
-                    : result.result === 'good'
+                    : effectiveResult === 'good'
                     ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
+                    : effectiveResult === 'practice'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
                     : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
                 }`}
               >
