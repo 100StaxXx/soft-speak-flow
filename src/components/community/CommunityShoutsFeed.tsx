@@ -148,7 +148,7 @@ interface SendShoutDialogProps {
   onOpenChange: (open: boolean) => void;
   members: Array<{
     user_id: string;
-    profile?: { email: string | null };
+    profile?: { email: string | null; onboarding_data?: unknown };
     companion?: { current_image_url: string | null; spirit_animal: string };
   }>;
   selectedRecipient: string | null;
@@ -194,7 +194,7 @@ const SendShoutDialog = ({
             <p className="text-sm font-medium">Who do you want to shout at?</p>
             <div className="flex flex-wrap gap-2">
               {members.map((member) => {
-                const name = member.profile?.email?.split('@')[0] || 'Anonymous';
+                const name = getUserDisplayName(member.profile);
                 const isSelected = selectedRecipient === member.user_id;
                 
                 return (

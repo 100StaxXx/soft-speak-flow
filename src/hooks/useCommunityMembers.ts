@@ -14,6 +14,7 @@ export interface CommunityMember {
   profile?: {
     id: string;
     email: string | null;
+    onboarding_data?: unknown;
   };
   companion?: {
     id: string;
@@ -47,10 +48,10 @@ export const useCommunityMembers = (communityId?: string) => {
       // Get user IDs to fetch profiles and companions
       const userIds = membersData.map(m => m.user_id);
 
-      // Fetch profiles for these users
+      // Fetch profiles for these users (including onboarding_data for display name)
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, email")
+        .select("id, email, onboarding_data")
         .in("id", userIds);
 
       // Fetch companions for these users
@@ -70,6 +71,7 @@ export const useCommunityMembers = (communityId?: string) => {
           profile: profile ? {
             id: profile.id,
             email: profile.email,
+            onboarding_data: profile.onboarding_data,
           } : undefined,
           companion: companion ? {
             id: companion.id,
