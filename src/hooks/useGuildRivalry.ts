@@ -15,53 +15,76 @@ export interface GuildRivalry {
   };
 }
 
-export const useGuildRivalry = (epicId?: string) => {
+interface UseGuildRivalryOptions {
+  epicId?: string;
+  communityId?: string;
+}
+
+export const useGuildRivalry = (options: UseGuildRivalryOptions | string = {}) => {
+  // Support both old signature (epicId string) and new options object
+  const { epicId, communityId } = typeof options === 'string' 
+    ? { epicId: options, communityId: undefined } 
+    : options;
+
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch user's rivalry in this epic
-  const { data: rivalry, isLoading } = useQuery<GuildRivalry | null>({
-    queryKey: ["guild-rivalry", epicId, user?.id],
-    queryFn: async () => {
-      if (!epicId || !user) return null;
+  const queryKeyId = communityId || epicId;
+  const queryKeyType = communityId ? 'community' : 'epic';
 
-      const { data, error } = await supabase
+  // Fetch user's rivalry in this epic or community
+  const { data: rivalry, isLoading } = useQuery<GuildRivalry | null>({
+    queryKey: ["guild-rivalry", queryKeyType, queryKeyId, user?.id],
+    queryFn: async () => {
+      if ((!epicId && !communityId) || !user) return null;
+
+      let query = supabase
         .from("guild_rivalries")
         .select(`
           *,
           rival:profiles!guild_rivalries_rival_id_fkey(email)
         `)
-        .eq("epic_id", epicId)
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .eq("user_id", user.id);
+
+      if (communityId) {
+        query = query.eq("community_id", communityId);
+      } else if (epicId) {
+        query = query.eq("epic_id", epicId);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
       return data as GuildRivalry | null;
     },
-    enabled: !!epicId && !!user,
+    enabled: !!(epicId || communityId) && !!user,
   });
 
   // Set a rival
   const setRival = useMutation({
     mutationFn: async (rivalId: string) => {
-      if (!user || !epicId) throw new Error("Not authenticated or no epic");
+      if (!user) throw new Error("Not authenticated");
+      if (!epicId && !communityId) throw new Error("No epic or community specified");
 
       // Prevent self-rivalry
       if (rivalId === user.id) {
         throw new Error("You cannot set yourself as a rival");
       }
 
+      const insertData = {
+        epic_id: epicId || null,
+        community_id: communityId || null,
+        user_id: user.id,
+        rival_id: rivalId,
+      };
+
+      // Determine conflict columns based on context
+      const onConflict = communityId ? 'community_id,user_id' : 'epic_id,user_id';
+
       // Upsert rivalry (replace if exists)
       const { data, error } = await supabase
         .from("guild_rivalries")
-        .upsert(
-          {
-            epic_id: epicId,
-            user_id: user.id,
-            rival_id: rivalId,
-          },
-          { onConflict: 'epic_id,user_id' }
-        )
+        .upsert(insertData, { onConflict })
         .select()
         .single();
 
@@ -70,7 +93,7 @@ export const useGuildRivalry = (epicId?: string) => {
     },
     onSuccess: () => {
       toast.success("Rival set! ⚔️ Let the competition begin!");
-      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", queryKeyType, queryKeyId] });
     },
     onError: (error) => {
       toast.error("Failed to set rival");
@@ -81,19 +104,27 @@ export const useGuildRivalry = (epicId?: string) => {
   // Remove rivalry
   const removeRival = useMutation({
     mutationFn: async () => {
-      if (!user || !epicId) throw new Error("Not authenticated or no epic");
+      if (!user) throw new Error("Not authenticated");
+      if (!epicId && !communityId) throw new Error("No epic or community specified");
 
-      const { error } = await supabase
+      let query = supabase
         .from("guild_rivalries")
         .delete()
-        .eq("epic_id", epicId)
         .eq("user_id", user.id);
+
+      if (communityId) {
+        query = query.eq("community_id", communityId);
+      } else if (epicId) {
+        query = query.eq("epic_id", epicId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Rivalry ended");
-      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", epicId] });
+      queryClient.invalidateQueries({ queryKey: ["guild-rivalry", queryKeyType, queryKeyId] });
     },
     onError: (error) => {
       toast.error("Failed to remove rival");

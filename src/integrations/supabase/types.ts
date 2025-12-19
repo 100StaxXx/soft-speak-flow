@@ -2119,7 +2119,7 @@ export type Database = {
         Row: {
           community_id: string | null
           created_at: string | null
-          epic_id: string
+          epic_id: string | null
           id: string
           rival_id: string
           user_id: string
@@ -2127,7 +2127,7 @@ export type Database = {
         Insert: {
           community_id?: string | null
           created_at?: string | null
-          epic_id: string
+          epic_id?: string | null
           id?: string
           rival_id: string
           user_id: string
@@ -2135,7 +2135,7 @@ export type Database = {
         Update: {
           community_id?: string | null
           created_at?: string | null
-          epic_id?: string
+          epic_id?: string | null
           id?: string
           rival_id?: string
           user_id?: string
@@ -2175,7 +2175,7 @@ export type Database = {
         Row: {
           community_id: string | null
           created_at: string | null
-          epic_id: string
+          epic_id: string | null
           id: string
           is_read: boolean | null
           message_key: string
@@ -2186,7 +2186,7 @@ export type Database = {
         Insert: {
           community_id?: string | null
           created_at?: string | null
-          epic_id: string
+          epic_id?: string | null
           id?: string
           is_read?: boolean | null
           message_key: string
@@ -2197,7 +2197,7 @@ export type Database = {
         Update: {
           community_id?: string | null
           created_at?: string | null
-          epic_id?: string
+          epic_id?: string | null
           id?: string
           is_read?: boolean | null
           message_key?: string

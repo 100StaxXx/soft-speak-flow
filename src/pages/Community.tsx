@@ -8,6 +8,7 @@ import { useCommunityMembers } from "@/hooks/useCommunityMembers";
 import { CommunityCard, PublicCommunityCard } from "@/components/community/CommunityCard";
 import { CommunityMembersSection } from "@/components/community/CommunityMembersSection";
 import { CommunityInviteSection } from "@/components/community/CommunityInviteSection";
+import { CommunityShoutsFeed } from "@/components/community/CommunityShoutsFeed";
 import { CreateCommunityDialog } from "@/components/community/CreateCommunityDialog";
 import { JoinCommunityDialog } from "@/components/community/JoinCommunityDialog";
 import { Plus, UserPlus, Users, Compass, Loader2, ArrowLeft, Settings, LogOut } from "lucide-react";
@@ -300,6 +301,11 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving }: Communit
           inviteCode={community.invite_code}
           communityName={community.name}
         />
+
+        {/* Shouts Feed */}
+        <div className="mt-6">
+          <CommunityShoutsFeed communityId={community.id} />
+        </div>
 
         {/* Members Leaderboard */}
         <div className="mt-6">
