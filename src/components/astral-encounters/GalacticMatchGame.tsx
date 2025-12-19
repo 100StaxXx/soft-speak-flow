@@ -28,11 +28,11 @@ interface GalacticMatchGameProps {
 
 // Difficulty config for lives and reveal time
 const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { startLives: number; revealTimeMultiplier: number; startPairs: number }> = {
-  beginner: { startLives: 5, revealTimeMultiplier: 1.5, startPairs: 2 },
-  easy: { startLives: 4, revealTimeMultiplier: 1.25, startPairs: 2 },
-  medium: { startLives: 3, revealTimeMultiplier: 1.0, startPairs: 2 },
-  hard: { startLives: 2, revealTimeMultiplier: 0.8, startPairs: 3 },
-  master: { startLives: 1, revealTimeMultiplier: 0.6, startPairs: 4 },
+  beginner: { startLives: 5, revealTimeMultiplier: 1.8, startPairs: 2 },
+  easy: { startLives: 4, revealTimeMultiplier: 1.5, startPairs: 2 },
+  medium: { startLives: 3, revealTimeMultiplier: 1.2, startPairs: 2 },
+  hard: { startLives: 2, revealTimeMultiplier: 1.0, startPairs: 3 },
+  master: { startLives: 1, revealTimeMultiplier: 0.75, startPairs: 4 },
 };
 
 const MAX_LIVES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
@@ -82,8 +82,8 @@ const getLevelConfig = (level: number, startPairs: number = 2, revealTimeMultipl
   else if (totalCards <= 30) { cols = 6; rows = 5; }
   else { cols = 6; rows = 5; } // Max grid
   
-  // Reveal time scales with cards: 2s base + 0.2s per pair, max 5s, modified by difficulty
-  const baseRevealTime = Math.min(2 + (pairs - 2) * 0.25, 5);
+  // Reveal time scales with cards: 3s base + 0.5s per pair, max 10s, modified by difficulty
+  const baseRevealTime = Math.min(3 + (pairs - 2) * 0.5, 10);
   const revealTime = baseRevealTime * revealTimeMultiplier;
   
   return { pairs, cols, rows, revealTime, totalCards };
