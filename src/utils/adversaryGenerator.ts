@@ -10,6 +10,7 @@ import {
   TIER_CONFIG,
   RESULT_MULTIPLIERS
 } from '@/types/astralEncounters';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 // Adversary name prefixes by theme
 const NAME_PREFIXES: Record<AdversaryTheme, string[]> = {
@@ -262,17 +263,22 @@ export const getResultFromAccuracy = (accuracy: number): 'perfect' | 'good' | 'f
 
 // Generate adversary for arcade mode (common/uncommon only)
 export const generateArcadeAdversary = (
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: ArcadeDifficulty
 ): Adversary => {
   // Determine tier based on difficulty
   let tier: AdversaryTier;
-  if (difficulty === 'easy') {
-    tier = 'common';
-  } else if (difficulty === 'hard') {
-    tier = 'uncommon';
-  } else {
-    // Medium: 70% common, 30% uncommon
-    tier = Math.random() < 0.7 ? 'common' : 'uncommon';
+  switch (difficulty) {
+    case 'beginner':
+    case 'easy':
+      tier = 'common';
+      break;
+    case 'hard':
+    case 'master':
+      tier = 'uncommon';
+      break;
+    default:
+      // Medium: 70% common, 30% uncommon
+      tier = Math.random() < 0.7 ? 'common' : 'uncommon';
   }
   
   const config = TIER_CONFIG[tier];
