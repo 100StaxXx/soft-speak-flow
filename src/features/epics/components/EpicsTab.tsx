@@ -32,26 +32,26 @@ export function EpicsTab() {
     <div className="space-y-4">
       {/* Create Epic and Join Guild Buttons */}
       <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full overflow-hidden">
           <Button
             onClick={() => setTemplatesDialogOpen(true)}
-            className="flex-1 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
+            className="flex-1 min-w-0 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
           >
-            <Star className="h-4 w-4 mr-1.5" />
+            <Star className="h-4 w-4 mr-1.5 flex-shrink-0" />
             Star Paths
           </Button>
           <Button
             onClick={() => setCreateEpicDialogOpen(true)}
             variant="outline"
-            className="flex-1 h-auto py-3 text-sm font-medium"
+            className="flex-1 min-w-0 h-auto py-3 text-sm font-medium"
           >
-            <Castle className="h-4 w-4 mr-1.5" />
+            <Castle className="h-4 w-4 mr-1.5 flex-shrink-0" />
             Create
           </Button>
           <Button
             onClick={() => setJoinEpicDialogOpen(true)}
             variant="outline"
-            className="h-auto py-3 px-4"
+            className="h-auto py-3 px-4 flex-shrink-0"
           >
             <Users className="w-4 h-4" />
           </Button>
