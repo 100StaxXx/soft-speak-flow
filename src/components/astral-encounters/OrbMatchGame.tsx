@@ -1246,7 +1246,7 @@ export const OrbMatchGame = ({
       </AnimatePresence>
 
       <GameHUD
-        title={`Orb Match - Level ${level}`} subtitle={`Target: ${levelConfig.targetScore} pts`}
+        title={`Starburst - Level ${level}`} subtitle={`Target: ${levelConfig.targetScore} pts`}
         timeLeft={timeLeft} totalTime={levelConfig.timeLimit} combo={combo} showCombo={true}
         primaryStat={{ value: score, label: `${score}/${levelConfig.targetScore}`, color: score >= levelConfig.targetScore ? '#22c55e' : '#a855f7' }}
         secondaryStat={{ value: levelsCompleted, label: `${levelsCompleted} cleared`, color: '#22d3ee' }}

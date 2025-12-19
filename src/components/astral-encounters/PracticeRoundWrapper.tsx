@@ -71,7 +71,7 @@ const PracticeIntro = memo(({
     eclipse_timing: 'Stellar Beats',
     starfall_dodge: 'Starfall Dodge',
     soul_serpent: 'Soul Serpent',
-    orb_match: 'Orb Match',
+    orb_match: 'Starburst',
     galactic_match: 'Galactic Match',
   }[gameType];
 

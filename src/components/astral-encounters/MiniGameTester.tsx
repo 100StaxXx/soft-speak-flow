@@ -22,7 +22,7 @@ const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: '
   { type: 'eclipse_timing', label: 'Stellar Beats', icon: <Moon className="w-4 h-4" />, stat: 'soul' },
   { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" />, stat: 'body' },
   { type: 'soul_serpent', label: 'Soul Serpent', icon: <Zap className="w-4 h-4" />, stat: 'body' },
-  { type: 'orb_match', label: 'Orb Match', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
+  { type: 'orb_match', label: 'Starburst', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
   { type: 'galactic_match', label: 'Galactic Match', icon: <Layers className="w-4 h-4" />, stat: 'mind' },
 ];
 
