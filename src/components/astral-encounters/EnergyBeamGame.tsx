@@ -121,6 +121,20 @@ interface ScorePopup {
   type: string;
 }
 
+interface CollectEffect {
+  id: string;
+  x: number;
+  y: number;
+  color: string;
+}
+
+interface HitEffect {
+  id: string;
+  x: number;
+  y: number;
+  type: 'damage' | 'shield-break';
+}
+
 const ENEMY_CONFIG: Record<EnemyType, { hp: number; points: number; color: string; size: number }> = {
   scout: { hp: 1, points: 10, color: '#22c55e', size: 24 },
   fighter: { hp: 1, points: 25, color: '#3b82f6', size: 28 },
@@ -433,6 +447,104 @@ const LivesDisplay = memo(({ lives }: { lives: number }) => (
 ));
 LivesDisplay.displayName = 'LivesDisplay';
 
+// Power-up collect effect - burst animation
+const PowerUpCollectEffect = memo(({ effect }: { effect: CollectEffect }) => (
+  <motion.div
+    className="absolute pointer-events-none z-40"
+    style={{
+      left: `${effect.x}%`,
+      top: `${effect.y}%`,
+      transform: 'translate(-50%, -50%)',
+    }}
+    initial={{ scale: 0, opacity: 1 }}
+    animate={{ scale: 2.5, opacity: 0 }}
+    transition={{ duration: 0.4, ease: 'easeOut' }}
+  >
+    {/* Expanding ring */}
+    <div
+      className="w-12 h-12 rounded-full"
+      style={{
+        border: `3px solid ${effect.color}`,
+        boxShadow: `0 0 20px ${effect.color}, inset 0 0 15px ${effect.color}40`,
+      }}
+    />
+    {/* Particle burst - 8 particles radiating outward */}
+    {Array.from({ length: 8 }).map((_, i) => (
+      <motion.div
+        key={i}
+        className="absolute w-2 h-2 rounded-full"
+        style={{
+          background: effect.color,
+          boxShadow: `0 0 6px ${effect.color}`,
+          left: '50%',
+          top: '50%',
+          marginLeft: -4,
+          marginTop: -4,
+        }}
+        initial={{ x: 0, y: 0, opacity: 1 }}
+        animate={{
+          x: Math.cos((i / 8) * Math.PI * 2) * 50,
+          y: Math.sin((i / 8) * Math.PI * 2) * 50,
+          opacity: 0,
+        }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      />
+    ))}
+  </motion.div>
+));
+PowerUpCollectEffect.displayName = 'PowerUpCollectEffect';
+
+// Player hit effect - damage or shield break
+const PlayerHitEffect = memo(({ effect }: { effect: HitEffect }) => (
+  <motion.div
+    className="absolute pointer-events-none z-40"
+    style={{
+      left: `${effect.x}%`,
+      top: `${effect.y}%`,
+      transform: 'translate(-50%, -50%)',
+    }}
+    initial={{ scale: 0.3, opacity: 1 }}
+    animate={{ scale: 2, opacity: 0 }}
+    transition={{ duration: 0.35, ease: 'easeOut' }}
+  >
+    <div
+      className="w-16 h-16 rounded-full"
+      style={{
+        background: effect.type === 'shield-break'
+          ? 'radial-gradient(circle, rgba(59,130,246,0.9) 0%, rgba(59,130,246,0.4) 40%, transparent 70%)'
+          : 'radial-gradient(circle, rgba(239,68,68,0.9) 0%, rgba(239,68,68,0.4) 40%, transparent 70%)',
+        boxShadow: effect.type === 'shield-break'
+          ? '0 0 30px rgba(59,130,246,0.6)'
+          : '0 0 30px rgba(239,68,68,0.6)',
+      }}
+    />
+    {/* Shatter particles for shield break */}
+    {effect.type === 'shield-break' && Array.from({ length: 6 }).map((_, i) => (
+      <motion.div
+        key={i}
+        className="absolute w-3 h-3"
+        style={{
+          background: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
+          left: '50%',
+          top: '50%',
+          marginLeft: -6,
+          marginTop: -6,
+          clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
+        }}
+        initial={{ x: 0, y: 0, opacity: 1, rotate: i * 60 }}
+        animate={{
+          x: Math.cos((i / 6) * Math.PI * 2) * 40,
+          y: Math.sin((i / 6) * Math.PI * 2) * 40,
+          opacity: 0,
+          rotate: i * 60 + 180,
+        }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+      />
+    ))}
+  </motion.div>
+));
+PlayerHitEffect.displayName = 'PlayerHitEffect';
+
 // Generate enemy formation - scales with wave number
 const generateEnemies = (wave: number, config: typeof DIFFICULTY_CONFIG['easy']): Enemy[] => {
   const enemies: Enemy[] = [];
@@ -512,6 +624,9 @@ export function EnergyBeamGame({
   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [scorePopups, setScorePopups] = useState<ScorePopup[]>([]);
+  const [collectEffects, setCollectEffects] = useState<CollectEffect[]>([]);
+  const [hitEffects, setHitEffects] = useState<HitEffect[]>([]);
+  const [screenFlash, setScreenFlash] = useState<string | null>(null);
   
   // Refs
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -817,9 +932,28 @@ export function EnergyBeamGame({
               if (hasShield) {
                 setHasShield(false);
                 triggerHaptic('medium');
+                // Shield break effect
+                setHitEffects(prev => [...prev, {
+                  id: `shield-${Date.now()}`,
+                  x: playerX,
+                  y: 85,
+                  type: 'shield-break',
+                }]);
+                setScreenFlash('rgba(59,130,246,0.4)');
+                setTimeout(() => setScreenFlash(null), 150);
               } else {
                 // Player takes damage from enemy projectile
                 onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'player_hit' });
+                
+                // Hit effect
+                setHitEffects(prev => [...prev, {
+                  id: `hit-${Date.now()}`,
+                  x: playerX,
+                  y: 85,
+                  type: 'damage',
+                }]);
+                setScreenFlash('rgba(239,68,68,0.5)');
+                setTimeout(() => setScreenFlash(null), 200);
                 
                 setLives(l => {
                   const newLives = l - 1;
@@ -858,6 +992,28 @@ export function EnergyBeamGame({
           if (dx < 6 && dy < 6) {
             statsRef.current.powerUpsCollected++;
             triggerHaptic('medium');
+            
+            // Get color for power-up type
+            const powerUpColors: Record<PowerUp['type'], string> = {
+              shield: '#3b82f6',
+              rapid: '#f59e0b',
+              repair: '#22c55e',
+              slowmo: '#a855f7',
+              spread: '#ec4899',
+              bonus: '#fbbf24',
+            };
+            
+            // Add collect effect
+            setCollectEffects(prev => [...prev, {
+              id: `collect-${Date.now()}`,
+              x: pu.x,
+              y: newY,
+              color: powerUpColors[pu.type],
+            }]);
+            
+            // Brief screen flash with power-up color
+            setScreenFlash(`${powerUpColors[pu.type]}40`);
+            setTimeout(() => setScreenFlash(null), 120);
             
             switch (pu.type) {
               case 'shield':
@@ -919,7 +1075,26 @@ export function EnergyBeamGame({
             if (dx < 5 && dy < 5) {
               if (hasShield) {
                 setHasShield(false);
+                // Shield break effect
+                setHitEffects(prevEffects => [...prevEffects, {
+                  id: `shield-enemy-${Date.now()}`,
+                  x: playerX,
+                  y: 85,
+                  type: 'shield-break',
+                }]);
+                setScreenFlash('rgba(59,130,246,0.4)');
+                setTimeout(() => setScreenFlash(null), 150);
               } else {
+                // Hit effect
+                setHitEffects(prevEffects => [...prevEffects, {
+                  id: `hit-enemy-${Date.now()}`,
+                  x: playerX,
+                  y: 85,
+                  type: 'damage',
+                }]);
+                setScreenFlash('rgba(239,68,68,0.5)');
+                setTimeout(() => setScreenFlash(null), 200);
+                
                 setLives(l => {
                   const newLives = l - 1;
                   if (newLives <= 0) {
@@ -937,9 +1112,11 @@ export function EnergyBeamGame({
         });
       }
       
-      // Clean up old explosions and popups
+      // Clean up old explosions, popups, and effects
       setExplosions(prev => prev.slice(-10));
       setScorePopups(prev => prev.slice(-10));
+      setCollectEffects(prev => prev.slice(-8));
+      setHitEffects(prev => prev.slice(-6));
       
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     };
@@ -1082,6 +1259,20 @@ export function EnergyBeamGame({
         <div className="absolute inset-0 bg-purple-500/10 pointer-events-none z-10" />
       )}
       
+      {/* Screen flash overlay for collisions */}
+      <AnimatePresence>
+        {screenFlash && (
+          <motion.div
+            className="absolute inset-0 z-50 pointer-events-none"
+            style={{ backgroundColor: screenFlash }}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          />
+        )}
+      </AnimatePresence>
+      
       {/* Game area */}
       <div
         ref={gameAreaRef}
@@ -1116,6 +1307,20 @@ export function EnergyBeamGame({
         <AnimatePresence>
           {scorePopups.map(popup => (
             <ScorePopupComponent key={popup.id} popup={popup} />
+          ))}
+        </AnimatePresence>
+        
+        {/* Power-up collect effects */}
+        <AnimatePresence>
+          {collectEffects.map(effect => (
+            <PowerUpCollectEffect key={effect.id} effect={effect} />
+          ))}
+        </AnimatePresence>
+        
+        {/* Player hit effects */}
+        <AnimatePresence>
+          {hitEffects.map(effect => (
+            <PlayerHitEffect key={effect.id} effect={effect} />
           ))}
         </AnimatePresence>
         
