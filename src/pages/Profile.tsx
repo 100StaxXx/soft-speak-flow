@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info, Search } from "lucide-react";
+import { SearchBar } from "@/components/SearchBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -244,6 +245,18 @@ const Profile = () => {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 space-y-6 relative z-10">
+          {/* Search Bar */}
+          <div className="max-w-md">
+            <SearchBar
+              placeholder="Search quotes, pep talks, mentors..."
+              onSearch={(query) => {
+                if (query.trim()) {
+                  navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                }
+              }}
+            />
+          </div>
+
           <div className="max-w-md space-y-3">
             <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/library")} data-tour="library">
               <CardHeader>
