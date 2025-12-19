@@ -435,7 +435,7 @@ export const TapSequenceGame = ({
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice]);
+  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, mistakesThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice]);
 
   const getHighlightedOrbOrder = useCallback(() => {
     const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);
@@ -494,8 +494,10 @@ export const TapSequenceGame = ({
       {/* Difficulty indicator */}
       <div className="mb-2 flex items-center gap-2">
         <span className={`text-xs px-2 py-0.5 rounded-full ${
+          difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
           difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
           difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+          difficulty === 'hard' ? 'bg-orange-500/20 text-orange-400' :
           'bg-red-500/20 text-red-400'
         }`}>
           {difficulty.toUpperCase()}
@@ -613,7 +615,7 @@ export const TapSequenceGame = ({
 
       {/* Game info */}
       <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-        <span>3 lives • Endless levels</span>
+        <span>{diffConfig.startLives} lives • Endless levels</span>
         <span className="text-primary">No time limit!</span>
       </div>
 
