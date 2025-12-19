@@ -64,7 +64,7 @@ const GAMES = [
   { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'soul' as const },
   { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
-  { type: 'orb_match' as MiniGameType, label: 'Orb Match', icon: Grid3X3, stat: 'mind' as const },
+  { type: 'orb_match' as MiniGameType, label: 'Starburst', icon: Grid3X3, stat: 'mind' as const },
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 

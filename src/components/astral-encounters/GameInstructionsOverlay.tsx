@@ -110,7 +110,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   orb_match: {
     icon: Grid3X3,
-    title: "Orb Match",
+    title: "Starburst",
     goal: "Match orbs before time runs out!",
     howToPlay: [
       "Touch and drag any orb across the grid",
