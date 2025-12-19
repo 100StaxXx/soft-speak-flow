@@ -67,11 +67,11 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
-// Timing windows (in % distance from hit zone)
+// Timing windows (in % distance from hit zone) - generous for mobile/casual play
 const TIMING_WINDOWS = {
-  perfect: 3,
-  great: 6,
-  good: 10,
+  perfect: 6,
+  great: 12,
+  good: 18,
 };
 
 // Max misses allowed by difficulty before losing
