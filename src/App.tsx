@@ -229,7 +229,7 @@ const AppContent = memo(() => {
             <Route path="/partners" element={<Partners />} />
             <Route path="/account-deletion" element={<AccountDeletionHelp />} />
             <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
-            <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+            <Route path="/guilds" element={<ProtectedRoute><Community /></ProtectedRoute>} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="*" element={<NotFound />} />

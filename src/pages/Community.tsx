@@ -23,7 +23,7 @@ const Community = () => {
   const [selectedCommunity, setSelectedCommunity] = useState<CommunityWithMembership | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('community');
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('guilds');
 
   const { leaveCommunity, isLeaving, joinCommunity, isJoining } = useCommunityMembers(selectedCommunity?.id);
 
@@ -60,7 +60,7 @@ const Community = () => {
   const handleJoinPublicCommunity = async (communityId: string) => {
     try {
       await joinCommunity.mutateAsync(communityId);
-      toast.success("Welcome to the community!");
+      toast.success("Welcome to the guild!");
     } catch (error) {
       // Error handled by hook
     }
@@ -86,7 +86,7 @@ const Community = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Users className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">Community</h1>
+              <h1 className="text-xl font-bold">Guilds</h1>
             </div>
             
             <div className="flex gap-2">
@@ -116,7 +116,7 @@ const Community = () => {
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="my" className="gap-2">
               <Users className="h-4 w-4" />
-              My Communities
+              My Guilds
             </TabsTrigger>
             <TabsTrigger value="discover" className="gap-2">
               <Compass className="h-4 w-4" />
@@ -131,8 +131,8 @@ const Community = () => {
               </div>
             ) : !myCommunities || myCommunities.length === 0 ? (
               <EmptyState
-                title="No communities yet"
-                description="Create your own community or join one with an invite code."
+                title="No guilds yet"
+                description="Create your own guild or join one with an invite code."
                 onCreateClick={() => setShowCreateDialog(true)}
                 onJoinClick={() => setShowJoinDialog(true)}
               />
@@ -165,9 +165,9 @@ const Community = () => {
             ) : !publicCommunities || publicCommunities.length === 0 ? (
               <Card className="p-8 text-center">
                 <Compass className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                <h3 className="font-semibold mb-2">No public communities yet</h3>
+                <h3 className="font-semibold mb-2">No public guilds yet</h3>
                 <p className="text-sm text-muted-foreground">
-                  Be the first to create a public community!
+                  Be the first to create a public guild!
                 </p>
               </Card>
             ) : (
@@ -226,7 +226,7 @@ const EmptyState = ({ title, description, onCreateClick, onJoinClick }: EmptySta
     <div className="flex flex-col sm:flex-row gap-3 justify-center">
       <Button onClick={onCreateClick}>
         <Plus className="h-4 w-4 mr-2" />
-        Create Community
+        Create Guild
       </Button>
       <Button variant="outline" onClick={onJoinClick}>
         <UserPlus className="h-4 w-4 mr-2" />
