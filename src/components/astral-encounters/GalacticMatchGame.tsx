@@ -298,7 +298,7 @@ export const GalacticMatchGame = ({
         }
         
         const nextLevel = level + 1;
-        const nextConfig = getLevelConfig(nextLevel);
+        const nextConfig = getLevelConfig(nextLevel, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
         
         // Generate new shuffled cards for next level, starting flipped for memorization
         const symbolIndices = Array.from({ length: nextConfig.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
