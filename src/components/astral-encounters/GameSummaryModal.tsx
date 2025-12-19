@@ -71,9 +71,10 @@ const GAME_STAT_CONFIG: Record<MiniGameType, {
   orb_match: {
     primaryStat: 'score',
     statLabels: {
-      score: { label: 'Score', icon: Star },
+      score: { label: 'Total Score', icon: Star },
+      levelsCompleted: { label: 'Levels Cleared', icon: TrendingUp },
       maxCombo: { label: 'Max Combo', icon: Flame },
-      time: { label: 'Time Left', icon: Clock, format: (v) => `${v}s` },
+      timeBonus: { label: 'Time Bonus', icon: Clock, format: (v) => `+${v}` },
     },
   },
   astral_frequency: {
