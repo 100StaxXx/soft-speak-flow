@@ -11,8 +11,10 @@ import { CommunityInviteSection } from "@/components/community/CommunityInviteSe
 import { CommunityShoutsFeed } from "@/components/community/CommunityShoutsFeed";
 import { CreateCommunityDialog } from "@/components/community/CreateCommunityDialog";
 import { JoinCommunityDialog } from "@/components/community/JoinCommunityDialog";
-import { Plus, UserPlus, Users, Compass, Loader2, ArrowLeft, Settings, LogOut } from "lucide-react";
+import { CommunityTutorialModal } from "@/components/community/CommunityTutorialModal";
+import { Plus, UserPlus, Users, Compass, Loader2, ArrowLeft, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { toast } from "sonner";
 
 const Community = () => {
@@ -21,6 +23,7 @@ const Community = () => {
   const [selectedCommunity, setSelectedCommunity] = useState<CommunityWithMembership | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('community');
 
   const { leaveCommunity, isLeaving, joinCommunity, isJoining } = useCommunityMembers(selectedCommunity?.id);
 
@@ -203,6 +206,7 @@ const Community = () => {
         onOpenChange={setShowJoinDialog}
         onSuccess={handleJoinSuccess}
       />
+      <CommunityTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </div>
   );
 };
