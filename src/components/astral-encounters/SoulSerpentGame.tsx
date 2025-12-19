@@ -626,8 +626,8 @@ export const SoulSerpentGame = ({
       if (newHead.x === stardust.x && newHead.y === stardust.y) {
         const newScore = score + 1;
         
-        // MILESTONE DAMAGE: Deal damage every 10 stardust collected
-        if (newScore > 0 && newScore % 10 === 0) {
+        // MILESTONE DAMAGE: Deal damage every 5 stardust collected (faster pacing)
+        if (newScore > 0 && newScore % 5 === 0) {
           onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.scoreMilestone, source: 'score_milestone' });
         }
         

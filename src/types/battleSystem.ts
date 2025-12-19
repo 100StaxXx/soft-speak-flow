@@ -28,31 +28,31 @@ export interface TierBattleConfig {
   attackDamage: number; // Damage adversary deals per hit
 }
 
-// HP configurations by tier - REBALANCED for longer battles (4-6 milestones needed)
+// HP configurations by tier - REBALANCED for 2-5 minute battles
 export const TIER_BATTLE_CONFIG: Record<AdversaryTier, TierBattleConfig> = {
   common: {
     playerHP: 100,
-    adversaryHP: 100,   // ~5 milestones needed
-    attackDamage: 12,   // Reduced for longer battles
+    adversaryHP: 80,    // ~3-4 milestones needed
+    attackDamage: 12,
   },
   uncommon: {
     playerHP: 100,
-    adversaryHP: 120,   // ~6 milestones
+    adversaryHP: 100,   // ~4 milestones
     attackDamage: 15,
   },
   rare: {
     playerHP: 100,
-    adversaryHP: 150,   // ~7-8 milestones
+    adversaryHP: 120,   // ~4-5 milestones
     attackDamage: 18,
   },
   epic: {
     playerHP: 100,
-    adversaryHP: 180,   // ~9 milestones
+    adversaryHP: 150,   // ~5-6 milestones
     attackDamage: 22,
   },
   legendary: {
     playerHP: 100,
-    adversaryHP: 220,   // ~11 milestones
+    adversaryHP: 180,   // ~6-7 milestones
     attackDamage: 28,
   },
 };
@@ -94,7 +94,7 @@ export const GAME_DAMAGE_VALUES = {
   
   // Orb Match - damage on score targets and special activation
   orb_match: {
-    scoreTarget: 25,          // Reaching score target deals damage
+    scoreTarget: 35,          // Reaching score target deals damage (boosted for faster battles)
     specialActivation: 10,    // Special orbs still valuable
     noMoves: 'tier_attack',   // Player takes tier damage for shuffles
   },
