@@ -42,9 +42,11 @@ export interface MiniGameResult {
 export interface GameStats {
   score?: number;
   level?: number;
+  levelsCompleted?: number;
   combo?: number;
   maxCombo?: number;
   time?: number;
+  timeBonus?: number;
   distance?: number;
   itemsCollected?: number;
   wavesCleared?: number;

@@ -18,13 +18,30 @@ interface OrbMatchGameProps {
   isPractice?: boolean;
 }
 
-// Difficulty config for timer and move time
-const ARCADE_DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { gameTime: number; moveTime: number }> = {
-  beginner: { gameTime: 90, moveTime: 15 },
-  easy: { gameTime: 75, moveTime: 12 },
-  medium: { gameTime: 60, moveTime: 10 },
-  hard: { gameTime: 45, moveTime: 8 },
-  master: { gameTime: 30, moveTime: 6 },
+// Difficulty multipliers for level scaling
+const DIFFICULTY_MULTIPLIERS: Record<ArcadeDifficulty, { targetMod: number; timeMod: number }> = {
+  beginner: { targetMod: 0.6, timeMod: 1.4 },
+  easy: { targetMod: 0.8, timeMod: 1.2 },
+  medium: { targetMod: 1.0, timeMod: 1.0 },
+  hard: { targetMod: 1.2, timeMod: 0.8 },
+  master: { targetMod: 1.5, timeMod: 0.6 },
+};
+
+// Level configuration - escalating difficulty
+const getLevelConfig = (level: number, difficultyMod: { targetMod: number; timeMod: number }) => {
+  const baseTarget = 100 + (level - 1) * 50; // 100, 150, 200, 250...
+  const baseTime = Math.max(20, 45 - (level - 1) * 2); // 45s → 20s minimum
+  const colors = Math.min(6, 4 + Math.floor(level / 4)) as 4 | 5 | 6; // 4 → 6 colors
+  const moveTime = Math.max(4, 10 - Math.floor(level / 3)); // 10s → 4s minimum
+  const specialSpawnBonus = Math.min(0.3, level * 0.02); // Increased special spawn rate
+  
+  return {
+    targetScore: Math.round(baseTarget * difficultyMod.targetMod),
+    timeLimit: Math.round(baseTime * difficultyMod.timeMod),
+    colors,
+    moveTime,
+    specialSpawnBonus,
+  };
 };
 
 type OrbColor = 'fire' | 'water' | 'earth' | 'light' | 'dark' | 'cosmic';
@@ -208,6 +225,95 @@ const ShuffleOverlay = memo(() => (
   </div>
 ));
 ShuffleOverlay.displayName = 'ShuffleOverlay';
+
+// Level Complete Overlay
+const LevelCompleteOverlay = memo(({ 
+  level, 
+  levelScore, 
+  timeBonus, 
+  totalScore,
+  onContinue 
+}: { 
+  level: number; 
+  levelScore: number; 
+  timeBonus: number; 
+  totalScore: number;
+  onContinue: () => void;
+}) => {
+  useEffect(() => {
+    const timer = setTimeout(onContinue, 2500);
+    return () => clearTimeout(timer);
+  }, [onContinue]);
+
+  return (
+    <motion.div
+      className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/70 rounded-2xl backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', damping: 15 }}
+        className="text-center"
+      >
+        <div className="text-4xl mb-2">🎉</div>
+        <h2 className="text-2xl font-black text-yellow-400 mb-1 drop-shadow-glow">
+          LEVEL {level} COMPLETE!
+        </h2>
+        <div className="space-y-1 text-sm">
+          <p className="text-white/80">Level Score: <span className="text-green-400 font-bold">+{levelScore}</span></p>
+          <p className="text-white/80">Time Bonus: <span className="text-cyan-400 font-bold">+{timeBonus}</span></p>
+          <p className="text-white/60 text-xs mt-2">Total: <span className="text-purple-400 font-bold">{totalScore}</span></p>
+        </div>
+        <motion.div
+          className="mt-4 px-4 py-2 bg-purple-500/30 rounded-full border border-purple-400/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+        >
+          <span className="text-sm text-purple-200">Next level starting...</span>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+});
+LevelCompleteOverlay.displayName = 'LevelCompleteOverlay';
+
+// Level Indicator Badge
+const LevelIndicator = memo(({ level, progress, targetScore }: { level: number; progress: number; targetScore: number }) => (
+  <div className="absolute left-2 top-2 z-40">
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/60 rounded-full border border-purple-500/40 backdrop-blur-sm">
+      <span className="text-xs font-bold text-purple-400">LVL</span>
+      <span className="text-lg font-black text-white">{level}</span>
+      <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-200"
+          style={{ width: `${Math.min(100, progress * 100)}%` }}
+        />
+      </div>
+    </div>
+  </div>
+));
+LevelIndicator.displayName = 'LevelIndicator';
+
+// Level Up Animation
+const LevelUpBanner = memo(() => (
+  <motion.div
+    className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
+    initial={{ opacity: 0, scale: 0.5 }}
+    animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.2, 1, 1] }}
+    transition={{ duration: 1, times: [0, 0.3, 0.7, 1] }}
+  >
+    <div className="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-500/40 to-pink-500/40 border-2 border-purple-400/60 shadow-glow-purple">
+      <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-pink-400">
+        ⬆️ LEVEL UP! ⬆️
+      </span>
+    </div>
+  </motion.div>
+));
+LevelUpBanner.displayName = 'LevelUpBanner';
 
 // Special Effect: Beam (horizontal/vertical)
 const BeamEffect = memo(({ effect, cellSize, onComplete }: { effect: SpecialEffect; cellSize: number; onComplete: () => void }) => {
@@ -437,13 +543,19 @@ OrbComponent.displayName = 'OrbComponent';
 export const OrbMatchGame = ({
   companionStats, onComplete, onDamage, tierAttackDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
 }: OrbMatchGameProps) => {
-  const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
+  const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'levelComplete' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
   const [selectedOrb, setSelectedOrb] = useState<Orb | null>(null);
   const [dragPath, setDragPath] = useState<string[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [moveTimeLeft, setMoveTimeLeft] = useState(0);
-  const [score, setScore] = useState(0);
+  const [score, setScore] = useState(0); // Current level score
+  const [totalScore, setTotalScore] = useState(0); // Cumulative score across all levels
+  const [level, setLevel] = useState(1);
+  const [levelsCompleted, setLevelsCompleted] = useState(0);
+  const [lastLevelScore, setLastLevelScore] = useState(0); // For level complete display
+  const [lastTimeBonus, setLastTimeBonus] = useState(0); // For level complete display
+  const [showLevelUp, setShowLevelUp] = useState(false);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [cascadeLevel, setCascadeLevel] = useState(0);
@@ -466,26 +578,21 @@ export const OrbMatchGame = ({
   useEffect(() => { orbsRef.current = orbs; }, [orbs]);
 
   const soulBonus = companionStats.soul / 100;
+  const difficultyMod = DIFFICULTY_MULTIPLIERS[difficulty];
 
-  const config = useMemo(() => {
-    const settings = {
-      easy: { colors: 5 as const, moveTime: 6, targetScore: 150, totalTime: 30 },
-      medium: { colors: 5 as const, moveTime: 5, targetScore: 200, totalTime: 30 },
-      hard: { colors: 6 as const, moveTime: 4, targetScore: 280, totalTime: 30 },
-    };
-    const s = settings[difficulty];
-    const effectiveTotalTime = maxTimer ?? s.totalTime;
-    const effectiveTargetScore = isPractice ? Math.floor(s.targetScore * 0.5) : s.targetScore;
+  // Level-based config
+  const levelConfig = useMemo(() => {
+    const cfg = getLevelConfig(level, difficultyMod);
     return {
-      ...s, totalTime: effectiveTotalTime, targetScore: effectiveTargetScore,
-      moveTime: Math.max(3, s.moveTime - questIntervalScale * 0.5 + soulBonus * 1.5),
+      ...cfg,
+      moveTime: Math.max(3, cfg.moveTime - questIntervalScale * 0.5 + soulBonus * 1.5),
     };
-  }, [difficulty, questIntervalScale, soulBonus, maxTimer, isPractice]);
+  }, [level, difficultyMod, questIntervalScale, soulBonus]);
 
   const availableColors = useMemo((): OrbColor[] => {
     const allColors: OrbColor[] = ['fire', 'water', 'earth', 'light', 'dark', 'cosmic'];
-    return allColors.slice(0, config.colors);
-  }, [config.colors]);
+    return allColors.slice(0, levelConfig.colors);
+  }, [levelConfig.colors]);
 
   const cellSize = useMemo(() => 280 / GRID_COLS, []);
 
@@ -549,18 +656,18 @@ export const OrbMatchGame = ({
 
   const startRound = useCallback(() => {
     initializeGrid();
-    setMoveTimeLeft(config.moveTime);
+    setMoveTimeLeft(levelConfig.moveTime);
     setSelectedOrb(null);
     setDragPath([]);
     setHint(null);
     isDraggingRef.current = false;
-  }, [initializeGrid, config.moveTime]);
+  }, [initializeGrid, levelConfig.moveTime]);
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
-    setTimeLeft(config.totalTime);
+    setTimeLeft(levelConfig.timeLimit);
     startRound();
-  }, [config.totalTime, startRound]);
+  }, [levelConfig.timeLimit, startRound]);
 
   const resetHintTimer = useCallback(() => {
     setHint(null);
@@ -923,7 +1030,7 @@ export const OrbMatchGame = ({
     if (currentCascade > 0) {
       setScore(s => s + totalScore);
       setCombo(c => { const newCombo = c + currentCascade; setMaxCombo(m => Math.max(m, newCombo)); return newCombo; });
-      setMoveTimeLeft(config.moveTime);
+      setMoveTimeLeft(levelConfig.moveTime);
       resetHintTimer();
       setTimeout(() => {
         const validMove = findValidMove(orbsRef.current);
@@ -932,7 +1039,7 @@ export const OrbMatchGame = ({
     }
     setCascadeLevel(0);
     return currentCascade;
-  }, [findMatches, dropAndFill, config.moveTime, cellSize, resetHintTimer, findValidMove, gameState, shuffleBoard, onDamage]);
+  }, [findMatches, dropAndFill, levelConfig.moveTime, cellSize, resetHintTimer, findValidMove, gameState, shuffleBoard, onDamage]);
 
   const getCellFromPosition = useCallback((clientX: number, clientY: number): { row: number; col: number } | null => {
     if (!gridRef.current) return null;
@@ -1010,7 +1117,7 @@ export const OrbMatchGame = ({
     
     // If move timer is at 0 and not dragging, reset it to allow new moves
     if (moveTimeLeft <= 0 && !isDraggingRef.current) {
-      setMoveTimeLeft(config.moveTime);
+      setMoveTimeLeft(levelConfig.moveTime);
       return;
     }
     
@@ -1026,7 +1133,7 @@ export const OrbMatchGame = ({
       });
     }, 150);
     return () => { if (moveTimerRef.current) clearInterval(moveTimerRef.current); };
-  }, [gameState, moveTimeLeft, handleDragEnd, config.moveTime]);
+  }, [gameState, moveTimeLeft, handleDragEnd, levelConfig.moveTime]);
 
   // Game timer
   useEffect(() => {
@@ -1042,23 +1149,60 @@ export const OrbMatchGame = ({
     return () => { if (hintTimerRef.current) clearTimeout(hintTimerRef.current); };
   }, [gameState, resetHintTimer]);
 
+  // Check for level completion (score target reached)
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+    if (score >= levelConfig.targetScore) {
+      // Level complete!
+      const timeBonus = timeLeft * 5;
+      const levelScoreWithBonus = score + timeBonus;
+      
+      // Store for display
+      setLastLevelScore(score);
+      setLastTimeBonus(timeBonus);
+      setTotalScore(prev => prev + levelScoreWithBonus);
+      setLevelsCompleted(prev => prev + 1);
+      
+      // Deal milestone damage
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.orb_match.scoreTarget, source: 'level_complete' });
+      
+      triggerHaptic('heavy');
+      setGameState('levelComplete');
+    }
+  }, [score, levelConfig.targetScore, gameState, timeLeft, onDamage]);
+
+  // Handle advancing to next level
+  const advanceToNextLevel = useCallback(() => {
+    setLevel(prev => prev + 1);
+    setScore(0);
+    setCombo(0);
+    setShowLevelUp(true);
+    setTimeout(() => setShowLevelUp(false), 1000);
+    
+    // Get next level config
+    const nextLevelCfg = getLevelConfig(level + 1, difficultyMod);
+    setTimeLeft(Math.round(nextLevelCfg.timeLimit * (1 - questIntervalScale * 0.5 + soulBonus * 1.5)));
+    
+    initializeGrid();
+    setMoveTimeLeft(nextLevelCfg.moveTime);
+    setGameState('playing');
+  }, [level, difficultyMod, questIntervalScale, soulBonus, initializeGrid]);
+
+  // Game over logic
   useEffect(() => {
     if (gameState === 'complete') {
-      const isPerfect = score >= config.targetScore && timeLeft > 5;
-      const finalScore = isPerfect ? score + 50 : score;
-      if (isPerfect) { setShowPerfect(true); triggerHaptic('heavy'); }
-      const passed = finalScore >= config.targetScore;
+      const finalScore = totalScore + score; // Include any partial level score
+      const passed = levelsCompleted >= 1;
       
-      // MILESTONE DAMAGE: Deal damage when reaching score target
-      if (passed) {
-        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.orb_match.scoreTarget, source: 'score_target' });
-      }
+      if (levelsCompleted >= 3) { setShowPerfect(true); triggerHaptic('heavy'); }
       
       const comboBonus = Math.min(maxCombo * 2, 15);
+      const levelBonus = levelsCompleted * 5;
       const accuracy = passed 
-        ? Math.round(Math.min(100, 70 + ((finalScore - config.targetScore) / config.targetScore) * 30 + comboBonus))
-        : Math.round(Math.min(50, (finalScore / config.targetScore) * 50));
-      const result: 'perfect' | 'good' | 'fail' = passed ? (accuracy >= 90 ? 'perfect' : 'good') : 'fail';
+        ? Math.round(Math.min(100, 50 + levelBonus + comboBonus))
+        : Math.round(Math.min(50, (score / levelConfig.targetScore) * 50));
+      const result: 'perfect' | 'good' | 'fail' = levelsCompleted >= 5 ? 'perfect' : passed ? 'good' : 'fail';
+      
       setTimeout(() => onComplete({ 
         success: passed, 
         accuracy, 
@@ -1066,42 +1210,57 @@ export const OrbMatchGame = ({
         highScoreValue: finalScore,
         gameStats: {
           score: finalScore,
+          level,
+          levelsCompleted,
           maxCombo,
           time: timeLeft,
+          timeBonus: lastTimeBonus,
         },
-      }), isPerfect ? 1200 : 400);
+      }), levelsCompleted >= 3 ? 1200 : 400);
     }
-  }, [gameState, score, config.targetScore, maxCombo, timeLeft, onComplete, onDamage]);
+  }, [gameState, score, totalScore, levelsCompleted, level, levelConfig.targetScore, maxCombo, timeLeft, lastTimeBonus, onComplete]);
 
   const removeExplosion = useCallback((id: string) => setExplosions(prev => prev.filter(e => e.id !== id)), []);
   const removeSpecialEffect = useCallback((id: string) => setSpecialEffects(prev => prev.filter(e => e.id !== id)), []);
-  const scoreProgress = score / config.targetScore;
+  const scoreProgress = score / levelConfig.targetScore;
   const isUrgent = timeLeft <= 5 && gameState === 'playing';
 
   return (
     <div className="flex flex-col items-center relative">
       {gameState === 'countdown' && <CountdownOverlay count={3} onComplete={handleCountdownComplete} />}
       <AnimatePresence>{gameState === 'paused' && <PauseOverlay onResume={() => setGameState('playing')} />}</AnimatePresence>
+      <AnimatePresence>
+        {gameState === 'levelComplete' && (
+          <LevelCompleteOverlay 
+            level={level}
+            levelScore={lastLevelScore}
+            timeBonus={lastTimeBonus}
+            totalScore={totalScore}
+            onContinue={advanceToNextLevel}
+          />
+        )}
+      </AnimatePresence>
 
       <GameHUD
-        title="Orb Match" subtitle={`Target: ${config.targetScore} pts`}
-        timeLeft={timeLeft} totalTime={config.totalTime} combo={combo} showCombo={true}
-        primaryStat={{ value: score, label: `${score}/${config.targetScore}`, color: score >= config.targetScore ? '#22c55e' : '#a855f7' }}
-        secondaryStat={{ value: Math.round(scoreProgress * 100), label: `${Math.min(100, Math.round(scoreProgress * 100))}%`, color: '#22d3ee' }}
+        title={`Orb Match - Level ${level}`} subtitle={`Target: ${levelConfig.targetScore} pts`}
+        timeLeft={timeLeft} totalTime={levelConfig.timeLimit} combo={combo} showCombo={true}
+        primaryStat={{ value: score, label: `${score}/${levelConfig.targetScore}`, color: score >= levelConfig.targetScore ? '#22c55e' : '#a855f7' }}
+        secondaryStat={{ value: levelsCompleted, label: `${levelsCompleted} cleared`, color: '#22d3ee' }}
         isPaused={gameState === 'paused'} onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
 
       <div className="relative w-full max-w-xs mb-2">
+        <LevelIndicator level={level} progress={scoreProgress} targetScore={levelConfig.targetScore} />
         <div className="absolute right-0 top-0">
-          <ScoreProgressRing progress={scoreProgress} isComplete={score >= config.targetScore} />
+          <ScoreProgressRing progress={scoreProgress} isComplete={score >= levelConfig.targetScore} />
         </div>
         {gameState === 'playing' && (
-          <div>
+          <div className="pt-8">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-150 ${moveTimeLeft < 2 ? 'animate-pulse' : ''}`}
                 style={{ 
-                  width: `${(moveTimeLeft / config.moveTime) * 100}%`,
+                  width: `${(moveTimeLeft / levelConfig.moveTime) * 100}%`,
                   background: moveTimeLeft < 2 ? 'linear-gradient(90deg, #ef4444, #f87171)' : 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))',
                 }}
               />
@@ -1165,6 +1324,7 @@ export const OrbMatchGame = ({
         {isUrgent && <UrgencyOverlay />}
         {isShuffling && <ShuffleOverlay />}
         {showPerfect && <PerfectGameBanner />}
+        <AnimatePresence>{showLevelUp && <LevelUpBanner />}</AnimatePresence>
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 mt-4 text-xs">
@@ -1293,6 +1453,7 @@ export const OrbMatchGame = ({
         }
         .drop-shadow-glow { text-shadow: 0 0 20px rgba(250,204,21,0.8); }
         .shadow-glow-yellow { box-shadow: 0 0 40px rgba(250,204,21,0.4); }
+        .shadow-glow-purple { box-shadow: 0 0 40px rgba(168,85,247,0.4); }
         
         /* Special orb animations */
         @keyframes special-pulse {
