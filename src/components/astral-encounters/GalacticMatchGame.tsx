@@ -171,6 +171,7 @@ export const GalacticMatchGame = ({
   const [matchEffects, setMatchEffects] = useState<{ id: string; color: string }[]>([]);
   const [countdown, setCountdown] = useState(3);
   const [revealCountdown, setRevealCountdown] = useState(0);
+  const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
   
   const config = useMemo(() => getLevelConfig(level), [level]);
 
@@ -247,8 +248,12 @@ export const GalacticMatchGame = ({
       triggerHaptic('success');
       setPhase('levelComplete');
       
-      // Deal bonus damage for completing the level
-      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.galactic_match.levelComplete, source: 'level_complete' });
+      // MILESTONE DAMAGE: Deal damage only on level complete
+      const perfectLevel = mistakesThisLevel === 0;
+      const damageAmount = perfectLevel 
+        ? (GAME_DAMAGE_VALUES.galactic_match.perfectLevel as number)
+        : (GAME_DAMAGE_VALUES.galactic_match.levelComplete as number);
+      onDamage?.({ target: 'adversary', amount: damageAmount, source: perfectLevel ? 'perfect_level' : 'level_complete' });
       
       // Add level completion bonus
       const levelBonus = 15 * level;
@@ -286,6 +291,7 @@ export const GalacticMatchGame = ({
         })));
         setFlippedCards([]);
         setMatchedPairs(0);
+        setMistakesThisLevel(0);
         setCombo(0);
         
         setLevel(nextLevel);
@@ -293,7 +299,7 @@ export const GalacticMatchGame = ({
         setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level, isPractice, onComplete]);
+  }, [matchedPairs, config.pairs, phase, level, isPractice, onComplete, mistakesThisLevel, onDamage]);
 
   // Handle game over
   useEffect(() => {
@@ -349,7 +355,7 @@ export const GalacticMatchGame = ({
       const secondCard = cards.find(c => c.id === secondId)!;
 
       if (firstCard.symbolIndex === secondCard.symbolIndex) {
-        // Match found!
+        // Match found! (No per-match damage anymore - only on level complete)
         const newCombo = combo + 1;
         const comboMultiplier = Math.min(3, 1 + newCombo * 0.5);
         const basePoints = 10 + level * 2;
@@ -357,9 +363,6 @@ export const GalacticMatchGame = ({
         
         playHabitComplete();
         triggerHaptic('success');
-        
-        // Deal damage to adversary for correct match
-        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.galactic_match.correctMatch, source: 'correct_match' });
 
         setCombo(newCombo);
         setScore(prev => prev + points);
@@ -384,6 +387,7 @@ export const GalacticMatchGame = ({
         const newLives = lives - 1;
         setLives(newLives);
         setCombo(0);
+        setMistakesThisLevel(prev => prev + 1);
         triggerHaptic('error');
         
         // Player takes damage from adversary attack

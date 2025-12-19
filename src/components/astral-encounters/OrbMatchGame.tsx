@@ -584,7 +584,7 @@ export const OrbMatchGame = ({
         }
         return {
           affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_line_bomb,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.specialActivation,
           effectType: isHorizontal ? 'beam_horizontal' : 'beam_vertical'
         };
       }
@@ -600,7 +600,7 @@ export const OrbMatchGame = ({
         }
         return {
           affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cross_bomb,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.specialActivation,
           effectType: 'cross_beam'
         };
       }
@@ -608,7 +608,7 @@ export const OrbMatchGame = ({
         const affected = currentOrbs.filter(o => o.color === orb.color).map(o => o.id);
         return {
           affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_star,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.specialActivation,
           effectType: 'color_burst'
         };
       }
@@ -622,7 +622,7 @@ export const OrbMatchGame = ({
         }
         return {
           affectedIds: affected,
-          bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
+          bonusDamage: GAME_DAMAGE_VALUES.orb_match.specialActivation,
           effectType: 'cosmic_nova'
         };
       }
@@ -764,7 +764,7 @@ export const OrbMatchGame = ({
       specialsActivated.push({
         orb: first,
         affectedIds: cosmicAffected,
-        bonusDamage: GAME_DAMAGE_VALUES.orb_match.special_cosmic_nova,
+        bonusDamage: GAME_DAMAGE_VALUES.orb_match.specialActivation,
         effectType: 'cosmic_nova'
       });
       cosmicAffected.forEach(id => matchedIds.add(id));
@@ -881,13 +881,7 @@ export const OrbMatchGame = ({
           const groupScore = Math.round(baseScore * cascadeMultiplier);
           totalScore += groupScore;
           
-          // Deal damage to adversary based on match size
-          const damageAmount = group.size >= 5 
-            ? GAME_DAMAGE_VALUES.orb_match.match5 
-            : group.size >= 4 
-              ? GAME_DAMAGE_VALUES.orb_match.match4 
-              : GAME_DAMAGE_VALUES.orb_match.match3;
-          onDamage?.({ target: 'adversary', amount: damageAmount, source: `match_${group.size}` });
+          // Note: Per-match damage removed - only special activations deal damage now
           
           return {
             id: `exp-${Date.now()}-${Math.random()}`,

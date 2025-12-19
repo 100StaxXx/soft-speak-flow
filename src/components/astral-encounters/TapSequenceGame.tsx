@@ -253,6 +253,7 @@ export const TapSequenceGame = ({
   const [totalCorrectTaps, setTotalCorrectTaps] = useState(0);
   const [totalTaps, setTotalTaps] = useState(0);
   const [levelMessage, setLevelMessage] = useState<string | null>(null);
+  const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
 
   // Get config based on current level and difficulty
   const levelConfig = getLevelConfig(level);
@@ -346,10 +347,7 @@ export const TapSequenceGame = ({
       setCurrentOrder(prev => prev + 1);
       setTotalCorrectTaps(prev => prev + 1);
       
-      // Deal damage to adversary for correct tap
-      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.tap_sequence.correctTap, source: 'correct_tap' });
-      
-      // Score based on level and attempts
+      // Score based on level and attempts (no per-tap damage anymore)
       const attemptMultiplier = attemptsThisLevel === 0 ? 2 : 1;
       setScore(prev => prev + (10 * level) * attemptMultiplier);
       
@@ -358,11 +356,14 @@ export const TapSequenceGame = ({
 
       // Check if level complete
       if (currentOrder === orbCount) {
-        const perfectLevel = attemptsThisLevel === 0;
+        const perfectLevel = mistakesThisLevel === 0;
         setLevelMessage(perfectLevel ? '⭐ Perfect!' : '✓ Level Complete!');
         
-        // Deal bonus damage for completing the level
-        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.tap_sequence.levelComplete, source: 'level_complete' });
+        // MILESTONE DAMAGE: Deal damage only on level complete
+        const damageAmount = perfectLevel 
+          ? (GAME_DAMAGE_VALUES.tap_sequence.perfectLevel as number)
+          : (GAME_DAMAGE_VALUES.tap_sequence.levelComplete as number);
+        onDamage?.({ target: 'adversary', amount: damageAmount, source: perfectLevel ? 'perfect_level' : 'level_complete' });
         
         // Next level after brief delay
         setTimeout(() => {
@@ -377,6 +378,7 @@ export const TapSequenceGame = ({
           setLevel(prev => prev + 1);
           setCurrentOrder(1);
           setAttemptsThisLevel(0);
+          setMistakesThisLevel(0);
           setGameState('showing');
           setHighlightIndex(0);
           generateOrbs();
@@ -385,6 +387,7 @@ export const TapSequenceGame = ({
     } else {
       // Wrong tap!
       triggerHaptic('error');
+      setMistakesThisLevel(prev => prev + 1);
       
       // Player takes damage from adversary attack
       onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'wrong_tap' });
