@@ -224,7 +224,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
               <Star className="w-5 h-5 text-primary fill-primary/30" />
-              Today's Cosmic Rituals
+              Today's Cosmiq habits
             </DrawerTitle>
           </DrawerHeader>
           
