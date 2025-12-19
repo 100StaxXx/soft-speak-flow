@@ -461,8 +461,8 @@ export const StarfallDodgeGame = ({
     const threshold = timeThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((survivalTime / threshold) * 100));
     
-    const result: 'perfect' | 'good' | 'partial' | 'fail' = 
-      accuracy >= 90 ? 'perfect' : accuracy >= 65 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+    const result: 'perfect' | 'good' | 'fail' = 
+      accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
     
     onComplete({
       success: result !== 'fail',

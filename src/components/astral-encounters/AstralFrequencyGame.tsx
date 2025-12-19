@@ -617,8 +617,8 @@ export const AstralFrequencyGame = ({
     const threshold = distanceThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((distance / threshold) * 100));
     
-    const result: 'perfect' | 'good' | 'partial' | 'fail' = 
-      accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 50 ? 'partial' : 'fail';
+    const result: 'perfect' | 'good' | 'fail' = 
+      accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
     
     onComplete({
       success: result !== 'fail',

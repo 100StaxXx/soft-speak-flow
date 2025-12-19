@@ -31,14 +31,8 @@ const RESULT_CONFIG: Record<ResultType, {
     color: 'text-primary',
     bgColor: 'from-primary/20 to-accent/20',
   },
-  partial: {
-    title: 'Partial Success',
-    icon: Sparkles,
-    color: 'text-blue-400',
-    bgColor: 'from-blue-500/20 to-cyan-500/20',
-  },
   fail: {
-    title: 'Adversary Escaped',
+    title: 'Defeated',
     icon: XCircle,
     color: 'text-red-400',
     bgColor: 'from-red-500/20 to-rose-500/20',

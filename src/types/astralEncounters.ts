@@ -27,7 +27,7 @@ export type MiniGameType =
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
-export type EncounterResult = 'perfect' | 'good' | 'partial' | 'fail';
+export type EncounterResult = 'perfect' | 'good' | 'fail';
 
 export interface MiniGameResult {
   success: boolean;
@@ -155,10 +155,9 @@ export const TIER_CONFIG: Record<AdversaryTier, { phases: number; statBoost: num
   legendary: { phases: 3, statBoost: 5, xpBase: 100 }, // Was 150 → 100 (-33%)
 };
 
-// Result XP multipliers
+// Result XP multipliers (binary win/lose - no partial)
 export const RESULT_MULTIPLIERS: Record<EncounterResult, number> = {
   perfect: 1.5,
   good: 1.0,
-  partial: 0.5,
   fail: 0,
 };

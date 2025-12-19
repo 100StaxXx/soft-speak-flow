@@ -503,7 +503,7 @@ export const EclipseTimingGame = ({
         // Song completed = WIN! Deal massive damage to adversary
         onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.songComplete, source: 'song_complete' });
         
-        const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
+        const result = accuracy >= 90 ? 'perfect' : 'good'; // Binary win - completed song = success
         
         setGameResult({
           success: true, // Completed the song = success

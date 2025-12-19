@@ -67,7 +67,7 @@ export const AstralEncounterModal = ({
   const [phaseResults, setPhaseResults] = useState<MiniGameResult[]>([]);
   const [usedTiltControls, setUsedTiltControls] = useState(false);
   const [finalResult, setFinalResult] = useState<{
-    result: 'perfect' | 'good' | 'partial' | 'fail';
+    result: 'perfect' | 'good' | 'fail';
     accuracy: number;
     xpEarned: number;
     tiltBonus?: boolean;

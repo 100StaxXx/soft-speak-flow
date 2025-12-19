@@ -18,7 +18,7 @@ interface UseBattleStateReturn {
   battleState: BattleState;
   dealDamage: (event: DamageEvent) => void;
   resetBattle: () => void;
-  getResult: () => 'perfect' | 'good' | 'partial' | 'fail';
+  getResult: () => 'perfect' | 'good' | 'fail';
   tierAttackDamage: number;
   damageEvents: DamageEvent[];
 }

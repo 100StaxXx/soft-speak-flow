@@ -945,11 +945,10 @@ export function EnergyBeamGame({
   }, [enemies.length, wave, config, gameState, isPractice]);
   
   // Determine result based on performance
-  const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'partial' | 'fail' => {
+  const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'fail' => {
     if (!hasLives) {
-      if (wavesCleared >= 5) return 'perfect';
-      if (wavesCleared >= 3) return 'good';
-      if (wavesCleared >= 1) return 'partial';
+      if (wavesCleared >= 4) return 'perfect';
+      if (wavesCleared >= 2) return 'good';
       return 'fail';
     }
     return 'perfect';

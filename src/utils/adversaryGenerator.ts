@@ -253,11 +253,10 @@ export const calculateXPReward = (
   return Math.round(baseXP * multiplier * tiltBonus);
 };
 
-// Get result from accuracy
-export const getResultFromAccuracy = (accuracy: number): 'perfect' | 'good' | 'partial' | 'fail' => {
+// Get result from accuracy (binary win/lose)
+export const getResultFromAccuracy = (accuracy: number): 'perfect' | 'good' | 'fail' => {
   if (accuracy >= 90) return 'perfect';
-  if (accuracy >= 70) return 'good';
-  if (accuracy >= 50) return 'partial';
+  if (accuracy >= 50) return 'good';
   return 'fail';
 };
 
