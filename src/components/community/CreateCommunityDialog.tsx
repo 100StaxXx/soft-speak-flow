@@ -60,19 +60,19 @@ export const CreateCommunityDialog = ({ open, onOpenChange, onSuccess }: CreateC
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Create Community
+            Create Guild
           </DialogTitle>
           <DialogDescription>
-            Start a new community to connect with friends and track progress together.
+            Start a new guild to connect with friends and track progress together.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Community Name</Label>
+            <Label htmlFor="name">Guild Name</Label>
             <Input
               id="name"
-              placeholder="My Awesome Community"
+              placeholder="My Awesome Guild"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={50}
@@ -118,7 +118,7 @@ export const CreateCommunityDialog = ({ open, onOpenChange, onSuccess }: CreateC
               )}
               <div>
                 <p className="text-sm font-medium">
-                  {isPublic ? "Public Community" : "Private Community"}
+                  {isPublic ? "Public Guild" : "Private Guild"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isPublic
@@ -153,7 +153,7 @@ export const CreateCommunityDialog = ({ open, onOpenChange, onSuccess }: CreateC
                   Creating...
                 </>
               ) : (
-                "Create Community"
+                "Create Guild"
               )}
             </Button>
           </div>

@@ -113,13 +113,13 @@ export const useCommunityMembers = (communityId?: string) => {
       return data;
     },
     onSuccess: () => {
-      toast.success("Welcome to the community! 🎉");
+      toast.success("Welcome to the guild! 🎉");
       queryClient.invalidateQueries({ queryKey: ["communities"] });
       queryClient.invalidateQueries({ queryKey: ["community-members"] });
     },
     onError: (error) => {
       console.error("Join community error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to join community");
+      toast.error(error instanceof Error ? error.message : "Failed to join guild");
     },
   });
 
@@ -131,7 +131,7 @@ export const useCommunityMembers = (communityId?: string) => {
       // Check if user is the owner
       const member = members?.find(m => m.user_id === user.id && m.community_id === targetCommunityId);
       if (member?.role === 'owner') {
-        throw new Error("Owners cannot leave their community. Transfer ownership or delete the community instead.");
+        throw new Error("Owners cannot leave their guild. Transfer ownership or delete the guild instead.");
       }
 
       const { error } = await supabase
@@ -143,13 +143,13 @@ export const useCommunityMembers = (communityId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Left the community");
+      toast.success("Left the guild");
       queryClient.invalidateQueries({ queryKey: ["communities"] });
       queryClient.invalidateQueries({ queryKey: ["community-members"] });
     },
     onError: (error) => {
       console.error("Leave community error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to leave community");
+      toast.error(error instanceof Error ? error.message : "Failed to leave guild");
     },
   });
 

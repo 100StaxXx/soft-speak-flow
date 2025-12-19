@@ -75,10 +75,10 @@ export const JoinCommunityDialog = ({ open, onOpenChange, onSuccess }: JoinCommu
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-primary" />
-            Join Community
+            Join Guild
           </DialogTitle>
           <DialogDescription>
-            Enter an invite code to join an existing community.
+            Enter an invite code to join an existing guild.
           </DialogDescription>
         </DialogHeader>
 
@@ -159,9 +159,9 @@ export const JoinCommunityDialog = ({ open, onOpenChange, onSuccess }: JoinCommu
                       Joining...
                     </>
                   ) : (
-                    "Join Community"
-                  )}
-                </Button>
+                "Join Guild"
+              )}
+            </Button>
               </div>
             </div>
           )}

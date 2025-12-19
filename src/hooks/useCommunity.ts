@@ -152,13 +152,13 @@ export const useCommunity = (communityId?: string) => {
       return data as Community;
     },
     onSuccess: () => {
-      toast.success("Community updated");
+      toast.success("Guild updated");
       queryClient.invalidateQueries({ queryKey: ["communities"] });
       queryClient.invalidateQueries({ queryKey: ["community", communityId] });
     },
     onError: (error) => {
       console.error("Update community error:", error);
-      toast.error("Failed to update community");
+      toast.error("Failed to update guild");
     },
   });
 
@@ -175,12 +175,12 @@ export const useCommunity = (communityId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Community deleted");
+      toast.success("Guild deleted");
       queryClient.invalidateQueries({ queryKey: ["communities"] });
     },
     onError: (error) => {
       console.error("Delete community error:", error);
-      toast.error("Failed to delete community");
+      toast.error("Failed to delete guild");
     },
   });
 
