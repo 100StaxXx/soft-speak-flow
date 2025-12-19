@@ -63,6 +63,13 @@ const TIMING_WINDOWS = {
   good: 10,
 };
 
+// Max misses allowed by difficulty before losing
+const MAX_MISSES_BY_DIFFICULTY = {
+  easy: 10,
+  medium: 8,
+  hard: 5,
+};
+
 const HIT_ZONE_Y = 85;
 const MAX_HIT_EFFECTS = 5; // Limit concurrent effects for performance
 const RENDER_THROTTLE_MS = 16; // ~60fps state sync
@@ -308,6 +315,8 @@ export const EclipseTimingGame = ({
   const [pressedLanes, setPressedLanes] = useState<Record<LaneType, boolean>>({ moon: false, star: false, sun: false });
   const [gameResult, setGameResult] = useState<MiniGameResult | null>(null);
   
+  const maxMisses = MAX_MISSES_BY_DIFFICULTY[difficulty];
+  
   const gameStartTimeRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
@@ -429,17 +438,37 @@ export const EclipseTimingGame = ({
       
       // Batch process misses
       if (missedThisFrame.length > 0) {
+        const newMissCount = stats.notesMissed + missedThisFrame.length;
         gameStatsRef.current = {
           ...stats,
-          notesMissed: stats.notesMissed + missedThisFrame.length,
+          notesMissed: newMissCount,
           combo: 0,
         };
         statsChanged = true;
         
-        // Trigger damage for each miss
-        missedThisFrame.forEach(() => {
-          onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'miss' });
-        });
+        // Check if player exceeded max misses - instant loss
+        if (newMissCount >= maxMisses) {
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+          
+          // Deal massive damage to player (instant loss)
+          onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.eclipse_timing.tooManyMisses, source: 'too_many_misses' });
+          
+          const totalNotes = notesRef.current.length;
+          const finalStats = gameStatsRef.current;
+          const accuracy = totalNotes > 0 ? Math.round((finalStats.notesHit / totalNotes) * 100) : 0;
+          
+          setGameResult({
+            success: false,
+            accuracy,
+            result: 'fail',
+            highScoreValue: finalStats.score,
+          });
+          setGameStats({ ...finalStats });
+          setGameState('complete');
+          return;
+        }
       }
       
       // OPTIMIZED: Throttle state sync to ~60fps for rendering
@@ -460,7 +489,7 @@ export const EclipseTimingGame = ({
         }
       }
       
-      // Check if game is complete
+      // Check if game is complete (song finished)
       const allNotesProcessed = notesRef.current.every(n => n.hit || n.missed || n.y > 100);
       if (allNotesProcessed && notesRef.current.length > 0) {
         if (audioRef.current) {
@@ -470,13 +499,17 @@ export const EclipseTimingGame = ({
         const totalNotes = notesRef.current.length;
         const finalStats = gameStatsRef.current;
         const accuracy = totalNotes > 0 ? Math.round((finalStats.notesHit / totalNotes) * 100) : 0;
+        
+        // Song completed = WIN! Deal massive damage to adversary
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.songComplete, source: 'song_complete' });
+        
         const result = accuracy >= 90 ? 'perfect' : accuracy >= 70 ? 'good' : accuracy >= 40 ? 'partial' : 'fail';
         
         setGameResult({
-          success: accuracy >= 50,
+          success: true, // Completed the song = success
           accuracy,
           result,
-          highScoreValue: finalStats.score, // Score for high score
+          highScoreValue: finalStats.score,
         });
         
         // Sync final stats
@@ -501,7 +534,7 @@ export const EclipseTimingGame = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, config.scrollSpeed, isPractice, onDamage, tierAttackDamage]);
+  }, [gameState, config.scrollSpeed, isPractice, onDamage, maxMisses]);
 
   // OPTIMIZED: Batched hit handler
   const handleLaneTap = useCallback((lane: LaneType) => {
@@ -544,19 +577,7 @@ export const EclipseTimingGame = ({
     const points = HIT_RESULTS[result].points * multiplier;
     const newCombo = currentStats.combo + 1;
     
-    // Check for combo milestone (every 20 combo)
-    const prevMilestone = Math.floor(currentStats.combo / 20);
-    const newMilestone = Math.floor(newCombo / 20);
-    if (newMilestone > prevMilestone) {
-      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.comboMilestone, source: 'combo_milestone' });
-    }
-    
-    // Check for section complete (every 30 notes hit)
-    const prevSection = Math.floor(currentStats.notesHit / 30);
-    const newSection = Math.floor((currentStats.notesHit + 1) / 30);
-    if (newSection > prevSection) {
-      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.sectionComplete, source: 'section_complete' });
-    }
+    // No per-note or milestone damage - win/lose is determined by song completion
     
     const newStats: GameStats = {
       score: currentStats.score + points,
@@ -776,10 +797,30 @@ export const EclipseTimingGame = ({
         maxScore={totalNotes * 100 * 4}
         combo={combo}
         showCombo={true}
-        primaryStat={{ value: notesMissed, label: 'Misses', color: 'hsl(0, 84%, 60%)' }}
+        primaryStat={{ value: notesMissed, label: `Misses (max ${maxMisses})`, color: notesMissed >= maxMisses - 2 ? 'hsl(0, 84%, 60%)' : 'hsl(45, 100%, 60%)' }}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
+      
+      {/* Warning when approaching miss limit */}
+      <AnimatePresence>
+        {notesMissed >= maxMisses - 2 && notesMissed < maxMisses && gameState === 'playing' && (
+          <motion.div
+            className="absolute top-20 right-4 z-30 px-3 py-1 rounded-full text-sm font-bold"
+            style={{
+              background: 'linear-gradient(135deg, hsl(0, 70%, 50%), hsl(0, 84%, 40%))',
+              color: 'white',
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [1, 1.1, 1], opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.3, repeat: Infinity, repeatDelay: 0.5 }}
+          >
+            ⚠️ {maxMisses - notesMissed} MISS{maxMisses - notesMissed > 1 ? 'ES' : ''} LEFT!
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Combo multiplier indicator */}
       <AnimatePresence>

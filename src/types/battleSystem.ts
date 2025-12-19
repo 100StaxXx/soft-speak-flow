@@ -99,11 +99,11 @@ export const GAME_DAMAGE_VALUES = {
     noMoves: 10,
   },
   
-  // Eclipse Timing - damage on section complete
+  // Eclipse Timing - WIN/LOSE based on song completion
   eclipse_timing: {
-    sectionComplete: 20,      // Every ~30 notes
-    comboMilestone: 10,       // Bonus per 20 combo
-    miss: 'tier_attack',
+    songComplete: 999,        // Instant win - defeats any adversary
+    tooManyMisses: 999,       // Instant lose - player takes fatal damage
+    maxMisses: { easy: 10, medium: 8, hard: 5 },
   },
   
   // Astral Frequency - damage on distance milestones
