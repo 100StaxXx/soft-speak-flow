@@ -315,151 +315,198 @@ export const AstralEncounterModal = ({
 
   if (!encounter || !adversary) return null;
 
+  // Games that need fullscreen rendering outside the Dialog
+  const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge'];
+  const currentGameType = getCurrentGameType();
+  const needsFullscreen = phase === 'battle' && FULLSCREEN_GAMES.includes(currentGameType);
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
-        <motion.div 
-          className="relative min-h-[500px] max-h-[90vh] overflow-hidden"
-          animate={showScreenShake ? { x: [0, -4, 4, -2, 2, 0] } : {}}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+    <>
+      {/* Fullscreen overlay for games that need it (like StarfallDodge) */}
+      {open && needsFullscreen && (
+        <div className="fixed inset-0 z-[100] bg-background">
+          {/* Battle HP Overlay */}
+          <BattleOverlay
+            battleState={battleState}
+            companionImageUrl={companion?.current_image_url || undefined}
+            companionName={companion?.spirit_animal || "Companion"}
+            adversaryImageUrl={adversaryImageUrl || undefined}
+            adversaryName={adversary.name}
+            showScreenShake={showScreenShake}
+          />
           
           {/* Floating damage numbers */}
-          {phase === 'battle' && (
-            <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+          <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+          
+          {/* Phase indicators */}
+          {adversary.phases > 1 && (
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex gap-2">
+              {Array.from({ length: adversary.phases }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full ${
+                    i < currentPhaseIndex 
+                      ? 'bg-green-500' 
+                      : i === currentPhaseIndex
+                        ? 'bg-primary animate-pulse'
+                        : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
           )}
           
-          <div className="relative z-10">
-            <AnimatePresence mode="wait">
-              {/* Boss Battle Intro Phase */}
-              {phase === 'boss_intro' && isBossBattle && bossBattleContext && (
-                <motion.div
-                  key="boss_intro"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <BossBattleIntro
-                    context={bossBattleContext}
-                    onBeginBattle={handleBossIntroComplete}
-                    onCancel={handleBossIntroCancel}
-                  />
-                </motion.div>
-              )}
+          {/* The fullscreen game */}
+          {renderMiniGame()}
+        </div>
+      )}
 
-              {phase === 'reveal' && (
-                <motion.div
-                  key="reveal"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <BattleVSScreen 
-                    adversary={adversary}
-                    adversaryImageUrl={adversaryImageUrl || undefined}
-                    isLoadingImage={isLoadingImage}
-                    companionImageUrl={companion?.current_image_url || undefined}
-                    companionName={currentCard?.creature_name || companion?.spirit_animal || "Companion"}
-                    companionStage={companion?.current_stage || 0}
-                    onReady={handleBeginBattle}
-                    onPass={onPass}
-                  />
-                </motion.div>
-              )}
+      {/* Regular Dialog for non-fullscreen phases/games */}
+      <Dialog open={open && !needsFullscreen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
+          <motion.div 
+            className="relative min-h-[500px] max-h-[90vh] overflow-hidden"
+            animate={showScreenShake ? { x: [0, -4, 4, -2, 2, 0] } : {}}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+            
+            {/* Floating damage numbers for non-fullscreen games */}
+            {phase === 'battle' && !needsFullscreen && (
+              <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
+            )}
+            
+            <div className="relative z-10">
+              <AnimatePresence mode="wait">
+                {/* Boss Battle Intro Phase */}
+                {phase === 'boss_intro' && isBossBattle && bossBattleContext && (
+                  <motion.div
+                    key="boss_intro"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <BossBattleIntro
+                      context={bossBattleContext}
+                      onBeginBattle={handleBossIntroComplete}
+                      onCancel={handleBossIntroCancel}
+                    />
+                  </motion.div>
+                )}
 
-              {phase === 'instructions' && (
-                <motion.div
-                  key={`instructions-${currentPhaseIndex}`}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                >
-                  <GameInstructionsOverlay 
-                    gameType={getCurrentGameType()}
-                    onReady={handleInstructionsReady}
-                  />
-                </motion.div>
-              )}
+                {phase === 'reveal' && (
+                  <motion.div
+                    key="reveal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <BattleVSScreen 
+                      adversary={adversary}
+                      adversaryImageUrl={adversaryImageUrl || undefined}
+                      isLoadingImage={isLoadingImage}
+                      companionImageUrl={companion?.current_image_url || undefined}
+                      companionName={currentCard?.creature_name || companion?.spirit_animal || "Companion"}
+                      companionStage={companion?.current_stage || 0}
+                      onReady={handleBeginBattle}
+                      onPass={onPass}
+                    />
+                  </motion.div>
+                )}
 
-              {phase === 'practice' && (
-                <motion.div
-                  key={`practice-${currentPhaseIndex}`}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                >
-                  <PracticeRoundWrapper
-                    gameType={getCurrentGameType()}
-                    companionStats={companionStats}
-                    onPracticeComplete={handlePracticeComplete}
-                    onSkipPractice={handleSkipPractice}
-                  />
-                </motion.div>
-              )}
+                {phase === 'instructions' && (
+                  <motion.div
+                    key={`instructions-${currentPhaseIndex}`}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                  >
+                    <GameInstructionsOverlay 
+                      gameType={getCurrentGameType()}
+                      onReady={handleInstructionsReady}
+                    />
+                  </motion.div>
+                )}
 
-              {phase === 'battle' && (
-                <motion.div
-                  key={`battle-${currentPhaseIndex}`}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                >
-                  {/* Battle HP Overlay */}
-                  <BattleOverlay
-                    battleState={battleState}
-                    companionImageUrl={companion?.current_image_url || undefined}
-                    companionName={companion?.spirit_animal || "Companion"}
-                    adversaryImageUrl={adversaryImageUrl || undefined}
-                    adversaryName={adversary.name}
-                  />
+                {phase === 'practice' && (
+                  <motion.div
+                    key={`practice-${currentPhaseIndex}`}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                  >
+                    <PracticeRoundWrapper
+                      gameType={getCurrentGameType()}
+                      companionStats={companionStats}
+                      onPracticeComplete={handlePracticeComplete}
+                      onSkipPractice={handleSkipPractice}
+                    />
+                  </motion.div>
+                )}
 
-                  {adversary.phases > 1 && (
-                    <div className="flex justify-center gap-2 py-2">
-                      {Array.from({ length: adversary.phases }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-3 h-3 rounded-full ${
-                            i < currentPhaseIndex 
-                              ? 'bg-green-500' 
-                              : i === currentPhaseIndex
-                                ? 'bg-primary animate-pulse'
-                                : 'bg-muted'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {renderMiniGame()}
-                </motion.div>
-              )}
+                {phase === 'battle' && !needsFullscreen && (
+                  <motion.div
+                    key={`battle-${currentPhaseIndex}`}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                  >
+                    {/* Battle HP Overlay */}
+                    <BattleOverlay
+                      battleState={battleState}
+                      companionImageUrl={companion?.current_image_url || undefined}
+                      companionName={companion?.spirit_animal || "Companion"}
+                      adversaryImageUrl={adversaryImageUrl || undefined}
+                      adversaryName={adversary.name}
+                    />
 
-              {phase === 'result' && finalResult && (
-                <motion.div
-                  key="result"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <EncounterResultScreen
-                    adversary={adversary}
-                    result={finalResult.result}
-                    accuracy={finalResult.accuracy}
-                    xpEarned={finalResult.xpEarned}
-                    onClose={handleClose}
-                    retryAvailableAt={
-                      finalResult.result === 'fail' 
-                        ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
-                        : undefined
-                    }
-                    tiltBonus={finalResult.tiltBonus}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </DialogContent>
-    </Dialog>
+                    {adversary.phases > 1 && (
+                      <div className="flex justify-center gap-2 py-2">
+                        {Array.from({ length: adversary.phases }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-3 h-3 rounded-full ${
+                              i < currentPhaseIndex 
+                                ? 'bg-green-500' 
+                                : i === currentPhaseIndex
+                                  ? 'bg-primary animate-pulse'
+                                  : 'bg-muted'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {renderMiniGame()}
+                  </motion.div>
+                )}
+
+                {phase === 'result' && finalResult && (
+                  <motion.div
+                    key="result"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <EncounterResultScreen
+                      adversary={adversary}
+                      result={finalResult.result}
+                      accuracy={finalResult.accuracy}
+                      xpEarned={finalResult.xpEarned}
+                      onClose={handleClose}
+                      retryAvailableAt={
+                        finalResult.result === 'fail' 
+                          ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+                          : undefined
+                      }
+                      tiltBonus={finalResult.tiltBonus}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
