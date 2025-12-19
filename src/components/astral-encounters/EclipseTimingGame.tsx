@@ -67,11 +67,11 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
-// Timing windows (in % distance from hit zone) - generous for mobile/casual play
+// Timing windows (in % distance from hit zone)
 const TIMING_WINDOWS = {
-  perfect: 6,
-  great: 12,
-  good: 18,
+  perfect: 3,
+  great: 6,
+  good: 10,
 };
 
 // Max misses allowed by difficulty before losing
@@ -197,7 +197,7 @@ const HitEffectCSS = memo(({ lane, result, id }: { lane: LaneType; result: HitRe
 });
 HitEffectCSS.displayName = 'HitEffectCSS';
 
-// Lane button component
+// Lane button component - optimized for touch responsiveness
 const LaneButton = memo(({ 
   lane, 
   laneIndex, 
@@ -211,15 +211,42 @@ const LaneButton = memo(({
 }) => {
   const config = LANE_CONFIG[lane];
   const Icon = config.icon;
+  const hasTriggeredRef = useRef(false);
+  
+  // Reset trigger flag on pointer/touch end
+  const handleEnd = useCallback(() => {
+    hasTriggeredRef.current = false;
+  }, []);
+  
+  // Unified handler for both touch and pointer
+  const handleInput = useCallback((e: React.TouchEvent | React.PointerEvent) => {
+    // Prevent double-triggering from touch + pointer events
+    if (hasTriggeredRef.current) return;
+    hasTriggeredRef.current = true;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    onTap();
+  }, [onTap]);
   
   return (
     <button
-      className="flex-1 h-full flex items-center justify-center relative overflow-hidden touch-manipulation"
-      onPointerDown={onTap}
+      className="flex-1 h-full flex items-center justify-center relative overflow-hidden select-none"
+      onTouchStart={handleInput}
+      onPointerDown={handleInput}
+      onTouchEnd={handleEnd}
+      onPointerUp={handleEnd}
+      onPointerCancel={handleEnd}
+      onContextMenu={(e) => e.preventDefault()}
       style={{
         background: isPressed 
           ? `linear-gradient(to top, ${config.color}60, transparent)` 
           : 'transparent',
+        touchAction: 'none',
+        WebkitTapHighlightColor: 'transparent',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
       }}
     >
       <div
@@ -234,7 +261,7 @@ const LaneButton = memo(({
         }}
       >
         <Icon 
-          className="w-8 h-8 transition-all" 
+          className="w-8 h-8 transition-all pointer-events-none" 
           style={{ 
             color: isPressed ? 'white' : config.color,
             filter: isPressed ? `drop-shadow(0 0 10px white)` : 'none',
