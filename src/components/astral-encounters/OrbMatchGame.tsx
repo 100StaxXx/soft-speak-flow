@@ -507,8 +507,8 @@ export const OrbMatchGame = ({
   const shuffleBoard = useCallback(() => {
     setIsShuffling(true);
     triggerHaptic('medium');
-    // Deal damage to player for no valid moves
-    onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.orb_match.noMoves, source: 'no_moves' });
+    // Deal tier-based damage to player for no valid moves
+    onDamage?.({ target: 'player', amount: tierAttackDamage || 15, source: 'no_moves' });
     setTimeout(() => {
       setOrbs(currentOrbs => {
         const colors = currentOrbs.map(o => o.color);
@@ -1026,6 +1026,12 @@ export const OrbMatchGame = ({
       const finalScore = isPerfect ? score + 50 : score;
       if (isPerfect) { setShowPerfect(true); triggerHaptic('heavy'); }
       const passed = finalScore >= config.targetScore;
+      
+      // MILESTONE DAMAGE: Deal damage when reaching score target
+      if (passed) {
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.orb_match.scoreTarget, source: 'score_target' });
+      }
+      
       const comboBonus = Math.min(maxCombo * 2, 15);
       const accuracy = passed 
         ? Math.round(Math.min(100, 70 + ((finalScore - config.targetScore) / config.targetScore) * 30 + comboBonus))
@@ -1033,7 +1039,7 @@ export const OrbMatchGame = ({
       const result: 'perfect' | 'good' | 'fail' = passed ? (accuracy >= 90 ? 'perfect' : 'good') : 'fail';
       setTimeout(() => onComplete({ success: passed, accuracy, result, highScoreValue: finalScore }), isPerfect ? 1200 : 400);
     }
-  }, [gameState, score, config.targetScore, maxCombo, timeLeft, onComplete]);
+  }, [gameState, score, config.targetScore, maxCombo, timeLeft, onComplete, onDamage]);
 
   const removeExplosion = useCallback((id: string) => setExplosions(prev => prev.filter(e => e.id !== id)), []);
   const removeSpecialEffect = useCallback((id: string) => setSpecialEffects(prev => prev.filter(e => e.id !== id)), []);

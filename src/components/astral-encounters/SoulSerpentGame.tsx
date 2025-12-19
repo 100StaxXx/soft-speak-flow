@@ -436,6 +436,7 @@ export const SoulSerpentGame = ({
   companionStats,
   onComplete,
   onDamage,
+  tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
   maxTimer,
@@ -589,8 +590,8 @@ export const SoulSerpentGame = ({
         setShake(true);
         setTimeout(() => setShake(false), 300);
         
-        // Player takes self-inflicted collision damage
-        onDamage?.({ target: 'player', amount: GAME_DAMAGE_VALUES.soul_serpent.collision, source: 'collision' });
+        // Player takes tier-based collision damage (game ends)
+        onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
         
         // Calculate result based on score achieved
         const { accuracy, result } = calculateAccuracy(score);
