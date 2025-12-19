@@ -76,7 +76,7 @@ export const GAME_DAMAGE_VALUES = {
   // Soul Serpent - damage based on score milestones
   soul_serpent: {
     scoreMilestone: 25,       // Every 10 stardust
-    collision: 50,
+    collision: 'tier_attack', // Player takes tier-based damage on collision (not instant death)
   },
   
   // Starfall Dodge - damage based on survival time
@@ -92,11 +92,11 @@ export const GAME_DAMAGE_VALUES = {
     playerHit: 'tier_attack',
   },
   
-  // Orb Match - damage on level complete
+  // Orb Match - damage on score targets and special activation
   orb_match: {
-    levelComplete: 25,        // After reaching score target
+    scoreTarget: 25,          // Reaching score target deals damage
     specialActivation: 10,    // Special orbs still valuable
-    noMoves: 10,
+    noMoves: 'tier_attack',   // Player takes tier damage for shuffles
   },
   
   // Eclipse Timing - WIN/LOSE based on song completion
