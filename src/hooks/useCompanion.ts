@@ -54,7 +54,7 @@ export const useCompanion = () => {
   const xpInProgress = useRef(false);
   const companionCreationInProgress = useRef(false);
 
-  const { data: companion, isLoading, error } = useQuery({
+  const { data: companion, isLoading, error, refetch } = useQuery({
     queryKey: ["companion", user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -686,6 +686,7 @@ export const useCompanion = () => {
         queryClient.invalidateQueries({ queryKey: ["companion"] });
         queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
         queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
       }
     },
     onError: (error) => {
@@ -711,6 +712,7 @@ export const useCompanion = () => {
     companion,
     isLoading,
     error,
+    refetch,
     createCompanion,
     awardXP,
     evolveCompanion,
