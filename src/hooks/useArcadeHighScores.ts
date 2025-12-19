@@ -8,14 +8,14 @@ export const GAME_METRICS: Record<MiniGameType, {
   format: (value: number) => string;
   icon: string;
 }> = {
-  astral_frequency: { label: 'Distance', format: v => `${v}m`, icon: '🚀' },
-  galactic_match: { label: 'Level', format: v => `Lvl ${v}`, icon: '🧠' },
-  soul_serpent: { label: 'Length', format: v => `${v}`, icon: '🐍' },
-  energy_beam: { label: 'Waves', format: v => `Wave ${v}`, icon: '🛡️' },
-  eclipse_timing: { label: 'Score', format: v => v.toLocaleString(), icon: '🎵' },
-  tap_sequence: { label: 'Level', format: v => `Lvl ${v}`, icon: '🔢' },
-  starfall_dodge: { label: 'Time', format: v => `${v}s`, icon: '⭐' },
-  orb_match: { label: 'Score', format: v => v.toLocaleString(), icon: '💎' },
+  astral_frequency: { label: 'Distance', format: v => `${Math.round(v)}m`, icon: '🚀' },
+  galactic_match: { label: 'Level', format: v => `Lvl ${Math.round(v)}`, icon: '🧠' },
+  soul_serpent: { label: 'Length', format: v => `${Math.round(v)}`, icon: '🐍' },
+  energy_beam: { label: 'Waves', format: v => `Wave ${Math.round(v)}`, icon: '🛡️' },
+  eclipse_timing: { label: 'Score', format: v => Math.round(v).toLocaleString(), icon: '🎵' },
+  tap_sequence: { label: 'Level', format: v => `Lvl ${Math.round(v)}`, icon: '🔢' },
+  starfall_dodge: { label: 'Time', format: v => `${Math.round(v)}s`, icon: '⭐' },
+  orb_match: { label: 'Score', format: v => Math.round(v).toLocaleString(), icon: '💎' },
 };
 
 interface HighScoreEntry {
