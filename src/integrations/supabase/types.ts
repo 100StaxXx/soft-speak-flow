@@ -4883,6 +4883,14 @@ export type Database = {
           owner_user_id: string
         }[]
       }
+      validate_referral_code_public: {
+        Args: { p_code: string }
+        Returns: {
+          code: string
+          is_valid: boolean
+          owner_type: string
+        }[]
+      }
       validate_referral_code_secure: {
         Args: { p_code: string }
         Returns: {
