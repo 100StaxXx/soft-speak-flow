@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MiniGameType } from '@/types/astralEncounters';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 // Game-specific metric configurations
 export const GAME_METRICS: Record<MiniGameType, { 
@@ -17,67 +18,111 @@ export const GAME_METRICS: Record<MiniGameType, {
   orb_match: { label: 'Score', format: v => v.toLocaleString(), icon: '💎' },
 };
 
-interface HighScore {
+interface HighScoreEntry {
   value: number;          // The actual high score value
   displayValue: string;   // Formatted display string
   metricLabel: string;    // e.g., "Distance", "Level", "Score"
   date: string;
+  difficulty: ArcadeDifficulty;
 }
 
-type HighScores = Partial<Record<MiniGameType, HighScore>>;
+// Storage format: { "starfall_dodge_easy": {...}, "starfall_dodge_hard": {...}, ... }
+type HighScoresV3 = Record<string, HighScoreEntry>;
 
-const STORAGE_KEY = 'arcade_high_scores_v2';
+// Old v2 format for migration
+interface HighScoreV2 {
+  value: number;
+  displayValue: string;
+  metricLabel: string;
+  date: string;
+}
+type HighScoresV2 = Partial<Record<MiniGameType, HighScoreV2>>;
+
+const STORAGE_KEY_V3 = 'arcade_high_scores_v3';
+const STORAGE_KEY_V2 = 'arcade_high_scores_v2';
+
+// Generate storage key for game + difficulty combo
+const getStorageKey = (gameType: MiniGameType, difficulty: ArcadeDifficulty): string => {
+  return `${gameType}_${difficulty}`;
+};
 
 export const useArcadeHighScores = () => {
-  const [highScores, setHighScores] = useState<HighScores>({});
+  const [highScores, setHighScores] = useState<HighScoresV3>({});
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount, with migration from v2
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setHighScores(JSON.parse(stored));
+      const storedV3 = localStorage.getItem(STORAGE_KEY_V3);
+      if (storedV3) {
+        setHighScores(JSON.parse(storedV3));
+        return;
+      }
+
+      // Migrate from v2 if exists
+      const storedV2 = localStorage.getItem(STORAGE_KEY_V2);
+      if (storedV2) {
+        const v2Data: HighScoresV2 = JSON.parse(storedV2);
+        const migratedData: HighScoresV3 = {};
+
+        // Assign old scores to 'medium' difficulty
+        for (const [gameType, score] of Object.entries(v2Data)) {
+          if (score) {
+            const key = getStorageKey(gameType as MiniGameType, 'medium');
+            migratedData[key] = {
+              ...score,
+              difficulty: 'medium',
+            };
+          }
+        }
+
+        setHighScores(migratedData);
+        localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(migratedData));
       }
     } catch (e) {
       // Invalid data, start fresh
     }
   }, []);
 
+  // Get high score for a specific game + difficulty
   const getHighScore = useCallback(
-    (gameType: MiniGameType): HighScore | null => {
-      return highScores[gameType] || null;
+    (gameType: MiniGameType, difficulty: ArcadeDifficulty): HighScoreEntry | null => {
+      const key = getStorageKey(gameType, difficulty);
+      return highScores[key] || null;
     },
     [highScores]
   );
 
+  // Set high score for a specific game + difficulty
   const setHighScore = useCallback(
-    (gameType: MiniGameType, value: number): boolean => {
+    (gameType: MiniGameType, difficulty: ArcadeDifficulty, value: number): boolean => {
       const metric = GAME_METRICS[gameType];
       if (!metric) return false;
 
-      const existing = highScores[gameType];
+      const key = getStorageKey(gameType, difficulty);
+      const existing = highScores[key];
       
       // Only update if this is a new high score
       if (existing && existing.value >= value) {
         return false;
       }
 
-      const newScore: HighScore = {
+      const newScore: HighScoreEntry = {
         value,
         displayValue: metric.format(value),
         metricLabel: metric.label,
         date: new Date().toISOString(),
+        difficulty,
       };
 
       setHighScores((prev) => {
         const newScores = {
           ...prev,
-          [gameType]: newScore,
+          [key]: newScore,
         };
 
         // Persist to localStorage
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(newScores));
+          localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(newScores));
         } catch (e) {
           // Storage full or unavailable
         }
@@ -90,19 +135,62 @@ export const useArcadeHighScores = () => {
     [highScores]
   );
 
+  // Get all high scores
   const getAllHighScores = useCallback(() => {
     return highScores;
   }, [highScores]);
 
+  // Get total unique games with any high score
   const getTotalGamesWithHighScores = useCallback(() => {
-    return Object.keys(highScores).length;
+    const gamesWithScores = new Set<string>();
+    for (const key of Object.keys(highScores)) {
+      const gameType = key.split('_').slice(0, -1).join('_'); // Remove difficulty suffix
+      gamesWithScores.add(gameType);
+    }
+    return gamesWithScores.size;
   }, [highScores]);
 
-  const getFormattedHighScore = useCallback((gameType: MiniGameType): string | null => {
-    const score = highScores[gameType];
+  // Get formatted high score for a specific game + difficulty
+  const getFormattedHighScore = useCallback((gameType: MiniGameType, difficulty: ArcadeDifficulty): string | null => {
+    const key = getStorageKey(gameType, difficulty);
+    const score = highScores[key];
     if (!score) return null;
     return score.displayValue;
   }, [highScores]);
+
+  // Get all high scores for a specific game (all difficulties)
+  const getHighScoresForGame = useCallback((gameType: MiniGameType): Partial<Record<ArcadeDifficulty, HighScoreEntry>> => {
+    const result: Partial<Record<ArcadeDifficulty, HighScoreEntry>> = {};
+    for (const [key, score] of Object.entries(highScores)) {
+      if (key.startsWith(gameType)) {
+        result[score.difficulty] = score;
+      }
+    }
+    return result;
+  }, [highScores]);
+
+  // Get the best (highest value) high score for a game across all difficulties
+  const getBestHighScore = useCallback((gameType: MiniGameType): HighScoreEntry | null => {
+    let best: HighScoreEntry | null = null;
+    for (const [key, score] of Object.entries(highScores)) {
+      if (key.startsWith(gameType)) {
+        if (!best || score.value > best.value) {
+          best = score;
+        }
+      }
+    }
+    return best;
+  }, [highScores]);
+
+  // Get formatted high scores map for all difficulties of a game
+  const getFormattedHighScoresForGame = useCallback((gameType: MiniGameType): Partial<Record<ArcadeDifficulty, string | null>> => {
+    const scores = getHighScoresForGame(gameType);
+    const result: Partial<Record<ArcadeDifficulty, string | null>> = {};
+    for (const [diff, score] of Object.entries(scores)) {
+      result[diff as ArcadeDifficulty] = score?.displayValue || null;
+    }
+    return result;
+  }, [getHighScoresForGame]);
 
   return {
     highScores,
@@ -111,5 +199,8 @@ export const useArcadeHighScores = () => {
     getAllHighScores,
     getTotalGamesWithHighScores,
     getFormattedHighScore,
+    getHighScoresForGame,
+    getBestHighScore,
+    getFormattedHighScoresForGame,
   };
 };

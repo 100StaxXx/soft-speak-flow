@@ -39,6 +39,11 @@ const LANE_INDICES: Record<LaneType, number> = { moon: 0, star: 1, sun: 2 };
 
 // Difficulty configurations for BPM-synced notes
 const DIFFICULTY_CONFIG = {
+  beginner: {
+    notesPerBeat: 0.25,   // Every 4 beats
+    scrollSpeed: 0.025,
+    patterns: ['single'] as const,
+  },
   easy: {
     notesPerBeat: 0.5,    // Every 2 beats
     scrollSpeed: 0.035,
@@ -52,6 +57,11 @@ const DIFFICULTY_CONFIG = {
   hard: {
     notesPerBeat: 2,      // Every half-beat
     scrollSpeed: 0.055,
+    patterns: ['single', 'double', 'triple'] as const,
+  },
+  master: {
+    notesPerBeat: 3,      // Every third-beat
+    scrollSpeed: 0.07,
     patterns: ['single', 'double', 'triple'] as const,
   },
 };
