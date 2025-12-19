@@ -12,6 +12,7 @@ import { CommunityShoutsFeed } from "@/components/community/CommunityShoutsFeed"
 import { CreateCommunityDialog } from "@/components/community/CreateCommunityDialog";
 import { JoinCommunityDialog } from "@/components/community/JoinCommunityDialog";
 import { CommunityTutorialModal } from "@/components/community/CommunityTutorialModal";
+import { BottomNav } from "@/components/BottomNav";
 import { Plus, UserPlus, Users, Compass, Loader2, ArrowLeft, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
@@ -207,6 +208,7 @@ const Community = () => {
         onSuccess={handleJoinSuccess}
       />
       <CommunityTutorialModal open={showTutorial} onClose={dismissTutorial} />
+      <BottomNav />
     </div>
   );
 };
@@ -316,6 +318,7 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving }: Communit
           <CommunityMembersSection communityId={community.id} maxHeight="400px" />
         </div>
       </div>
+      <BottomNav />
     </div>
   );
 };
