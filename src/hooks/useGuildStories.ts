@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface GuildStory {
   id: string;
   epic_id: string;
+  community_id: string | null;
   chapter_number: number;
   chapter_title: string;
   intro_line: string;
@@ -40,7 +41,10 @@ export const useGuildStories = (epicId?: string) => {
         .order("chapter_number", { ascending: true });
 
       if (error) throw error;
-      return data as GuildStory[];
+      return (data || []).map(story => ({
+        ...story,
+        companion_spotlights: story.companion_spotlights as GuildStory['companion_spotlights']
+      })) as GuildStory[];
     },
     enabled: !!epicId,
   });

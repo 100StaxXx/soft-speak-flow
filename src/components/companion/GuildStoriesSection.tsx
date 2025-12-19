@@ -20,6 +20,7 @@ import {
 interface GuildStory {
   id: string;
   epic_id: string;
+  community_id: string | null;
   chapter_number: number;
   chapter_title: string;
   intro_line: string;
@@ -111,7 +112,10 @@ export const GuildStoriesSection = () => {
             id: epic.id,
             title: epic.title,
             memberCount: memberCount || 0,
-            stories: (stories || []) as GuildStory[],
+            stories: (stories || []).map(story => ({
+              ...story,
+              companion_spotlights: story.companion_spotlights as GuildStory['companion_spotlights']
+            })) as GuildStory[],
           };
         })
       );
