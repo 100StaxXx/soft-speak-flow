@@ -639,13 +639,14 @@ export const OrbMatchGame = ({
     }, 600);
   }, [onDamage]);
 
-  const initializeGrid = useCallback(() => {
+  const initializeGrid = useCallback((colorsOverride?: OrbColor[]) => {
+    const colors = colorsOverride || availableColors;
     const newOrbs: Orb[] = [];
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         newOrbs.push({
           id: `${row}-${col}`,
-          color: availableColors[Math.floor(Math.random() * availableColors.length)],
+          color: colors[Math.floor(Math.random() * colors.length)],
           row, col, special: 'normal',
         });
       }
@@ -1173,20 +1174,23 @@ export const OrbMatchGame = ({
 
   // Handle advancing to next level
   const advanceToNextLevel = useCallback(() => {
-    setLevel(prev => prev + 1);
+    const nextLevel = level + 1;
+    setLevel(nextLevel);
     setScore(0);
     setCombo(0);
     setShowLevelUp(true);
     setTimeout(() => setShowLevelUp(false), 1000);
     
-    // Get next level config
-    const nextLevelCfg = getLevelConfig(level + 1, difficultyMod);
-    setTimeLeft(Math.round(nextLevelCfg.timeLimit * (1 - questIntervalScale * 0.5 + soulBonus * 1.5)));
+    // Get next level config and colors
+    const nextLevelCfg = getLevelConfig(nextLevel, difficultyMod);
+    const allColors: OrbColor[] = ['fire', 'water', 'earth', 'light', 'dark', 'cosmic'];
+    const nextLevelColors = allColors.slice(0, nextLevelCfg.colors);
     
-    initializeGrid();
+    setTimeLeft(nextLevelCfg.timeLimit);
+    initializeGrid(nextLevelColors);
     setMoveTimeLeft(nextLevelCfg.moveTime);
     setGameState('playing');
-  }, [level, difficultyMod, questIntervalScale, soulBonus, initializeGrid]);
+  }, [level, difficultyMod, initializeGrid]);
 
   // Game over logic
   useEffect(() => {
