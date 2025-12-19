@@ -708,8 +708,13 @@ export const StarfallDodgeGame = ({
       result,
       usedTiltControls: useTilt,
       highScoreValue: Math.floor(survivalTime),
+      gameStats: {
+        time: Math.floor(survivalTime),
+        itemsCollected: crystalsCollected,
+        livesRemaining: lives,
+      },
     });
-  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete, useTilt]);
+  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete, useTilt, lives]);
 
   return (
     <div

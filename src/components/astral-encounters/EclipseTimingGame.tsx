@@ -502,6 +502,12 @@ export const EclipseTimingGame = ({
             accuracy,
             result: 'fail',
             highScoreValue: finalStats.score,
+            gameStats: {
+              score: finalStats.score,
+              maxCombo: finalStats.maxCombo,
+              notesHit: finalStats.notesHit,
+              misses: finalStats.notesMissed,
+            },
           });
           setGameStats({ ...finalStats });
           setGameState('complete');
@@ -544,10 +550,16 @@ export const EclipseTimingGame = ({
         const result = accuracy >= 90 ? 'perfect' : 'good'; // Binary win - completed song = success
         
         setGameResult({
-          success: true, // Completed the song = success
+          success: true,
           accuracy,
           result,
           highScoreValue: finalStats.score,
+          gameStats: {
+            score: finalStats.score,
+            maxCombo: finalStats.maxCombo,
+            notesHit: finalStats.notesHit,
+            misses: finalStats.notesMissed,
+          },
         });
         
         // Sync final stats

@@ -610,7 +610,10 @@ export const SoulSerpentGame = ({
           success: result !== 'fail',
           accuracy,
           result,
-          highScoreValue: score, // Snake length/stardust collected for high score
+          highScoreValue: score,
+          gameStats: {
+            score,
+          },
         });
         return prevSnake;
       }
@@ -630,7 +633,7 @@ export const SoulSerpentGame = ({
         if (isPractice && newScore >= 5) {
           setScore(newScore);
           setGameState('complete');
-          onComplete({ success: true, accuracy: 80, result: 'good', highScoreValue: newScore });
+          onComplete({ success: true, accuracy: 80, result: 'good', highScoreValue: newScore, gameStats: { score: newScore } });
           return newSnake;
         }
         

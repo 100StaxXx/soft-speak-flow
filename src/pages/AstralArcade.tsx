@@ -25,6 +25,7 @@ import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcad
 import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
 import { toast } from 'sonner';
 import { PracticeRoundWrapper } from '@/components/astral-encounters';
+import { GameSummaryModal } from '@/components/astral-encounters/GameSummaryModal';
 import { MiniGameSkeleton } from '@/components/skeletons';
 import {
   ArrowLeft,
@@ -69,7 +70,7 @@ const GAMES = [
 
 // Re-export ArcadeDifficulty as Difficulty for internal use
 type Difficulty = ArcadeDifficulty;
-type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result';
+type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result' | 'summary';
 type ArcadeMode = 'practice' | 'battle';
 type BattleResult = 'victory' | 'defeat' | null;
 
@@ -126,6 +127,8 @@ export default function AstralArcade() {
   const [adversary, setAdversary] = useState<Adversary | null>(null);
   const [battleResult, setBattleResult] = useState<BattleResult>(null);
   const [screenShake, setScreenShake] = useState(false);
+  const [practiceResult, setPracticeResult] = useState<MiniGameResult | null>(null);
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
 
   // Get adversary image
   const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
@@ -245,22 +248,23 @@ export default function AstralArcade() {
   // Handle game complete
   const handleGameComplete = useCallback((result: MiniGameResult) => {
     if (arcadeMode === 'practice') {
-      // Practice mode - update high scores and skill tracker
+      // Practice mode - update high scores and skill tracker, then show summary
+      let newHighScore = false;
       if (activeGame && result.highScoreValue !== undefined) {
-        const isNewHighScore = setHighScore(activeGame, difficulty, result.highScoreValue);
+        newHighScore = setHighScore(activeGame, difficulty, result.highScoreValue);
         
         // Record result for skill-based recommendations
         recordGameResult(activeGame, difficulty, result.accuracy, result.success);
         
-        if (isNewHighScore) {
+        if (newHighScore) {
           playArcadeHighScore();
-          toast.success('New High Score!', {
-            description: getFormattedHighScore(activeGame, difficulty) || '',
-            icon: '🏆',
-          });
         }
       }
-      setActiveGame(null);
+      
+      // Store result and show summary modal
+      setPracticeResult(result);
+      setIsNewHighScore(newHighScore);
+      setGamePhase('summary');
     } else {
       // Battle mode - game ended, determine outcome
       // If neither side is defeated yet, deal final damage based on accuracy
@@ -298,8 +302,19 @@ export default function AstralArcade() {
     setActiveGame(null);
     setAdversary(null);
     setBattleResult(null);
+    setPracticeResult(null);
+    setIsNewHighScore(false);
     setGamePhase('instructions');
   }, []);
+
+  // Handle play again from summary modal
+  const handlePlayAgain = useCallback(() => {
+    if (activeGame) {
+      setPracticeResult(null);
+      setIsNewHighScore(false);
+      setGamePhase('playing');
+    }
+  }, [activeGame]);
 
   // Retry battle
   const handleRetryBattle = useCallback(() => {
@@ -597,6 +612,18 @@ export default function AstralArcade() {
                     >
                       {renderBattleResult()}
                     </motion.div>
+                  )}
+
+                  {gamePhase === 'summary' && practiceResult && (
+                    <GameSummaryModal
+                      isOpen={true}
+                      gameType={activeGame!}
+                      gameLabel={GAMES.find(g => g.type === activeGame)?.label || 'Game'}
+                      result={practiceResult}
+                      isNewHighScore={isNewHighScore}
+                      onPlayAgain={handlePlayAgain}
+                      onExit={handleExitGame}
+                    />
                   )}
                 </AnimatePresence>
               </div>
