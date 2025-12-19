@@ -325,10 +325,10 @@ export const TapSequenceGame = ({
     const finalAccuracy = Math.min(100, accuracy + levelBonus);
     
     onComplete({
-      success: won && finalAccuracy >= 50,
-      accuracy: Math.min(finalAccuracy, 100), // Cap at 100
-      result: finalAccuracy >= 90 ? 'perfect' : finalAccuracy >= 70 ? 'good' : finalAccuracy >= 50 ? 'partial' : 'fail',
-      highScoreValue: level, // Level reached for high score
+      success: won,
+      accuracy: Math.min(finalAccuracy, 100),
+      result: won ? (finalAccuracy >= 90 ? 'perfect' : 'good') : 'fail',
+      highScoreValue: level,
     });
   }, [level, totalCorrectTaps, totalTaps, onComplete]);
 

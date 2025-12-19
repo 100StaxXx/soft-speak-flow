@@ -309,8 +309,8 @@ export const GalacticMatchGame = ({
     const accuracy = Math.min(100, Math.round((score / maxPossibleScore) * 100));
     const cappedXP = Math.min(score, MAX_XP);
 
-    const result = level >= 3 
-      ? (level >= 7 ? 'perfect' : level >= 5 ? 'good' : 'partial')
+    const result: 'perfect' | 'good' | 'fail' = level >= 3 
+      ? (level >= 6 ? 'perfect' : 'good')
       : 'fail';
 
     if (result !== 'fail') {

@@ -518,25 +518,23 @@ export const SoulSerpentGame = ({
     return newPos;
   }, []);
 
-  // Calculate accuracy based on score achieved (endless mode)
-  const calculateAccuracy = useCallback((finalScore: number): { accuracy: number; result: 'perfect' | 'good' | 'partial' | 'fail' } => {
+  // Calculate accuracy based on score achieved (endless mode) - binary win/lose
+  const calculateAccuracy = useCallback((finalScore: number): { accuracy: number; result: 'perfect' | 'good' | 'fail' } => {
     // Score thresholds based on difficulty
     const thresholds = {
-      easy: { fail: 2, partial: 4, good: 6, perfect: 10 },
-      medium: { fail: 3, partial: 5, good: 8, perfect: 12 },
-      hard: { fail: 4, partial: 6, good: 10, perfect: 15 },
+      easy: { fail: 3, good: 6, perfect: 10 },
+      medium: { fail: 4, good: 8, perfect: 12 },
+      hard: { fail: 5, good: 10, perfect: 15 },
     };
     
     const t = thresholds[difficulty];
     
     if (finalScore < t.fail) {
-      return { accuracy: Math.round((finalScore / t.fail) * 30), result: 'fail' };
-    } else if (finalScore < t.partial) {
-      return { accuracy: 30 + Math.round(((finalScore - t.fail) / (t.partial - t.fail)) * 20), result: 'partial' };
+      return { accuracy: Math.round((finalScore / t.fail) * 40), result: 'fail' };
     } else if (finalScore < t.good) {
-      return { accuracy: 50 + Math.round(((finalScore - t.partial) / (t.good - t.partial)) * 25), result: 'good' };
+      return { accuracy: 50 + Math.round(((finalScore - t.fail) / (t.good - t.fail)) * 30), result: 'good' };
     } else if (finalScore < t.perfect) {
-      return { accuracy: 75 + Math.round(((finalScore - t.good) / (t.perfect - t.good)) * 15), result: 'good' };
+      return { accuracy: 80 + Math.round(((finalScore - t.good) / (t.perfect - t.good)) * 10), result: 'good' };
     } else {
       return { accuracy: Math.min(100, 90 + Math.round((finalScore - t.perfect) * 0.5)), result: 'perfect' };
     }

@@ -113,25 +113,22 @@ export const GAME_DAMAGE_VALUES = {
   },
 } as const;
 
-// Result calculation thresholds based on remaining player HP
+// Result calculation thresholds based on remaining player HP (binary win/lose)
 export const RESULT_HP_THRESHOLDS = {
-  perfect: 80, // 80%+ HP remaining
-  good: 50,    // 50-79% HP remaining
-  partial: 25, // 25-49% HP remaining
-  fail: 0,     // Defeated or < 25%
+  perfect: 70, // 70%+ HP remaining = perfect win
+  good: 1,     // Any HP remaining = good win
+  fail: 0,     // Defeated = fail
 } as const;
 
 export function calculateResultFromHP(
   playerHP: number, 
   playerMaxHP: number,
   isPlayerDefeated: boolean
-): 'perfect' | 'good' | 'partial' | 'fail' {
+): 'perfect' | 'good' | 'fail' {
   if (isPlayerDefeated) return 'fail';
   
   const hpPercent = (playerHP / playerMaxHP) * 100;
   
   if (hpPercent >= RESULT_HP_THRESHOLDS.perfect) return 'perfect';
-  if (hpPercent >= RESULT_HP_THRESHOLDS.good) return 'good';
-  if (hpPercent >= RESULT_HP_THRESHOLDS.partial) return 'partial';
-  return 'fail';
+  return 'good'; // Any survival = win
 }

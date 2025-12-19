@@ -124,8 +124,7 @@ export const MiniGameTester = ({ companionStats: initialStats }: MiniGameTesterP
                 animate={{ scale: 1 }}
                 className={`w-2 h-2 rounded-full ${
                   entry.result.result === 'perfect' ? 'bg-yellow-500' :
-                  entry.result.result === 'good' ? 'bg-green-500' :
-                  entry.result.result === 'partial' ? 'bg-orange-500' : 'bg-red-500'
+                  entry.result.result === 'good' ? 'bg-green-500' : 'bg-red-500'
                 }`}
                 title={`${GAMES.find(g => g.type === entry.game)?.label}: ${entry.result.accuracy}%`}
               />
@@ -144,7 +143,6 @@ export const MiniGameTester = ({ companionStats: initialStats }: MiniGameTesterP
             className={`p-3 rounded-lg text-sm flex items-center justify-between ${
               lastResult.result === 'perfect' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
               lastResult.result === 'good' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-              lastResult.result === 'partial' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 
               'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}
           >
