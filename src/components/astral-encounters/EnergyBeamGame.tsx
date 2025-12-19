@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Shield, Zap, Bomb, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, Shield, Zap, Clock, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
@@ -80,7 +80,7 @@ interface Projectile {
 
 interface PowerUp {
   id: string;
-  type: 'shield' | 'rapid' | 'bomb' | 'bonus';
+  type: 'shield' | 'rapid' | 'repair' | 'slowmo' | 'bonus';
   x: number;
   y: number;
 }
@@ -302,7 +302,8 @@ const PowerUpSprite = memo(({ powerUp }: { powerUp: PowerUp }) => {
   const config = {
     shield: { icon: Shield, color: '#3b82f6', bg: 'rgba(59,130,246,0.3)' },
     rapid: { icon: Zap, color: '#f59e0b', bg: 'rgba(245,158,11,0.3)' },
-    bomb: { icon: Bomb, color: '#ef4444', bg: 'rgba(239,68,68,0.3)' },
+    repair: { icon: Heart, color: '#22c55e', bg: 'rgba(34,197,94,0.3)' },
+    slowmo: { icon: Clock, color: '#a855f7', bg: 'rgba(168,85,247,0.3)' },
     bonus: { icon: Star, color: '#fbbf24', bg: 'rgba(251,191,36,0.3)' },
   }[powerUp.type];
   
@@ -361,6 +362,7 @@ ExplosionEffect.displayName = 'ExplosionEffect';
 const ScorePopupComponent = memo(({ popup }: { popup: ScorePopup }) => (
   <motion.div
     className={`absolute pointer-events-none font-bold text-sm z-30 ${
+      popup.type === 'repair' ? 'text-green-400' :
       popup.score < 0 ? 'text-red-400' : popup.type === 'bonus' ? 'text-yellow-400' : 'text-green-400'
     }`}
     style={{ left: `${popup.x}%`, top: `${popup.y}%`, transform: 'translate(-50%, -50%)' }}
@@ -368,7 +370,7 @@ const ScorePopupComponent = memo(({ popup }: { popup: ScorePopup }) => (
     animate={{ opacity: 0, y: -20, scale: 1 }}
     transition={{ duration: 0.6 }}
   >
-    {popup.score > 0 ? `+${popup.score}` : popup.score}
+    {popup.type === 'repair' ? '+1 ❤️' : popup.score > 0 ? `+${popup.score}` : popup.score}
   </motion.div>
 ));
 ScorePopupComponent.displayName = 'ScorePopupComponent';
@@ -478,6 +480,7 @@ export function EnergyBeamGame({
   const [playerX, setPlayerX] = useState(50);
   const [hasShield, setHasShield] = useState(false);
   const [rapidFire, setRapidFire] = useState(false);
+  const [isSlowMo, setIsSlowMo] = useState(false);
   const [isInvulnerable, setIsInvulnerable] = useState(false);
   
   // Game objects
@@ -505,6 +508,9 @@ export function EnergyBeamGame({
     wavesCompleted: 0,
     powerUpsCollected: 0,
   });
+  
+  // Speed multiplier for slow-mo effect
+  const speedMultiplier = isSlowMo ? 0.5 : 1;
   
   // Current wave difficulty (scales with wave)
   const currentConfig = useMemo(() => ({
@@ -638,8 +644,8 @@ export function EnergyBeamGame({
       // Auto-fire
       fireProjectile();
       
-      // Update formation movement
-      formationOffset.current += currentConfig.enemySpeed * formationDirection.current * 0.3;
+      // Update formation movement (affected by slow-mo)
+      formationOffset.current += currentConfig.enemySpeed * formationDirection.current * 0.3 * speedMultiplier;
       if (Math.abs(formationOffset.current) > 12) {
         formationDirection.current *= -1;
       }
@@ -647,8 +653,8 @@ export function EnergyBeamGame({
       // Update enemies
       setEnemies(prev => prev.map(enemy => {
         if (enemy.isDiving) {
-          // Diving behavior - swooping attack
-          enemy.divePhase += 0.05;
+          // Diving behavior - swooping attack (affected by slow-mo)
+          enemy.divePhase += 0.05 * speedMultiplier;
           const newY = enemy.formationY + Math.sin(enemy.divePhase) * 50 + enemy.divePhase * 15;
           const newX = enemy.diveStartX + Math.sin(enemy.divePhase * 2) * 20;
           
@@ -674,14 +680,14 @@ export function EnergyBeamGame({
           return { ...enemy, isDiving: true, diveStartX: newX, divePhase: 0 };
         }
         
-        // Enemy shooting
-        if (currentConfig.enemyFireRate > 0 && Math.random() < currentConfig.enemyFireRate) {
+        // Enemy shooting (affected by slow-mo - less likely to fire)
+        if (currentConfig.enemyFireRate > 0 && Math.random() < currentConfig.enemyFireRate * speedMultiplier) {
           setProjectiles(p => [...p, {
             id: `ep-${Date.now()}-${enemy.id}`,
             x: newX,
             y: enemy.y + 3,
             isEnemy: true,
-            speed: 1.5,
+            speed: 1.5 * speedMultiplier,
           }]);
         }
         
@@ -693,7 +699,9 @@ export function EnergyBeamGame({
         const updated: Projectile[] = [];
         
         prev.forEach(proj => {
-          const newY = proj.y + (proj.isEnemy ? proj.speed : -proj.speed);
+          // Enemy projectiles are slowed, player projectiles are not
+          const effectiveSpeed = proj.isEnemy ? proj.speed * speedMultiplier : proj.speed;
+          const newY = proj.y + (proj.isEnemy ? effectiveSpeed : -effectiveSpeed);
           
           if (newY < 0 || newY > 100) return;
           
@@ -746,7 +754,7 @@ export function EnergyBeamGame({
                   
                   // Spawn power-up
                   if (Math.random() < currentConfig.powerUpChance) {
-                    const types: PowerUp['type'][] = ['shield', 'rapid', 'bomb', 'bonus'];
+                    const types: PowerUp['type'][] = ['shield', 'rapid', 'repair', 'slowmo', 'bonus'];
                     setPowerUps(p => [...p, {
                       id: `pu-${Date.now()}`,
                       type: types[Math.floor(Math.random() * types.length)],
@@ -826,21 +834,21 @@ export function EnergyBeamGame({
                 setRapidFire(true);
                 setTimeout(() => setRapidFire(false), 5000);
                 break;
-              case 'bomb':
-                // Clear all enemies on screen
-                setEnemies(enemies => {
-                  enemies.forEach(e => {
-                    setScore(s => s + e.points);
-                    statsRef.current.enemiesDestroyed++;
-                    setExplosions(ex => [...ex, {
-                      id: `exp-bomb-${e.id}`,
-                      x: e.x,
-                      y: e.y,
-                      size: 'small',
-                    }]);
-                  });
-                  return [];
-                });
+              case 'repair':
+                // Restore 1 life (max 3)
+                setLives(l => Math.min(l + 1, 3));
+                setScorePopups(p => [...p, {
+                  id: `sp-repair-${Date.now()}`,
+                  x: pu.x,
+                  y: pu.y,
+                  score: 0,
+                  type: 'repair',
+                }]);
+                break;
+              case 'slowmo':
+                // Slow everything down for 5 seconds
+                setIsSlowMo(true);
+                setTimeout(() => setIsSlowMo(false), 5000);
                 break;
               case 'bonus':
                 setScore(s => s + 200);
@@ -1014,8 +1022,18 @@ export function EnergyBeamGame({
               <Zap className="w-3 h-3" /> RAPID
             </div>
           )}
+          {isSlowMo && (
+            <div className="px-2 py-1 bg-purple-500/30 rounded text-xs text-purple-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> SLOW-MO
+            </div>
+          )}
         </div>
       </div>
+      
+      {/* Slow-mo visual overlay */}
+      {isSlowMo && (
+        <div className="absolute inset-0 bg-purple-500/10 pointer-events-none z-10" />
+      )}
       
       {/* Game area */}
       <div
