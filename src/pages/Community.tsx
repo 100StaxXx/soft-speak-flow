@@ -78,7 +78,7 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b pt-[env(safe-area-inset-top)]">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -246,7 +246,7 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving }: Communit
     <div className="min-h-screen bg-background pb-24">
       {/* Header with community color */}
       <div
-        className="h-24 relative"
+        className="h-24 relative pt-[env(safe-area-inset-top)]"
         style={{
           background: `linear-gradient(135deg, ${community.theme_color}, ${community.theme_color}88)`,
         }}
@@ -254,7 +254,7 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving }: Communit
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-4 left-4 text-white hover:bg-white/20"
+          className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-4 text-white hover:bg-white/20"
           onClick={onBack}
         >
           <ArrowLeft className="h-5 w-5" />
@@ -264,7 +264,7 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving }: Communit
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 text-white hover:bg-white/20"
+            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 text-white hover:bg-white/20"
             onClick={onLeave}
             disabled={isLeaving}
           >
