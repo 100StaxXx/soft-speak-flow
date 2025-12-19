@@ -27,8 +27,12 @@ const TIER_GLOW: Record<AdversaryTier, string> = {
 const MINIGAME_ICONS: Record<string, typeof Skull> = {
   energy_beam: Zap,
   tap_sequence: Brain,
-  breath_sync: Wind,
-  quick_swipe: Skull,
+  astral_frequency: Wind,
+  eclipse_timing: Skull,
+  starfall_dodge: Skull,
+  soul_serpent: Skull,
+  orb_match: Brain,
+  galactic_match: Brain,
 };
 
 export const AdversaryReveal = ({ adversary, onBeginBattle }: AdversaryRevealProps) => {

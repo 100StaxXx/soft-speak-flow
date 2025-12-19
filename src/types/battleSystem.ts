@@ -114,12 +114,6 @@ export const GAME_DAMAGE_VALUES = {
     miss: 'tier_attack',
   },
   
-  // Rune Resonance
-  rune_resonance: {
-    perfectHit: 8,
-    goodHit: 5,
-    miss: 'tier_attack',
-  },
   
   // Astral Frequency (endless runner)
   astral_frequency: {

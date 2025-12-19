@@ -6,7 +6,7 @@ import { TapSequenceGame } from './TapSequenceGame';
 import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
-import { RuneResonanceGame } from './RuneResonanceGame';
+
 import { SoulSerpentGame } from './SoulSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
 import { GalacticMatchGame } from './GalacticMatchGame';
@@ -70,7 +70,6 @@ const PracticeIntro = memo(({
     astral_frequency: 'Cosmiq Dash',
     eclipse_timing: 'Stellar Beats',
     starfall_dodge: 'Starfall Dodge',
-    rune_resonance: 'Rune Resonance',
     soul_serpent: 'Soul Serpent',
     orb_match: 'Orb Match',
     galactic_match: 'Galactic Match',
@@ -224,8 +223,6 @@ export const PracticeRoundWrapper = ({
         return <EclipseTimingGame {...props} />;
       case 'starfall_dodge':
         return <StarfallDodgeGame {...props} />;
-      case 'rune_resonance':
-        return <RuneResonanceGame {...props} />;
       case 'soul_serpent':
         return <SoulSerpentGame {...props} />;
       case 'orb_match':

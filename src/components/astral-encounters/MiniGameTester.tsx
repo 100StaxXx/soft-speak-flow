@@ -7,7 +7,7 @@ import { TapSequenceGame } from './TapSequenceGame';
 import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { StarfallDodgeGame } from './StarfallDodgeGame';
-import { RuneResonanceGame } from './RuneResonanceGame';
+
 import { SoulSerpentGame } from './SoulSerpentGame';
 import { OrbMatchGame } from './OrbMatchGame';
 import { GalacticMatchGame } from './GalacticMatchGame';
@@ -19,9 +19,8 @@ const GAMES: { type: MiniGameType; label: string; icon: React.ReactNode; stat: '
   { type: 'energy_beam', label: 'Star Defender', icon: <Zap className="w-4 h-4" />, stat: 'body' },
   { type: 'tap_sequence', label: 'Tap Sequence', icon: <Target className="w-4 h-4" />, stat: 'mind' },
   { type: 'astral_frequency', label: 'Cosmiq Dash', icon: <Radio className="w-4 h-4" />, stat: 'soul' },
-  { type: 'eclipse_timing', label: 'Stellar Beats', icon: <Moon className="w-4 h-4" />, stat: 'body' },
-  { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" />, stat: 'mind' },
-  { type: 'rune_resonance', label: 'Rune Resonance', icon: <Music className="w-4 h-4" />, stat: 'soul' },
+  { type: 'eclipse_timing', label: 'Stellar Beats', icon: <Moon className="w-4 h-4" />, stat: 'soul' },
+  { type: 'starfall_dodge', label: 'Starfall Dodge', icon: <Sparkles className="w-4 h-4" />, stat: 'body' },
   { type: 'soul_serpent', label: 'Soul Serpent', icon: <Zap className="w-4 h-4" />, stat: 'body' },
   { type: 'orb_match', label: 'Orb Match', icon: <Grid3X3 className="w-4 h-4" />, stat: 'soul' },
   { type: 'galactic_match', label: 'Galactic Match', icon: <Layers className="w-4 h-4" />, stat: 'mind' },
@@ -68,8 +67,6 @@ export const MiniGameTester = ({ companionStats: initialStats }: MiniGameTesterP
         return <EclipseTimingGame {...props} />;
       case 'starfall_dodge':
         return <StarfallDodgeGame {...props} />;
-      case 'rune_resonance':
-        return <RuneResonanceGame {...props} />;
       case 'soul_serpent':
         return <SoulSerpentGame {...props} />;
       case 'orb_match':

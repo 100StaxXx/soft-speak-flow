@@ -45,7 +45,7 @@ const TapSequenceGame = lazy(() => import('@/components/astral-encounters/TapSeq
 const AstralFrequencyGame = lazy(() => import('@/components/astral-encounters/AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
 const EclipseTimingGame = lazy(() => import('@/components/astral-encounters/EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
 const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
-const RuneResonanceGame = lazy(() => import('@/components/astral-encounters/RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
+
 const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
@@ -54,12 +54,11 @@ const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/Gala
 const arcadePracticedGames = new Set<MiniGameType>();
 
 const GAMES = [
-  { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'mind' as const },
+  { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'body' as const },
   { type: 'tap_sequence' as MiniGameType, label: 'Tap Sequence', icon: Target, stat: 'mind' as const },
   { type: 'astral_frequency' as MiniGameType, label: 'Cosmiq Dash', icon: Radio, stat: 'soul' as const },
-  { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'body' as const },
+  { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'soul' as const },
   { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
-  { type: 'rune_resonance' as MiniGameType, label: 'Rune Resonance', icon: Hexagon, stat: 'soul' as const },
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Orb Match', icon: Grid3X3, stat: 'mind' as const },
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
@@ -350,7 +349,6 @@ export default function AstralArcade() {
         case 'astral_frequency': return AstralFrequencyGame;
         case 'eclipse_timing': return EclipseTimingGame;
         case 'starfall_dodge': return StarfallDodgeGame;
-        case 'rune_resonance': return RuneResonanceGame;
         case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
         case 'galactic_match': return GalacticMatchGame;

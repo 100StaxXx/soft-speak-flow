@@ -68,8 +68,8 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
       "🔵 CYAN SHIELDS = Protection for 1 hit",
       "Speed increases - survive as long as you can!"
     ],
-    statBonus: 'mind',
-    statIcon: Brain,
+    statBonus: 'soul',
+    statIcon: Sparkles,
   },
   eclipse_timing: {
     icon: Music,
@@ -80,8 +80,8 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
       "Tap the lane when notes reach the glowing line",
       "Chain combos for multiplied points!"
     ],
-    statBonus: 'body',
-    statIcon: Heart,
+    statBonus: 'soul',
+    statIcon: Sparkles,
   },
   starfall_dodge: {
     icon: Smartphone,
@@ -93,21 +93,8 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
       "Collect 💎 crystals for bonus points",
       "Speed increases - how long can you last?"
     ],
-    statBonus: 'mind',
-    statIcon: Brain,
-  },
-  rune_resonance: {
-    icon: Music,
-    title: "Rune Resonance",
-    goal: "Tap runes at peak brightness - endless rounds!",
-    howToPlay: [
-      "Each rune pulses at its own rhythm",
-      "Tap when a rune glows brightest",
-      "Each round adds more runes & decoys",
-      "Limited lives - how many rounds can you beat?"
-    ],
-    statBonus: 'soul',
-    statIcon: Sparkles,
+    statBonus: 'body',
+    statIcon: Heart,
   },
   soul_serpent: {
     icon: Zap,

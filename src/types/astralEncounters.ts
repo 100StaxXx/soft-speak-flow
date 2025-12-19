@@ -21,7 +21,6 @@ export type MiniGameType =
   | 'astral_frequency'
   | 'eclipse_timing'
   | 'starfall_dodge'
-  | 'rune_resonance'
   | 'soul_serpent'
   | 'orb_match'
   | 'galactic_match';
@@ -119,7 +118,7 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   overthinking: 'astral_frequency', // Quieting mental noise - find clarity
   doubt: 'starfall_dodge',          // Facing fears - courage under fire
   fear: 'starfall_dodge',           // Overcoming fear - dodge the darkness
-  confusion: 'rune_resonance',      // Finding patterns - recognize the rhythm
+  confusion: 'eclipse_timing',      // Finding patterns - timing precision
   vulnerability: 'eclipse_timing',  // Precise timing - trust your instincts
   imbalance: 'energy_beam',         // Controlled release - find balance
 };
