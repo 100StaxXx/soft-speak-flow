@@ -115,7 +115,7 @@ You agree not to:
 ## 8. Intellectual Property Rights
 
 ### 8.1 Our Rights
-The App and its original content, features, and functionality are owned by R-Evolution LLC and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
+The App and its original content, features, and functionality are owned by Cosmiq LLC and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
 
 ### 8.2 Limited License
 We grant you a limited, non-exclusive, non-transferable, revocable license to use the App for personal, non-commercial purposes, subject to these Terms.
@@ -169,7 +169,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW:
 
 ## 12. Indemnification
 
-You agree to indemnify, defend, and hold harmless R-Evolution LLC, its officers, directors, employees, and agents from any claims, damages, liabilities, costs, and expenses (including legal fees) arising from:
+You agree to indemnify, defend, and hold harmless Cosmiq LLC, its officers, directors, employees, and agents from any claims, damages, liabilities, costs, and expenses (including legal fees) arising from:
 - Your use of the App
 - Your violation of these Terms
 - Your violation of any rights of another party
@@ -231,7 +231,7 @@ Your privacy is important to us. Please review our Privacy Policy, which explain
 
 ## 18. Entire Agreement
 
-These Terms, together with our Privacy Policy, constitute the entire agreement between you and R-Evolution LLC regarding the use of the App.
+These Terms, together with our Privacy Policy, constitute the entire agreement between you and Cosmiq LLC regarding the use of the App.
 
 ## 19. Severability
 
