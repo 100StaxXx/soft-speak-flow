@@ -18,19 +18,19 @@ interface OrbMatchGameProps {
   isPractice?: boolean;
 }
 
-// Difficulty multipliers for level scaling
+// Difficulty multipliers for level scaling - balanced for higher base targets
 const DIFFICULTY_MULTIPLIERS: Record<ArcadeDifficulty, { targetMod: number; timeMod: number }> = {
-  beginner: { targetMod: 0.6, timeMod: 1.4 },
-  easy: { targetMod: 0.8, timeMod: 1.2 },
+  beginner: { targetMod: 0.5, timeMod: 1.5 },  // Half target, 50% more time
+  easy: { targetMod: 0.7, timeMod: 1.3 },
   medium: { targetMod: 1.0, timeMod: 1.0 },
-  hard: { targetMod: 1.2, timeMod: 0.8 },
-  master: { targetMod: 1.5, timeMod: 0.6 },
+  hard: { targetMod: 1.4, timeMod: 0.85 },
+  master: { targetMod: 2.0, timeMod: 0.7 },    // Double target, 30% less time
 };
 
-// Level configuration - escalating difficulty
+// Level configuration - escalating difficulty (5x harder base targets)
 const getLevelConfig = (level: number, difficultyMod: { targetMod: number; timeMod: number }) => {
-  const baseTarget = 100 + (level - 1) * 50; // 100, 150, 200, 250...
-  const baseTime = Math.max(20, 45 - (level - 1) * 2); // 45s → 20s minimum
+  const baseTarget = 500 + (level - 1) * 300; // 500, 800, 1100, 1400... (5x harder)
+  const baseTime = Math.max(30, 60 - (level - 1) * 2.5); // 60s → 30s minimum (more time to compensate)
   const colors = Math.min(6, 4 + Math.floor(level / 4)) as 4 | 5 | 6; // 4 → 6 colors
   const moveTime = Math.max(4, 10 - Math.floor(level / 3)); // 10s → 4s minimum
   const specialSpawnBonus = Math.min(0.3, level * 0.02); // Increased special spawn rate
