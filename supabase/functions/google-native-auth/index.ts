@@ -1,10 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { jwtVerify, createRemoteJWKSet } from "https://esm.sh/jose@5.8.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Create Google JWKS for token verification
+const googleJWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/oauth2/v3/certs')
+);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -19,28 +25,9 @@ serve(async (req) => {
       throw new Error('ID token is required');
     }
 
-    console.log('Validating Google ID token...');
+    console.log('Validating Google ID token with jose library...');
 
-    // Validate token with Google
-    const tokenInfoResponse = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
-    );
-
-    if (!tokenInfoResponse.ok) {
-      const error = await tokenInfoResponse.text();
-      console.error('Google token validation failed:', error);
-      throw new Error('Invalid Google ID token');
-    }
-
-    const tokenInfo = await tokenInfoResponse.json();
-    console.log('Token info received:', { 
-      aud: tokenInfo.aud, 
-      email: tokenInfo.email,
-      sub: tokenInfo.sub 
-    });
-
-    // Verify audience is either Web or iOS Client ID
-    // Note: These must be set as Supabase secrets via `supabase secrets set`
+    // Get client IDs from environment
     const webClientId = Deno.env.get('GOOGLE_WEB_CLIENT_ID');
     const iosClientId = Deno.env.get('GOOGLE_IOS_CLIENT_ID');
 
@@ -50,16 +37,51 @@ serve(async (req) => {
       throw new Error('Google OAuth not configured - missing client IDs');
     }
 
-    const validAudience = 
-      tokenInfo.aud === webClientId || 
-      tokenInfo.aud === iosClientId;
+    // Build valid audiences array
+    const validAudiences: string[] = [];
+    if (webClientId) validAudiences.push(webClientId);
+    if (iosClientId) validAudiences.push(iosClientId);
 
-    if (!validAudience) {
-      console.error('Invalid audience:', tokenInfo.aud, 'Expected:', { webClientId: webClientId?.substring(0, 20), iosClientId: iosClientId?.substring(0, 20) });
-      throw new Error('Token audience does not match expected client IDs');
+    // Verify JWT with Google's JWKS - this automatically validates:
+    // - exp (expiration)
+    // - iat (issued at)
+    // - signature
+    // - issuer
+    // - audience
+    let payload;
+    try {
+      const result = await jwtVerify(idToken, googleJWKS, {
+        issuer: ['https://accounts.google.com', 'accounts.google.com'],
+        audience: validAudiences,
+      });
+      payload = result.payload;
+    } catch (jwtError) {
+      console.error('JWT verification failed:', jwtError);
+      throw new Error('Invalid or expired Google ID token');
     }
 
-    console.log('Audience validated successfully');
+    // Additional timestamp validation for defense-in-depth
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Ensure token is not too old (max 10 minutes since issued)
+    if (payload.iat && (now - (payload.iat as number)) > 600) {
+      console.error('Token issued too long ago:', now - (payload.iat as number), 'seconds');
+      throw new Error('Token issued too long ago');
+    }
+
+    console.log('Token verified successfully:', { 
+      aud: payload.aud, 
+      email: payload.email,
+      sub: payload.sub,
+      iss: payload.iss
+    });
+
+    const tokenInfo = {
+      email: payload.email as string,
+      name: payload.name as string | undefined,
+      picture: payload.picture as string | undefined,
+      sub: payload.sub as string,
+    };
 
     // Create Supabase admin client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
