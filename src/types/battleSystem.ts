@@ -28,96 +28,87 @@ export interface TierBattleConfig {
   attackDamage: number; // Damage adversary deals per hit
 }
 
-// HP configurations by tier
+// HP configurations by tier - REBALANCED for longer battles (4-6 milestones needed)
 export const TIER_BATTLE_CONFIG: Record<AdversaryTier, TierBattleConfig> = {
   common: {
     playerHP: 100,
-    adversaryHP: 80,
-    attackDamage: 15,
+    adversaryHP: 100,   // ~5 milestones needed
+    attackDamage: 12,   // Reduced for longer battles
   },
   uncommon: {
     playerHP: 100,
-    adversaryHP: 100,
-    attackDamage: 18,
+    adversaryHP: 120,   // ~6 milestones
+    attackDamage: 15,
   },
   rare: {
     playerHP: 100,
-    adversaryHP: 130,
-    attackDamage: 22,
+    adversaryHP: 150,   // ~7-8 milestones
+    attackDamage: 18,
   },
   epic: {
     playerHP: 100,
-    adversaryHP: 160,
-    attackDamage: 28,
+    adversaryHP: 180,   // ~9 milestones
+    attackDamage: 22,
   },
   legendary: {
     playerHP: 100,
-    adversaryHP: 200,
-    attackDamage: 35,
+    adversaryHP: 220,   // ~11 milestones
+    attackDamage: 28,
   },
 };
 
-// Damage values for each mini-game action
+// REBALANCED: Milestone-based damage values (no per-action damage)
 export const GAME_DAMAGE_VALUES = {
-  // Tap Sequence
+  // Tap Sequence - damage only on level complete
   tap_sequence: {
-    correctTap: 8,
-    levelComplete: 25,
-    wrongTap: 'tier_attack', // Uses tier attack damage
+    levelComplete: 20,
+    perfectLevel: 30,         // Bonus for no mistakes
+    wrongTap: 'tier_attack',
   },
   
-  // Galactic Match
+  // Galactic Match - damage only on level complete
   galactic_match: {
-    correctMatch: 12,
     levelComplete: 20,
+    perfectLevel: 30,         // No wrong pairs
     wrongMatch: 'tier_attack',
   },
   
-  // Soul Serpent (endless)
+  // Soul Serpent - damage based on score milestones
   soul_serpent: {
-    collectStardust: 5,
-    collision: 50, // Self-inflicted
+    scoreMilestone: 25,       // Every 10 stardust
+    collision: 50,
   },
   
-  // Starfall Dodge
+  // Starfall Dodge - damage based on survival time
   starfall_dodge: {
-    collectCrystal: 4,
+    survivalMilestone: 20,    // Every 10 seconds survived
     hitByProjectile: 'tier_attack',
   },
   
-  // Energy Beam
+  // Energy Beam - damage only on wave clear
   energy_beam: {
-    destroyAsteroid: 3,
-    destroyEnemy: 8,
-    destroyBoss: 20,
+    waveComplete: 25,
+    bossKill: 15,
     playerHit: 'tier_attack',
   },
   
-  // Orb Match
+  // Orb Match - damage on level complete
   orb_match: {
-    match3: 5,
-    match4: 10,
-    match5: 18,
-    noMoves: 10, // Player takes damage
-    // Special ability bonus damages
-    special_line_bomb: 15,
-    special_cross_bomb: 20,
-    special_star: 25,
-    special_cosmic_nova: 40,
+    levelComplete: 25,        // After reaching score target
+    specialActivation: 10,    // Special orbs still valuable
+    noMoves: 10,
   },
   
-  // Eclipse Timing
+  // Eclipse Timing - damage on section complete
   eclipse_timing: {
-    perfect: 6,
-    great: 4,
-    good: 2,
+    sectionComplete: 20,      // Every ~30 notes
+    comboMilestone: 10,       // Bonus per 20 combo
     miss: 'tier_attack',
   },
   
-  
-  // Astral Frequency (endless runner)
+  // Astral Frequency - damage on distance milestones
   astral_frequency: {
-    collectOrb: 4,
+    distanceMilestone: 20,    // Every 100m traveled
     collision: 'tier_attack',
   },
 } as const;

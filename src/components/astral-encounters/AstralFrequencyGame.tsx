@@ -540,9 +540,7 @@ export const AstralFrequencyGame = ({
         return newCombo;
       });
       triggerHaptic('light');
-      
-      // Deal damage to adversary for collecting crystal
-      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.astral_frequency.collectOrb, source: 'collect_orb' });
+      // Crystal collection no longer deals damage - distance milestone-based only
     } else if (type === 'shield') {
       setHasShield(true);
       triggerHaptic('medium');
@@ -557,6 +555,13 @@ export const AstralFrequencyGame = ({
       // Update distance
       setDistance(prev => {
         const newDistance = prev + speed * 0.1;
+        
+        // MILESTONE DAMAGE: Deal damage every 100m traveled
+        const prevMilestones = Math.floor(prev / 100);
+        const newMilestones = Math.floor(newDistance / 100);
+        if (newMilestones > prevMilestones) {
+          onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.astral_frequency.distanceMilestone, source: 'distance_milestone' });
+        }
         
         // Practice mode: end after reaching 500 distance
         if (isPractice && newDistance >= 500) {

@@ -535,19 +535,28 @@ export const EclipseTimingGame = ({
     // Update ref immediately
     notesRef.current = notesRef.current.map(n => n.id === closestNote.id ? { ...n, hit: true } : n);
     
-    // Deal damage to adversary
-    const damageAmount = result === 'perfect' 
-      ? GAME_DAMAGE_VALUES.eclipse_timing.perfect 
-      : result === 'great' 
-        ? GAME_DAMAGE_VALUES.eclipse_timing.great 
-        : GAME_DAMAGE_VALUES.eclipse_timing.good;
-    onDamage?.({ target: 'adversary', amount: damageAmount, source: result });
+    // MILESTONE DAMAGE: Deal damage on combo milestones (every 20 combo) or section complete
+    // No per-note damage anymore
     
     // OPTIMIZED: Single batched state update
     const currentStats = gameStatsRef.current;
     const multiplier = getComboMultiplier(currentStats.combo);
     const points = HIT_RESULTS[result].points * multiplier;
     const newCombo = currentStats.combo + 1;
+    
+    // Check for combo milestone (every 20 combo)
+    const prevMilestone = Math.floor(currentStats.combo / 20);
+    const newMilestone = Math.floor(newCombo / 20);
+    if (newMilestone > prevMilestone) {
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.comboMilestone, source: 'combo_milestone' });
+    }
+    
+    // Check for section complete (every 30 notes hit)
+    const prevSection = Math.floor(currentStats.notesHit / 30);
+    const newSection = Math.floor((currentStats.notesHit + 1) / 30);
+    if (newSection > prevSection) {
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.eclipse_timing.sectionComplete, source: 'section_complete' });
+    }
     
     const newStats: GameStats = {
       score: currentStats.score + points,

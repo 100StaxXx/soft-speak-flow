@@ -612,8 +612,10 @@ export const SoulSerpentGame = ({
       if (newHead.x === stardust.x && newHead.y === stardust.y) {
         const newScore = score + 1;
         
-        // Deal damage to adversary for collecting stardust
-        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.collectStardust, source: 'collect_stardust' });
+        // MILESTONE DAMAGE: Deal damage every 10 stardust collected
+        if (newScore > 0 && newScore % 10 === 0) {
+          onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.scoreMilestone, source: 'score_milestone' });
+        }
         
         // Practice mode: end after collecting 5 stardust
         if (isPractice && newScore >= 5) {

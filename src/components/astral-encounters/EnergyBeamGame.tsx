@@ -721,13 +721,11 @@ export function EnergyBeamGame({
                   setScore(s => s + points);
                   triggerHaptic('light');
                   
-                  // Deal damage to adversary based on enemy type
-                  const damageAmount = enemy.type === 'boss' 
-                    ? GAME_DAMAGE_VALUES.energy_beam.destroyBoss
-                    : enemy.type === 'scout' 
-                      ? GAME_DAMAGE_VALUES.energy_beam.destroyAsteroid
-                      : GAME_DAMAGE_VALUES.energy_beam.destroyEnemy;
-                  onDamage?.({ target: 'adversary', amount: damageAmount, source: `destroy_${enemy.type}` });
+                  // Deal damage to adversary only for boss kills (milestone-based)
+                  if (enemy.type === 'boss') {
+                    onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.energy_beam.bossKill, source: 'boss_kill' });
+                  }
+                  // Note: Regular enemy kills no longer deal damage - wave completion handles it
                   
                   // Add explosion
                   setExplosions(e => [...e, {
@@ -929,6 +927,10 @@ export function EnergyBeamGame({
     
     // Wave clear bonus
     setScore(s => s + 100 + wave * 50);
+    
+    // MILESTONE DAMAGE: Deal damage for completing the wave
+    onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.energy_beam.waveComplete, source: 'wave_complete' });
+    
     setGameState('wave-transition');
     
     setTimeout(() => {

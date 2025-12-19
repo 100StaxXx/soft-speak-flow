@@ -357,6 +357,13 @@ export const StarfallDodgeGame = ({
     setSurvivalTime(prev => {
       const newTime = prev + deltaTime / 1000;
       
+      // MILESTONE DAMAGE: Deal damage every 10 seconds survived
+      const prevMilestones = Math.floor(prev / 10);
+      const newMilestones = Math.floor(newTime / 10);
+      if (newMilestones > prevMilestones) {
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.survivalMilestone, source: 'survival_milestone' });
+      }
+      
       // Practice mode: end after 15 seconds
       if (isPractice && newTime >= 15) {
         setGameState('complete');
@@ -402,9 +409,7 @@ export const StarfallDodgeGame = ({
             setCrystalsCollected(c => c + 1);
             emitParticles(obj.x, obj.y, '#22d3ee', 6);
             triggerHaptic('light');
-            
-            // Deal damage to adversary for collecting crystal
-            onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.collectCrystal, source: 'collect_crystal' });
+            // Crystal collection no longer deals damage - milestone-based only
             return false;
           } else if (obj.type === 'powerup_shield') {
             setHasShield(true);
