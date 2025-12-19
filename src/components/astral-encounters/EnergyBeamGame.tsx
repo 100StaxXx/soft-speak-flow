@@ -1185,7 +1185,13 @@ export function EnergyBeamGame({
     const wavesCleared = stats.wavesCompleted;
     
     // Accuracy based on waves cleared
-    const waveThresholds = { easy: 4, medium: 3, hard: 2 };
+    const waveThresholds: Record<ArcadeDifficulty, number> = { 
+      beginner: 5, 
+      easy: 4, 
+      medium: 3, 
+      hard: 2, 
+      master: 2 
+    };
     const threshold = waveThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((wavesCleared / threshold) * 100));
     
@@ -1205,7 +1211,7 @@ export function EnergyBeamGame({
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [gameState, lives, difficulty, onComplete, getResult]);
+  }, [gameState, lives, difficulty, onComplete, getResult, score]);
   
   return (
     <div className="relative w-full h-full min-h-[500px] flex flex-col items-center overflow-hidden select-none">
