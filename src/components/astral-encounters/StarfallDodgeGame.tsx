@@ -22,63 +22,80 @@ interface StarfallDodgeGameProps {
   isPractice?: boolean;
 }
 
+// Extended object types with new power-ups and obstacles
+type ObjectType = 
+  | 'debris' 
+  | 'crystal' 
+  | 'powerup_shield' 
+  | 'powerup_magnet' 
+  | 'powerup_slowmo' 
+  | 'powerup_life' 
+  | 'bomb' 
+  | 'homing_debris';
+
 interface FallingObject {
   id: number;
   x: number;
   y: number;
-  type: 'debris' | 'crystal' | 'powerup_shield';
+  type: ObjectType;
   speed: number;
   size: number;
+  targetX?: number; // For homing debris
 }
 
-// ENDLESS mode config - progressive difficulty, 3 lives
-// Enhanced for more noticeable difficulty scaling
+// ENDLESS mode config - GREATLY INCREASED SPEEDS
 const DIFFICULTY_CONFIG = {
   beginner: {
-    initialSpawnRate: 1100,
+    initialSpawnRate: 1000,
     debrisRatio: 0.35,
-    baseSpeed: 0.9,
-    speedIncrease: 0.04,
-    spawnRateDecrease: 6,
-    minSpawnRate: 400,
-    maxSpeed: 4.5,
+    baseSpeed: 1.5,
+    speedIncrease: 0.06,
+    spawnRateDecrease: 8,
+    minSpawnRate: 350,
+    maxSpeed: 6.0,
   },
   easy: { 
-    initialSpawnRate: 900, 
+    initialSpawnRate: 800, 
     debrisRatio: 0.45, 
-    baseSpeed: 1.3,
-    speedIncrease: 0.08,
-    spawnRateDecrease: 12,
-    minSpawnRate: 280,
-    maxSpeed: 6.5,
-  },
-  medium: { 
-    initialSpawnRate: 700, 
-    debrisRatio: 0.55, 
-    baseSpeed: 1.7,
+    baseSpeed: 2.0,
     speedIncrease: 0.10,
-    spawnRateDecrease: 16,
-    minSpawnRate: 230,
-    maxSpeed: 7.5,
-  },
-  hard: { 
-    initialSpawnRate: 550, 
-    debrisRatio: 0.65, 
-    baseSpeed: 2.2,
-    speedIncrease: 0.12,
-    spawnRateDecrease: 20,
-    minSpawnRate: 180,
+    spawnRateDecrease: 14,
+    minSpawnRate: 250,
     maxSpeed: 8.5,
   },
-  master: {
-    initialSpawnRate: 450,
-    debrisRatio: 0.75,
+  medium: { 
+    initialSpawnRate: 650, 
+    debrisRatio: 0.55, 
     baseSpeed: 2.8,
-    speedIncrease: 0.15,
-    spawnRateDecrease: 25,
-    minSpawnRate: 150,
+    speedIncrease: 0.14,
+    spawnRateDecrease: 18,
+    minSpawnRate: 200,
     maxSpeed: 10.0,
   },
+  hard: { 
+    initialSpawnRate: 500, 
+    debrisRatio: 0.65, 
+    baseSpeed: 3.5,
+    speedIncrease: 0.16,
+    spawnRateDecrease: 22,
+    minSpawnRate: 150,
+    maxSpeed: 12.0,
+  },
+  master: {
+    initialSpawnRate: 400,
+    debrisRatio: 0.75,
+    baseSpeed: 4.5,
+    speedIncrease: 0.20,
+    spawnRateDecrease: 28,
+    minSpawnRate: 120,
+    maxSpeed: 14.0,
+  },
+};
+
+// Power-up durations in milliseconds
+const POWERUP_DURATIONS = {
+  magnet: 5000,
+  slowmo: 4000,
 };
 
 // Memoized star background
@@ -102,36 +119,85 @@ const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStar
 ));
 StarBackground.displayName = 'StarBackground';
 
-// Falling object component
+// Falling object component with new types
 const FallingObjectComponent = memo(({ obj }: { obj: FallingObject }) => {
-  if (obj.type === 'crystal') {
-    return (
-      <div 
-        className="w-7 h-7 flex items-center justify-center"
-        style={{ filter: 'drop-shadow(0 0 8px #22d3ee)', animation: 'spin 3s linear infinite' }}
-      >
-        <span className="text-2xl">💎</span>
-      </div>
-    );
-  } else if (obj.type === 'powerup_shield') {
-    return (
-      <div 
-        className="w-8 h-8 flex items-center justify-center"
-        style={{ filter: 'drop-shadow(0 0 12px #10b981)', animation: 'pulse 1.5s ease-in-out infinite' }}
-      >
-        <span className="text-2xl">🛡️</span>
-      </div>
-    );
-  } else {
-    return (
-      <div
-        className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 via-orange-500 to-red-600"
-        style={{ 
-          boxShadow: '0 0 12px rgba(239, 68, 68, 0.6)',
-          animation: 'spin 0.8s linear infinite',
-        }}
-      />
-    );
+  switch (obj.type) {
+    case 'crystal':
+      return (
+        <div 
+          className="w-7 h-7 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 8px #22d3ee)', animation: 'spin 3s linear infinite' }}
+        >
+          <span className="text-2xl">💎</span>
+        </div>
+      );
+    case 'powerup_shield':
+      return (
+        <div 
+          className="w-8 h-8 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 12px #10b981)', animation: 'pulse 1.5s ease-in-out infinite' }}
+        >
+          <span className="text-2xl">🛡️</span>
+        </div>
+      );
+    case 'powerup_magnet':
+      return (
+        <div 
+          className="w-8 h-8 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 12px #f59e0b)', animation: 'pulse 1.2s ease-in-out infinite' }}
+        >
+          <span className="text-2xl">🧲</span>
+        </div>
+      );
+    case 'powerup_slowmo':
+      return (
+        <div 
+          className="w-8 h-8 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 12px #8b5cf6)', animation: 'pulse 1.8s ease-in-out infinite' }}
+        >
+          <span className="text-2xl">⏳</span>
+        </div>
+      );
+    case 'powerup_life':
+      return (
+        <div 
+          className="w-9 h-9 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 15px #ec4899)', animation: 'pulse 0.8s ease-in-out infinite' }}
+        >
+          <span className="text-2xl">💖</span>
+        </div>
+      );
+    case 'bomb':
+      return (
+        <div 
+          className="w-10 h-10 flex items-center justify-center"
+          style={{ filter: 'drop-shadow(0 0 15px #ef4444)', animation: 'pulse 0.5s ease-in-out infinite' }}
+        >
+          <span className="text-3xl">💣</span>
+        </div>
+      );
+    case 'homing_debris':
+      return (
+        <div
+          className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 via-red-600 to-orange-500"
+          style={{ 
+            boxShadow: '0 0 16px rgba(249, 115, 22, 0.8), 0 0 8px rgba(255, 255, 255, 0.4)',
+            animation: 'spin 0.4s linear infinite',
+          }}
+        >
+          <div className="absolute inset-1 rounded-full bg-yellow-400/50" />
+        </div>
+      );
+    default: // debris
+      return (
+        <div
+          className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 via-orange-500 to-red-600"
+          style={{ 
+            boxShadow: '0 0 12px rgba(239, 68, 68, 0.6)',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+      );
   }
 });
 FallingObjectComponent.displayName = 'FallingObjectComponent';
@@ -215,9 +281,9 @@ const TiltPermissionOverlay = memo(({ onRequest, onSkip }: { onRequest: () => vo
 TiltPermissionOverlay.displayName = 'TiltPermissionOverlay';
 
 // Lives display
-const LivesDisplay = memo(({ lives }: { lives: number }) => (
+const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: number }) => (
   <div className="flex gap-1">
-    {Array.from({ length: 3 }).map((_, i) => (
+    {Array.from({ length: maxLives }).map((_, i) => (
       <span key={i} className={`text-xl ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
         ❤️
       </span>
@@ -225,6 +291,42 @@ const LivesDisplay = memo(({ lives }: { lives: number }) => (
   </div>
 ));
 LivesDisplay.displayName = 'LivesDisplay';
+
+// Active power-ups display
+const ActivePowerupsDisplay = memo(({ 
+  hasShield, 
+  hasMagnet, 
+  hasSlowMo,
+  magnetTimeLeft,
+  slowMoTimeLeft 
+}: { 
+  hasShield: boolean; 
+  hasMagnet: boolean; 
+  hasSlowMo: boolean;
+  magnetTimeLeft: number;
+  slowMoTimeLeft: number;
+}) => (
+  <div className="flex gap-2">
+    {hasShield && (
+      <div className="bg-emerald-500/30 backdrop-blur-sm rounded-full px-2 py-0.5">
+        <span className="text-emerald-300 text-sm">🛡️</span>
+      </div>
+    )}
+    {hasMagnet && (
+      <div className="bg-amber-500/30 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
+        <span className="text-amber-300 text-sm">🧲</span>
+        <span className="text-amber-300 text-xs">{Math.ceil(magnetTimeLeft / 1000)}s</span>
+      </div>
+    )}
+    {hasSlowMo && (
+      <div className="bg-purple-500/30 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
+        <span className="text-purple-300 text-sm">⏳</span>
+        <span className="text-purple-300 text-xs">{Math.ceil(slowMoTimeLeft / 1000)}s</span>
+      </div>
+    )}
+  </div>
+));
+ActivePowerupsDisplay.displayName = 'ActivePowerupsDisplay';
 
 export const StarfallDodgeGame = ({
   companionStats,
@@ -241,6 +343,10 @@ export const StarfallDodgeGame = ({
   const [crystalsCollected, setCrystalsCollected] = useState(0);
   const [lives, setLives] = useState(3);
   const [hasShield, setHasShield] = useState(false);
+  const [hasMagnet, setHasMagnet] = useState(false);
+  const [hasSlowMo, setHasSlowMo] = useState(false);
+  const [magnetEndTime, setMagnetEndTime] = useState(0);
+  const [slowMoEndTime, setSlowMoEndTime] = useState(0);
   const [survivalTime, setSurvivalTime] = useState(0);
   const [shake, setShake] = useState(false);
   
@@ -258,6 +364,10 @@ export const StarfallDodgeGame = ({
   const touchStartRef = useRef<{ x: number; playerX: number } | null>(null);
   const livesRef = useRef(lives);
   const hasShieldRef = useRef(hasShield);
+  const hasMagnetRef = useRef(hasMagnet);
+  const hasSlowMoRef = useRef(hasSlowMo);
+  const magnetEndTimeRef = useRef(magnetEndTime);
+  const slowMoEndTimeRef = useRef(slowMoEndTime);
   
   // Smooth player movement interpolation
   const targetPlayerXRef = useRef(50);
@@ -271,6 +381,10 @@ export const StarfallDodgeGame = ({
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
   useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
+  useEffect(() => { hasMagnetRef.current = hasMagnet; }, [hasMagnet]);
+  useEffect(() => { hasSlowMoRef.current = hasSlowMo; }, [hasSlowMo]);
+  useEffect(() => { magnetEndTimeRef.current = magnetEndTime; }, [magnetEndTime]);
+  useEffect(() => { slowMoEndTimeRef.current = slowMoEndTime; }, [slowMoEndTime]);
 
   // Lock to landscape on mount, restore portrait on unmount
   useEffect(() => {
@@ -300,6 +414,11 @@ export const StarfallDodgeGame = ({
     setCurrentSpeed(config.baseSpeed);
     setCurrentSpawnRate(config.initialSpawnRate);
   }, [config]);
+
+  // Calculate time left for power-ups
+  const now = Date.now();
+  const magnetTimeLeft = Math.max(0, magnetEndTime - now);
+  const slowMoTimeLeft = Math.max(0, slowMoEndTime - now);
 
   // Handle rotate screen continue
   const handleRotateContinue = useCallback(async () => {
@@ -349,24 +468,80 @@ export const StarfallDodgeGame = ({
     setGameState('playing');
   }, []);
 
+  // Spawn object helper
+  const spawnObject = useCallback((time: number, playerX: number) => {
+    const rand = Math.random();
+    
+    // Spawn probabilities (cumulative):
+    // 1% life, 2% bomb, 3% homing, 4% shield, 4% magnet, 4% slowmo, rest split between debris/crystal
+    let type: ObjectType;
+    let size: number;
+    
+    if (rand < 0.01) {
+      type = 'powerup_life';
+      size = 36;
+    } else if (rand < 0.03) {
+      type = 'bomb';
+      size = 40;
+    } else if (rand < 0.06) {
+      type = 'homing_debris';
+      size = 28;
+    } else if (rand < 0.10) {
+      type = 'powerup_shield';
+      size = 32;
+    } else if (rand < 0.14) {
+      type = 'powerup_magnet';
+      size = 32;
+    } else if (rand < 0.18) {
+      type = 'powerup_slowmo';
+      size = 32;
+    } else if (rand < 0.18 + config.debrisRatio * 0.82) {
+      type = 'debris';
+      size = 24;
+    } else {
+      type = 'crystal';
+      size = 28;
+    }
+
+    const newObj: FallingObject = {
+      id: objectIdRef.current++,
+      x: 5 + Math.random() * 90,
+      y: -5,
+      type,
+      speed: currentSpeed * (0.8 + Math.random() * 0.4),
+      size,
+      targetX: type === 'homing_debris' ? playerX : undefined,
+    };
+    
+    objectsRef.current.push(newObj);
+  }, [config.debrisRatio, currentSpeed]);
+
   // Game loop - ENDLESS with progressive difficulty
   useGameLoop((deltaTime, time) => {
     if (gameStateRef.current !== 'playing') return;
 
+    const currentTime = Date.now();
+    
+    // Check power-up expirations
+    if (hasMagnetRef.current && currentTime > magnetEndTimeRef.current) {
+      setHasMagnet(false);
+    }
+    if (hasSlowMoRef.current && currentTime > slowMoEndTimeRef.current) {
+      setHasSlowMo(false);
+    }
+
+    // Speed multiplier for slow-mo
+    const speedMultiplier = hasSlowMoRef.current ? 0.5 : 1.0;
+
     // Smoothing factor for player movement interpolation (per frame)
-    // Higher = more responsive, lower = smoother
     const LERP_SPEED = 0.12;
     
     let currentPlayerX: number;
     
     if (useTilt) {
-      // Get target position from tilt
       targetPlayerXRef.current = getLandscapePositionFromTilt(6, 1.4);
-      
-      // Smooth interpolation (lerp) toward target
       smoothPlayerXRef.current += (targetPlayerXRef.current - smoothPlayerXRef.current) * LERP_SPEED;
       currentPlayerX = smoothPlayerXRef.current;
-      
       setPlayerX(currentPlayerX);
     } else {
       currentPlayerX = playerXRef.current;
@@ -395,69 +570,113 @@ export const StarfallDodgeGame = ({
     setCurrentSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrease * deltaTime / 1000));
     setCurrentSpawnRate(prev => Math.max(config.minSpawnRate, prev - config.spawnRateDecrease * deltaTime / 1000));
 
-    // Spawn objects - use wider spawn zone for landscape
+    // Spawn objects
     if (time - lastSpawnRef.current > currentSpawnRate) {
       lastSpawnRef.current = time;
-      const rand = Math.random();
-      const isShield = rand > 0.96;
-      const isCrystal = !isShield && rand > config.debrisRatio;
-
-      const newObj: FallingObject = {
-        id: objectIdRef.current++,
-        x: 5 + Math.random() * 90, // Wider spawn zone for landscape
-        y: -5,
-        type: isShield ? 'powerup_shield' : isCrystal ? 'crystal' : 'debris',
-        speed: currentSpeed * (0.8 + Math.random() * 0.4),
-        size: isCrystal ? 28 : isShield ? 32 : 24,
-      };
-      objectsRef.current.push(newObj);
+      spawnObject(time, currentPlayerX);
     }
 
     // Update objects
     objectsRef.current = objectsRef.current.filter(obj => {
-      obj.y += obj.speed * deltaTime * 60 * 0.5;
+      // Apply speed with slow-mo multiplier
+      const effectiveSpeed = obj.speed * speedMultiplier;
+      obj.y += effectiveSpeed * deltaTime * 60 * 0.5;
       
-      // Collision detection - adjusted for landscape player position
+      // Homing debris tracks player slowly
+      if (obj.type === 'homing_debris' && obj.y > 0 && obj.y < 60) {
+        const homingSpeed = 0.15 * speedMultiplier;
+        if (obj.x < currentPlayerX) {
+          obj.x = Math.min(obj.x + homingSpeed, currentPlayerX);
+        } else if (obj.x > currentPlayerX) {
+          obj.x = Math.max(obj.x - homingSpeed, currentPlayerX);
+        }
+      }
+      
+      // Magnet effect - crystals attracted to player
+      if (obj.type === 'crystal' && hasMagnetRef.current) {
+        const dist = Math.abs(obj.x - currentPlayerX);
+        if (dist < 25) { // Within 25% of screen width
+          const magnetPull = 0.3;
+          if (obj.x < currentPlayerX) {
+            obj.x += magnetPull;
+          } else {
+            obj.x -= magnetPull;
+          }
+        }
+      }
+      
+      // Collision detection
       if (obj.y > 70 && obj.y < 92) {
         const dist = Math.abs(obj.x - currentPlayerX);
-        // Hit distance in percentage units (3-4% of screen width)
-        const hitDist = obj.type === 'debris' ? 3.5 : 4.5;
+        const hitDist = obj.type === 'bomb' ? 5 : obj.type === 'debris' || obj.type === 'homing_debris' ? 3.5 : 4.5;
         
         if (dist < hitDist) {
-          if (obj.type === 'crystal') {
-            setCrystalsCollected(c => c + 1);
-            emitParticles(obj.x, obj.y, '#22d3ee', 6);
-            triggerHaptic('light');
-            // Crystal collection no longer deals damage - milestone-based only
-            return false;
-          } else if (obj.type === 'powerup_shield') {
-            setHasShield(true);
-            emitParticles(obj.x, obj.y, '#10b981', 8);
-            triggerHaptic('medium');
-            return false;
-          } else if (obj.type === 'debris') {
-            if (hasShieldRef.current) {
-              setHasShield(false);
-              emitParticles(obj.x, obj.y, '#ef4444', 6);
-              triggerHaptic('medium');
-            } else {
-              // Player takes damage from debris hit
-              onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'hit_by_projectile' });
+          // Handle collision based on object type
+          switch (obj.type) {
+            case 'crystal':
+              setCrystalsCollected(c => c + 1);
+              emitParticles(obj.x, obj.y, '#22d3ee', 6);
+              triggerHaptic('light');
+              return false;
               
-              // Lose a life
-              setLives(prev => {
-                const newLives = prev - 1;
-                if (newLives <= 0) {
-                  setGameState('complete');
-                }
-                return newLives;
-              });
-              setShake(true);
-              setTimeout(() => setShake(false), 200);
-              emitParticles(obj.x, obj.y, '#ef4444', 8);
+            case 'powerup_shield':
+              setHasShield(true);
+              emitParticles(obj.x, obj.y, '#10b981', 8);
+              triggerHaptic('medium');
+              return false;
+              
+            case 'powerup_magnet':
+              setHasMagnet(true);
+              setMagnetEndTime(currentTime + POWERUP_DURATIONS.magnet);
+              emitParticles(obj.x, obj.y, '#f59e0b', 8);
+              triggerHaptic('medium');
+              return false;
+              
+            case 'powerup_slowmo':
+              setHasSlowMo(true);
+              setSlowMoEndTime(currentTime + POWERUP_DURATIONS.slowmo);
+              emitParticles(obj.x, obj.y, '#8b5cf6', 8);
+              triggerHaptic('medium');
+              return false;
+              
+            case 'powerup_life':
+              setLives(prev => Math.min(prev + 1, 5)); // Max 5 lives
+              emitParticles(obj.x, obj.y, '#ec4899', 12);
               triggerHaptic('heavy');
-            }
-            return false;
+              return false;
+              
+            case 'bomb':
+              // Bomb = instant game over (lose all lives)
+              emitParticles(obj.x, obj.y, '#ef4444', 15);
+              emitParticles(obj.x, obj.y, '#f97316', 15);
+              triggerHaptic('heavy');
+              setLives(0);
+              setShake(true);
+              setTimeout(() => setShake(false), 400);
+              setGameState('complete');
+              return false;
+              
+            case 'debris':
+            case 'homing_debris':
+              if (hasShieldRef.current) {
+                setHasShield(false);
+                emitParticles(obj.x, obj.y, '#ef4444', 6);
+                triggerHaptic('medium');
+              } else {
+                onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'hit_by_projectile' });
+                setLives(prev => {
+                  const newLives = prev - 1;
+                  if (newLives <= 0) {
+                    setGameState('complete');
+                  }
+                  return newLives;
+                });
+                setShake(true);
+                setTimeout(() => setShake(false), 200);
+                emitParticles(obj.x, obj.y, '#ef4444', 8);
+                triggerHaptic('heavy');
+              }
+              return false;
           }
         }
       }
@@ -476,7 +695,7 @@ export const StarfallDodgeGame = ({
     const score = crystalsCollected * 10 + survivalBonus;
     
     // Accuracy based on survival time
-    const timeThresholds = { easy: 60, medium: 45, hard: 30 };
+    const timeThresholds = { beginner: 90, easy: 60, medium: 45, hard: 30, master: 20 };
     const threshold = timeThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((survivalTime / threshold) * 100));
     
@@ -488,29 +707,27 @@ export const StarfallDodgeGame = ({
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
       usedTiltControls: useTilt,
-      highScoreValue: Math.floor(survivalTime), // Survival time in seconds for high score
+      highScoreValue: Math.floor(survivalTime),
     });
-  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete]);
+  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete, useTilt]);
 
   return (
     <div
       ref={gameAreaRef}
       className={`relative overflow-hidden ${shake ? 'animate-shake' : ''}`}
       style={{ 
-        background: 'linear-gradient(to bottom, #0f0a1a, #1a1033)',
-        // Fill entire viewport in landscape mode
+        background: hasSlowMo 
+          ? 'linear-gradient(to bottom, #1a0a2e, #2d1052)' // Purple tint for slow-mo
+          : 'linear-gradient(to bottom, #0f0a1a, #1a1033)',
+        transition: 'background 0.5s ease',
         width: '100vw',
         height: '100dvh',
-        // Fallback for browsers without dvh support
         minHeight: '100vh',
-        // Remove any rounding in fullscreen landscape
         borderRadius: 0,
-        // Ensure it's positioned at top-left and above dialogs
         position: 'fixed',
         top: 0,
         left: 0,
         zIndex: 60,
-        // Safe area padding for notched devices
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
@@ -536,12 +753,14 @@ export const StarfallDodgeGame = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {hasShield && (
-                <div className="bg-emerald-500/30 backdrop-blur-sm rounded-full px-2 py-0.5">
-                  <span className="text-emerald-300 text-sm">🛡️</span>
-                </div>
-              )}
-              <LivesDisplay lives={lives} />
+              <ActivePowerupsDisplay 
+                hasShield={hasShield}
+                hasMagnet={hasMagnet}
+                hasSlowMo={hasSlowMo}
+                magnetTimeLeft={magnetTimeLeft}
+                slowMoTimeLeft={slowMoTimeLeft}
+              />
+              <LivesDisplay lives={lives} maxLives={5} />
             </div>
           </div>
         </div>
@@ -593,11 +812,16 @@ export const StarfallDodgeGame = ({
             height: playerSize,
             boxShadow: hasShield 
               ? '0 0 20px #10b981, 0 0 40px #10b98150' 
+              : hasMagnet
+              ? '0 0 20px #f59e0b, 0 0 40px #f59e0b50'
               : '0 0 20px #a855f7, 0 0 40px #a855f750',
           }}
         >
           {hasShield && (
             <div className="absolute -inset-2 rounded-full border-2 border-emerald-400 animate-pulse" />
+          )}
+          {hasMagnet && (
+            <div className="absolute -inset-3 rounded-full border-2 border-amber-400 animate-spin" style={{ animationDuration: '2s' }} />
           )}
           <div className="absolute inset-2 rounded-full bg-white/20" />
         </div>
@@ -612,7 +836,6 @@ export const StarfallDodgeGame = ({
           <TiltPermissionOverlay onRequest={handleRequestPermission} onSkip={handleSkipTilt} />
         )}
         {gameState === 'permission' && !available && (
-          // Auto-skip if tilt not available
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
