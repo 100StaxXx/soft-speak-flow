@@ -194,7 +194,7 @@ export const BattleVSScreen = ({
 
           {/* Center VS Badge - Clean & Sharp */}
           <motion.div
-            className="absolute left-[55%] top-[30%] -translate-x-1/2 -translate-y-1/2 z-20"
+            className="absolute left-[45%] top-[30%] -translate-x-1/2 -translate-y-1/2 z-20"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.3 }}
