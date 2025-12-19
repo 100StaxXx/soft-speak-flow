@@ -532,10 +532,12 @@ export const SoulSerpentGame = ({
   // Calculate accuracy based on score achieved (endless mode) - binary win/lose
   const calculateAccuracy = useCallback((finalScore: number): { accuracy: number; result: 'perfect' | 'good' | 'fail' } => {
     // Score thresholds based on difficulty
-    const thresholds = {
+    const thresholds: Record<ArcadeDifficulty, { fail: number; good: number; perfect: number }> = {
+      beginner: { fail: 2, good: 4, perfect: 7 },
       easy: { fail: 3, good: 6, perfect: 10 },
       medium: { fail: 4, good: 8, perfect: 12 },
       hard: { fail: 5, good: 10, perfect: 15 },
+      master: { fail: 6, good: 12, perfect: 18 },
     };
     
     const t = thresholds[difficulty];
