@@ -9,7 +9,7 @@ interface ArcadeGameCardProps {
   label: string;
   icon: LucideIcon;
   stat: 'mind' | 'body' | 'soul';
-  highScore?: number | null;
+  highScoreDisplay?: string | null;
   onSelect: (gameType: MiniGameType) => void;
 }
 
@@ -30,7 +30,7 @@ export const ArcadeGameCard = memo(({
   label,
   icon: Icon,
   stat,
-  highScore,
+  highScoreDisplay,
   onSelect,
 }: ArcadeGameCardProps) => {
   const handleClick = useCallback(() => {
@@ -89,10 +89,10 @@ export const ArcadeGameCard = memo(({
 
         {/* High score - always rendered for consistent height */}
         <div className="flex items-center gap-1 mt-1 h-4">
-          {highScore !== null && highScore !== undefined ? (
+          {highScoreDisplay ? (
             <>
               <span className="text-[10px] text-yellow-400/80">★</span>
-              <span className="text-xs text-yellow-400 font-mono">{highScore}%</span>
+              <span className="text-xs text-yellow-400 font-mono">{highScoreDisplay}</span>
             </>
           ) : (
             <span className="text-[10px] text-muted-foreground/50">No record</span>

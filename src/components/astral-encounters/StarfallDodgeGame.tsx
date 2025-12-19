@@ -464,6 +464,7 @@ export const StarfallDodgeGame = ({
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
       usedTiltControls: useTilt,
+      highScoreValue: Math.floor(survivalTime), // Survival time in seconds for high score
     });
   }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete]);
 

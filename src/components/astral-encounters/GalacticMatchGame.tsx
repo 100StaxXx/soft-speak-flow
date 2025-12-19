@@ -262,6 +262,7 @@ export const GalacticMatchGame = ({
             success: true, 
             accuracy: 100, 
             result: 'good',
+            highScoreValue: level, // Level reached for high score
           });
           return;
         }
@@ -316,7 +317,7 @@ export const GalacticMatchGame = ({
         success: result !== 'fail', 
         accuracy: Math.min(accuracy, 100), 
         result,
-        // Score is capped at MAX_XP for XP calculation
+        highScoreValue: level, // Level reached for high score
       });
     }, 1500);
   }, [phase, score, level, onComplete]);

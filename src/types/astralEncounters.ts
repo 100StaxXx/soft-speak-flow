@@ -29,6 +29,14 @@ export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
 export type EncounterResult = 'perfect' | 'good' | 'partial' | 'fail';
 
+export interface MiniGameResult {
+  success: boolean;
+  accuracy: number;
+  result: EncounterResult;
+  usedTiltControls?: boolean;
+  highScoreValue?: number; // Game-specific metric for high score tracking
+}
+
 export interface Adversary {
   name: string;
   theme: AdversaryTheme;

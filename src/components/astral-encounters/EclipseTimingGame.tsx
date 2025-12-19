@@ -476,6 +476,7 @@ export const EclipseTimingGame = ({
           success: accuracy >= 50,
           accuracy,
           result,
+          highScoreValue: finalStats.score, // Score for high score
         });
         
         // Sync final stats

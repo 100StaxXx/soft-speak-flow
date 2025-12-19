@@ -1,15 +1,32 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MiniGameType } from '@/types/astralEncounters';
 
+// Game-specific metric configurations
+export const GAME_METRICS: Record<MiniGameType, { 
+  label: string; 
+  format: (value: number) => string;
+  icon: string;
+}> = {
+  astral_frequency: { label: 'Distance', format: v => `${v}m`, icon: '🚀' },
+  galactic_match: { label: 'Level', format: v => `Lvl ${v}`, icon: '🧠' },
+  soul_serpent: { label: 'Length', format: v => `${v}`, icon: '🐍' },
+  energy_beam: { label: 'Waves', format: v => `Wave ${v}`, icon: '🛡️' },
+  eclipse_timing: { label: 'Score', format: v => v.toLocaleString(), icon: '🎵' },
+  tap_sequence: { label: 'Level', format: v => `Lvl ${v}`, icon: '🔢' },
+  starfall_dodge: { label: 'Time', format: v => `${v}s`, icon: '⭐' },
+  orb_match: { label: 'Score', format: v => v.toLocaleString(), icon: '💎' },
+};
+
 interface HighScore {
-  accuracy: number;
-  result: string;
+  value: number;          // The actual high score value
+  displayValue: string;   // Formatted display string
+  metricLabel: string;    // e.g., "Distance", "Level", "Score"
   date: string;
 }
 
 type HighScores = Partial<Record<MiniGameType, HighScore>>;
 
-const STORAGE_KEY = 'arcade_high_scores';
+const STORAGE_KEY = 'arcade_high_scores_v2';
 
 export const useArcadeHighScores = () => {
   const [highScores, setHighScores] = useState<HighScores>({});
@@ -34,27 +51,28 @@ export const useArcadeHighScores = () => {
   );
 
   const setHighScore = useCallback(
-    (gameType: MiniGameType, accuracy: number, result: string): boolean => {
-      let isNewHighScore = false;
+    (gameType: MiniGameType, value: number): boolean => {
+      const metric = GAME_METRICS[gameType];
+      if (!metric) return false;
+
+      const existing = highScores[gameType];
       
+      // Only update if this is a new high score
+      if (existing && existing.value >= value) {
+        return false;
+      }
+
+      const newScore: HighScore = {
+        value,
+        displayValue: metric.format(value),
+        metricLabel: metric.label,
+        date: new Date().toISOString(),
+      };
+
       setHighScores((prev) => {
-        const existing = prev[gameType];
-        
-        // Only update if this is a new high score
-        if (existing && existing.accuracy >= accuracy) {
-          isNewHighScore = false;
-          return prev;
-        }
-
-        isNewHighScore = true;
-
         const newScores = {
           ...prev,
-          [gameType]: {
-            accuracy,
-            result,
-            date: new Date().toISOString(),
-          },
+          [gameType]: newScore,
         };
 
         // Persist to localStorage
@@ -67,9 +85,9 @@ export const useArcadeHighScores = () => {
         return newScores;
       });
 
-      return isNewHighScore;
+      return true;
     },
-    []
+    [highScores]
   );
 
   const getAllHighScores = useCallback(() => {
@@ -80,11 +98,10 @@ export const useArcadeHighScores = () => {
     return Object.keys(highScores).length;
   }, [highScores]);
 
-  const getAverageHighScore = useCallback(() => {
-    const scores = Object.values(highScores);
-    if (scores.length === 0) return 0;
-    const total = scores.reduce((sum, s) => sum + s.accuracy, 0);
-    return Math.round(total / scores.length);
+  const getFormattedHighScore = useCallback((gameType: MiniGameType): string | null => {
+    const score = highScores[gameType];
+    if (!score) return null;
+    return score.displayValue;
   }, [highScores]);
 
   return {
@@ -93,6 +110,6 @@ export const useArcadeHighScores = () => {
     setHighScore,
     getAllHighScores,
     getTotalGamesWithHighScores,
-    getAverageHighScore,
+    getFormattedHighScore,
   };
 };
