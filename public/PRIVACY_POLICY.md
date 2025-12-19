@@ -322,7 +322,7 @@ We process your personal data based on:
 For GDPR-related inquiries, contact: admin@cosmiq.quest
 
 **Company Information:**
-R-Evolution LLC
+Cosmiq LLC
 Email: admin@cosmiq.quest
 Jurisdiction: New Mexico, USA
 
@@ -401,7 +401,7 @@ In the unlikely event of a data breach that affects your personal information:
 
 If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices:
 
-**Company:** R-Evolution LLC
+**Company:** Cosmiq LLC
 **Email:** admin@cosmiq.quest
 **Location:** New Mexico, USA
 
