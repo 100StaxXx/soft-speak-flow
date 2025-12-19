@@ -15,6 +15,12 @@ export interface Community {
   created_at: string;
   updated_at: string;
   member_count?: number;
+  // New customization fields
+  banner_style?: string;
+  emblem_icon?: string;
+  frame_style?: string;
+  glow_effect?: string;
+  particle_effect?: string;
 }
 
 export interface CommunityWithMembership extends Community {
@@ -27,6 +33,11 @@ interface CreateCommunityParams {
   description?: string;
   is_public?: boolean;
   theme_color?: string;
+  banner_style?: string;
+  emblem_icon?: string;
+  frame_style?: string;
+  glow_effect?: string;
+  particle_effect?: string;
 }
 
 interface UpdateCommunityParams {
@@ -36,6 +47,11 @@ interface UpdateCommunityParams {
   is_public?: boolean;
   theme_color?: string;
   avatar_url?: string;
+  banner_style?: string;
+  emblem_icon?: string;
+  frame_style?: string;
+  glow_effect?: string;
+  particle_effect?: string;
 }
 
 export const useCommunity = (communityId?: string) => {
@@ -118,6 +134,11 @@ export const useCommunity = (communityId?: string) => {
           is_public: params.is_public ?? false,
           theme_color: params.theme_color || '#8B5CF6',
           owner_id: user.id,
+          banner_style: params.banner_style || 'cosmic',
+          emblem_icon: params.emblem_icon || 'shield',
+          frame_style: params.frame_style || 'ornate',
+          glow_effect: params.glow_effect || 'pulse',
+          particle_effect: params.particle_effect || 'stars',
         })
         .select()
         .single();

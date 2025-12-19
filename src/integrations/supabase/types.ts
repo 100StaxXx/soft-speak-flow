@@ -763,37 +763,52 @@ export type Database = {
       communities: {
         Row: {
           avatar_url: string | null
+          banner_style: string | null
           created_at: string | null
           description: string | null
+          emblem_icon: string | null
+          frame_style: string | null
+          glow_effect: string | null
           id: string
           invite_code: string
           is_public: boolean | null
           name: string
           owner_id: string
+          particle_effect: string | null
           theme_color: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
+          banner_style?: string | null
           created_at?: string | null
           description?: string | null
+          emblem_icon?: string | null
+          frame_style?: string | null
+          glow_effect?: string | null
           id?: string
           invite_code?: string
           is_public?: boolean | null
           name: string
           owner_id: string
+          particle_effect?: string | null
           theme_color?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
+          banner_style?: string | null
           created_at?: string | null
           description?: string | null
+          emblem_icon?: string | null
+          frame_style?: string | null
+          glow_effect?: string | null
           id?: string
           invite_code?: string
           is_public?: boolean | null
           name?: string
           owner_id?: string
+          particle_effect?: string | null
           theme_color?: string | null
           updated_at?: string | null
         }
