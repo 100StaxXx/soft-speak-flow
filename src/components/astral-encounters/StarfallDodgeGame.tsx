@@ -36,29 +36,29 @@ const DIFFICULTY_CONFIG = {
   easy: { 
     initialSpawnRate: 900, 
     debrisRatio: 0.45, 
-    baseSpeed: 1.0,
-    speedIncrease: 0.035,      // +75% faster speed increase
-    spawnRateDecrease: 6,      // 2x faster spawn rate increase
-    minSpawnRate: 300,         // Lower floor for endgame intensity
-    maxSpeed: 4.5,             // Higher ceiling
+    baseSpeed: 1.3,            // Faster start
+    speedIncrease: 0.08,       // 2x faster ramping
+    spawnRateDecrease: 12,     // 2x faster spawn increase
+    minSpawnRate: 280,         // Slightly lower floor
+    maxSpeed: 6.5,             // +2.0 higher ceiling
   },
   medium: { 
     initialSpawnRate: 700, 
     debrisRatio: 0.55, 
-    baseSpeed: 1.4,
-    speedIncrease: 0.045,      // +80% faster speed increase
-    spawnRateDecrease: 8,      // 2x faster spawn rate increase
-    minSpawnRate: 250,         // Lower floor
-    maxSpeed: 5.5,             // Higher ceiling
+    baseSpeed: 1.7,            // Faster start
+    speedIncrease: 0.10,       // 2x faster ramping
+    spawnRateDecrease: 16,     // 2x faster spawn increase
+    minSpawnRate: 230,         // Slightly lower floor
+    maxSpeed: 7.5,             // +2.0 higher ceiling
   },
   hard: { 
     initialSpawnRate: 550, 
     debrisRatio: 0.65, 
-    baseSpeed: 1.8,
-    speedIncrease: 0.055,      // +83% faster speed increase
-    spawnRateDecrease: 10,     // 2x faster spawn rate increase
-    minSpawnRate: 200,         // Intense endgame
-    maxSpeed: 6.5,             // Higher ceiling
+    baseSpeed: 2.2,            // Faster start
+    speedIncrease: 0.12,       // 2x faster ramping
+    spawnRateDecrease: 20,     // 2x faster spawn increase
+    minSpawnRate: 180,         // Lower floor for intense endgame
+    maxSpeed: 8.5,             // +2.0 higher ceiling
   },
 };
 
