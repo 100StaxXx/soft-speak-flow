@@ -192,195 +192,40 @@ export const BattleVSScreen = ({
             </motion.div>
           </motion.div>
 
-          {/* Center VS Badge - Fighting Game Style */}
+          {/* Center VS Badge - Clean & Sharp */}
           <motion.div
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.3 }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.3 }}
           >
-            {/* Explosive energy burst rings */}
-            {[0, 1, 2, 3].map((i) => (
-              <motion.div
-                key={i}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                style={{ 
-                  width: 80 + i * 20,
-                  height: 80 + i * 20,
-                  background: i % 2 === 0 
-                    ? `conic-gradient(from ${i * 45}deg, hsl(var(--primary) / 0.4), transparent, ${tierColors.primary}60, transparent, hsl(var(--primary) / 0.4))`
-                    : `conic-gradient(from ${i * 90}deg, ${tierColors.primary}40, transparent, hsl(var(--primary) / 0.3), transparent, ${tierColors.primary}40)`,
-                }}
-                animate={{ 
-                  rotate: i % 2 === 0 ? [0, 360] : [360, 0],
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{ 
-                  rotate: { duration: 3 + i, repeat: Infinity, ease: "linear" },
-                  scale: { duration: 1.5, repeat: Infinity, delay: i * 0.2 }
-                }}
-              />
-            ))}
-
-            {/* Electric arc effects */}
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={`arc-${i}`}
-                className="absolute left-1/2 top-1/2 h-[2px] origin-left"
-                style={{
-                  width: 60 + Math.random() * 30,
-                  background: `linear-gradient(90deg, ${i % 2 === 0 ? 'hsl(var(--primary))' : tierColors.primary}, transparent)`,
-                  transform: `translate(-50%, -50%) rotate(${i * 60}deg)`,
-                  filter: 'blur(1px)',
-                }}
-                animate={{
-                  opacity: [0, 1, 0],
-                  scaleX: [0.3, 1, 0.3],
-                }}
-                transition={{
-                  duration: 0.8,
-                  repeat: Infinity,
-                  delay: i * 0.15,
-                  ease: "easeInOut",
-                }}
-              />
-            ))}
-
-            {/* Impact shockwave rings */}
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={`shock-${i}`}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
-                style={{ 
-                  width: 70,
-                  height: 70,
-                  borderColor: i % 2 === 0 ? 'hsl(var(--primary))' : tierColors.primary,
-                  boxShadow: `0 0 20px ${i % 2 === 0 ? 'hsl(var(--primary) / 0.5)' : tierColors.glow}`,
-                }}
-                animate={{ 
-                  scale: [1, 3 + i * 0.5], 
-                  opacity: [0.8, 0],
-                }}
-                transition={{ 
-                  duration: 1.2, 
-                  repeat: Infinity, 
-                  delay: i * 0.3,
-                  ease: "easeOut"
-                }}
-              />
-            ))}
+            {/* Subtle glow backdrop */}
+            <motion.div
+              className="absolute inset-0 rounded-lg blur-xl"
+              style={{ background: `${tierColors.primary}40` }}
+              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.8, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
             
-            {/* Main VS Badge - Metallic fighting game style */}
-            <motion.div 
-              className="relative w-20 h-20 sm:w-24 sm:h-24"
-              animate={{ 
-                scale: [1, 1.05, 1],
+            {/* Clean badge container */}
+            <div 
+              className="relative px-3 py-1.5 bg-background/95 border border-primary/50 rounded-md backdrop-blur-sm"
+              style={{
+                boxShadow: `0 0 20px ${tierColors.glow}`,
               }}
-              transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
             >
-              {/* Outer metallic ring */}
-              <div 
-                className="absolute inset-0 rounded-full"
+              <span 
+                className="text-lg sm:text-xl font-black tracking-tight"
                 style={{
-                  background: `conic-gradient(from 0deg, 
-                    hsl(45, 100%, 70%), 
-                    hsl(45, 100%, 40%), 
-                    hsl(45, 100%, 80%), 
-                    hsl(45, 100%, 35%), 
-                    hsl(45, 100%, 70%), 
-                    hsl(45, 100%, 45%), 
-                    hsl(45, 100%, 75%),
-                    hsl(45, 100%, 70%)
-                  )`,
-                  boxShadow: `
-                    0 0 30px hsl(45, 100%, 50% / 0.6),
-                    0 0 60px hsl(var(--primary) / 0.4),
-                    inset 0 0 20px hsl(45, 100%, 80% / 0.3)
-                  `,
+                  background: `linear-gradient(135deg, hsl(var(--primary)) 0%, ${tierColors.primary} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
                 }}
-              />
-              
-              {/* Inner dark background */}
-              <div 
-                className="absolute inset-[4px] rounded-full"
-                style={{
-                  background: `radial-gradient(circle at 30% 30%, 
-                    hsl(240, 20%, 20%), 
-                    hsl(240, 30%, 8%) 60%,
-                    hsl(240, 40%, 4%)
-                  )`,
-                  boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.8)',
-                }}
-              />
-
-              {/* Inner metallic ring */}
-              <div 
-                className="absolute inset-[6px] rounded-full border-2"
-                style={{
-                  borderColor: 'hsl(45, 80%, 60%)',
-                  boxShadow: 'inset 0 0 10px hsl(45, 100%, 50% / 0.3)',
-                }}
-              />
-              
-              {/* VS Text with 3D effect */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* Text shadow layers for 3D depth */}
-                <span 
-                  className="absolute text-3xl sm:text-4xl font-black tracking-tighter"
-                  style={{
-                    color: 'hsl(0, 0%, 10%)',
-                    transform: 'translate(2px, 3px)',
-                  }}
-                >
-                  VS
-                </span>
-                <span 
-                  className="absolute text-3xl sm:text-4xl font-black tracking-tighter"
-                  style={{
-                    color: 'hsl(45, 80%, 25%)',
-                    transform: 'translate(1px, 2px)',
-                  }}
-                >
-                  VS
-                </span>
-                
-                {/* Main gradient text */}
-                <motion.span
-                  className="relative text-3xl sm:text-4xl font-black tracking-tighter"
-                  style={{
-                    background: `linear-gradient(180deg, 
-                      hsl(45, 100%, 85%) 0%,
-                      hsl(45, 100%, 60%) 30%,
-                      hsl(35, 100%, 50%) 50%,
-                      hsl(25, 100%, 45%) 70%,
-                      hsl(45, 100%, 70%) 100%
-                    )`,
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    textShadow: '0 0 30px hsl(45, 100%, 60% / 0.8)',
-                    filter: 'drop-shadow(0 0 10px hsl(45, 100%, 50% / 0.5))',
-                  }}
-                  animate={{ 
-                    textShadow: [
-                      '0 0 20px hsl(45, 100%, 60% / 0.6)',
-                      '0 0 40px hsl(45, 100%, 60% / 0.9)',
-                      '0 0 20px hsl(45, 100%, 60% / 0.6)',
-                    ]
-                  }}
-                  transition={{ duration: 0.8, repeat: Infinity }}
-                >
-                  VS
-                </motion.span>
-              </div>
-
-              {/* Highlight gleam */}
-              <motion.div
-                className="absolute top-2 left-1/4 w-8 h-1 rounded-full bg-white/60 blur-[2px]"
-                animate={{ opacity: [0.4, 0.8, 0.4] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-            </motion.div>
+              >
+                VS
+              </span>
+            </div>
           </motion.div>
 
           {/* Adversary Side */}
