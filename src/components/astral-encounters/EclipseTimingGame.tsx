@@ -5,7 +5,7 @@ import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars } from './gameUtils';
 import { TrackRatingUI } from './TrackRatingUI';
 import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
-import { Moon, Star, Sun, Music } from 'lucide-react';
+import { Moon, Star, Sun, Music, Sparkles } from 'lucide-react';
 import { stopEncounterMusic } from '@/utils/soundEffects';
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -67,11 +67,11 @@ const DIFFICULTY_CONFIG = {
   },
 };
 
-// Timing windows (in % distance from hit zone)
+// IMPROVED: More forgiving timing windows (in % distance from hit zone)
 const TIMING_WINDOWS = {
-  perfect: 3,
-  great: 6,
-  good: 10,
+  perfect: 5,  // Was 3% → now 5% (easier to hit perfect)
+  great: 9,    // Was 6% → now 9%
+  good: 14,    // Was 10% → now 14%
 };
 
 // Max misses allowed by difficulty before losing
@@ -83,15 +83,16 @@ const MAX_MISSES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
   master: 3,
 };
 
-const HIT_ZONE_Y = 85;
-const MAX_HIT_EFFECTS = 5; // Limit concurrent effects for performance
+// IMPROVED: Hit zone moved up for better visibility
+const HIT_ZONE_Y = 80; // Was 85% → now 80%
+const MAX_HIT_EFFECTS = 8; // Increased for more visual feedback
 const RENDER_THROTTLE_MS = 16; // ~60fps state sync
 
-const HIT_RESULTS: Record<HitResult, { label: string; points: number; color: string }> = {
-  perfect: { label: 'PERFECT!', points: 100, color: 'hsl(45, 100%, 60%)' },
-  great: { label: 'GREAT!', points: 75, color: 'hsl(271, 91%, 65%)' },
-  good: { label: 'GOOD', points: 50, color: 'hsl(142, 71%, 45%)' },
-  miss: { label: 'MISS', points: 0, color: 'hsl(0, 84%, 60%)' },
+const HIT_RESULTS: Record<HitResult, { label: string; points: number; color: string; particles: number }> = {
+  perfect: { label: 'PERFECT!', points: 100, color: 'hsl(45, 100%, 60%)', particles: 12 },
+  great: { label: 'GREAT!', points: 75, color: 'hsl(271, 91%, 65%)', particles: 8 },
+  good: { label: 'GOOD', points: 50, color: 'hsl(142, 71%, 45%)', particles: 5 },
+  miss: { label: 'MISS', points: 0, color: 'hsl(0, 84%, 60%)', particles: 0 },
 };
 
 const LANE_CONFIG: Record<LaneType, { icon: typeof Moon; color: string; bgColor: string }> = {
@@ -130,120 +131,258 @@ const initialGameStats: GameStats = {
   notesMissed: 0,
 };
 
-// Star background - memoized with no deps
-const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
+// IMPROVED: Animated star background with parallax
+const AnimatedStarBackground = memo(({ stars, beatPulse }: { stars: ReturnType<typeof useStaticStars>; beatPulse: boolean }) => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {stars.map(star => (
+    {/* Ambient floating particles */}
+    <div className="absolute inset-0">
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div
+          key={`particle-${i}`}
+          className="absolute rounded-full animate-stellar-float"
+          style={{
+            width: `${2 + Math.random() * 3}px`,
+            height: `${2 + Math.random() * 3}px`,
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            background: `radial-gradient(circle, hsl(${200 + Math.random() * 60}, 80%, 70%), transparent)`,
+            animationDelay: `${Math.random() * 5}s`,
+            animationDuration: `${4 + Math.random() * 4}s`,
+            opacity: 0.4 + Math.random() * 0.4,
+          }}
+        />
+      ))}
+    </div>
+    
+    {/* Static stars with parallax layers */}
+    {stars.map((star, i) => (
       <div
         key={star.id}
-        className="absolute w-1 h-1 bg-white/20 rounded-full"
-        style={{ left: `${star.x}%`, top: `${star.y}%` }}
+        className="absolute rounded-full transition-all duration-300"
+        style={{ 
+          left: `${star.x}%`, 
+          top: `${star.y}%`,
+          width: `${i % 3 === 0 ? 3 : 2}px`,
+          height: `${i % 3 === 0 ? 3 : 2}px`,
+          background: i % 5 === 0 
+            ? 'radial-gradient(circle, hsl(45, 100%, 80%), hsl(45, 100%, 60%))'
+            : 'radial-gradient(circle, hsl(210, 100%, 90%), hsl(210, 50%, 70%))',
+          boxShadow: beatPulse && i % 3 === 0 
+            ? `0 0 ${8 + (i % 4) * 2}px hsl(45, 100%, 70%)` 
+            : `0 0 ${3 + (i % 3)}px rgba(255,255,255,0.5)`,
+          opacity: beatPulse && i % 2 === 0 ? 1 : 0.6 + (i % 4) * 0.1,
+          transform: beatPulse ? `scale(${1 + (i % 3) * 0.15})` : 'scale(1)',
+        }}
       />
     ))}
+    
+    {/* Nebula gradients */}
+    <div 
+      className="absolute inset-0 opacity-30"
+      style={{
+        background: 'radial-gradient(ellipse at 20% 30%, hsl(271, 50%, 30%) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, hsl(45, 50%, 20%) 0%, transparent 50%)',
+      }}
+    />
   </div>
 ));
-StarBackground.displayName = 'StarBackground';
+AnimatedStarBackground.displayName = 'AnimatedStarBackground';
 
-// OPTIMIZED: Note component with GPU-accelerated transforms
-const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) => {
+// IMPROVED: Larger note with trail effect and pulsing glow
+const NoteOrb = memo(({ note, laneIndex, approachPercent }: { note: Note; laneIndex: number; approachPercent: number }) => {
   const config = LANE_CONFIG[note.lane];
   const Icon = config.icon;
   
+  // Calculate glow intensity based on approach
+  const glowIntensity = Math.min(1, approachPercent * 1.5);
+  const scale = 1 + (approachPercent * 0.15);
+  
   return (
     <div
-      className="absolute w-14 h-14 flex items-center justify-center gpu-layer"
+      className="absolute flex items-center justify-center gpu-layer"
       style={{
-        left: `calc(${(laneIndex + 0.5) * 33.33}% - 28px)`,
-        transform: `translateY(calc(${note.y}vh - 50%)) translateZ(0)`,
+        width: '72px', // Increased from 56px
+        height: '72px',
+        left: `calc(${(laneIndex + 0.5) * 33.33}% - 36px)`,
+        transform: `translateY(calc(${note.y}vh - 50%)) translateZ(0) scale(${scale})`,
         willChange: 'transform',
         top: 0,
       }}
     >
+      {/* Trail effect */}
       <div
-        className="w-full h-full rounded-full flex items-center justify-center"
+        className="absolute w-full h-24 -top-20 rounded-full opacity-60"
+        style={{
+          background: `linear-gradient(to bottom, transparent 0%, ${config.color}40 50%, ${config.color}80 100%)`,
+          filter: 'blur(8px)',
+        }}
+      />
+      
+      {/* Approach ring */}
+      <div
+        className="absolute w-full h-full rounded-full animate-pulse"
+        style={{
+          border: `2px solid ${config.color}${Math.round(glowIntensity * 80).toString(16).padStart(2, '0')}`,
+          transform: `scale(${1.3 - glowIntensity * 0.2})`,
+          opacity: glowIntensity * 0.6,
+        }}
+      />
+      
+      {/* Main orb */}
+      <div
+        className="w-full h-full rounded-full flex items-center justify-center animate-stellar-orb-pulse"
         style={{
           background: `radial-gradient(circle at 30% 30%, ${config.color}, ${config.color}88)`,
-          boxShadow: `0 0 20px ${config.color}80, 0 0 40px ${config.color}40`,
-          border: `2px solid ${config.color}`,
+          boxShadow: `
+            0 0 ${20 + glowIntensity * 20}px ${config.color}${Math.round(128 + glowIntensity * 80).toString(16)},
+            0 0 ${40 + glowIntensity * 30}px ${config.color}60,
+            inset 0 0 20px ${config.color}40
+          `,
+          border: `3px solid ${config.color}`,
         }}
       >
-        <Icon className="w-7 h-7 text-white drop-shadow-lg" />
+        <Icon className="w-9 h-9 text-white drop-shadow-lg" />
       </div>
     </div>
   );
 });
 NoteOrb.displayName = 'NoteOrb';
 
-// OPTIMIZED: CSS-only hit effect (no framer-motion overhead)
-const HitEffectCSS = memo(({ lane, result, id }: { lane: LaneType; result: HitResult; id: number }) => {
+// IMPROVED: Enhanced hit feedback with particles and animations
+const HitEffectEnhanced = memo(({ lane, result, id }: { lane: LaneType; result: HitResult; id: number }) => {
   const laneIndex = LANE_INDICES[lane];
   const config = HIT_RESULTS[result];
+  const laneConfig = LANE_CONFIG[lane];
+  
+  // Generate burst particles
+  const particles = useMemo(() => 
+    Array.from({ length: config.particles }).map((_, i) => ({
+      id: i,
+      angle: (360 / config.particles) * i + Math.random() * 30,
+      distance: 40 + Math.random() * 40,
+      size: 4 + Math.random() * 6,
+      delay: Math.random() * 0.1,
+    })),
+  [config.particles]);
   
   return (
     <div
-      className="absolute flex flex-col items-center pointer-events-none animate-hit-pop"
+      className="absolute flex flex-col items-center pointer-events-none"
       style={{
-        left: `calc(${(laneIndex + 0.5) * 33.33}% - 40px)`,
-        top: `${HIT_ZONE_Y - 15}%`,
-        '--hit-color': config.color,
-      } as React.CSSProperties}
+        left: `calc(${(laneIndex + 0.5) * 33.33}%)`,
+        top: `${HIT_ZONE_Y}%`,
+        transform: 'translate(-50%, -50%)',
+      }}
     >
-      <span
-        className="text-lg font-black"
-        style={{ color: config.color, textShadow: `0 0 10px ${config.color}` }}
-      >
-        {config.label}
-      </span>
+      {/* Particle burst */}
+      {particles.map(particle => (
+        <div
+          key={particle.id}
+          className="absolute rounded-full animate-stellar-particle-burst"
+          style={{
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            background: result === 'perfect' 
+              ? `radial-gradient(circle, hsl(45, 100%, 80%), ${config.color})`
+              : config.color,
+            boxShadow: `0 0 ${particle.size * 2}px ${config.color}`,
+            '--particle-angle': `${particle.angle}deg`,
+            '--particle-distance': `${particle.distance}px`,
+            animationDelay: `${particle.delay}s`,
+          } as React.CSSProperties}
+        />
+      ))}
+      
+      {/* Ring burst effect */}
+      <div
+        className="absolute w-16 h-16 rounded-full animate-stellar-ring-burst"
+        style={{
+          border: `3px solid ${config.color}`,
+          boxShadow: `0 0 20px ${config.color}`,
+        }}
+      />
+      
+      {/* Hit text */}
+      <div className="animate-stellar-hit-text">
+        <span
+          className="text-2xl font-black whitespace-nowrap"
+          style={{ 
+            color: config.color, 
+            textShadow: `0 0 20px ${config.color}, 0 0 40px ${config.color}80`,
+            letterSpacing: '0.05em',
+          }}
+        >
+          {config.label}
+        </span>
+      </div>
+      
+      {/* Perfect flash */}
+      {result === 'perfect' && (
+        <div className="absolute inset-0 w-32 h-32 -translate-x-1/2 -translate-y-1/2 animate-stellar-perfect-flash rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${config.color}60, transparent 70%)`,
+          }}
+        />
+      )}
     </div>
   );
 });
-HitEffectCSS.displayName = 'HitEffectCSS';
+HitEffectEnhanced.displayName = 'HitEffectEnhanced';
 
-// Lane button component - optimized for touch responsiveness
+// IMPROVED: Larger, more responsive lane buttons
 const LaneButton = memo(({ 
   lane, 
   laneIndex, 
   onTap, 
-  isPressed 
+  isPressed,
+  hasApproachingNote,
 }: { 
   lane: LaneType; 
   laneIndex: number; 
   onTap: () => void;
   isPressed: boolean;
+  hasApproachingNote: boolean;
 }) => {
   const config = LANE_CONFIG[lane];
   const Icon = config.icon;
-  const hasTriggeredRef = useRef(false);
+  const touchIdRef = useRef<number | null>(null);
   
-  // Reset trigger flag on pointer/touch end
-  const handleEnd = useCallback(() => {
-    hasTriggeredRef.current = false;
-  }, []);
-  
-  // Unified handler for both touch and pointer
-  const handleInput = useCallback((e: React.TouchEvent | React.PointerEvent) => {
-    // Prevent double-triggering from touch + pointer events
-    if (hasTriggeredRef.current) return;
-    hasTriggeredRef.current = true;
-    
+  // IMPROVED: Unified pointer handler - immediate response
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Only respond to primary pointer
+    if (touchIdRef.current !== null) return;
+    touchIdRef.current = e.pointerId;
+    
+    // Immediate haptic feedback
+    triggerHaptic('light');
     onTap();
   }, [onTap]);
+  
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (e.pointerId === touchIdRef.current) {
+      touchIdRef.current = null;
+    }
+  }, []);
+  
+  const handlePointerCancel = useCallback(() => {
+    touchIdRef.current = null;
+  }, []);
   
   return (
     <button
       className="flex-1 h-full flex items-center justify-center relative overflow-hidden select-none"
-      onTouchStart={handleInput}
-      onPointerDown={handleInput}
-      onTouchEnd={handleEnd}
-      onPointerUp={handleEnd}
-      onPointerCancel={handleEnd}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         background: isPressed 
-          ? `linear-gradient(to top, ${config.color}60, transparent)` 
-          : 'transparent',
+          ? `linear-gradient(to top, ${config.color}70, ${config.color}20)` 
+          : hasApproachingNote
+            ? `linear-gradient(to top, ${config.color}30, transparent)`
+            : 'transparent',
         touchAction: 'none',
         WebkitTapHighlightColor: 'transparent',
         WebkitTouchCallout: 'none',
@@ -251,25 +390,51 @@ const LaneButton = memo(({
         userSelect: 'none',
       }}
     >
+      {/* Glow effect when note approaching */}
+      {hasApproachingNote && !isPressed && (
+        <div
+          className="absolute inset-0 animate-pulse"
+          style={{
+            background: `radial-gradient(ellipse at center bottom, ${config.color}30, transparent 70%)`,
+          }}
+        />
+      )}
+      
+      {/* Main button circle - LARGER */}
       <div
-        className="w-16 h-16 rounded-full flex items-center justify-center transition-all duration-75"
+        className="w-20 h-20 rounded-full flex items-center justify-center transition-all duration-75"
         style={{
           background: isPressed 
-            ? `radial-gradient(circle, ${config.color}80, ${config.color}40)`
-            : `radial-gradient(circle, ${config.color}30, ${config.color}10)`,
-          border: `3px solid ${config.color}${isPressed ? '' : '60'}`,
-          boxShadow: isPressed ? `0 0 30px ${config.color}80, inset 0 0 20px ${config.color}40` : 'none',
-          transform: isPressed ? 'scale(0.95)' : 'scale(1)',
+            ? `radial-gradient(circle, ${config.color}, ${config.color}80)`
+            : `radial-gradient(circle, ${config.color}40, ${config.color}15)`,
+          border: `4px solid ${config.color}${isPressed ? '' : '80'}`,
+          boxShadow: isPressed 
+            ? `0 0 40px ${config.color}, inset 0 0 30px ${config.color}60, 0 0 60px ${config.color}40` 
+            : hasApproachingNote
+              ? `0 0 20px ${config.color}60`
+              : `0 0 10px ${config.color}30`,
+          transform: isPressed ? 'scale(0.9)' : 'scale(1)',
         }}
       >
         <Icon 
-          className="w-8 h-8 transition-all pointer-events-none" 
+          className="w-10 h-10 transition-all pointer-events-none" 
           style={{ 
             color: isPressed ? 'white' : config.color,
-            filter: isPressed ? `drop-shadow(0 0 10px white)` : 'none',
+            filter: isPressed ? `drop-shadow(0 0 15px white)` : 'none',
+            transform: isPressed ? 'scale(1.1)' : 'scale(1)',
           }} 
         />
       </div>
+      
+      {/* Press ripple effect */}
+      {isPressed && (
+        <div
+          className="absolute inset-0 animate-stellar-ripple"
+          style={{
+            background: `radial-gradient(circle at center, ${config.color}40, transparent 70%)`,
+          }}
+        />
+      )}
     </button>
   );
 });
@@ -319,8 +484,11 @@ const generateFallbackNotes = (difficulty: ArcadeDifficulty): Note[] => {
 // Loading screen component
 const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) => (
   <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
-    <div className="animate-spin">
-      <Music className="w-16 h-16 text-primary" />
+    <div className="relative">
+      <div className="animate-spin">
+        <Music className="w-16 h-16 text-primary" />
+      </div>
+      <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
     </div>
     <p className="text-lg font-medium text-foreground">
       {isGenerating ? 'Generating music...' : 'Loading music...'}
@@ -331,6 +499,20 @@ const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) =
   </div>
 ));
 TrackLoadingScreen.displayName = 'TrackLoadingScreen';
+
+// Screen flash effect component
+const ScreenFlash = memo(({ color, visible }: { color: string; visible: boolean }) => {
+  if (!visible) return null;
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none z-50 animate-stellar-screen-flash"
+      style={{
+        background: `radial-gradient(circle at center, ${color}40, transparent 70%)`,
+      }}
+    />
+  );
+});
+ScreenFlash.displayName = 'ScreenFlash';
 
 export const EclipseTimingGame = ({
   companionStats,
@@ -354,6 +536,8 @@ export const EclipseTimingGame = ({
   const [hitEffects, setHitEffects] = useState<{ id: number; lane: LaneType; result: HitResult }[]>([]);
   const [pressedLanes, setPressedLanes] = useState<Record<LaneType, boolean>>({ moon: false, star: false, sun: false });
   const [gameResult, setGameResult] = useState<MiniGameResult | null>(null);
+  const [beatPulse, setBeatPulse] = useState(false);
+  const [screenFlash, setScreenFlash] = useState<{ visible: boolean; color: string }>({ visible: false, color: '' });
   
   const maxMisses = MAX_MISSES_BY_DIFFICULTY[difficulty];
   
@@ -361,6 +545,7 @@ export const EclipseTimingGame = ({
   const lastFrameTimeRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>();
+  const beatIntervalRef = useRef<NodeJS.Timeout>();
   
   // OPTIMIZED: Use ref for all notes, only sync visible ones to state
   const notesRef = useRef<Note[]>([]);
@@ -370,7 +555,7 @@ export const EclipseTimingGame = ({
   const currentTrackRef = useRef<RhythmTrack | null>(null);
   const loadingStartRef = useRef<number>(0);
   
-  const stars = useStaticStars(20);
+  const stars = useStaticStars(30); // More stars
   const config = DIFFICULTY_CONFIG[difficulty];
   
   const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
@@ -379,6 +564,25 @@ export const EclipseTimingGame = ({
   useEffect(() => {
     stopEncounterMusic();
   }, []);
+
+  // Beat pulse effect synced to BPM
+  useEffect(() => {
+    if (gameState === 'playing' && currentTrackRef.current) {
+      const bpm = currentTrackRef.current.bpm;
+      const beatMs = 60000 / bpm;
+      
+      beatIntervalRef.current = setInterval(() => {
+        setBeatPulse(true);
+        setTimeout(() => setBeatPulse(false), 100);
+      }, beatMs);
+      
+      return () => {
+        if (beatIntervalRef.current) {
+          clearInterval(beatIntervalRef.current);
+        }
+      };
+    }
+  }, [gameState]);
 
   // Load track and initialize notes
   useEffect(() => {
@@ -588,12 +792,13 @@ export const EclipseTimingGame = ({
     };
   }, [gameState, config.scrollSpeed, isPractice, onDamage, maxMisses]);
 
-  // OPTIMIZED: Batched hit handler
+  // IMPROVED: More responsive hit handler with better press feedback
   const handleLaneTap = useCallback((lane: LaneType) => {
     if (gameState !== 'playing') return;
     
+    // Longer press visual feedback (150ms instead of 100ms)
     setPressedLanes(prev => ({ ...prev, [lane]: true }));
-    setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 100);
+    setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 150);
     
     const laneNotes = notesRef.current.filter(n => n.lane === lane && !n.hit && !n.missed);
     if (laneNotes.length === 0) return;
@@ -620,16 +825,17 @@ export const EclipseTimingGame = ({
     // Update ref immediately
     notesRef.current = notesRef.current.map(n => n.id === closestNote.id ? { ...n, hit: true } : n);
     
-    // MILESTONE DAMAGE: Deal damage on combo milestones (every 20 combo) or section complete
-    // No per-note damage anymore
+    // Screen flash on perfect hits
+    if (result === 'perfect') {
+      setScreenFlash({ visible: true, color: HIT_RESULTS.perfect.color });
+      setTimeout(() => setScreenFlash({ visible: false, color: '' }), 150);
+    }
     
     // OPTIMIZED: Single batched state update
     const currentStats = gameStatsRef.current;
     const multiplier = getComboMultiplier(currentStats.combo);
     const points = HIT_RESULTS[result].points * multiplier;
     const newCombo = currentStats.combo + 1;
-    
-    // No per-note or milestone damage - win/lose is determined by song completion
     
     const newStats: GameStats = {
       score: currentStats.score + points,
@@ -642,17 +848,15 @@ export const EclipseTimingGame = ({
     gameStatsRef.current = newStats;
     setGameStats(newStats);
     
-    // OPTIMIZED: Limit concurrent effects
+    // OPTIMIZED: Limit concurrent effects - longer display (700ms)
     const effectId = Date.now() + Math.random();
     setHitEffects(prev => [...prev.slice(-(MAX_HIT_EFFECTS - 1)), { id: effectId, lane, result }]);
     setTimeout(() => {
       setHitEffects(prev => prev.filter(e => e.id !== effectId));
-    }, 500);
+    }, 700);
     
-    // Defer haptic to idle time
-    requestIdleCallback(() => {
-      triggerHaptic(result === 'perfect' ? 'success' : result === 'great' ? 'medium' : 'light');
-    }, { timeout: 50 });
+    // Immediate haptic feedback
+    triggerHaptic(result === 'perfect' ? 'success' : result === 'great' ? 'medium' : 'light');
   }, [gameState]);
 
   // Keyboard controls
@@ -755,6 +959,17 @@ export const EclipseTimingGame = ({
     }
   }, [gameState]);
 
+  // Check for approaching notes per lane (for button glow)
+  const approachingLanes = useMemo(() => {
+    const approaching: Record<LaneType, boolean> = { moon: false, star: false, sun: false };
+    visibleNotes.forEach(note => {
+      if (note.y > HIT_ZONE_Y - 25 && note.y < HIT_ZONE_Y + 10) {
+        approaching[note.lane] = true;
+      }
+    });
+    return approaching;
+  }, [visibleNotes]);
+
   const { score, combo, notesHit, notesMissed } = gameStats;
   const comboMultiplier = getComboMultiplier(combo);
   const totalNotes = notesRef.current.length;
@@ -829,6 +1044,9 @@ export const EclipseTimingGame = ({
         backfaceVisibility: 'hidden',
       }}
     >
+      {/* Screen flash effect */}
+      <ScreenFlash color={screenFlash.color} visible={screenFlash.visible} />
+      
       {/* Countdown Overlay */}
       {gameState === 'countdown' && (
         <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
@@ -878,18 +1096,19 @@ export const EclipseTimingGame = ({
       <AnimatePresence>
         {combo >= 10 && (
           <motion.div
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full text-sm font-bold"
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full text-base font-bold"
             style={{
               background: 'linear-gradient(135deg, hsl(45, 100%, 50%), hsl(25, 95%, 50%))',
               color: 'white',
-              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              boxShadow: '0 0 20px hsl(45, 100%, 50% / 0.5)',
             }}
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: [1, 1.1, 1], opacity: 1 }}
+            animate={{ scale: [1, 1.05, 1], opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {comboMultiplier}x MULTIPLIER
+            🔥 {comboMultiplier}x MULTIPLIER
           </motion.div>
         )}
       </AnimatePresence>
@@ -898,7 +1117,11 @@ export const EclipseTimingGame = ({
       <div 
         className="relative w-full rounded-xl overflow-hidden gpu-layer"
         style={{
-          background: 'linear-gradient(to bottom, hsl(240, 30%, 8%), hsl(260, 30%, 12%))',
+          background: `linear-gradient(to bottom, 
+            hsl(240, 30%, 6%), 
+            hsl(260, 35%, 10%), 
+            hsl(270, 40%, 12%)
+          )`,
           height: 'calc(100% - 100px)',
           minHeight: '350px',
           touchAction: 'none',
@@ -906,82 +1129,132 @@ export const EclipseTimingGame = ({
           willChange: 'contents',
         }}
       >
-        <StarBackground stars={stars} />
+        <AnimatedStarBackground stars={stars} beatPulse={beatPulse} />
         
-        {/* Lane dividers */}
+        {/* Lane dividers - more visible */}
         <div className="absolute inset-0 flex pointer-events-none">
           {LANES.map((lane, i) => (
             <div
               key={lane}
               className="flex-1 border-r last:border-r-0"
-              style={{ borderColor: 'hsl(var(--border) / 0.2)' }}
+              style={{ borderColor: 'hsl(var(--border) / 0.35)' }}
             />
           ))}
         </div>
         
-        {/* Lane glow trails */}
+        {/* Lane glow trails - enhanced */}
         <div className="absolute inset-0 flex pointer-events-none">
           {LANES.map((lane, i) => {
             const laneConfig = LANE_CONFIG[lane];
+            const hasApproaching = approachingLanes[lane];
             return (
               <div
                 key={lane}
-                className="flex-1"
+                className="flex-1 transition-all duration-200"
                 style={{
-                  background: `linear-gradient(to bottom, transparent 0%, ${laneConfig.color}08 50%, ${laneConfig.color}15 100%)`,
+                  background: `linear-gradient(to bottom, 
+                    transparent 0%, 
+                    ${laneConfig.color}${hasApproaching ? '15' : '08'} 40%, 
+                    ${laneConfig.color}${hasApproaching ? '25' : '12'} 70%,
+                    ${laneConfig.color}${hasApproaching ? '35' : '18'} 100%
+                  )`,
                 }}
               />
             );
           })}
         </div>
 
-        {/* Hit zone line */}
+        {/* IMPROVED: Enhanced hit zone line - thicker and animated */}
         <div
-          className="absolute left-0 right-0 h-1 pointer-events-none z-10"
+          className="absolute left-0 right-0 pointer-events-none z-10"
           style={{
             top: `${HIT_ZONE_Y}%`,
+            height: '3px',
             background: 'linear-gradient(90deg, hsl(271, 91%, 65%), hsl(45, 100%, 60%), hsl(25, 95%, 55%))',
-            boxShadow: '0 0 20px hsl(271, 91%, 65% / 0.5), 0 0 40px hsl(45, 100%, 60% / 0.3)',
+            boxShadow: `
+              0 0 20px hsl(271, 91%, 65% / 0.6), 
+              0 0 40px hsl(45, 100%, 60% / 0.4),
+              0 -5px 20px hsl(45, 100%, 60% / 0.2),
+              0 5px 20px hsl(45, 100%, 60% / 0.2)
+            `,
           }}
         />
         
-        {/* Hit zone glow area */}
+        {/* Hit zone target circles */}
+        <div className="absolute left-0 right-0 flex justify-around pointer-events-none z-5" style={{ top: `${HIT_ZONE_Y}%`, transform: 'translateY(-50%)' }}>
+          {LANES.map(lane => {
+            const laneConfig = LANE_CONFIG[lane];
+            return (
+              <div
+                key={lane}
+                className="w-20 h-20 rounded-full border-2 animate-pulse"
+                style={{
+                  borderColor: `${laneConfig.color}40`,
+                  boxShadow: `inset 0 0 20px ${laneConfig.color}20`,
+                }}
+              />
+            );
+          })}
+        </div>
+        
+        {/* Hit zone glow area - more prominent */}
         <div
           className="absolute left-0 right-0 pointer-events-none"
           style={{
-            top: `${HIT_ZONE_Y - 5}%`,
-            height: '10%',
-            background: 'linear-gradient(to bottom, transparent, hsl(var(--primary) / 0.1), transparent)',
+            top: `${HIT_ZONE_Y - 8}%`,
+            height: '16%',
+            background: `linear-gradient(to bottom, 
+              transparent, 
+              hsl(var(--primary) / 0.15), 
+              hsl(var(--primary) / 0.1),
+              transparent
+            )`,
           }}
         />
 
-        {/* Lane icons at top */}
-        <div className="absolute top-3 left-0 right-0 flex justify-around pointer-events-none z-20">
+        {/* Lane icons at top - slightly larger */}
+        <div className="absolute top-4 left-0 right-0 flex justify-around pointer-events-none z-20">
           {LANES.map(lane => {
             const laneConfig = LANE_CONFIG[lane];
             const Icon = laneConfig.icon;
             return (
               <div key={lane} className="flex flex-col items-center">
-                <Icon className="w-6 h-6" style={{ color: laneConfig.color, opacity: 0.6 }} />
+                <div 
+                  className="p-2 rounded-full"
+                  style={{
+                    background: `${laneConfig.color}20`,
+                    boxShadow: `0 0 15px ${laneConfig.color}30`,
+                  }}
+                >
+                  <Icon className="w-7 h-7" style={{ color: laneConfig.color, opacity: 0.8 }} />
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* OPTIMIZED: Only render visible notes */}
-        {visibleNotes.map(note => (
-          <NoteOrb key={note.id} note={note} laneIndex={LANE_INDICES[note.lane]} />
-        ))}
+        {/* OPTIMIZED: Only render visible notes with approach calculation */}
+        {visibleNotes.map(note => {
+          const approachPercent = Math.max(0, Math.min(1, (note.y - 20) / (HIT_ZONE_Y - 20)));
+          return (
+            <NoteOrb 
+              key={note.id} 
+              note={note} 
+              laneIndex={LANE_INDICES[note.lane]} 
+              approachPercent={approachPercent}
+            />
+          );
+        })}
 
-        {/* OPTIMIZED: CSS-animated hit effects (no AnimatePresence) */}
+        {/* IMPROVED: Enhanced hit effects with particles */}
         {hitEffects.map(effect => (
-          <HitEffectCSS key={effect.id} id={effect.id} lane={effect.lane} result={effect.result} />
+          <HitEffectEnhanced key={effect.id} id={effect.id} lane={effect.lane} result={effect.result} />
         ))}
 
-        {/* Tap buttons at bottom */}
+        {/* Tap buttons at bottom - increased height */}
         <div 
           className="absolute bottom-0 left-0 right-0 flex"
-          style={{ height: '15%' }}
+          style={{ height: '18%' }}
         >
           {LANES.map((lane, i) => (
             <LaneButton
@@ -990,15 +1263,18 @@ export const EclipseTimingGame = ({
               laneIndex={i}
               onTap={() => handleLaneTap(lane)}
               isPressed={pressedLanes[lane]}
+              hasApproachingNote={approachingLanes[lane]}
             />
           ))}
         </div>
       </div>
 
       {/* Instructions */}
-      <p className={`text-xs text-muted-foreground mt-2 text-center h-4 ${gameState !== 'playing' ? 'opacity-0' : ''}`}>
-        Tap lanes when notes reach the line • Keyboard: A/S/D
-      </p>
+      {gameState === 'playing' && (
+        <div className="text-center py-2 text-xs text-muted-foreground">
+          Tap lanes when notes reach the line • Keys: A/S/D or ←/↓/→
+        </div>
+      )}
     </div>
   );
 };
