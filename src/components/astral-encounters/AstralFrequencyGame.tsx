@@ -619,6 +619,7 @@ export const AstralFrequencyGame = ({
       success: result !== 'fail',
       accuracy,
       result,
+      highScoreValue: distance, // Distance traveled for high score
     });
   }, [gameState, score, distance, difficulty, onComplete]);
   

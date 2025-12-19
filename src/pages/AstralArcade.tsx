@@ -110,7 +110,7 @@ const gameCardVariants = {
 export default function AstralArcade() {
   const navigate = useNavigate();
   const { companion } = useCompanion();
-  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getAverageHighScore } = useArcadeHighScores();
+  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getFormattedHighScore } = useArcadeHighScores();
   const { checkArcadeDiscovery } = useAchievements();
 
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
@@ -239,13 +239,13 @@ export default function AstralArcade() {
   // Handle game complete
   const handleGameComplete = useCallback((result: MiniGameResult) => {
     if (arcadeMode === 'practice') {
-      // Practice mode - just update high scores
-      if (activeGame) {
-        const isNewHighScore = setHighScore(activeGame, result.accuracy, result.result);
+      // Practice mode - just update high scores using game-specific value
+      if (activeGame && result.highScoreValue !== undefined) {
+        const isNewHighScore = setHighScore(activeGame, result.highScoreValue);
         if (isNewHighScore) {
           playArcadeHighScore();
           toast.success('New High Score!', {
-            description: `${result.accuracy}% accuracy`,
+            description: getFormattedHighScore(activeGame) || '',
             icon: '🏆',
           });
         }
@@ -667,15 +667,9 @@ export default function AstralArcade() {
                     <span className="text-sm font-semibold uppercase tracking-wide">High Scores</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/9</p>
-                    <p className="text-xs text-muted-foreground">Games mastered</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-cyan-400">{getAverageHighScore()}%</p>
-                    <p className="text-xs text-muted-foreground">Average best</p>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-2xl font-bold text-cyan-400">{getTotalGamesWithHighScores()}/8</p>
+                  <p className="text-xs text-muted-foreground">Games with high scores</p>
                 </div>
               </Card>
             </motion.div>
@@ -732,7 +726,7 @@ export default function AstralArcade() {
                   label={game.label}
                   icon={game.icon}
                   stat={game.stat}
-                  highScore={arcadeMode === 'practice' ? getHighScore(game.type)?.accuracy : undefined}
+                  highScoreDisplay={arcadeMode === 'practice' ? getFormattedHighScore(game.type) : null}
                   onSelect={handleSelectGame}
                 />
               </motion.div>

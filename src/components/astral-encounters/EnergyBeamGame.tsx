@@ -972,6 +972,7 @@ export function EnergyBeamGame({
         success: wavesCleared >= 1,
         accuracy,
         result,
+        highScoreValue: wavesCleared, // Waves completed for high score
       });
     }, 1500);
     
