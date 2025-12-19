@@ -793,6 +793,7 @@ export default function AstralArcade() {
                       gameLabel={GAMES.find(g => g.type === activeGame)?.label || 'Game'}
                       result={practiceResult}
                       isNewHighScore={isNewHighScore}
+                      isPracticeMode={arcadeMode === 'practice'}
                       onPlayAgain={handlePlayAgain}
                       onExit={handleExitGame}
                     />
