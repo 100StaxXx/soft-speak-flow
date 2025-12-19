@@ -26,7 +26,7 @@ const TapSequenceGame = lazy(() => import('./TapSequenceGame').then(m => ({ defa
 const AstralFrequencyGame = lazy(() => import('./AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
 const EclipseTimingGame = lazy(() => import('./EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
 const StarfallDodgeGame = lazy(() => import('./StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
-const RuneResonanceGame = lazy(() => import('./RuneResonanceGame').then(m => ({ default: m.RuneResonanceGame })));
+
 const SoulSerpentGame = lazy(() => import('./SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('./OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 const GalacticMatchGame = lazy(() => import('./GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
@@ -181,9 +181,9 @@ export const AstralEncounterModal = ({
     if (!adversary) return 'energy_beam';
     
     const themeGameMap: Record<string, MiniGameType[]> = {
-      mind: ['tap_sequence', 'starfall_dodge'],
-      body: ['energy_beam', 'eclipse_timing'],
-      soul: ['astral_frequency', 'rune_resonance'],
+      mind: ['tap_sequence', 'galactic_match'],
+      body: ['energy_beam', 'starfall_dodge'],
+      soul: ['astral_frequency', 'eclipse_timing'],
     };
     
     const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
@@ -296,7 +296,6 @@ export const AstralEncounterModal = ({
         case 'astral_frequency': return AstralFrequencyGame;
         case 'eclipse_timing': return EclipseTimingGame;
         case 'starfall_dodge': return StarfallDodgeGame;
-        case 'rune_resonance': return RuneResonanceGame;
         case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
         case 'galactic_match': return GalacticMatchGame;
