@@ -15,9 +15,6 @@ import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords } from "
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { GuildMembersSection } from "./GuildMembersSection";
-import { GuildShoutsFeed } from "./GuildShoutsFeed";
-import { GuildActivityFeed } from "./GuildActivityFeed";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
@@ -469,13 +466,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             </div>
           </div>
         )}
-
-        {/* Community Features for Shared Epics */}
-        <div className="mt-4 pt-4 border-t border-border space-y-4">
-          <GuildMembersSection epicId={epic.id} />
-          <GuildActivityFeed epicId={epic.id} />
-          <GuildShoutsFeed epicId={epic.id} />
-        </div>
 
         {/* Action Buttons */}
         {isActive && epic.progress_percentage >= 100 && (
