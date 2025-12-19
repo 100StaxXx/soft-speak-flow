@@ -615,7 +615,7 @@ export const AstralFrequencyGame = ({
     }, 100);
     
     return () => clearInterval(interval);
-  }, [gameState, config, speed, isPractice]);
+  }, [gameState, config, speed, isPractice, onDamage]);
   
   // Complete game - calculate result based on distance and score
   useEffect(() => {
@@ -626,7 +626,13 @@ export const AstralFrequencyGame = ({
     const finalScore = score + distanceBonus;
     
     // Accuracy based on how far they got relative to difficulty
-    const distanceThresholds = { easy: 500, medium: 400, hard: 300 };
+    const distanceThresholds: Record<ArcadeDifficulty, number> = { 
+      beginner: 600, 
+      easy: 500, 
+      medium: 400, 
+      hard: 300, 
+      master: 250 
+    };
     const threshold = distanceThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((distance / threshold) * 100));
     
@@ -641,11 +647,11 @@ export const AstralFrequencyGame = ({
       gameStats: {
         distance: Math.floor(distance),
         score,
-        maxCombo: combo,
+        maxCombo,
         livesRemaining: lives,
       },
     });
-  }, [gameState, score, distance, difficulty, onComplete, combo, lives]);
+  }, [gameState, score, distance, difficulty, onComplete, maxCombo, lives]);
   
   return (
     <div 
