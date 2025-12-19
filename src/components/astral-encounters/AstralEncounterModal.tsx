@@ -74,12 +74,19 @@ export const AstralEncounterModal = ({
   } | null>(null);
   const [showScreenShake, setShowScreenShake] = useState(false);
   
-  const { companion } = useCompanion();
+  const { companion, refetch: refetchCompanion } = useCompanion();
   const battleEndedRef = useRef(false);
 
-  // Query current evolution card for creature name
+  // Force fresh companion data when modal opens to avoid stale evolution state
+  useEffect(() => {
+    if (open) {
+      refetchCompanion();
+    }
+  }, [open, refetchCompanion]);
+
+  // Query current evolution card for creature name - include current_stage in key for proper cache invalidation
   const { data: currentCard } = useQuery({
-    queryKey: ['current-evolution-card', companion?.id],
+    queryKey: ['current-evolution-card', companion?.id, companion?.current_stage],
     queryFn: async () => {
       if (!companion?.id) return null;
       const { data } = await supabase
