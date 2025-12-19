@@ -9,7 +9,6 @@ export { BattleVSScreen } from './BattleVSScreen';
 export { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
 
 // Supporting components
-export { MiniGameTester } from './MiniGameTester';
 export { CosmicCodex } from './CosmicCodex';
 export { EncounterHistory } from './EncounterHistory';
 export { AstralEncounterProvider } from './AstralEncounterProvider';
@@ -24,8 +23,7 @@ export {
   useParticleSystem, 
   useStaticStars,
   useDebouncedCallback,
-  getGridPositions,
-  shakeKeyframes 
+  getGridPositions
 } from './gameUtils';
 
 // ⚠️ MINI-GAMES ARE NOT EXPORTED HERE FOR BUNDLE SIZE OPTIMIZATION
