@@ -22,6 +22,12 @@ interface AstralFrequencyGameProps {
 // Difficulty configuration - NO TIMER, endless until lives = 0
 // UNLIMITED progressive speed - no cap, gets faster forever
 const DIFFICULTY_CONFIG = {
+  beginner: {
+    startSpeed: 16,
+    spawnInterval: 1.2,
+    obstacleChance: 0.45,
+    speedIncrement: 0.15,
+  },
   easy: {
     startSpeed: 22,
     spawnInterval: 0.9,
@@ -39,6 +45,12 @@ const DIFFICULTY_CONFIG = {
     spawnInterval: 0.5,
     obstacleChance: 0.65,
     speedIncrement: 0.45,
+  },
+  master: {
+    startSpeed: 45,
+    spawnInterval: 0.35,
+    obstacleChance: 0.72,
+    speedIncrement: 0.6,
   },
 };
 

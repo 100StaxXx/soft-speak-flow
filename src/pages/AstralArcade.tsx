@@ -12,6 +12,9 @@ import { useCompanion } from '@/hooks/useCompanion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useArcadeHighScores } from '@/hooks/useArcadeHighScores';
+import { useArcadeSkillTracker } from '@/hooks/useArcadeSkillTracker';
+import { ArcadeDifficulty, DIFFICULTY_LABELS } from '@/types/arcadeDifficulty';
+import { ArcadeDifficultySelector } from '@/components/astral-encounters/ArcadeDifficultySelector';
 import { useAchievements } from '@/hooks/useAchievements';
 import { useBattleState } from '@/hooks/useBattleState';
 import { useAdversaryImage } from '@/hooks/useAdversaryImage';
@@ -64,10 +67,24 @@ const GAMES = [
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
 ];
 
-type Difficulty = 'easy' | 'medium' | 'hard';
+// Re-export ArcadeDifficulty as Difficulty for internal use
+type Difficulty = ArcadeDifficulty;
 type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result';
 type ArcadeMode = 'practice' | 'battle';
 type BattleResult = 'victory' | 'defeat' | null;
+
+// Map 5-level difficulty to 3-level for game components that don't yet support all 5
+// beginner -> easy, master -> hard
+type GameDifficulty = 'easy' | 'medium' | 'hard';
+const mapToGameDifficulty = (difficulty: ArcadeDifficulty): GameDifficulty => {
+  switch (difficulty) {
+    case 'beginner': return 'easy';
+    case 'easy': return 'easy';
+    case 'medium': return 'medium';
+    case 'hard': return 'hard';
+    case 'master': return 'hard';
+  }
+};
 
 // Animation variants
 const containerVariants = {
@@ -110,7 +127,8 @@ const gameCardVariants = {
 export default function AstralArcade() {
   const navigate = useNavigate();
   const { companion } = useCompanion();
-  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getFormattedHighScore } = useArcadeHighScores();
+  const { getHighScore, setHighScore, getTotalGamesWithHighScores, getFormattedHighScore, getBestHighScore, getFormattedHighScoresForGame } = useArcadeHighScores();
+  const { recordGameResult, getRecommendedDifficulty } = useArcadeSkillTracker();
   const { checkArcadeDiscovery } = useAchievements();
 
   const [activeGame, setActiveGame] = useState<MiniGameType | null>(null);
@@ -191,7 +209,7 @@ export default function AstralArcade() {
     
     if (arcadeMode === 'battle') {
       // Generate adversary for battle mode
-      const newAdversary = generateArcadeAdversary(difficulty);
+      const newAdversary = generateArcadeAdversary(mapToGameDifficulty(difficulty));
       setAdversary(newAdversary);
       resetBattle();
       setGamePhase('instructions');
@@ -239,13 +257,17 @@ export default function AstralArcade() {
   // Handle game complete
   const handleGameComplete = useCallback((result: MiniGameResult) => {
     if (arcadeMode === 'practice') {
-      // Practice mode - just update high scores using game-specific value
+      // Practice mode - update high scores and skill tracker
       if (activeGame && result.highScoreValue !== undefined) {
-        const isNewHighScore = setHighScore(activeGame, result.highScoreValue);
+        const isNewHighScore = setHighScore(activeGame, difficulty, result.highScoreValue);
+        
+        // Record result for skill-based recommendations
+        recordGameResult(activeGame, difficulty, result.accuracy, result.success);
+        
         if (isNewHighScore) {
           playArcadeHighScore();
           toast.success('New High Score!', {
-            description: getFormattedHighScore(activeGame) || '',
+            description: getFormattedHighScore(activeGame, difficulty) || '',
             icon: '🏆',
           });
         }
@@ -332,9 +354,12 @@ export default function AstralArcade() {
   const renderGame = () => {
     if (!activeGame) return null;
 
+    // Map to game difficulty (3-level) for components that don't support 5 levels yet
+    const gameDifficulty = mapToGameDifficulty(difficulty);
+    
     const gameProps = {
       companionStats,
-      difficulty,
+      difficulty: gameDifficulty,
       onComplete: handleGameComplete,
       ...(arcadeMode === 'battle' && {
         onDamage: handleDamage,
@@ -667,13 +692,13 @@ export default function AstralArcade() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {GAMES.map((game) => {
-                    const score = getFormattedHighScore(game.type);
-                    if (!score) return null;
+                    const bestScore = getBestHighScore(game.type);
+                    if (!bestScore) return null;
                     return (
                       <div key={game.type} className="flex items-center gap-2 text-xs">
                         <game.icon className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-muted-foreground truncate">{game.label}:</span>
-                        <span className="text-cyan-400 font-medium">★ {score}</span>
+                        <span className="text-cyan-400 font-medium">★ {bestScore.displayValue}</span>
                       </div>
                     );
                   })}
@@ -701,20 +726,12 @@ export default function AstralArcade() {
           )}
 
           {/* Difficulty Selector */}
-          <motion.div className="flex items-center justify-center gap-2" variants={cardVariants}>
-            {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
-              <button
-                key={d}
-                onClick={() => setDifficulty(d)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                  difficulty === d
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
-                    : 'bg-white/5 text-muted-foreground hover:bg-white/10'
-                }`}
-              >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
-              </button>
-            ))}
+          <motion.div variants={cardVariants} className="w-full max-w-md mx-auto">
+            <ArcadeDifficultySelector
+              selected={difficulty}
+              onSelect={setDifficulty}
+              recommended={activeGame ? getRecommendedDifficulty(activeGame) : null}
+            />
           </motion.div>
 
           {/* Game Grid */}
@@ -733,7 +750,7 @@ export default function AstralArcade() {
                   label={game.label}
                   icon={game.icon}
                   stat={game.stat}
-                  highScoreDisplay={arcadeMode === 'practice' ? getFormattedHighScore(game.type) : null}
+                  highScoreDisplay={arcadeMode === 'practice' ? getFormattedHighScore(game.type, difficulty) : null}
                   onSelect={handleSelectGame}
                 />
               </motion.div>

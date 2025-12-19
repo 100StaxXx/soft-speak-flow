@@ -20,6 +20,16 @@ interface EnergyBeamGameProps {
 
 // ENDLESS mode config - no timer, no wave cap
 const DIFFICULTY_CONFIG = {
+  beginner: {
+    baseEnemiesPerWave: 6,
+    enemyFireRate: 0,
+    enemySpeed: 0.2,
+    diveChance: 0.01,
+    powerUpChance: 0.25,
+    enemyIncreasePerWave: 1,
+    speedIncreasePerWave: 0.03,
+    diveIncreasePerWave: 0.003,
+  },
   easy: {
     baseEnemiesPerWave: 8,
     enemyFireRate: 0,
@@ -49,6 +59,16 @@ const DIFFICULTY_CONFIG = {
     enemyIncreasePerWave: 3,
     speedIncreasePerWave: 0.08,
     diveIncreasePerWave: 0.008,
+  },
+  master: {
+    baseEnemiesPerWave: 15,
+    enemyFireRate: 0.01,
+    enemySpeed: 0.65,
+    diveChance: 0.06,
+    powerUpChance: 0.08,
+    enemyIncreasePerWave: 4,
+    speedIncreasePerWave: 0.1,
+    diveIncreasePerWave: 0.01,
   },
 };
 
