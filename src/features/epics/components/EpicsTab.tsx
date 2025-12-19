@@ -35,17 +35,17 @@ export function EpicsTab() {
         <div className="flex gap-2 w-full overflow-hidden">
           <Button
             onClick={() => setTemplatesDialogOpen(true)}
-            className="flex-1 min-w-0 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-sm font-bold"
+            className="flex-1 min-w-0 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-xs font-bold"
           >
-            <Star className="h-4 w-4 mr-1.5 flex-shrink-0" />
+            <Star className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
             Star Paths
           </Button>
           <Button
             onClick={() => setCreateEpicDialogOpen(true)}
             variant="outline"
-            className="flex-1 min-w-0 h-auto py-3 text-sm font-medium"
+            className="flex-1 min-w-0 h-auto py-3 text-xs font-medium"
           >
-            <Castle className="h-4 w-4 mr-1.5 flex-shrink-0" />
+            <Castle className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
             Create
           </Button>
           <Button
@@ -53,7 +53,7 @@ export function EpicsTab() {
             variant="outline"
             className="h-auto py-3 px-4 flex-shrink-0"
           >
-            <Users className="w-4 h-4" />
+            <Users className="w-3.5 h-3.5" />
           </Button>
         </div>
       </Card>
