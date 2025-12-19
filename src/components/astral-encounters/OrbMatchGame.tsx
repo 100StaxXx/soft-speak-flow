@@ -1168,9 +1168,16 @@ export const OrbMatchGame = ({
       onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.orb_match.scoreTarget, source: 'level_complete' });
       
       triggerHaptic('heavy');
+      
+      // Practice mode: end after completing 1 level
+      if (isPractice) {
+        setGameState('complete');
+        return;
+      }
+      
       setGameState('levelComplete');
     }
-  }, [score, levelConfig.targetScore, gameState, timeLeft, onDamage]);
+  }, [score, levelConfig.targetScore, gameState, timeLeft, onDamage, isPractice]);
 
   // Handle advancing to next level
   const advanceToNextLevel = useCallback(() => {
