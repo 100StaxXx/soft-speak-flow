@@ -73,18 +73,6 @@ type GamePhase = 'instructions' | 'practice' | 'vs_screen' | 'playing' | 'result
 type ArcadeMode = 'practice' | 'battle';
 type BattleResult = 'victory' | 'defeat' | null;
 
-// Map 5-level difficulty to 3-level for game components that don't yet support all 5
-// beginner -> easy, master -> hard
-type GameDifficulty = 'easy' | 'medium' | 'hard';
-const mapToGameDifficulty = (difficulty: ArcadeDifficulty): GameDifficulty => {
-  switch (difficulty) {
-    case 'beginner': return 'easy';
-    case 'easy': return 'easy';
-    case 'medium': return 'medium';
-    case 'hard': return 'hard';
-    case 'master': return 'hard';
-  }
-};
 
 // Animation variants
 const containerVariants = {
@@ -209,7 +197,7 @@ export default function AstralArcade() {
     
     if (arcadeMode === 'battle') {
       // Generate adversary for battle mode
-      const newAdversary = generateArcadeAdversary(mapToGameDifficulty(difficulty));
+      const newAdversary = generateArcadeAdversary(difficulty);
       setAdversary(newAdversary);
       resetBattle();
       setGamePhase('instructions');
@@ -354,12 +342,9 @@ export default function AstralArcade() {
   const renderGame = () => {
     if (!activeGame) return null;
 
-    // Map to game difficulty (3-level) for components that don't support 5 levels yet
-    const gameDifficulty = mapToGameDifficulty(difficulty);
-    
     const gameProps = {
       companionStats,
-      difficulty: gameDifficulty,
+      difficulty,
       onComplete: handleGameComplete,
       ...(arcadeMode === 'battle' && {
         onDamage: handleDamage,

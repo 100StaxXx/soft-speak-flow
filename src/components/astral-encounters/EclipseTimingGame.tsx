@@ -8,13 +8,14 @@ import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
 import { Moon, Star, Sun, Music } from 'lucide-react';
 import { stopEncounterMusic } from '@/utils/soundEffects';
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
+import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
 interface EclipseTimingGameProps {
   companionStats: { mind: number; body: number; soul: number };
   onComplete: (result: MiniGameResult) => void;
   onDamage?: (event: DamageEvent) => void;
   tierAttackDamage?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: ArcadeDifficulty;
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
@@ -249,7 +250,7 @@ LaneButton.displayName = 'LaneButton';
 const generateSyncedNotes = (
   bpm: number, 
   durationSeconds: number, 
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: ArcadeDifficulty
 ): Note[] => {
   const config = DIFFICULTY_CONFIG[difficulty];
   const beatInterval = 60000 / bpm;
@@ -282,7 +283,7 @@ const generateSyncedNotes = (
   return notes;
 };
 
-const generateFallbackNotes = (difficulty: 'easy' | 'medium' | 'hard'): Note[] => {
+const generateFallbackNotes = (difficulty: ArcadeDifficulty): Note[] => {
   return generateSyncedNotes(120, 30, difficulty);
 };
 
