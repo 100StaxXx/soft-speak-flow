@@ -1165,7 +1165,7 @@ export function EnergyBeamGame({
       setGameState('playing');
       isWaveTransitioning.current = false; // Unlock after complete
     }, 2000);
-  }, [enemies.length, wave, config, gameState, isPractice]);
+  }, [enemies.length, wave, config, gameState, isPractice, onDamage]);
   
   // Determine result based on performance
   const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'fail' => {
