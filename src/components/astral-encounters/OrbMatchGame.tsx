@@ -1006,15 +1006,27 @@ export const OrbMatchGame = ({
 
   // Move timer - 150ms interval (smoother than 100ms with less overhead)
   useEffect(() => {
-    if (gameState !== 'playing' || moveTimeLeft <= 0) return;
+    if (gameState !== 'playing') return;
+    
+    // If move timer is at 0 and not dragging, reset it to allow new moves
+    if (moveTimeLeft <= 0 && !isDraggingRef.current) {
+      setMoveTimeLeft(config.moveTime);
+      return;
+    }
+    
+    if (moveTimeLeft <= 0) return;
+    
     moveTimerRef.current = setInterval(() => {
       setMoveTimeLeft(prev => {
-        if (prev <= 0.15) { if (isDraggingRef.current) handleDragEnd(); return 0; }
+        if (prev <= 0.15) { 
+          if (isDraggingRef.current) handleDragEnd(); 
+          return 0; 
+        }
         return prev - 0.15;
       });
     }, 150);
     return () => { if (moveTimerRef.current) clearInterval(moveTimerRef.current); };
-  }, [gameState, moveTimeLeft, handleDragEnd]);
+  }, [gameState, moveTimeLeft, handleDragEnd, config.moveTime]);
 
   // Game timer
   useEffect(() => {
