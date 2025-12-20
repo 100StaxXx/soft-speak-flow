@@ -186,7 +186,7 @@ export const AdminCompanionImageTester = () => {
     <Card className="p-6 mb-8 rounded-3xl shadow-soft">
       <h2 className="font-heading text-2xl font-semibold mb-4">🎨 Companion Image Tester</h2>
       <p className="text-muted-foreground mb-6">
-        Test companion image generation with I2I support for evolution chains
+        Test companion image generation with visual metadata extraction for consistent evolution chains
       </p>
       
       <div className="space-y-4">
@@ -257,11 +257,21 @@ export const AdminCompanionImageTester = () => {
           />
           
           {/* Generation Mode Indicator */}
-          <div className="flex items-center gap-2 mt-2">
-            {currentMode === "image-to-image" ? (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-600 text-xs font-medium">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {currentMode.includes("Visual Metadata") ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-600 text-xs font-medium">
                 <LinkIcon className="w-3 h-3" />
-                Image-to-Image (stage {testData.stage - 1} → {testData.stage})
+                T2I + Visual Metadata (stage {testData.stage - 1} → {testData.stage})
+              </span>
+            ) : currentMode.includes("Egg") ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 text-xs font-medium">
+                <ImageIcon className="w-3 h-3" />
+                Text-to-Image (Egg)
+              </span>
+            ) : currentMode.includes("Cosmic") ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-600 text-xs font-medium">
+                <ImageIcon className="w-3 h-3" />
+                Text-to-Image (Cosmic)
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-600 text-xs font-medium">
@@ -271,10 +281,43 @@ export const AdminCompanionImageTester = () => {
             )}
             {testData.stage >= 2 && testData.stage <= 14 && !hasPreviousStageImage && (
               <span className="text-xs text-amber-600">
-                ⚠️ No previous stage image - will use T2I instead of I2I
+                ⚠️ No previous stage - generate chain or prior stage first
               </span>
             )}
           </div>
+
+          {/* Color Palette Preview for Visual Metadata Mode */}
+          {hasPreviousStageImage && testData.stage >= 2 && testData.stage <= 14 && (
+            <div className="mt-3 p-3 rounded-xl bg-muted/50 border border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Colors that will be extracted & matched:</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <div 
+                    className="w-5 h-5 rounded-full border border-border" 
+                    style={{ backgroundColor: testData.favoriteColor }}
+                  />
+                  <span className="text-xs text-muted-foreground">Primary</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div 
+                    className="w-5 h-5 rounded-full border border-border" 
+                    style={{ backgroundColor: testData.eyeColor }}
+                  />
+                  <span className="text-xs text-muted-foreground">Eyes</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div 
+                    className="w-5 h-5 rounded-full border border-border" 
+                    style={{ backgroundColor: testData.furColor }}
+                  />
+                  <span className="text-xs text-muted-foreground">Fur</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                ✨ Metadata (hex colors, pose, angle, style) will be extracted from stage {testData.stage - 1}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Retry Attempt */}

@@ -409,9 +409,16 @@ serve(async (req) => {
     // ========================================================================
     let previousImageUrl: string | null = null;
     let extractedMetadata: {
-      primaryColor: string;
-      eyeColor: string;
+      hexPrimaryColor: string;
+      hexEyeColor: string;
+      hexAccentColor: string;
+      primaryColorDesc: string;
+      eyeColorDesc: string;
       markings: string;
+      viewingAngle: string;
+      pose: string;
+      expression: string;
+      lightingDirection: string;
       artStyle: string;
       distinctiveFeatures: string;
       overallDescription: string;
@@ -442,22 +449,38 @@ serve(async (req) => {
         }
       }
 
-      // Extract visual metadata from previous image using vision API
+      // Extract visual metadata using tool calling for guaranteed JSON structure
       if (previousImageUrl) {
         try {
-          console.log("Extracting visual metadata from previous stage image...");
+          console.log("Extracting visual metadata using tool calling...");
           
-          const analysisPrompt = `Analyze this ${spiritAnimal} creature image and extract visual characteristics.
-          
-Respond ONLY with a valid JSON object (no markdown, no code blocks):
-{
-  "primaryColor": "exact description of the main body/fur color with approximate hex code",
-  "eyeColor": "exact eye color description",
-  "markings": "description of any patterns, spots, stripes, gradients, or unique markings",
-  "artStyle": "description of the rendering style, lighting, mood, and atmosphere",
-  "distinctiveFeatures": "list of unique identifying physical features that define this specific creature",
-  "overallDescription": "one detailed paragraph describing exactly how this creature looks"
-}`;
+          const extractionTool = {
+            type: "function",
+            function: {
+              name: "extract_visual_metadata",
+              description: "Extract detailed visual characteristics from a creature image for consistency in evolution chain",
+              parameters: {
+                type: "object",
+                properties: {
+                  hexPrimaryColor: { type: "string", description: "Exact hex code of the primary body/fur color (e.g., #FF6B35)" },
+                  hexEyeColor: { type: "string", description: "Exact hex code of the eye color (e.g., #FFD700)" },
+                  hexAccentColor: { type: "string", description: "Exact hex code of any accent/secondary color (e.g., #FFFFFF)" },
+                  primaryColorDesc: { type: "string", description: "Description of primary color (e.g., warm orange-red)" },
+                  eyeColorDesc: { type: "string", description: "Description of eye color (e.g., golden amber)" },
+                  markings: { type: "string", description: "Description of patterns, spots, stripes, or unique markings" },
+                  viewingAngle: { type: "string", enum: ["front", "side", "3/4 view", "rear 3/4"], description: "Camera angle viewing the creature" },
+                  pose: { type: "string", enum: ["sitting", "standing", "lying down", "action/dynamic", "curled up"], description: "Body pose of the creature" },
+                  expression: { type: "string", enum: ["happy", "curious", "fierce", "serene", "playful", "alert"], description: "Facial expression" },
+                  lightingDirection: { type: "string", enum: ["from above", "from side", "from below", "ambient/soft", "dramatic"], description: "Main light source direction" },
+                  artStyle: { type: "string", description: "Rendering style description (e.g., painterly digital art, soft cel shading)" },
+                  distinctiveFeatures: { type: "string", description: "Unique physical features that identify this specific creature" },
+                  overallDescription: { type: "string", description: "Detailed paragraph describing exactly how this creature looks" }
+                },
+                required: ["hexPrimaryColor", "hexEyeColor", "primaryColorDesc", "eyeColorDesc", "markings", "viewingAngle", "pose", "expression", "lightingDirection", "artStyle", "distinctiveFeatures", "overallDescription"],
+                additionalProperties: false
+              }
+            }
+          };
 
           const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
@@ -467,47 +490,64 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks):
               messages: [{
                 role: "user",
                 content: [
-                  { type: "text", text: analysisPrompt },
+                  { type: "text", text: `Analyze this ${spiritAnimal} creature image and extract its visual characteristics for consistent evolution. Be precise with hex colors and descriptive with features.` },
                   { type: "image_url", image_url: { url: previousImageUrl } }
                 ]
-              }]
+              }],
+              tools: [extractionTool],
+              tool_choice: { type: "function", function: { name: "extract_visual_metadata" } }
             })
           });
 
           if (analysisResponse.ok) {
             const analysisData = await analysisResponse.json();
-            const analysisText = analysisData.choices?.[0]?.message?.content || "";
+            const toolCall = analysisData.choices?.[0]?.message?.tool_calls?.[0];
             
-            // Parse the JSON response
-            try {
-              // Remove any markdown code blocks if present
-              let cleanedText = analysisText.trim();
-              if (cleanedText.startsWith("```json")) {
-                cleanedText = cleanedText.slice(7);
-              } else if (cleanedText.startsWith("```")) {
-                cleanedText = cleanedText.slice(3);
+            if (toolCall?.function?.arguments) {
+              try {
+                extractedMetadata = JSON.parse(toolCall.function.arguments);
+                console.log("Successfully extracted visual metadata via tool calling:", extractedMetadata);
+              } catch (parseError) {
+                console.warn("Failed to parse tool call arguments:", parseError);
               }
-              if (cleanedText.endsWith("```")) {
-                cleanedText = cleanedText.slice(0, -3);
+            }
+            
+            // Fallback to content parsing if tool calling didn't return expected format
+            if (!extractedMetadata) {
+              const content = analysisData.choices?.[0]?.message?.content || "";
+              if (content) {
+                try {
+                  let cleanedText = content.trim();
+                  if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+                  else if (cleanedText.startsWith("```")) cleanedText = cleanedText.slice(3);
+                  if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+                  extractedMetadata = JSON.parse(cleanedText.trim());
+                } catch (e) {
+                  console.warn("Content fallback parsing failed");
+                }
               }
-              cleanedText = cleanedText.trim();
-              
-              extractedMetadata = JSON.parse(cleanedText);
-              console.log("Successfully extracted visual metadata:", extractedMetadata);
-            } catch (parseError) {
-              console.warn("Failed to parse metadata JSON, using raw text:", analysisText);
-              // Fallback: use the raw description
+            }
+            
+            // Ultimate fallback with user-provided colors
+            if (!extractedMetadata) {
               extractedMetadata = {
-                primaryColor: favoriteColor,
-                eyeColor: eyeColor || favoriteColor,
-                markings: "none specified",
+                hexPrimaryColor: favoriteColor,
+                hexEyeColor: eyeColor || favoriteColor,
+                hexAccentColor: "#FFFFFF",
+                primaryColorDesc: `Color ${favoriteColor}`,
+                eyeColorDesc: eyeColor ? `Color ${eyeColor}` : "matching body",
+                markings: "none detected",
+                viewingAngle: "3/4 view",
+                pose: "standing",
+                expression: "curious",
+                lightingDirection: "from above",
                 artStyle: "stylized digital fantasy art",
-                distinctiveFeatures: spiritAnimal + " features",
-                overallDescription: analysisText.slice(0, 500)
+                distinctiveFeatures: `${spiritAnimal} typical features`,
+                overallDescription: `A ${spiritAnimal} creature with ${favoriteColor} coloring`
               };
             }
           } else {
-            console.warn("Metadata extraction failed, proceeding without reference");
+            console.warn("Metadata extraction API call failed, proceeding without reference");
           }
         } catch (metadataError) {
           console.warn("Error extracting metadata:", metadataError);
@@ -549,19 +589,31 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks):
 
 Generate a Stage ${stage} (${stageName}) ${spiritAnimal} that MATCHES this visual reference:
 
-━━━ VISUAL REFERENCE FROM PREVIOUS STAGE ━━━
-${extractedMetadata.overallDescription}
+━━━ EXACT COLOR PALETTE (MANDATORY) ━━━
+┌─────────────────────────────────────────────┐
+│ PRIMARY: ${extractedMetadata.hexPrimaryColor} (${extractedMetadata.primaryColorDesc})
+│ EYES:    ${extractedMetadata.hexEyeColor} (${extractedMetadata.eyeColorDesc})
+│ ACCENT:  ${extractedMetadata.hexAccentColor || '#FFFFFF'}
+└─────────────────────────────────────────────┘
+⚠️ USE THESE EXACT HEX COLORS - DO NOT DEVIATE
 
-━━━ COLORS TO MATCH EXACTLY ━━━
-• Primary Body Color: ${extractedMetadata.primaryColor}
-• Eye Color: ${extractedMetadata.eyeColor}
-• Markings/Patterns: ${extractedMetadata.markings}
+━━━ MARKINGS & PATTERNS ━━━
+${extractedMetadata.markings}
+
+━━━ POSE & COMPOSITION (MATCH PREVIOUS) ━━━
+• Viewing Angle: ${extractedMetadata.viewingAngle} (KEEP SAME)
+• Pose: ${extractedMetadata.pose} (KEEP SAME)
+• Expression: ${extractedMetadata.expression} (MAINTAIN)
+• Lighting: ${extractedMetadata.lightingDirection}
 
 ━━━ ART STYLE TO MAINTAIN ━━━
 ${extractedMetadata.artStyle}
 
 ━━━ DISTINCTIVE FEATURES TO PRESERVE ━━━
 ${extractedMetadata.distinctiveFeatures}
+
+━━━ REFERENCE DESCRIPTION ━━━
+${extractedMetadata.overallDescription}
 
 ${categoryRules}
 
@@ -579,15 +631,20 @@ ${retryEnforcement}
 ${negativePrompts}
 
 ━━━ SELF-VERIFICATION CHECKLIST ━━━
-□ Colors MATCH the reference description above
-□ Limb count is EXACTLY ${anatomy.limbCount}
+□ PRIMARY COLOR is ${extractedMetadata.hexPrimaryColor} - verified
+□ EYE COLOR is ${extractedMetadata.hexEyeColor} - verified
+□ POSE matches: ${extractedMetadata.pose} - verified
+□ VIEWING ANGLE matches: ${extractedMetadata.viewingAngle} - verified
+□ EXPRESSION matches: ${extractedMetadata.expression} - verified
+□ Limb count is EXACTLY ${anatomy.limbCount} - verified
 □ ${anatomy.hasWings ? 'Wings present' : 'NO wings'} - correct
-□ Recognizable as the SAME creature, just older/more developed
-□ Art style matches the reference
+□ Recognizable as the SAME creature, just evolved
+□ Art style matches reference
 
 ━━━ RENDERING STYLE ━━━
 Stylized digital fantasy art, appealing and charming, expressive features.
-Match the art style described in the reference.
+MUST use the exact color palette specified above.
+Match the art style: ${extractedMetadata.artStyle}
 Painterly digital art with rich saturated colors, soft but defined edges.`;
 
     } else {
