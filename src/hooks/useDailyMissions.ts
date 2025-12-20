@@ -178,6 +178,9 @@ export const useDailyMissions = () => {
       queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
       toast({ title: "Mission Complete!", description: "XP awarded!" });
       playMissionComplete();
+      
+      // Trigger astral encounter check
+      window.dispatchEvent(new CustomEvent('quest-completed'));
     },
     onError: (error: Error) => {
       toast({

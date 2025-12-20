@@ -133,6 +133,9 @@ const MorningCheckInContent = () => {
         await checkFirstTimeAchievements('checkin');
       }
 
+      // Trigger astral encounter check
+      window.dispatchEvent(new CustomEvent('quest-completed'));
+
       // Start polling timer (using ref to avoid stale closure)
       pollStartTimeRef.current = Date.now();
 
