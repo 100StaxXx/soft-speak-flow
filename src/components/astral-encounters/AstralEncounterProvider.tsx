@@ -29,12 +29,19 @@ interface EpicCheckinEventDetail {
   currentProgress?: number;
 }
 
+// Session warmup period before encounters can trigger (30 seconds)
+const SESSION_WARMUP_MS = 30000;
+
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
   const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const isEvolutionActiveRef = useRef(false);
+  
+  // Session protection: require warmup + interaction before encounters can trigger
+  const sessionStartTime = useRef(Date.now());
+  const hasInteractedThisSession = useRef(false);
 
   const { user } = useAuth();
   const { isEvolvingLoading } = useEvolution();
@@ -50,7 +57,14 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     passEncounter,
   } = useAstralEncounters();
 
-  const { checkActivityMilestone, checkWeeklyTrigger } = useEncounterTrigger();
+  const { checkActivityMilestone } = useEncounterTrigger();
+
+  // Check if session is ready for encounters (warmup + interaction)
+  const isSessionReady = useCallback(() => {
+    const warmedUp = Date.now() - sessionStartTime.current > SESSION_WARMUP_MS;
+    const interacted = hasInteractedThisSession.current;
+    return warmedUp && interacted;
+  }, []);
 
   // Track evolution state in ref for immediate access
   useEffect(() => {
@@ -133,8 +147,19 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     epicId?: string,
     epicProgress?: number
   ) => {
+    // Mark that user has interacted this session
+    hasInteractedThisSession.current = true;
+    
     console.log('[AstralEncounterProvider] Activity completed:', activityType, epicId);
+    
+    // Always check milestone (updates activity count), but only trigger encounter if session ready
     const result = await checkActivityMilestone(activityType, epicId, epicProgress);
+    
+    if (!isSessionReady()) {
+      console.log('[AstralEncounterProvider] Session not ready, skipping encounter trigger');
+      return;
+    }
+    
     if (result.shouldTrigger && result.triggerType) {
       triggerEncounterWithOverlay(
         result.triggerType,
@@ -144,7 +169,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         result.activityInterval
       );
     }
-  }, [checkActivityMilestone, triggerEncounterWithOverlay]);
+  }, [checkActivityMilestone, triggerEncounterWithOverlay, isSessionReady]);
 
   // Listen for quest completion events
   const handleQuestCompleted = useCallback(async () => {
@@ -160,20 +185,6 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     },
     [handleActivityCompleted]
   );
-
-  // Check for weekly trigger on mount
-  useEffect(() => {
-    const checkWeekly = async () => {
-      const result = await checkWeeklyTrigger();
-      if (result.shouldTrigger && result.triggerType) {
-        // Delay slightly to avoid immediate popup on app load
-        setTimeout(() => {
-          triggerEncounterWithOverlay(result.triggerType!);
-        }, 3000);
-      }
-    };
-    checkWeekly();
-  }, [checkWeeklyTrigger, triggerEncounterWithOverlay]);
 
   // Listen for quest-completed events
   useEffect(() => {
