@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { Card, CardContent } from "@/components/ui/card";
@@ -120,14 +120,27 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
   const habitLimit = getHabitLimitForTier(template.difficulty_tier);
   const displayedHabits = template.habits.slice(0, habitLimit);
 
+  const handleSelect = useCallback(() => {
+    onSelect(template);
+  }, [onSelect, template]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    handleSelect();
+  }, [handleSelect]);
+
   return (
     <Card 
       className={cn(
-        "cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg border",
+        "cursor-pointer transition-all sm:hover:scale-[1.02] hover:shadow-lg border select-none active:scale-[0.98]",
         `bg-gradient-to-r ${themeGradient}`,
         featured && "ring-2 ring-primary/50"
       )}
-      onClick={() => onSelect(template)}
+      onClick={handleSelect}
+      onTouchEnd={handleTouchEnd}
+      role="button"
+      tabIndex={0}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
