@@ -30,12 +30,137 @@ const EVOLUTION_STAGES = {
     useFutureSilhouette: true,
     futureStage: 20
   },
-  2: { name: "Newborn Emergence", prompt: "A tiny newborn {spirit} taking its first breaths, anatomically accurate with realistic proportions for a hatchling. Oversized curious eyes with proper iris detail and light reflection, soft vulnerable body with correct skeletal structure visible beneath skin/fur/scales. Realistic newborn proportions: large head-to-body ratio, short stubby limbs with proper joint placement. Delicate faint markings in {color} tones. Gentle {element} aura flickering softly. Cinematic lighting highlighting vulnerability and innocence." },
-  3: { name: "Early Infant Form", prompt: "A slightly larger infant {spirit} with improved motor control, steadier posture showing proper spine alignment and center of gravity. Still youthfully round with baby fat/fluff but developing muscle definition. Bright intelligent eyes with proper anatomical positioning. Species-accurate features emerging: correct number of digits, proper ear/horn placement, accurate tail structure. {element} effects manifesting naturally along the creature's energetic meridians. Dynamic lighting showing form and depth." },
-  4: { name: "Juvenile Form", prompt: "A young {spirit} entering adolescence with lengthening limbs showing proper bone structure and joint articulation. Playful athletic pose demonstrating agility and emerging coordination. Anatomically correct musculature beginning to define beneath fur/feathers/scales. Realistic texture details: individual hair strands, scale overlap patterns, or feather barbules. {color} patterning following natural pigmentation paths. {element} energy highlighting movement with motion blur and particle effects." },
-  5: { name: "Young Explorer", prompt: "A growing {spirit} reaching balanced adult proportions with realistic skeletal structure and proper weight distribution. Signature anatomical features now prominent: horns with proper keratin texture, wings with accurate bone structure and membrane/feather detail, claws with realistic curvature, fins with proper ray structure, or tail with correct vertebrae articulation. {element} energy flowing along natural body contours. Confident dynamic pose with cinematic three-point lighting." },
-  6: { name: "Adolescent Guardian", prompt: "A larger adolescent {spirit} with well-defined musculature showing proper anatomical groups: shoulders, haunches, core. Realistic skin/fur/scale texture with subsurface scattering. Confident powerful stance with accurate weight-bearing posture. {element} markings following natural body patterns like tiger stripes or leopard spots but glowing with magical energy. {color} highlights emphasizing anatomical form. Dramatic atmospheric lighting with rim light defining silhouette." },
-  7: { name: "Initiate Protector", prompt: "A mature {spirit} with peak physical conditioning, every muscle group anatomically correct and properly defined. Majestic facial features with realistic bone structure, proper eye socket depth, accurate muzzle/beak proportions. Fur/feathers/scales rendered with microscopic detail showing individual elements. Battle-ready stance with proper weight distribution and tension. {element} aura forming a luminous shield-like corona with atmospheric perspective. {color} patterns creating visual hierarchy. Epic hero lighting with motivated shadows." },
+  // STAGES 2-7: BABY/YOUNG STAGES - Very slow progression, color consistency enforced
+  2: { 
+    name: "Hatchling", 
+    prompt: `A TINY baby {spirit} that JUST emerged from its egg seconds ago.
+
+SIZE: Palm-sized - fits easily in a human hand. Maximum 10% of adult size. EXTREMELY SMALL.
+
+APPEARANCE (CRITICAL):
+- Wet/damp looking as if just hatched, still glistening
+- Eyes barely opening, squinting at first light
+- Extremely soft, vulnerable, completely helpless
+- Body extremely round, squishy, NO muscle definition at all
+- Oversized head (60% of total body mass)
+- Tiny stubby limbs barely visible, pressed close to body
+- If wings: just tiny wet nubs pressed flat against body, not visible yet
+
+POSTURE: Same curled position as seen in the egg, barely moved
+
+COLORS: {color} tones - soft, muted, newborn coloring. Gentle {element} shimmer.
+
+THIS IS A NEWBORN - think seconds-old baby bird or puppy, eyes barely open, completely helpless and precious.`
+  },
+  3: { 
+    name: "Nestling", 
+    prompt: `A TINY baby {spirit}, NEARLY IDENTICAL to Stage 2 but now with eyes fully open.
+
+SIZE: Still palm-sized. Maximum 12% of adult size. STILL EXTREMELY SMALL.
+
+CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
+- Eyes now fully open (big, curious, innocent, taking up most of face)
+- Slightly drier/fluffier than wet hatchling
+- Can hold head up slightly, looking around with wonder
+
+EVERYTHING ELSE IDENTICAL TO STAGE 2:
+- Same tiny round body shape
+- Same soft squishy proportions  
+- Same stubby limbs and tiny wing nubs
+- Same helpless baby appearance
+- Same curled posture, just head lifted
+
+COLORS: EXACT SAME {color} as Stage 2 - absolutely NO COLOR CHANGES. Same {element} shimmer.
+
+Think: 3-day-old puppy or kitten - eyes just opened, still wobbly and helpless.`
+  },
+  4: { 
+    name: "Fledgling", 
+    prompt: `A small baby {spirit}, NEARLY IDENTICAL to Stage 3 with slightly more coordination.
+
+SIZE: Still very small, now 15% of adult size. Still fits in cupped hands.
+
+CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
+- Can now sit upright steadily instead of just lying curled
+- Limbs slightly more defined but still short and stubby
+- Beginning to show playful curiosity in expression
+
+EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+- Same round baby proportions (big head, tiny body)
+- Same fluffy/soft texture
+- Same big innocent eyes
+- Still clearly a helpless baby, cannot walk yet
+
+COLORS: EXACT SAME {color} palette - identical to Stage 2 and 3. NO color changes allowed. {element} glow slightly more visible.
+
+Think: 3-week-old puppy - can sit up, playful but still very much a baby.`
+  },
+  5: { 
+    name: "Cub", 
+    prompt: `A small {spirit} cub, NEARLY IDENTICAL to Stage 4 but now mobile.
+
+SIZE: Small - 20% of adult size. Still fits on a lap easily.
+
+CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
+- Can walk/toddle around (wobbly but mobile)
+- Body slightly less perfectly round (baby fat still very present)
+- If wings: now small visible buds instead of flat nubs
+
+EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+- Same adorable baby face with big eyes
+- Same soft fluffy texture
+- Same baby proportions overall
+- Still clearly a young baby, not a juvenile
+
+COLORS: {color} - COMPLETELY UNCHANGED from earlier stages. Exact same color palette. {element} trails visible when moving.
+
+Think: 6-week-old puppy - playful, wobbly walking, but obviously still a baby.`
+  },
+  6: { 
+    name: "Pup", 
+    prompt: `A young {spirit} pup, NEARLY IDENTICAL to Stage 5 but slightly larger.
+
+SIZE: 25% of adult size. Small and young.
+
+CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
+- Slightly longer limbs (still short, still puppy-like proportions)
+- Face slightly less perfectly round
+- More coordinated movement, less wobbly
+- If wings: small but now can flutter slightly
+
+EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+- Same soft baby texture
+- Same playful innocent expression  
+- Same baby proportions overall
+- Still clearly a baby/young creature
+
+COLORS: EXACT SAME {color} as Stages 2-5 - absolutely NO color shifting or changes. Consistent {element} aura.
+
+Think: 3-month-old puppy - growing but still very much a baby in appearance and proportions.`
+  },
+  7: { 
+    name: "Kit", 
+    prompt: `A young {spirit} kit, NEARLY IDENTICAL to Stage 6 with early signs of growth.
+
+SIZE: 30% of adult size. Still clearly young and small.
+
+CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
+- Limbs proportionally slightly longer
+- Species-specific features becoming slightly clearer
+- Slightly more athletic movement capability
+- If wings: now visible small wings, about 40% of adult wing size
+
+EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+- Same cute youthful face with expressive eyes
+- Same soft texture (maybe slightly less fluffy)
+- Same innocent expression
+- Still clearly a young creature, NOT an adolescent or teen
+
+COLORS: {color} - SAME AS ALL PREVIOUS STAGES, only very slightly more vibrant. {element} effects slightly more defined.
+
+Think: 5-month-old puppy - growing taller but still very puppy-like, not yet approaching teenage proportions.`
+  },
+  // STAGES 8+: Adolescent through Adult and Beyond
   8: { name: "Seasoned Guardian", prompt: "An imposing {spirit} at full adult size with flawless species anatomy and heroic proportions. Powerful physique showing realistic muscle tension and relaxation. Every anatomical detail perfect: teeth/fangs with proper dental structure, eyes with corneal reflection and depth, skin showing appropriate thickness and texture variation. Dynamic pose mid-motion with realistic momentum. {element} energy creating environmental interaction: heat waves, water displacement, ground fissures. Cinematic wide-angle composition with depth of field." },
   9: { name: "Mature Protector", prompt: "A battle-hardened {spirit} in its prime, anatomically perfect with scars and weathering that tell a story. Peak physical condition with defined musculature showing proper insertion points and fiber direction. Regal commanding pose with perfect posture and balance. Environment responding realistically: wind-blown debris, displaced water, crackling energy, gravitational distortion. {element} power radiating with volumetric lighting effects. {color} markings intricate and luminous. Dramatic low-angle cinematic framing emphasizing power." },
   10: { name: "Veteran Form", prompt: "A legendary {spirit} with refined elegant anatomy showing both power and grace. Muscles/feathers/scales/skin exhibiting masterful detail: individual muscle striations, scale iridescence, feather microstructures, skin pores and texture. Wise battle-scarred face with deep intelligent eyes showing inner light. Poised stance radiating authority. {element} markings pulsing with rhythmic energy following circulatory patterns. {color} accents creating focal points. Museum-quality rendering with perfect subsurface scattering and ambient occlusion." },
@@ -259,6 +384,20 @@ CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multi
 GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
       }
       
+      // Evolution consistency enforcement for baby stages (2-7)
+      const evolutionConsistencyNote = stage >= 2 && stage <= 7 ? `
+
+EVOLUTION CONSISTENCY (CRITICAL - READ CAREFULLY):
+- This creature should look NEARLY IDENTICAL to the previous stage
+- DO NOT dramatically change colors - use EXACT SAME color palette as earlier stages
+- DO NOT make the creature look more mature than described - follow SIZE PERCENTAGES exactly
+- Changes between stages should be SUBTLE and MINIMAL - think "spot the difference" level
+- At Stage ${stage}, creature is only ${stage === 2 ? '10%' : stage === 3 ? '12%' : stage === 4 ? '15%' : stage === 5 ? '20%' : stage === 6 ? '25%' : '30%'} of adult size
+- This is still a BABY - cute, round, helpless, NOT athletic or muscular
+- NO dramatic transformations - each stage is almost the same as the previous
+- Real-world comparison: ${stage === 2 ? 'seconds-old hatchling' : stage === 3 ? '3-day-old baby' : stage === 4 ? '3-week-old baby' : stage === 5 ? '6-week-old puppy' : stage === 6 ? '3-month-old puppy' : '5-month-old puppy'}
+` : '';
+      
       fullPrompt = `STYLIZED FANTASY CREATURE - Digital painting style, appealing but not overly cute:
 
 CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
@@ -274,6 +413,7 @@ BASE DESCRIPTION:
 ${basePrompt}
 ${speciesGuidance}
 ${retryEnforcement}
+${evolutionConsistencyNote}
 
 COLOR PALETTE:
 - Primary colors: Rich ${favoriteColor} tones
