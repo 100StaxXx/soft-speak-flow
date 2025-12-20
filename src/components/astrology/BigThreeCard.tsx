@@ -49,6 +49,11 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
     navigate(`/cosmic/${type}/${sign.toLowerCase()}`);
   };
 
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    handleClick();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
@@ -60,9 +65,13 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
         stiffness: 100,
       }}
       onClick={handleClick}
-      className="cursor-pointer"
+      onTouchEnd={handleTouchEnd}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer select-none"
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
-      <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} hover:scale-105 transition-transform duration-300`}>
+      <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} sm:hover:scale-105 active:scale-[0.98] transition-transform duration-300`}>
         {/* Animated cosmiq background */}
         <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-30`}>
           <motion.div

@@ -258,7 +258,18 @@ const Profile = () => {
           </div>
 
           <div className="max-w-md space-y-3">
-            <Card className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-glow" onClick={() => navigate("/library")} data-tour="library">
+            <Card 
+              className="cursor-pointer sm:hover:border-primary/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
+              onClick={() => navigate("/library")} 
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                navigate("/library");
+              }}
+              role="button"
+              tabIndex={0}
+              data-tour="library"
+              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+            >
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <BookHeart className="h-5 w-5 text-primary" />
@@ -267,7 +278,17 @@ const Profile = () => {
                 <CardDescription>View your saved favorites and downloads</CardDescription>
               </CardHeader>
             </Card>
-            <Card className="cursor-pointer hover:border-amber-500/50 transition-all hover:shadow-glow" onClick={() => navigate("/recaps")}>
+            <Card 
+              className="cursor-pointer sm:hover:border-amber-500/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
+              onClick={() => navigate("/recaps")}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                navigate("/recaps");
+              }}
+              role="button"
+              tabIndex={0}
+              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+            >
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <Sparkles className="h-5 w-5 text-amber-400" />

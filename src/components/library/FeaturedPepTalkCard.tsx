@@ -15,14 +15,28 @@ interface FeaturedPepTalkCardProps {
 export const FeaturedPepTalkCard = ({ pepTalk, index }: FeaturedPepTalkCardProps) => {
   const navigate = useNavigate();
 
+  const handleClick = () => {
+    navigate(`/pep-talk/${pepTalk.id}`);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    handleClick();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.15, duration: 0.5 }}
       whileHover={{ y: -4 }}
-      onClick={() => navigate(`/pep-talk/${pepTalk.id}`)}
-      className="group relative cursor-pointer"
+      whileTap={{ scale: 0.98 }}
+      onClick={handleClick}
+      onTouchEnd={handleTouchEnd}
+      role="button"
+      tabIndex={0}
+      className="group relative cursor-pointer select-none"
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(var(--graphite))] to-[hsl(var(--charcoal))] p-5 border border-white/5">
         <motion.div
