@@ -317,6 +317,20 @@ function getElementOverlay(element: string): string {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Validates and sanitizes hex color codes.
+ * Returns the fallback if the input is not a valid hex color.
+ */
+function ensureValidHex(color: string | undefined | null, fallback: string): string {
+  if (!color) return fallback;
+  const hexPattern = /^#[0-9A-Fa-f]{6}$/;
+  const cleanColor = color.trim();
+  if (hexPattern.test(cleanColor)) return cleanColor;
+  // Try adding # if missing
+  if (/^[0-9A-Fa-f]{6}$/.test(cleanColor)) return `#${cleanColor}`;
+  return fallback;
+}
+
 function generateCharacterDNA(spiritAnimal: string, element: string, favoriteColor: string, eyeColor: string | undefined, furColor: string | undefined, stage: number): string {
   const anatomy = getCreatureAnatomy(spiritAnimal);
   const isBabyStage = stage >= 2 && stage <= 7;
@@ -531,8 +545,8 @@ serve(async (req) => {
             // Ultimate fallback with user-provided colors
             if (!extractedMetadata) {
               extractedMetadata = {
-                hexPrimaryColor: favoriteColor,
-                hexEyeColor: eyeColor || favoriteColor,
+                hexPrimaryColor: ensureValidHex(favoriteColor, "#FF6B35"),
+                hexEyeColor: ensureValidHex(eyeColor || favoriteColor, "#FFD700"),
                 hexAccentColor: "#FFFFFF",
                 primaryColorDesc: `Color ${favoriteColor}`,
                 eyeColorDesc: eyeColor ? `Color ${eyeColor}` : "matching body",
@@ -545,6 +559,15 @@ serve(async (req) => {
                 distinctiveFeatures: `${spiritAnimal} typical features`,
                 overallDescription: `A ${spiritAnimal} creature with ${favoriteColor} coloring`
               };
+            }
+            
+            // Sanitize extracted hex colors
+            if (extractedMetadata) {
+              extractedMetadata.hexPrimaryColor = ensureValidHex(extractedMetadata.hexPrimaryColor, favoriteColor);
+              extractedMetadata.hexEyeColor = ensureValidHex(extractedMetadata.hexEyeColor, eyeColor || favoriteColor);
+              if (extractedMetadata.hexAccentColor) {
+                extractedMetadata.hexAccentColor = ensureValidHex(extractedMetadata.hexAccentColor, "#FFFFFF");
+              }
             }
           } else {
             console.warn("Metadata extraction API call failed, proceeding without reference");
@@ -677,58 +700,12 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
     }
 
     // ========================================================================
-    // CALL AI FOR IMAGE GENERATION (always T2I now)
+    // CALL AI FOR IMAGE GENERATION WITH AUTO-RETRY ON LOW QUALITY
     // ========================================================================
 
-    console.log(`Calling AI for T2I generation (stage ${stage}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
-
-    const messageContent = fullPrompt;
-
-    let aiResponse;
-    try {
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [{ role: "user", content: messageContent }],
-          modalities: ["image", "text"]
-        })
-      });
-    } catch (fetchError) {
-      console.error("Network error:", fetchError);
-      return new Response(JSON.stringify({ error: "Network error. Try again.", code: "NETWORK_ERROR" }), 
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 });
-    }
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI error:", errorText);
-
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Insufficient AI credits.", code: "INSUFFICIENT_CREDITS" }), 
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 });
-      }
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "AI service busy. Try again.", code: "RATE_LIMITED" }), 
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 });
-      }
-      throw new Error(`AI request failed: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!imageUrl) {
-      console.error("No image URL in response:", JSON.stringify(aiData));
-      throw new Error("No image URL in response");
-    }
-
-    console.log("Image generated, running quality analysis...");
-
-    // ========================================================================
-    // QUALITY SCORING - Analyze generated image for anatomical correctness
-    // ========================================================================
+    const MAX_INTERNAL_RETRIES = 2;
+    let currentAttempt = 0;
+    let imageUrl: string | null = null;
     let qualityScore: { 
       overall: number; 
       limbCount: number; 
@@ -738,29 +715,83 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
       shouldRetry: boolean;
     } | null = null;
 
-    try {
-      const qualityTool = {
-        type: "function",
-        function: {
-          name: "score_image_quality",
-          description: "Score the quality and correctness of a generated creature image",
-          parameters: {
-            type: "object",
-            properties: {
-              limbCountScore: { type: "number", description: "Score 0-100: Does the creature have the correct number of limbs? 100 = correct, 0 = wrong count" },
-              actualLimbCount: { type: "number", description: "How many limbs does the creature appear to have?" },
-              speciesFidelityScore: { type: "number", description: "Score 0-100: How well does this look like the intended species?" },
-              colorMatchScore: { type: "number", description: "Score 0-100: How well do the colors match the expected palette?" },
-              anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
-              overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" }
-            },
-            required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "anatomyIssues", "overallQuality"],
-            additionalProperties: false
-          }
-        }
-      };
+    while (currentAttempt <= MAX_INTERNAL_RETRIES) {
+      console.log(`Calling AI for T2I generation (stage ${stage}, attempt ${currentAttempt + 1}/${MAX_INTERNAL_RETRIES + 1}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
 
-      const qualityPrompt = `Analyze this ${spiritAnimal} creature image for quality and correctness.
+      const messageContent = currentAttempt > 0 
+        ? `${fullPrompt}\n\n━━━ QUALITY RETRY #${currentAttempt} ━━━\nPrevious attempt had issues: ${qualityScore?.issues?.join(', ') || 'low quality'}\nPAY EXTRA ATTENTION to anatomical correctness. Ensure EXACTLY ${anatomy.limbCount} limbs.`
+        : fullPrompt;
+
+      let aiResponse;
+      try {
+        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image-preview",
+            messages: [{ role: "user", content: messageContent }],
+            modalities: ["image", "text"]
+          })
+        });
+      } catch (fetchError) {
+        console.error("Network error:", fetchError);
+        return new Response(JSON.stringify({ error: "Network error. Try again.", code: "NETWORK_ERROR" }), 
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 });
+      }
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error("AI error:", errorText);
+
+        if (aiResponse.status === 402) {
+          return new Response(JSON.stringify({ error: "Insufficient AI credits.", code: "INSUFFICIENT_CREDITS" }), 
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 });
+        }
+        if (aiResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "AI service busy. Try again.", code: "RATE_LIMITED" }), 
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 });
+        }
+        throw new Error(`AI request failed: ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+      imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!imageUrl) {
+        console.error("No image URL in response:", JSON.stringify(aiData));
+        throw new Error("No image URL in response");
+      }
+
+      console.log("Image generated, running quality analysis...");
+
+      // ========================================================================
+      // QUALITY SCORING - Analyze generated image for anatomical correctness
+      // ========================================================================
+      qualityScore = null;
+
+      try {
+        const qualityTool = {
+          type: "function",
+          function: {
+            name: "score_image_quality",
+            description: "Score the quality and correctness of a generated creature image",
+            parameters: {
+              type: "object",
+              properties: {
+                limbCountScore: { type: "number", description: "Score 0-100: Does the creature have the correct number of limbs? 100 = correct, 0 = wrong count" },
+                actualLimbCount: { type: "number", description: "How many limbs does the creature appear to have?" },
+                speciesFidelityScore: { type: "number", description: "Score 0-100: How well does this look like the intended species?" },
+                colorMatchScore: { type: "number", description: "Score 0-100: How well do the colors match the expected palette?" },
+                anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
+                overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" }
+              },
+              required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "anatomyIssues", "overallQuality"],
+              additionalProperties: false
+            }
+          }
+        };
+
+        const qualityPrompt = `Analyze this ${spiritAnimal} creature image for quality and correctness.
 
 Expected characteristics:
 - Species: ${spiritAnimal}
@@ -772,47 +803,65 @@ ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` 
 
 Score each aspect from 0-100 and list any issues.`;
 
-      const qualityResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: qualityPrompt },
-              { type: "image_url", image_url: { url: imageUrl } }
-            ]
-          }],
-          tools: [qualityTool],
-          tool_choice: { type: "function", function: { name: "score_image_quality" } }
-        })
-      });
+        const qualityResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: qualityPrompt },
+                { type: "image_url", image_url: { url: imageUrl } }
+              ]
+            }],
+            tools: [qualityTool],
+            tool_choice: { type: "function", function: { name: "score_image_quality" } }
+          })
+        });
 
-      if (qualityResponse.ok) {
-        const qualityData = await qualityResponse.json();
-        const toolCall = qualityData.choices?.[0]?.message?.tool_calls?.[0];
-        
-        if (toolCall?.function?.arguments) {
-          const scores = JSON.parse(toolCall.function.arguments);
-          qualityScore = {
-            overall: scores.overallQuality || 0,
-            limbCount: scores.limbCountScore || 0,
-            speciesFidelity: scores.speciesFidelityScore || 0,
-            colorMatch: scores.colorMatchScore || 0,
-            issues: scores.anatomyIssues || [],
-            shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50
-          };
-          console.log("Quality analysis:", qualityScore);
+        if (qualityResponse.ok) {
+          const qualityData = await qualityResponse.json();
+          const toolCall = qualityData.choices?.[0]?.message?.tool_calls?.[0];
+          
+          if (toolCall?.function?.arguments) {
+            const scores = JSON.parse(toolCall.function.arguments);
+            qualityScore = {
+              overall: scores.overallQuality || 0,
+              limbCount: scores.limbCountScore || 0,
+              speciesFidelity: scores.speciesFidelityScore || 0,
+              colorMatch: scores.colorMatchScore || 0,
+              issues: scores.anatomyIssues || [],
+              shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50
+            };
+            console.log("Quality analysis:", qualityScore);
+          }
         }
+      } catch (qualityError) {
+        console.warn("Quality analysis failed (non-blocking):", qualityError);
       }
-    } catch (qualityError) {
-      console.warn("Quality analysis failed (non-blocking):", qualityError);
+
+      // Check if we should retry
+      if (qualityScore?.shouldRetry && currentAttempt < MAX_INTERNAL_RETRIES) {
+        console.log(`Quality too low (overall: ${qualityScore.overall}, limbs: ${qualityScore.limbCount}), retrying... (${currentAttempt + 1}/${MAX_INTERNAL_RETRIES})`);
+        currentAttempt++;
+        continue;
+      }
+
+      // Quality acceptable or max retries reached
+      if (qualityScore?.shouldRetry) {
+        console.log(`Accepting image after ${currentAttempt + 1} attempts despite quality issues`);
+      }
+      break;
     }
 
     // ========================================================================
     // UPLOAD TO STORAGE
     // ========================================================================
+    if (!imageUrl) {
+      throw new Error("No image was generated after all attempts");
+    }
+    
     console.log("Uploading to storage...");
 
     const base64Data = imageUrl.split(",")[1];

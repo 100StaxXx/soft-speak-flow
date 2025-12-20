@@ -57,6 +57,7 @@ interface ExtractedMetadata {
   expression: string;
   artStyle: string;
   distinctiveFeatures: string;
+  lightingDirection?: string;
 }
 
 interface GeneratedImage {
