@@ -29,22 +29,17 @@ export function HourlyViewModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isToday = isSameDay(selectedDate, new Date());
 
-  // Auto-scroll to current hour when modal opens
+  // Auto-scroll to show previous hour at top when modal opens
   useEffect(() => {
     if (open && scrollRef.current) {
       const now = new Date();
       const currentHour = now.getHours();
-      const currentMinutes = now.getMinutes();
       
-      // Each hour has 2 time slots (30min each), each slot is ~60px height
-      // So each hour = 120px. Add partial hour offset for more precision.
-      const hourOffset = currentHour * 120;
-      const minuteOffset = (currentMinutes / 60) * 120;
-      // Scroll to show current time roughly in the upper third of the viewport
-      const viewportOffset = 100;
-      const scrollTarget = Math.max(0, hourOffset + minuteOffset - viewportOffset);
+      // Each hour = 120px (2 slots × 60px per slot)
+      // Scroll to show the PREVIOUS hour at the top of the modal
+      const previousHour = Math.max(0, currentHour - 1);
+      const scrollTarget = previousHour * 120;
       
-      // Use a longer timeout to ensure DOM is fully rendered
       setTimeout(() => {
         if (scrollRef.current) {
           scrollRef.current.scrollTo({ top: scrollTarget, behavior: "smooth" });
