@@ -386,7 +386,8 @@ export const AstralEncounterModal = ({
       <Dialog open={open && !needsFullscreen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
           <motion.div 
-            className="relative min-h-[500px] max-h-[90vh] overflow-hidden"
+            className="relative min-h-[500px] max-h-[90dvh] overflow-y-auto"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 24px)' }}
             animate={showScreenShake ? { x: [0, -4, 4, -2, 2, 0] } : {}}
             transition={{ duration: 0.3 }}
           >
