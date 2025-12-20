@@ -77,7 +77,7 @@ const CREATURE_DATA: Record<string, { cat: string; baby: string; adult: string; 
   
   // === MYTHICAL FELINES ===
   "Sphinx": { cat: "feline", baby: "lion cub body with small wing nubs, human-like wise eyes", adult: "lion body with large eagle/feathered wings, serene wise expression, regal posture", notes: "Egyptian: lion body + wings + wise expression, majestic feathered wings", wings: true, body: "quadruped-winged", ref: "Egyptian sphinx" },
-  "Kitsune": { cat: "feline", baby: "adorable fox kit with 1-2 small fluffy tails, white/golden fur", adult: "elegant fox with MULTIPLE flowing tails (up to 9), white/golden/silver fur, mystical flames", notes: "Japanese fox spirit - MORE TAILS = MORE POWERFUL (1-9 tails), fox fire flames", body: "quadruped-multitail", ref: "nine-tailed fox" },
+  "Kitsune": { cat: "canine", baby: "adorable fox kit with 1-2 small fluffy tails, white/golden fur", adult: "elegant fox with MULTIPLE flowing tails (up to 9), white/golden/silver fur, mystical flames", notes: "Japanese fox spirit - MORE TAILS = MORE POWERFUL (1-9 tails), fox fire flames", body: "quadruped-multitail", ref: "nine-tailed fox" },
   
   // === DRAGONS & REPTILES ===
   "Dragon": { cat: "dragon", baby: "small cute dragon with oversized head, tiny wing nubs, stubby tail", adult: "4 legs + 2 wings (6 limbs), scales, horns, powerful tail, fire breath, majestic wingspan", notes: "Western dragon: 4 legs + 2 wings = 6 limbs, scales, horns on head, long neck", ref: "Western dragon" },
