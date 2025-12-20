@@ -600,7 +600,7 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
 
     console.log(`Uploaded: ${publicUrl}`);
 
-    return new Response(JSON.stringify({ imageUrl: publicUrl }), 
+    return new Response(JSON.stringify({ imageUrl: publicUrl, prompt: fullPrompt }), 
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
 
   } catch (error) {

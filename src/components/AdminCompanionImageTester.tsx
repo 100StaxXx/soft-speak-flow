@@ -23,11 +23,11 @@ const CREATURE_OPTIONS = {
   "Equines": ["Horse (Stallion)", "Unicorn", "Pegasus"],
   "Aquatic": ["Dolphin", "Shark", "Orca", "Blue Whale", "Jellyfish", "Octopus", "Manta Ray"],
   "Mythical Aquatic": ["Kraken", "Leviathan"],
-  "Other Mammals": ["Bear", "Elephant", "Gorilla", "Rhino", "Hippo", "Mammoth", "Kangaroo", "Koala", "Red Panda", "Panda", "Sloth", "Rabbit", "Mouse", "Chinchilla", "Raccoon", "Bat", "Deer"],
+  "Other Mammals": ["Bear", "Deer", "Elephant", "Gorilla", "Rhino", "Hippo", "Mammoth", "Kangaroo", "Koala", "Red Panda", "Panda", "Sloth", "Rabbit", "Mouse", "Chinchilla", "Raccoon", "Bat"],
 };
 
-const ELEMENTS = ["fire", "water", "earth", "air", "lightning", "ice", "light", "shadow"];
-const STORY_TONES = ["", "heroic", "ethereal", "mystical", "ancient", "celestial"];
+const ELEMENTS = ["Fire", "Water", "Earth", "Air", "Lightning", "Ice", "Nature", "Light", "Shadow", "Cosmic"];
+const STORY_TONES = ["", "whimsical", "epic", "cozy", "mysterious", "triumphant", "melancholic", "playful"];
 
 const STAGE_NAMES = [
   "Egg", "Hatchling", "Sproutling", "Cub", "Juvenile",
@@ -46,12 +46,13 @@ interface GeneratedImage {
 export const AdminCompanionImageTester = () => {
   const [testData, setTestData] = useState({
     spiritAnimal: "Wolf",
-    element: "fire",
+    element: "Fire",
     stage: 0,
     favoriteColor: "#FF6B35",
     eyeColor: "#FFD700",
     furColor: "#8B4513",
     storyTone: "",
+    retryAttempt: 0,
   });
   
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -86,18 +87,19 @@ export const AdminCompanionImageTester = () => {
       const previousStageImage = generatedChain[testData.stage - 1]?.imageUrl;
       const generationMode = getGenerationMode(testData.stage, !!previousStageImage);
 
-      const { data, error } = await supabase.functions.invoke("generate-companion-image", {
-        body: {
-          spiritAnimal: testData.spiritAnimal,
-          element: testData.element,
-          stage: testData.stage,
-          favoriteColor: testData.favoriteColor,
-          eyeColor: testData.eyeColor || undefined,
-          furColor: testData.furColor || undefined,
-          storyTone: testData.storyTone || undefined,
-          previousStageImageUrl: previousStageImage,
-        },
-      });
+        const { data, error } = await supabase.functions.invoke("generate-companion-image", {
+          body: {
+            spiritAnimal: testData.spiritAnimal,
+            element: testData.element,
+            stage: testData.stage,
+            favoriteColor: testData.favoriteColor,
+            eyeColor: testData.eyeColor || undefined,
+            furColor: testData.furColor || undefined,
+            storyTone: testData.storyTone || undefined,
+            previousStageImageUrl: previousStageImage,
+            retryAttempt: testData.retryAttempt || undefined,
+          },
+        });
 
       if (error) throw error;
 
@@ -215,7 +217,7 @@ export const AdminCompanionImageTester = () => {
               className="w-full p-3 min-h-[44px] border rounded-2xl bg-background text-base"
             >
               {ELEMENTS.map(el => (
-                <option key={el} value={el}>{el.charAt(0).toUpperCase() + el.slice(1)}</option>
+                <option key={el} value={el}>{el}</option>
               ))}
             </select>
           </div>
@@ -271,6 +273,20 @@ export const AdminCompanionImageTester = () => {
               </span>
             )}
           </div>
+        </div>
+
+        {/* Retry Attempt */}
+        <div>
+          <Label htmlFor="retryAttempt">Retry Attempt (0-3, affects enforcement text)</Label>
+          <Input
+            type="number"
+            id="retryAttempt"
+            min="0"
+            max="3"
+            value={testData.retryAttempt}
+            onChange={(e) => setTestData({ ...testData, retryAttempt: parseInt(e.target.value) || 0 })}
+            className="w-full rounded-2xl min-h-[44px] text-base"
+          />
         </div>
 
         {/* Color Pickers */}
