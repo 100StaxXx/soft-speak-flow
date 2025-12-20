@@ -121,6 +121,7 @@ const StaticStarBackground = memo(({ stars }: { stars: ReturnType<typeof useStat
 StaticStarBackground.displayName = 'StaticStarBackground';
 
 // OPTIMIZED: Simplified note orb - no trail, no approach ring, simple shadow
+// FIX: Use percentage instead of vh for proper positioning within container
 const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) => {
   const config = LANE_CONFIG[note.lane];
   const Icon = config.icon;
@@ -132,9 +133,9 @@ const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) =>
         width: '64px',
         height: '64px',
         left: `calc(${(laneIndex + 0.5) * 33.33}% - 32px)`,
-        transform: `translateY(calc(${note.y}vh - 50%)) translateZ(0)`,
+        top: `${note.y}%`,
+        transform: 'translateY(-50%) translateZ(0)',
         willChange: 'transform',
-        top: 0,
       }}
     >
       <div
