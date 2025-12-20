@@ -207,7 +207,7 @@ serve(async (req) => {
         try {
           console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
           await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
-            body: { pepTalkId: dailyPepTalk.id }
+            body: { id: dailyPepTalk.id }
           });
           console.log(`✓ Transcript synced for ${mentorSlug}`);
         } catch (syncError) {
