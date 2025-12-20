@@ -187,36 +187,7 @@ export const useEncounterTrigger = () => {
     return { shouldTrigger: false };
   }, [user?.id, ensureEncountersEnabled]);
 
-  // Check for weekly trigger (once per 7 days)
-  const checkWeeklyTrigger = useCallback(async (): Promise<TriggerResult> => {
-    if (!user?.id) return { shouldTrigger: false };
-
-    const encountersEnabled = await ensureEncountersEnabled();
-    if (!encountersEnabled) return { shouldTrigger: false };
-
-    // Check last weekly encounter
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    
-    const { data: recentWeekly } = await supabase
-      .from('astral_encounters')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('trigger_type', 'weekly')
-      .gte('created_at', oneWeekAgo)
-      .limit(1);
-
-    if (!recentWeekly || recentWeekly.length === 0) {
-      return {
-        shouldTrigger: true,
-        triggerType: 'weekly'
-      };
-    }
-
-    return { shouldTrigger: false };
-  }, [user?.id, ensureEncountersEnabled]);
-
   return {
-    checkActivityMilestone,
-    checkWeeklyTrigger
+    checkActivityMilestone
   };
 };
