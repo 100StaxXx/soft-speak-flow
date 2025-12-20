@@ -305,9 +305,14 @@ const Horoscope = () => {
         description: "Your celestial map has been calculated.",
       });
 
-      setTimeout(() => {
-        window.location.href = window.location.pathname;
-      }, 1000);
+      // Invalidate profile and regenerate horoscope instead of full page reload
+      await queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
+      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      
+      // Wait for profile state to update then regenerate horoscope
+      setTimeout(async () => {
+        await generateHoroscope();
+      }, 500);
     } catch (error) {
       console.error('Error:', error);
       toast({
