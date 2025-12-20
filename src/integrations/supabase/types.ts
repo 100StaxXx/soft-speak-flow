@@ -4948,6 +4948,13 @@ export type Database = {
       }
     }
     Functions: {
+      apply_referral_code_secure: {
+        Args: { p_referral_code: string; p_user_id: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       count_user_epics: { Args: { p_user_id: string }; Returns: number }
       create_companion_if_not_exists: {
@@ -5012,16 +5019,6 @@ export type Database = {
       should_evolve: {
         Args: { current_stage: number; current_xp: number }
         Returns: boolean
-      }
-      validate_referral_code: {
-        Args: { p_code: string }
-        Returns: {
-          code: string
-          id: string
-          is_active: boolean
-          owner_type: string
-          owner_user_id: string
-        }[]
       }
       validate_referral_code_public: {
         Args: { p_code: string }

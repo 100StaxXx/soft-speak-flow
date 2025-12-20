@@ -57,13 +57,10 @@ serve(async (req) => {
       .eq('id', compId);
     if (delCompErr) throw delCompErr;
 
-    // Clear referral relationship (allows user to apply a new code if they want)
-    // This prevents UX issues where users are stuck with an old referral code
-    const { error: clearReferralErr } = await supabase
-      .from('profiles')
-      .update({ referred_by: null })
-      .eq('id', user.id);
-    if (clearReferralErr) throw clearReferralErr;
+    // SECURITY FIX: Do NOT clear referral relationship on companion reset
+    // Referral relationships must be permanent after stage 3 completion to prevent gaming
+    // The referral_completions table tracks completed referrals and should be authoritative
+    // Clearing referred_by would allow users to repeatedly apply codes and farm payouts
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
