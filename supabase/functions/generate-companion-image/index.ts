@@ -898,6 +898,255 @@ const ELEMENT_AS_OVERLAY: Record<string, string> = {
 };
 
 // ============================================================================
+// AGING PARAMETERS SYSTEM - Quantified changes for each stage
+// ============================================================================
+
+interface AgingParams {
+  eyeOpenness: string;
+  bodyRoundness: string;
+  furState: string;
+  limbDevelopment: string;
+  mobilityLevel: string;
+  sizePercent: string;
+  muscleDefinition: string;
+  wingDevelopment: string;
+  elementalManifest: string;
+  cosmicPower: string;
+}
+
+const AGING_PARAMETERS: Record<number, AgingParams> = {
+  // Egg stages (0-1) don't have aging params
+  2: {
+    eyeOpenness: "5% - barely cracking open, squinting at first light",
+    bodyRoundness: "95% - nearly perfect sphere of baby fat",
+    furState: "20% dry - still damp/glistening from egg",
+    limbDevelopment: "10% - tiny nubs pressed flat against body",
+    mobilityLevel: "0% - lying curled in egg position, cannot move",
+    sizePercent: "8% of adult",
+    muscleDefinition: "0% - pure soft baby fat",
+    wingDevelopment: "0% - invisible wet nubs if species has wings",
+    elementalManifest: "0% - no elemental effects visible",
+    cosmicPower: "0%"
+  },
+  3: {
+    eyeOpenness: "100% - eyes now fully open, huge and curious",
+    bodyRoundness: "92% - still extremely round blob",
+    furState: "70% dry - now fluffy instead of wet",
+    limbDevelopment: "15% - slightly more visible but still pressed to body",
+    mobilityLevel: "5% - can lift head slightly, look around",
+    sizePercent: "10% of adult",
+    muscleDefinition: "0% - still pure baby fat",
+    wingDevelopment: "5% - tiny dry nubs barely visible",
+    elementalManifest: "0% - no elemental effects",
+    cosmicPower: "0%"
+  },
+  4: {
+    eyeOpenness: "100% - fully open, expressive",
+    bodyRoundness: "88% - very round but slightly less spherical",
+    furState: "90% dry - fully fluffy and soft",
+    limbDevelopment: "20% - short stubby limbs, can support sitting",
+    mobilityLevel: "15% - can sit upright steadily",
+    sizePercent: "12% of adult",
+    muscleDefinition: "0% - no muscle, all fluff",
+    wingDevelopment: "10% - small visible nubs",
+    elementalManifest: "0% - no effects",
+    cosmicPower: "0%"
+  },
+  5: {
+    eyeOpenness: "100%",
+    bodyRoundness: "82% - still round but body elongating slightly",
+    furState: "100% - fully developed baby fluff",
+    limbDevelopment: "30% - can support wobbly walking",
+    mobilityLevel: "30% - wobbly toddle, unstable but mobile",
+    sizePercent: "18% of adult",
+    muscleDefinition: "5% - hint of future strength",
+    wingDevelopment: "20% - small buds visible, cannot use",
+    elementalManifest: "5% - faintest hints of element color in eyes",
+    cosmicPower: "0%"
+  },
+  6: {
+    eyeOpenness: "100%",
+    bodyRoundness: "75% - rounder than adult but less baby-blob",
+    furState: "100%",
+    limbDevelopment: "40% - proportionally longer, more coordinated",
+    mobilityLevel: "50% - steady walking, some playful running",
+    sizePercent: "22% of adult",
+    muscleDefinition: "8% - slight definition under fluff",
+    wingDevelopment: "30% - can flutter slightly",
+    elementalManifest: "8% - very subtle glow possible",
+    cosmicPower: "0%"
+  },
+  7: {
+    eyeOpenness: "100%",
+    bodyRoundness: "68% - transitioning toward juvenile proportions",
+    furState: "100%",
+    limbDevelopment: "50% - noticeably longer, more capable",
+    mobilityLevel: "65% - running, climbing, exploring",
+    sizePercent: "28% of adult",
+    muscleDefinition: "12% - baby fat reducing, shape emerging",
+    wingDevelopment: "40% - small wings, can glide briefly",
+    elementalManifest: "12% - subtle elemental hints around creature",
+    cosmicPower: "0%"
+  },
+  8: {
+    eyeOpenness: "100%",
+    bodyRoundness: "55% - gangly adolescent proportions",
+    furState: "100%",
+    limbDevelopment: "65% - long and somewhat awkward",
+    mobilityLevel: "80% - agile and energetic",
+    sizePercent: "38% of adult",
+    muscleDefinition: "25% - athletic build emerging",
+    wingDevelopment: "50% - can glide medium distances",
+    elementalManifest: "20% - noticeable elemental aura",
+    cosmicPower: "0%"
+  },
+  9: {
+    eyeOpenness: "100%",
+    bodyRoundness: "45% - approaching adult proportions",
+    furState: "100%",
+    limbDevelopment: "75% - near adult proportions",
+    mobilityLevel: "90% - full mobility",
+    sizePercent: "48% of adult",
+    muscleDefinition: "40% - clearly athletic",
+    wingDevelopment: "60% - capable short flight",
+    elementalManifest: "30% - clear elemental effects",
+    cosmicPower: "0%"
+  },
+  10: {
+    eyeOpenness: "100%",
+    bodyRoundness: "35% - near adult proportions",
+    furState: "100%",
+    limbDevelopment: "85% - almost adult length",
+    mobilityLevel: "100% - full adult mobility",
+    sizePercent: "60% of adult",
+    muscleDefinition: "55% - well-defined athlete",
+    wingDevelopment: "75% - proficient flyer",
+    elementalManifest: "45% - strong elemental presence",
+    cosmicPower: "0%"
+  },
+  11: {
+    eyeOpenness: "100%",
+    bodyRoundness: "25% - prime adult proportions",
+    furState: "100%",
+    limbDevelopment: "95% - peak proportions",
+    mobilityLevel: "100%",
+    sizePercent: "80% of adult",
+    muscleDefinition: "70% - peak physical condition",
+    wingDevelopment: "90% - powerful flight",
+    elementalManifest: "60% - element part of being",
+    cosmicPower: "5% - first hints of mythic power"
+  },
+  12: {
+    eyeOpenness: "100%",
+    bodyRoundness: "20% - perfect adult form",
+    furState: "100%",
+    limbDevelopment: "100% - full adult development",
+    mobilityLevel: "100%",
+    sizePercent: "100% of adult",
+    muscleDefinition: "80% - magnificent specimen",
+    wingDevelopment: "100% - full wingspan",
+    elementalManifest: "75% - commanding elemental power",
+    cosmicPower: "10% - mythic potential visible"
+  },
+  13: {
+    eyeOpenness: "100%",
+    bodyRoundness: "18%",
+    furState: "100% - with subtle magical shimmer",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "115% of normal adult",
+    muscleDefinition: "85%",
+    wingDevelopment: "110% - enhanced mythic wings",
+    elementalManifest: "85% - element integral to being",
+    cosmicPower: "25% - reality subtly bends"
+  },
+  14: {
+    eyeOpenness: "100%",
+    bodyRoundness: "15%",
+    furState: "100% - magical luminescence in coat",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "140% of normal adult",
+    muscleDefinition: "90%",
+    wingDevelopment: "125% - legendary wings",
+    elementalManifest: "95% - environment responds to presence",
+    cosmicPower: "40% - heroic mythic power"
+  },
+  15: {
+    eyeOpenness: "100%",
+    bodyRoundness: "12%",
+    furState: "100% - divine light woven in",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "TITAN - building-sized",
+    muscleDefinition: "95%",
+    wingDevelopment: "150% - colossal divine wings",
+    elementalManifest: "100% - IS the element",
+    cosmicPower: "55% - earth-shaking power"
+  },
+  16: {
+    eyeOpenness: "100%",
+    bodyRoundness: "10%",
+    furState: "100% - stars visible within coat",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "CELESTIAL - mountain-sized",
+    muscleDefinition: "98%",
+    wingDevelopment: "175% - cosmic wings",
+    elementalManifest: "100%",
+    cosmicPower: "70% - celestial being"
+  },
+  17: {
+    eyeOpenness: "100%",
+    bodyRoundness: "8%",
+    furState: "100% - nebulae and galaxies visible",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "DIVINE - planetary scale",
+    muscleDefinition: "100%",
+    wingDevelopment: "200% - divine wings",
+    elementalManifest: "100%",
+    cosmicPower: "85% - approaching godhood"
+  },
+  18: {
+    eyeOpenness: "100%",
+    bodyRoundness: "5%",
+    furState: "100% - made of starlight",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "UNIVERSAL - stellar scale",
+    muscleDefinition: "100%",
+    wingDevelopment: "INFINITE",
+    elementalManifest: "100%",
+    cosmicPower: "92% - shapes reality"
+  },
+  19: {
+    eyeOpenness: "100%",
+    bodyRoundness: "2%",
+    furState: "100% - primordial energy",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "PRIMORDIAL - galactic scale",
+    muscleDefinition: "100%",
+    wingDevelopment: "INFINITE",
+    elementalManifest: "100%",
+    cosmicPower: "98% - creation power"
+  },
+  20: {
+    eyeOpenness: "100%",
+    bodyRoundness: "0% - perfect divine form",
+    furState: "100% - IS creation itself",
+    limbDevelopment: "100%",
+    mobilityLevel: "100%",
+    sizePercent: "ORIGIN - universal scale",
+    muscleDefinition: "100%",
+    wingDevelopment: "INFINITE",
+    elementalManifest: "100%",
+    cosmicPower: "100% - THE ORIGIN"
+  }
+};
+
+// ============================================================================
 // COMPLETE 21 EVOLUTION STAGES - Ultra-detailed prompts
 // ============================================================================
 
@@ -1680,18 +1929,19 @@ serve(async (req) => {
     }
 
     // ========================================================================
-    // IMAGE-TO-IMAGE FOR BABY STAGES (2-7)
+    // IMAGE-TO-IMAGE FOR ALL STAGES 2+ (Extended from baby only)
     // ========================================================================
     let useImageToImage = false;
     let previousImageUrl: string | null = null;
 
-    if (stage >= 2 && stage <= 7) {
+    // Use image-to-image for ALL stages 2+ to maintain consistency
+    if (stage >= 2) {
       // Try to get previous stage image
       if (previousStageImageUrl) {
         previousImageUrl = previousStageImageUrl;
         useImageToImage = true;
-        console.log(`Using provided previous stage image for image-to-image editing`);
-      } else if (companionId && stage > 2) {
+        console.log(`Using provided previous stage image for image-to-image editing (stage ${stage})`);
+      } else if (companionId) {
         // Fetch from companion_evolutions table
         const previousStage = stage - 1;
         const { data: prevEvolution } = await supabase
@@ -1708,6 +1958,10 @@ serve(async (req) => {
         }
       }
     }
+    
+    // Get aging parameters for current and previous stage
+    const currentAgingParams = AGING_PARAMETERS[stage as number];
+    const previousAgingParams = stage > 2 ? AGING_PARAMETERS[(stage - 1) as number] : null;
 
     // ========================================================================
     // BUILD THE PROMPT
@@ -1754,38 +2008,99 @@ RENDERING STYLE:
 - NOT photorealistic, NOT hyper-cartoonish
 - Magical and ethereal atmosphere`;
 
-    } else if (useImageToImage && previousImageUrl) {
-      // IMAGE-TO-IMAGE EDITING for baby stages 2-7
-      const stageChanges = {
-        2: "Just hatched - eyes barely opening, wet/damp appearance, still in egg-curled position",
-        3: "Eyes now FULLY OPEN (big, curious), slightly drier/fluffier than before",
-        4: "Can now SIT UPRIGHT steadily, limbs slightly more defined, playful curiosity showing",
-        5: "Can now WALK/TODDLE (wobbly), body slightly less round, tiny wing buds visible if species has wings",
-        6: "Limbs slightly longer, face slightly less round, more coordinated movement",
-        7: "Limbs proportionally longer, species features clearer, small wings visible if species has wings"
-      };
+    } else if (useImageToImage && previousImageUrl && currentAgingParams) {
+      // IMAGE-TO-IMAGE EDITING with quantified aging parameters for ALL stages 2+
+      
+      // Build the before→after aging changes
+      let agingChangesPrompt = '';
+      
+      if (previousAgingParams) {
+        agingChangesPrompt = `
+━━━ AGING MODIFICATIONS TO APPLY (Before → After) ━━━
+• Eye Openness: ${previousAgingParams.eyeOpenness} → ${currentAgingParams.eyeOpenness}
+• Body Roundness: ${previousAgingParams.bodyRoundness} → ${currentAgingParams.bodyRoundness}
+• Fur/Coat State: ${previousAgingParams.furState} → ${currentAgingParams.furState}
+• Limb Development: ${previousAgingParams.limbDevelopment} → ${currentAgingParams.limbDevelopment}
+• Mobility/Pose: ${previousAgingParams.mobilityLevel} → ${currentAgingParams.mobilityLevel}
+• Size: ${previousAgingParams.sizePercent} → ${currentAgingParams.sizePercent}
+• Muscle Definition: ${previousAgingParams.muscleDefinition} → ${currentAgingParams.muscleDefinition}
+• Wing Development: ${previousAgingParams.wingDevelopment} → ${currentAgingParams.wingDevelopment}
+• Elemental Power: ${previousAgingParams.elementalManifest} → ${currentAgingParams.elementalManifest}
+• Cosmic Power: ${previousAgingParams.cosmicPower} → ${currentAgingParams.cosmicPower}`;
+      } else {
+        // Stage 2 (first baby stage, no previous aging params)
+        agingChangesPrompt = `
+━━━ STAGE 2 HATCHING STATE ━━━
+• Eye Openness: ${currentAgingParams.eyeOpenness}
+• Body Roundness: ${currentAgingParams.bodyRoundness}
+• Fur/Coat State: ${currentAgingParams.furState}
+• Limb Development: ${currentAgingParams.limbDevelopment}
+• Mobility/Pose: ${currentAgingParams.mobilityLevel}
+• Size: ${currentAgingParams.sizePercent}
+• Muscle Definition: ${currentAgingParams.muscleDefinition}
+• Wing Development: ${currentAgingParams.wingDevelopment}`;
+      }
+      
+      // Stage category-specific instructions
+      let stageCategory = '';
+      if (stage >= 2 && stage <= 7) {
+        stageCategory = `
+━━━ BABY STAGE RULES ━━━
+- Keep the creature looking like a BABY/INFANT
+- NO muscle definition, NO athletic appearance
+- Round, soft, adorable proportions
+- This is "spot the difference" - barely change anything`;
+      } else if (stage >= 8 && stage <= 12) {
+        stageCategory = `
+━━━ ADOLESCENT/ADULT STAGE RULES ━━━
+- Creature is maturing physically
+- Growing more athletic and capable
+- Species features becoming more defined
+- Maintain core identity while allowing natural growth`;
+      } else if (stage >= 13 && stage <= 17) {
+        stageCategory = `
+━━━ MYTHIC STAGE RULES ━━━
+- Creature transcending normal limits
+- Add subtle magical/divine enhancements
+- Elemental power becoming visible
+- Growing beyond normal species size`;
+      } else if (stage >= 18) {
+        stageCategory = `
+━━━ COSMIC/DIVINE STAGE RULES ━━━
+- Creature becoming cosmic entity
+- Stars, galaxies, divine light in form
+- Reality-warping scale and power
+- Species identity preserved at divine scale`;
+      }
 
-      fullPrompt = `IMAGE EDITING INSTRUCTION - MAKE MINIMAL CHANGES ONLY
+      fullPrompt = `IMAGE AGING INSTRUCTION - EVOLVE THE CREATURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-I am providing an image of a Stage ${stage - 1} ${spiritAnimal} baby.
-Edit this image to create Stage ${stage} with ONLY these specific changes:
+I am providing an image of a Stage ${stage - 1} ${spiritAnimal}.
+Age/evolve this creature to Stage ${stage} (${stageInfo.name}) using the EXACT modifications below.
 
-━━━ SPECIFIC CHANGES FOR STAGE ${stage} ━━━
-${stageChanges[stage as keyof typeof stageChanges]}
+${agingChangesPrompt}
 
-━━━ CRITICAL: WHAT MUST STAY IDENTICAL ━━━
-- EXACT SAME body color (${favoriteColor})
-- EXACT SAME eye color (${eyeColor || favoriteColor})
-- EXACT SAME fur/feather/scale color (${furColor || favoriteColor})
-- EXACT SAME face structure and features
-- EXACT SAME overall body shape (with minor specified changes)
-- EXACT SAME style and rendering quality
+${stageCategory}
 
-━━━ THIS IS "SPOT THE DIFFERENCE" LEVEL CHANGE ━━━
-The two images should look nearly identical except for the 1-2 specific changes listed above.
+━━━ ABSOLUTELY LOCKED (NO CHANGE ALLOWED) ━━━
+✓ Body Color: KEEP EXACT ${favoriteColor} - do not shift or alter
+✓ Eye Color: KEEP EXACT ${eyeColor || favoriteColor} - identical shade
+✓ Fur/Feather/Scale Color: KEEP EXACT ${furColor || favoriteColor}
+✓ Species: Still a ${spiritAnimal} - same anatomy rules
+✓ Art Style: Same digital painting style and quality
+✓ Face Structure: Same facial features and proportions
+✓ Unique Markings: Any patterns or markings must remain
+
+━━━ STAGE ${stage} DESCRIPTION ━━━
+${stagePrompt}
 
 ${characterDNA}
-${negativePrompts}`;
+${elementOverlay}
+${negativePrompts}
+
+CRITICAL: This should look like the SAME creature at a slightly older/more developed stage.
+Apply ONLY the percentage changes listed above. Colors must be IDENTICAL.`;
 
     } else {
       // Standard text-to-image generation
