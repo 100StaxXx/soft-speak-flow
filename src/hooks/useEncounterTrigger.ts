@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TriggerType } from '@/types/astralEncounters';
 
-export type ActivityType = 'quest' | 'epic_checkin';
+export type ActivityType = 'quest' | 'epic_checkin' | 'daily_mission' | 'morning_checkin';
 
 interface TriggerResult {
   shouldTrigger: boolean;
@@ -11,12 +11,12 @@ interface TriggerResult {
   sourceId?: string;
   epicProgress?: number;
   epicCategory?: string;
-  activityInterval?: number; // Number of activities since last encounter (2-4)
+  activityInterval?: number; // Number of activities since last encounter (2-5)
   activityType?: ActivityType;
 }
 
-// Generate random interval between 2-4 activities
-const getRandomInterval = () => Math.floor(Math.random() * 3) + 2;
+// Generate random interval between 2-5 activities
+const getRandomInterval = () => Math.floor(Math.random() * 4) + 2;
 const MIN_ACTIVITIES_BEFORE_ENCOUNTERS = 2;
 
 export const useEncounterTrigger = () => {
