@@ -40,7 +40,7 @@ interface GeneratedImage {
   stage: number;
   imageUrl: string;
   prompt?: string;
-  generationMode: "text-to-image" | "image-to-image";
+  generationMode: string;
 }
 
 export const AdminCompanionImageTester = () => {
@@ -64,11 +64,13 @@ export const AdminCompanionImageTester = () => {
   const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
   const [selectedPreviewStage, setSelectedPreviewStage] = useState<number | null>(null);
 
-  const getGenerationMode = (stage: number, hasPreviousImage: boolean): "text-to-image" | "image-to-image" => {
+  // All stages now use T2I, but stages 2-14 extract metadata from previous image
+  const getGenerationMode = (stage: number, hasPreviousImage: boolean): string => {
     // Text-to-image for stages 0, 1, and cosmic stages 15-20
-    if (stage <= 1 || stage >= 15) return "text-to-image";
-    // Image-to-image for stages 2-14 when previous image exists
-    return hasPreviousImage ? "image-to-image" : "text-to-image";
+    if (stage <= 1) return "Text-to-Image (Egg Stage)";
+    if (stage >= 15) return "Text-to-Image (Cosmic Stage)";
+    // Stages 2-14 use T2I but extract visual metadata from previous image for consistency
+    return hasPreviousImage ? "Text-to-Image (with Visual Metadata)" : "Text-to-Image (No Reference)";
   };
 
   const estimateGenerationTime = (stagesCount: number) => {

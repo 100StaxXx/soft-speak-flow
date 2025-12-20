@@ -403,17 +403,31 @@ serve(async (req) => {
     if (!stageName) throw new Error(`Invalid stage: ${stage}`);
 
     // ========================================================================
-    // IMAGE-TO-IMAGE FOR STAGES 2-14 ONLY (Smart I2I Logic)
-    // Cosmic stages 15-20 use text-to-image for dramatic transformations
+    // VISUAL METADATA EXTRACTION FOR CONSISTENCY (Stages 2-14)
+    // Instead of I2I (too similar), we analyze the previous image and inject
+    // the extracted visual metadata into the T2I prompt for consistency
     // ========================================================================
-    let useImageToImage = false;
     let previousImageUrl: string | null = null;
+    let extractedMetadata: {
+      primaryColor: string;
+      eyeColor: string;
+      markings: string;
+      artStyle: string;
+      distinctiveFeatures: string;
+      overallDescription: string;
+    } | null = null;
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }
 
     if (stage >= 2 && stage <= 14) {
       if (previousStageImageUrl) {
         previousImageUrl = previousStageImageUrl;
-        useImageToImage = true;
-        console.log(`Using provided previous stage image for I2I (stage ${stage})`);
+        console.log(`Will extract metadata from provided previous stage image (stage ${stage})`);
       } else if (companionId) {
         const { data: prevEvolution } = await supabase
           .from('companion_evolutions')
@@ -424,8 +438,79 @@ serve(async (req) => {
 
         if (prevEvolution?.image_url) {
           previousImageUrl = prevEvolution.image_url;
-          useImageToImage = true;
-          console.log(`Fetched previous stage ${stage - 1} image for I2I`);
+          console.log(`Fetched previous stage ${stage - 1} image for metadata extraction`);
+        }
+      }
+
+      // Extract visual metadata from previous image using vision API
+      if (previousImageUrl) {
+        try {
+          console.log("Extracting visual metadata from previous stage image...");
+          
+          const analysisPrompt = `Analyze this ${spiritAnimal} creature image and extract visual characteristics.
+          
+Respond ONLY with a valid JSON object (no markdown, no code blocks):
+{
+  "primaryColor": "exact description of the main body/fur color with approximate hex code",
+  "eyeColor": "exact eye color description",
+  "markings": "description of any patterns, spots, stripes, gradients, or unique markings",
+  "artStyle": "description of the rendering style, lighting, mood, and atmosphere",
+  "distinctiveFeatures": "list of unique identifying physical features that define this specific creature",
+  "overallDescription": "one detailed paragraph describing exactly how this creature looks"
+}`;
+
+          const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [{
+                role: "user",
+                content: [
+                  { type: "text", text: analysisPrompt },
+                  { type: "image_url", image_url: { url: previousImageUrl } }
+                ]
+              }]
+            })
+          });
+
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            const analysisText = analysisData.choices?.[0]?.message?.content || "";
+            
+            // Parse the JSON response
+            try {
+              // Remove any markdown code blocks if present
+              let cleanedText = analysisText.trim();
+              if (cleanedText.startsWith("```json")) {
+                cleanedText = cleanedText.slice(7);
+              } else if (cleanedText.startsWith("```")) {
+                cleanedText = cleanedText.slice(3);
+              }
+              if (cleanedText.endsWith("```")) {
+                cleanedText = cleanedText.slice(0, -3);
+              }
+              cleanedText = cleanedText.trim();
+              
+              extractedMetadata = JSON.parse(cleanedText);
+              console.log("Successfully extracted visual metadata:", extractedMetadata);
+            } catch (parseError) {
+              console.warn("Failed to parse metadata JSON, using raw text:", analysisText);
+              // Fallback: use the raw description
+              extractedMetadata = {
+                primaryColor: favoriteColor,
+                eyeColor: eyeColor || favoriteColor,
+                markings: "none specified",
+                artStyle: "stylized digital fantasy art",
+                distinctiveFeatures: spiritAnimal + " features",
+                overallDescription: analysisText.slice(0, 500)
+              };
+            }
+          } else {
+            console.warn("Metadata extraction failed, proceeding without reference");
+          }
+        } catch (metadataError) {
+          console.warn("Error extracting metadata:", metadataError);
         }
       }
     }
@@ -451,52 +536,62 @@ serve(async (req) => {
       // Egg stages
       fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere.`;
 
-    } else if (useImageToImage && previousImageUrl && currentAging) {
-      // Image-to-image with quantified aging (stages 2-14)
-      const agingChanges = previousAging 
-        ? `━━━ AGING MODIFICATIONS (Before → After) ━━━\n• Eyes: ${describeAgingParam('eyes', previousAging.eyes)} → ${describeAgingParam('eyes', currentAging.eyes)}\n• Body: ${describeAgingParam('body', previousAging.body)} → ${describeAgingParam('body', currentAging.body)}\n• Limbs: ${describeAgingParam('limbs', previousAging.limbs)} → ${describeAgingParam('limbs', currentAging.limbs)}\n• Mobility: ${describeAgingParam('mobility', previousAging.mobility)} → ${describeAgingParam('mobility', currentAging.mobility)}\n• Size: ${previousAging.size} → ${currentAging.size}\n• Muscle: ${describeAgingParam('muscle', previousAging.muscle)} → ${describeAgingParam('muscle', currentAging.muscle)}\n• Wings: ${describeAgingParam('wings', previousAging.wings)} → ${describeAgingParam('wings', currentAging.wings)}\n• Element: ${describeAgingParam('element', previousAging.element)} → ${describeAgingParam('element', currentAging.element)}`
-        : `━━━ STAGE 2 HATCHING STATE ━━━\n• Eyes: ${describeAgingParam('eyes', currentAging.eyes)}\n• Body: ${describeAgingParam('body', currentAging.body)}\n• Limbs: ${describeAgingParam('limbs', currentAging.limbs)}\n• Size: ${currentAging.size}`;
-      
+    } else if (extractedMetadata && stage >= 2 && stage <= 14) {
+      // Text-to-image with extracted visual metadata from previous stage
       const categoryRules = stage <= 7 
-        ? "━━━ BABY STAGE RULES ━━━\n- Keep BABY/INFANT appearance\n- NO muscle, round soft adorable\n- 'Spot the difference' - minimal change"
+        ? "━━━ BABY STAGE RULES ━━━\n- Keep BABY/INFANT appearance\n- NO muscle, round soft adorable\n- Proportions should be youthful"
         : stage <= 12 
-        ? "━━━ ADOLESCENT/ADULT RULES ━━━\n- Creature maturing physically\n- Growing athletic and capable\n- Maintain core identity"
+        ? "━━━ ADOLESCENT/ADULT RULES ━━━\n- Creature maturing physically\n- Growing athletic and capable\n- More defined features"
         : "━━━ MYTHIC RULES ━━━\n- Transcending normal limits\n- Subtle magical enhancements\n- Elemental power visible";
 
-      fullPrompt = `IMAGE AGING INSTRUCTION - EVOLVE THE CREATURE
+      fullPrompt = `STYLIZED FANTASY CREATURE - Text-to-image with Visual Reference
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-I am providing an image of a Stage ${stage - 1} ${spiritAnimal}.
-Age/evolve this creature to Stage ${stage} (${stageName}) using these EXACT modifications:
+Generate a Stage ${stage} (${stageName}) ${spiritAnimal} that MATCHES this visual reference:
 
-${agingChanges}
+━━━ VISUAL REFERENCE FROM PREVIOUS STAGE ━━━
+${extractedMetadata.overallDescription}
+
+━━━ COLORS TO MATCH EXACTLY ━━━
+• Primary Body Color: ${extractedMetadata.primaryColor}
+• Eye Color: ${extractedMetadata.eyeColor}
+• Markings/Patterns: ${extractedMetadata.markings}
+
+━━━ ART STYLE TO MAINTAIN ━━━
+${extractedMetadata.artStyle}
+
+━━━ DISTINCTIVE FEATURES TO PRESERVE ━━━
+${extractedMetadata.distinctiveFeatures}
 
 ${categoryRules}
 
-━━━ ABSOLUTELY LOCKED (NO CHANGE) ━━━
-✓ Body Color: KEEP EXACT ${favoriteColor}
-✓ Eye Color: KEEP EXACT ${eyeColor || favoriteColor}
-✓ Fur/Scale Color: KEEP EXACT ${furColor || favoriteColor}
-✓ Species: Still a ${spiritAnimal}
-✓ Art Style: Same digital painting style
-✓ Face Structure: Same facial features
-✓ Unique Markings: Preserve any patterns
-
-━━━ SELF-VERIFICATION CHECKLIST ━━━
-□ Colors match EXACTLY - no drift
-□ Limb count is EXACTLY ${anatomy.limbCount}
-□ ${anatomy.hasWings ? 'Wings present and appropriate size' : 'NO wings added'}
-□ Still recognizable as same creature
-□ Only applied the listed percentage changes
-
 ${characterDNA}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVOLUTION STAGE ${stage}: ${stageName}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${stagePrompt}
+
+${storyToneStyle}
 ${elementOverlay}
+${retryEnforcement}
 ${negativePrompts}
 
-CRITICAL: Same creature, slightly older/more developed. Colors IDENTICAL.`;
+━━━ SELF-VERIFICATION CHECKLIST ━━━
+□ Colors MATCH the reference description above
+□ Limb count is EXACTLY ${anatomy.limbCount}
+□ ${anatomy.hasWings ? 'Wings present' : 'NO wings'} - correct
+□ Recognizable as the SAME creature, just older/more developed
+□ Art style matches the reference
+
+━━━ RENDERING STYLE ━━━
+Stylized digital fantasy art, appealing and charming, expressive features.
+Match the art style described in the reference.
+Painterly digital art with rich saturated colors, soft but defined edges.`;
 
     } else {
-      // Text-to-image (egg stages, cosmic stages 15-20, or when no previous image)
+      // Text-to-image (egg stages, cosmic stages 15-20, or when no previous image/metadata)
       fullPrompt = `STYLIZED FANTASY CREATURE - Digital painting, game art quality
 
 ${characterDNA}
@@ -525,21 +620,12 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
     }
 
     // ========================================================================
-    // CALL AI FOR IMAGE GENERATION
+    // CALL AI FOR IMAGE GENERATION (always T2I now)
     // ========================================================================
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
-    }
+    console.log(`Calling AI for T2I generation (stage ${stage}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
 
-    console.log(`Calling AI for ${useImageToImage ? 'I2I' : 'T2I'} generation...`);
-
-    const messageContent = useImageToImage && previousImageUrl
-      ? [{ type: "text", text: fullPrompt }, { type: "image_url", image_url: { url: previousImageUrl } }]
-      : fullPrompt;
+    const messageContent = fullPrompt;
 
     let aiResponse;
     try {
