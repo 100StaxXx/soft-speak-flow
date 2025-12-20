@@ -361,80 +361,159 @@ export const CalendarDayView = ({
       )}
 
       {/* Timeline */}
-      <ScrollArea className={cn("rounded-lg border border-border", fullDayMode ? "h-full" : "max-h-[520px] min-h-[320px]")}>
-        <div className="relative">
-          {timeSlots.map(({ hour, minute }, index) => {
-            const slotTasks = getTasksForTimeSlot(hour, minute);
-            const isHourMark = minute === 0;
-            const time24 = formatTime24(hour, minute);
+      {fullDayMode ? (
+        // No ScrollArea in fullDayMode - let parent modal handle scrolling
+        <div className="rounded-lg border border-border">
+          <div className="relative">
+            {timeSlots.map(({ hour, minute }, index) => {
+              const slotTasks = getTasksForTimeSlot(hour, minute);
+              const isHourMark = minute === 0;
+              const time24 = formatTime24(hour, minute);
 
-            return (
-              <div
-                key={`${hour}-${minute}`}
-                className={cn(
-                  "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
-                  isHourMark && "border-t border-border"
-                )}
-                style={{ minHeight: '60px' }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const taskId = e.dataTransfer.getData('taskId');
-                  playSound('complete');
-                  onTaskDrop(taskId, selectedDate, time24);
-                  setDraggedTask(null);
-                }}
-                onTouchStart={() => handleTouchStart(hour, minute)}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={() => handleTouchStart(hour, minute)}
-                onMouseUp={handleTouchEnd}
-                onMouseLeave={handleTouchEnd}
-              >
-                {/* Time Label */}
-                <div className={cn(
-                  "flex-shrink-0 w-20 p-2 text-xs font-medium",
-                  isHourMark ? "text-foreground" : "text-muted-foreground/60"
-                )}>
-                  {isHourMark && formatTimeSlot(hour, minute)}
-                </div>
-
-                {/* Task Area */}
-                <div className="flex-1 p-2 relative">
-                  {slotTasks.length === 0 ? (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs text-muted-foreground">
-                      <Plus className="h-3 w-3" />
-                      <span>Long press to add quest</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {slotTasks.map(task => (
-                        <div
-                          key={task.id}
-                          style={{
-                            height: `${calculateTaskHeight(task.estimated_duration)}px`,
-                            minHeight: '60px'
-                          }}
-                        >
-                          <QuestDragCard
-                            task={task}
-                            isDragging={draggedTask === task.id}
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('taskId', task.id);
-                              setDraggedTask(task.id);
-                              playSound('pop');
-                            }}
-                            showTime
-                          />
-                        </div>
-                      ))}
-                    </div>
+              return (
+                <div
+                  key={`${hour}-${minute}`}
+                  className={cn(
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
+                    isHourMark && "border-t border-border"
                   )}
+                  style={{ minHeight: '60px' }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const taskId = e.dataTransfer.getData('taskId');
+                    playSound('complete');
+                    onTaskDrop(taskId, selectedDate, time24);
+                    setDraggedTask(null);
+                  }}
+                  onTouchStart={() => handleTouchStart(hour, minute)}
+                  onTouchEnd={handleTouchEnd}
+                  onMouseDown={() => handleTouchStart(hour, minute)}
+                  onMouseUp={handleTouchEnd}
+                  onMouseLeave={handleTouchEnd}
+                >
+                  {/* Time Label */}
+                  <div className={cn(
+                    "flex-shrink-0 w-20 p-2 text-xs font-medium",
+                    isHourMark ? "text-foreground" : "text-muted-foreground/60"
+                  )}>
+                    {isHourMark && formatTimeSlot(hour, minute)}
+                  </div>
+
+                  {/* Task Area */}
+                  <div className="flex-1 p-2 relative">
+                    {slotTasks.length === 0 ? (
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs text-muted-foreground">
+                        <Plus className="h-3 w-3" />
+                        <span>Long press to add quest</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {slotTasks.map(task => (
+                          <div
+                            key={task.id}
+                            style={{
+                              height: `${calculateTaskHeight(task.estimated_duration)}px`,
+                              minHeight: '60px'
+                            }}
+                          >
+                            <QuestDragCard
+                              task={task}
+                              isDragging={draggedTask === task.id}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('taskId', task.id);
+                                setDraggedTask(task.id);
+                                playSound('pop');
+                              }}
+                              showTime
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </ScrollArea>
+      ) : (
+        // Normal view with ScrollArea
+        <ScrollArea className="rounded-lg border border-border max-h-[520px] min-h-[320px]">
+          <div className="relative">
+            {timeSlots.map(({ hour, minute }, index) => {
+              const slotTasks = getTasksForTimeSlot(hour, minute);
+              const isHourMark = minute === 0;
+              const time24 = formatTime24(hour, minute);
+
+              return (
+                <div
+                  key={`${hour}-${minute}`}
+                  className={cn(
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
+                    isHourMark && "border-t border-border"
+                  )}
+                  style={{ minHeight: '60px' }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const taskId = e.dataTransfer.getData('taskId');
+                    playSound('complete');
+                    onTaskDrop(taskId, selectedDate, time24);
+                    setDraggedTask(null);
+                  }}
+                  onTouchStart={() => handleTouchStart(hour, minute)}
+                  onTouchEnd={handleTouchEnd}
+                  onMouseDown={() => handleTouchStart(hour, minute)}
+                  onMouseUp={handleTouchEnd}
+                  onMouseLeave={handleTouchEnd}
+                >
+                  {/* Time Label */}
+                  <div className={cn(
+                    "flex-shrink-0 w-20 p-2 text-xs font-medium",
+                    isHourMark ? "text-foreground" : "text-muted-foreground/60"
+                  )}>
+                    {isHourMark && formatTimeSlot(hour, minute)}
+                  </div>
+
+                  {/* Task Area */}
+                  <div className="flex-1 p-2 relative">
+                    {slotTasks.length === 0 ? (
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs text-muted-foreground">
+                        <Plus className="h-3 w-3" />
+                        <span>Long press to add quest</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {slotTasks.map(task => (
+                          <div
+                            key={task.id}
+                            style={{
+                              height: `${calculateTaskHeight(task.estimated_duration)}px`,
+                              minHeight: '60px'
+                            }}
+                          >
+                            <QuestDragCard
+                              task={task}
+                              isDragging={draggedTask === task.id}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('taskId', task.id);
+                                setDraggedTask(task.id);
+                                playSound('pop');
+                              }}
+                              showTime
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      )}
 
       {/* Completed Today Section */}
       {getCompletedTasks().length > 0 && (
