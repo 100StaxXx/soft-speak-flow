@@ -2,15 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
-import { retryWithBackoff } from "@/utils/retry";
-import type { ApplyReferralCodeResult, ApplyReferralCodeArgs } from "@/types/referral-functions";
 
-interface ReferralCodeData {
-  id: string;
-  code: string;
-  owner_type: "user" | "influencer";
-  owner_user_id: string | null;
-  is_active: boolean;
+// Secure response type from apply_referral_code_secure RPC
+interface ApplyReferralResult {
+  success: boolean;
+  message: string;
 }
 
 export const useReferrals = () => {
@@ -82,69 +78,33 @@ export const useReferrals = () => {
     },
   });
 
-  // Apply referral code
+  // Apply referral code - uses secure server-side RPC
   const applyReferralCode = useMutation({
     mutationFn: async (code: string) => {
       if (!user) throw new Error("User not authenticated");
 
       const normalizedCode = code.trim().toUpperCase();
 
-      // Validate code using secure RPC function (prevents full table scans)
-      const { data: codeResults, error: codeError } = await supabase
-        .rpc("validate_referral_code", { p_code: normalizedCode });
+      // SECURITY FIX: Use secure RPC that handles everything server-side
+      // This RPC validates the code, checks for self-referral, and applies it
+      // without ever exposing owner_user_id or other sensitive data to the client
+      const { data: result, error } = await (supabase.rpc as Function)(
+        "apply_referral_code_secure",
+        { p_user_id: user.id, p_referral_code: normalizedCode }
+      );
+
+      if (error) {
+        console.error("Error applying referral code:", error);
+        throw new Error("Unable to apply referral code. Please try again.");
+      }
+
+      const applyResult = (result?.[0] || result) as ApplyReferralResult | undefined;
       
-      const codeData = (codeResults?.[0] as ReferralCodeData | undefined) || null;
-
-      if (codeError) {
-        console.error("Error fetching referral code:", codeError);
-        throw new Error("Unable to validate referral code. Please try again.");
-      }
-      
-      if (!codeData) {
-        throw new Error("Invalid referral code");
+      if (!applyResult?.success) {
+        throw new Error(applyResult?.message || "Failed to apply referral code");
       }
 
-      // Prevent self-referral for user codes
-      if (codeData.owner_type === "user" && codeData.owner_user_id === user.id) {
-        throw new Error("Cannot use your own referral code");
-      }
-
-      if (codeData.owner_type === "user") {
-        if (!codeData.owner_user_id) {
-          throw new Error("Referral code is missing owner information");
-        }
-
-        // Type assertion needed: apply_referral_code_atomic is a custom RPC not in generated types
-        const rpcArgs: ApplyReferralCodeArgs = {
-          p_user_id: user.id,
-          p_referrer_id: codeData.owner_user_id,
-          p_referral_code: normalizedCode,
-        };
-        const { data: applyResult, error: applyError } = await (supabase.rpc as Function)(
-          "apply_referral_code_atomic",
-          rpcArgs
-        );
-
-        if (applyError) {
-          console.error("Failed to apply referral code atomically:", applyError);
-          throw new Error("Failed to apply referral code. Please try again.");
-        }
-
-        const typedResult = applyResult as unknown as ApplyReferralCodeResult | null;
-        if (!typedResult?.success) {
-          throw new Error(typedResult?.message ?? "Failed to apply referral code");
-        }
-      }
-
-      // Update profile with referred_by_code for payout tracking
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ referred_by_code: normalizedCode })
-        .eq("id", user.id);
-
-      if (updateError) throw updateError;
-
-      return codeData;
+      return { success: true };
     },
     onSuccess: () => {
       // Invalidate queries to trigger refetch (UI updates asynchronously)
